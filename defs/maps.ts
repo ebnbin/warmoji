@@ -259,7 +259,7 @@ export const MAPS = {
   oldRuins: {
     emoji: '1f3da',
     name: '残垣（旧）',
-    desc: '断壁残垣的废墟回廊——墙挡人、挡弹、也挡视线；靠掩体、卡口与探头作战',
+    desc: '断壁残垣的废墟回廊——墙挡人、挡弹、也挡视线，墙后的敌人只剩淡影；靠掩体、卡口与探头作战',
     kind: 'oldRuins',
     stamina: { exertion: 0.6, regen: 1 },
     palette: {
@@ -281,7 +281,7 @@ export const MAPS = {
   ruins: {
     emoji: '1f3da',
     name: '残垣',
-    desc: '山顶台地上一座塌了大半的石砌院落：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少——高过膝盖挡人，高过胸口挡子弹，高过眼睛挡视线，看不见的敌人不会被自动瞄准；矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
+    desc: '山顶台地上一座塌了大半的石砌院落：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少——高过膝盖挡人，高过胸口挡子弹，高过眼睛挡视线，看不见的敌人不会被自动瞄准，只剩一道淡影；跨得过的残基贴着地面，挡路的墙露出一截立面，越高露得越多。矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
     kind: 'ruins',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
@@ -301,20 +301,20 @@ export const MAPS = {
     ruins: {
       meterPerU: 0.5,
       cellU: 0.25,
-      site: { marginU: [3.2, 5.4], waveU: 7, padU: 2.5, neckU: 0.8 },
+      site: { marginU: [2.6, 4.8], waveU: 7, padU: 2.5, neckU: 0.8 },
       plan: {
         tiltDeg: [8, 24],
         garthU: [6, 8],
-        walkU: 2.4,
+        walkU: 3.2,
         depthU: [6.5, 8],
         roomU: [6, 10],
-        doorU: [2, 2.6],
+        doorU: [2.4, 3],
         gates: [2, 4],
         loops: 0.3,
         wallU: { outer: 1.5, inner: 1, tower: 1.75, parapet: 0.75 },
       },
-      masonry: { courseM: 0.28, density: 2200, bond: 1, heightM: { outer: [4.2, 5.6], inner: [3, 4.2], tower: [7, 9], parapet: 0.84, column: 3.4 } },
-      arcade: { radiusU: 0.42, spacingU: 2.8, entries: [1, 1] },
+      masonry: { courseM: 0.28, density: 2200, bond: 2, heightM: { outer: [4.2, 5.6], inner: [3, 4.2], tower: [7, 9], parapet: 0.84, column: 3.4 } },
+      arcade: { radiusU: 0.4, spacingU: 2.9, entries: [1, 1] },
       decay: { waveU: 6, keep: [0.1, 1], razed: [2, 4], razeU: [1.6, 3], breaches: [2, 4], breachM3: [0.6, 1.6], broken: 0.35, fallen: 0.2, rubble: 0.06 },
       timber: { doors: [1, 3], heightM: 1.9, thickU: 0.3 },
       rubble: { reposeDeg: 36, fullM: 0.4, viscosity: 1.6, exertion: 0.5 },
@@ -322,6 +322,7 @@ export const MAPS = {
       dust: { perM3: 6, spreadU: 2.5, halfLifeS: 2.5, opaqueTau: 1.2 },
       trees: { crownU: [1.3, 2.4], heightM: [6, 11], gapU: 2.6 },
       bodyCapU: 0.8,
+      gapU: 2,
       reflowMs: 150,
     },
     boss: 'rhino',
@@ -714,7 +715,7 @@ export const MAPS = {
   cave: {
     emoji: '1f987',
     name: '溶洞',
-    desc: '一座部分露天的石灰岩溶洞。阳光从洞顶的天窗照进来，随太阳东升西落：白天整个洞厅亮堂，看得到大半个洞；黄昏光柱变红、爬上洞壁，洞里一点点暗下来；入夜后只看得清火把照亮的那一圈。怪物只从暗处出来：白天从深处的支洞里，夜里可能就在火光外不远处。石柱与大石笋挡人也挡子弹，水潭里蹚水更慢',
+    desc: '一座部分露天的石灰岩溶洞。阳光从洞顶的天窗照进来，随太阳东升西落：白天整个洞厅亮堂，看得到大半个洞；黄昏光柱变红、爬上洞壁，洞里一点点暗下来；入夜后只看得清火把照亮的那一圈。怪物只从暗处出来：白天从深处的支洞里，夜里可能就在火光外不远处。石柱与大石笋挡人也挡子弹，被它们挡住的敌人只剩淡影，水潭里蹚水更慢',
     kind: 'cave',
     size: { w: 40, h: 40 },
     stamina: { exertion: 0.5, regen: 1 },

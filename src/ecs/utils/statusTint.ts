@@ -1,4 +1,4 @@
-import { MARK, Motion, Tint, TRANSIT } from '../components'
+import { MARK, Motion, Seen, Tint, TRANSIT, Uid } from '../components'
 import { hasMark, inTransit, isAirborne, isHidden } from './marks'
 import type { Sim } from '../sim'
 
@@ -19,14 +19,21 @@ const TINTS: readonly (readonly [number, number])[] = [
 const REALM_TINT = 0x9575cd
 
 const STREAK_ALPHA = 0.5
+/** 看不见的身体只剩这么淡的影子 */
+const UNSEEN_ALPHA = 0.35
 
 /** 存在感：隐身穿行的看不见，残影穿行的半透明，被吞的几乎看不见，碰不到的半透明，看不见的只剩淡影 */
 export function presence(sim: Sim, eid: number): number {
   if (inTransit(eid)) return Motion.look[eid] === TRANSIT.hidden ? 0 : STREAK_ALPHA
   if (hasMark(sim, eid, MARK.devoured)) return 0.1
-  if (isHidden(sim, eid)) return 0.35
+  if (isHidden(sim, eid)) return UNSEEN_ALPHA
   if (hasMark(sim, eid, MARK.untargetable)) return 0.5
   return 1
+}
+
+/** 队伍里谁也看不见的敌人（被挡视线的障碍挡住）和隐身的一样只剩淡影，看见与看不见之间渐变；还没判断过的照常画 */
+export function shownToTeam(eid: number): number {
+  return Seen.uid[eid] === Uid.v[eid] ? UNSEEN_ALPHA + (1 - UNSEEN_ALPHA) * Seen.v[eid]! : 1
 }
 
 /** 挂在身体上的东西随宿主显隐的那一份：宿主画出来多透明，它就多透明 */

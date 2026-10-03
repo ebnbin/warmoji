@@ -82,6 +82,9 @@ export const Breath = { phase: f32() }
 
 export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f32() }
 
+/** 敌人在队伍眼里看不看得见：v 是渐变后的程度（0 看不见、1 看得见），want 是上一次判断的结果，at 是下一次判断的时刻；uid 对不上就是换了实体，还没判断过 */
+export const Seen = { v: f32(), want: u8(), at: f32(), uid: u32() }
+
 export const Alive = { v: u8() }
 
 export const CharScale = { v: f32() }

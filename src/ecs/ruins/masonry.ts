@@ -24,7 +24,7 @@ export interface Structure {
 
 /**
  * 砌体此刻的样子：每格剩几层石块、属于哪一处（0 是空地，否则是 structures 的序号加一）、封着几层高的木板、地上的碎石多深（米）。
- * 一层石块高 courseM 米，一格边长 cellM 米；同一处相邻两格最多差 bond 层才立得住；碎石按休止角的正切堆
+ * 一层石块高 courseM 米，一格边长 cellM 米；同一处砌体里横竖相隔 bond 格以内的两格最多差一层才立得住；碎石按休止角的正切堆
  */
 export interface Masonry {
   readonly grid: Grid
@@ -165,21 +165,25 @@ export function carve(m: Masonry, k: Strength, u: number, v: number, z: number, 
   return used
 }
 
-/** 同一处砌体里比相邻格高出 bond 层以上的那截立不住，塌到只高 bond 层，一路传开；塌下来的记进 out */
+/** 同一处砌体里比横竖 bond 格以内的哪一格高出一层以上的那截立不住，塌到只比它高一层，一路传开；塌下来的记进 out */
 export function relax(m: Masonry, seeds: readonly number[], out: Fall[]): void {
   const { cols, rows } = m.grid
   const n = m.n
   const sid = m.sid
   const hc = m.courseM
   const area = m.cellM * m.cellM
+  const reach = m.bond
   const stack: number[] = []
   const push = (i: number): void => {
     const ci = i % cols
+    const cj = (i - ci) / cols
     stack.push(i)
-    if (ci > 0) stack.push(i - 1)
-    if (ci < cols - 1) stack.push(i + 1)
-    if (i >= cols) stack.push(i - cols)
-    if (i < cols * (rows - 1)) stack.push(i + cols)
+    for (let d = 1; d <= reach; d++) {
+      if (ci >= d) stack.push(i - d)
+      if (ci + d < cols) stack.push(i + d)
+      if (cj >= d) stack.push(i - d * cols)
+      if (cj + d < rows) stack.push(i + d * cols)
+    }
   }
   for (const i of seeds) push(i)
   while (stack.length > 0) {
@@ -187,11 +191,14 @@ export function relax(m: Masonry, seeds: readonly number[], out: Fall[]): void {
     const s = sid[i]!
     if (s === 0 || n[i] === 0) continue
     const ci = i % cols
+    const cj = (i - ci) / cols
     let low = n[i]!
-    if (ci > 0 && sid[i - 1] === s) low = Math.min(low, n[i - 1]! + m.bond)
-    if (ci < cols - 1 && sid[i + 1] === s) low = Math.min(low, n[i + 1]! + m.bond)
-    if (i >= cols && sid[i - cols] === s) low = Math.min(low, n[i - cols]! + m.bond)
-    if (i < cols * (rows - 1) && sid[i + cols] === s) low = Math.min(low, n[i + cols]! + m.bond)
+    for (let d = 1; d <= reach; d++) {
+      if (ci >= d && sid[i - d] === s) low = Math.min(low, n[i - d]! + 1)
+      if (ci + d < cols && sid[i + d] === s) low = Math.min(low, n[i + d]! + 1)
+      if (cj >= d && sid[i - d * cols] === s) low = Math.min(low, n[i - d * cols]! + 1)
+      if (cj + d < rows && sid[i + d * cols] === s) low = Math.min(low, n[i + d * cols]! + 1)
+    }
     if (low >= n[i]!) continue
     out.push({ i, z0: low * hc, z1: n[i]! * hc, volume: (n[i]! - low) * hc * area, timber: false })
     n[i] = low

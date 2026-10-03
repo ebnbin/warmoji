@@ -700,7 +700,7 @@ export interface RuinsConfig {
       readonly parapet: number
     }
   }
-  /** 砌体：一层石块高 courseM 米、密度（千克/米³）；同一处相邻两格最多差 bond 层才立得住；原本多高（米）：外墙、内墙、塔楼、柱廊的矮墙与石柱 */
+  /** 砌体：一层石块高 courseM 米、密度（千克/米³）；同一处砌体里横竖相隔 bond 格以内的两格最多差一层才立得住；原本多高（米）：外墙、内墙、塔楼、柱廊的矮墙与石柱 */
   readonly masonry: {
     readonly courseM: number
     readonly density: number
@@ -767,6 +767,8 @@ export interface RuinsConfig {
   }
   /** 撞墙时身体的半径最多按这么大算（格）：大个子也挤得过门洞 */
   readonly bodyCapU: number
+  /** 门洞、柱间与开局时墙上塌出的缺口最窄多宽（格）：塌出来更窄的缺口补回刚好挡人的高度 */
+  readonly gapU: number
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
 }

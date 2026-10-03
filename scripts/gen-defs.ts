@@ -31,7 +31,8 @@ import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
 import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
-import { ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
+import { makeMasonry, ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
+import { bodyField } from '../src/ecs/ruins/masonry.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
 import { UNIT } from '../src/util/units.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
@@ -513,8 +514,8 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
 
 /**
  * 残垣：参数说得通；砌体的层高把挡人、挡弹、挡视线分开——总有几层高的墙只挡标准身体、几层只挡身体和平射；原本的墙与石柱高过眼睛，
- * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞放得下压过半径的大个子。抽一批种子生成：能走的地方约有标准的 32×32 那么大，
- * 从回廊院走得到台地上几乎所有能走的地方
+ * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：能走的地方约有标准的 32×32 那么大，
+ * 从回廊院走得到台地上几乎所有能走的地方，标准身体走得过的通道大个子也都走得过
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'ruins') === (m.ruins !== undefined), `maps.${id} 是残垣当且仅当写了 ruins`)
@@ -534,18 +535,20 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const W = p.wallU
   need(r.meterPerU > 0 && r.cellU > 0 && r.cellU <= 0.5, `${at} 的米每格须为正，砌体格子在 (0, 0.5] 格内`)
   need(pos(site.marginU) && site.waveU > 0 && site.padU > 0 && site.neckU > 0, `${at}.site 的边距、波长、山坡与窄缝须为正`)
+  need(site.marginU[0] >= 2 * r.bodyCapU && site.neckU >= r.bodyCapU, `${at}.site 台地边离院落外框须放得下按 bodyCapU 算的大个子，填掉的窄缝也不窄于他`)
   need(span(p.tiltDeg) && p.tiltDeg[0] >= 0 && p.tiltDeg[1] <= 45, `${at}.plan.tiltDeg 须在 0 到 45 度之间`)
-  need(pos(p.garthU) && p.walkU >= 1.5 && pos(p.depthU) && pos(p.roomU) && pos(p.doorU) && ints(p.gates) && p.loops >= 0 && p.loops <= 1, `${at}.plan 的尺寸须为正、回廊至少 1.5 格宽，门的道数是非负整数，多开门的概率在 [0, 1] 内`)
+  need(pos(p.garthU) && pos(p.depthU) && pos(p.roomU) && pos(p.doorU) && ints(p.gates) && p.loops >= 0 && p.loops <= 1, `${at}.plan 的尺寸须为正，门的道数是非负整数，多开门的概率在 [0, 1] 内`)
+  need(p.walkU - W.inner / 2 - Math.max(W.parapet / 2, a.radiusU) >= 2 * r.bodyCapU, `${at}.plan.walkU 去掉内墙、矮墙与石柱后须放得下按 bodyCapU 算的大个子`)
   need(W.outer > 0 && W.inner > 0 && W.tower >= W.outer && W.parapet > 0, `${at}.plan.wallU 的墙厚须为正，塔楼的墙不比外墙薄`)
   need(p.depthU[0] - W.outer - W.inner / 2 >= 3, `${at}.plan.depthU 去掉墙厚后房间至少 3 格深`)
   need(p.roomU[0] - W.inner - 1 >= p.doorU[1], `${at}.plan.roomU 最短的开间也放得下最宽的门洞`)
-  need(r.bodyCapU > 0 && p.doorU[0] >= 2 * r.bodyCapU, `${at}.plan.doorU 最窄的门洞须放得下按 bodyCapU 算的大个子`)
+  need(r.bodyCapU > 0 && r.gapU >= 2 * r.bodyCapU && p.doorU[0] >= r.gapU, `${at}.gapU 须放得下按 bodyCapU 算的大个子，最窄的门洞也不窄于 gapU`)
   need(pos(ms.heightM.outer) && pos(ms.heightM.inner) && pos(ms.heightM.tower) && ms.density > 0 && Number.isInteger(ms.bond) && ms.bond >= 1, `${at}.masonry 的高度与密度须为正，bond 是正整数`)
   need(hc > 0 && Math.floor(flatM / hc) > Math.floor(stepM / hc) && Math.floor(eyeM / hc) > Math.floor(flatM / hc), `${at}.masonry.courseM 须让标准身体跨得过的、平射飞得过的与眼睛看得过的墙各差至少一层`)
   need(Math.min(ms.heightM.outer[0], ms.heightM.inner[0], ms.heightM.tower[0], ms.heightM.column) > eyeM, `${at}.masonry 原本的墙与石柱须高过标准身体的眼睛`)
   const parapet = Math.round(ms.heightM.parapet / hc) * hc
   need(parapet > stepM && parapet <= flatM, `${at}.masonry.heightM.parapet 砌成 ${parapet.toFixed(2)} 米，须挡得住标准身体、挡不住平射`)
-  need(a.radiusU > 0 && a.spacingU - 2 * a.radiusU >= 1.5 && ints(a.entries) && a.entries[0] >= 1, `${at}.arcade 的柱间须至少 1.5 格宽，每边至少一个入口：队伍从回廊院出发`)
+  need(a.radiusU > 0 && a.spacingU - 2 * a.radiusU >= r.gapU && ints(a.entries) && a.entries[0] >= 1, `${at}.arcade 的柱间须不窄于 gapU，每边至少一个入口：队伍从回廊院出发`)
   need(p.garthU[0] >= 2 * a.spacingU, `${at}.plan.garthU 须放得下每边至少两个柱间`)
   need(d.waveU > 0 && d.keep[0] >= 0 && d.keep[1] <= 1 && span(d.keep) && ints(d.razed) && pos(d.razeU) && ints(d.breaches) && pos(d.breachM3), `${at}.decay 的波长、保留比例、拆毁与破坏须合理`)
   need(d.broken >= 0 && d.fallen >= 0 && d.broken + d.fallen <= 1 && d.rubble >= 0 && d.rubble <= 1, `${at}.decay 的石柱折断与倒下的比例加起来不超过 1，留下的碎石比例在 [0, 1] 内`)
@@ -560,7 +563,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const level = Math.floor(stepM / hc)
   for (let k = 0; k < 6; k++) {
     const seed = k * 7919 + 17
-    const plan = ruinsPlan(r, strength, seed)
+    const plan = ruinsPlan(r, { strength, walk: level, bodyU: B.refRadiusU }, seed)
     const b = plan.basin
     let open = 0
     for (let i = 0; i < b.room.length; i++) if (b.room[i]! > 0) open++
@@ -599,6 +602,41 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     }
     const total = walk.reduce((s0, x) => s0 + x, 0)
     need(reached >= total * 0.9, `${at} 种子 ${seed} 从回廊院只走得到 ${Math.round((reached / total) * 100)}% 能走的地方`)
+    // 窄口：从回廊院出发标准身体站得下的地方里，大个子站得下的连成一片，挡人的东西之间也没有只放得过标准身体的缝（差半格算格子的误差）
+    const room = bodyField(makeMasonry(r, g, plan.structures, plan.n, plan.sid, plan.timber, plan.rubble), level)
+    const flood = (ok: (i: number) => boolean, from: number, mark: Uint8Array, eight: boolean): boolean => {
+      let edge = false
+      const todo = [from]
+      mark[from] = 1
+      while (todo.length > 0) {
+        const i = todo.pop()!
+        const ci = i % g.cols
+        const cj = (i - ci) / g.cols
+        if (ci === 0 || cj === 0 || ci === g.cols - 1 || cj === g.rows - 1) edge = true
+        for (let dj = -1; dj <= 1; dj++) {
+          for (let di = -1; di <= 1; di++) {
+            const x = ci + di
+            const y = cj + dj
+            if ((di === 0 && dj === 0) || (!eight && di !== 0 && dj !== 0) || x < 0 || y < 0 || x >= g.cols || y >= g.rows) continue
+            const j = y * g.cols + x
+            if (mark[j] || !ok(j)) continue
+            mark[j] = 1
+            todo.push(j)
+          }
+        }
+      }
+      return edge
+    }
+    const parts = (ok: (i: number) => boolean, eight: boolean, inner: boolean): number => {
+      const mark = new Uint8Array(walk.length)
+      let n = 0
+      for (let i = 0; i < walk.length; i++) if (!mark[i] && ok(i) && !(flood(ok, i, mark, eight) && inner)) n++
+      return n
+    }
+    const stand = new Uint8Array(walk.length)
+    if (room[start]! >= B.refRadiusU) flood((i) => room[i]! >= B.refRadiusU, start, stand, false)
+    const big = (i: number): boolean => stand[i] === 1 && room[i]! >= r.bodyCapU - g.cell / 2
+    need(parts(big, false, false) === 1 && parts((i) => stand[i] === 0, true, true) === parts((i) => !big(i), true, true), `${at} 种子 ${seed} 有标准身体走得过、按 bodyCapU 算的大个子走不过的窄口`)
   }
 }
 

@@ -12,15 +12,13 @@ import { browserStorage } from '../../util/storage'
 import { spawnDecor } from '../entities/decor'
 import { Alive, Transform } from '../components'
 import { devFlag } from '../../devtools'
-import { OBSTACLES } from '../../data/obstacles'
-import { eyeM } from '../utils/pass'
 import { roomAt } from '../worlds/basin'
 import { CANOPY_PPU, PAINT_PAD_U, textureSize } from './ground'
 import { toLocal, toWorld } from './layout'
 import { cellAt, GRAVITY } from './masonry'
 import { RuinsPainter } from './painter'
-import { drawChip, drawDust, drawPigeon, drawSplinter, SIGHT_BINS, SIGHT_FRAG, SIGHT_RANGE_U, sightRing } from './shader'
-import { fieldOf, levelFor, ruinsOf, ruinsPlanFor } from './world'
+import { drawChip, drawDust, drawPigeon, drawSplinter } from './sprites'
+import { fieldOf, ruinsOf, ruinsPlanFor, walkLevel } from './world'
 import type { PaintPiece, PaintScene, PaintState } from './ground'
 import type { RuinsPlan } from './layout'
 import type { PaintTask } from './painter'
@@ -33,7 +31,6 @@ import type { Point } from '../../util/vec'
 const BG = 0x15120d
 const GROUND_KEY = 'ruins-ground'
 const CANOPY_KEY = 'ruins-canopy'
-const SIGHT_KEY = 'ruins-sight'
 const DUST_KEY = 'ruins-dust'
 const CHIP_KEY = 'ruins-chip'
 const SPLINTER_KEY = 'ruins-splinter'
@@ -47,14 +44,10 @@ const STRIP_PX = 64
 const TILE_PX = 64
 /** 两批补画之间至少隔这么久，毫秒 */
 const REPAINT_MS = 200
-/** 压在看不见的地方上的颜色：暗一半，偏冷 */
-const SIGHT_DIM = [0.64, 0.67, 0.76] as const
 /** 风往哪吹，像素/秒：扬尘顺风飘 */
 const WIND = { x: 10, y: -4 }
 /** 抛起的东西高出地面一米，画面上抬起多少像素 */
 const LIFT_PX_PER_M = UNIT * 0.5
-/** 视线环所在的深度：盖在身体之上、树冠之上 */
-const SIGHT_DEPTH = 25
 /** 开发者工具里「显示碰撞边界」的开关 */
 const DEV_WALLS = 'battle.walls'
 /** 鸽子停在多高（米）以上的墙头 */
@@ -123,9 +116,8 @@ function snapshot(s: RuinsState): PaintState {
 }
 
 /**
- * 残垣：地面、墙顶与碎石是线程里按砌体画好的贴图，按太阳投下长长的影子；墙一塌，受影响的那几块按新的砌体补画。
- * 队长看不见的地方由着色器按视线环压暗。塌墙时石块从墙上落下、尘土翻滚、墙头的鸽子惊飞；子弹打在墙上崩出碎石，打在木板上溅起木屑。
- * 台地边外是林子，树冠盖在一切之上
+ * 残垣：地面、墙顶、立面与碎石是线程里按砌体画好的贴图，按太阳投下影子；墙一塌，受影响的那几块按新的砌体补画。
+ * 塌墙时石块从墙上落下、尘土翻滚、墙头的鸽子惊飞；子弹打在墙上崩出碎石，打在木板上溅起木屑。台地边外是林子，树冠盖在一切之上
  */
 export class RuinsView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -133,8 +125,6 @@ export class RuinsView implements MapView {
   private plan?: RuinsPlan
   private painter?: RuinsPainter
   private ground?: { tex: Phaser.Textures.CanvasTexture; seen: Uint8Array; seenT: Uint8Array; dirty: Uint8Array; cols: number; rows: number; busy: boolean }
-  private sight?: { tex: Phaser.Textures.CanvasTexture; img: ImageData }
-  private readonly u = { eye: [0, 0] }
   private repaintAt = 0
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter
   private chips?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -205,7 +195,7 @@ export class RuinsView implements MapView {
     const plan = s.plan
     const cfg = v.def.ruins!
     const scene = v.scene
-    const sc: PaintScene = { cfg, w: plan.w, h: plan.h, frame: plan.frame, grid: plan.grid, structures: plan.structures, sid: plan.sid, spaces: plan.spaces, doors: plan.doors, fallen: plan.fallen, basin: plan.basin, trees: plan.trees, seed: plan.seed }
+    const sc: PaintScene = { cfg, w: plan.w, h: plan.h, frame: plan.frame, grid: plan.grid, structures: plan.structures, sid: plan.sid, spaces: plan.spaces, doors: plan.doors, fallen: plan.fallen, basin: plan.basin, trees: plan.trees, seed: plan.seed, walk: walkLevel(cfg) }
     const gs = textureSize(sc, 'ground')
     const cs = textureSize(sc, 'canopy')
     const ground = canvasTexture(scene, GROUND_KEY, gs.w, gs.h)
@@ -232,47 +222,9 @@ export class RuinsView implements MapView {
     const cols = Math.ceil(gs.w / TILE_PX)
     const rows = Math.ceil(gs.h / TILE_PX)
     this.ground = { tex: ground, seen: state.n, seenT: state.timber, dirty: new Uint8Array(cols * rows), cols, rows, busy: false }
-    this.sightLayer(v, plan)
     this.effects(v)
     this.roost(v, s)
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.74, 0.22, 0x000000)
-  }
-
-  /** 视线环：一行像素的贴图喂给压暗的着色器 */
-  private sightLayer(v: ViewCtx, plan: RuinsPlan): void {
-    const scene = v.scene
-    const tex = canvasTexture(scene, SIGHT_KEY, SIGHT_BINS, 1)
-    this.sight = { tex, img: tex.getContext().createImageData(SIGHT_BINS, 1) }
-    const u = this.u
-    const x0 = -PAINT_PAD_U * UNIT
-    const y0 = -PAINT_PAD_U * UNIT
-    const w = (plan.w + PAINT_PAD_U * 2) * UNIT
-    const h = (plan.h + PAINT_PAD_U * 2) * UNIT
-    this.visuals.push(
-      scene.add
-        .shader(
-          {
-            name: 'RuinsSight',
-            fragmentSource: SIGHT_FRAG,
-            setupUniforms: (set: (name: string, value: unknown) => void) => {
-              set('uSight', 0)
-              set('uRect', [x0, y0, w, h])
-              set('uEye', u.eye)
-              set('uRange', SIGHT_RANGE_U * UNIT)
-              set('uSoft', 0.14 * UNIT)
-              set('uDim', SIGHT_DIM)
-            },
-          },
-          x0,
-          y0,
-          w,
-          h,
-          [SIGHT_KEY],
-        )
-        .setOrigin(0, 0)
-        .setDepth(SIGHT_DEPTH)
-        .setBlendMode(Phaser.BlendModes.MULTIPLY),
-    )
   }
 
   /** 扬尘、碎石与木屑的粒子，落石的影子 */
@@ -364,7 +316,6 @@ export class RuinsView implements MapView {
     }
     s.impacts.length = 0
     this.stepStones(dt)
-    this.stepSight(v, sim, s)
     this.stepPigeons(sim, s, dt)
     this.stepDevWalls(v, s)
   }
@@ -382,8 +333,7 @@ export class RuinsView implements MapView {
     const gfx = this.devWalls
     gfx.clear()
     gfx.lineStyle(0.05 * UNIT, 0xff00ff, 1)
-    const B = OBSTACLES.body
-    const field = fieldOf(s, levelFor(v.def.ruins!, B.heightM * B.step))
+    const field = fieldOf(s, walkLevel(v.def.ruins!))
     const g = s.m.grid
     const f = s.plan.frame
     const at = (i: number, j: number, k: number, l: number): Point => {
@@ -525,19 +475,6 @@ export class RuinsView implements MapView {
     this.stones = kept
   }
 
-  /** 视线环：从队长的眼睛看出去，写进贴图喂给着色器 */
-  private stepSight(v: ViewCtx, sim: Sim, s: RuinsState): void {
-    const sg = this.sight
-    if (!sg) return
-    const lx = Transform.x[sim.leader]!
-    const ly = Transform.y[sim.leader]!
-    sightRing(s.m, s.dust, v.def.ruins!.dust.opaqueTau, s.plan.frame, lx / UNIT, ly / UNIT, eyeM(sim.world, sim.leader), sg.img.data)
-    sg.tex.getContext().putImageData(sg.img, 0, 0)
-    upload(sg.tex)
-    this.u.eye[0] = lx
-    this.u.eye[1] = ly
-  }
-
   /**
    * 鸽子：停着时偶尔转转身；有身体走近、附近塌了墙或脚下的墙头没了就扑棱棱飞起来，往高处兜几圈再落到别的墙头。
    * 飞着的画在树冠之上，地上跟着一个影子
@@ -644,7 +581,6 @@ export class RuinsView implements MapView {
     this.pigeons = []
     this.perches = []
     this.ground = undefined
-    this.sight = undefined
-    for (const key of [GROUND_KEY, CANOPY_KEY, SIGHT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [GROUND_KEY, CANOPY_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }

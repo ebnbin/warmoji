@@ -2,7 +2,7 @@ import { UNIT } from '../../util/units.ts'
 import { fbm } from '../../util/noise.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin } from '../worlds/basin.ts'
-import { carve, cellCenter, relax, settle, spill } from './masonry.ts'
+import { bodyField, carve, cellCenter, relax, settle, spill } from './masonry.ts'
 import type { Basin } from '../worlds/basin'
 import type { RuinsConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -19,6 +19,8 @@ const STONE_U = 0.5
 const DOOR_END_U = 0.5
 /** 生成不出合格的院落就换一组随机数重来，最多这么多次 */
 const TRIES = 40
+/** 窄口最多塌这么多遍 */
+const NECK_PASSES = 12
 
 const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t)
 function smooth(e0: number, e1: number, x: number): number {
@@ -125,6 +127,13 @@ export interface RuinsPlan {
   readonly trees: readonly Tree[]
   readonly start: Point
   readonly seed: number
+}
+
+/** 生成残垣要知道的规则：砌体与木板的强度，标准身高的身体跨得过几层石块、身体的半径（格） */
+export interface PlanRules {
+  readonly strength: Strength
+  readonly walk: number
+  readonly bodyU: number
 }
 
 /** 按配置与砌体格子造一份可以改的砌体 */
@@ -520,6 +529,203 @@ function ruin(cfg: RuinsConfig, k0: Strength, rng: Rng, m: Masonry, d: Draft, se
   return fallen
 }
 
+/**
+ * 墙上窄过 gapU 格的缺口补回 walk + 1 层：横过墙厚的那排格子连同两侧紧挨着的都跨得过 walk 层、没封木板才算缺口，顺着墙线数宽；
+ * 补完被四面挡死、只剩砌体的跨得过的小块也补上
+ */
+function closeSlots(m: Masonry, walk: number, gapU: number): void {
+  const g = m.grid
+  const low = (i: number): boolean => m.n[i]! <= walk && m.timber[i] === 0
+  const raise = (i: number): void => {
+    if (m.sid[i] === 0) return
+    m.n[i] = walk + 1
+    m.rubble[i] = 0
+  }
+  for (const st of m.structures) {
+    if (st.axis < 0) continue
+    const alongU = st.axis === 0
+    const len = alongU ? g.cols : g.rows
+    const wide = alongU ? g.rows : g.cols
+    const span = (lo: number, hi: number, origin: number, count: number): [number, number] => [Math.max(0, Math.ceil((lo - origin) / g.cell - 0.5)), Math.min(count - 1, Math.floor((hi - origin) / g.cell - 0.5))]
+    const [c0, c1] = alongU ? span(st.v0, st.v1, g.v0, g.rows) : span(st.u0, st.u1, g.u0, g.cols)
+    const [a0, a1] = alongU ? span(st.u0, st.u1, g.u0, g.cols) : span(st.v0, st.v1, g.v0, g.rows)
+    const at = (a: number, c: number): number => (alongU ? c * g.cols + a : a * g.cols + c)
+    const open = (a: number): boolean => {
+      for (let c = Math.max(0, c0 - 1); c <= Math.min(wide - 1, c1 + 1); c++) if (!low(at(a, c))) return false
+      return true
+    }
+    for (let a = a0; a <= a1; a++) {
+      if (!open(a)) continue
+      let lo = a
+      let hi = a
+      while (lo > 0 && open(lo - 1)) lo--
+      while (hi + 1 < len && open(hi + 1)) hi++
+      a = hi
+      if ((hi - lo + 1) * g.cell >= gapU - 1e-9) continue
+      for (let k = lo; k <= hi; k++) for (let c = c0; c <= c1; c++) raise(at(k, c))
+    }
+  }
+  const seen = new Uint8Array(m.n.length)
+  for (let s0 = 0; s0 < m.n.length; s0++) {
+    if (seen[s0] || !low(s0)) continue
+    const part = [s0]
+    seen[s0] = 1
+    let floor = false
+    for (let t = 0; t < part.length; t++) {
+      const i = part[t]!
+      if (m.sid[i] === 0) floor = true
+      const ci = i % g.cols
+      for (const j of [ci > 0 ? i - 1 : -1, ci < g.cols - 1 ? i + 1 : -1, i - g.cols, i + g.cols]) {
+        if (j < 0 || j >= m.n.length || seen[j] || !low(j)) continue
+        seen[j] = 1
+        part.push(j)
+      }
+    }
+    if (!floor) for (const i of part) raise(i)
+  }
+}
+
+/**
+ * 窄口最窄处的格子：标准身体站得下的格子（离挡人处至少 bodyU 格）从远到近并成连通块，两片大个子站得下的地方（差一格够 capU 的也算）
+ * 在不到 capU 的格子上连上就是窄口；再从近到远把格子并到挡人的东西上（八邻接），两块挡人的东西在不到 capU 的格子上连上就是窄缝
+ */
+function findNecks(m: Masonry, walk: number, bodyU: number, capU: number): number[] {
+  const g = m.grid
+  const room = bodyField(m, walk)
+  const size = room.length
+  const out: number[] = []
+  const parent = new Int32Array(size).fill(-1)
+  const find = (i: number): number => {
+    let r = i
+    while (parent[r] !== r) r = parent[r]!
+    while (parent[i] !== r) {
+      const next = parent[i]!
+      parent[i] = r
+      i = next
+    }
+    return r
+  }
+  const stand: number[] = []
+  for (let i = 0; i < size; i++) if (room[i]! >= bodyU) stand.push(i)
+  stand.sort((a, b) => room[b]! - room[a]!)
+  const big = new Uint8Array(size)
+  const roots: number[] = []
+  for (const c of stand) {
+    const ci = c % g.cols
+    roots.length = 0
+    let bigs = 0
+    for (const q of [ci > 0 ? c - 1 : -1, ci < g.cols - 1 ? c + 1 : -1, c - g.cols, c + g.cols]) {
+      if (q < 0 || q >= size || parent[q] === -1) continue
+      const b = find(q)
+      if (roots.includes(b)) continue
+      roots.push(b)
+      bigs += big[b]!
+    }
+    if (bigs > 1 && room[c]! < capU) out.push(c)
+    parent[c] = c
+    big[c] = room[c]! >= capU - g.cell ? 1 : 0
+    for (const b of roots) {
+      parent[b] = c
+      big[c] = big[c]! | big[b]!
+    }
+  }
+  parent.fill(-1)
+  const near = (c: number, visit: (q: number) => void): void => {
+    const ci = c % g.cols
+    const cj = (c - ci) / g.cols
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let di = -1; di <= 1; di++) {
+        if ((di === 0 && dj === 0) || ci + di < 0 || cj + dj < 0 || ci + di >= g.cols || cj + dj >= g.rows) continue
+        const q = c + dj * g.cols + di
+        if (parent[q] !== -1) visit(q)
+      }
+    }
+  }
+  for (let c = 0; c < size; c++) {
+    if (room[c]! >= bodyU) continue
+    parent[c] = c
+    near(c, (q) => {
+      const a = find(c)
+      const b = find(q)
+      if (a !== b) parent[a] = b
+    })
+  }
+  for (let k = stand.length - 1; k >= 0; k--) {
+    const c = stand[k]!
+    if (room[c]! >= capU) break
+    parent[c] = c
+    let joins = 0
+    near(c, (q) => {
+      const a = find(c)
+      const b = find(q)
+      if (a === b) return
+      parent[a] = b
+      joins++
+    })
+    if (joins > 1) out.push(c)
+  }
+  return out
+}
+
+/**
+ * 窄口（见 findNecks）最窄处 bodyCapU 以内的砌体塌到跨得过，碰到的石柱整根折断、木板整道拆掉，塌下的石块留 decay.rubble 那么多；
+ * 反复到没有窄口为止
+ */
+function openNecks(cfg: RuinsConfig, m: Masonry, rules: PlanRules, rng: Rng): void {
+  const g = m.grid
+  const hc = m.courseM
+  const area = m.cellM * m.cellM
+  const walk = rules.walk
+  const reach = cfg.bodyCapU / g.cell + 0.5
+  for (let pass = 0; pass < NECK_PASSES; pass++) {
+    const necks = findNecks(m, walk, rules.bodyU, cfg.bodyCapU)
+    if (necks.length === 0) return
+    const falls: Fall[] = []
+    const lowered: number[] = []
+    const drop = (k: number): void => {
+      if (m.n[k]! <= walk) return
+      falls.push({ i: k, z0: walk * hc, z1: m.n[k]! * hc, volume: (m.n[k]! - walk) * hc * area * cfg.decay.rubble, timber: false })
+      m.n[k] = walk
+      lowered.push(k)
+    }
+    const unboard = (k: number): void => {
+      const line = [k]
+      m.timber[k] = 0
+      for (let t = 0; t < line.length; t++) {
+        const i = line[t]!
+        const ci = i % g.cols
+        for (const q of [ci > 0 ? i - 1 : -1, ci < g.cols - 1 ? i + 1 : -1, i - g.cols, i + g.cols]) {
+          if (q < 0 || q >= m.timber.length || m.timber[q] === 0) continue
+          m.timber[q] = 0
+          line.push(q)
+        }
+      }
+      lowered.push(...line)
+    }
+    for (const c of necks) {
+      const ci = c % g.cols
+      const cj = (c - ci) / g.cols
+      for (let j = Math.max(0, Math.floor(cj - reach)); j <= Math.min(g.rows - 1, Math.ceil(cj + reach)); j++) {
+        for (let i = Math.max(0, Math.floor(ci - reach)); i <= Math.min(g.cols - 1, Math.ceil(ci + reach)); i++) {
+          const k = j * g.cols + i
+          if ((i - ci) ** 2 + (j - cj) ** 2 > reach * reach) continue
+          if (m.timber[k]! > 0) unboard(k)
+          if (m.n[k]! <= walk) continue
+          const s = m.sid[k]!
+          if (s > 0 && m.structures[s - 1]!.kind === 'column') {
+            for (let q = 0; q < m.n.length; q++) if (m.sid[q] === s) drop(q)
+          } else drop(k)
+        }
+      }
+    }
+    if (lowered.length === 0) return
+    const settled: Fall[] = []
+    relax(m, lowered, settled)
+    for (const f of settled) falls.push({ ...f, volume: f.volume * cfg.decay.rubble })
+    spill(m, falls, null, () => rng.next())
+  }
+}
+
 /** 两条线段之间最近的距离 */
 function segGap(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): number {
   const toSeg = (px: number, py: number, x0: number, y0: number, x1: number, y1: number): number => {
@@ -536,7 +742,7 @@ function segGap(ax: number, ay: number, bx: number, by: number, cx: number, cy: 
   return Math.min(toSeg(ax, ay, cx, cy, dx, dy), toSeg(bx, by, cx, cy, dx, dy), toSeg(cx, cy, ax, ay, bx, by), toSeg(dx, dy, ax, ay, bx, by))
 }
 
-/** 回廊院四周的柱廊：一圈矮墙，石柱立在矮墙上；每边挑一两个柱间拆掉矮墙当入口 */
+/** 回廊院四周的柱廊：一圈矮墙，石柱按不小于 spacingU 的柱距立在矮墙上；每边挑一两个柱间拆掉矮墙当入口 */
 function arcade(cfg: RuinsConfig, rng: Rng, d: Draft, structures: Structure[]): { columns: { u: number; v: number }[]; gaps: Rect[] } {
   const A = cfg.arcade
   const t = cfg.plan.wallU.parapet
@@ -551,7 +757,7 @@ function arcade(cfg: RuinsConfig, rng: Rng, d: Draft, structures: Structure[]): 
   ]
   for (const e of edges) {
     structures.push(e.axis === 0 ? { kind: 'parapet', axis: 0, u0: e.a - t / 2, v0: e.line - t / 2, u1: e.b + t / 2, v1: e.line + t / 2 } : { kind: 'parapet', axis: 1, u0: e.line - t / 2, v0: e.a - t / 2, u1: e.line + t / 2, v1: e.b + t / 2 })
-    const k = Math.max(2, Math.round((e.b - e.a) / A.spacingU))
+    const k = Math.max(2, Math.floor((e.b - e.a) / A.spacingU))
     const at = Array.from({ length: k + 1 }, (_, i) => e.a + ((e.b - e.a) * i) / k)
     for (const s of at) {
       const p = e.axis === 0 ? { u: s, v: e.line } : { u: e.line, v: s }
@@ -682,17 +888,20 @@ function roomU(b: Basin, x: number, y: number): number {
   return (a + (c - a) * fx + (dd - a) * fy + (a - c - dd + e) * fx * fy) / UNIT
 }
 
-let last: { cfg: RuinsConfig; seed: number; plan: RuinsPlan } | null = null
+let last: { cfg: RuinsConfig; key: string; plan: RuinsPlan } | null = null
 
-/** 按种子生成一局的残垣，开局前的破坏按砌体与木板的强度算；同一份配置与种子只生成一次 */
-export function ruinsPlan(cfg: RuinsConfig, strength: Strength, seed: number): RuinsPlan {
-  if (last && last.cfg === cfg && last.seed === seed) return last.plan
+/** 按种子生成一局的残垣；同一份配置、规则与种子只生成一次 */
+export function ruinsPlan(cfg: RuinsConfig, rules: PlanRules, seed: number): RuinsPlan {
+  const key = `${seed}:${rules.walk}:${rules.bodyU}:${rules.strength.masonry}:${rules.strength.timber}`
+  if (last && last.cfg === cfg && last.key === key) return last.plan
   const rng = new Rng(scramble(seed))
   let k: Sketch | null = null
-  for (let t = 0; t < TRIES && !k; t++) k = sketch(cfg, strength, rng, seed)
+  for (let t = 0; t < TRIES && !k; t++) k = sketch(cfg, rules.strength, rng, seed)
   if (!k) throw new Error(`残垣生成不出来：种子 ${seed}`)
   const { d, doors, m, fallen } = k
   barricade(cfg, rng, m, doors)
+  closeSlots(m, rules.walk, cfg.gapU)
+  openNecks(cfg, m, rules, rng)
   const tilt = (rng.next() < 0.5 ? -1 : 1) * between(rng, cfg.plan.tiltDeg) * DEG
   const S = cfg.site
   const c = Math.abs(Math.cos(tilt))
@@ -718,6 +927,6 @@ export function ruinsPlan(cfg: RuinsConfig, strength: Strength, seed: number): R
   spaces.push({ kind: 'walk', ...d.court, style: rng.int(0, 2), worn: rng.next() * 0.6 })
   const trees = plantTrees(cfg, rng, basin, w, h)
   const plan: RuinsPlan = { w, h, frame, grid: m.grid, structures: m.structures, n: m.n, sid: m.sid, timber: m.timber, rubble: m.rubble, spaces, doors, fallen, basin, trees, start, seed }
-  last = { cfg, seed, plan }
+  last = { cfg, key, plan }
   return plan
 }

@@ -2,7 +2,7 @@ import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { UNIT } from '../../util/units'
-import { toLocal } from './layout'
+import { toLocal, toWorld } from './layout'
 import type { RuinsConfig } from '../../types/maps'
 import type { Basin } from '../worlds/basin'
 import type { Door, Fallen, Frame, Space, Tree } from './layout'
@@ -18,6 +18,15 @@ const BUCKET_U = 2
 const TREE_SHADOW_U = 7
 /** 一段鼓形柱身多长，格 */
 const DRUM_U = 0.9
+/** 立面按假想的斜俯视画：墙每高一米，朝屏幕下方的那一面露出多宽（格）；整面最多露出 FACE_MAX_U 格，再高的墙按比例压扁 */
+const FACE_U_PER_M = 0.2
+const FACE_MAX_U = 0.55
+/** 立面上一排石块在贴图上至少这么高（像素）：压扁的高墙几层并成一排画 */
+const COURSE_MIN_PX = 3.5
+/** 立着的石柱一段多高，米 */
+const DRUM_M = 0.62
+/** 墙投下的影子挡掉多少阳光 */
+const WALL_SHADE = 0.34
 
 const LXY = Math.hypot(SUN.x, SUN.y)
 const LEN = Math.hypot(SUN.x, SUN.y, SUN.z)
@@ -58,6 +67,8 @@ export interface PaintScene {
   readonly basin: Basin
   readonly trees: readonly Tree[]
   readonly seed: number
+  /** 标准身高的身体跨得过几层石块：不高于它的残基画成贴地的墙基，高过它的才画成墙 */
+  readonly walk: number
 }
 
 /** 砌体此刻的样子：每批活之前发给线程 */
@@ -184,6 +195,20 @@ function columnAt(sc: PaintScene, stat: Static, st: PaintState, ci: number, cj: 
   return null
 }
 
+/** 地面上的点离旁边挡人的墙或木板多远（格）：看四邻，没有挡人的邻格为无穷 */
+function besideWall(sc: PaintScene, st: PaintState, ci: number, cj: number, u: number, v: number): number {
+  const g = sc.grid
+  const fu = (u - g.u0) / g.cell - ci
+  const fv = (v - g.v0) / g.cell - cj
+  const tall = (i: number, j: number): boolean => heightAt(sc, st, i, j) > 0
+  let d = Infinity
+  if (tall(ci - 1, cj)) d = Math.min(d, fu * g.cell)
+  if (tall(ci + 1, cj)) d = Math.min(d, (1 - fu) * g.cell)
+  if (tall(ci, cj - 1)) d = Math.min(d, fv * g.cell)
+  if (tall(ci, cj + 1)) d = Math.min(d, (1 - fv) * g.cell)
+  return d
+}
+
 /** 墙顶离最近一道往下的边多远（格）与那道边朝外的方向（局部）：往下的边是相邻格比这格矮 */
 function lowerEdge(sc: PaintScene, st: PaintState, ci: number, cj: number, u: number, v: number): { d: number; nu: number; nv: number } {
   const g = sc.grid
@@ -224,12 +249,62 @@ function sunLocal(f: Frame): { su: number; sv: number } {
   return { su: x * f.cos + y * f.sin, sv: -x * f.sin + y * f.cos }
 }
 
-/** 格子 (i, j) 上的东西有多高（米）：砌体或木板，格子外为零 */
+/** 格子 (i, j) 上挡人的东西有多高（米）：高过跨步的砌体或木板；跨得过的残基画成贴地的墙基，算作地面；格子外为零 */
 function heightAt(sc: PaintScene, st: PaintState, i: number, j: number): number {
   const g = sc.grid
   if (i < 0 || j < 0 || i >= g.cols || j >= g.rows) return 0
   const k = j * g.cols + i
-  return Math.max(st.n[k]!, st.timber[k]!) * sc.cfg.masonry.courseM
+  const n = st.n[k]!
+  return Math.max(n > sc.walk ? n : 0, st.timber[k]!) * sc.cfg.masonry.courseM
+}
+
+/** 高 h 米的东西，立面上每高一米在屏幕上占多宽（格） */
+function faceScale(h: number): number {
+  return Math.min(FACE_U_PER_M, FACE_MAX_U / h)
+}
+
+/** 斜着看到的是什么：face 为真时是立面，z 是立面上的高度（米），(nu, nv) 是那道边朝外的方向（局部）；否则是顶，lip 表示再往下一点就是立面 */
+interface Sight {
+  face: boolean
+  lip: boolean
+  z: number
+  nu: number
+  nv: number
+}
+
+const SIGHT: Sight = { face: false, lip: false, z: 0, nu: 0, nv: 0 }
+
+/** 从世界 (x, y) 格、高 h 米的顶上沿视线往屏幕下方斜着往下：每走 faceScale(h) 格低一米，走进比视线还矮的格子就看到了前一格的立面，落到地上还没穿出来就是顶 */
+function sightAt(sc: PaintScene, st: PaintState, x: number, y: number, h: number): Sight {
+  const g = sc.grid
+  const o = SIGHT
+  o.face = false
+  o.lip = false
+  const k = faceScale(h)
+  const lip = 0.035 / k
+  const step = 1 / GROUND_PPU
+  let l = toLocal(sc.frame, x, y)
+  let ci = Math.floor((l.u - g.u0) / g.cell)
+  let cj = Math.floor((l.v - g.v0) / g.cell)
+  for (let s = step * 0.5; s <= h * k + 0.035; s += step) {
+    l = toLocal(sc.frame, x, y + s)
+    const ni = Math.floor((l.u - g.u0) / g.cell)
+    const nj = Math.floor((l.v - g.v0) / g.cell)
+    if (ni === ci && nj === cj) continue
+    const z = h - s / k
+    const hh = heightAt(sc, st, ni, nj)
+    if (hh < z - 1e-6) {
+      o.face = true
+      o.z = z
+      o.nu = Math.sign(ni - ci)
+      o.nv = ni === ci ? Math.sign(nj - cj) : 0
+      return o
+    }
+    if (hh < h - 1e-6 && hh < z + lip) o.lip = true
+    ci = ni
+    cj = nj
+  }
+  return o
 }
 
 /** 每格的影子高度：沿着光线往太阳那边走，挡光的东西减去光线升起的高度取最大；走到最高的墙也投不过来的远处为止 */
@@ -737,6 +812,90 @@ function masonryTop(o: Px, sc: PaintScene, s: number, n: number, u: number, v: n
   o.nz = 1
 }
 
+/**
+ * 墙朝屏幕下方的立面：zf 是这个像素在立面上离地多高（米），scale 是立面每米占多宽（格），a 是沿墙的坐标；一排石块一道横缝、石块之间错开的竖缝，
+ * 离地越近越潮越绿；法线朝外、几乎水平，背着太阳的立面只受天光
+ */
+function facade(o: Px, sc: PaintScene, sid: number, zf: number, scale: number, a: number, nx: number, ny: number, x: number, y: number): void {
+  const S = sid > 0 ? sc.structures[sid - 1]! : null
+  const pal = S?.kind === 'tower' ? TOWER_STONES : STONES
+  const hc = sc.cfg.masonry.courseM
+  const row = hc * Math.max(1, Math.round(COURSE_MIN_PX / (hc * scale * GROUND_PPU)))
+  const k = Math.max(0, Math.floor(zf / row))
+  const fz = zf / row - k
+  const seed = sc.seed + sid * 101 + 7
+  const len = 0.95 + 0.3 * hash(k, 3, seed)
+  const off = hash(k, 5, seed) * len
+  const j = Math.floor((a + off) / len)
+  const fa = (a + off) / len - j
+  const c = pal[Math.floor(hash(j, k, seed) * pal.length)]!
+  const tone = (0.86 + 0.18 * hash(j, k + 1, seed)) * (0.9 + 0.14 * valueNoise(x * 15, y * 15, seed + 3))
+  set(o, c[0] * tone, c[1] * tone, c[2] * tone)
+  const joint = Math.max(smooth(0.2, 0.08, Math.min(fz, 1 - fz)), smooth(0.06, 0.02, Math.min(fa, 1 - fa) * len))
+  mix(o, 72, 66, 54, joint * 0.85)
+  mix(o, 78, 90, 56, smooth(0.45, 0, zf) * 0.45)
+  o.nx = nx
+  o.ny = ny
+  o.nz = 0.15
+  o.z = zf
+  o.top = true
+}
+
+/** 立着的石柱朝下的半圈柱身：竖着的凹槽按圆柱打光，一段段鼓形之间一道缝；t 是横过柱子的位置（-1 到 1） */
+function columnSide(o: Px, sc: PaintScene, sid: number, zf: number, t: number, x: number, y: number): void {
+  const c = STONES[2]!
+  const across = Math.asin(Math.max(-1, Math.min(1, t)))
+  const flute = smooth(0.4, 0.95, Math.cos(across * 16))
+  const tone = 0.9 + 0.12 * valueNoise(x * 18, y * 18, sc.seed + sid * 13)
+  set(o, c[0] * tone, c[1] * tone, c[2] * tone)
+  mix(o, 110, 100, 82, flute * 0.35)
+  const fz = fract(zf / DRUM_M)
+  mix(o, 88, 80, 66, smooth(0.07, 0.02, Math.min(fz, 1 - fz)) * 0.8)
+  mix(o, 78, 90, 56, smooth(0.4, 0, zf) * 0.4)
+  o.nx = t
+  o.ny = Math.sqrt(Math.max(0, 1 - t * t))
+  o.nz = 0.12
+  o.z = zf
+  o.top = true
+}
+
+/** 跨得过的残基：画成嵌在地里的旧墙基，和地面齐平，石面风化发暗，石缝和一部分石面盖着土和草，没有高光也不投影 */
+function foundation(o: Px, x: number, y: number, seed: number): void {
+  o.r *= 0.8
+  o.g *= 0.82
+  o.b *= 0.78
+  const cover = smooth(0.38, 0.66, fbm(x * 0.9, y * 0.9, seed + 121, 3))
+  grass(PX2, x, y, seed + 123, 0.6, 0)
+  mix(o, PX2.r, PX2.g, PX2.b, cover * 0.8)
+  o.nx *= 0.25
+  o.ny *= 0.25
+  o.nz = 1
+  o.z = 0
+  o.top = false
+}
+
+/** 封门木板的立面：一块块竖着的木板，木纹竖着走，板缝发暗，两道横档上钉着钉子 */
+function boards(o: Px, sc: PaintScene, zf: number, a: number, nx: number, ny: number): void {
+  const wB = 0.36
+  const id = Math.floor(a / wB)
+  const fa = fract(a / wB) * wB
+  const c = WOOD[Math.floor(hash(id, 1, sc.seed) * WOOD.length)]!
+  const grainLine = 0.86 + 0.18 * valueNoise(a * 40, zf * 3, sc.seed + 91)
+  set(o, c[0] * grainLine, c[1] * grainLine, c[2] * grainLine)
+  mix(o, 46, 34, 24, smooth(0.035, 0, Math.min(fa, wB - fa)) * 0.9)
+  const rail = Math.min(Math.abs(zf - 0.45), Math.abs(zf - 1.4))
+  if (rail < 0.09) {
+    const rc = WOOD[2]!
+    set(o, rc[0] * 0.92, rc[1] * 0.92, rc[2] * 0.92)
+    if (Math.abs(fa - wB / 2) < 0.04) mix(o, 40, 38, 36, 0.8)
+  }
+  o.nx = nx
+  o.ny = ny
+  o.nz = 0.15
+  o.z = zf
+  o.top = true
+}
+
 /** 封门的木板：一块块竖着钉的木板露出顶上的端头，木纹顺着板，板缝发暗，几颗钉帽 */
 function planks(o: Px, sc: PaintScene, u: number, v: number): void {
   let axis = 0
@@ -763,8 +922,8 @@ function planks(o: Px, sc: PaintScene, u: number, v: number): void {
 
 /**
  * 地面：台地上院落外是草地，通到院门的小路踩出了泥；院落里回廊与房间铺着石板、碎拼石或赤陶砖，回廊院里是草；台地边外是陡坡，
- * 乱石与灌木，越往下越暗。塌下的碎石盖在上面，倒下的石柱横在地上；墙顶露出石块，封门处钉着木板。
- * 按法线与太阳打光，往太阳那边被墙挡住的地方在影子里，墙脚被周围的墙挡掉天光，树冠背着太阳投下软影。只画 rect 那一块
+ * 乱石与灌木，越往下越暗。塌下的碎石盖在上面，倒下的石柱横在地上；挡人的墙露出墙顶的石块和朝屏幕下方的立面，跨得过的残基贴着地面，封门处钉着木板。
+ * 按法线与太阳打光，往太阳那边被墙挡住的地方在影子里，墙脚一道接地线、被周围的墙挡掉天光，树冠背着太阳投下软影。只画 rect 那一块
  */
 export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: PaintState, out: Uint8ClampedArray, rect: PixelRect): void {
   const g = sc.grid
@@ -793,23 +952,60 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
       const col = cell >= 0 ? columnAt(sc, stat, st, ci, cj, u, v) : null
       const sid = cell >= 0 ? sc.sid[cell]! : 0
       const pillar = sid > 0 && sc.structures[sid - 1]!.kind === 'column'
-      if (col) masonryTop(o, sc, col.sid, col.n, u, v, x, y)
-      else if (cell >= 0 && st.n[cell]! > 0 && !pillar) {
-        masonryTop(o, sc, sid, st.n[cell]!, u, v, x, y)
-        // 墙顶往下的边：朝太阳的边亮一道，背着太阳的边暗一道
-        const e = lowerEdge(sc, st, ci, cj, u, v)
-        if (e.d < 0.09) {
-          const t = 1 - e.d / 0.09
-          const w = toWorldDir(f, e.nu, e.nv)
-          const face = (w.x * SUN.x + w.y * SUN.y) / LXY
-          const k = 1 + 0.42 * t * t * face
-          o.r *= k
-          o.g *= k
-          o.b *= k
+      const n = cell >= 0 ? st.n[cell]! : 0
+      const hc = sc.cfg.masonry.courseM
+      if (col && col.n > sc.walk) {
+        // 立着的石柱：朝下的半圈露出柱身，越高露得越多，其余是柱顶
+        const S = sc.structures[col.sid - 1]!
+        const r = (S.u1 - S.u0) / 2
+        const c = toWorld(f, (S.u0 + S.u1) / 2, (S.v0 + S.v1) / 2)
+        const dx = x - c.x
+        const s = c.y + Math.sqrt(Math.max(0, r * r - dx * dx)) - y
+        const h = col.n * hc
+        const k = faceScale(h)
+        if (s < h * k) columnSide(o, sc, col.sid, h - s / k, dx / r, x, y)
+        else masonryTop(o, sc, col.sid, col.n, u, v, x, y)
+      } else if (col) {
+        masonryTop(o, sc, col.sid, col.n, u, v, x, y)
+        foundation(o, x, y, seed)
+      } else if (n > sc.walk && !pillar) {
+        const h = n * hc
+        const look = sightAt(sc, st, x, y, h)
+        if (look.face) {
+          const nw = toWorldDir(f, look.nu, look.nv)
+          facade(o, sc, sid, look.z, faceScale(h), look.nu !== 0 ? v : u, nw.x, nw.y, x, y)
+        } else {
+          masonryTop(o, sc, sid, n, u, v, x, y)
+          // 墙顶往下的边：朝太阳的边亮一道，背着太阳的边暗一道；立面上沿亮一道
+          const e = lowerEdge(sc, st, ci, cj, u, v)
+          if (e.d < 0.09) {
+            const t = 1 - e.d / 0.09
+            const w = toWorldDir(f, e.nu, e.nv)
+            const face = (w.x * SUN.x + w.y * SUN.y) / LXY
+            const k = 1 + 0.42 * t * t * face
+            o.r *= k
+            o.g *= k
+            o.b *= k
+          }
+          if (look.lip) {
+            o.r *= 1.12
+            o.g *= 1.12
+            o.b *= 1.1
+          }
         }
+      } else if (n > 0 && !pillar) {
+        masonryTop(o, sc, sid, n, u, v, x, y)
+        foundation(o, x, y, seed)
       } else if (cell >= 0 && st.timber[cell]! > 0) {
-        planks(o, sc, u, v)
-        o.z = st.timber[cell]! * sc.cfg.masonry.courseM
+        const h = st.timber[cell]! * hc
+        const look = sightAt(sc, st, x, y, h)
+        if (look.face) {
+          const nw = toWorldDir(f, look.nu, look.nv)
+          boards(o, sc, look.z, look.nu !== 0 ? v : u, nw.x, nw.y)
+        } else {
+          planks(o, sc, u, v)
+          o.z = h
+        }
       } else {
         const sp = spaceAt(sc, u, v)
         if (room < 0.25) {
@@ -858,6 +1054,16 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
           paving(o, u, v, x, y, sp, seed, alongU)
         }
         if (cell >= 0 && !drum(o, sc, u, v, x, y)) rubbleOn(o, f, x, y, sample(g, st.rubble, u, v), seed)
+        // 墙脚的接地线：挨着挡人的墙与木板，地面上一道深色的线
+        if (cell >= 0) {
+          const d = besideWall(sc, st, ci, cj, u, v)
+          if (d < 0.07) {
+            const k = 1 - 0.38 * (1 - d / 0.07) ** 1.5
+            o.r *= k
+            o.g *= k
+            o.b *= k
+          }
+        }
         // 墙脚的常春藤：伸到地上的一小片
         if (cell >= 0) {
           const ao = sample(g, prep.ao, u, v)
@@ -877,9 +1083,9 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
         const dd = Math.sqrt((x - c.x) * (x - c.x) + (y - c.y) * (y - c.y))
         tree = Math.max(tree, smooth(c.r + soft, c.r - soft, dd))
       }
-      const shade = Math.max(sh * 0.46, tree * 0.4)
+      const shade = Math.max(sh * WALL_SHADE, tree * 0.4)
       const ao = cell >= 0 ? sample(g, prep.ao, u, v) : 0
-      const sun = 0.82 * lambert * (1 - shade / 0.46)
+      const sun = 0.82 * lambert * (1 - Math.min(1, shade / WALL_SHADE))
       const sky = 0.48 * (1 - 0.55 * ao)
       const k = (sky + Math.max(0, sun)) * far
       const lit = Math.max(0, sun) / Math.max(0.001, sky + Math.max(0, sun))

@@ -107,7 +107,7 @@ function cfgOf(sim: Sim): RuinsConfig {
 
 /** 这一局的残垣：视图要它定地图的大小，规则要它定一切，两边按同一个种子各要一次 */
 export function ruinsPlanFor(cfg: RuinsConfig, decorSeed: number): RuinsPlan {
-  return ruinsPlan(cfg, STRENGTH, (decorSeed ^ PLAN_SEED) >>> 0)
+  return ruinsPlan(cfg, { strength: STRENGTH, walk: walkLevel(cfg), bodyU: OBSTACLES.body.refRadiusU }, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
 export function ruinsOf(sim: Sim): RuinsState {
@@ -131,8 +131,13 @@ export function ruinsOf(sim: Sim): RuinsState {
 }
 
 /** 跨得过 m 米的身体跨得过几层石块 */
-export function levelFor(cfg: RuinsConfig, m: number): number {
+function levelFor(cfg: RuinsConfig, m: number): number {
   return Math.max(0, Math.min(LEVELS - 1, Math.floor(m / cfg.masonry.courseM + 1e-6)))
+}
+
+/** 标准身高的身体跨得过几层石块 */
+export function walkLevel(cfg: RuinsConfig): number {
+  return levelFor(cfg, OBSTACLES.body.heightM * OBSTACLES.body.step)
 }
 
 /** 这具身体跨得过几层石块 */
