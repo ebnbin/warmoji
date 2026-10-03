@@ -1,25 +1,34 @@
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { SPAWN } from '../../data/enemies'
+import { ENEMIES, SPAWN } from '../../data/enemies'
+import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
+import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
-import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
+import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
+import { accrete, aroundCircle, endMeteor, feed, flyMeteor, fromCenterU, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
+import type { NebulaMeteor, NebulaState } from '../worlds/nebula'
 import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
 import type { VolcanoState } from '../worlds/volcano'
 import { addWeight, bumpBalls, clearWeights, makeShip, paceOf, stepBalls, stepOnDeck, stepShip } from '../worlds/ship'
 import type { ShipState } from '../worlds/ship'
+import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, gustSpan, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING, windAt, windPush } from '../worlds/floe'
+import type { FloeField, FloeState } from '../worlds/floe'
+import { clearPath, diffuseLux, directLux, flowDir, flowFrom, inPool, makeCaveState, outward, pushOut, rockHit, roomOf, skyAt, stepLight, stepTorch, torchesLux, torchSpot } from '../worlds/cave'
+import type { CaveState, Rock } from '../worlds/cave'
+import { clockSec } from '../fight/clock'
+import { charSize } from '../systems/shared/scale'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/oldRiver'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/oldRiver'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Swarmer, Tint, Transform, Uid } from '../components'
+import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
@@ -34,6 +43,7 @@ import { fleeSteer } from '../systems/shared/steer'
 import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
 import { withBuilt } from './built'
+import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { river } from '../river/world'
 import type { RiverState } from '../river/world'
@@ -82,10 +92,13 @@ export interface WorldState {
   volcano: VolcanoState | null
   ship: ShipState | null
   river: RiverState | null
+  nebula: NebulaState | null
+  floe: FloeState | null
+  cave: CaveState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null }
 }
 
 export interface WorldHooks {
@@ -97,6 +110,8 @@ export interface WorldHooks {
   mediumVelocity(sim: Sim, x: number, y: number): Point
   /** 这里的引力加速度，像素/秒² */
   pull(sim: Sim, x: number, y: number): Point
+  /** 这里是不是汇（黑洞的视界）：进了这里的身体、弹体就停下，由地图吞掉 */
+  sink(sim: Sim, x: number, y: number): boolean
   surface(sim: Sim, x: number, y: number): Surface
   /** 在这里朝 (dx, dy) 赶路的费力倍率：逆着介质更累，顺着更省力 */
   effort(sim: Sim, x: number, y: number, dx: number, dy: number): number
@@ -141,6 +156,9 @@ const bounded: WorldHooks = {
   },
   pull() {
     return ZERO
+  },
+  sink() {
+    return false
   },
   surface(sim) {
     return groundOf(sim)
@@ -461,18 +479,18 @@ const space: WorldHooks = {
   },
 }
 
-function nebulaCfg(sim: Sim): NebulaConfig {
-  return MAPS[sim.mapId].nebula!
+function nebulaOldCfg(sim: Sim): NebulaOldConfig {
+  return MAPS[sim.mapId].nebulaOld!
 }
 
 /** 空腔的边：壳层从这里开始 */
-function nebulaWall(sim: Sim): number {
-  return nebulaCfg(sim).shell.innerU * UNIT
+function nebulaOldWall(sim: Sim): number {
+  return nebulaOldCfg(sim).shell.innerU * UNIT
 }
 
 /** 黑洞的位置由布景种子定下，视图从这里读 */
 function holeOf(sim: Sim): Point {
-  if (!sim.worldState.hole) sim.worldState.hole = holeAt(new Rng(sim.run.decorSeed ^ 0x6e62), nebulaCfg(sim))
+  if (!sim.worldState.hole) sim.worldState.hole = holeAt(new Rng(sim.run.decorSeed ^ 0x6e62), nebulaOldCfg(sim))
   return sim.worldState.hole
 }
 
@@ -481,7 +499,7 @@ const METEOR_TINT = 0xffaa33
 
 /** 中心进了视界的都被吞噬：角色倒下，敌人与召唤出的身体死去，掉落物、蜜蜂、弹体消失；穿行中没有实体，不吞 */
 function swallow(sim: Sim): void {
-  const cfg = nebulaCfg(sim)
+  const cfg = nebulaOldCfg(sim)
   const hole = holeOf(sim)
   const inside = (eid: number): boolean => inHorizon(hole, cfg, Transform.x[eid]!, Transform.y[eid]!)
   const src = hazardSource('blackhole', HOLE_TINT)
@@ -510,8 +528,8 @@ function swallow(sim: Sim): void {
 }
 
 /** 壳层落下的碎块从内壁冲进空腔，初速对准队长身旁的瞄准点，之后只受引力 */
-function launchNebulaMeteor(sim: Sim): void {
-  const cfg = nebulaCfg(sim)
+function launchNebulaOldMeteor(sim: Sim): void {
+  const cfg = nebulaOldCfg(sim)
   const mc = cfg.meteor
   const a = sim.rng.next() * Math.PI * 2
   const dx = Math.cos(a)
@@ -526,8 +544,8 @@ function launchNebulaMeteor(sim: Sim): void {
 }
 
 /** 流星本体扫到的敌我各挨一下，伤害与此刻的动能成正比，即随速度的平方变化 */
-function nebulaMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: number): void {
-  const mc = nebulaCfg(sim).meteor
+function nebulaOldMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: number): void {
+  const mc = nebulaOldCfg(sim).meteor
   const rr = mc.radiusU * UNIT
   const damage = mc.damage * (speed / (mc.speedU * UNIT)) ** 2
   const struck = meteorHit[m]!
@@ -541,13 +559,13 @@ function nebulaMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: nu
   for (const eid of [...query(sim.world, ENEMY_SET)]) strike(eid)
 }
 
-/** 星云的流星：预警后沿积分好的轨迹飞，轨迹走完（扎回壳层或掉进视界）就消失 */
-function nebulaMeteors(sim: Sim, delta: number): void {
-  const mc = nebulaCfg(sim).meteor
+/** 旧星云的流星：预警后沿积分好的轨迹飞，轨迹走完（扎回壳层或掉进视界）就消失 */
+function nebulaOldMeteors(sim: Sim, delta: number): void {
+  const mc = nebulaOldCfg(sim).meteor
   const now = sim.elapsedMs
   const m = query(sim.world, [Meteor])[0]
   if (m === undefined) {
-    if (now >= sim.worldState.tickAt) launchNebulaMeteor(sim)
+    if (now >= sim.worldState.tickAt) launchNebulaOldMeteor(sim)
     return
   }
   if (now < Due.at[m]!) return
@@ -572,14 +590,14 @@ function nebulaMeteors(sim: Sim, delta: number): void {
   Transform.y[m] = y
   Transform.rot[m] = Transform.rot[m]! + (sim.dtMs / 1000) * 1.4
   Tint.alpha[m] = 1
-  nebulaMeteorStrike(sim, m, x, y, Math.hypot(dx, dy) / (mc.stepMs / 1000))
+  nebulaOldMeteorStrike(sim, m, x, y, Math.hypot(dx, dy) / (mc.stepMs / 1000))
 }
 
-/** 星云：圆心在原点的空心星云，黑洞与壳层的万有引力作用于一切；没有墙，走进壳层的都被它的引力拉回空腔 */
-const nebula: WorldHooks = {
+/** 旧星云：圆心在原点的空心星云，黑洞与壳层的万有引力作用于一切；没有墙，走进壳层的都被它的引力拉回空腔 */
+const nebulaOld: WorldHooks = {
   ...bounded,
   pull(sim, x, y) {
-    return gravity(holeOf(sim), nebulaCfg(sim), x, y)
+    return gravity(holeOf(sim), nebulaOldCfg(sim), x, y)
   },
   constrainBody(_sim, _eid, _from, next) {
     return next
@@ -588,7 +606,7 @@ const nebula: WorldHooks = {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = Math.hypot(x, y)
-    if (d < nebulaWall(sim) - 0.6 * UNIT || x * dx + y * dy <= 0) return { x: dx, y: dy }
+    if (d < nebulaOldWall(sim) - 0.6 * UNIT || x * dx + y * dy <= 0) return { x: dx, y: dy }
     const dot = (dx * x + dy * y) / d
     return { x: dx - (2 * dot * x) / d, y: dy - (2 * dot * y) / d }
   },
@@ -596,13 +614,13 @@ const nebula: WorldHooks = {
     return { x: awayX, y: awayY }
   },
   outside(sim, x, y) {
-    return Math.hypot(x, y) > nebulaCfg(sim).shell.outerU * UNIT
+    return Math.hypot(x, y) > nebulaOldCfg(sim).shell.outerU * UNIT
   },
   spawnPoint(sim, boss) {
     const hole = holeOf(sim)
-    const clear2 = (nebulaCfg(sim).hole.clearU * UNIT) ** 2
+    const clear2 = (nebulaOldCfg(sim).hole.clearU * UNIT) ** 2
     const near2 = (SPAWN.minPlayerDist * UNIT * (boss ? 2 : 1)) ** 2
-    const inner = nebulaWall(sim) - UNIT
+    const inner = nebulaOldWall(sim) - UNIT
     const lx = leaderX(sim)
     const ly = leaderY(sim)
     let p = ringPoint(sim.rng, ZERO, 0, inner)
@@ -617,20 +635,20 @@ const nebula: WorldHooks = {
   },
   settle(sim, p) {
     const hole = holeOf(sim)
-    const clear = nebulaCfg(sim).hole.clearU * UNIT
+    const clear = nebulaOldCfg(sim).hole.clearU * UNIT
     const dx = p.x - hole.x
     const dy = p.y - hole.y
     const d = Math.hypot(dx, dy)
     const q = d >= clear ? p : d < 1e-6 ? { x: hole.x + clear, y: hole.y } : { x: hole.x + (dx / d) * clear, y: hole.y + (dy / d) * clear }
-    return clampToDisc(q.x, q.y, 0, 0, nebulaWall(sim) - UNIT)
+    return clampToDisc(q.x, q.y, 0, 0, nebulaOldWall(sim) - UNIT)
   },
   onStart(sim) {
     holeOf(sim)
-    sim.worldState.tickAt = nebulaCfg(sim).meteor.firstMs
+    sim.worldState.tickAt = nebulaOldCfg(sim).meteor.firstMs
   },
   tick(sim, delta) {
     swallow(sim)
-    nebulaMeteors(sim, delta)
+    nebulaOldMeteors(sim, delta)
   },
 }
 
@@ -878,6 +896,641 @@ const ship: WorldHooks = {
   },
 }
 
+function nebulaCfg(sim: Sim): NebulaConfig {
+  return MAPS[sim.mapId].nebula!
+}
+
+/** 星云的摆法由布景种子定下，视图开战前就按它摆镜头；黑洞的质量与流星由对局推进 */
+function nebulaOf(sim: Sim): NebulaState {
+  let s = sim.worldState.nebula
+  if (!s) {
+    s = makeNebula(nebulaCfg(sim), sim.run.decorSeed, sim.mapW / 2)
+    sim.worldState.nebula = s
+  }
+  return s
+}
+
+/** 敌人的身体都一样：终端漂移按质量/阻力 */
+const FOE_FALL = ENEMY_BODY.mass / ENEMY_BODY.drag
+const SLOWEST = new Map<MapId, number>()
+
+/** 这张图会刷出来的敌人里最慢的能走多快，格/秒 */
+function slowestFoeU(sim: Sim): number {
+  let v = SLOWEST.get(sim.mapId)
+  if (v === undefined) {
+    const def = MAPS[sim.mapId]
+    v = Math.min(...def.mix.map((r) => ENEMIES[r.kind].speed), ENEMIES[def.boss].speed) / UNIT
+    SLOWEST.set(sim.mapId, v)
+  }
+  return v
+}
+
+/** 刷怪点离黑洞至少多远，像素：这张图最慢的敌人此刻走不出来的半径，再加余量 */
+function nebulaClearPx(sim: Sim): number {
+  return reachPx(nebulaOf(sim), FOE_FALL, slowestFoeU(sim)) + nebulaCfg(sim).spawnClearU * UNIT
+}
+
+const ACCRETION_TINT = 0xffb36b
+const METEOR_GLOW_TINT = 0xff8a3d
+
+/** 吞下的身体折成多少 GM：按质量与半径的三次方 */
+function bodyGm(cfg: NebulaConfig, eid: number): number {
+  return cfg.swallow.bodyGm * Phys.mass[eid]! * (Radius.v[eid]! / (cfg.swallow.bodyRadiusU * UNIT)) ** 3
+}
+
+/** 不在活动的平面上：穿行中没有实体，跳起来的在空中 */
+function offPlane(eid: number): boolean {
+  return inTransit(eid) || Motion.kind[eid] === MOTION.arc
+}
+
+/** 中心进了视界的都被吞掉：角色倒下，敌人死去，掉落物、蜜蜂、碎片与弹体消失；吞下的质量让黑洞长大，放出的光能化作一阵闪耀 */
+function swallowNebula(sim: Sim, s: NebulaState, cfg: NebulaConfig): void {
+  const now = sim.elapsedMs
+  const src = hazardSource('blackhole', ACCRETION_TINT)
+  const st = sim.run.stats
+  const inside = (eid: number): boolean => inNebulaHorizon(s, Transform.x[eid]!, Transform.y[eid]!)
+  for (const m of sim.characters) {
+    if (!Alive.v[m] || offPlane(m) || !inside(m)) continue
+    const slot = Slot.v[m]!
+    if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + Hp.v[m]!
+    st.hazardDamage.blackhole = (st.hazardDamage.blackhole ?? 0) + Hp.v[m]!
+    const x = Transform.x[m]!
+    const y = Transform.y[m]!
+    const gm = bodyGm(cfg, m)
+    die(sim, m, src, 0, 0)
+    feed(s, cfg, gm, now, x, y)
+  }
+  for (const eid of [...query(sim.world, ENEMY_SET)]) {
+    if (!Alive.v[eid] || offPlane(eid) || !inside(eid)) continue
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const gm = bodyGm(cfg, eid)
+    die(sim, eid, src, 0, 0)
+    feed(s, cfg, gm, now, x, y)
+  }
+  for (const eid of [...query(sim.world, PICKUP_SET)]) {
+    if (!inside(eid)) continue
+    feed(s, cfg, cfg.swallow.pickupGm, now, Transform.x[eid]!, Transform.y[eid]!)
+    removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, [Swarmer, Transform])]) {
+    if (!inside(eid)) continue
+    feed(s, cfg, bodyGm(cfg, eid), now, Transform.x[eid]!, Transform.y[eid]!)
+    bodyRules[eid] = undefined
+    removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, [Shard, Transform])]) {
+    if (inside(eid)) removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, PROJ_SET)]) {
+    if (!inside(eid)) continue
+    feed(s, cfg, cfg.swallow.shotGm, now, Transform.x[eid]!, Transform.y[eid]!)
+    cullProjectile(sim, eid)
+  }
+}
+
+/**
+ * 流星撞上身体：两者按完全非弹性碰撞交换动量，身体沿碰上那一刻的法线被撞开；
+ * 伤害按碰撞损耗的动能，随法向相对速度的平方变，正面以 speedU 撞上时是 damage
+ */
+function strikeNebula(sim: Sim, cfg: NebulaConfig, m: NebulaMeteor, x0: number, y0: number): void {
+  const mc = cfg.meteor
+  const src = hazardSource('meteor', METEOR_GLOW_TINT)
+  const meteorMass = mc.gm / cfg.swallow.bodyGm
+  const ref = mc.speedU * UNIT
+  const strike = (eid: number): void => {
+    if (m.hit.has(Uid.v[eid]!) || offPlane(eid)) return
+    const n = sweepContact(x0, y0, m.x, m.y, Transform.x[eid]!, Transform.y[eid]!, mc.radiusU * UNIT + Radius.v[eid]!)
+    if (!n) return
+    m.hit.add(Uid.v[eid]!)
+    const vn = Math.max(0, (m.vx - Phys.vx[eid]!) * n.x + (m.vy - Phys.vy[eid]!) * n.y)
+    const mass = Phys.mass[eid]!
+    const j = ((meteorMass * mass) / (meteorMass + mass)) * vn
+    hit(sim, src, eid, mc.damage * (vn / ref) ** 2, { tick: true, knockback: j, from: { x: Transform.x[eid]! - n.x, y: Transform.y[eid]! - n.y } })
+  }
+  for (const c of sim.characters) if (Alive.v[c]) strike(c)
+  for (const eid of [...query(sim.world, ENEMY_SET)]) if (Alive.v[eid]) strike(eid)
+}
+
+/** 流星：到点在内壁上起预兆，预兆完冲进空腔，只受引力；扎进壳层被撕碎、掉进视界被吞掉、飞到时限散掉，之后隔一阵再来 */
+function nebulaMeteors(sim: Sim, s: NebulaState, cfg: NebulaConfig, delta: number): void {
+  const mc = cfg.meteor
+  const now = sim.elapsedMs
+  const m = s.meteor
+  if (!m) {
+    if (now >= s.meteorAt) s.meteor = launchMeteor(s, cfg, sim.rng, leaderX(sim), leaderY(sim), now)
+    return
+  }
+  if (m.phase === 'warn') {
+    if (now < m.since + mc.warnMs) return
+    m.phase = 'fly'
+    m.since = now
+  }
+  const x0 = m.x
+  const y0 = m.y
+  const end = flyMeteor(s, cfg, m, delta / 1000)
+  strikeNebula(sim, cfg, m, x0, y0)
+  if (!end && now - m.since < mc.maxFlightMs) return
+  if (end === 'swallow') feed(s, cfg, mc.gm, now, m.x, m.y)
+  endMeteor(s, { kind: end ?? 'fade', x: m.x, y: m.y, vx: m.vx, vy: m.vy, at: now })
+  s.meteor = null
+  s.meteorAt = now + mc.intervalMs + (sim.rng.next() * 2 - 1) * mc.intervalJitterMs
+}
+
+/**
+ * 星云：一团空心星云的空腔，没有墙。黑洞（Paczyński–Wiita 势）与壳层（牛顿壳层定理）的万有引力作用于一切，走进壳层的都被拉回空腔；
+ * 中心进了视界的被吞掉，黑洞随吞下的质量长大；壳层不时甩出流星横穿空腔。敌人只顾着追人，头目会绕开自己走不出来的那一圈
+ */
+const nebula: WorldHooks = {
+  ...bounded,
+  pull(sim, x, y) {
+    return gravityAt(nebulaOf(sim), nebulaCfg(sim), x, y)
+  },
+  sink(sim, x, y) {
+    return inNebulaHorizon(nebulaOf(sim), x, y)
+  },
+  constrainBody(_sim, _eid, _from, next) {
+    return next
+  },
+  chaseDir(sim, eid, tx, ty) {
+    if (Boss.v[eid] !== 1) return bounded.chaseDir(sim, eid, tx, ty)
+    const s = nebulaOf(sim)
+    const r = reachPx(s, Phys.mass[eid]! / Phys.drag[eid]!, Stats.moveSpeed[eid]!) + UNIT
+    return aroundCircle(Transform.x[eid]!, Transform.y[eid]!, tx, ty, s.layout.hx, s.layout.hy, r)
+  },
+  wanderDir(sim, eid, dx, dy) {
+    return keepInCavity(nebulaOf(sim), nebulaCfg(sim), Transform.x[eid]!, Transform.y[eid]!, dx, dy, Radius.v[eid]! + 0.6 * UNIT)
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return keepInCavity(nebulaOf(sim), nebulaCfg(sim), Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
+  },
+  outside(sim, x, y) {
+    return fromCenterU(nebulaOf(sim), x, y) > nebulaCfg(sim).shell.outerU
+  },
+  spawnPoint(sim, boss) {
+    const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
+    return spawnSpot(nebulaOf(sim), nebulaCfg(sim), () => sim.rng.next(), nebulaClearPx(sim), (boss ? 2 : SPAWN.edgeInset) * UNIT, leaderX(sim), leaderY(sim), near)
+  },
+  center(sim) {
+    const L = nebulaOf(sim).layout
+    return { x: L.sx, y: L.sy }
+  },
+  settle(sim, p) {
+    return settleSpot(nebulaOf(sim), nebulaCfg(sim), p.x, p.y, nebulaClearPx(sim), SPAWN.edgeInset * UNIT)
+  },
+  onStart(sim) {
+    nebulaOf(sim)
+  },
+  tick(sim, delta) {
+    const cfg = nebulaCfg(sim)
+    const s = nebulaOf(sim)
+    accrete(s, cfg, delta / 1000)
+    swallowNebula(sim, s, cfg)
+    nebulaMeteors(sim, s, cfg, delta)
+    pruneFlares(s, cfg, sim.elapsedMs)
+  },
+}
+
+function floeCfg(sim: Sim): FloeConfig {
+  return MAPS[sim.mapId].floe!
+}
+
+/** 浮冰的形状由布景种子定下，视图从这里读；阵风哪一刻来、偏多少由对局的随机数定 */
+function floeOf(sim: Sim): FloeState {
+  let s = sim.worldState.floe
+  if (!s) {
+    const cfg = floeCfg(sim)
+    s = newFloe(floeFor(sim.run.decorSeed, cfg), cfg)
+    sim.worldState.floe = s
+  }
+  return s
+}
+
+const WATER_TINT = 0x4fc3f7
+/** 冰上的路多久按队长的位置重铺一次，毫秒 */
+const PATH_MS = 250
+/** 直线走过去时，沿途离冰缘至少留多远，格；目标本身离冰缘更近就按目标的算 */
+const LINE_CLEAR_U = 0.35
+/** 离目标这么近（格）就直扑过去：冰缘边上的目标也够得着，扑过头就滑进海里 */
+const LUNGE_U = 1.5
+/** 漂在水上的小东西随海流漂：速度朝海流靠拢的速率，每秒 */
+const FLOAT_K = 2
+
+/** 离冰缘 reach 格以内还朝着海走，就改为顺着冰缘走；正对着海时转向一侧 */
+function alongEdge(f: FloeField, x: number, y: number, dx: number, dy: number, reach: number): Point {
+  if (edgeAt(f, x, y) > reach) return { x: dx, y: dy }
+  const n = seaward(f, x, y)
+  const out = dx * n.x + dy * n.y
+  if (out <= 0) return { x: dx, y: dy }
+  const tx = dx - out * n.x
+  const ty = dy - out * n.y
+  const l = Math.hypot(tx, ty)
+  return l > 1e-3 ? { x: tx / l, y: ty / l } : { x: -n.y, y: n.x }
+}
+
+/** 两点之间的直线一路都在冰上、离冰缘留得出 clear 格 */
+function clearLine(f: FloeField, x: number, y: number, tx: number, ty: number, clear: number): boolean {
+  const n = Math.ceil(Math.hypot(tx - x, ty - y) / (0.5 * UNIT))
+  for (let k = 1; k <= n; k++) if (edgeAt(f, x + ((tx - x) * k) / n, y + ((ty - y) * k) / n) < clear) return false
+  return true
+}
+
+/** 在冰上从 (x, y) 去 (tx, ty)：贴近了直扑；看得到就直走；隔着水就顺着冰上的路绕（路通往队长那里），否则贴着冰缘走 */
+function walkTo(s: FloeState, x: number, y: number, tx: number, ty: number, reach: number): Point {
+  const f = s.field
+  const d = norm(tx - x, ty - y)
+  if (Math.hypot(tx - x, ty - y) < LUNGE_U * UNIT) return d
+  if (clearLine(f, x, y, tx, ty, Math.min(LINE_CLEAR_U, edgeAt(f, tx, ty)))) return alongEdge(f, x, y, d.x, d.y, reach)
+  const src = s.paths.source
+  if (src >= 0) {
+    const c = s.paths.center(src)
+    if (Math.hypot(c.x - tx, c.y - ty) < 3 * UNIT) {
+      const down = s.paths.downhill(x, y)
+      if (down) return down
+    }
+  }
+  return alongEdge(f, x, y, d.x, d.y, reach)
+}
+
+/** 阵风：到点就起下一轮，风向偏一点；一轮没落尽不起新的 */
+function tickGust(sim: Sim, s: FloeState, cfg: FloeConfig): void {
+  const w = cfg.wind
+  const now = sim.elapsedMs
+  if (now < s.nextGust) return
+  s.gust = { at: now, veer: (sim.rng.next() * 2 - 1) * w.veerDeg * (Math.PI / 180) }
+  s.nextGust = now + Math.max(gustSpan(w), w.intervalMs + (sim.rng.next() * 2 - 1) * w.jitterMs)
+}
+
+/** 泡在冰水里的按体温往下掉血：冻僵的时长与体型成正比（散热按表面积、热容按体积），满血的标准身体 freezeSec 秒冻死 */
+function chill(sim: Sim, s: FloeState, cfg: FloeConfig): void {
+  const now = sim.elapsedMs
+  if (now < s.hurtAt) return
+  s.hurtAt = now + cfg.coldTickMs
+  const src = hazardSource('coldWater', WATER_TINT)
+  const frac = cfg.coldTickMs / 1000
+  const freeze = (eid: number): void => {
+    if (!Alive.v[eid] || inTransit(eid) || !inWater(s, eid, Uid.v[eid]!)) return
+    const t = cfg.body.freezeSec * bulk(cfg, Radius.v[eid]!, Phys.mass[eid]!)
+    hit(sim, src, eid, Math.max(1, Math.round((Hp.max[eid]! * frac) / t)), { tick: true })
+  }
+  for (const m of sim.characters) freeze(m)
+  for (const eid of [...query(sim.world, ENEMY_SET)]) freeze(eid)
+}
+
+/** 掉进海里的金币沉下去；别的掉落物浮着，随海流漂 */
+function sinkCoins(sim: Sim, s: FloeState): void {
+  for (const eid of [...query(sim.world, [Pickup, GrantCoins, Transform])]) {
+    if (!inWater(s, eid, Uid.v[eid]!)) continue
+    s.splashes.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, r: Radius.v[eid]!, at: sim.elapsedMs, sink: true })
+    removeEntity(sim.world, eid)
+  }
+}
+
+/** 冰上的路按队长的位置重铺：队长在水里就通往离他最近的冰 */
+function tickPaths(sim: Sim, s: FloeState): void {
+  if (sim.elapsedMs < s.pathAt) return
+  s.pathAt = sim.elapsedMs + PATH_MS
+  const c = s.paths.nearest(leaderX(sim), leaderY(sim))
+  if (c !== s.paths.source) s.paths.build(c)
+}
+
+/** 复活落座、跳跃这类脚本位移不走 contact：被它从水里带上冰的，脚下改回冰上 */
+function landed(s: FloeState, cfg: FloeConfig): void {
+  for (const [eid, foot] of s.feet) {
+    if (foot.mode !== SWIMMING || Uid.v[eid] !== foot.uid) continue
+    if (edgeAt(s.field, Transform.x[eid]!, Transform.y[eid]!) * UNIT < Radius.v[eid]! * cfg.body.climbFrac) continue
+    foot.mode = ICE
+    foot.slip = true
+  }
+}
+
+/**
+ * 浮冰：南极海上一块没有边的浮冰。冰上一切按库仑摩擦走、滑、停，摩擦随积雪、老冰、新冰变，阵风按风压推着身体；
+ * 重心探出冰缘就掉进海里，水里按二次阻力与推力游、随海流漂，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底
+ */
+const floe: WorldHooks = {
+  ...bounded,
+  surface(sim, x, y) {
+    if (edgeAt(floeOf(sim).field, x, y) >= 0) return groundOf(sim)
+    const cfg = floeCfg(sim)
+    return { ...GROUND, exertion: cfg.waterExertion, regen: cfg.waterRegen }
+  },
+  /**
+   * 一步：站在冰上的按摩擦与风走；重心撑不住就从冰缘往下掉，掉的这一下不受摩擦；落进水里按阻力与推力游，重心爬过冰缘一截就上了冰。
+   * 自己发动的冲刺、跳跃由能力推着走、也由能力刹住，收尾时还回冲之前的速度；被打飞、被扔出去的照样带着速度滑
+   */
+  contact(sim, eid, dt, x, y, vx, vy, out) {
+    if (hasComponent(sim.world, eid, Phasing)) return false
+    const cfg = floeCfg(sim)
+    const s = floeOf(sim)
+    const f = s.field
+    const foot = footingOf(s, eid, Uid.v[eid]!)
+    if (foot.at >= 0 && hasComponent(sim.world, eid, Motion) && Motion.self[eid] === 1 && Motion.stamp[eid]! >= foot.at) {
+      vx = foot.vx
+      vy = foot.vy
+    }
+    const g = (GRAVITY / cfg.meterPerU) * UNIT
+    const r = Radius.v[eid]!
+    const footR = r * cfg.body.footFrac
+    const pickup = hasComponent(sim.world, eid, Pickup)
+    const loose = pickup || hasComponent(sim.world, eid, Shard)
+    const dx = Drive.x[eid]!
+    const dy = Drive.y[eid]!
+    const pulled = pickup && (dx !== 0 || dy !== 0)
+    const k = (Phys.drag[eid]! * Phys.grip[eid]!) / Phys.mass[eid]!
+    if (foot.mode === ICE && !standing(f, x, y, footR)) {
+      foot.mode = FALLING
+      foot.fall = 0
+      foot.drop = foot.h
+    }
+    if (foot.mode === FALLING) {
+      out.x = x + vx * dt
+      out.y = y + vy * dt
+      out.vx = vx
+      out.vy = vy
+      foot.fall += dt
+      if (standing(f, out.x, out.y, footR)) foot.mode = ICE
+      else if (foot.fall >= fallTime(foot.drop)) {
+        foot.mode = SWIMMING
+        if (!loose) s.splashes.push({ x: out.x, y: out.y, r, at: sim.elapsedMs, sink: false })
+      }
+    } else if (foot.mode === SWIMMING) {
+      if (pulled) approach(out, x, y, vx, vy, dx, dy, k, dt)
+      else if (loose) approach(out, x, y, vx, vy, s.current.x, s.current.y, FLOAT_K, dt)
+      else {
+        const len = cfg.body.dragU * UNIT * bulk(cfg, r, Phys.mass[eid]!)
+        const sp = Math.hypot(dx, dy)
+        const swim = sp * cfg.body.swimRatio
+        stepInWater(out, x, y, vx, vy, sp > 0 ? dx / sp : 0, sp > 0 ? dy / sp : 0, (swim * swim) / len, len, s.current.x, s.current.y, dt)
+      }
+      if (edgeAt(f, out.x, out.y) * UNIT >= r * cfg.body.climbFrac) {
+        foot.mode = ICE
+        foot.slip = true
+      }
+    } else {
+      const t = sim.hooks.surface(sim, x, y).traction
+      if (pulled) approach(out, x, y, vx, vy, dx, dy, k, dt)
+      else if (loose) slideLoose(out, x, y, vx, vy, cfg.friction.loose * t, g, dt)
+      else {
+        const mu = frictionAt(f, cfg, x, y)
+        const w = windAt(f, cfg, s.gust, sim.elapsedMs)
+        const push = windPush(cfg, w.speed, w.angle, vx, vy, bulk(cfg, r, Phys.mass[eid]!))
+        stepOnIce(out, foot, x, y, vx, vy, dx, dy, k, mu.s * t, mu.k * t, g, push.x, push.y, dt)
+      }
+      foot.h = heightAt(f, out.x, out.y)
+    }
+    foot.at = Math.fround(sim.elapsedMs)
+    foot.vx = out.vx
+    foot.vy = out.vy
+    return true
+  },
+  constrainBody(_sim, _eid, _from, next) {
+    return next
+  },
+  chaseDir(sim, eid, tx, ty) {
+    const s = floeOf(sim)
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    if (inWater(s, eid, Uid.v[eid]!) || hasComponent(sim.world, eid, Phasing)) return norm(tx - x, ty - y)
+    const reach = Radius.v[eid]! / UNIT + 0.6
+    if (edgeAt(s.field, tx, ty) >= 0) return walkTo(s, x, y, tx, ty, reach)
+    // 目标在水里：不跟着跳下去，走到离它最近的冰上守着
+    const c = s.paths.nearest(tx, ty)
+    if (c < 0) return { x: 0, y: 0 }
+    const p = s.paths.center(c)
+    if (Math.hypot(p.x - x, p.y - y) < 0.5 * UNIT) return { x: 0, y: 0 }
+    return walkTo(s, x, y, p.x, p.y, reach)
+  },
+  wanderDir(sim, eid, dx, dy) {
+    const f = floeOf(sim).field
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    if (edgeAt(f, x, y) > Radius.v[eid]! / UNIT + 1.2) return { x: dx, y: dy }
+    const n = seaward(f, x, y)
+    const dot = dx * n.x + dy * n.y
+    return dot <= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return alongEdge(floeOf(sim).field, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! / UNIT + 1.5)
+  },
+  outside(sim, x, y) {
+    const m = 4 * UNIT
+    return x < -m || x > sim.mapW + m || y < -m || y > sim.mapH + m
+  },
+  spawnPoint(sim, boss) {
+    const f = floeOf(sim).field
+    const min = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
+    const inset = boss ? 3 : 1.5
+    const lx = leaderX(sim)
+    const ly = leaderY(sim)
+    let p: Point = f.heart
+    for (let i = 0; i < 48; i++) {
+      const q = { x: sim.rng.next() * sim.mapW, y: sim.rng.next() * sim.mapH }
+      if (edgeAt(f, q.x, q.y) < inset) continue
+      p = q
+      if (Math.hypot(q.x - lx, q.y - ly) >= min) break
+    }
+    return p
+  },
+  center(sim) {
+    return floeOf(sim).field.heart
+  },
+  settle(sim, p) {
+    return ashore(floeOf(sim).field, p.x, p.y, SPAWN.edgeInset)
+  },
+  onStart(sim) {
+    floeOf(sim)
+  },
+  tick(sim) {
+    const cfg = floeCfg(sim)
+    const s = floeOf(sim)
+    tickGust(sim, s, cfg)
+    tickPaths(sim, s)
+    landed(s, cfg)
+    chill(sim, s, cfg)
+    sinkCoins(sim, s)
+    if (s.splashes.length > 64) s.splashes.splice(0, s.splashes.length - 64)
+  },
+}
+
+function caveCfg(sim: Sim): CaveConfig {
+  return MAPS[sim.mapId].cave!
+}
+
+/** 溶洞的地形与这一局的月龄由布景种子定下，视图从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
+function caveOf(sim: Sim): CaveState {
+  let s = sim.worldState.cave
+  if (!s) {
+    s = makeCaveState(caveCfg(sim), sim.mapW, sim.mapH, MAP.cameraMargin * UNIT, new Rng(sim.run.decorSeed ^ 0x3c4e), clockSec(sim))
+    sim.worldState.cave = s
+  }
+  return s
+}
+
+/** 重算洞里的光、重算绕路的间隔，毫秒 */
+const CAVE_LIGHT_MS = 200
+const CAVE_FLOW_MS = 250
+
+const WADES = new Map<MapId, Surface>()
+
+/** 水潭里的地面：黏滞与费力来自地图，回复同平地 */
+function wadeOf(sim: Sim): Surface {
+  let w = WADES.get(sim.mapId)
+  if (!w) {
+    const p = caveCfg(sim).pools
+    w = { ...groundOf(sim), viscosity: p.viscosity, exertion: p.exertion }
+    WADES.set(sim.mapId, w)
+  }
+  return w
+}
+
+/** 离岩石 reach 以内、方向扎进岩石时改成顺着壁面走，免得顶在石头上不动 */
+function glide(r: Rock, x: number, y: number, dx: number, dy: number, reach: number): Point {
+  if (roomOf(r, x, y) > reach) return { x: dx, y: dy }
+  const n = outward(r, x, y)
+  const dot = dx * n.x + dy * n.y
+  if (dot >= -0.2) return { x: dx, y: dy }
+  const tx = dx - dot * n.x
+  const ty = dy - dot * n.y
+  const len = Math.hypot(tx, ty)
+  return len > 1e-6 ? { x: tx / len, y: ty / len } : { x: -n.y, y: n.x }
+}
+
+/** 队员的火把此刻在哪、多亮 */
+function caveTorches(sim: Sim, s: CaveState): { spots: Point[]; lits: number[] } {
+  const spots: Point[] = []
+  const lits: number[] = []
+  for (const m of sim.characters) {
+    const t = s.torches.get(m)
+    if (!t || t.uid !== Uid.v[m] || t.lit <= 0) continue
+    spots.push(torchSpot(Transform.x[m]!, Transform.y[m]!, charSize(m)))
+    lits.push(t.lit)
+  }
+  return { spots, lits }
+}
+
+/** 怪物只从照度不到 spawnLux 的地方出来，离队长至少 minPlayerDist 格；挑不到就挑最暗的 */
+function caveSpawn(sim: Sim, boss: boolean): Point {
+  const s = caveOf(sim)
+  const cfg = caveCfg(sim)
+  const cells = boss ? s.layout.bossSpawns : s.layout.spawns
+  const n = cells.length / 2
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
+  const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
+  const { spots, lits } = caveTorches(sim, s)
+  let best: Point = { x: cells[0]!, y: cells[1]! }
+  let bestLux = Infinity
+  for (let k = 0; k < 64; k++) {
+    const i = Math.floor(sim.rng.next() * n)
+    const x = cells[i * 2]!
+    const y = cells[i * 2 + 1]!
+    if (Math.hypot(x - lx, y - ly) < near) continue
+    const e = diffuseLux(s.light, x, y) + directLux(s.layout, s.sky, x, y, 0) + torchesLux(cfg.torch, spots, lits, x, y)
+    if (e < cfg.spawnLux) return { x, y }
+    if (e < bestLux) {
+      bestLux = e
+      best = { x, y }
+    }
+  }
+  return best
+}
+
+/**
+ * 溶洞：能走的是洞厅与支洞，洞壁、石柱与挡路的石笋是硬边界，挡人也挡子弹；绕不过去的按步数场绕。
+ * 光照随真实的太阳月亮走，队员天暗了点起火把；怪物只从暗处出来；水潭里蹚水更慢更累
+ */
+const cave: WorldHooks = {
+  ...bounded,
+  surface(sim, x, y) {
+    return inPool(caveOf(sim).layout, x, y) ? wadeOf(sim) : groundOf(sim)
+  },
+  constrainBody(sim, eid, from, next) {
+    if (hasComponent(sim.world, eid, Phasing)) return bounded.constrainBody(sim, eid, from, next)
+    return pushOut(caveOf(sim).layout.rock, next.x, next.y, Radius.v[eid]!)
+  },
+  basin(sim) {
+    return caveOf(sim).layout.rock
+  },
+  chaseDir(sim, eid, tx, ty) {
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const d = norm(tx - x, ty - y)
+    if (hasComponent(sim.world, eid, Phasing)) return d
+    const s = caveOf(sim)
+    const rock = s.layout.rock
+    const rad = Radius.v[eid]!
+    if (clearPath(rock, x, y, tx, ty, rad * 0.9)) return glide(rock, x, y, d.x, d.y, rad + 0.3 * UNIT)
+    const f = flowDir(s.flow, x, y) ?? d
+    return glide(rock, x, y, f.x, f.y, rad + 0.3 * UNIT)
+  },
+  wallHit(sim, ax, ay, bx, by) {
+    return rockHit(caveOf(sim).layout.rock, ax, ay, bx, by)
+  },
+  wanderDir(sim, eid, dx, dy) {
+    const rock = caveOf(sim).layout.rock
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    if (roomOf(rock, x, y) > Radius.v[eid]! + 0.6 * UNIT) return { x: dx, y: dy }
+    const n = outward(rock, x, y)
+    const dot = dx * n.x + dy * n.y
+    return dot >= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return glide(caveOf(sim).layout.rock, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
+  },
+  spawnPoint(sim, boss) {
+    return caveSpawn(sim, boss)
+  },
+  settle(sim, p) {
+    const rock = caveOf(sim).layout.rock
+    const inset = SPAWN.edgeInset * UNIT
+    const q = pushOut(rock, p.x, p.y, inset)
+    if (roomOf(rock, q.x, q.y) >= inset * 0.9) return q
+    const cells = caveOf(sim).layout.spawns
+    let best = { x: cells[0]!, y: cells[1]! }
+    let bd = Infinity
+    for (let i = 0; i < cells.length; i += 2) {
+      const d = (cells[i]! - p.x) ** 2 + (cells[i + 1]! - p.y) ** 2
+      if (d < bd) {
+        bd = d
+        best = { x: cells[i]!, y: cells[i + 1]! }
+      }
+    }
+    return best
+  },
+  onStart(sim) {
+    const s = caveOf(sim)
+    flowFrom(s.flow, leaderX(sim), leaderY(sim))
+  },
+  /** 每隔一阵按此刻的天重算洞里的光；火把每帧推进；绕路的步数场跟着队长重算 */
+  tick(sim, delta) {
+    const cfg = caveCfg(sim)
+    const s = caveOf(sim)
+    s.lightIn -= delta
+    if (s.lightIn <= 0) {
+      s.lightIn += CAVE_LIGHT_MS
+      skyAt(cfg, clockSec(sim), s.age0, s.sky)
+      stepLight(s.light, s.layout, cfg, s.sky)
+    }
+    sim.characters.forEach((m, slot) => {
+      let t = s.torches.get(m)
+      if (!t || t.uid !== Uid.v[m]) {
+        t = { uid: Uid.v[m]!, on: false, lit: 0, due: 0, want: false }
+        s.torches.set(m, t)
+      }
+      const x = Transform.x[m]!
+      const y = Transform.y[m]!
+      stepTorch(t, cfg.torch, diffuseLux(s.light, x, y) + directLux(s.layout, s.sky, x, y, 0), Alive.v[m] === 1, slot, sim.elapsedMs, delta)
+    })
+    s.flowIn -= delta
+    if (s.flowIn <= 0) {
+      s.flowIn = CAVE_FLOW_MS
+      flowFrom(s.flow, leaderX(sim), leaderY(sim))
+    }
+  },
+}
+
 function oldRiverCfg(sim: Sim): OldRiverConfig {
   return MAPS[sim.mapId].oldRiver!
 }
@@ -1000,10 +1653,13 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   oldRiver,
   void: torus,
   space,
+  nebulaOld,
   nebula,
   volcano,
   ship,
   river,
+  floe,
+  cave,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

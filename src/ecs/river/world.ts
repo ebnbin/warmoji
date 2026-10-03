@@ -207,6 +207,9 @@ export const river: WorldHooks = {
   pull() {
     return ZERO
   },
+  sink() {
+    return false
+  },
   surface(sim) {
     return groundOf(sim)
   },
