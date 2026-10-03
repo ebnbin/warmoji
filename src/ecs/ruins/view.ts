@@ -322,7 +322,7 @@ export class RuinsView implements MapView {
     const rng = new Rng(v.run.decorSeed ^ 0xb1d)
     for (let k = 0; k < PIGEONS && this.perches.length > 0; k++) {
       const p = this.perches[Math.floor(rng.next() * this.perches.length)]!
-      const img = v.scene.add.image(p.x, p.y, PIGEON_KEY, 0).setScale((0.55 * UNIT) / PIGEON_PX).setRotation(rng.next() * Math.PI * 2).setDepth(12)
+      const img = v.scene.add.image(p.x, p.y, PIGEON_KEY, 0).setScale((0.62 * UNIT) / PIGEON_PX).setRotation(rng.next() * Math.PI * 2).setDepth(12)
       this.pigeons.push({ img, x: p.x, y: p.y, z: 0, vx: 0, vy: 0, to: null, left: 0, flap: rng.next(), scared: 0 })
       this.visuals.push(img)
     }

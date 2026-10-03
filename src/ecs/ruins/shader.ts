@@ -163,78 +163,89 @@ export function drawSplinter(ctx: CanvasRenderingContext2D, w: number, h: number
 }
 
 /**
- * 从上往下看的鸽子，三帧排成一行：收着翅膀站着、翅膀展平、翅膀往上收；灰蓝的身子，翅上两道深色横斑，颈上一圈绿紫的光泽
+ * 从上往下看的鸽子，三帧排成一行：收着翅膀站着、翅膀展平、翅膀往上收。灰蓝的身子圆滚滚的，收起的翅上两道深色横斑，
+ * 颈上一圈绿紫的光泽，尾羽末端一道深色；头朝上
  */
 export function drawPigeon(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   for (let k = 0; k < 3; k++) {
     const cx = k * w + w / 2
-    const cy = h * 0.5
+    const cy = h * 0.52
     ctx.save()
     if (k > 0) {
-      const span = k === 1 ? 0.48 : 0.3
+      const span = k === 1 ? 0.49 : 0.34
+      const lift = k === 1 ? 0 : -h * 0.08
       for (const side of [-1, 1]) {
-        ctx.fillStyle = '#8e95a3'
+        ctx.fillStyle = '#8f97a6'
         ctx.beginPath()
-        ctx.moveTo(cx, cy - h * 0.08)
-        ctx.quadraticCurveTo(cx + side * w * span * 0.55, cy - h * 0.26, cx + side * w * span, cy - h * 0.02)
-        ctx.quadraticCurveTo(cx + side * w * span * 0.6, cy + h * 0.05, cx, cy + h * 0.1)
+        ctx.moveTo(cx + side * w * 0.06, cy - h * 0.12)
+        ctx.quadraticCurveTo(cx + side * w * span * 0.6, cy - h * 0.24 + lift, cx + side * w * span, cy - h * 0.06 + lift)
+        ctx.quadraticCurveTo(cx + side * w * span * 0.7, cy + h * 0.06, cx + side * w * 0.06, cy + h * 0.1)
         ctx.closePath()
         ctx.fill()
-        ctx.fillStyle = '#3d414b'
+        ctx.fillStyle = '#3b3f49'
         ctx.beginPath()
-        ctx.moveTo(cx + side * w * span * 0.78, cy - h * 0.1)
-        ctx.quadraticCurveTo(cx + side * w * span * 0.92, cy - h * 0.1, cx + side * w * span, cy - h * 0.02)
-        ctx.quadraticCurveTo(cx + side * w * span * 0.86, cy, cx + side * w * span * 0.74, cy - h * 0.02)
+        ctx.moveTo(cx + side * w * span * 0.72, cy - h * 0.14 + lift)
+        ctx.quadraticCurveTo(cx + side * w * span * 0.94, cy - h * 0.13 + lift, cx + side * w * span, cy - h * 0.06 + lift)
+        ctx.quadraticCurveTo(cx + side * w * span * 0.86, cy - h * 0.02, cx + side * w * span * 0.68, cy - h * 0.04)
         ctx.closePath()
         ctx.fill()
-        ctx.strokeStyle = 'rgba(40,42,50,0.7)'
-        ctx.lineWidth = h * 0.025
+        ctx.strokeStyle = 'rgba(40,42,50,0.75)'
+        ctx.lineWidth = h * 0.035
         ctx.beginPath()
-        ctx.moveTo(cx + side * w * span * 0.25, cy - h * 0.06)
-        ctx.lineTo(cx + side * w * span * 0.32, cy + h * 0.04)
-        ctx.moveTo(cx + side * w * span * 0.38, cy - h * 0.08)
-        ctx.lineTo(cx + side * w * span * 0.45, cy + h * 0.03)
+        ctx.moveTo(cx + side * w * span * 0.3, cy - h * 0.1)
+        ctx.lineTo(cx + side * w * span * 0.36, cy + h * 0.04)
+        ctx.moveTo(cx + side * w * span * 0.44, cy - h * 0.11)
+        ctx.lineTo(cx + side * w * span * 0.5, cy + h * 0.03)
         ctx.stroke()
       }
     }
-    ctx.fillStyle = '#9aa1ae'
+    // 尾羽
+    ctx.fillStyle = '#7f8794'
     ctx.beginPath()
-    ctx.ellipse(cx, cy + h * 0.04, w * 0.07, h * 0.26, 0, 0, Math.PI * 2)
+    ctx.moveTo(cx - w * 0.07, cy + h * 0.18)
+    ctx.lineTo(cx + w * 0.07, cy + h * 0.18)
+    ctx.lineTo(cx + w * 0.09, cy + h * 0.4)
+    ctx.lineTo(cx - w * 0.09, cy + h * 0.4)
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = '#2f3239'
+    ctx.fillRect(cx - w * 0.09, cy + h * 0.35, w * 0.18, h * 0.05)
+    // 身子
+    ctx.fillStyle = '#a1a8b5'
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, w * 0.13, h * 0.24, 0, 0, Math.PI * 2)
     ctx.fill()
     if (k === 0) {
       for (const side of [-1, 1]) {
-        ctx.fillStyle = '#878e9c'
+        ctx.fillStyle = '#8c94a2'
         ctx.beginPath()
-        ctx.ellipse(cx + side * w * 0.035, cy + h * 0.1, w * 0.05, h * 0.2, side * 0.12, 0, Math.PI * 2)
+        ctx.ellipse(cx + side * w * 0.075, cy + h * 0.05, w * 0.085, h * 0.22, side * 0.1, 0, Math.PI * 2)
         ctx.fill()
-        ctx.strokeStyle = 'rgba(40,42,50,0.7)'
-        ctx.lineWidth = h * 0.025
+        ctx.strokeStyle = 'rgba(40,42,50,0.8)'
+        ctx.lineWidth = h * 0.035
         ctx.beginPath()
-        ctx.moveTo(cx + side * w * 0.02, cy + h * 0.06)
-        ctx.lineTo(cx + side * w * 0.07, cy + h * 0.08)
-        ctx.moveTo(cx + side * w * 0.02, cy + h * 0.14)
-        ctx.lineTo(cx + side * w * 0.07, cy + h * 0.16)
+        ctx.moveTo(cx + side * w * 0.03, cy + h * 0.0)
+        ctx.lineTo(cx + side * w * 0.13, cy + h * 0.02)
+        ctx.moveTo(cx + side * w * 0.03, cy + h * 0.09)
+        ctx.lineTo(cx + side * w * 0.13, cy + h * 0.11)
         ctx.stroke()
       }
     }
-    ctx.fillStyle = '#5d6b72'
+    // 头与颈上的光泽
+    ctx.fillStyle = 'rgba(112,152,126,0.85)'
     ctx.beginPath()
-    ctx.ellipse(cx, cy - h * 0.18, w * 0.055, h * 0.07, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx, cy - h * 0.17, w * 0.1, h * 0.07, 0, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = 'rgba(110,150,120,0.75)'
+    ctx.fillStyle = '#5c6870'
     ctx.beginPath()
-    ctx.ellipse(cx, cy - h * 0.13, w * 0.06, h * 0.04, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx, cy - h * 0.25, w * 0.075, h * 0.08, 0, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = '#2f3138'
+    ctx.fillStyle = '#d6ad66'
     ctx.beginPath()
-    ctx.moveTo(cx - w * 0.04, cy + h * 0.27)
-    ctx.lineTo(cx + w * 0.04, cy + h * 0.27)
-    ctx.lineTo(cx, cy + h * 0.36)
+    ctx.moveTo(cx - w * 0.02, cy - h * 0.31)
+    ctx.lineTo(cx + w * 0.02, cy - h * 0.31)
+    ctx.lineTo(cx, cy - h * 0.36)
     ctx.closePath()
-    ctx.fill()
-    ctx.fillStyle = '#d9b26a'
-    ctx.beginPath()
-    ctx.arc(cx, cy - h * 0.255, w * 0.012, 0, Math.PI * 2)
     ctx.fill()
     ctx.restore()
   }
