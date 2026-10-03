@@ -14,6 +14,7 @@ import type { NebulaMeteor, NebulaState } from '../worlds/nebula'
 import { around, fumaroles, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava, VENT_COUNT, volcanoMarks } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
+import { roomFor } from '../worlds/gates'
 import type { GateRuntime, Landmark } from '../worlds/gates'
 import type { VolcanoState } from '../worlds/volcano'
 import { GRAVITY as SHIP_G } from '../../data/ship'
@@ -761,9 +762,6 @@ function clearGround(sim: Sim, p: Point): boolean {
   return roomAt(f.basin, p.x, p.y) >= UNIT && !moltenAt(f, p.x, p.y)
 }
 
-/** 出怪口的落点离岩壁至少这么远，大的身体按它自己的半径 */
-const LANDING_ROOM = 0.5 * UNIT
-
 /**
  * 火山：能走的是崖壁围着的盆地，岩壁与山体是硬边界，身体走到跟前就停住、顺着壁面滑；火山定期喷发，
  * 熔岩按地势往四面八方流、离火山口越远凉得越快，盖住的地方敌我都受伤
@@ -800,7 +798,7 @@ const volcano: WorldHooks = {
   },
   canSpawn(sim, x, y, radius) {
     const f = volcanoOf(sim).field
-    return roomAt(f.basin, x, y) >= Math.max(LANDING_ROOM, radius) && !moltenAt(f, x, y)
+    return roomFor(f.basin, x, y, radius) && !moltenAt(f, x, y)
   },
   /** 火山口只在喷发时抛出东西 */
   landmarks(sim) {
@@ -912,7 +910,7 @@ const ship: WorldHooks = {
     return keepOut(shipOf(sim).deck.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
   canSpawn(sim, x, y, radius) {
-    return roomAt(shipOf(sim).deck.basin, x, y) >= Math.max(LANDING_ROOM, radius)
+    return roomFor(shipOf(sim).deck.basin, x, y, radius)
   },
   landmarks(sim) {
     return shipOf(sim).deck.marks

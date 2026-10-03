@@ -447,8 +447,8 @@ export const MAPS = {
       fallback: 'rise',
       boss: 'foot',
       kinds: {
-        cave: { name: '洞穴', at: { kind: 'nooks', spacingU: 6, away: { mark: 'cone', minU: 9 } }, enter: 'walk', weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'creeper', 'skeleton'] },
-        cliff: { name: '崖顶', at: { kind: 'rim', segU: 3, away: { mark: 'cone', minU: 9 } }, enter: 'climb', weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie'] },
+        cave: { name: '洞穴', at: { kind: 'nooks', spacingU: 6, away: { mark: 'cone', minU: 9 } }, enter: 'walk', snapU: 5, weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'creeper', 'skeleton'] },
+        cliff: { name: '崖顶', at: { kind: 'rim', segU: 3, away: { mark: 'cone', minU: 9 } }, enter: 'climb', snapU: 5, weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie'] },
         vent: { name: '喷气孔', at: { kind: 'mark' }, enter: 'rise', look: 'steam', weight: 2, perSec: 1, only: ['turtle', 'creeper'] },
         crater: { name: '火山口', at: { kind: 'mark' }, enter: 'lob', look: 'sparks', weight: 4, perSec: 4, reachU: 14, only: ['comet', 'turtle'] },
         ash: { name: '灰地', at: { kind: 'ground' }, enter: 'rise', weight: 1 },

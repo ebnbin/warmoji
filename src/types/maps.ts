@@ -693,13 +693,14 @@ export type GatePlace =
 
 /**
  * 一种出怪口：weight 是几种都够得着时抽中的权重，perSec 是每一处每秒最多出几只（多的分给别处），only 只出这几种敌人，reachU 是抛入的口子抛得到多远；
- * look 是进场时冒出的样子（默认一团烟尘），落下的冒在落点，抛入的起点落点都冒，其余的冒在起点
+ * snapU 是这一种自己的吸附半径（不写按地图的）；look 是进场时冒出的样子（默认一团烟尘），落下的冒在落点，抛入的起点落点都冒，其余的冒在起点
  */
 export interface GateKind {
   readonly name: string
   readonly at: GatePlace
   readonly enter: Entrance
   readonly look?: EntranceLook
+  readonly snapU?: number
   readonly weight: number
   readonly perSec?: number
   readonly only?: readonly EnemyKind[]

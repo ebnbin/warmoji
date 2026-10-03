@@ -102,6 +102,13 @@ const LANDING_TRIES = 3
 const SLIDE_U = 0.6
 /** 翻进、走出的落点横着散开多远，格 */
 const SIDE_U = 0.5
+/** 落点离壁至少这么远，格；大的身体按它自己的半径 */
+const LANDING_ROOM_U = 0.5
+
+/** 半径 radius 像素的身体落在这片地面上的这一点站得下 */
+export function roomFor(b: Basin, x: number, y: number, radius: number): boolean {
+  return roomAt(b, x, y) >= Math.max(LANDING_ROOM_U * UNIT, radius)
+}
 
 function hashOf(s: string): number {
   let h = 0x811c9dc5
@@ -327,13 +334,23 @@ function sampleLanding(sim: Sim, g: Gate, hit: Point, p: Point): Landing {
   const base = g.shape === 'segment' ? slide(g, hit, (rng.next() * 2 - 1) * SLIDE_U * UNIT) : { x: g.ax, y: g.ay }
   const d = (f.distU[0] + rng.next() * (f.distU[1] - f.distU[0])) * UNIT
   const side = (rng.next() * 2 - 1) * SIDE_U * UNIT
-  const out = enter === 'climb' ? ENTRANCE.climb.outU * UNIT : 0
+  const out = enter === 'climb' ? ENTRANCE.climb.outU * UNIT + sunk(sim, g, base) : 0
   return { sx: base.x - g.nx * out, sy: base.y - g.ny * out, x: base.x + g.nx * d - g.ny * side, y: base.y + g.ny * d + g.nx * side }
 }
 
-/** 挑一个落点：试几次，半径 radius 的身体站得住、翻进的起点在能站的地面外的里面，离这一处刚落下的几只最远的；都不行是 null */
+/** 外边界上的一点陷在能站的地面里多深：弯弯曲曲的边，切成的段从里面抄近路；地标上的为零 */
+function sunk(sim: Sim, g: Gate, p: Point): number {
+  if (g.def.at.kind === 'mark') return 0
+  const b = sim.hooks.ground(sim)
+  return b ? Math.max(0, roomAt(b, p.x, p.y)) : 0
+}
+
+/**
+ * 挑一个落点：试几次，半径 radius 的身体站得住、外边界上翻进的起点在能站的地面外（地标上的由地图摆好）的里面，离这一处刚落下的几只最远的；
+ * 都不行是 null
+ */
 function landing(sim: Sim, g: Gate, hit: Point, p: Point, u: GateUse, now: number, radius: number): Landing | null {
-  const ground = g.def.enter === 'climb' ? sim.hooks.ground(sim) : null
+  const ground = g.def.enter === 'climb' && g.def.at.kind !== 'mark' ? sim.hooks.ground(sim) : null
   let best: Landing | null = null
   let bestGap = -1
   for (let i = 0; i < LANDING_TRIES; i++) {
@@ -378,15 +395,14 @@ function firstLanding(sim: Sim, rt: GateRuntime, order: readonly Candidate[], p:
   return null
 }
 
-/** p 吸附到哪一处出怪口：snapU 格以内、接这种敌人、此刻还出得了的里面按权重抽；都不行是 null */
+/** p 吸附到哪一处出怪口：吸附半径以内、接这种敌人、此刻还出得了的里面按权重抽；都不行是 null */
 function snap(sim: Sim, cfg: GatesConfig, rt: GateRuntime, p: Point, enemy: EnemyKind, radius: number): Entry | null {
   const now = sim.elapsedMs
-  const reach = cfg.snapU * UNIT
   const list: Candidate[] = []
   for (const g of gatesNow(sim)) {
     if (g.def.only && !g.def.only.includes(enemy)) continue
     const h = hitOf(g, p)
-    if (!h || h.d > reach) continue
+    if (!h || h.d > (g.def.snapU ?? cfg.snapU) * UNIT) continue
     if (!ready(useOf(rt, g, now), g.def, now)) continue
     list.push({ g, hit: h, w: g.def.weight * bias(sim, cfg, g) })
   }

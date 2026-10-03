@@ -182,7 +182,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(g.lean === undefined || (g.lean.mul >= 1 && g.lean.full > 0), `${at}.lean 的倍率不小于 1、偏满的量为正`)
   for (const [k, d] of kinds) {
     const p = `${at}.kinds.${k}`
-    need(d.weight > 0 && (d.perSec ?? 1) > 0, `${p} 的权重与限速须为正`)
+    need(d.weight > 0 && (d.perSec ?? 1) > 0 && (d.snapU ?? 1) > 0, `${p} 的权重、限速与吸附半径须为正`)
     need(d.only === undefined || (d.only.length > 0 && d.only.every((e) => ENEMIES[e] !== undefined)), `${p}.only 须引用存在的敌人`)
     need((d.enter === 'lob') === (d.reachU !== undefined) && (d.reachU ?? 1) > 0, `${p} 抛入的才写抛得到多远，且须为正`)
     need(d.enter !== 'lob' || d.at.kind === 'mark', `${p} 抛入的出怪口只能摆在地标上`)
