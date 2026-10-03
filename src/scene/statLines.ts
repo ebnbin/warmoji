@@ -81,7 +81,7 @@ function joinFx(effects: readonly Effect[], self = false): string {
 export function effectLine(e: Effect, self = false): string {
   switch (e.kind) {
     case 'blast':
-      return `命中处爆开 ${grid(e.radius)}，波及 ${pct(e.ratio)} 伤害`
+      return `命中处爆开 ${grid(e.radius)}，波及 ${pct(e.ratio)} 伤害${e.breach ? `，炸掉约 ${e.breach} 立方米的墙` : ''}`
     case 'slow':
       return e.factor === 0 ? `冻结 ${sec(e.durationMs)}` : `减速 ${pct(1 - e.factor)} ${sec(e.durationMs)}`
     case 'poison':
@@ -298,7 +298,7 @@ const MARK_LABEL: Record<MarkName, string> = {
 function shapeLine(w: AbilityDef, s: Shape): string {
   switch (s.kind) {
     case 'bolt':
-      return `弹速 ${grid(s.projectile.speed)}/秒 · 弹体 ${grid(s.projectile.radius * 2)}${s.pierce ? ` · 贯穿 ${s.pierce} 名` : ''}${s.projectile.homingDeg ? ` · 追踪（每秒转 ${s.projectile.homingDeg}°）` : ''}${s.projectile.linger ? ` · 飞完落地 ${sec(s.projectile.linger)} 等召回` : ''}`
+      return `弹速 ${grid(s.projectile.speed)}/秒 · 弹体 ${grid(s.projectile.radius * 2)}${s.projectile.arc ? ` · 抛射（拱起 ${s.projectile.arc} 米，越过比它矮的墙，落下来才打得到人）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${s.projectile.homingDeg ? ` · 追踪（每秒转 ${s.projectile.homingDeg}°）` : ''}${s.projectile.linger ? ` · 飞完落地 ${sec(s.projectile.linger)} 等召回` : ''}`
     case 'segment':
       return s.beam
         ? `射程 ${grid(s.reach)} · 束宽 ${grid(s.radius * 2)} · 贯穿直线全部敌人`
@@ -391,6 +391,8 @@ export function abilityStatLines(w: AbilityDef): string[] {
   if (base.length > 0) lines.push(base.join(' · '))
   const shape = shapeLine(w, w.shape)
   if (shape) lines.push(shape)
+  const walls = [w.piercesWalls ? '不受障碍阻挡' : '', w.breach ? `破墙：能打掉约 ${w.breach} 立方米的墙` : ''].filter(Boolean)
+  if (walls.length > 0) lines.push(walls.join(' · '))
   const rep = repeatLine(w)
   if (rep) lines.push(rep)
   lines.push(...availLines(w))

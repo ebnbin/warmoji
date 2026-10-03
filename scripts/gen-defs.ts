@@ -15,6 +15,7 @@ import { LEVEL_STATS } from '../defs/levels.ts'
 import { MAP_DEFAULTS } from '../defs/mapdefaults.ts'
 import { MAPS } from '../defs/maps.ts'
 import { MUTATORS } from '../defs/mutators.ts'
+import { OBSTACLES } from '../defs/obstacles.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { ROLES } from '../defs/roles.ts'
@@ -496,6 +497,17 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
 }
 
+/** 障碍：跨得过的比眼睛低，平射飞在膝盖与眼睛之间；贯穿次数是非负整数，强度为正 */
+{
+  const { body, shot, materials } = OBSTACLES
+  need(body.refRadiusU > 0 && body.heightM > 0 && body.step > 0 && body.step < body.eye && body.eye < 1, 'obstacles.body 的半径、身高须为正，跨得过的高度低于眼睛，眼睛低于头顶')
+  need(shot.flatM > body.step * body.heightM && shot.flatM < body.eye * body.heightM && shot.launchM > 0 && shot.blastM > 0, 'obstacles.shot 的平射高度须在标准身体的膝盖与眼睛之间，抛射的出手高度与爆炸的高度为正')
+  for (const [id, m] of Object.entries(materials)) {
+    need(m.pierce === null || (Number.isInteger(m.pierce) && m.pierce >= 0), `obstacles.materials.${id}.pierce 须是非负整数或 null`)
+    need(m.strength === null || m.strength > 0, `obstacles.materials.${id}.strength 须为正或 null`)
+  }
+}
+
 need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restRatio 须在 (0, 1] 内')
 need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
 need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
@@ -525,6 +537,7 @@ write('levels', LEVEL_STATS)
 write('mapdefaults', MAP_DEFAULTS)
 write('maps', MAPS)
 write('mutators', MUTATORS)
+write('obstacles', OBSTACLES)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('roles', ROLES)

@@ -7,6 +7,7 @@ import { deliveryOf, HIT } from './hitTags'
 import { hasMark, realmOf } from './marks'
 import { isSameEntity } from './identity'
 import { NEUTRAL, offenseOf } from './stats'
+import { eyeM } from './pass'
 import type { Offense } from './stats'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
@@ -34,7 +35,10 @@ export interface Source {
   readonly realm?: number
   /** 出手的那条能力 */
   readonly ability?: number
-  readonly sight?: { readonly x: number; readonly y: number }
+  /** 瞄准时从哪里看、眼睛离地多高（米）：看不见的不瞄；出手不受障碍阻挡的没有 */
+  readonly sight?: { readonly x: number; readonly y: number; readonly eye: number }
+  /** 这一下被障碍挡：近战、爆炸与场只打得到从出手处够得着的身体 */
+  readonly blocked?: boolean
   /** 出手的位置：迷雾里的身体只能被同在迷雾里出手的打到 */
   readonly from?: { readonly x: number; readonly y: number }
   /** 伤害标签（见 hitTags）：出手方式与是否来自召唤物；范围与持续由出手处补上 */
@@ -64,10 +68,8 @@ export function sourceOf(sim: Sim, e: number): Source {
     foes: foesOf(sim, o, Faction.v[e]!),
     realm: realmOf(sim, o),
     from: { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! },
-    sight:
-      sim.worldState.walls !== null && WallBlocked.v[e]
-        ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
-        : undefined,
+    sight: WallBlocked.v[e] ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]!, eye: eyeM(sim.world, Anchor.eid[e]!) } : undefined,
+    blocked: WallBlocked.v[e] === 1,
     tags: deliveryOf(abilityDef[e]) | (summon ? HIT.summon : 0),
   }
 }
@@ -89,7 +91,7 @@ export function selfSource(sim: Sim, eid: number): Source {
   return def ? { ...enemySource(def.kind, atk), faction, slot: faction === FACTION.team ? creditSlot(sim, eid) : -1, ...own } : bodySource(sim, eid)
 }
 
-/** 飞出去的身体自己看：不带发射者的视角与视线 */
+/** 飞出去的东西自己看：不带发射者的视角与视线，挡不挡照旧 */
 export function flying(src: Source): Source {
   return { ...src, viewer: undefined, sight: undefined }
 }

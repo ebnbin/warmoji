@@ -1,6 +1,7 @@
 import { FACTION, Radius, Transform, Uid, Zone } from '../components'
 import { isSameEntity } from './identity'
 import { tauntedBy } from './marks'
+import { canSee, eyeM } from './pass'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
@@ -48,13 +49,13 @@ function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, s
       if (d.x * d.x + d.y * d.y > rr * rr) continue
       const x = cx + d.x
       const y = cy + d.y
-      if (sight && sim.hooks.wallHit(sim, sight.x, sight.y, x, y) !== null) continue
+      if (seeing && sight && !canSee(sim, sight.x, sight.y, sight.eye, x, y, eyeM(sim.world, t.eid))) continue
       if (visit(t.eid, x, y, t.radius)) return
     }
   }
 }
 
-/** 看：来源能打的身体里瞄得到的。世界打所有人；倒戈的打自己人；被嘲讽的观察者只看得见嘲讽者；隐匿的谁也看不见；碰不到的、不在同一个界的、躲在迷雾里而出手者在雾外的不算；有视线要求时墙后不算 */
+/** 看：来源能打的身体里瞄得到的。世界打所有人；倒戈的打自己人；被嘲讽的观察者只看得见嘲讽者；隐匿的谁也看不见；碰不到的、不在同一个界的、躲在迷雾里而出手者在雾外的不算；有视线要求时看不见的不算 */
 export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
   if (by >= 0) {
@@ -67,14 +68,14 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   eachFoe(sim, src, cx, cy, reach, true, visit)
 }
 
-/** 碰：来源能打的身体里被覆盖到的，隐匿与嘲讽不算数，碰不到的与界外的仍不算，墙后仍不算 */
+/** 碰：来源能打的身体里被覆盖到的，隐匿、嘲讽与视线不算数，碰不到的与界外的仍不算；够不够得着由出手处另查（见 pass.covered） */
 export function eachTargetBody(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   eachFoe(sim, src, cx, cy, reach, false, visit)
 }
 
 /** 身体的实体接触：不看隐匿、嘲讽与视线，倒地的、碰不到的、界外的不算 */
 export function eachFoeBody(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
-  eachFoe(sim, { ...src, sight: undefined }, cx, cy, reach, false, visit)
+  eachFoe(sim, src, cx, cy, reach, false, visit)
 }
 
 /** 同阵营的身体，隐匿的也算，界外的不算；downed 为真时倒地的也算 */

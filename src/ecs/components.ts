@@ -182,7 +182,7 @@ export const Clock = { v: u8() }
 /** 不吃冲量的身体 */
 export const Anchored = {}
 
-/** 无视墙体的身体 */
+/** 穿墙的身体：材质允许的障碍挡不住它 */
 export const Phasing = {}
 
 export const Flash = { until: f32() }
@@ -220,6 +220,7 @@ export const Projectile = {}
 
 export const Vel = { x: f32(), y: f32() }
 
+/** 弹体：pierce 是还能贯穿的次数（身体与障碍共用）；arc 是抛射拱起的高度（米，平射为 0），reach 是抛射的全程、flown 是已经飞了多远（像素）；breach 是撞上障碍时的破坏力，through 为 1 的不受障碍阻挡 */
 export const Proj = {
   damage: f32(),
   radius: f32(),
@@ -228,6 +229,11 @@ export const Proj = {
   spin: f32(),
   dieAt: f32(),
   rotOffset: f32(),
+  arc: f32(),
+  reach: f32(),
+  flown: f32(),
+  breach: f32(),
+  through: u8(),
 }
 
 export const PrevPos = { x: f32(), y: f32() }
@@ -396,7 +402,7 @@ export const Shots = { n: i32() }
 
 export const Swing = { startMs: f32(), durMs: f32() }
 
-export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32(), homingDeg: f32(), linger: f32() }
+export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32(), homingDeg: f32(), linger: f32(), arc: f32() }
 
 export const Segment = { reach: f32(), radius: f32(), ms: f32(), lunge: f32(), beam: u8() }
 
@@ -540,6 +546,8 @@ export const Motion = {
   seek: u8(),
   /** 这段动作带着的伤害：冲刺撞人、跳跃落地按它结算 */
   dmg: f32(),
+  /** 冲刺还剩多少破坏力：撞上障碍时一路打掉 */
+  breach: f32(),
   look: u8(),
   color: u32(),
 }
@@ -629,8 +637,6 @@ export const WindupState = { until: f32(), angle: f32() }
 
 /** 飞在空中的身体：不受地面与介质影响 */
 export const Airborne = {}
-
-export const BreaksWalls = {}
 
 /** 这一帧身体能做什么：move 自己走、act 普通出手、cast 施放技能、dash 自己位移；forced 非零时被迫朝 f 点走（1 逃离、2 靠近） */
 export const Ctl = { move: u8(), act: u8(), cast: u8(), dash: u8(), forced: u8(), fx: f32(), fy: f32() }
