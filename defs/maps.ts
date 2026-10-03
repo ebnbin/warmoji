@@ -712,7 +712,7 @@ export const MAPS = {
       shadow: 0x000000,
     },
     decor: {
-      emojis: ['1f9b4', '1faa8'],
+      emojis: ['1f9b4'],
       sizeU: [0.3, 0.5],
       alpha: [0.75, 0.9],
       density: [0.002, 0.0035],

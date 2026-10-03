@@ -6,6 +6,7 @@ import { GROUND_PPU } from '../../data/texel'
 import { viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
 import { fbm } from '../../util/noise'
+import { devFlag } from '../../devtools/flags'
 import { spawnDecor } from '../entities/decor'
 import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
 import { DesertPainter } from './painter'
@@ -15,6 +16,7 @@ import { desertOf, desertPlanOf } from './world'
 import { wrapU } from './terrain'
 import type { PixelRect } from './ground'
 import type { DesertPlan, Landmark } from './terrain'
+import type { Solid } from './landmarks'
 import type { TrackTex } from './stamp'
 import type { DesertState } from './world'
 import type { EcsAtlas } from '../atlas'
@@ -41,6 +43,9 @@ const TRACK_UPLOAD_MS = 50
 const CANOPY_DEPTH = 20
 const RAG_DEPTH = 21
 const RAG_SHADOW_DEPTH = -0.5
+/** 开发工具里"显示碰撞边界"的开关：打开时标志物挡人的轮廓和别的地图的岩壁一样勾在一切之上 */
+const WALLS_FLAG = 'battle.walls'
+const WALLS_DEPTH = 1001
 /** 脚下扬起的沙最多每秒这么多团：人多的时候不糊成一片 */
 const PUFFS_PER_S = 40
 
@@ -78,6 +83,21 @@ function patchTexture(scene: Phaser.Scene, tex: Phaser.Textures.CanvasTexture, i
   gl.texSubImage2D(gl.TEXTURE_2D, 0, x, gt.flipY ? gt.height - y - img.height : y, gl.RGBA, gl.UNSIGNED_BYTE, img)
 }
 
+/** 勾一段挡人的胶囊：(cx, cy) 是标志物中心（像素） */
+function strokeSolid(g: Phaser.GameObjects.Graphics, cx: number, cy: number, s: Solid): void {
+  const x0 = cx + s.x0 * UNIT
+  const y0 = cy + s.y0 * UNIT
+  const x1 = cx + s.x1 * UNIT
+  const y1 = cy + s.y1 * UNIT
+  const r = s.r * UNIT
+  const a = Math.atan2(y1 - y0, x1 - x0)
+  g.beginPath()
+  g.arc(x1, y1, r, a - Math.PI / 2, a + Math.PI / 2, false)
+  g.arc(x0, y0, r, a + Math.PI / 2, a + (Math.PI * 3) / 2, false)
+  g.closePath()
+  g.strokePath()
+}
+
 /** 一团扬起的沙尘：边缘被噪声扰得参差，里面一絮一絮的浓淡；贴图边上一定透明 */
 function drawDust(ctx: CanvasRenderingContext2D, size: number): void {
   const img = ctx.createImageData(size, size)
@@ -113,6 +133,7 @@ export class DesertView implements MapView {
   private marks: LandmarkFx[] = []
   private ragGfx?: Phaser.GameObjects.Graphics
   private ragShadow?: Phaser.GameObjects.Graphics
+  private solidGfx?: Phaser.GameObjects.Graphics
   private puffs?: Phaser.GameObjects.Particles.ParticleEmitter
   private puffBudget = 0
 
@@ -230,7 +251,8 @@ export class DesertView implements MapView {
         emitting: false,
       })
       .setDepth(1.5)
-    this.visuals.push(this.ragShadow, this.ragGfx, this.puffs)
+    this.solidGfx = scene.add.graphics().setDepth(WALLS_DEPTH).setVisible(false)
+    this.visuals.push(this.ragShadow, this.ragGfx, this.puffs, this.solidGfx)
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.2, 0x140a04)
     this.step(v, sim, 0)
   }
@@ -313,13 +335,21 @@ export class DesertView implements MapView {
     }
   }
 
-  /** 每样标志物挪到离镜头最近的那一份上；破布条顺着盛行风飘，微风一阵紧一阵松，紧时飘得平、抖得急，影子落在杆影的尽头 */
+  /**
+   * 每样标志物挪到离镜头最近的那一份上；破布条顺着盛行风飘，微风一阵紧一阵松，紧时飘得平、抖得急，影子落在杆影的尽头。
+   * 打开了显示碰撞边界就把挡人的轮廓也勾在那一份上
+   */
   private placeLandmarks(s: DesertState, mid: Point, now: number): void {
     const size = s.plan.sizeU * UNIT
     const rag = this.ragGfx!
     const shade = this.ragShadow!
+    const walls = this.solidGfx!
     rag.clear()
     shade.clear()
+    walls.clear()
+    const showWalls = devFlag(WALLS_FLAG)
+    walls.setVisible(showWalls)
+    if (showWalls) walls.lineStyle(0.05 * UNIT, 0xff00ff, 1)
     const wx = Math.cos(s.plan.windAngle)
     const wy = Math.sin(s.plan.windAngle)
     const gust = 0.26 + 0.05 * Math.sin(now / 1700) + 0.03 * Math.sin(now / 430 + 1.1)
@@ -327,6 +357,7 @@ export class DesertView implements MapView {
       const x = mid.x + wrapU(m.land.x * UNIT - mid.x, size)
       const y = mid.y + wrapU(m.land.y * UNIT - mid.y, size)
       m.img?.setPosition(x, y)
+      if (showWalls) for (const sol of m.land.shape.solids) strokeSolid(walls, x, y, sol)
       if (!m.rag) continue
       const pole = m.land.shape.limbs[0]!
       const top = pole.z1
@@ -371,6 +402,7 @@ export class DesertView implements MapView {
     this.tracks = undefined
     this.ragGfx = undefined
     this.ragShadow = undefined
+    this.solidGfx = undefined
     this.puffs = undefined
     for (const key of [GROUND_KEY, TRACKS_KEY, INFO_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
     for (const key of v.scene.textures.getTextureKeys()) if (key.startsWith(CANOPY_KEY)) v.scene.textures.remove(key)

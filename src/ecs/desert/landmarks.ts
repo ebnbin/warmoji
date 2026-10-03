@@ -148,7 +148,7 @@ function cairn(rng: Rng): LandmarkShape {
   return { kind: 'cairn', limbs: [], stones, slab: null, solids: [around(stones)], reach: 0.5, top: 0.8 }
 }
 
-/** 驼骨：一条微弯的脊椎，一头是头骨，中段两侧的肋骨往外弯、一半埋在沙里，几根腿骨散在旁边 */
+/** 驼骨：一条微弯的脊椎，一头是头骨，中段两侧的肋骨往外弯、一半埋在沙里 */
 function bones(rng: Rng): LandmarkShape {
   const limbs: Limb[] = []
   const stones: Stone[] = []
@@ -186,16 +186,7 @@ function bones(rng: Rng): LandmarkShape {
       limbs.push({ x0: mx, y0: my, z0: lift, x1: ex, y1: ey, z1: 0.01, r0: 0.022, r1: 0.016 })
     }
   }
-  for (let k = 0; k < 4; k++) {
-    const b = rng.next() * TAU
-    const d = 0.45 + 0.35 * rng.next()
-    const s = rng.next() * TAU
-    const cx = Math.cos(b) * d
-    const cy = Math.sin(b) * d
-    const half = 0.2 + 0.08 * rng.next()
-    limbs.push({ x0: cx - Math.cos(s) * half, y0: cy - Math.sin(s) * half, z0: 0.04, x1: cx + Math.cos(s) * half, y1: cy + Math.sin(s) * half, z1: 0.04, r0: 0.04, r1: 0.032 })
-  }
-  // 尾巴一段细，带肋骨的一段宽，脖子连头骨一段；散落的腿骨贴着沙、跨得过去
+  // 尾巴一段细，带肋骨的一段宽，脖子连头骨一段
   const snout = { x: head.x + head.dx * 0.33, y: head.y + head.dy * 0.33 }
   const solids: Solid[] = [
     { x0: spine[0]!.x, y0: spine[0]!.y, x1: spine[3]!.x, y1: spine[3]!.y, r: 0.08 },
@@ -207,18 +198,12 @@ function bones(rng: Rng): LandmarkShape {
 
 function rock(rng: Rng, windAngle: number): LandmarkShape {
   const slab: Slab = { length: 1.9 + 0.6 * rng.next(), width: 0.85 + 0.3 * rng.next(), height: 0.36 + 0.2 * rng.next(), angle: windAngle + (rng.next() * 2 - 1) * 0.2 }
-  const stones: Stone[] = []
-  for (let k = 0; k < 5; k++) {
-    const a = rng.next() * TAU
-    const d = slab.length * (0.55 + 0.25 * rng.next())
-    stones.push({ x: Math.cos(a) * d, y: Math.sin(a) * d * 0.6, r: 0.06 + 0.06 * rng.next(), z0: 0, z1: 0.05 + 0.05 * rng.next() })
-  }
-  // 迎风钝、背风收尖：顺着长轴分三段，一段比一段细；周围的小石子跨得过去
+  // 迎风钝、背风收尖：顺着长轴分三段，一段比一段细
   const half = slab.length / 2
   const r0 = slab.width / 2
   const along = (u0: number, u1: number, r: number): Solid => ({ x0: Math.cos(slab.angle) * u0, y0: Math.sin(slab.angle) * u0, x1: Math.cos(slab.angle) * u1, y1: Math.sin(slab.angle) * u1, r })
   const solids = [along(-half + r0, 0, r0), along(0, half * 0.5, r0 * 0.72), along(half * 0.5, half * 0.86, r0 * 0.36)]
-  return { kind: 'rock', limbs: [], stones, slab, solids, reach: slab.length * 0.85, top: slab.height }
+  return { kind: 'rock', limbs: [], stones: [], slab, solids, reach: slab.length * 0.85, top: slab.height }
 }
 
 /** 按种类与种子生成一样标志物；岩盘顺着盛行风拉长 */
