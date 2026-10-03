@@ -1165,6 +1165,8 @@ const LINE_CLEAR_U = 0.35
 const LUNGE_U = 1.5
 /** 漂在水上的小东西随海流漂：速度朝海流靠拢的速率，每秒 */
 const FLOAT_K = 2
+/** 此刻的风推得动的身体落在离冰缘再远这么多的地方，格：免得一落地就被吹下海 */
+const BLOWN_U = 1
 
 /** 离冰缘 reach 格以内还朝着海走，就改为顺着冰缘走；正对着海时转向一侧 */
 function alongEdge(f: FloeField, x: number, y: number, dx: number, dy: number, reach: number): Point {
@@ -1387,6 +1389,28 @@ const floe: WorldHooks = {
   },
   settle(sim, p) {
     return ashore(floeOf(sim).field, p.x, p.y, SPAWN.edgeInset)
+  },
+  ground(sim) {
+    return floeOf(sim).ground
+  },
+  /** 落在冰上离冰缘留得出身体；此刻的风推得动它的地方（光冰、新冰）离冰缘再多留一截 */
+  canSpawn(sim, x, y, radius) {
+    const s = floeOf(sim)
+    if (!roomFor(s.ground, x, y, radius)) return false
+    const cfg = floeCfg(sim)
+    const w = windAt(s.field, cfg, s.gust, sim.elapsedMs)
+    const push = windPush(cfg, w.speed, w.angle, 0, 0, bulk(cfg, radius, ENEMY_BODY.mass))
+    const hold = frictionAt(s.field, cfg, x, y).s * (GRAVITY / cfg.meterPerU) * UNIT
+    return Math.hypot(push.x, push.y) <= hold || roomFor(s.ground, x, y, radius + BLOWN_U * UNIT)
+  },
+  landmarks(sim) {
+    return floeOf(sim).marks
+  },
+  /** 往上风偏，偏多少按此刻的风速（米/秒）：风从哪边来，从哪边冰缘爬上来的就多 */
+  lean(sim) {
+    const s = floeOf(sim)
+    const w = windAt(s.field, floeCfg(sim), s.gust, sim.elapsedMs)
+    return { x: -Math.cos(w.angle) * w.speed, y: -Math.sin(w.angle) * w.speed }
   },
   onStart(sim) {
     floeOf(sim)

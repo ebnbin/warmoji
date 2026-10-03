@@ -3,6 +3,8 @@ import { fbm } from '../../util/noise.ts'
 import { Rng } from '../../util/rng.ts'
 import type { FloeConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
+import type { Basin } from './basin'
+import type { Landmark } from './gates'
 
 /** 重力加速度，米/秒² */
 export const GRAVITY = 9.81
@@ -757,9 +759,11 @@ export interface Splash {
   readonly sink: boolean
 }
 
-/** 一局里的浮冰：地形、各个身体的状态、冰上的路、海流与这一轮阵风 */
+/** 一局里的浮冰：地形与出怪口用的冰面、地标，各个身体的状态、冰上的路、海流与这一轮阵风 */
 export interface FloeState {
   readonly field: FloeField
+  readonly ground: Basin
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly feet: Map<number, Footing>
   readonly paths: IcePaths
   readonly current: Point
@@ -774,9 +778,72 @@ export interface FloeState {
 const PATH_CELL_U = 0.5
 const PATH_CLEAR_U = 0.6
 
+/** 新冰缝上的口子沿缝每隔这么远一处，格；口子的半径不超过这么大，格 */
+const SEAM_STEP_U = 4
+const MARK_R_U = 0.8
+/** 雪堆上的口子：积雪至少有最深处的这么多（比例），离冰缘至少这么远，彼此至少隔这么远，格；按这么大的步子找 */
+const DRIFT_DEEP = 0.6
+const DRIFT_EDGE_U = 1.5
+const DRIFT_APART_U = 4.5
+const DRIFT_STEP_U = 0.5
+
+/** 冰面当作能站的地面：到冰缘的距离换成像素，格子最外一圈按海 */
+function groundOf(f: FloeField): Basin {
+  const room = new Float32Array(f.edge.length)
+  for (let i = 0; i < room.length; i++) room[i] = f.edge[i]! * UNIT
+  for (let j = 0; j < f.rows; j++) {
+    for (let i = 0; i < f.cols; i++) {
+      if (i > 0 && j > 0 && i < f.cols - 1 && j < f.rows - 1) continue
+      const k = j * f.cols + i
+      room[k] = Math.min(room[k]!, -f.cell)
+    }
+  }
+  return { cols: f.cols, rows: f.rows, cell: f.cell, x0: 0, y0: 0, room }
+}
+
+/** 浮冰的地标，像素：seam 是新冰缝上每隔一段的一处，drift 是积雪最深的几处雪堆，都在冰面中间、不朝哪边 */
+function marksOf(f: FloeField): Record<string, Landmark[]> {
+  const seam: Landmark[] = []
+  const step = SEAM_STEP_U * UNIT
+  for (const sm of f.seams) {
+    let at = step / 2
+    for (let i = 1; i < sm.line.length; i++) {
+      const a = sm.line[i - 1]!
+      const b = sm.line[i]!
+      const len = Math.hypot(b.x - a.x, b.y - a.y)
+      for (; at <= len; at += step) {
+        const t = at / len
+        const x = a.x + (b.x - a.x) * t
+        const y = a.y + (b.y - a.y) * t
+        if (edgeAt(f, x, y) >= 1) seam.push({ x, y, r: Math.min(MARK_R_U * UNIT, sm.half[i]!), nx: 0, ny: 0 })
+      }
+      at -= len
+    }
+  }
+  const stride = Math.max(1, Math.round((DRIFT_STEP_U * UNIT) / f.cell))
+  let deepest = 0
+  for (let k = 0; k < f.snow.length; k++) deepest = Math.max(deepest, f.snow[k]!)
+  const spots: { x: number; y: number; d: number }[] = []
+  for (let j = 0; j < f.rows; j += stride) {
+    for (let i = 0; i < f.cols; i += stride) {
+      const k = j * f.cols + i
+      if (f.snow[k]! < deepest * DRIFT_DEEP || f.edge[k]! < DRIFT_EDGE_U) continue
+      spots.push({ x: (i + 0.5) * f.cell, y: (j + 0.5) * f.cell, d: f.snow[k]! })
+    }
+  }
+  const drift: Landmark[] = []
+  for (const p of spots.sort((a, b) => b.d - a.d)) {
+    if (drift.some((m) => Math.hypot(m.x - p.x, m.y - p.y) < DRIFT_APART_U * UNIT)) continue
+    drift.push({ x: p.x, y: p.y, r: MARK_R_U * UNIT, nx: 0, ny: 0 })
+  }
+  return { seam, drift }
+}
+
 export function newFloe(field: FloeField, cfg: FloeConfig): FloeState {
   return {
     field,
+    ground: groundOf(field),
+    marks: marksOf(field),
     feet: new Map(),
     paths: new IcePaths(field, PATH_CELL_U, PATH_CLEAR_U),
     current: currentOf(field, cfg),
