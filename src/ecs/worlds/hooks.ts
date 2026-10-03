@@ -31,7 +31,7 @@ import { hasComponent, query, removeEntity } from 'bitecs'
 import { Airborne, Alive, Boss, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
-import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
+import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/oldRuins'
 import { hit } from '../systems/shared/damage'
 import { despawnEnemy, die } from '../systems/shared/combat'
 import { cullProjectile } from '../systems/shared/projectile'
@@ -46,10 +46,12 @@ import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { river } from '../river/world'
+import { ruins } from '../ruins/world'
 import { phases } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
 import type { RiverState } from '../river/world'
+import type { RuinsState } from '../ruins/world'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -95,13 +97,14 @@ export interface WorldState {
   volcano: VolcanoState | null
   ship: ShipState | null
   river: RiverState | null
+  ruins: RuinsState | null
   nebula: NebulaState | null
   floe: FloeState | null
   cave: CaveState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null }
 }
 
 export interface WorldHooks {
@@ -283,7 +286,7 @@ const ice: WorldHooks = {
   },
 }
 
-const ruins: WorldHooks = {
+const oldRuins: WorldHooks = {
   ...bounded,
   onStart(sim) {
     const cfg = MAPS[sim.mapId].walls
@@ -1669,7 +1672,8 @@ const torus: WorldHooks = {
 const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   bounded,
   daynight: bounded,
-  ruins: ruins,
+  oldRuins,
+  ruins,
   ice,
   oldRiver,
   void: torus,
@@ -1688,7 +1692,7 @@ const BUILT = new Map<WorldHooks, WorldHooks>()
 /** 地图的规则，叠上能力造出的地形 */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
-  const base = def.ice ? ice : def.walls ? ruins : BY_KIND[def.kind]!
+  const base = def.ice ? ice : def.walls ? oldRuins : BY_KIND[def.kind]!
   let hooks = BUILT.get(base)
   if (!hooks) {
     hooks = withBuilt(base)

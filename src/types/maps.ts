@@ -664,6 +664,112 @@ export interface RiverConfig {
     readonly wetM: number
   }
 }
+/**
+ * 残垣：山顶台地上一座塌了大半的石砌院落——中间是回廊院，四周一圈房间，一角是塔楼。墙按一层层石块砌成，各处剩多高按砌体的物理来：
+ * 高过膝盖挡人、高过胸口挡子弹、高过眼睛挡视线（按 obstacles 的身高比例）；打掉的石块以上失去支撑一起塌下，陡过砌法的地方塌成台阶，
+ * 塌下来的落石砸人、在墙脚按休止角堆成碎石、扬起挡视线的尘雾。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface RuinsConfig {
+  readonly meterPerU: number
+  /** 砌体格子的边长，格：每格记剩几层石块、封着的木板与地上的碎石 */
+  readonly cellU: number
+  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地边到地图边留 padU 格的山坡；窄过两倍 neckU 的缝填掉 */
+  readonly site: {
+    readonly marginU: readonly [number, number]
+    readonly waveU: number
+    readonly padU: number
+    readonly neckU: number
+  }
+  /**
+   * 院落的平面：整体转过 tiltDeg 度；回廊院中间的庭院多大、回廊多宽，四周房间的进深与开间（格）；门洞多宽，通到院外的门几道，
+   * 连通以外每道墙再开门的概率；外墙、内墙、塔楼的墙与柱廊矮墙的厚（格）
+   */
+  readonly plan: {
+    readonly tiltDeg: readonly [number, number]
+    readonly garthU: readonly [number, number]
+    readonly walkU: number
+    readonly depthU: readonly [number, number]
+    readonly roomU: readonly [number, number]
+    readonly doorU: readonly [number, number]
+    readonly gates: readonly [number, number]
+    readonly loops: number
+    readonly wallU: {
+      readonly outer: number
+      readonly inner: number
+      readonly tower: number
+      readonly parapet: number
+    }
+  }
+  /** 砌体：一层石块高 courseM 米、密度（千克/米³）；同一处相邻两格最多差 bond 层才立得住；原本多高（米）：外墙、内墙、塔楼、柱廊的矮墙与石柱 */
+  readonly masonry: {
+    readonly courseM: number
+    readonly density: number
+    readonly bond: number
+    readonly heightM: {
+      readonly outer: readonly [number, number]
+      readonly inner: readonly [number, number]
+      readonly tower: readonly [number, number]
+      readonly parapet: number
+      readonly column: number
+    }
+  }
+  /** 柱廊：石柱的底半径与柱距（格），每边拆掉几个柱间的矮墙当入口 */
+  readonly arcade: {
+    readonly radiusU: number
+    readonly spacingU: number
+    readonly entries: readonly [number, number]
+  }
+  /**
+   * 年久失修：墙顶按低频噪声（波长 waveU 格）往下塌，剩原高的 keep 那么多；几处半径 razeU 格的地方拆到只剩墙基；开局前再预演几次多大的破坏（立方米）。
+   * 石柱折断、倒下的比例；塌下来的石块留在墙脚的比例（其余早被搬走）
+   */
+  readonly decay: {
+    readonly waveU: number
+    readonly keep: readonly [number, number]
+    readonly razed: readonly [number, number]
+    readonly razeU: readonly [number, number]
+    readonly breaches: readonly [number, number]
+    readonly breachM3: readonly [number, number]
+    readonly broken: number
+    readonly fallen: number
+    readonly rubble: number
+  }
+  /** 封门的木板：几道门洞、多高（米）、多厚（格） */
+  readonly timber: {
+    readonly doors: readonly [number, number]
+    readonly heightM: number
+    readonly thickU: number
+  }
+  /** 碎石：休止角（度）；碎石深 fullM 米时走起来最慢：黏滞与每走一格多耗的体力 */
+  readonly rubble: {
+    readonly reposeDeg: number
+    readonly fullM: number
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /** 落石：每千焦的冲击打掉多少血；落在身体半径外多远（格）也砸得到 */
+  readonly fall: {
+    readonly damagePerKJ: number
+    readonly radiusU: number
+  }
+  /** 尘雾：每塌下一立方米扬起多少（消光系数乘面积，米），摊开的半径（格），多久落下一半（秒）；视线攒下的光学厚度到 opaqueTau 就看不穿 */
+  readonly dust: {
+    readonly perM3: number
+    readonly spreadU: number
+    readonly halfLifeS: number
+    readonly opaqueTau: number
+  }
+  /** 台地边外的树：树冠半径（格）、树高（米）、撒树的格子间距（格） */
+  readonly trees: {
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly gapU: number
+  }
+  /** 撞墙时身体的半径最多按这么大算（格）：大个子也挤得过门洞 */
+  readonly bodyCapU: number
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -674,7 +780,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -695,13 +801,14 @@ export interface MapDef {
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
   readonly river?: RiverConfig
+  readonly ruins?: RuinsConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse'
 
 export interface DecorInstance {
   emoji: string

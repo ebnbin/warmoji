@@ -60,6 +60,7 @@ import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { RiverView } from './river/view'
+import { RuinsView } from './ruins/view'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -528,7 +529,7 @@ class NebulaOldView extends BoundedView {
   }
 }
 
-class RuinsView extends BoundedView {
+class OldRuinsView extends BoundedView {
   private tiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
 
   onSimReady(v: ViewCtx, sim: Sim): void {
@@ -3469,6 +3470,7 @@ export function viewFor(mapId: MapId): MapView {
 const MAKE: Record<MapDef['kind'], () => MapView> = {
   bounded: () => new BoundedView(),
   daynight: () => new DayNightView(),
+  oldRuins: () => new OldRuinsView(),
   ruins: () => new RuinsView(),
   ice: () => new IceView(),
   oldRiver: () => new OldRiverView(),
