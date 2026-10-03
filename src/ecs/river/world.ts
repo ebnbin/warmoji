@@ -248,6 +248,9 @@ export const river: WorldHooks = {
   basin(sim) {
     return riverOf(sim).plan.basin
   },
+  ground(sim) {
+    return riverOf(sim).plan.basin
+  },
   chaseDir(sim, eid, tx, ty) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
@@ -303,7 +306,7 @@ export const river: WorldHooks = {
   landmarks() {
     return NO_MARKS
   },
-  slope() {
+  lean() {
     return ZERO
   },
   onStart(sim) {

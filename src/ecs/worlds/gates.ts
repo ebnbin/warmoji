@@ -1,12 +1,12 @@
 import { ACQUIRE } from '../../data/abilities'
-import { SPAWN } from '../../data/enemies'
+import { ENEMIES, SPAWN } from '../../data/enemies'
 import { ENTRANCE } from '../../data/feel'
 import { MAPS } from '../../data/maps'
-import { DEG2RAD, UNIT } from '../../util/units'
+import { UNIT } from '../../util/units'
 import { Rng } from '../../util/rng'
 import type { Point } from '../../util/vec'
 import type { EnemyKind } from '../../types/enemies'
-import type { Entrance, GateAway, GateKind, GatesConfig } from '../../types/maps'
+import type { Entrance, EntranceLook, GateAway, GateKind, GatesConfig } from '../../types/maps'
 import type { SpawnAt } from '../../types/runs'
 import { awayFromWall, roomAt, wallLoops } from './basin'
 import type { Basin } from './basin'
@@ -40,9 +40,10 @@ export interface Gate {
   readonly ny: number
 }
 
-/** 一只敌人怎么进场，像素：从哪一处出怪口（原地冒出来的为空）、怎么进、起点与落点；at 是关卡给的站位，落点到时站不住时按它重找，moves 是已经换过几次 */
+/** 一只敌人怎么进场，像素：从哪一处出怪口与它是哪一种（原地冒出来的都为空）、怎么进、起点与落点；at 是关卡给的站位，落点到时站不住时按它重找，moves 是已经换过几次 */
 export interface Entry {
   readonly gate: string | null
+  readonly kind: string | null
   readonly enter: Entrance
   readonly sx: number
   readonly sy: number
@@ -65,12 +66,23 @@ interface GateUse {
   readonly spots: { x: number; y: number; t: number }[]
 }
 
-/** 这一场的出怪口：不随时间变的几处按建出它们时的地图宽高留着，每处的计数，吸附不到在原地出来的与落点到时换地方的次数 */
+/** 一只还在进场路上的敌人：到 at 毫秒落地时在 x、y 冒出它的样子，落地前倒下或换了实体（uid 对不上）就不冒 */
+export interface Touchdown {
+  readonly at: number
+  readonly eid: number
+  readonly uid: number
+  readonly look: EntranceLook
+  readonly x: number
+  readonly y: number
+}
+
+/** 这一场的出怪口：不随时间变的几处按建出它们时的地图宽高留着，每处的计数，还在进场路上的，吸附不到在原地出来的与落点到时换地方的次数 */
 export interface GateRuntime {
   readonly w: number
   readonly h: number
   readonly fixed: readonly Gate[]
   readonly use: Map<string, GateUse>
+  readonly landing: Touchdown[]
   misses: number
   moves: number
 }
@@ -156,8 +168,8 @@ function fixedGates(sim: Sim, cfg: GatesConfig): Gate[] {
     const at = def.at
     if (at.kind === 'ground') out.push({ key: `${kind}:0`, kind, def, shape: 'area', ax: 0, ay: 0, bx: 0, by: 0, r: 0, nx: 0, ny: 0 })
     if (at.kind !== 'rim' && at.kind !== 'nooks') continue
-    const b = sim.hooks.basin(sim)
-    if (!b) throw new Error(`地图 ${sim.mapId} 的出怪口 ${kind} 摆在外边界上，地图却没有能走的地面的边界`)
+    const b = sim.hooks.ground(sim)
+    if (!b) throw new Error(`地图 ${sim.mapId} 的出怪口 ${kind} 摆在外边界上，地图却没有给能站的地面`)
     const ring = resample(outerLoop(b), STEP_U * UNIT)
     let n = 0
     if (at.kind === 'rim') {
@@ -190,7 +202,7 @@ function fixedGates(sim: Sim, cfg: GatesConfig): Gate[] {
 function runtime(sim: Sim, cfg: GatesConfig): GateRuntime {
   const old = sim.worldState.gates
   if (old && old.w === sim.mapW && old.h === sim.mapH) return old
-  const rt: GateRuntime = { w: sim.mapW, h: sim.mapH, fixed: fixedGates(sim, cfg), use: new Map(), misses: old?.misses ?? 0, moves: old?.moves ?? 0 }
+  const rt: GateRuntime = { w: sim.mapW, h: sim.mapH, fixed: fixedGates(sim, cfg), use: new Map(), landing: old?.landing ?? [], misses: old?.misses ?? 0, moves: old?.moves ?? 0 }
   sim.worldState.gates = rt
   return rt
 }
@@ -270,13 +282,13 @@ function hitOf(g: Gate, p: Point): { readonly d: number; readonly x: number; rea
   }
 }
 
-/** 地面倾斜时低的一侧边上的出怪口：朝外的方向越顺着下坡，权重乘得越多 */
+/** 地图偏向的那一侧：出怪口朝外的方向越顺着偏向，权重乘得越多 */
 function bias(sim: Sim, cfg: GatesConfig, g: Gate): number {
-  const low = cfg.lowSide
-  if (!low || (g.nx === 0 && g.ny === 0)) return 1
-  const s = sim.hooks.slope(sim)
-  const down = -(g.nx * s.x + g.ny * s.y) / Math.sin(low.fullDeg * DEG2RAD)
-  return 1 + (low.mul - 1) * Math.min(1, Math.max(0, down))
+  const lean = cfg.lean
+  if (!lean || (g.nx === 0 && g.ny === 0)) return 1
+  const l = sim.hooks.lean(sim)
+  const toward = -(g.nx * l.x + g.ny * l.y) / lean.full
+  return 1 + (lean.mul - 1) * Math.min(1, Math.max(0, toward))
 }
 
 interface Landing {
@@ -319,13 +331,15 @@ function sampleLanding(sim: Sim, g: Gate, hit: Point, p: Point): Landing {
   return { sx: base.x - g.nx * out, sy: base.y - g.ny * out, x: base.x + g.nx * d - g.ny * side, y: base.y + g.ny * d + g.nx * side }
 }
 
-/** 挑一个落点：试几次，站得住的里面离这一处刚落下的几只最远的；都站不住是 null */
-function landing(sim: Sim, g: Gate, hit: Point, p: Point, u: GateUse, now: number): Landing | null {
+/** 挑一个落点：试几次，半径 radius 的身体站得住、翻进的起点在能站的地面外的里面，离这一处刚落下的几只最远的；都不行是 null */
+function landing(sim: Sim, g: Gate, hit: Point, p: Point, u: GateUse, now: number, radius: number): Landing | null {
+  const ground = g.def.enter === 'climb' ? sim.hooks.ground(sim) : null
   let best: Landing | null = null
   let bestGap = -1
   for (let i = 0; i < LANDING_TRIES; i++) {
     const c = sampleLanding(sim, g, hit, p)
-    if (!sim.hooks.canSpawn(sim, c.x, c.y)) continue
+    if (!sim.hooks.canSpawn(sim, c.x, c.y, radius)) continue
+    if (ground && roomAt(ground, c.sx, c.sy) >= 0) continue
     let gap = Infinity
     for (const s of u.spots) if (now - s.t <= SPOT_MS) gap = Math.min(gap, Math.hypot(c.x - s.x, c.y - s.y))
     if (gap > bestGap) {
@@ -352,20 +366,20 @@ function byWeight(sim: Sim, list: readonly Candidate[]): Candidate[] {
 }
 
 /** 依次试候选的出怪口，第一处落点站得住的就是它 */
-function firstLanding(sim: Sim, rt: GateRuntime, order: readonly Candidate[], p: () => Point): Entry | null {
+function firstLanding(sim: Sim, rt: GateRuntime, order: readonly Candidate[], p: () => Point, radius: number): Entry | null {
   const now = sim.elapsedMs
   for (const c of order) {
     const u = useOf(rt, c.g, now)
-    const at = landing(sim, c.g, c.hit, p(), u, now)
+    const at = landing(sim, c.g, c.hit, p(), u, now, radius)
     if (!at) continue
     record(u, at.x, at.y, now)
-    return { gate: c.g.key, enter: c.g.def.enter, ...at, moves: 0 }
+    return { gate: c.g.key, kind: c.g.kind, enter: c.g.def.enter, ...at, moves: 0 }
   }
   return null
 }
 
 /** p 吸附到哪一处出怪口：snapU 格以内、接这种敌人、此刻还出得了的里面按权重抽；都不行是 null */
-function snap(sim: Sim, cfg: GatesConfig, rt: GateRuntime, p: Point, enemy: EnemyKind): Entry | null {
+function snap(sim: Sim, cfg: GatesConfig, rt: GateRuntime, p: Point, enemy: EnemyKind, radius: number): Entry | null {
   const now = sim.elapsedMs
   const reach = cfg.snapU * UNIT
   const list: Candidate[] = []
@@ -376,14 +390,14 @@ function snap(sim: Sim, cfg: GatesConfig, rt: GateRuntime, p: Point, enemy: Enem
     if (!ready(useOf(rt, g, now), g.def, now)) continue
     list.push({ g, hit: h, w: g.def.weight * bias(sim, cfg, g) })
   }
-  return firstLanding(sim, rt, byWeight(sim, list), () => p)
+  return firstLanding(sim, rt, byWeight(sim, list), () => p, radius)
 }
 
 /**
  * 指定种类的出怪口：接这种敌人的几处里，离队长在 near 到索敌距离之间的按权重抽，一处都不在就从离这个范围最近的试起；
  * 段按两头与中点试，整片地面与抛得到的圈按 base 定下的出生点试。设计好的一队不看每一处还出不出得了
  */
-function pick(sim: Sim, cfg: GatesConfig, rt: GateRuntime, kind: string, enemy: EnemyKind, boss: boolean, base: () => Point): Entry | null {
+function pick(sim: Sim, cfg: GatesConfig, rt: GateRuntime, kind: string, enemy: EnemyKind, boss: boolean, base: () => Point, radius: number): Entry | null {
   const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
   const far = ACQUIRE.range * UNIT
   const lx = leaderX(sim)
@@ -407,18 +421,18 @@ function pick(sim: Sim, cfg: GatesConfig, rt: GateRuntime, kind: string, enemy: 
     }
   }
   const order = [...byWeight(sim, banded), ...rest.sort((a, b) => a.off - b.off)]
-  return firstLanding(sim, rt, order, p)
+  return firstLanding(sim, rt, order, p, radius)
 }
 
-/** p 附近站得住的一点：由近到远绕几圈找，找不到就是 p */
-function standNear(sim: Sim, p: Point): Point {
-  if (sim.hooks.canSpawn(sim, p.x, p.y)) return p
+/** p 附近半径 radius 的身体站得住的一点：由近到远绕几圈找，找不到就是 p */
+function standNear(sim: Sim, p: Point, radius: number): Point {
+  if (sim.hooks.canSpawn(sim, p.x, p.y, radius)) return p
   for (let ring = 1; ring <= 6; ring++) {
     const r = ring * 0.6 * UNIT
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2 + ring
       const q = { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
-      if (sim.hooks.canSpawn(sim, q.x, q.y)) return q
+      if (sim.hooks.canSpawn(sim, q.x, q.y, radius)) return q
     }
   }
   return p
@@ -431,17 +445,18 @@ function standNear(sim: Sim, p: Point): Point {
 export function gateEntry(sim: Sim, at: SpawnAt | undefined, enemy: EnemyKind, boss: boolean, base: () => Point): Entry {
   const cfg = MAPS[sim.mapId].gates!
   const rt = runtime(sim, cfg)
+  const radius = ENEMIES[enemy].radius * UNIT
   const named = at?.kind === 'gate' ? at.gate : boss && at === undefined ? cfg.boss : undefined
   if (named !== undefined && cfg.kinds[named] !== undefined) {
-    const e = pick(sim, cfg, rt, named, enemy, boss, base)
+    const e = pick(sim, cfg, rt, named, enemy, boss, base, radius)
     if (e) return { ...e, at }
   }
   const p = base()
-  const e = snap(sim, cfg, rt, p, enemy)
+  const e = snap(sim, cfg, rt, p, enemy, radius)
   if (e) return { ...e, at }
   rt.misses++
-  const q = standNear(sim, p)
-  return { gate: null, enter: cfg.fallback, sx: q.x, sy: q.y, x: q.x, y: q.y, at, moves: 0 }
+  const q = standNear(sim, p, radius)
+  return { gate: null, kind: null, enter: cfg.fallback, sx: q.x, sy: q.y, x: q.x, y: q.y, at, moves: 0 }
 }
 
 /** 落点到时站不住了（比如熔岩漫了过来）：按原来的站位重找一处 */
@@ -449,6 +464,30 @@ export function moveEntry(sim: Sim, e: Entry, enemy: EnemyKind, boss: boolean, b
   const next = gateEntry(sim, e.at, enemy, boss, base)
   runtime(sim, MAPS[sim.mapId].gates!).moves++
   return { ...next, moves: e.moves + 1 }
+}
+
+/** 这只敌人进场时冒出的样子：从出怪口出来的按那种口子，原地出来的按地图 */
+export function entryLook(sim: Sim, e: Entry): EntranceLook {
+  const cfg = MAPS[sim.mapId].gates!
+  return (e.kind === null ? cfg.look : cfg.kinds[e.kind]!.look) ?? 'puff'
+}
+
+/** 记下一只还在进场路上的敌人 */
+export function expectLanding(sim: Sim, t: Touchdown): void {
+  runtime(sim, MAPS[sim.mapId].gates!).landing.push(t)
+}
+
+/** 到点落地的：交出去冒样子，没到的留着 */
+export function takeLandings(sim: Sim): Touchdown[] {
+  const list = sim.worldState.gates?.landing
+  if (!list || list.length === 0) return []
+  const now = sim.elapsedMs
+  const due = list.filter((t) => t.at <= now)
+  if (due.length === 0) return due
+  const rest = list.filter((t) => t.at > now)
+  list.length = 0
+  list.push(...rest)
+  return due
 }
 
 /** 进场动作要多久，毫秒：钻出没有动作，抛入按飞多远 */

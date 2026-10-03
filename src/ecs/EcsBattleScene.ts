@@ -157,9 +157,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private skillAim: Point | null = null
   private aimGfx?: Phaser.GameObjects.Graphics
   private damageText?: DamageTextLayer
-  private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
-  private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
-  private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  private bursts!: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter>
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
   private camAnchor!: Phaser.GameObjects.Zone
@@ -439,9 +437,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.map.decor(this.ctx, atlas)
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
-    this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
-    this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
-    this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
+    this.bursts = {
+      death: burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230),
+      coin: burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340),
+      puff: burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520),
+      splash: burstEmitter(this, [0xe3f2fd, 0xbbdefb, 0xffffff, 0x90caf9], 190, 620, { gravityY: 520 }),
+      steam: burstEmitter(this, [0xfafafa, 0xeceff1, 0xe0e0e0], 55, 1300, { gravityY: -70, scale: { start: 0.6, end: 1.6 }, alpha: { start: 0.5, end: 0 } }),
+      sparks: burstEmitter(this, [0xffe082, 0xff9800, 0xff3d00], 240, 700, { gravityY: 180, blendMode: Phaser.BlendModes.ADD }),
+      snow: burstEmitter(this, [0xffffff, 0xe3f2fd, 0xd6e9f8], 120, 900, { gravityY: 90 }),
+      leaves: burstEmitter(this, [0x7cb342, 0x558b2f, 0x9ccc65, 0x8d6e63], 110, 950, { gravityY: 110, rotate: { min: 0, max: 360 } }),
+      glow: burstEmitter(this, [0xd1c4e9, 0x80deea, 0xffffff, 0xb388ff], 150, 800, { blendMode: Phaser.BlendModes.ADD }),
+    }
     const origin = { x: this.camAnchor.x, y: this.camAnchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
@@ -477,12 +483,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       }
     })
     drain(out.bursts, (bs) => {
-      const byKind: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter> = {
-        death: this.deathBurst,
-        coin: this.coinBurst,
-        puff: this.puffBurst,
-      }
-      for (const b of bs) byKind[b.kind]!.explode(b.count, b.x, b.y)
+      for (const b of bs) this.bursts[b.kind].explode(b.count, b.x, b.y)
     })
     if (out.flash) {
       this.cues?.screenFlash(out.flash.color, out.flash.alpha, out.flash.durationMs)

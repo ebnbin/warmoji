@@ -2,7 +2,7 @@ import { playSfx } from '../../audio/sfx'
 import { SPAWN } from '../../data/enemies'
 import { attachCarrierRing } from '../entities/pickup'
 import { markBounty, sightedSpawnPoint, spawnEnemy } from '../entities/enemy'
-import { enterBody } from '../entities/entrance'
+import { enterBody, landEntries } from '../entities/entrance'
 import { telegraphDelay } from '../entities/telegraph'
 import { enemyCarries, telegraphDef, telegraphEntry, telegraphTraits } from '../store'
 import { Bounty, Due, Telegraph, Transform } from '../components'
@@ -31,10 +31,11 @@ function retarget(sim: Sim, t: number, e: Entry): void {
 export function spawnStep(sim: Sim): void {
   const atlas = sim.frames
   const now = sim.elapsedMs
+  landEntries(sim)
   for (const e of [...query(sim.world, [Telegraph, Due])]) {
     if (now < Due.at[e]!) continue
     const entry = telegraphEntry[e]
-    if (entry && entry.moves < MAX_MOVES && !sim.hooks.canSpawn(sim, entry.x, entry.y)) {
+    if (entry && entry.moves < MAX_MOVES && !sim.hooks.canSpawn(sim, entry.x, entry.y, telegraphDef[e]!.radius)) {
       retarget(sim, e, entry)
       continue
     }

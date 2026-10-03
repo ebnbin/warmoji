@@ -1,4 +1,4 @@
-import { UNIT } from '../../util/units'
+import { DEG2RAD, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
@@ -126,6 +126,8 @@ export interface WorldHooks {
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
   /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
+  /** 能站的地面：出怪口沿它的外边界摆，翻进从它外面起跳；默认是 basin，冰面外是海、空腔外是软壳层这类没有硬墙的地图另给 */
+  ground(sim: Sim): Basin | null
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
   wallHit(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   smashWall(sim: Sim, x: number, y: number): void
@@ -138,12 +140,12 @@ export interface WorldHooks {
   center(sim: Sim): Point
   /** 把一个点收进敌人能站、能走到队伍的范围 */
   settle(sim: Sim, p: Point): Point
-  /** 这里此刻能不能冒出一只敌人：在能走的地面上、脚下没有要命的东西；只有出怪口挑落点时用 */
-  canSpawn(sim: Sim, x: number, y: number): boolean
-  /** 地图自己的地标，按组：出怪口里摆在同名地标上的从这里取，有的组只在某些时候有东西（火山口只在喷发时） */
+  /** 半径 radius 像素的一只敌人此刻能不能落在这里：站得下、脚下没有要命的东西；只有出怪口挑落点时用 */
+  canSpawn(sim: Sim, x: number, y: number, radius: number): boolean
+  /** 地图自己的地标，按组：出怪口里摆在同名地标上的从这里取；一组要么整组都在、要么整组都空（火山口只在喷发时有），组里的次序不变 */
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
-  /** 地面往哪边倾、倾多少：沿地面的重力占重力的比例，朝下坡；平地为零 */
-  slope(sim: Sim): Point
+  /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（船是倾角的度数，浮冰是风速）；不偏为零 */
+  lean(sim: Sim): Point
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
@@ -229,13 +231,16 @@ const bounded: WorldHooks = {
     const inset = SPAWN.edgeInset * UNIT
     return { x: Math.min(Math.max(p.x, inset), sim.mapW - inset), y: Math.min(Math.max(p.y, inset), sim.mapH - inset) }
   },
+  ground(sim) {
+    return sim.hooks.basin(sim)
+  },
   canSpawn() {
     return true
   },
   landmarks() {
     return NO_MARKS
   },
-  slope() {
+  lean() {
     return ZERO
   },
   onStart() {},
@@ -756,7 +761,7 @@ function clearGround(sim: Sim, p: Point): boolean {
   return roomAt(f.basin, p.x, p.y) >= UNIT && !moltenAt(f, p.x, p.y)
 }
 
-/** 出怪口的落点离岩壁至少这么远：一只身体放得下 */
+/** 出怪口的落点离岩壁至少这么远，大的身体按它自己的半径 */
 const LANDING_ROOM = 0.5 * UNIT
 
 /**
@@ -793,9 +798,9 @@ const volcano: WorldHooks = {
   settle(sim, p) {
     return keepOut(volcanoOf(sim).field.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
-  canSpawn(sim, x, y) {
+  canSpawn(sim, x, y, radius) {
     const f = volcanoOf(sim).field
-    return roomAt(f.basin, x, y) >= LANDING_ROOM && !moltenAt(f, x, y)
+    return roomAt(f.basin, x, y) >= Math.max(LANDING_ROOM, radius) && !moltenAt(f, x, y)
   },
   /** 火山口只在喷发时抛出东西 */
   landmarks(sim) {
@@ -906,16 +911,19 @@ const ship: WorldHooks = {
   settle(sim, p) {
     return keepOut(shipOf(sim).deck.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
-  canSpawn(sim, x, y) {
-    return roomAt(shipOf(sim).deck.basin, x, y) >= LANDING_ROOM
+  canSpawn(sim, x, y, radius) {
+    return roomAt(shipOf(sim).deck.basin, x, y) >= Math.max(LANDING_ROOM, radius)
   },
   landmarks(sim) {
     return shipOf(sim).deck.marks
   },
-  slope(sim) {
+  /** 往低的一舷偏，偏多少按倾角的度数：低的一侧干舷离水面近，登船的多 */
+  lean(sim) {
     const s = shipOf(sim)
-    const g = (SHIP_G * UNIT) / shipCfg(sim).meterPerU
-    return { x: s.gx / g, y: s.gy / g }
+    const along = Math.hypot(s.gx, s.gy)
+    if (along === 0) return ZERO
+    const deg = Math.asin(Math.min(1, along / ((SHIP_G * UNIT) / shipCfg(sim).meterPerU))) / DEG2RAD
+    return { x: (s.gx / along) * deg, y: (s.gy / along) * deg }
   },
   onStart(sim) {
     shipOf(sim)

@@ -179,7 +179,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const kinds = Object.entries(g.kinds)
   const at = `maps.${id}.gates`
   need(g.snapU > 0 && kinds.length > 0, `${at} 的吸附半径须为正、至少一种出怪口`)
-  need(g.lowSide === undefined || (g.lowSide.mul >= 1 && g.lowSide.fullDeg > 0 && g.lowSide.fullDeg < 90), `${at}.lowSide 的倍率不小于 1、角度在 0 到 90 度之间`)
+  need(g.lean === undefined || (g.lean.mul >= 1 && g.lean.full > 0), `${at}.lean 的倍率不小于 1、偏满的量为正`)
   for (const [k, d] of kinds) {
     const p = `${at}.kinds.${k}`
     need(d.weight > 0 && (d.perSec ?? 1) > 0, `${p} 的权重与限速须为正`)
