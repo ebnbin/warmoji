@@ -27,7 +27,7 @@ const NO_GHOSTS: Point[] = []
 /** 残垣按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a1e
 /** 跨步高度分这么多档（层），各按一张距离场与一张寻路走 */
-export const LEVELS = 6
+const LEVELS = 6
 /** 寻路的粗格子里离挡路处至少这么远（格）才算走得过 */
 const FLOW_CLEAR_U = 0.32
 /** 尘雾每隔这么久（毫秒）落一次、扩散一次 */

@@ -90,11 +90,6 @@ export function cellCenter(g: Grid, i: number): { u: number; v: number } {
   return { u: g.u0 + (ci + 0.5) * g.cell, v: g.v0 + ((i - ci) / g.cols + 0.5) * g.cell }
 }
 
-/** 格子 i 的砌体顶有多高，米 */
-export function topM(m: Masonry, i: number): number {
-  return m.n[i]! * m.courseM
-}
-
 interface Hit {
   readonly i: number
   readonly d: number
@@ -328,7 +323,7 @@ function edt1(f: Float64Array, n: number, d: Float64Array, v: Int32Array, z: Flo
 }
 
 /** 每格到最近的 on 格的距离，以格计；没有 on 格时处处极远 */
-export function distanceTo(on: Uint8Array, cols: number, rows: number): Float64Array {
+function distanceTo(on: Uint8Array, cols: number, rows: number): Float64Array {
   const out = new Float64Array(cols * rows)
   const n = Math.max(cols, rows)
   const f = new Float64Array(n)
@@ -350,7 +345,7 @@ export function distanceTo(on: Uint8Array, cols: number, rows: number): Float64A
 }
 
 /** 挡得住跨过 level 层的身体的格子：砌体高过 level 层，或封着木板 */
-export function blocksBody(m: Masonry, i: number, level: number): boolean {
+function blocksBody(m: Masonry, i: number, level: number): boolean {
   return m.n[i]! > level || m.timber[i]! > 0
 }
 
