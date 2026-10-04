@@ -1,10 +1,9 @@
 import Phaser from 'phaser'
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { MAP, rollDecor } from '../../data/maps'
+import { rollDecor } from '../../data/maps'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
-import { safeInsets, viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
 import { playSfx } from '../../audio/sfx'
 import { spawnDecor } from '../entities/decor'
@@ -21,6 +20,7 @@ import type { Area, PaintLayer, PaintPiece, PaintScene } from './ground'
 import type { Local, MeadowPlan } from './layout'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import type { MeadowConfig } from '../../types/maps'
@@ -146,22 +146,12 @@ export class MeadowView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG)
-        .setScrollFactor(0)
-        .setDepth(-2),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     ensureCritters(v.scene)
   }
 
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
-    const m = MAP.cameraMargin * UNIT
-    const s = safeInsets
-    cam.setZoom(viewport.renderScale)
-    cam.setBounds(-m - s.left, -m - s.top, v.w + m * 2 + s.left + s.right, v.h + m * 2 + s.top + s.bottom)
-    cam.startFollow(v.anchor)
+  framing(v: ViewCtx): Framing {
+    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
   }
 
   /** 野花只开在草地上，不长在路上，离边有一点距离 */
@@ -481,9 +471,7 @@ export class MeadowView implements MapView {
     })
   }
 
-  resize(v: ViewCtx): void {
-    this.camera(v)
-  }
+  resize(): void {}
 
   destroy(v: ViewCtx): void {
     this.painter?.close()

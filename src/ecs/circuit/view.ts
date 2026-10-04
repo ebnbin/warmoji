@@ -1,8 +1,6 @@
 import Phaser from 'phaser'
 import { UNIT } from '../../util/units'
-import { MAP } from '../../data/maps'
 import { GROUND_PPU } from '../../data/texel'
-import { safeInsets, viewport } from '../../util/apply'
 import { playSfx } from '../../audio/sfx'
 import { loadSettings } from '../../save/settings'
 import { browserStorage } from '../../util/storage'
@@ -17,6 +15,7 @@ import type { PaintScene, PixelRect } from './ground'
 import type { CircuitPlan, Gap, NetKind, Plate } from './layout'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 
@@ -294,23 +293,13 @@ export class CircuitView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG)
-        .setScrollFactor(0)
-        .setDepth(-2),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     if (!v.scene.textures.exists(SPARK_KEY)) upload(canvasTexture(v.scene, SPARK_KEY, 32, 32, (ctx) => drawSpark(ctx, 32)), Phaser.Textures.FilterMode.LINEAR)
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
-    const m = MAP.cameraMargin * UNIT
-    const s = safeInsets
-    cam.setZoom(viewport.renderScale)
-    cam.setBounds(-m - s.left, -m - s.top, v.w + m * 2 + s.left + s.right, v.h + m * 2 + s.top + s.bottom)
-    cam.startFollow(v.anchor)
+  framing(v: ViewCtx): Framing {
+    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
   }
 
   /** 板面上不撒 emoji */
@@ -634,8 +623,7 @@ export class CircuitView implements MapView {
           fx.shapedAt = 0
           if (this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 3)) {
             playSfx('arc')
-            const cam = v.scene.cameras.main
-            if (this.shake && this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 0)) cam.shake(120, 0.0015)
+            if (this.shake && this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 0)) v.lens.shake(120, 0.0015)
           }
           this.sparks?.explode(10, ax, ay)
           this.sparks?.explode(10, bx, by)
@@ -673,9 +661,7 @@ export class CircuitView implements MapView {
     if (heard) playSfx('shock')
   }
 
-  resize(v: ViewCtx): void {
-    this.camera(v)
-  }
+  resize(): void {}
 
   destroy(v: ViewCtx): void {
     this.painter?.close()

@@ -9,7 +9,7 @@ import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
 import { LayerType, TriBatch } from './layer'
 import { packTint } from './tint'
-import { mainCameraOnly } from '../../util/camera'
+import type { Lens } from '../lens'
 
 
 export interface CircleCue {
@@ -40,14 +40,8 @@ export class CueLayer {
 
   private now = 0
 
-  constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
-    this.flash = mainCameraOnly(
-      scene.add
-        .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, 0xffffff, 1)
-        .setScrollFactor(0)
-        .setDepth(200)
-        .setVisible(false),
-    )
+  constructor(scene: Phaser.Scene, private readonly world: EcsWorld, lens: Lens) {
+    this.flash = lens.cover(scene.add.rectangle(0, 0, 1, 1, 0xffffff, 1).setDepth(200).setVisible(false))
     for (let b = 0; b < BANDS.length; b++) this.batches.push(new TriBatch(scene, LayerType.Shape, BANDS[b]!.depth, (o, m) => this.buildBand(b, o, m)))
   }
 

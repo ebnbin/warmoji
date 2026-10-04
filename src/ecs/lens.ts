@@ -244,6 +244,10 @@ export class Lens {
   }
 }
 
+export function inRect(r: Rect, x: number, y: number): boolean {
+  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
+}
+
 function setPort(cam: Phaser.Cameras.Scene2D.Camera, p: Port): void {
   if (cam.x !== p.x || cam.y !== p.y || cam.width !== p.w || cam.height !== p.h) cam.setViewport(p.x, p.y, p.w, p.h)
 }
