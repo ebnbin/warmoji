@@ -61,6 +61,7 @@ import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { RiverView } from './river/view'
 import { MeadowView } from './meadow/view'
+import { CircuitView } from './circuit/view'
 import { DesertView } from './desert/view'
 import { RuinsView } from './ruins/view'
 
@@ -3487,4 +3488,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   cave: () => new CaveView(),
   meadow: () => new MeadowView(),
   desert: () => new DesertView(),
+  circuit: () => new CircuitView(),
 }

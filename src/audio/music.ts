@@ -866,6 +866,53 @@ function buildDunes(): BgmScore {
   )
 }
 
+/** 电路板：方波琶音像时钟一样一格一格地跳，锯齿波的低音按拍子脉动，十六分的踩镲不停，隔一小节一下嗞的高音 */
+function buildCircuit(): BgmScore {
+  const chords = [0, 0, 5, 5, 3, 3, 4, 4, 0, 0, 5, 5, 3, 4, 6, 4]
+  return track(
+    {
+      bpm: 118,
+      stepsPerBeat: 4,
+      stepsPerBar: 16,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 118) * 0.75, feedback: 0.3, level: 0.2 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sawtooth', vol: 0.085, attack: 0.005, release: 0.06, octave: -1 }
+      const arp: Voice = { wave: 'square', vol: 0.04, attack: 0.002, release: 0.04, octave: 1, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.12, attack: 0.01, release: 0.1, octave: 1 }
+      const blip: Voice = { wave: 'sine', vol: 0.04, attack: 0.002, release: 0.05, octave: 3 }
+      b.bass(bass, chords, 'r.r.o.r.r.r.o.r.')
+      b.arp(arp, chords, [0, 1, 2, 3, 2, 1, 0, 2])
+      b.line(lead, [
+        [0, 0, 4, 3], [0, 4, 6, 3], [0, 8, 7, 2], [0, 10, 6, 2], [0, 12, 4, 4],
+        [1, 0, 5, 6], [1, 8, 4, 4], [1, 12, 2, 4],
+        [2, 0, 3, 3], [2, 4, 4, 3], [2, 8, 5, 2], [2, 10, 4, 2], [2, 12, 3, 4],
+        [3, 0, 1, 8], [3, 8, 2, 4], [3, 12, 4, 4],
+        [4, 0, 4, 3], [4, 4, 6, 3], [4, 8, 7, 2], [4, 10, 9, 2], [4, 12, 8, 4],
+        [5, 0, 7, 6], [5, 8, 6, 4], [5, 12, 4, 4],
+        [6, 0, 5, 4], [6, 4, 6, 4], [6, 8, 7, 4], [6, 12, 6, 4],
+        [7, 0, 4, 12],
+        [8, 0, 7, 3], [8, 4, 9, 3], [8, 8, 11, 2], [8, 10, 9, 2], [8, 12, 7, 4],
+        [9, 0, 8, 6], [9, 8, 7, 4], [9, 12, 5, 4],
+        [10, 0, 6, 3], [10, 4, 7, 3], [10, 8, 8, 2], [10, 10, 7, 2], [10, 12, 6, 4],
+        [11, 0, 4, 8], [11, 8, 5, 4], [11, 12, 7, 4],
+        [12, 0, 6, 4], [12, 4, 5, 4], [12, 8, 4, 4], [12, 12, 3, 4],
+        [13, 0, 4, 4], [13, 4, 5, 4], [13, 8, 6, 8],
+        [14, 0, 8, 3], [14, 4, 7, 3], [14, 8, 6, 2], [14, 10, 5, 2], [14, 12, 4, 4],
+        [15, 0, 0, 12],
+      ])
+      for (let bar = 1; bar < chords.length; bar += 2) b.note(blip, bar, 14, chords[bar]! + 7, 1)
+      b.drums('kick', 'x...x...x...x...', 0, 16, 0.15)
+      b.drums('hat', '..o...o...o...o.', 0, 16, 0.04)
+      b.drums('hat', 'o.o.o.o.o.o.o.o.', 8, 16, 0.022)
+      b.drums('snare', '....x.......x...', 4, 16, 0.07)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -886,6 +933,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   cave: buildCave,
   meadow: buildMeadow,
   desert: buildDunes,
+  circuit: buildCircuit,
 }
 
 const cache = new Map<BgmId, BgmScore>()

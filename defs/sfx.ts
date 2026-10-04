@@ -37,4 +37,9 @@ export const SFX = {
   chip: { wave: 'noise', freq: 3400, freqEnd: 950, duration: 0.07, volume: 0.15, attack: 0.002, decayPow: 2, throttleMs: 70, jitter: 0.25 },
   thud: { wave: 'noise', freq: 280, freqEnd: 60, duration: 0.22, volume: 0.28, attack: 0.004, decayPow: 1.8, throttleMs: 110, jitter: 0.25 },
   splinter: { wave: 'noise', freq: 1900, freqEnd: 320, duration: 0.26, volume: 0.3, attack: 0.003, decayPow: 1.5, steps: [1, 0.72, 1.12, 0.8], throttleMs: 140, jitter: 0.2 },
+  crackle: { wave: 'noise', freq: 5200, freqEnd: 2600, duration: 0.55, volume: 0.13, attack: 0.01, decayPow: 0.8, steps: [1, 0.35, 1.2, 0.3, 0.9, 0.45, 1.25, 0.3, 1, 0.4], throttleMs: 600, jitter: 0.25 },
+  arc: { wave: 'noise', freq: 6800, freqEnd: 420, duration: 0.42, volume: 0.42, attack: 0.002, decayPow: 1.3, steps: [1, 0.45, 1.35, 0.55, 1.2, 0.4, 1], throttleMs: 220, jitter: 0.15 },
+  surge: { wave: 'sawtooth', freq: 120, freqEnd: 360, duration: 0.3, volume: 0.1, attack: 0.02, decayPow: 1, throttleMs: 300, jitter: 0.08 },
+  relay: { wave: 'square', freq: 1800, freqEnd: 900, duration: 0.035, volume: 0.1, steps: [1, 0.55], throttleMs: 150 },
+  shock: { wave: 'sawtooth', freq: 2600, freqEnd: 900, duration: 0.09, volume: 0.09, steps: [1, 0.6, 1.15, 0.5], throttleMs: 200, jitter: 0.15 },
 } as const satisfies Record<string, SfxDef>
