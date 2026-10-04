@@ -1112,7 +1112,7 @@ class VolcanoView extends BoundedView {
         scale: { start: 0.7, end: 2.8 },
         alpha: { start: 0.3, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0x8a8480, 0x9c9591, 0x7a7471],
+        tint: [0x959a9e, 0xa9adb2, 0x83878c],
       })
       .setDepth(35)
     this.column = scene.add
@@ -1124,7 +1124,7 @@ class VolcanoView extends BoundedView {
         scale: { start: 0.8, end: 3.2 },
         alpha: { start: 0.42, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0x57504d, 0x6a615d, 0x9a4a2c],
+        tint: [0x5a5e62, 0x6e7276, 0x9a4a2c],
         emitting: false,
       })
       .setDepth(36)
@@ -1149,7 +1149,7 @@ class VolcanoView extends BoundedView {
         speedY: { min: 8, max: 22 },
         scale: { min: 0.18, max: 0.42 },
         alpha: { start: 0.55, end: 0 },
-        tint: [0x9e9690, 0x7d7571, 0xbdb4ad],
+        tint: [0xaaafb3, 0x84898d, 0xccd1d6],
         emitZone: {
           type: 'random',
           source: {
@@ -1194,7 +1194,7 @@ class VolcanoView extends BoundedView {
         speedY: { min: -14, max: -4 },
         scale: { start: 0.18, end: 0.6 },
         alpha: { start: 0.4, end: 0 },
-        tint: [0x3a3230, 0x4d4441],
+        tint: [0x383c40, 0x4d5155],
         emitting: false,
       })
       .setDepth(33)

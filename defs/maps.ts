@@ -524,9 +524,9 @@ export const MAPS = {
     size: { w: 32, h: 32 },
     stamina: { exertion: 0.5, regen: 0.9 },
     palette: {
-      bgFrom: 'hsl(14 45% 18%)',
-      bgTo: 'hsl(5 40% 6%)',
-      map: hslToInt(18, 0.14, 0.26),
+      bgFrom: 'hsl(210 6% 19%)',
+      bgTo: 'hsl(210 20% 6%)',
+      map: hslToInt(209, 0.05, 0.3),
       shadow: 0x000000,
     },
     decor: {
