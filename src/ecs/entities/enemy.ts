@@ -78,6 +78,16 @@ import type { ByKind } from '../../util/record'
 
 type DriveOf = ByKind<DriveDef>
 
+/** 敌人与 Boss 同在一档，每帧按脚底相对队长的上下排：越靠下越靠前，离队长再远也不出这一档 */
+export const ENEMY_Z = 5
+const ENEMY_Z_SPAN = 0.45
+const ENEMY_Z_RANGE_U = 30
+
+/** dyU 是脚底在队长下方多少格 */
+export function enemyZ(dyU: number): number {
+  return ENEMY_Z + Math.max(-ENEMY_Z_SPAN, Math.min(ENEMY_Z_SPAN, (dyU / ENEMY_Z_RANGE_U) * ENEMY_Z_SPAN))
+}
+
 type DriveAttach<K extends keyof DriveOf> = (sim: Sim, eid: number, d: DriveOf[K]) => void
 
 /** 头目看得见全场，其余身体用通用索敌距离 */
@@ -216,7 +226,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Grow.s0[eid] = size
   Pop.back[eid] = boss ? 1 : 0
   Pop.alpha[eid] = alpha
-  Depth.z[eid] = boss ? 7 : 5
+  Depth.z[eid] = ENEMY_Z
   enemyDef[eid] = def
   if (elite) setStatLayer(eid, 'elite', [ELITE.stats])
   setStatLayer(eid, 'fight', fightMods(sim.fight, faction))
