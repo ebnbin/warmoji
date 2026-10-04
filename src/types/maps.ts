@@ -664,6 +664,74 @@ export interface RiverConfig {
     readonly wetM: number
   }
 }
+/**
+ * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
+ * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
+ */
+export interface MeadowConfig {
+  readonly meterPerU: number
+  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  readonly sizeU: number
+  readonly padU: number
+  /** 能走的草地有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /** 草地的起伏（米）与波长（格）；整片从坡脚往外每格降低多少米 */
+  readonly turf: { readonly reliefM: number; readonly waveU: number; readonly riseM: number }
+  /**
+   * 陡坡：坡脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU）；另有 spurs 处往草地鼓出来或往里凹进去，
+   * 鼓出或凹进 spurU 格、宽约 spurWidthU 格。坡顶比坡脚高 heightM 米，坡面平均每格升 riseM 米，坡面多宽由这两样定；
+   * 坡顶是圆圆的肩，坡脚缓缓弯回平地，坡顶往外是高一层的草甸
+   */
+  readonly bank: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly spurs: readonly [number, number]
+    readonly spurU: readonly [number, number]
+    readonly spurWidthU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly riseM: readonly [number, number]
+  }
+  /**
+   * 针叶林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进草地的林舌或凹进林子的草湾，
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格；大树的树冠半径（格）与树高（米），林缘一圈灌木与小树的树冠半径（格），其中白桦占多少；树冠最多探进草地 overhangU 格
+   */
+  readonly forest: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly scallopU: number
+    readonly lobes: readonly [number, number]
+    readonly lobeU: readonly [number, number]
+    readonly lobeWidthU: readonly [number, number]
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly edgeU: readonly [number, number]
+    readonly birch: number
+    readonly overhangU: number
+  }
+  /** 林间小路：路口凹进林缘多深、多宽（格）；横在路上的倒木多长（格） */
+  readonly trail: { readonly notchU: number; readonly widthU: number; readonly logU: readonly [number, number] }
+  /**
+   * 牧场的木栅栏：离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；桩距（格）、桩高（米）与门宽（格）；
+   * 栅栏在陡坡对面那条边的概率，其余时候在一条侧边
+   */
+  readonly fence: {
+    readonly insetU: readonly [number, number]
+    readonly skewDeg: number
+    readonly kinkDeg: number
+    readonly postU: number
+    readonly heightM: number
+    readonly gateU: number
+    readonly farChance: number
+  }
+  /** 野花：成片开花的地方占草地的多少，花片的尺度（格） */
+  readonly flowers: { readonly cover: number; readonly patchU: number }
+  /** 栅栏外吃草的羊有几只 */
+  readonly sheep: readonly [number, number]
+}
 /** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
 export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
 
@@ -847,7 +915,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -870,6 +938,7 @@ export interface MapDef {
   readonly river?: RiverConfig
   readonly desert?: DesertConfig
   readonly ruins?: RuinsConfig
+  readonly meadow?: MeadowConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

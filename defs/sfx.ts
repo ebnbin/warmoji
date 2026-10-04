@@ -31,6 +31,8 @@ export const SFX = {
   flutter: { wave: 'noise', freq: 2600, freqEnd: 1500, duration: 1.4, volume: 0.16, attack: 0.25, decayPow: 0.9, steps: [1, 0.8, 1.1, 0.75, 1.05, 0.8, 1.12, 0.78, 1, 0.82, 1.08, 0.76], throttleMs: 2500, jitter: 0.15 },
   ignite: { wave: 'noise', freq: 260, freqEnd: 1400, duration: 0.42, volume: 0.24, attack: 0.03, decayPow: 1.4, throttleMs: 220, jitter: 0.2 },
   snuff: { wave: 'noise', freq: 900, freqEnd: 180, duration: 0.28, volume: 0.12, attack: 0.01, decayPow: 1.6, throttleMs: 220, jitter: 0.2 },
+  bleat: { wave: 'sawtooth', freq: 340, freqEnd: 300, duration: 0.7, volume: 0.1, attack: 0.05, decayPow: 0.8, steps: [1, 1.05, 0.97, 1.06, 0.96, 1.05, 0.97, 1.04, 0.96, 1.05, 0.97, 1.04, 0.96, 1.03], throttleMs: 4000, jitter: 0.15 },
+  chirp: { wave: 'sine', freq: 3400, freqEnd: 4300, duration: 0.42, volume: 0.06, attack: 0.005, decayPow: 1.2, steps: [1, 1.18, 0.92, 1.24, 1, 1.2], throttleMs: 3000, jitter: 0.12 },
   crumble: { wave: 'noise', freq: 340, freqEnd: 38, duration: 1.3, volume: 0.8, attack: 0.015, decayPow: 1.25, throttleMs: 380, jitter: 0.15 },
   chip: { wave: 'noise', freq: 3400, freqEnd: 950, duration: 0.07, volume: 0.15, attack: 0.002, decayPow: 2, throttleMs: 70, jitter: 0.25 },
   thud: { wave: 'noise', freq: 280, freqEnd: 60, duration: 0.22, volume: 0.28, attack: 0.004, decayPow: 1.8, throttleMs: 110, jitter: 0.25 },

@@ -38,6 +38,8 @@ import { UNIT, VIEW } from '../src/util/units.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
+import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
+import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { render } from '../src/emoji/painted/design.ts'
@@ -310,6 +312,52 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
   need(view.dayU / 2 <= side / 2 + MAP_DEFAULTS.cameraMargin, `maps.${id}.cave.view.dayU 须让白天的镜头落在地图与边距以内`)
+}
+
+/**
+ * 草甸：参数说得通；陡坡背着太阳时，最矮最缓的一段影子也落得出坡脚；抽一批种子真的生成一遍：每张都生成得出来，
+ * 开局站位离边够远，栅栏有门，林子里有树，栅栏外有羊
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'meadow') === (m.meadow !== undefined), `maps.${id} 是草甸当且仅当写了 meadow`)
+  const g = m.meadow
+  if (!g) continue
+  const at = `maps.${id}.meadow`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { bank, forest, trail, fence, flowers, turf } = g
+  need(g.meterPerU > 0 && g.sizeU > 0 && g.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
+  need(g.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(g.areaU2[0] > 0 && range(g.areaU2, false) && g.areaU2[1] < g.sizeU * g.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
+  need(turf.reliefM >= 0 && turf.waveU > 0 && turf.riseM >= 0, `${at}.turf 的起伏、坡度不为负，波长为正`)
+  need(bank.insetU[0] > 0 && range(bank.insetU, false) && bank.insetU[1] < g.sizeU / 4, `${at}.bank.insetU 须让坡脚落在地图边与中线之间`)
+  need(bank.bendU >= 0 && bank.waveU > 0 && range(bank.spurs, true) && bank.spurU[0] > 0 && range(bank.spurU, false) && bank.spurWidthU[0] > 0 && range(bank.spurWidthU, false), `${at}.bank 的弯与鼓包须为正的范围`)
+  need(bank.heightM[0] > 0 && range(bank.heightM, false) && bank.riseM[0] > 0 && range(bank.riseM, false), `${at}.bank 的坡高与坡面每格升多少须为正的范围`)
+  // 陡坡背着太阳（太阳在坡那边）时：顺着坡的法向，光线每往草地这边一格降 drop 米；坡最矮最缓的一段挡下的光，也要在坡脚外落下一溜影子
+  const sunLen = Math.hypot(SUN.x, SUN.y)
+  for (const c of [SUN.x, -SUN.x, SUN.y, -SUN.y].map((v) => v / sunLen).filter((v) => v > 0)) {
+    const drop = ((SUN.z / sunLen) * g.meterPerU) / c
+    const width = bank.heightM[0] / bank.riseM[0]
+    let over = 0
+    for (let t = 0; t <= 1; t += 0.01) over = Math.max(over, bank.heightM[0] * bankShape(t) - drop * width * t)
+    need(over / drop >= 0.25, `${at}.bank 最矮最缓的一段坡背着太阳时，影子只落出坡脚 ${(over / drop).toFixed(2)} 格，须至少 0.25 格：坡要比太阳的光线陡`)
+  }
+  need(forest.insetU[0] > 0 && range(forest.insetU, false) && forest.insetU[1] < g.sizeU / 4, `${at}.forest.insetU 须让林缘落在地图边与中线之间`)
+  need(forest.bendU >= 0 && forest.waveU > 0 && forest.scallopU >= 0 && range(forest.lobes, true) && forest.lobeU[0] > 0 && range(forest.lobeU, false) && forest.lobeWidthU[0] > 0 && range(forest.lobeWidthU, false), `${at}.forest 的弯与林舌草湾须为正的范围`)
+  need(forest.crownU[0] > 0 && range(forest.crownU, false) && forest.heightM[0] > 0 && range(forest.heightM, false) && forest.edgeU[0] > 0 && range(forest.edgeU, false), `${at}.forest 的树冠与树高须为正的范围`)
+  need(forest.birch >= 0 && forest.birch <= 1 && forest.overhangU >= 0 && forest.overhangU < forest.edgeU[0], `${at}.forest 的白桦占比须在 [0, 1] 内，树冠探进草地的那截比最小的树冠还小`)
+  need(trail.notchU > 0 && trail.widthU > g.neckU * 2 && trail.logU[0] > trail.widthU && range(trail.logU, false), `${at}.trail 的路口须走得进去、比窄缝宽，倒木比路口宽`)
+  need(fence.insetU[0] > 0 && range(fence.insetU, false) && fence.insetU[1] < g.sizeU / 4, `${at}.fence.insetU 须让栅栏落在地图边与中线之间`)
+  need(fence.skewDeg >= 0 && fence.skewDeg < 30 && fence.kinkDeg >= 0 && fence.kinkDeg < 30, `${at}.fence 的斜度与拐角须在 0 到 30 度之间`)
+  need(fence.postU > 0 && fence.heightM > 0 && fence.gateU > 0 && fence.farChance >= 0 && fence.farChance <= 1, `${at}.fence 的桩距、桩高与门宽须为正，在对边的概率在 [0, 1] 内`)
+  need(flowers.cover > 0 && flowers.cover < 1 && flowers.patchU > 0, `${at}.flowers 的覆盖须在 (0, 1) 内、花片的尺度为正`)
+  need(range(g.sheep, true), `${at}.sheep 须为非负整数范围`)
+  for (let s = 0; s < 24; s++) {
+    const plan = meadowPlan(g, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
+    need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
+    need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
+  }
 }
 
 /**

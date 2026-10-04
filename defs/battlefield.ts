@@ -24,6 +24,13 @@ const RUINS_EVENTS = [
 
 export const BATTLEFIELD = {
   pools: {
+    meadow: [
+      { id: 'meadow_breeze', emoji: '1f32c', name: '山风送爽', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'meadow_bloom', emoji: '1f33c', name: '花香提神', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'meadow_sun', emoji: '2600', name: '晴空万里', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'meadow_pollen', emoji: '1f927', name: '花粉过敏', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'meadow_dew', emoji: '1f4a7', name: '露水沾鞋', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
     forest: [
       { id: 'forest_hunt', emoji: '1f43e', name: '狩猎本能', desc: '全队伤害 +35%（8 秒）', polarity: 'buff', durationMs: 8000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'forest_swift', emoji: '1f342', name: '林间疾风', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },

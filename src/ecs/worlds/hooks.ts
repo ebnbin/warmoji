@@ -51,6 +51,8 @@ import { phases } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
 import type { RiverState } from '../river/world'
+import { meadow } from '../meadow/world'
+import type { MeadowState } from '../meadow/world'
 import { desert } from '../desert/world'
 import type { DesertState } from '../desert/world'
 import type { RuinsState } from '../ruins/world'
@@ -104,10 +106,11 @@ export interface WorldState {
   floe: FloeState | null
   cave: CaveState | null
   desert: DesertState | null
+  meadow: MeadowState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null }
 }
 
 export interface WorldHooks {
@@ -1688,6 +1691,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   river,
   floe,
   cave,
+  meadow,
   desert,
 }
 

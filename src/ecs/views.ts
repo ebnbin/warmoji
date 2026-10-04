@@ -60,6 +60,7 @@ import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { RiverView } from './river/view'
+import { MeadowView } from './meadow/view'
 import { DesertView } from './desert/view'
 import { RuinsView } from './ruins/view'
 
@@ -3484,5 +3485,6 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   river: () => new RiverView(),
   floe: () => new FloeView(),
   cave: () => new CaveView(),
+  meadow: () => new MeadowView(),
   desert: () => new DesertView(),
 }
