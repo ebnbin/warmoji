@@ -665,53 +665,72 @@ export interface RiverConfig {
   readonly body: WadeConfig
 }
 /**
- * 樱庭：瓦顶土墙围着的一座日式庭院，樱花开着。一条溪从一面院墙下的水门流进来，弯弯地穿过院子，在另一面院墙前漫过一道低石堰、从墙下流走；
- * 溪的水流沿用河流的机制，溪上架着一座木桥。院墙、堰下石壁与树干挡人；院子的形状、溪的走向与出入口都由种子定。
- * 物理量按米、千克、秒算，一格 meterPerU 米
+ * 樱庭：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘一圈杜鹃丛；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
+ * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流沿用河流的机制，溪上架着一座木桥；
+ * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
  */
 export interface SakuraConfig {
   readonly meterPerU: number
   /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
   readonly cellU: number
+  /** 地图是 sizeU 见方的方形 */
+  readonly sizeU: number
+  /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
   /**
-   * 院子：院墙里能走的地面连同溪面的面积（格²）；院子的长宽比；四个墙角各自偏离长方形最多 jitterU 格，整座院子最多转 skewDeg 度；
-   * 地图边离院墙 padU 格；窄过两倍 neckU 的缝与尖角不能走
+   * 寺墙：墙身中线离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；
+   * 院门宽（格）
    */
-  readonly garden: {
-    readonly areaU2: readonly [number, number]
-    readonly aspect: readonly [number, number]
-    readonly jitterU: number
-    readonly skewDeg: number
-    readonly padU: number
-    readonly neckU: number
-  }
-  /** 院墙：墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；院门宽（格） */
   readonly wall: {
+    readonly insetU: readonly [number, number]
+    readonly skewDeg: number
+    readonly kinkDeg: number
     readonly thickU: number
     readonly heightM: number
     readonly eaveU: number
     readonly gateU: number
   }
   /**
-   * 溪：水门离墙角至少 cornerU 格；出水口在对面那面墙的概率，其余时候在相邻的一面，两个水门各离共用的墙角多远（占短的那面墙长的比例）；
-   * 蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍，溪岸离院墙至少 edgeGapU 格（水门附近除外）
+   * 樱林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进空地的林舌或凹进林子的草湾，
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格；林缘一圈杜鹃丛的半径（格）
+   */
+  readonly forest: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly scallopU: number
+    readonly lobes: readonly [number, number]
+    readonly lobeU: readonly [number, number]
+    readonly lobeWidthU: readonly [number, number]
+    readonly azaleaU: readonly [number, number]
+  }
+  /**
+   * 溪：从进林缘到出林缘的走向离横竖方向至少 slantDeg 度，两头进出林子时再各偏最多 turnDeg 度；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍；
+   * 溪岸离寺墙至少 wallGapU 格
    */
   readonly stream: {
-    readonly cornerU: number
-    readonly opposite: number
-    readonly turnAt: readonly [number, number]
+    readonly slantDeg: number
+    readonly turnDeg: number
     readonly meanderU: number
     readonly minBend: number
-    readonly edgeGapU: number
+    readonly wallGapU: number
   }
-  /** 溪的流量（米³/秒），河道按流量定；院子里地面的起伏多少米 */
+  /** 溪的流量（米³/秒），河道按流量定；空地上地面的起伏多少米 */
   readonly flow: ChannelConfig & { readonly discharge: number; readonly reliefM: number }
-  /** 石堰：堰顶离出水那面院墙多远（格）、堰前从河床升上堰顶的坡多长（格）、堰下比堰顶低多少米；堰顶外还能被冲过去的那一段多长（格） */
-  readonly weir: {
-    readonly backU: number
+  /** 上游的石组：石头的半径（格）、石缝多宽（格）、石顶比水面高多少米 */
+  readonly rocks: {
+    readonly radiusU: readonly [number, number]
+    readonly gapU: readonly [number, number]
+    readonly heightM: number
+  }
+  /** 下游的石槛：槛前从河床升上槛顶的坡多长（格）、槛下的溪比槛顶低多少米；槛上的竹栅：竹桩隔多远（格）、多高（米） */
+  readonly sill: {
     readonly rampU: number
     readonly dropM: number
-    readonly lipU: number
+    readonly postU: number
+    readonly heightM: number
   }
   /** 木桥：桥面宽（格）、两头落地的坡道多长（格）、桥面正中拱起多高（米）；架在溪的哪一段（弧长的比例） */
   readonly bridge: {
@@ -720,13 +739,13 @@ export interface SakuraConfig {
     readonly riseM: number
     readonly at: readonly [number, number]
   }
-  /** 樱花树：院子里几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；院墙外沿着墙种的树隔多远（格） */
+  /** 樱花：空地上几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；寺墙外（寺里）的樱花隔多远一棵（格） */
   readonly trees: {
     readonly inside: readonly [number, number]
     readonly crownU: readonly [number, number]
     readonly heightM: readonly [number, number]
     readonly overhangU: number
-    readonly outsideGapU: number
+    readonly templeGapU: number
   }
   readonly body: WadeConfig
 }
@@ -1012,7 +1031,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse' | 'weir'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse'
 
 export interface DecorInstance {
   emoji: string

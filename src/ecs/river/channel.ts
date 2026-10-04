@@ -58,11 +58,11 @@ export function hermite(a: Point, ta: Point, b: Point, tb: Point, k: number, n: 
   return out
 }
 
-/** 端点与端点切向固定的曲线（两端切向的长短是弦长的 reach 倍），叠上两端为零的蜿蜒：只留波长不短于九格的大弯，短河段弯得更缓 */
-export function route(rng: Rng, a: Point, ta: Point, b: Point, tb: Point, meander: number, seed: number, reach = 0.9): Point[] {
+/** 端点与端点切向固定的曲线，叠上两端为零的蜿蜒：只留波长不短于九格的大弯，短河段弯得更缓 */
+export function route(rng: Rng, a: Point, ta: Point, b: Point, tb: Point, meander: number, seed: number): Point[] {
   const L = len(b.x - a.x, b.y - a.y)
   const n = Math.max(16, Math.ceil(L / 0.1))
-  const raw = hermite(a, ta, b, tb, L * reach, n)
+  const raw = hermite(a, ta, b, tb, L * 0.9, n)
   const modes = [1, 2, 3].filter((m) => (2 * L) / m >= 9).map((m) => ({ m, amp: (rng.next() * 2 - 1) / m ** 1.3, ph: rng.next() * Math.PI * 2 }))
   const fine = Math.min(1, L / 20)
   return raw.map((p, i) => {

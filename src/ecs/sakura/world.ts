@@ -5,13 +5,12 @@ import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { Airborne, Alive, Phys, Pickup, Radius, Transform, Uid } from '../components'
 import { fleeSteer } from '../systems/shared/steer'
-import { hazardSource } from '../utils/source'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { project } from '../river/channel'
-import { flowAt, sinkAt } from '../river/water'
-import { wade, washOut } from '../river/bodies'
-import { bridgeLocal, sakuraPlan, WASH_U, weirLocal } from './layout'
+import { flowAt } from '../river/water'
+import { wade } from '../river/bodies'
+import { bridgeLocal, sakuraPlan } from './layout'
 import { solveSakura } from './water'
 import type { Along } from '../river/channel'
 import type { Flow, Water } from '../river/water'
@@ -25,7 +24,6 @@ const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
 /** 樱庭按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a4c1e
-const WEIR_TINT = 0xbfe6ff
 
 /**
  * 樱庭此刻的状态：按种子生成的地图，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
@@ -158,7 +156,7 @@ function viaBridge(s: SakuraState, eid: number, x: number, y: number, tx: number
   return onRamp ? (toSpan ? { x: tx, y: ty } : end(-mine)) : end(mine)
 }
 
-/** 离壁 reach 像素以内几乎正对着壁走时改为顺着壁走：院墙、树干与堰下的石壁都挡路 */
+/** 离壁 reach 像素以内几乎正对着壁走时改为顺着壁走：寺墙、林缘、树干、石组与竹栅都挡路 */
 function alongWall(s: SakuraState, x: number, y: number, dx: number, dy: number, reach: number): Point {
   const b = s.plan.basin
   if (roomAt(b, x, y) > reach) return { x: dx, y: dy }
@@ -180,28 +178,6 @@ function dryNear(sim: Sim, s: SakuraState, p: Point, room: number): Point {
     }
   }
   return keepOut(b, p.x, p.y, room)
-}
-
-/** 越过了堰顶：身体中心过了堰顶 WASH_U 格、还在跌水沟的宽里，或者脚下已经是堰下的汇格 */
-function overWeir(s: SakuraState, x: number, y: number): boolean {
-  if (s.water && sinkAt(s.water, x / UNIT, y / UNIT) >= 0) return true
-  const wl = weirLocal(s.plan.weir, x / UNIT, y / UNIT)
-  return wl.along > WASH_U && wl.side < s.plan.weir.half + 0.5
-}
-
-/** 越过堰顶的都被冲出了院子：落进堰下的跌水沟，顺着沟从墙下冲走 */
-function plunge(sim: Sim, s: SakuraState): void {
-  const src = hazardSource('weir', WEIR_TINT)
-  const wr = s.plan.weir
-  for (const eid of [...query(sim.world, [Phys, Transform, Radius])]) {
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    if (!overWeir(s, x, y)) continue
-    const side = (x / UNIT - wr.x) * -wr.ty + (y / UNIT - wr.y) * wr.tx
-    const lim = Math.max(0, wr.half - 0.4)
-    const t = Math.max(-lim, Math.min(lim, side))
-    washOut(sim, eid, src, (wr.x + wr.tx * (WASH_U + 1.2) - wr.ty * t) * UNIT, (wr.y + wr.ty * (WASH_U + 1.2) + wr.tx * t) * UNIT)
-  }
 }
 
 /**
@@ -228,8 +204,8 @@ function board(sim: Sim, s: SakuraState): void {
 }
 
 /**
- * 樱庭：能走的是院墙里的院子，溪面也能走；院墙、院里樱花的树干与堰下的石壁是硬边界，身体走到跟前就停住、顺着壁面滑。
- * 水里站不住的身体随水漂、自己划水，站得住的跟在岸上一样，掉落物顺水漂（都沿用河流，见 wade）；被冲过堰顶就出了院子。
+ * 樱庭：能走的是寺墙与三面林缘围着的空地，溪面也能走；寺墙、林缘、空地上樱花的树干、上游的石组与下游的竹栅是硬边界，身体走到跟前就停住、顺着壁面滑。
+ * 水里站不住的身体随水漂、自己划水，站得住的跟在岸上一样，掉落物顺水漂（都沿用河流，见 wade）；漂到下游的被水压在竹栅前，贴着竹栅挪到岸边才上得来。
  * 桥上的身体不沾水、出不了栏杆，桥下的照样漂
  */
 export const sakura: WorldHooks = {
@@ -332,8 +308,6 @@ export const sakura: WorldHooks = {
     sakuraOf(sim)
   },
   tick(sim) {
-    const s = sakuraOf(sim)
-    plunge(sim, s)
-    board(sim, s)
+    board(sim, sakuraOf(sim))
   },
 }

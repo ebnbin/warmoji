@@ -14,7 +14,7 @@ export const Z_SPAN = 12
 const SPEED_SPAN = 4
 /** 干地上的水位与流速从有水的格子往外推几圈：岸线才按地形的细格子切出来，细浪的块中心落在岸上也有流向 */
 const SPREAD = 4
-/** 跌水沟里的水多快（米/秒）；出了堰顶这么多格以内翻白，往外慢慢平下来 */
+/** 石槛下的水多快（米/秒）；出了槛顶这么多格以内翻白，往外慢慢平下来 */
 const DITCH_SPEED = 1.4
 const DITCH_WHITE_U = 4
 
@@ -39,9 +39,9 @@ function put16(out: Uint8ClampedArray, o: number, z: number): void {
 
 /**
  * 编码水面：地形高程照搬；水面高程与流速按 WATER_CELL_U 的格子铺满整片地形，有解出来的稳态水流就用它；
- * 没有的地方只有院墙外的上游溪沟（按设计水位与曼宁流速铺）与堰下的跌水沟（一沟翻白的急水）；干地上的水位与流速从水边往外推几圈，
- * 推出去的水位不高过那里的地面。堰顶比一格水面窄，堰顶下缘那一格的水面接着堰顶上的临界水深，落差留到白水帘底下，插值才不在堰顶上干出缺口。
- * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、堰顶、水门下都翻白
+ * 没有的地方只有石组以上的溪（按设计水位与曼宁流速铺）与石槛下流出去的溪（一溪翻白的急水）；干地上的水位与流速从水边往外推几圈，
+ * 推出去的水位不高过那里的地面。槛顶比一格水面窄，槛顶下缘那一格的水面接着槛顶上的临界水深，落差留到白水帘底下，插值才不在槛顶上干出缺口。
+ * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、槛顶、石组下都翻白
  */
 export function encodeWater(cfg: SakuraConfig, plan: SakuraPlan, w: Water): WaterImages {
   const t = plan.terrain
@@ -171,7 +171,7 @@ export function encodeWater(cfg: SakuraConfig, plan: SakuraPlan, w: Water): Wate
 /**
  * 樱庭溪水的片元着色器，四边形盖住整片地形，坐标以格计、y 朝下；四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。
  * 泉水一样清：浅处几乎透明、透出沙底与卵石，深处青碧；细浪顺着流速漂，浅水里晃着焦散，按太阳打出高光、映出天色；
- * 院墙、桥与樱花的影子落在水面上，影子里不反光。水门下的水翻着白往外涌；堰顶的水一折落进跌水沟，沟里一沟白水。输出按预乘透明度
+ * 寺墙、桥、竹栅与花的影子落在水面上，影子里不反光。石组下的水翻着白往外涌；槛顶的水一折落下去，往林子里流去一溪白水。输出按预乘透明度
  */
 export const WATER_FRAG = `
 #pragma phaserTemplate(shaderName)
@@ -222,12 +222,12 @@ void main ()
   float speed = length(vel);
   float shade = texture2D(uShade, tc).a;
 
-  // 堰：顺水离堰顶上游边多远、离溪中线多远；堰顶往下一折是一道白水帘，再往下是翻滚的跌水沟
+  // 石槛：顺水离槛顶上游边多远、离溪中线多远；槛顶往下一折是一道白水帘，再往下是翻滚的急水
   float wAlong = dot(p - uWeir.xy, uWeir.zw);
   float wSide = abs(dot(p - uWeir.xy, vec2(-uWeir.w, uWeir.z)));
   float inDitch = 1.0 - smoothstep(uWeirHalf, uWeirHalf + 0.2, wSide);
   float fall = inDitch * smoothstep(${(CREST_U - 0.05).toFixed(2)}, ${CREST_U.toFixed(2)}, wAlong) * (1.0 - smoothstep(${(CREST_U + 0.35).toFixed(2)}, ${(CREST_U + 0.7).toFixed(2)}, wAlong));
-  // 水门：从墙下涌进来的水，靠墙最翻腾，往院里几格就平了
+  // 石组：从石缝里涌进来的水，紧挨着石头最翻腾，往下游几格就平了
   vec2 ri = p - uIn.xy;
   float into = dot(ri, uIn.zw) - uInSize.y;
   float spout = (1.0 - smoothstep(0.0, 2.6, into)) * step(-0.2, into) * (1.0 - smoothstep(uInSize.x * 0.6, uInSize.x * 1.1, abs(dot(ri, vec2(-uIn.w, uIn.z)))));
