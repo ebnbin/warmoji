@@ -47,7 +47,6 @@ export const BATTLEFIELD = {
     oldDesert: DESERT_EVENTS,
     desert: DESERT_EVENTS,
     oldRiver: RIVER_EVENTS,
-    river: RIVER_EVENTS,
     sakura: RIVER_EVENTS,
     void: [
       { id: 'factory_grind', emoji: '2699', name: '齿轮咬滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
