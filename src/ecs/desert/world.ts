@@ -3,9 +3,10 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phasing, Phys, Pickup, PrevPos, Radius, Shadow, Shard, Transform } from '../components'
+import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phys, Pickup, PrevPos, Radius, Shadow, Shard, Transform } from '../components'
 import { traces } from '../store'
 import { approach } from '../systems/shared/body'
+import { phases } from '../utils/pass'
 import { leaderX, leaderY } from '../utils/team'
 import { desertPlanFor, gridAt, slopeAt, solidAt, sunAt, wrapU } from './terrain'
 import { paceOf } from './gait'
@@ -226,7 +227,7 @@ export const desert: WorldHooks = {
   /** 标志物挡人：会穿墙的照旧穿过去 */
   constrainBody(sim, eid, _from, next) {
     const p = nearLeader(sim, next.x, next.y)
-    if (hasComponent(sim.world, eid, Phasing)) return p
+    if (phases(sim.world, eid, 'landmark')) return p
     return pushOut(desertOf(sim).plan, p.x, p.y, Radius.v[eid]!)
   },
   basin() {
@@ -236,19 +237,15 @@ export const desert: WorldHooks = {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = norm(tx - x, ty - y)
-    if (hasComponent(sim.world, eid, Phasing)) return d
+    if (phases(sim.world, eid, 'landmark')) return d
     return glide(desertOf(sim).plan, x, y, d.x, d.y, Radius.v[eid]! + GLIDE_U * UNIT)
   },
-  wallHit() {
-    return null
-  },
-  smashWall() {},
   wanderDir(sim, eid, dx, dy) {
-    if (hasComponent(sim.world, eid, Phasing)) return { x: dx, y: dy }
+    if (phases(sim.world, eid, 'landmark')) return { x: dx, y: dy }
     return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, dx, dy, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT)
   },
   fleeDir(sim, eid, awayX, awayY) {
-    if (hasComponent(sim.world, eid, Phasing)) return { x: awayX, y: awayY }
+    if (phases(sim.world, eid, 'landmark')) return { x: awayX, y: awayY }
     return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT)
   },
   outside(sim, x, y) {

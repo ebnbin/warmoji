@@ -14,6 +14,8 @@ export const OBSTACLES = {
     timber: { name: '木板', phase: true, opaque: true, pierce: 1, strength: 0.25 },
     // 塌墙扬起的尘雾：只挡视线
     dust: { name: '尘雾', phase: true, opaque: true, pierce: 0, strength: null },
+    // 沙漠的标志物：只挡身体，弹体与视线从上面过去
+    landmark: { name: '标志物', phase: true, opaque: false, pierce: 0, strength: null },
     // 技能立的墙：看得穿，挡身体与弹体按它自己的规则
     barrier: { name: '技能墙', phase: true, opaque: false, pierce: null, strength: null },
   },
