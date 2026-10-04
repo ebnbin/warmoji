@@ -414,7 +414,7 @@ function dappleAt(sc: PaintScene, prep: Prepared, x: number, y: number): number 
     const p = prep.puffs[i]!
     const c = puffShadow(sh, p)
     const d = len(x - c.x, y - c.y)
-    if (d < p.r + 0.12) s = Math.max(s, smooth(p.r + 0.12, p.r * 0.7, d) * 0.28 * (0.55 + 0.45 * valueNoise(x * 2.6, y * 2.6, i)))
+    if (d < p.r + 0.12) s = Math.max(s, smooth(p.r + 0.12, p.r * 0.7, d) * 0.22 * (0.55 + 0.45 * valueNoise(x * 2.6, y * 2.6, i)))
   }
   return s
 }
@@ -448,10 +448,10 @@ function bridgeShadow(b: Bridge, bankM: number, z: number, mpu: number, x: numbe
 
 /** 几种落花的颜色：近白、淡粉、粉、深一点的粉 */
 const PETALS = [
-  [255, 246, 248],
-  [251, 226, 234],
-  [246, 204, 218],
-  [236, 176, 198],
+  [255, 240, 244],
+  [250, 222, 230],
+  [244, 198, 214],
+  [234, 172, 194],
 ] as const
 
 /** 一点有没有落着花瓣：花瓣是一头带小缺口的椭圆，按 dens 的密度撒；有就把颜色写进 out，返回盖住了多少 */
@@ -516,13 +516,23 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       const moss = clamp01(smooth(0.42, 0.62, patch) + shadeLove * 0.5)
       const blade = valueNoise(x * 4 + y * 0.6, y * 26 - x * 3, seed + 13)
       const fine = 0.9 + 0.12 * grain + 0.06 * blade
-      r = (138 + (100 - 138) * moss) * fine
-      g = (152 + (126 - 152) * moss) * fine
-      b = (80 + (66 - 80) * moss) * fine
+      const tone = 0.92 + 0.16 * fbm(x / 2.4 + 7, y / 2.4, seed + 17, 2)
+      r = (140 + (104 - 140) * moss) * fine * tone
+      g = (150 + (126 - 150) * moss) * fine * tone
+      b = (88 + (72 - 88) * moss) * fine * tone
       const dry = smooth(0.55, 0.8, fbm(x / 9 + 3, y / 9, seed + 15, 2)) * (1 - moss)
       r += (150 - r) * dry * 0.35
       g += (156 - g) * dry * 0.25
       b += (84 - b) * dry * 0.3
+      const gray = (r + g + b) / 3
+      r += (gray - r) * 0.12
+      g += (gray - g) * 0.12
+      b += (gray - b) * 0.12
+      // 树下积着的花瓣连成一层薄薄的粉
+      const carpet = smooth(0.35, 0.95, sampleField(prep.petalNear, x, y)) * (0.75 + 0.25 * valueNoise(x * 1.7, y * 1.7, seed + 19))
+      r += (236 - r) * carpet * 0.42
+      g += (206 - g) * carpet * 0.42
+      b += (206 - b) * carpet * 0.42
       // 院墙外：同样的苔地，稍暗
       const out_ = smooth(-th, -th - 1, inside)
       r *= 1 - 0.1 * out_
@@ -584,7 +594,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           r = 168 * k
           g = 160 * k
           b = 148 * k
-        } else if (wl.along > CREST_U && wl.side < ditch) {
+        } else if (wl.along > CREST_U && wl.side < ditch && wl.along < cfg.weir.backU + th) {
           r = 72 + 20 * grain
           g = 74 + 20 * grain
           b = 70 + 18 * grain
@@ -611,7 +621,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       }
       // 落花：树下最厚、墙根积着一溜，别处零星几片；水下的不画（水面上的花瓣另画）
       if (depth < 0.01) {
-        const dens = 0.03 + 0.5 * sampleField(prep.petalNear, x, y)
+        const dens = 0.012 + 0.5 * sampleField(prep.petalNear, x, y)
         for (const [scale, sd] of [
           [3.2, 81],
           [5, 83],
@@ -642,10 +652,10 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
 function blossom(tint: number): { dark: number[]; mid: number[]; lit: number[]; eye: number[] } {
   const mix = (a: readonly number[], b: readonly number[]): number[] => a.map((v, i) => v + (b[i]! - v) * tint)
   return {
-    dark: mix([228, 178, 184], [214, 128, 156]),
+    dark: mix([226, 172, 170], [212, 124, 140]),
     mid: mix([252, 222, 224], [246, 180, 198]),
     lit: mix([255, 248, 240], [255, 230, 232]),
-    eye: mix([232, 140, 158], [210, 92, 130]),
+    eye: mix([238, 160, 150], [222, 116, 128]),
   }
 }
 
@@ -721,7 +731,7 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const warmth = lit * lit
         let r = c.dark[0]! + (c.lit[0]! - c.dark[0]!) * warmth
         let g = c.dark[1]! + (c.lit[1]! - c.dark[1]!) * warmth
-        let b = c.dark[2]! + (c.lit[2]! - c.dark[2]!) * (0.6 + 0.4 * warmth)
+        let b = c.dark[2]! + (c.lit[2]! - c.dark[2]!) * warmth
         const mid = 1 - Math.abs(warmth - 0.5) * 2
         r += (c.mid[0]! - r) * mid * 0.5
         g += (c.mid[1]! - g) * mid * 0.5
@@ -732,7 +742,7 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         b *= k * (1 + vary * 0.5)
         // 花心：一点深粉，亮面上看得见
         if (fd < petal * 0.26) {
-          const e = smooth(petal * 0.26, petal * 0.1, fd) * (0.35 + 0.4 * lit)
+          const e = smooth(petal * 0.26, petal * 0.1, fd) * (0.15 + 0.25 * lit)
           r += (c.eye[0]! - r) * e
           g += (c.eye[1]! - g) * e
           b += (c.eye[2]! - b) * e
@@ -863,9 +873,9 @@ function roofTile(sc: PaintScene, x: number, y: number, eave: number, seed: numb
   const lit = clamp01((tx * LX + ty * LY + LZ) / l)
   const grain = 0.94 + 0.1 * valueNoise(x * 18, y * 18, seed + 109)
   const k = (0.42 + 0.78 * lit) * base * grain
-  r = 116 * k
-  g = 116 * k
-  b = 124 * k
+  r = 120 * k
+  g = 117 * k
+  b = 120 * k
   ROOF[0] = r * GRADE.r
   ROOF[1] = g * GRADE.g
   ROOF[2] = b * GRADE.b

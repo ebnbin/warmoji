@@ -336,7 +336,7 @@ function outsideOf(cfg: SakuraConfig, rng: Rng, inlet: Port, outlet: Port, weir:
   const down = makeReach(cfg, hermite(from, { x: weir.tx, y: weir.ty }, to, { x: outlet.dx, y: outlet.dy }, len(to.x - from.x, to.y - from.y) * 0.5, 40), q, weir.crest - cfg.weir.dropM, seed + 53, 0)
   // 堰下：院里是和溪一样宽的跌水沟，出了墙收窄成一条石砌的水路
   const out = cfg.weir.backU + th
-  for (let i = 0; i < down.half.length; i++) down.half[i] = weir.half + 0.15 - (weir.half * 0.35 - 0.05) * smooth(out, out + 1.5, down.s[i]!)
+  for (let i = 0; i < down.half.length; i++) down.half[i] = weir.half + 0.15 - (weir.half * 0.5 - 0.05) * smooth(out, out + 1.5, down.s[i]!)
   return { upstream: up, downstream: down }
 }
 
@@ -633,7 +633,7 @@ function terrainOf(cfg: SakuraConfig, k: Sketch, seed: number, x0: number, y0: n
         const ditch = at(k.downstream.half, tmp)
         if (tmp.d < ditch) {
           nearLevel = at(k.downstream.level, tmp)
-          g = nearLevel - 0.25
+          g = nearLevel - 0.25 - 0.2 * smooth(wc.backU, wc.backU + 2, tmp.s)
           nearD = tmp.d - ditch
           b = 0
         } else g = Math.max(g, wr.level + f.bankM)
