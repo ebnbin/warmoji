@@ -12,7 +12,7 @@ import { spawnDecor } from '../entities/decor'
 import { Alive, Transform } from '../components'
 import { devFlag } from '../../devtools'
 import { roomAt } from '../worlds/basin'
-import { CANOPY_PPU, PAINT_PAD_U, textureSize } from './ground'
+import { CANOPY_PPU, textureSize } from './ground'
 import { toLocal, toWorld } from './layout'
 import { cellAt, GRAVITY } from './masonry'
 import { RuinsPainter } from './painter'
@@ -24,6 +24,7 @@ import type { PaintTask } from './painter'
 import type { Collapse, RuinsState } from './world'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { FRAME } from '../frame'
 import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -160,8 +161,8 @@ export class RuinsView implements MapView {
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   /** 野花与蘑菇只撒在台地上空着的地面：不压墙、不压木板与厚碎石 */
@@ -204,8 +205,8 @@ export class RuinsView implements MapView {
     painter.trim(1)
     upload(ground)
     upload(canopy)
-    const x0 = -PAINT_PAD_U * UNIT
-    const y0 = -PAINT_PAD_U * UNIT
+    const x0 = 0
+    const y0 = 0
     this.visuals.push(scene.add.image(x0, y0, GROUND_KEY).setOrigin(0, 0).setDisplaySize((gs.w / GROUND_PPU) * UNIT, (gs.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.visuals.push(scene.add.image(x0, y0, CANOPY_KEY).setOrigin(0, 0).setDisplaySize((cs.w / CANOPY_PPU) * UNIT, (cs.h / CANOPY_PPU) * UNIT).setDepth(20))
     const cols = Math.ceil(gs.w / TILE_PX)
@@ -361,8 +362,8 @@ export class RuinsView implements MapView {
     const ly = -SUN.y / Math.hypot(SUN.x, SUN.y)
     const perM = Math.hypot(SUN.x, SUN.y) / SUN.z
     const mark = (x: number, y: number): void => {
-      const tx = Math.floor(((x + PAINT_PAD_U) * GROUND_PPU) / TILE_PX)
-      const ty = Math.floor(((y + PAINT_PAD_U) * GROUND_PPU) / TILE_PX)
+      const tx = Math.floor((x * GROUND_PPU) / TILE_PX)
+      const ty = Math.floor((y * GROUND_PPU) / TILE_PX)
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const cx = tx + dx

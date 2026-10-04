@@ -7,7 +7,7 @@ import type { Basin } from './basin'
 import type { Landmark } from './gates'
 import type { VolcanoConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
-import type { Rect } from '../lens'
+import type { Rect } from '../frame'
 
 /**
  * 地形与熔岩的格子场：地面高度、熔岩厚度都以格计，温度 1 是刚喷出。

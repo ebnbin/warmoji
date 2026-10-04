@@ -1,6 +1,13 @@
 import { FRAME_U, UNIT } from '../util/units.ts'
-import type { Rect } from './lens'
 import type { Point } from '../util/vec'
+
+/** 世界里的一块矩形，像素 */
+export interface Rect {
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+}
 
 /** 沙盒地图的方框，像素：左上角是世界原点 */
 export const FRAME: Rect = { x: 0, y: 0, w: FRAME_U * UNIT, h: FRAME_U * UNIT }

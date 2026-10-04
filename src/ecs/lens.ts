@@ -5,15 +5,10 @@ import { mainCameraOnly } from '../util/camera'
 import { UNIT } from '../util/units'
 import { FRAME } from './frame'
 import { fitAspectRect } from './worlds/torus'
+import type { Rect } from './frame'
 import type { Point } from '../util/vec'
 
-/** 世界里的一块矩形，像素 */
-export interface Rect {
-  readonly x: number
-  readonly y: number
-  readonly w: number
-  readonly h: number
-}
+export type { Rect } from './frame'
 
 /**
  * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；

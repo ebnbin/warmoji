@@ -884,11 +884,10 @@ export interface RuinsConfig {
   readonly meterPerU: number
   /** 砌体格子的边长，格：每格记剩几层石块、封着的木板与地上的碎石 */
   readonly cellU: number
-  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地边到地图边留 padU 格的山坡；窄过两倍 neckU 的缝填掉 */
+  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地外是山坡；窄过两倍 neckU 的缝填掉 */
   readonly site: {
     readonly marginU: readonly [number, number]
     readonly waveU: number
-    readonly padU: number
     readonly neckU: number
   }
   /**

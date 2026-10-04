@@ -434,11 +434,11 @@ export const MAPS = {
     ruins: {
       meterPerU: 0.5,
       cellU: 0.25,
-      site: { marginU: [2.6, 4.8], waveU: 7, padU: 2.5, neckU: 0.8 },
+      site: { marginU: [1.6, 2], waveU: 7, neckU: 0.8 },
       plan: {
         tiltDeg: [8, 24],
-        garthU: [6, 8],
-        walkU: 3.2,
+        garthU: [5.8, 8],
+        walkU: 2.6,
         depthU: [6.5, 8],
         roomU: [6, 10],
         doorU: [2.4, 3],

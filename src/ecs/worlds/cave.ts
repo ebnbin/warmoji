@@ -7,7 +7,7 @@ import type { CaveConfig } from '../../types/maps'
 import { daysAt, moonAt, moonDirectLux, moonSkyLux, phaseAngle, skyLux, sunAt, sunDirectLux, SYNODIC_DAYS, torchLux } from '../../data/cave'
 import type { SkyDir } from '../../data/cave'
 import type { Landmark } from './gates'
-import type { Rect } from '../lens'
+import type { Rect } from '../frame'
 
 const DEG = Math.PI / 180
 

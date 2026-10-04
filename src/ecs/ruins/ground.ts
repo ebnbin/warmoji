@@ -10,8 +10,6 @@ import type { Grid, Structure } from './masonry'
 
 /** 树冠贴图每格多少像素：树冠边是软的，用不着地面那么细 */
 export const CANOPY_PPU = 16
-/** 地面贴图铺到地图外多远，格：镜头边距再加设备安全区 */
-export const PAINT_PAD_U = 6
 /** 树按这么大（格）的格子分桶，画一个像素只看附近几桶 */
 const BUCKET_U = 2
 /** 树影最多拖出这么远（格） */
@@ -109,7 +107,7 @@ export function pixelBuffer(rect: PixelRect): Uint8ClampedArray<ArrayBuffer> {
 /** 地面与树冠贴图的大小，像素：铺满地图与外面一圈 */
 export function textureSize(sc: Pick<PaintScene, 'w' | 'h'>, layer: PaintLayer): { w: number; h: number } {
   const ppu = layer === 'ground' ? GROUND_PPU : CANOPY_PPU
-  return { w: Math.round((sc.w + PAINT_PAD_U * 2) * ppu), h: Math.round((sc.h + PAINT_PAD_U * 2) * ppu) }
+  return { w: Math.round(sc.w * ppu), h: Math.round(sc.h * ppu) }
 }
 
 /** 树按位置分桶：键是桶的行列 */
@@ -139,12 +137,12 @@ function shadowOf(cfg: RuinsConfig, tr: Tree): { x: number; y: number; r: number
 }
 
 function indexTrees(sc: PaintScene, discs: readonly { x: number; y: number; r: number }[], pad: number): TreeIndex {
-  const cols = Math.ceil((sc.w + PAINT_PAD_U * 2) / BUCKET_U) + 1
+  const cols = Math.ceil(sc.w / BUCKET_U) + 1
   const buckets = new Map<number, number[]>()
   discs.forEach((c, k) => {
     const r = c.r + pad
-    for (let by = Math.floor((c.y - r + PAINT_PAD_U) / BUCKET_U); by <= Math.floor((c.y + r + PAINT_PAD_U) / BUCKET_U); by++) {
-      for (let bx = Math.floor((c.x - r + PAINT_PAD_U) / BUCKET_U); bx <= Math.floor((c.x + r + PAINT_PAD_U) / BUCKET_U); bx++) {
+    for (let by = Math.max(0, Math.floor((c.y - r) / BUCKET_U)); by <= Math.floor((c.y + r) / BUCKET_U); by++) {
+      for (let bx = Math.max(0, Math.floor((c.x - r) / BUCKET_U)); bx <= Math.min(cols - 1, Math.floor((c.x + r) / BUCKET_U)); bx++) {
         const key = by * cols + bx
         let list = buckets.get(key)
         if (!list) buckets.set(key, (list = []))
@@ -157,7 +155,7 @@ function indexTrees(sc: PaintScene, discs: readonly { x: number; y: number; r: n
 
 const NONE: readonly number[] = []
 function near(ix: TreeIndex, x: number, y: number): readonly number[] {
-  return ix.buckets.get(Math.floor((y + PAINT_PAD_U) / BUCKET_U) * ix.cols + Math.floor((x + PAINT_PAD_U) / BUCKET_U)) ?? NONE
+  return ix.buckets.get(Math.floor(y / BUCKET_U) * ix.cols + Math.floor(x / BUCKET_U)) ?? NONE
 }
 
 export function prepareStatic(sc: PaintScene): Static {
@@ -934,8 +932,8 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
   const o = PX
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
-      const x = -PAINT_PAD_U + (px + 0.5) / ppu
-      const y = -PAINT_PAD_U + (py + 0.5) / ppu
+      const x = (px + 0.5) / ppu
+      const y = (py + 0.5) / ppu
       const l = toLocal(f, x, y)
       const u = l.u
       const v = l.v
@@ -1133,8 +1131,8 @@ export function paintCanopy(sc: PaintScene, stat: Static, out: Uint8ClampedArray
   const shapes = sc.trees.map((tr, k) => clumps(tr, k))
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
-      const x = -PAINT_PAD_U + (px + 0.5) / ppu
-      const y = -PAINT_PAD_U + (py + 0.5) / ppu
+      const x = (px + 0.5) / ppu
+      const y = (py + 0.5) / ppu
       let best = -Infinity
       let nx = 0
       let ny = 0

@@ -267,8 +267,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
  * 星光暗过刷怪的门槛；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍
  */
 const DEG = Math.PI / 180
-/** 新地图有效场地的标准边长，格 */
-const STANDARD_SIDE_U = 32
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'cave') === (m.cave !== undefined), `maps.${id} 是溶洞当且仅当写了 cave`)
   const c = m.cave
@@ -687,7 +685,7 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
 
 /**
  * 残垣：参数说得通；砌体的层高把挡人、挡弹、挡视线分开——总有几层高的墙只挡标准身体、几层只挡身体和平射；原本的墙与石柱高过眼睛，
- * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：能走的地方约有标准的 32×32 那么大，
+ * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：
  * 从回廊院走得到台地上几乎所有能走的地方，标准身体走得过的通道大个子也都走得过
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -707,7 +705,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const hc = ms.courseM
   const W = p.wallU
   need(r.meterPerU > 0 && r.cellU > 0 && r.cellU <= 0.5, `${at} 的米每格须为正，砌体格子在 (0, 0.5] 格内`)
-  need(pos(site.marginU) && site.waveU > 0 && site.padU > 0 && site.neckU > 0, `${at}.site 的边距、波长、山坡与窄缝须为正`)
+  need(pos(site.marginU) && site.waveU > 0 && site.neckU > 0, `${at}.site 的边距、波长与窄缝须为正`)
   need(site.marginU[0] >= 2 * r.bodyCapU && site.neckU >= r.bodyCapU, `${at}.site 台地边离院落外框须放得下按 bodyCapU 算的大个子，填掉的窄缝也不窄于他`)
   need(span(p.tiltDeg) && p.tiltDeg[0] >= 0 && p.tiltDeg[1] <= 45, `${at}.plan.tiltDeg 须在 0 到 45 度之间`)
   need(pos(p.garthU) && pos(p.depthU) && pos(p.roomU) && pos(p.doorU) && ints(p.gates) && p.loops >= 0 && p.loops <= 1, `${at}.plan 的尺寸须为正，门的道数是非负整数，多开门的概率在 [0, 1] 内`)
@@ -738,8 +736,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     const seed = k * 7919 + 17
     const plan = ruinsPlan(r, { strength, walk: level, bodyU: B.refRadiusU }, seed)
     const b = plan.basin
-    let open = 0
-    for (let i = 0; i < b.room.length; i++) if (b.room[i]! > 0) open++
     const g = plan.grid
     const onSite = (i: number): boolean => {
       const ci = i % g.cols
@@ -747,14 +743,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       return roomAt(b, w.x * UNIT, w.y * UNIT) > 0
     }
     const walk = new Uint8Array(g.cols * g.rows)
-    let blocked = 0
-    for (let i = 0; i < walk.length; i++) {
-      if (!onSite(i)) continue
-      if (plan.n[i]! > level || plan.timber[i]! > 0) blocked++
-      else walk[i] = 1
-    }
-    const floor = open * (b.cell / UNIT) ** 2 - blocked * g.cell ** 2
-    need(floor >= 0.85 * STANDARD_SIDE_U ** 2 && floor <= 1.2 * STANDARD_SIDE_U ** 2, `${at} 种子 ${seed} 能走的地方约 ${Math.round(floor)} 格²，须在 ${STANDARD_SIDE_U}×${STANDARD_SIDE_U} 上下`)
+    for (let i = 0; i < walk.length; i++) if (onSite(i) && plan.n[i]! <= level && plan.timber[i]! <= 0) walk[i] = 1
     const fu = (plan.start.x - plan.frame.cx) * plan.frame.cos + (plan.start.y - plan.frame.cy) * plan.frame.sin + plan.frame.w / 2
     const fv = -(plan.start.x - plan.frame.cx) * plan.frame.sin + (plan.start.y - plan.frame.cy) * plan.frame.cos + plan.frame.h / 2
     const start = Math.floor((fv - g.v0) / g.cell) * g.cols + Math.floor((fu - g.u0) / g.cell)

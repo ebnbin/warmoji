@@ -1,4 +1,4 @@
-import { UNIT } from '../../util/units.ts'
+import { FRAME_U, SAFE_U, UNIT } from '../../util/units.ts'
 import { fbm } from '../../util/noise.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin } from '../worlds/basin.ts'
@@ -197,16 +197,23 @@ interface Draft {
   readonly lines: { readonly axis: 0 | 1; readonly line: number; readonly a: number; readonly b: number; readonly kind: StructureKind; readonly thick: number }[]
 }
 
-/** 院落的平面：中间是回廊院，四周一圈房间，一角是塔楼；墙都在房间的边界上 */
-function draft(cfg: RuinsConfig, rng: Rng): Draft {
+/**
+ * 院落的平面：中间是回廊院，四周一圈房间，一角是塔楼；墙都在房间的边界上。
+ * 尺寸都按同一个比例往下限收：外框的边长加上回廊院偏开中心的那点，不超过 sideU 格
+ */
+function draft(cfg: RuinsConfig, rng: Rng, sideU: number): Draft {
   const P = cfg.plan
   const T = P.wallU
-  const gW = between(rng, P.garthU)
-  const gH = between(rng, P.garthU)
-  const dL = between(rng, P.depthU)
-  const dR = between(rng, P.depthU)
-  const dT = between(rng, P.depthU)
-  const dB = between(rng, P.depthU)
+  const least = 2 * P.depthU[0] + P.garthU[0] + 2 * P.walkU
+  const most = 2 * P.depthU[1] + P.garthU[1] + 2 * P.walkU
+  const k = Math.min(1, Math.max(0, (sideU - least) / (most - least + P.depthU[1] - P.depthU[0])))
+  const pick = (r: readonly [number, number]): number => between(rng, [r[0], r[0] + (r[1] - r[0]) * k])
+  const gW = pick(P.garthU)
+  const gH = pick(P.garthU)
+  const dL = pick(P.depthU)
+  const dR = pick(P.depthU)
+  const dT = pick(P.depthU)
+  const dB = pick(P.depthU)
   const cW = gW + 2 * P.walkU
   const cH = gH + 2 * P.walkU
   const W = dL + cW + dR
@@ -783,8 +790,8 @@ interface Sketch {
 }
 
 /** 一次尝试：平面、门洞、柱廊，填进砌体格子再让它塌成废墟 */
-function sketch(cfg: RuinsConfig, k0: Strength, rng: Rng, seed: number): Sketch | null {
-  const d = draft(cfg, rng)
+function sketch(cfg: RuinsConfig, k0: Strength, rng: Rng, seed: number, sideU: number): Sketch | null {
+  const d = draft(cfg, rng, sideU)
   const doors = pickDoors(cfg, rng, d)
   if (!doors) return null
   const structures: Structure[] = []
@@ -852,13 +859,12 @@ function barricade(cfg: RuinsConfig, rng: Rng, m: Masonry, doors: readonly Door[
   }
 }
 
-/** 台地边外的树：按抖动的格子撒，离台地边至少半格，树冠之间不挤 */
+/** 台地边外的树：按抖动的格子撒在方框里，离台地边至少半格，树冠之间不挤 */
 function plantTrees(cfg: RuinsConfig, rng: Rng, basin: Basin, w: number, h: number): Tree[] {
   const T = cfg.trees
   const out: Tree[] = []
-  const pad = 6
-  for (let y = -pad; y < h + pad; y += T.gapU) {
-    for (let x = -pad; x < w + pad; x += T.gapU) {
+  for (let y = 0; y < h; y += T.gapU) {
+    for (let x = 0; x < w; x += T.gapU) {
       const px = x + rng.next() * T.gapU
       const py = y + rng.next() * T.gapU
       const r = between(rng, T.crownU)
@@ -895,27 +901,31 @@ export function ruinsPlan(cfg: RuinsConfig, rules: PlanRules, seed: number): Rui
   const key = `${seed}:${rules.walk}:${rules.bodyU}:${rules.strength.masonry}:${rules.strength.timber}`
   if (last && last.cfg === cfg && last.key === key) return last.plan
   const rng = new Rng(scramble(seed))
+  // 先定院落斜多少：转过去的院落连同台地边要放得进安全区，院落就按这个收
+  const tilt = (rng.next() < 0.5 ? -1 : 1) * between(rng, cfg.plan.tiltDeg) * DEG
+  const S = cfg.site
+  const sideU = (FRAME_U - SAFE_U * 2 - S.marginU[1] * 2) / (Math.abs(Math.cos(tilt)) + Math.abs(Math.sin(tilt)))
   let k: Sketch | null = null
-  for (let t = 0; t < TRIES && !k; t++) k = sketch(cfg, rules.strength, rng, seed)
+  for (let t = 0; t < TRIES && !k; t++) k = sketch(cfg, rules.strength, rng, seed, sideU)
   if (!k) throw new Error(`残垣生成不出来：种子 ${seed}`)
   const { d, doors, m, fallen } = k
   barricade(cfg, rng, m, doors)
   closeSlots(m, rules.walk, cfg.gapU)
   openNecks(cfg, m, rules, rng)
-  const tilt = (rng.next() < 0.5 ? -1 : 1) * between(rng, cfg.plan.tiltDeg) * DEG
-  const S = cfg.site
-  const c = Math.abs(Math.cos(tilt))
-  const s = Math.abs(Math.sin(tilt))
-  const edge = S.marginU[1] + S.padU
-  const w = Math.ceil(d.W * c + d.H * s + edge * 2)
-  const h = Math.ceil(d.W * s + d.H * c + edge * 2)
-  const frame: Frame = { cos: Math.cos(tilt), sin: Math.sin(tilt), cx: w / 2, cy: h / 2, w: d.W, h: d.H }
+  // 出生点在回廊院正中，落在方框正中
+  const w = FRAME_U
+  const h = FRAME_U
+  const gu = (d.garth.u0 + d.garth.u1) / 2 - d.W / 2
+  const gv = (d.garth.v0 + d.garth.v1) / 2 - d.H / 2
+  const cos = Math.cos(tilt)
+  const sin = Math.sin(tilt)
+  const frame: Frame = { cos, sin, cx: w / 2 - (gu * cos - gv * sin), cy: h / 2 - (gu * sin + gv * cos), w: d.W, h: d.H }
   const start = toWorld(frame, (d.garth.u0 + d.garth.u1) / 2, (d.garth.v0 + d.garth.v1) / 2)
   const siteSeed = (scramble(seed) ^ 0x51e) >>> 0
   const open = (x: number, y: number): boolean => {
     const xu = x / UNIT
     const yu = y / UNIT
-    if (xu < S.padU || yu < S.padU || xu > w - S.padU || yu > h - S.padU) return false
+    if (xu < SAFE_U || yu < SAFE_U || xu > w - SAFE_U || yu > h - SAFE_U) return false
     const l = toLocal(frame, xu, yu)
     const margin = S.marginU[0] + (S.marginU[1] - S.marginU[0]) * smooth(0.3, 0.7, fbm(xu / S.waveU, yu / S.waveU, siteSeed, 3))
     return boxDist(l.u - d.W / 2, l.v - d.H / 2, d.W / 2, d.H / 2) < margin
