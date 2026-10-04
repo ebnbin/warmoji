@@ -161,7 +161,7 @@ export const MAPS = {
   meadow: {
     emoji: '1f33c',
     name: '草甸',
-    desc: '山脚下一片开满野花的草甸。一边是黑压压的针叶林，林间小路被倒下的大树堵住了；一边是牧场的木栅栏，门闩着，羊在外头吃草；一边是陡峭的山崖，上山的小路被落石埋了。这里没有别的规矩，放开手脚打就是',
+    desc: '一片开满野花的草甸。一边是黑压压的针叶林，林间小路被倒下的大树堵住了；一边是牧场的木栅栏，门闩着，羊在外头吃草；一边是一道陡坡，坡上是更高的一层草甸，上不去。这里没有别的规矩，放开手脚打就是',
     kind: 'meadow',
     stamina: { exertion: 0.4, regen: 1.2 },
     palette: {
@@ -185,7 +185,7 @@ export const MAPS = {
       areaU2: [760, 1040],
       neckU: 0.35,
       turf: { reliefM: 0.16, waveU: 7, riseM: 0.035 },
-      cliff: { insetU: [2, 5.5], bendU: 2.6, waveU: 12, jagU: 0.22, spurs: [0, 2], spurU: [1.2, 3], spurWidthU: [1.5, 3.5], screeU: [0.8, 1.4], heightM: [1.8, 2.6], riseM: 0.22, snow: 0.35 },
+      bank: { insetU: [3.5, 6.5], bendU: 2.6, waveU: 12, jagU: 0.12, spurs: [0, 2], spurU: [1.2, 3], spurWidthU: [1.5, 3.5], slopeU: [1.3, 1.8], heightM: [1.4, 1.9] },
       forest: { insetU: [1.5, 5.5], bendU: 2.4, waveU: 9, scallopU: 0.45, lobes: [0, 2], lobeU: [1.5, 3.5], lobeWidthU: [1.6, 3], crownU: [1.3, 2.3], heightM: [4.5, 6.5], edgeU: [0.5, 1], birch: 0.25, overhangU: 0.4 },
       trail: { notchU: 1.6, widthU: 1.3, logU: [5, 6.5] },
       fence: { insetU: [1.5, 3], skewDeg: 6, kinkDeg: 6, postU: 2.6, heightM: 1.1, gateU: 2.2, farChance: 0.35 },

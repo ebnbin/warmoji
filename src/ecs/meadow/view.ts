@@ -13,7 +13,7 @@ import { roomAt } from '../worlds/basin'
 import { CANOPY_PPU, grassMask, groundArea, MASK_PPU, textureSize } from './ground'
 import { MeadowPainter } from './painter'
 import { GRASS_FRAG } from './shader'
-import { beyondFence, footAt, forestDepth, polylineDist, toLocal, toMap } from './layout'
+import { bankWidth, beyondFence, footAt, forestDepth, polylineDist, toLocal, toMap } from './layout'
 import { meadowPlanFor } from './world'
 import { drawBird, drawButterfly, drawFluff, drawHawk, drawSheep, drawSheepHead } from './critters'
 import type { PaintTask } from './painter'
@@ -52,7 +52,7 @@ const BIRD_U = 0.36
 const BIRD_SPEED_U = 7
 const BIRD_ALT_M = 2.6
 const FLOCK_MS = { min: 22000, max: 45000 } as const
-/** 鹰：在山崖上空绕多大的圈（格）、多快（弧度/秒）、翅展（格）、离地多高（米，定影子落在哪） */
+/** 鹰：在坡上那层草甸的上空绕多大的圈（格）、多快（弧度/秒）、翅展（格）、离地多高（米，定影子落在哪） */
 const HAWK = { radius: 6.5, rate: 0.16, span: 1.9, altM: 4 } as const
 /** 羊多久叫一声（毫秒） */
 const BLEAT_MS = { min: 9000, max: 20000 } as const
@@ -117,8 +117,8 @@ function ensureCritters(scene: Phaser.Scene): void {
 }
 
 /**
- * 草甸：地面与树冠是开局在后台线程画好的贴图，山崖画在地面里，按高度场打光、投下影子；草地上山风吹出一道道草浪。
- * 栅栏外几只羊在吃草，草地上蝴蝶围着花飞，林子里不时飞出一群小鸟掠过草地，山崖上空有只鹰在盘旋，蒲公英的种子顺风飘。树冠盖在一切之上
+ * 草甸：地面与树冠是开局在后台线程画好的贴图，陡坡与坡上那层草甸画在地面里，按高度场打光、投下影子；两层草甸上风吹出一道道草浪。
+ * 栅栏外几只羊在吃草，草地上蝴蝶围着花飞，林子里不时飞出一群小鸟掠过草地，坡上那层草甸的上空有只鹰在盘旋，蒲公英的种子顺风飘。树冠盖在一切之上
  */
 export class MeadowView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -217,7 +217,7 @@ export class MeadowView implements MapView {
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.2, 0x000000)
   }
 
-  /** 草浪：遮罩标出哪里是草，着色器顺着山风吹出一道道亮的草浪 */
+  /** 草浪：遮罩标出哪里是草，着色器顺着风吹出一道道亮的草浪 */
   private grass(v: ViewCtx, sc: PaintScene, plan: MeadowPlan, ga: Area): void {
     const scene = v.scene
     const m = grassMask(sc)
@@ -277,11 +277,11 @@ export class MeadowView implements MapView {
     }
   }
 
-  /** 山崖上空盘旋的鹰：圈心在山脚往山里几格，绕着圈时不时飞到草地上空 */
+  /** 坡上那层草甸上空盘旋的鹰：圈心在坡顶往外几格，绕着圈时不时飞到下面草地的上空 */
   private soar(v: ViewCtx, plan: MeadowPlan): void {
     const rng = new Rng(plan.seed ^ 0x4a3c)
     const b = plan.size * (0.2 + rng.next() * 0.6)
-    const c = toMap(plan.frame, footAt(plan.edges, b) - 2.5 - rng.next() * 2, b)
+    const c = toMap(plan.frame, footAt(plan.edges, b) - bankWidth(plan.edges, b) - 1.5 - rng.next() * 2, b)
     const img = v.scene.add.image(0, 0, HAWK_KEY).setDepth(36)
     this.visuals.push(img)
     this.hawk = { a: rng.next() * Math.PI * 2, cx: c.x, cy: c.y, img }
@@ -315,7 +315,7 @@ export class MeadowView implements MapView {
     )
   }
 
-  /** 这一点在不在牧场里：栅栏外、林子外、离山脚一格以上，在画过的地方以内 */
+  /** 这一点在不在牧场里：栅栏外、林子外、离坡脚一格以上，在画过的地方以内 */
   private inPasture(plan: MeadowPlan, cfg: MeadowConfig, x: number, y: number): boolean {
     const pad = cfg.padU - 1
     if (x < -pad || y < -pad || x > plan.size + pad || y > plan.size + pad) return false
@@ -420,7 +420,7 @@ export class MeadowView implements MapView {
       g.fillCircle(b.x * UNIT + shx * alt, b.y * UNIT + shy * alt, BUTTERFLY_U * UNIT * 0.2)
     }
     this.flock(v, plan, now, dt, shx, shy)
-    // 鹰：在山崖上空慢慢绕圈，影子从山坡与草地上掠过
+    // 鹰：在坡上那层草甸的上空慢慢绕圈，影子从两层草地上掠过
     const eg = this.hawk
     if (eg) {
       eg.a += HAWK.rate * dt
@@ -437,7 +437,7 @@ export class MeadowView implements MapView {
     }
   }
 
-  /** 一群小鸟：隔一阵从林缘飞出来，掠过草地，往山那边飞走；影子在地上跟着跑 */
+  /** 一群小鸟：隔一阵从林缘飞出来，掠过草地，往坡上那边飞走；影子在地上跟着跑 */
   private flock(v: ViewCtx, plan: MeadowPlan, now: number, dt: number, shx: number, shy: number): void {
     const g = this.shadows!
     const scene = v.scene

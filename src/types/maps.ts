@@ -665,8 +665,8 @@ export interface RiverConfig {
   }
 }
 /**
- * 草甸：山脚下一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是往上的山崖；
- * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和山脚都是硬边界。一格 meterPerU 米：树高、岩壁高与影子长短按米算
+ * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
+ * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
  */
 export interface MeadowConfig {
   readonly meterPerU: number
@@ -677,14 +677,13 @@ export interface MeadowConfig {
   readonly areaU2: readonly [number, number]
   /** 窄过两倍 neckU 的缝与尖角不能走 */
   readonly neckU: number
-  /** 草地的起伏（米）与波长（格）；整片从山脚往外每格降低多少米 */
+  /** 草地的起伏（米）与波长（格）；整片从坡脚往外每格降低多少米 */
   readonly turf: { readonly reliefM: number; readonly waveU: number; readonly riseM: number }
   /**
-   * 山崖：山脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），石头再参差 jagU；另有 spurs 处探进草地的山嘴或凹进山里的山坳，
-   * 探出或凹进 spurU 格、宽约 spurWidthU 格。山脚先是 screeU 格宽的碎石坡，接着一级 heightM 米高的岩壁，再往上的山坡每格升 riseM 米；
-   * 山坡高处的洼地里积着残雪，snow 越大积得越多
+   * 陡坡：坡脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），再参差 jagU；另有 spurs 处往草地鼓出来或往里凹进去，
+   * 鼓出或凹进 spurU 格、宽约 spurWidthU 格。坡面从坡脚到坡顶 slopeU 格宽，坡顶比坡脚高 heightM 米；坡顶往外是高一层的草甸
    */
-  readonly cliff: {
+  readonly bank: {
     readonly insetU: readonly [number, number]
     readonly bendU: number
     readonly waveU: number
@@ -692,10 +691,8 @@ export interface MeadowConfig {
     readonly spurs: readonly [number, number]
     readonly spurU: readonly [number, number]
     readonly spurWidthU: readonly [number, number]
-    readonly screeU: readonly [number, number]
+    readonly slopeU: readonly [number, number]
     readonly heightM: readonly [number, number]
-    readonly riseM: number
-    readonly snow: number
   }
   /**
    * 针叶林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进草地的林舌或凹进林子的草湾，
@@ -719,7 +716,7 @@ export interface MeadowConfig {
   readonly trail: { readonly notchU: number; readonly widthU: number; readonly logU: readonly [number, number] }
   /**
    * 牧场的木栅栏：离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；桩距（格）、桩高（米）与门宽（格）；
-   * 栅栏在山崖对面那条边的概率，其余时候在一条侧边
+   * 栅栏在陡坡对面那条边的概率，其余时候在一条侧边
    */
   readonly fence: {
     readonly insetU: readonly [number, number]
