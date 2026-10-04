@@ -396,6 +396,17 @@ export const MAPS = {
       density: [0.006, 0.01],
     },
     mix: RUINS_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'slope',
+      kinds: {
+        door: { name: '院门', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
+        slope: { name: '山坡', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'leaves', weight: 2, perSec: 1 },
+        wall: { name: '断墙', at: { kind: 'mark' }, enter: 'climb', weight: 1.5, perSec: 1, only: ['zombie', 'skeleton', 'snake', 'knight', 'gargoyle'] },
+        haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['ghost'] },
+      },
+    },
     finalWaveSub: '暴龙撞穿墙冲过来——别和它一起被塌下的墙堵在屋里！',
     ruins: {
       meterPerU: 0.5,

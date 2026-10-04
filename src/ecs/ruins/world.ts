@@ -14,6 +14,7 @@ import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { makeMasonry, ruinsPlan, toLocal, toWorld } from './layout'
 import { awayOf, bodyField, carve, cellAt, GRAVITY, newDust, pushOut, roomOf, spill, walkStop } from './masonry'
 import { traceLocal } from './trace'
+import { ruinsMarks } from './marks'
 import type { RuinsPlan } from './layout'
 import type { Dust, Fall, Landing, Masonry, Strength } from './masonry'
 import type { MapId, RuinsConfig } from '../../types/maps'
@@ -25,7 +26,6 @@ import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
-const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 /** 残垣按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a1e
 /** 跨步高度分这么多档（层），各按一张距离场与一张寻路走 */
@@ -84,11 +84,12 @@ interface Flow {
 }
 
 /**
- * 残垣此刻的状态：按种子生成的地图，开局后会被打坏的砌体、尘雾；各档跨步高度的距离场与寻路（砌体一变就作废，用到时再算）；
+ * 残垣此刻的状态：按种子生成的地图与它上面的地标，开局后会被打坏的砌体、尘雾；各档跨步高度的距离场与寻路（砌体一变就作废，用到时再算）；
  * 还没落地的落石；给画面的改动过的砌体格子、塌落与打击
  */
 export interface RuinsState {
   readonly plan: RuinsPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly m: Masonry
   readonly dust: Dust
   readonly fields: (Float32Array | null)[]
@@ -126,7 +127,7 @@ export function ruinsOf(sim: Sim): RuinsState {
         onSite[j * dust.cols + i] = roomAt(plan.basin, w.x * UNIT, w.y * UNIT) >= FLOW_CLEAR_U * UNIT ? 1 : 0
       }
     }
-    s = { plan, m, dust, fields: new Array(LEVELS).fill(null), flows: new Array(LEVELS).fill(null), onSite, version: 0, dustAt: 0, pending: [], changed: [], collapses: [], impacts: [] }
+    s = { plan, marks: ruinsMarks(plan, walkLevel(cfg)), m, dust, fields: new Array(LEVELS).fill(null), flows: new Array(LEVELS).fill(null), onSite, version: 0, dustAt: 0, pending: [], changed: [], collapses: [], impacts: [] }
     sim.worldState.ruins = s
   }
   return s
@@ -690,11 +691,13 @@ export const ruins: WorldHooks = {
   ground(sim) {
     return sim.hooks.basin(sim)
   },
-  canSpawn() {
-    return true
+  /** 和刷怪点一样：离墙与台地边留得出身体，到得了队长（不落进封死的屋子）；看不看得见不管，出生点已经先挑看不见的 */
+  canSpawn(sim, x, y, radius) {
+    const s = ruinsOf(sim)
+    return roomPx(s, x, y) >= Math.max(0.5 * UNIT, radius) && reachable(s, flowOf(sim, s, walkLevel(cfgOf(sim))), x, y)
   },
-  landmarks() {
-    return NO_MARKS
+  landmarks(sim) {
+    return ruinsOf(sim).marks
   },
   lean() {
     return ZERO
