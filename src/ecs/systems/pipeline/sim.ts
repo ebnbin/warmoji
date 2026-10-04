@@ -37,6 +37,7 @@ import { recordTraces } from '../shared/trace'
 import { tickBarriers } from '../../entities/barrier'
 import { tickTethers } from '../../entities/tether'
 import { tintEnemies } from '../tintEnemies'
+import { trackSight } from '../trackSight'
 import { cullProjectiles } from '../cullProjectiles'
 import { hitProjectiles } from '../hitProjectiles'
 import { refreshTargets } from '../refreshTargets'
@@ -74,6 +75,7 @@ export const SIM_PIPELINE = pipeline([
   { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: tickStamina, after: [moveBodies] },
   { run: refreshTargets, after: [moveBodies] },
+  { run: trackSight, after: [moveBodies] },
   { run: recordTraces, after: [moveBodies] },
   { run: tickPets, after: [moveBodies] },
   { run: tickTethers, after: [refreshTargets] },

@@ -10,6 +10,8 @@ import { leaderX, leaderY } from '../utils/team'
 import { fanDistance, fanSpreadDeg, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
 
 const HEADING_MIN = 0.5
+/** 队员离坑位比这（格）远时按地图的寻路走 */
+const NAVIGATE_U = 2
 
 /** 活着的队员，不含队长：倒下的人不跟队，也不占坑位 */
 export function followersOf(sim: Sim): number[] {
@@ -58,7 +60,7 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位，扇形只给活着的队员留坑；进占位半径即占位、同位取最近；这一帧不能自己走时不动 */
+/** 队员的驱动指向队长身后扇形上的目标位（远了按地图的寻路绕过障碍），扇形只给活着的队员留坑；进占位半径即占位、同位取最近；这一帧不能自己走时不动 */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -109,8 +111,10 @@ export function layoutTeam(sim: Sim): void {
     const d = sim.hooks.worldDelta(sim, x, y, seat.x, seat.y)
     const dist = Math.hypot(d.x, d.y)
     if (dist <= seatR) continue
-    const nx = d.x / dist
-    const ny = d.y / dist
+    // 离坑位远了就按地图的寻路绕过障碍，近了直奔坑位
+    const way = dist > NAVIGATE_U * UNIT ? sim.hooks.chaseDir(sim, f, seat.x, seat.y) : { x: d.x / dist, y: d.y / dist }
+    const nx = way.x
+    const ny = way.y
     const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1
     const want = moveSpeed(f) * gain
     Drive.x[f] = nx * want

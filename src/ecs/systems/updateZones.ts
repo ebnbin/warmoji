@@ -8,6 +8,7 @@ import { backEaseOut } from '../utils/ease'
 import { addMark } from '../utils/marks'
 import { isSameEntity } from '../utils/identity'
 import { eachAlly, targetsWithin } from '../utils/targets'
+import { covered } from '../utils/pass'
 import { zoneDwellIn, zoneEffects, zoneRules, zoneSrc } from '../store'
 import { spawnFxCircle } from '../entities/fx'
 import { attackOf } from '../utils/source'
@@ -43,10 +44,9 @@ function inside(x: number, y: number, r: number, tx: number, ty: number): boolea
   return dx * dx + dy * dy <= r * r
 }
 
+/** 场内能打的身体：被障碍挡的场只打得到从圆心够得着的 */
 function foesIn(sim: Sim, src: Source, x: number, y: number, r: number): number[] {
-  return targetsWithin(sim, src, x, y, r)
-    .filter((t) => inside(x, y, r, t.x, t.y))
-    .map((t) => t.eid)
+  return covered(sim, src, x, y, targetsWithin(sim, src, x, y, r).filter((t) => inside(x, y, r, t.x, t.y))).map((t) => t.eid)
 }
 
 function alliesIn(sim: Sim, src: Source, x: number, y: number, r: number): number[] {

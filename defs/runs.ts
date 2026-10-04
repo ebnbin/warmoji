@@ -181,7 +181,7 @@ const EXPEDITION = {
         clockSec: 190,
         phases: [
           {
-            intro: { title: '第二章 · 残垣', sub: '墙挡人、挡弹，也挡视线；清空三面来敌' },
+            intro: { title: '第二章 · 残垣', sub: '高墙挡人挡弹也挡视线，矮墙只挡人——躲在矮墙后开火；清空三面来敌' },
             spawns: [
               {
                 kind: 'waves',
@@ -258,7 +258,7 @@ const EXPEDITION = {
                 kind: 'batch',
                 atMs: 1500,
                 squad: { count: 1, enemy: 'rhino', stats: { mul: { maxHp: 0.55, damage: 0.8 } } },
-                banner: { title: '暴龙现身', sub: '它会冲锋撞人，横着躲开；跺地前退出圈外' },
+                banner: { title: '暴龙现身', sub: '它冲锋时连墙一起撞穿，横着躲开、别贴着墙；跺地前退出圈外' },
               },
             ],
             ends: [{ kind: 'boss' }],

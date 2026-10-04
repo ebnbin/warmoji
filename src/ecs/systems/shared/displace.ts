@@ -96,6 +96,7 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
   Motion.landed[eid] = 0
   Motion.skill[eid] = by.skill ?? 0
   Motion.stamp[eid] = sim.elapsedMs
+  Motion.breach[eid] = 0
   if (by.src) motionFx[eid] = { src: by.src, onLand: by.onLand, onWall: by.onWall, base: by.base ?? 0 }
   if (d.kind === 'dash') {
     const speed = d.distance / Math.max(1e-3, d.ms / 1000)

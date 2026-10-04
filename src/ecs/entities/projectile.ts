@@ -7,6 +7,9 @@ import type { Effect } from '../../types/abilityDefs'
 import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
+/** 抛射最近抛出这么远，像素：贴脸的目标也画得出一道弧 */
+const MIN_LOB_PX = 24
+
 interface BoltSpec {
   readonly faction: number
   readonly frame: number
@@ -22,9 +25,15 @@ interface BoltSpec {
   readonly onHit?: readonly Effect[]
   readonly homingDeg?: number
   readonly linger?: number
+  /** 抛射拱起的高度（米）与抛到多远（像素）：落地就停 */
+  readonly arc?: number
+  readonly reach?: number
+  /** 撞上障碍时的破坏力；through 为真的不受障碍阻挡 */
+  readonly breach?: number
+  readonly through?: boolean
 }
 
-/** 弹体：直线飞行（追踪的会转向）、一帧扫掠一段的飞行物，敌我同一种；无朝向的弹体自转；会落地的飞完躺在地上等召回 */
+/** 弹体：直线飞行（追踪的会转向）、一帧扫掠一段的飞行物，敌我同一种；无朝向的弹体自转；会落地的飞完躺在地上等召回；抛射的抛到瞄准的地方落地 */
 export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: BoltSpec): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth, VisOff)
@@ -58,8 +67,16 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
     addComponents(sim.world, eid, Linger)
     Linger.ms[eid] = spec.linger
   }
+  const arc = spec.arc ?? 0
+  const reach = arc > 0 ? Math.max(MIN_LOB_PX, Math.min(spec.reach ?? Infinity, (spec.speed * spec.lifeMs) / 1000)) : 0
+  Proj.arc[eid] = arc
+  Proj.reach[eid] = reach
+  Proj.flown[eid] = 0
+  Proj.breach[eid] = spec.breach ?? 0
+  Proj.through[eid] = spec.through ? 1 : 0
+  const life = arc > 0 && spec.speed > 0 ? Math.min(spec.lifeMs, (reach / spec.speed) * 1000) : spec.lifeMs
   const mapLife = sim.hooks.projectileLifeMs(sim)
-  Proj.dieAt[eid] = sim.elapsedMs + (mapLife > 0 ? Math.min(mapLife, spec.lifeMs) : spec.lifeMs)
+  Proj.dieAt[eid] = sim.elapsedMs + (mapLife > 0 ? Math.min(mapLife, life) : life)
   Depth.z[eid] = 8
   projOnHit[eid] = spec.onHit
   projHitUids[eid] = new Set()
