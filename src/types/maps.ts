@@ -606,9 +606,9 @@ export interface WadeConfig {
  */
 export interface SakuraConfig {
   readonly meterPerU: number
-  /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
+  /** 地形格子的边长，格；地形铺满方框 */
   readonly cellU: number
-  /** 地图是 sizeU 见方的方形 */
+  /** 地图是 sizeU 见方的方形，摆在方框正中 */
   readonly sizeU: number
   /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
   readonly areaU2: readonly [number, number]

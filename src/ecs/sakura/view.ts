@@ -24,6 +24,7 @@ import type { Flow, Water } from './water'
 import type { SakuraPlan, Tree } from './layout'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { FRAME } from '../frame'
 import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -132,8 +133,8 @@ export class SakuraView implements MapView {
     ensurePetal(v.scene)
   }
 
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   /** 零星的落樱：只落在空地上，离墙根、林缘有一点距离，不落在桥上 */

@@ -366,6 +366,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const { wall, forest: fo, stream: st, flow: f, rocks: rk, sill: sl, bridge: bg, trees: tr, body: b } = s
   need(s.meterPerU > 0 && s.cellU > 0 && s.sizeU > 0 && s.neckU > 0, `${at} 的米每格、地形格子、地图边长与窄缝须为正`)
+  need(s.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(s.areaU2[0] > 0 && range(s.areaU2, false) && s.areaU2[1] < s.sizeU * s.sizeU, `${at}.areaU2 须是比整张地图小的正的范围`)
   need(wall.insetU[0] > wall.thickU / 2 && range(wall.insetU, false) && wall.skewDeg >= 0 && wall.skewDeg < 30 && wall.kinkDeg >= 0 && wall.kinkDeg < 30, `${at}.wall 的墙身离地图边至少半个墙厚，整条斜与中途拐都不到 30 度`)
   need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
@@ -384,7 +385,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (let k = 0; k < 8; k++) {
     const plan = sakuraPlan(s, k * 7919 + 13)
     const where = `${at} 第 ${k} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 3 * UNIT, `${where} 的开局站位离边不到三格`)
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     const br = plan.bridge
     for (const sgn of [-1, 1]) {
       const x = br.x + br.ax * sgn * (br.half - 0.3)
