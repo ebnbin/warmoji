@@ -33,7 +33,7 @@ import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
-import { LIP_PPU, LIP_RANGE, LIP_STEP, lipAt, meadowPlan, VALLEY_OUT_U, VALLEY_SIDE_U } from '../src/ecs/meadow/layout.ts'
+import { FACE_U, lipAt, meadowPlan, VALLEY_OUT_U, VALLEY_SIDE_U } from '../src/ecs/meadow/layout.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
 import { UNIT, VIEW } from '../src/util/units.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -346,12 +346,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
-    let packs = true
-    for (let b = -VALLEY_SIDE_U; b <= plan.size + VALLEY_SIDE_U; b += 1 / LIP_PPU) {
-      const l = lipAt(plan.edges, b)
-      packs &&= l > LIP_RANGE[0] && l < LIP_RANGE[1] && Math.abs(lipAt(plan.edges, b + 1 / LIP_PPU) - l) < LIP_STEP
-    }
-    need(packs, `${where} 的崖边离地图边太远或弯得太急，压不进给着色器的崖边贴图`)
+    let faceInside = true
+    for (let b = -g.padU; b <= plan.size + g.padU; b += 0.25) faceInside &&= lipAt(plan.edges, b) - FACE_U > -g.padU
+    need(faceInside, `${where} 的崖边探出地图太远：崖外那圈岩壁超出了地面贴图`)
   }
 }
 

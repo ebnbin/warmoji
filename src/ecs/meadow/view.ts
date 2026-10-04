@@ -10,10 +10,10 @@ import { playSfx } from '../../audio/sfx'
 import { spawnDecor } from '../entities/decor'
 import { Airborne, Alive, Pickup, Radius, Transform } from '../components'
 import { roomAt } from '../worlds/basin'
-import { CANOPY_PPU, grassMask, groundArea, lipStrip, MASK_PPU, textureSize, valleyArea } from './ground'
+import { CANOPY_PPU, grassMask, groundArea, inShade, MASK_PPU, textureSize, valleyArea, valleyInland } from './ground'
 import { MeadowPainter } from './painter'
 import { GRASS_FRAG, VALLEY_FRAG } from './shader'
-import { beyondFence, forestDepth, LIP_PPU, LIP_RANGE, LIP_STEP, lipAt, polylineDist, toLocal } from './layout'
+import { beyondFence, forestDepth, lipAt, polylineDist, toLocal } from './layout'
 import { meadowPlanFor } from './world'
 import { drawBird, drawButterfly, drawFluff, drawHawk, drawSheep, drawSheepHead } from './critters'
 import type { PaintTask } from './painter'
@@ -30,7 +30,6 @@ const GROUND_KEY = 'meadow-ground'
 const CANOPY_KEY = 'meadow-canopy'
 const VALLEY_KEY = 'meadow-valley'
 const MASK_KEY = 'meadow-mask'
-const LIP_KEY = 'meadow-lip'
 const SHEEP_KEY = 'meadow-sheep'
 const HEAD_KEY = 'meadow-sheep-head'
 const BUTTERFLY_KEY = 'meadow-butterfly'
@@ -56,8 +55,14 @@ const BIRD_ALT_M = 2.6
 const FLOCK_MS = { min: 22000, max: 45000 } as const
 /** 鹰：在崖下多深的地方盘旋（占谷深的比例）、绕多大的圈（格）、多快（弧度/秒）、翅展（格） */
 const HAWK = { depth: 0.38, radius: 24, rate: 0.09, span: 2.6 } as const
-/** 雾色：谷底贴图外与远处 */
+/** 谷底在高地影子里时，鹰也在影子里飞 */
+const HAWK_SHADE = 0x9da3ab
+/** 雾色：谷底贴图外与远处；谷底在高地影子里时暗一些 */
 const HAZE = [0.7, 0.76, 0.81] as const
+const HAZE_SHADE = [0.46, 0.51, 0.57] as const
+/** 半山腰那两层雾的颜色：在阳光里、在高地的影子里 */
+const MIST_TINT = [0.92, 0.94, 0.95] as const
+const MIST_TINT_SHADE = [0.68, 0.72, 0.77] as const
 /** 半山腰两层雾在谷深的几成处 */
 const MIST = [0.3, 0.62] as const
 /** 羊多久叫一声（毫秒） */
@@ -237,14 +242,14 @@ export class MeadowView implements MapView {
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.2, 0x000000)
   }
 
-  /** 崖下的山谷：一块四边形盖住镜头能去的地方，着色器按透视找朝着镜头的崖壁、取谷底的贴图；崖边那条线压成一行像素交给它 */
+  /** 崖下的山谷：一块四边形盖住镜头能去的地方，着色器按透视取谷底的贴图 */
   private valley(v: ViewCtx, sc: PaintScene, va: Area): void {
     const { plan, cfg } = sc
     const scene = v.scene
     const cam = scene.cameras.main
-    const lip = lipStrip(sc)
-    canvasTexture(scene, LIP_KEY, lip.n, 1, (ctx) => ctx.putImageData(new ImageData(lip.data, lip.n, 1), 0, 0)).setFilter(Phaser.Textures.FilterMode.NEAREST)
     const f = plan.frame
+    const inland = valleyInland(sc)
+    const shade = inShade(plan)
     const reach = cfg.cliff.lookU + MAP.cameraMargin + 6
     const area = [-reach, -reach, plan.size + reach * 2, plan.size + reach * 2]
     const depthU = cfg.cliff.depthM / cfg.meterPerU
@@ -260,28 +265,23 @@ export class MeadowView implements MapView {
             fragmentSource: VALLEY_FRAG,
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               set('uValley', 0)
-              set('uLip', 1)
               set('uArea', area)
               set('uRect', [va.x0, va.y0, va.w, va.h])
               set('uCam', [cam.midPoint.x / UNIT, cam.midPoint.y / UNIT, k])
-              set('uDrop', [H, depthU])
+              set('uFrame', [f.ox, f.oy, f.nx, f.ny])
+              set('uInland', inland)
               set('uMist', mist)
               set('uTime', u.time)
               set('uWind', [plan.wind.x, plan.wind.y])
-              set('uHaze', HAZE)
-              set('uFrame', [f.ox, f.oy, f.nx, f.ny])
-              set('uTan', [f.tx, f.ty])
-              set('uLipMap', [lip.b0, LIP_PPU, lip.n, 0])
-              set('uLipCode', [LIP_RANGE[0], LIP_RANGE[1] - LIP_RANGE[0], LIP_STEP])
-              set('uLipSpan', [lip.min, lip.max])
-              set('uSun', [SUN.x, SUN.y])
+              set('uHaze', shade ? HAZE_SHADE : HAZE)
+              set('uMistTint', shade ? MIST_TINT_SHADE : MIST_TINT)
             },
           },
           area[0]! * UNIT,
           area[1]! * UNIT,
           area[2]! * UNIT,
           area[3]! * UNIT,
-          [VALLEY_KEY, LIP_KEY],
+          [VALLEY_KEY],
         )
         .setOrigin(0, 0)
         .setDepth(-1.5),
@@ -354,7 +354,7 @@ export class MeadowView implements MapView {
     const f = plan.frame
     const b = plan.size * (0.2 + rng.next() * 0.6)
     const a = lipAt(plan.edges, b) - (cfg.cliff.cameraU * 0.6 + 14 + rng.next() * 10)
-    const img = v.scene.add.image(0, 0, HAWK_KEY).setDepth(-1.4)
+    const img = v.scene.add.image(0, 0, HAWK_KEY).setDepth(-1.4).setTint(inShade(plan) ? HAWK_SHADE : 0xffffff)
     this.visuals.push(img)
     this.hawk = { a: rng.next() * Math.PI * 2, cx: f.ox + f.nx * a + f.tx * b, cy: f.oy + f.ny * a + f.ty * b, img }
   }
@@ -570,6 +570,6 @@ export class MeadowView implements MapView {
     this.birds = []
     this.hawk = undefined
     this.shadows = undefined
-    for (const key of [GROUND_KEY, CANOPY_KEY, VALLEY_KEY, MASK_KEY, LIP_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [GROUND_KEY, CANOPY_KEY, VALLEY_KEY, MASK_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }

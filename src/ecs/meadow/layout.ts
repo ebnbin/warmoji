@@ -23,10 +23,8 @@ const TRIES = 40
 /** 崖下谷底的贴图从崖边往外铺多远、顺着崖边往两头多铺多远，格：镜头在草地上任何地方都看不出谷底的边，更远处是雾 */
 export const VALLEY_OUT_U = 120
 export const VALLEY_SIDE_U = 130
-/** 崖边那条线交给山谷的着色器找崖壁：顺着崖边每格采几个样，离地图边多远按 LIP_RANGE（格）压进两个字节，相邻两样的差按 ±LIP_STEP（格）压进一个字节 */
-export const LIP_PPU = 4
-export const LIP_RANGE = [-32, 96] as const
-export const LIP_STEP = 2
+/** 崖边外那圈岩壁从上往下看有多宽（格）：地面贴图画到这里，再往外透出谷底 */
+export const FACE_U = 1.8
 
 const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t)
 /** 多项式平滑取小：两者相差 k 以内时圆滑过渡 */
