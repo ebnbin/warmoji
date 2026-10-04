@@ -579,7 +579,7 @@ export const MAPS = {
       shadow: 0x000000,
     },
     decor: {
-      emojis: ['1f33c', '1f340', '1f344'],
+      emojis: ['1f338'],
       sizeU: [0.3, 0.5],
       alpha: [0.75, 0.9],
       density: [0.008, 0.012],
@@ -593,6 +593,7 @@ export const MAPS = {
       network: { oppositeDeg: 34, spreadDeg: [52, 92], apartDeg: 80, splitAt: [0.38, 0.55], majorTurnDeg: [0, 14], minorTurnDeg: [32, 52], meanderU: 1.6, minBend: 1.4, edgeGapU: 1.5 },
       flow: { discharge: 6, share: 0.6, widthCoef: 1.55, depthCoef: 0.69, manning: 0.035, bedShape: 8, pool: 1.35, riffle: 0.8, thalwegShift: 0.35, bankM: 0.45, bankU: 1, floodSlope: 0.02, reliefM: 0.15 },
       falls: { cliffM: 3.6, cliffU: 1.6, poolM: 2.5, poolR: 0.55, gorgeM: 7, lipU: 1.2, sillU: 1.5 },
+      shrine: '26e9',
       trees: { crownU: [1.4, 2.6], overhangU: 0.4, tongues: [0, 2], groves: [1, 3], lone: [1, 3] },
       body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, mu: 0.5, swim: 0.4, wetM: 0.02 },
     },

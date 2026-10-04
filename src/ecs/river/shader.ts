@@ -329,22 +329,22 @@ void main ()
   float wet = smoothstep(0.0, 0.012, depth);
 
   float od = 1.0 - exp(-max(depth, 0.0) * 3.0);
-  vec3 col = mix(vec3(0.26, 0.47, 0.40), vec3(0.02, 0.13, 0.15), pow(od, 0.85));
+  vec3 col = mix(vec3(0.60, 0.90, 0.90), vec3(0.28, 0.60, 0.80), pow(od, 0.85));
   float alpha = (0.07 + 0.88 * od) * wet;
 
   float face = dot(-slope, normalize(uSun.xy));
   float refl = (0.08 + clamp(face * 0.55, -0.07, 0.26)) * wet;
-  col = mix(col, vec3(0.66, 0.78, 0.84), refl / max(alpha + refl, 0.001));
+  col = mix(col, vec3(1.0, 0.87, 0.93), refl / max(alpha + refl, 0.001));
   alpha = alpha + refl * (1.0 - alpha);
   vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);
   float glint = pow(max(dot(r, uSun), 0.0), 180.0) * wet;
-  col = mix(col, vec3(1.0, 0.97, 0.88), glint);
+  col = mix(col, vec3(1.0, 0.98, 1.0), glint);
   alpha = max(alpha, glint);
 
   float shoal = (1.0 - smoothstep(0.06, 0.28, depth)) * smoothstep(0.02, 0.05, depth) * (1.0 - smoothstep(0.1, 0.4, rough));
   float patchy = smoothstep(0.35, 0.7, vnoise(p * 0.6 + vec2(uTime * 0.05, 0.0)));
   float caust = mix(1.0 - smoothstep(0.0, 0.08, cells(qa * 2.6 + slope * 3.0)), 1.0 - smoothstep(0.0, 0.08, cells(qb * 2.6 + slope * 3.0 + 2.1)), w) * shoal * patchy;
-  col = mix(col, vec3(0.9, 1.0, 0.88), caust * 0.16);
+  col = mix(col, vec3(1.0, 0.97, 0.99), caust * 0.16);
   alpha = max(alpha, caust * 0.1);
 
   float boil = mix(vnoise(qa * 2.2 + 5.1), vnoise(qb * 2.2 + 8.3), w);
@@ -354,22 +354,22 @@ void main ()
   white += lip * smoothstep(0.35, 0.75, lines * 0.6 + churn * 0.5) * 0.85;
   white += plunge * smoothstep(0.45, 0.85, churn * 0.5 + boil * 0.3 + vnoise(vec2(inSide * 2.7, inAlong * 2.7 - uTime * 1.3)) * 0.4) * 1.3;
   white = clamp(white, 0.0, 1.0) * wet;
-  vec3 foam = vec3(0.88, 0.92, 0.9) * (0.8 + 0.25 * max(dot(n, uSun), 0.0));
+  vec3 foam = vec3(1.0, 0.95, 0.97) * (0.86 + 0.18 * max(dot(n, uSun), 0.0));
   col = mix(col, foam, white);
   alpha = max(alpha, white * 0.95);
 
   if (curtain > 0.0) {
     float h = clamp(-inAlong / uInSize.z, 0.0, 1.0);
     float fall = vnoise(vec2(inSide * 5.0, inAlong * 1.4 - uTime * 4.5)) * 0.55 + vnoise(vec2(inSide * 13.0, inAlong * 3.0 - uTime * 8.0)) * 0.45;
-    vec3 sheet = mix(vec3(0.5, 0.64, 0.66), vec3(0.97, 0.99, 0.98), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
-    sheet = mix(sheet, vec3(0.75, 0.86, 0.86), smoothstep(0.85, 1.0, h) * 0.6);
+    vec3 sheet = mix(vec3(0.74, 0.86, 0.92), vec3(1.0, 0.98, 0.99), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
+    sheet = mix(sheet, vec3(0.92, 0.93, 0.97), smoothstep(0.85, 1.0, h) * 0.6);
     float a = curtain * (0.62 + 0.38 * fall) * (0.75 + 0.25 * (1.0 - h));
     col = (col * alpha * (1.0 - a) + sheet * a) / max(alpha + a * (1.0 - alpha), 0.001);
     alpha = alpha + a * (1.0 - alpha);
   }
   if (drop > 0.0) {
     float fall = vnoise(vec2(dropSide * 5.0, dropAlong * 1.5 - uTime * 5.0)) * 0.6 + vnoise(vec2(dropSide * 13.0, dropAlong * 3.0 - uTime * 8.0)) * 0.4;
-    vec3 sheet = mix(vec3(0.5, 0.64, 0.64), vec3(0.94, 0.97, 0.96), smoothstep(0.25, 0.75, fall));
+    vec3 sheet = mix(vec3(0.76, 0.86, 0.92), vec3(1.0, 0.97, 0.99), smoothstep(0.25, 0.75, fall));
     float a = drop * (0.5 + 0.5 * fall) * (1.0 - smoothstep(0.6, 2.8, dropAlong) * 0.75);
     col = (col * alpha * (1.0 - a) + sheet * a) / max(alpha + a * (1.0 - alpha), 0.001);
     alpha = alpha + a * (1.0 - alpha);

@@ -624,6 +624,8 @@ export interface RiverConfig {
     readonly lipU: number
     readonly sillU: number
   }
+  /** 进水口崖顶上、溪沟边立着的鸟居（表情） */
+  readonly shrine: string
   /** 树：树冠半径（格）、伸进空地的树冠下有多宽能走；伸进空地的林舌、空地里的树丛与孤树各几处 */
   readonly trees: {
     readonly crownU: readonly [number, number]
