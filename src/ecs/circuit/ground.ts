@@ -1,6 +1,7 @@
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { fbm, valueNoise } from '../../util/noise'
+import { FRAME_U } from '../../util/units'
 import { glyphAt, glyphOffset, glyphSegments, lineUnits, STROKE } from './font'
 import { arenaRoom, boxDist, FRAME_LIP_U, FRAME_WALL_U, plateDist, segDist } from './layout'
 import type { CircuitPlan, Label, Part, Plate } from './layout'
@@ -102,16 +103,12 @@ export function pixelBuffer(rect: PixelRect): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray((rect.x1 - rect.x0) * (rect.y1 - rect.y0) * 4)
 }
 
-/** 地面铺满地图外 padU 格 */
-export function groundArea(sc: PaintScene): Area {
-  const pad = sc.cfg.padU
-  return { x0: -pad, y0: -pad, w: sc.plan.size + pad * 2, h: sc.plan.size + pad * 2 }
-}
+/** 地面铺满方框 */
+export const GROUND_AREA: Area = { x0: 0, y0: 0, w: FRAME_U, h: FRAME_U }
 
 /** 地面贴图的大小，像素 */
-export function textureSize(sc: PaintScene): { w: number; h: number } {
-  const a = groundArea(sc)
-  return { w: Math.round(a.w * GROUND_PPU), h: Math.round(a.h * GROUND_PPU) }
+export function textureSize(): { w: number; h: number } {
+  return { w: Math.round(GROUND_AREA.w * GROUND_PPU), h: Math.round(GROUND_AREA.h * GROUND_PPU) }
 }
 
 /** 一段线：从 a 到 b、半宽 r（格）；dash 不为 0 时是虚线，s0 是这段起点在整条线上的弧长 */
@@ -222,7 +219,7 @@ function bodyText(p: Part): Text | null {
 
 export function prepare(sc: PaintScene): Prepared {
   const plan = sc.plan
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const exposed = plan.traces.filter((t) => t.net >= 0).flatMap((t) => lineSegs(t.pts, t.w / 2, 0))
   const signals = plan.traces.filter((t) => t.net < 0).flatMap((t) => lineSegs(t.pts, t.w / 2, 0))
   const silk: Seg[] = plan.marks.flatMap((m) => lineSegs(m.pts, m.w / 2, m.dash))
@@ -526,7 +523,7 @@ function frameShadow(sc: PaintScene, prep: Prepared, x: number, y: number): numb
 
 /** 画一块地面：先定这一点是元件、屏蔽罩还是板面，板面一层层叠上铺铜、细线、过孔、裸铜与丝印，再按太阳打光、投影、压暗罩外 */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const plan = sc.plan
   const arena = plan.arena
   const seed = plan.seed

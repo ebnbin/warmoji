@@ -757,9 +757,8 @@ export interface MeadowConfig {
  */
 export interface CircuitConfig {
   readonly mmPerU: number
-  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  /** 地图是 sizeU 见方的方形，摆在方框正中；地面画满方框 */
   readonly sizeU: number
-  readonly padU: number
   /** 能走的板面有多大，格²：生成出来不在这个范围里就换一组随机数 */
   readonly areaU2: readonly [number, number]
   /** 窄过两倍 neckU 的缝不能走 */

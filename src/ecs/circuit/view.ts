@@ -5,7 +5,7 @@ import { playSfx } from '../../audio/sfx'
 import { loadSettings } from '../../save/settings'
 import { browserStorage } from '../../util/storage'
 import { drawSpark } from '../render/volcano'
-import { groundArea, textureSize } from './ground'
+import { GROUND_AREA, textureSize } from './ground'
 import { CircuitPainter } from './painter'
 import { CURRENT_FRAG, encodeCopper, encodeNets } from './shader'
 import { COPPER_REACH_U, NET_SLOTS } from './layout'
@@ -15,6 +15,7 @@ import type { PaintScene, PixelRect } from './ground'
 import type { CircuitPlan, Gap, NetKind, Plate } from './layout'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { FRAME } from '../frame'
 import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -289,7 +290,7 @@ export class CircuitView implements MapView {
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const p = this.planOf(v)
-    return { w: p.size * UNIT, h: p.size * UNIT, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
+    return { w: FRAME.w, h: FRAME.h, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
   }
 
   build(v: ViewCtx): void {
@@ -298,8 +299,8 @@ export class CircuitView implements MapView {
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   /** 板面上不撒 emoji */
@@ -310,7 +311,7 @@ export class CircuitView implements MapView {
     const cfg = v.def.circuit!
     const scene = v.scene
     const sc: PaintScene = { cfg, plan }
-    const size = textureSize(sc)
+    const size = textureSize()
     const tex = canvasTexture(scene, GROUND_KEY, size.w, size.h)
     const painter = new CircuitPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
@@ -323,7 +324,7 @@ export class CircuitView implements MapView {
     if (this.painter !== painter) return
     this.painter = undefined
     upload(tex, Phaser.Textures.FilterMode.LINEAR)
-    const ga = groundArea(sc)
+    const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.copper(v, plan)
     this.dynamics(v, plan)

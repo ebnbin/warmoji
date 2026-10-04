@@ -415,10 +415,10 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const body = TEAM_BASELINE.member.radius * 2
   const { frame, shock, rail, clock, arc, button } = c
-  need(c.mmPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU > 0, `${at} 的毫米每格、地图边长、窄缝与开局空地须为正`)
-  need(c.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(c.mmPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at} 的毫米每格、地图边长与窄缝须为正，开局空地空得出出生点要的格数`)
+  need(c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(c.areaU2[0] > 0 && range(c.areaU2, false) && c.areaU2[1] < c.sizeU * c.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
-  need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.insetU[1] < c.padU && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正，罩壁落在画了的地方里`)
+  need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正`)
   need(range(c.aisleU, false) && c.aisleU[0] > body + c.neckU * 2 && range(c.chipU, false), `${at}.aisleU 须走得过标准身体，chipU 须为非负的范围`)
   need(shock.teamDps > 0 && shock.enemyDps > 0 && shock.tickMs > 0 && shock.footFrac > 0 && shock.footFrac <= 1, `${at}.shock 的伤害与结算间隔须为正，脚的范围在 (0, 1] 内`)
   need(rail.widthU[0] > 0 && range(rail.widthU, false), `${at}.rail.widthU 须为正的范围`)
