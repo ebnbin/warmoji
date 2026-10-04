@@ -801,9 +801,9 @@ export const MAPS = {
     size: { w: 32, h: 32 },
     stamina: { exertion: 0.75, regen: 0.55 },
     palette: {
-      bgFrom: 'hsl(34 46% 36%)',
-      bgTo: 'hsl(18 38% 12%)',
-      map: hslToInt(36, 0.5, 0.62),
+      bgFrom: 'hsl(35 43% 54%)',
+      bgTo: 'hsl(22 32% 20%)',
+      map: hslToInt(42, 0.84, 0.69),
       shadow: 0x000000,
     },
     decor: {

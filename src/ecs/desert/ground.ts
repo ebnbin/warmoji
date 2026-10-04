@@ -18,20 +18,20 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 
 type Rgb = [number, number, number]
 
-/** 斜阳、天光与沙地反上来的光：影子里偏蓝，向阳的坡偏暖 */
-const SUN_COL: Rgb = [1.0, 0.92, 0.79]
-const SKY_COL: Rgb = [0.7, 0.76, 0.92]
+/** 金黄的阳光、近白的天光与沙地反上来的暖光：向阳处金黄，影子里暗成琥珀色 */
+const SUN_COL: Rgb = [1.0, 0.9, 0.52]
+const SKY_COL: Rgb = [0.91, 0.92, 1.0]
 const BOUNCE_COL: Rgb = [0.95, 0.74, 0.52]
 const SUN_I = 0.6
 const SKY_I = 0.4
 const BOUNCE_I = 0.09
 
 /** 沙的固有色：丘间实一点的沙偏红偏深、松沙偏橙，沙丘上的细沙金黄，有的偏红、有的偏白；风纹的凹里积着一层深色的重矿物 */
-const FLAT_FIRM: Rgb = [0.75, 0.54, 0.36]
-const FLAT_LOOSE: Rgb = [0.8, 0.61, 0.41]
-const DUNE: Rgb = [0.83, 0.65, 0.44]
-const DUNE_RED: Rgb = [0.8, 0.59, 0.4]
-const DUNE_PALE: Rgb = [0.86, 0.71, 0.5]
+const FLAT_FIRM: Rgb = [0.93, 0.7, 0.5]
+const FLAT_LOOSE: Rgb = [0.98, 0.78, 0.57]
+const DUNE: Rgb = [1.0, 0.81, 0.6]
+const DUNE_RED: Rgb = [0.97, 0.75, 0.55]
+const DUNE_PALE: Rgb = [1.0, 0.86, 0.68]
 const MINERAL: Rgb = [0.5, 0.38, 0.3]
 const BARK: Rgb = [0.3, 0.23, 0.18]
 const BONE: Rgb = [0.93, 0.9, 0.82]
@@ -293,7 +293,7 @@ function tone(c: number): number {
 
 /**
  * 地面：几乎全是沙。沙丘是金黄的细沙，有的偏红、有的偏白，顶上更淡；丘间的沙成片地实一些、松一些，实的偏红偏深。
- * 迎风坡与丘间排着一道道风纹，凹里积着深色的重矿物，背风坡的沙更平整。斜阳从左上照来：向阳坡亮而暖，背着太阳的坡与影子偏蓝；
+ * 迎风坡与丘间排着一道道风纹，凹里积着深色的重矿物，背风坡的沙更平整。斜阳从左上照来：向阳坡亮而金黄，背着太阳的坡与影子暗成琥珀色；
  * 标志物在地上的那部分（树根与落枝、石头、驼骨、岩盘）一起画进来，背风处拖着一条沙尾。贴图左右、上下首尾相接，横竖各挪半圈也一模一样。
  * 只画 rect 那一块，out 里按这块的范围逐行排
  */
