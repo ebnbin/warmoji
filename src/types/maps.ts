@@ -757,10 +757,7 @@ export interface CircuitConfig {
   readonly shock: { readonly teamDps: number; readonly enemyDps: number; readonly tickMs: number; readonly footFrac: number }
   /** 电源线：一直通电，线宽（格） */
   readonly rail: { readonly widthU: readonly [number, number] }
-  /**
-   * 时钟线：几条并排，线宽与线距（格），线距就是时钟芯片的脚距；按节拍断 offMs、预警 warnMs、通 onMs，
-   * 通电时电从时钟芯片的脚以每秒 surgeU 格冲过去
-   */
+  /** 时钟线：几条并排，线宽与线距（格），线距就是时钟芯片的脚距；按节拍断 offMs、预警 warnMs、通 onMs，一通整条同时通 */
   readonly clock: {
     readonly traces: readonly [number, number]
     readonly widthU: number
@@ -768,7 +765,6 @@ export interface CircuitConfig {
     readonly offMs: number
     readonly warnMs: number
     readonly onMs: number
-    readonly surgeU: number
   }
   /**
    * 电弧：几处，两极的尖相隔 gapU 格；歇 restMs、蓄电 chargeMs、放电 arcMs，循环往复，各处错开；
@@ -786,14 +782,13 @@ export interface CircuitConfig {
   }
   /**
    * 开关：触摸盘的半径（格），盘中间那块圆金的半径（格），连着的铜板边长（格），盘到铜板的连线多长（格）；
-   * 身体中心踩进圆金，电以每秒 linkU 格从开关沿线传过去，铜板全通之后再通 holdMs，断开后 rearmMs 内再踩也不通
+   * 身体中心踩进圆金，连线与铜板一齐通电 holdMs，断开后 rearmMs 内再踩也不通
    */
   readonly button: {
     readonly padU: number
     readonly touchU: number
     readonly plateU: readonly [number, number]
     readonly reachU: readonly [number, number]
-    readonly linkU: number
     readonly holdMs: number
     readonly rearmMs: number
   }

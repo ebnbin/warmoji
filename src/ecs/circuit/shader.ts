@@ -1,6 +1,5 @@
-import { ALONG_SPAN_U, COPPER_REACH_U, NET_SLOTS } from './layout'
+import { COPPER_REACH_U, NET_SLOTS } from './layout'
 import type { CopperGrid } from './layout'
-
 
 /** 着色器用的噪声：格点哈希与平滑的值噪声 */
 const NOISE = `
@@ -37,9 +36,9 @@ varying vec2 outTexCoord;
 `
 
 /**
- * 电流：盖在地面贴图上，只在带电的铜和它周围画。通着电的铜发出霓虹青光，铜心更白，一道道亮纹顺着电流从电源往外淌，
- * 光洒到旁边的板面上；电正沿线冲过去时，冲到的那一头格外亮；快要通电的时钟线上一节节青光沿线往外爬，越临近通电越快越急。
- * 输出按预乘透明度：通电的铜盖住底下的金，洒出去的光只往上加
+ * 带电的铜：盖在地面贴图上，只在带电的铜边上画，铜本身还是金的。通着电时铜边上一圈细光断断续续、乱跳乱闪，
+ * 铜面微微泛冷光，边外一层薄光晕；刚通电那一下整片闪白；快通电时铜边上零星蹦出亮点，越临近越密。
+ * 图案按很短的间隔整个跳成新的样子，不朝哪个方向移动。输出按预乘透明度：铜边的光盖上去，光晕和闪白只往上加
  */
 export const CURRENT_FRAG = `${HEADER}
 uniform sampler2D uCopper;
@@ -47,14 +46,9 @@ uniform sampler2D uDist;
 uniform sampler2D uNets;
 uniform vec4 uArea;
 uniform float uTime;
-uniform float uSpan;
 uniform float uReach;
 uniform float uSlots;
 ${NOISE}
-float decode16(vec2 hl) {
-  return (hl.x * 255.0 * 256.0 + hl.y * 255.0) / 65535.0;
-}
-
 void main ()
 {
   vec2 tc = outTexCoord;
@@ -63,55 +57,39 @@ void main ()
     gl_FragColor = vec4(0.0);
     return;
   }
-  vec4 na = texture2D(uNets, vec2((id * 2.0 + 0.5) / (uSlots * 2.0), 0.5));
-  vec4 nb = texture2D(uNets, vec2((id * 2.0 + 1.5) / (uSlots * 2.0), 0.5));
-  float level = na.r;
-  float warn = nb.r;
-  if (level < 0.01 && warn < 0.01) {
+  vec3 net = texture2D(uNets, vec2((id + 0.5) / uSlots, 0.5)).rgb;
+  float level = net.r;
+  float warn = net.g * (1.0 - level);
+  float flash = net.b;
+  if (level < 0.01 && warn < 0.01 && flash < 0.01) {
     gl_FragColor = vec4(0.0);
     return;
   }
-  vec4 f = texture2D(uDist, tc);
-  float d = f.r * (uReach + 1.0) - 1.0;
-  float along = f.g * uSpan;
-  float front = decode16(na.gb) * uSpan;
+  float d = texture2D(uDist, tc).r * (uReach + 1.0) - 1.0;
   vec2 p = uArea.xy + vec2(tc.x, 1.0 - tc.y) * uArea.zw;
-  float travelling = step(front, uSpan * 0.99);
-  float lit = level * (1.0 - smoothstep(front - 0.2, front + 0.2, along));
-  float ahead = (along - front) / 0.45;
-  float head = level * travelling * exp(-ahead * ahead);
-  float cover = 1.0 - smoothstep(-0.035, 0.035, d);
-  float depth = -d;
-  // 一道道亮纹顺着电流从电源往外淌
-  float flow = 0.72 + 0.28 * sin(along * 2.4 - uTime * 9.0);
-  float flick = 0.86 + 0.14 * vnoise(p * 6.0 + vec2(uTime * 17.0, -uTime * 13.0));
-  // 大块的铜面上电一团团地翻涌
-  float sheet = smoothstep(0.45, 0.9, depth);
-  float boil = mix(1.0, 0.7 + 0.45 * vnoise(p * 2.2 + vec2(uTime * 2.3, uTime * 1.7)), sheet);
-  vec3 neon = vec3(0.1, 0.82, 1.0);
-  vec3 hot = vec3(0.78, 1.0, 1.0);
-  float e = lit * flow * flick * boil;
-  float white = smoothstep(0.2, 0.55, depth) * (1.0 - sheet * 0.6) * 0.65;
-  vec3 col = mix(neon, hot, white) * (0.5 + 0.6 * e);
-  float a = cover * clamp(lit * 0.95 + head, 0.0, 1.0);
-  float spill = exp(-max(d, 0.0) / 0.38) * (1.0 - cover);
-  vec3 glow = neon * spill * lit * 0.5 * flow;
+  float cover = 1.0 - smoothstep(-0.03, 0.03, d);
+  float edge = exp(-abs(d) / 0.05);
   float halo = exp(-max(d, 0.0) / 0.2) * (1.0 - cover);
-  vec3 spark = hot * head * (cover * 0.9 + halo * 1.1);
-  // 预警：一节节青光顺着线往外爬，越临近通电爬得越快、闪得越急
-  float w = warn * (1.0 - level);
-  float march = smoothstep(0.45, 0.95, sin(along * 3.2 - uTime * (7.0 + 9.0 * w)));
-  float blink = 0.55 + 0.45 * step(0.0, sin(uTime * (10.0 + 26.0 * w)));
-  float ah = cover * w * blink * (0.12 + 0.62 * march);
-  vec3 hint = neon * ah + neon * w * blink * spill * 0.2 * march;
-  gl_FragColor = vec4(col * a + glow + spark + hint, a + ah * (1.0 - a));
+  vec3 deep = vec3(0.36, 0.42, 1.0);
+  vec3 glow = vec3(0.56, 0.61, 1.0);
+  vec3 core = vec3(0.96, 0.97, 1.0);
+  vec2 jump = hash2(vec2(mod(floor(uTime * 18.0), 997.0), id)) * 97.0;
+  float flick = 0.55 + 0.45 * hash2(vec2(mod(floor(uTime * 26.0), 997.0), id + 7.0)).x;
+  float bits = smoothstep(0.42, 0.8, vnoise(p * 2.4 + jump));
+  float lit = edge * bits * level * flick;
+  vec2 spot = hash2(vec2(mod(floor(uTime * 22.0), 997.0), id + 3.0)) * 89.0;
+  float spit = edge * warn * (0.1 + step(1.0 - 0.32 * warn, vnoise(p * 3.3 + spot)));
+  // 铜边上的光盖上去（金面上也是蓝紫的），光晕与刚通电的白光往上加
+  float a = clamp((lit + spit) * 0.6, 0.0, 0.8);
+  vec3 col = deep * (lit + spit) * 0.9 + glow * halo * 0.14 * level * flick + core * cover * 0.05 * level;
+  col += (core * cover * 0.85 + glow * (halo + edge) * 0.7) * flash;
+  gl_FragColor = vec4(col, a);
 }
 `
 
 /**
  * 带电的铜编成两张数据图，每格一个像素、不透明（画布会按透明度预乘，数据必须满 alpha）：
- * copper 的 R 是网络编号加一（0 是没有），按最近点取；dist 的 R 是离铜多远（铜里为负），按 [−1, COPPER_REACH_U] 格拉开，
- * G 是沿铜离电源多远，按 [0, ALONG_SPAN_U] 格拉开，都能线性插值
+ * copper 的 R 是网络编号加一（0 是没有），按最近点取；dist 的 R 是离铜多远（铜里为负），按 [−1, COPPER_REACH_U] 格拉开，能线性插值
  */
 export function encodeCopper(g: CopperGrid): { copper: Uint8ClampedArray<ArrayBuffer>; dist: Uint8ClampedArray<ArrayBuffer> } {
   const n = g.cols * g.rows
@@ -121,28 +99,22 @@ export function encodeCopper(g: CopperGrid): { copper: Uint8ClampedArray<ArrayBu
     copper[i * 4] = g.net[i]! + 1
     copper[i * 4 + 3] = 255
     dist[i * 4] = Math.round(((Math.min(COPPER_REACH_U, Math.max(-1, g.dist[i]!)) + 1) / (COPPER_REACH_U + 1)) * 255)
-    dist[i * 4 + 1] = Math.round(Math.min(1, Math.max(0, g.along[i]! / ALONG_SPAN_U)) * 255)
     dist[i * 4 + 3] = 255
   }
   return { copper, dist }
 }
 
-/** 网络状态图：每条网络两个像素，头一个是通没通电与电冲到了多远（高低字节），后一个是预警的程度 */
-export function encodeNets(out: Uint8ClampedArray, nets: readonly { level: number; front: number; warn: number }[]): void {
+/** 网络状态图：每条网络一个像素，R 通没通电，G 离通电还有多近，B 刚通电闪白还剩多少（0 到 1） */
+export function encodeNets(out: Uint8ClampedArray, nets: readonly { level: number; warn: number }[], flash: readonly number[]): void {
   out.fill(0)
-  nets.forEach((n, i) => {
-    if (i >= NET_SLOTS) return
-    const f = Math.round(Math.min(1, Math.max(0, n.front / ALONG_SPAN_U)) * 65535)
-    const o = i * 8
-    out[o] = n.level * 255
-    out[o + 1] = f >> 8
-    out[o + 2] = f & 255
+  for (let i = 0; i < NET_SLOTS; i++) {
+    const n = nets[i]
+    const o = i * 4
+    if (n) {
+      out[o] = n.level * 255
+      out[o + 1] = n.warn * 255
+      out[o + 2] = (flash[i] ?? 0) * 255
+    }
     out[o + 3] = 255
-    out[o + 4] = n.warn * 255
-    out[o + 7] = 255
-  })
-  for (let i = nets.length; i < NET_SLOTS; i++) {
-    out[i * 8 + 3] = 255
-    out[i * 8 + 7] = 255
   }
 }

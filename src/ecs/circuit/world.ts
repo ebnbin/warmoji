@@ -31,10 +31,9 @@ const SEAT_BODY_U = 0.45
 const SEAT_MARGIN_U = 0.2
 const SEAT_ARC_FROM = 0.4
 
-/** 一条网络此刻：通没通电（0 或 1）、电从电源沿铜冲到了多远（格）、离通电还有多近（0 到 1，只有时钟线有） */
+/** 一条网络此刻：通没通电（0 或 1）、离通电还有多近（0 到 1，只有时钟线有） */
 export interface NetState {
   level: number
-  front: number
   warn: number
 }
 
@@ -48,9 +47,9 @@ export interface GapState {
   readonly struck: Set<number>
 }
 
-export type ButtonPhase = 'ready' | 'travel' | 'live' | 'rearm'
+export type ButtonPhase = 'ready' | 'live' | 'rearm'
 
-/** 开关此刻：等人踩、电在沿线走、铜板通着、断开后歇着；从什么时候起，被踩过几次 */
+/** 开关此刻：等人踩、通着、断开后歇着；从什么时候起，被踩过几次 */
 export interface ButtonState {
   phase: ButtonPhase
   since: number
@@ -83,7 +82,7 @@ export function circuitOf(sim: Sim): CircuitState {
     const plan = circuitPlanFor(cfgOf(sim), sim.run.decorSeed)
     s = {
       plan,
-      nets: plan.nets.map(() => ({ level: 0, front: 0, warn: 0 })),
+      nets: plan.nets.map(() => ({ level: 0, warn: 0 })),
       gaps: plan.gaps.map(() => ({ phase: 'rest' as GapPhase, charge: 0, count: 0, struck: new Set<number>() })),
       buttons: plan.buttons.map(() => ({ phase: 'ready' as ButtonPhase, since: 0, presses: 0 })),
       hurtAt: cfgOf(sim).shock.tickMs,
@@ -96,12 +95,12 @@ export function circuitOf(sim: Sim): CircuitState {
 }
 
 /** 时钟的节拍：断、预警、通，各占多久由地图定，每个时钟错开 phaseMs */
-export function clockPhase(cfg: CircuitConfig, now: number, phaseMs: number): { level: number; warn: number; onFor: number } {
+export function clockPhase(cfg: CircuitConfig, now: number, phaseMs: number): { level: number; warn: number } {
   const c = cfg.clock
   const t = (now + phaseMs) % (c.offMs + c.warnMs + c.onMs)
-  if (t < c.offMs) return { level: 0, warn: 0, onFor: 0 }
-  if (t < c.offMs + c.warnMs) return { level: 0, warn: (t - c.offMs) / c.warnMs, onFor: 0 }
-  return { level: 1, warn: 0, onFor: t - c.offMs - c.warnMs }
+  if (t < c.offMs) return { level: 0, warn: 0 }
+  if (t < c.offMs + c.warnMs) return { level: 0, warn: (t - c.offMs) / c.warnMs }
+  return { level: 1, warn: 0 }
 }
 
 /** 电弧的节拍：歇、蓄电、放电，每处错开 phaseMs */
@@ -133,8 +132,7 @@ function bodies(sim: Sim): number[] {
 function shocked(s: CircuitState, cfg: CircuitConfig, eid: number): boolean {
   const c = copperAt(s.plan.copper, Transform.x[eid]! / UNIT, Transform.y[eid]! / UNIT)
   if (!c || c.dist > (Radius.v[eid]! / UNIT) * cfg.shock.footFrac) return false
-  const n = s.nets[c.net]!
-  return n.level > 0 && c.along <= n.front
+  return s.nets[c.net]!.level > 0
 }
 
 /** 按此刻的时间更新每条网络、每个开关、每处电弧 */
@@ -142,11 +140,7 @@ function step(sim: Sim, s: CircuitState, cfg: CircuitConfig, live: readonly numb
   const now = sim.elapsedMs
   const plan = s.plan
   plan.nets.forEach((net, i) => {
-    const st = s.nets[i]!
-    if (net.kind === 'rail') {
-      st.level = 1
-      st.front = Infinity
-    }
+    if (net.kind === 'rail') s.nets[i]!.level = 1
   })
   for (const c of plan.clocks) {
     const p = clockPhase(cfg, now, c.phaseMs)
@@ -154,24 +148,18 @@ function step(sim: Sim, s: CircuitState, cfg: CircuitConfig, live: readonly numb
       const st = s.nets[i]!
       st.level = p.level
       st.warn = p.warn
-      st.front = (p.onFor / 1000) * cfg.clock.surgeU
     }
   }
   const bc = cfg.button
   plan.buttons.forEach((b, i) => {
     const st = s.buttons[i]!
-    const ns = s.nets[b.net]!
-    const len = plan.nets[b.net]!.length
     if (st.phase === 'ready') {
       const r = b.touch * UNIT
       if (live.some((eid) => (Transform.x[eid]! - b.x * UNIT) ** 2 + (Transform.y[eid]! - b.y * UNIT) ** 2 <= r * r)) {
-        st.phase = 'travel'
+        st.phase = 'live'
         st.since = now
         st.presses++
       }
-    } else if (st.phase === 'travel' && ((now - st.since) / 1000) * bc.linkU >= len) {
-      st.phase = 'live'
-      st.since = now
     } else if (st.phase === 'live' && now - st.since >= bc.holdMs) {
       st.phase = 'rearm'
       st.since = now
@@ -179,8 +167,7 @@ function step(sim: Sim, s: CircuitState, cfg: CircuitConfig, live: readonly numb
       st.phase = 'ready'
       st.since = now
     }
-    ns.level = st.phase === 'travel' || st.phase === 'live' ? 1 : 0
-    ns.front = st.phase === 'live' ? Infinity : st.phase === 'travel' ? ((now - st.since) / 1000) * bc.linkU : 0
+    s.nets[b.net]!.level = st.phase === 'live' ? 1 : 0
   })
   plan.gaps.forEach((g, i) => {
     const st = s.gaps[i]!
@@ -288,7 +275,7 @@ function clearOfCopper(plan: CircuitPlan, p: Point): boolean {
 
 /**
  * 电路板：能走的是屏蔽罩围着的板面，罩壁、芯片和别的元件是硬边界，身体走到跟前就停住、顺着边滑，子弹照样飞过去。
- * 镀金的裸铜线带电：电源线一直通，时钟线按节拍通断，开关线有人踩了开关才从开关沿线一路通过去；脚碰着通电的铜就触电，
+ * 镀金的裸铜线带电：电源线一直通，时钟线按节拍通断，开关线有人踩了开关才连着铜板整条一齐通；脚碰着通电的铜就触电，
  * 一对电极隔一阵在两尖之间打出电弧，都是敌我通吃
  */
 export const circuit: WorldHooks = {

@@ -853,7 +853,7 @@ export const MAPS = {
   circuit: {
     emoji: '26a1',
     name: '电路板',
-    desc: '一块电路板上屏蔽罩围着的一小片：队伍和敌人缩得比芯片还小，芯片像楼，走线像路，丝印字铺满地面。镀金的裸铜线带电，碰到就触电，敌我都一样：电源线一直通着；时钟线跟着指示灯一通一断，通电前先闪；踩一下触摸开关，电顺着线一路亮过去，连着的铜板通一阵；芯片和罩壁之间的过道里，两根电极隔一阵蓄满电，打出一道电弧。阻焊层底下的暗线不带电',
+    desc: '一块电路板上屏蔽罩围着的一小片：队伍和敌人缩得比芯片还小，芯片像楼，走线像路，丝印字铺满地面。镀金的裸铜线带电，碰到就触电，敌我都一样：电源线一直通着；时钟线跟着指示灯一通一断，通电前先闪；踩一下触摸开关，连线和连着的铜板一齐通电一阵；芯片和罩壁之间的过道里，两根电极隔一阵蓄满电，打出一道电弧。阻焊层底下的暗线不带电',
     kind: 'circuit',
     stamina: { exertion: 0.4, regen: 1 },
     palette: {
@@ -882,9 +882,9 @@ export const MAPS = {
       chipU: [2.6, 4],
       shock: { teamDps: 30, enemyDps: 45, tickMs: 250, footFrac: 0.5 },
       rail: { widthU: [1.5, 1.9] },
-      clock: { traces: [2, 3], widthU: 0.85, pitchU: 1.27, offMs: 2600, warnMs: 1100, onMs: 2200, surgeU: 36 },
+      clock: { traces: [2, 3], widthU: 0.85, pitchU: 1.27, offMs: 2600, warnMs: 1100, onMs: 2200 },
       arc: { count: [2, 3], gapU: [1.8, 2.5], restMs: 1800, chargeMs: 3600, arcMs: 380, reachU: 0.45, teamDamage: 30, enemyDamage: 60 },
-      button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], linkU: 9, holdMs: 3200, rearmMs: 4800 },
+      button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], holdMs: 3200, rearmMs: 4800 },
     },
     boss: 'mecha',
   },
