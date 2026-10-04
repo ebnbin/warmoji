@@ -20,9 +20,8 @@ const GATE_EAVE_U = 0.4
 /** 一垄瓦宽多少格，筒瓦占一垄的多少 */
 const TILE_U = 0.3
 const ROUND_TILE = 0.4
-/** 桥面板多厚（米），栏杆多高（米）：桥面两头落在岸顶，正中拱起 */
+/** 桥面板多厚（米）：桥面两头落在岸顶，正中拱起 */
 const DECK_M = 0.12
-const RAIL_M = 0.7
 
 const LX = SUN.x
 const LY = SUN.y
@@ -415,30 +414,23 @@ function dappleAt(sc: PaintScene, prep: Prepared, x: number, y: number): number 
 }
 
 /**
- * 桥投下的影子：桥面与两道栏杆按离地多高顺着背光挪开；z 是受影子的那一面（地面或水面）的高程（米），桥面两头落在岸顶（桥心水面高 bankM 米处）。
+ * 桥面投下的影子：按桥面离地多高顺着背光挪开；z 是受影子的那一面（地面或水面）的高程（米），桥面两头落在岸顶（桥心水面高 bankM 米处）。
  * 往太阳那边找两三次就对上了
  */
 function bridgeShadow(b: Bridge, bankM: number, z: number, mpu: number, x: number, y: number): number {
   const gain = (LZ / SUN_LEN) * mpu
-  const foot = b.level + bankM
-  let s = 0
-  for (const [lift, w0, w1, k] of [
-    [DECK_M, 0, b.width * 0.98, 0.5],
-    [DECK_M + RAIL_M, b.width * 0.86, b.width * 0.98, 0.35],
-  ] as const) {
-    let lam = Math.max(0, (foot + lift + b.rise * 0.5 - z) / gain)
-    let q = { a: 0, t: 0 }
-    for (let it = 0; it < 3; it++) {
-      q = bridgeLocal(b, x + TO_SUN.x * lam, y + TO_SUN.y * lam)
-      const top = Math.abs(q.a) < b.half ? foot + lift + deckHeight(b, q.a) : z
-      lam = Math.max(0, (top - z) / gain)
-    }
+  const foot = b.level + bankM + DECK_M
+  let lam = Math.max(0, (foot + b.rise * 0.5 - z) / gain)
+  let q = { a: 0, t: 0 }
+  for (let it = 0; it < 3; it++) {
     q = bridgeLocal(b, x + TO_SUN.x * lam, y + TO_SUN.y * lam)
-    const along = Math.abs(q.a) < b.half - 0.1
-    const at = Math.abs(q.t)
-    if (along && at >= w0 && at < w1) s = Math.max(s, k * smooth(w1, w1 - 0.06, at))
+    const top = Math.abs(q.a) < b.half ? foot + deckHeight(b, q.a) : z
+    lam = Math.max(0, (top - z) / gain)
   }
-  return s
+  q = bridgeLocal(b, x + TO_SUN.x * lam, y + TO_SUN.y * lam)
+  const w = b.width * 0.98
+  const at = Math.abs(q.t)
+  return Math.abs(q.a) < b.half - 0.1 && at < w ? 0.5 * smooth(w, w - 0.06, at) : 0
 }
 
 /** 几种落花的颜色：近白、淡粉、粉、深一点的粉 */
