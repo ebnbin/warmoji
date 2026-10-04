@@ -36,8 +36,9 @@ const ARC_CORE = 0xf4f0ff
 const ARC_GLOW = 0x9d8cff
 /** 电弧闪一下要多久换一个形状，毫秒 */
 const ARC_FLICKER_MS = 45
-/** 蓄电蓄到这么多以后电极尖上开始冒细小的火花 */
+/** 蓄电蓄到这么多以后电极尖上开始冒细小的火花，再多一些开始滋滋响 */
 const STREAMER_FROM = 0.55
+const HISS_FROM = 0.7
 /** 开关准备好时那一圈光呼吸的快慢（弧度/秒） */
 const BREATHE = 3.2
 
@@ -104,6 +105,8 @@ interface GapFx {
   bolts: Point[][]
   shapedAt: number
   count: number
+  /** 这一轮蓄电快满时已经响过滋滋声 */
+  hissed: boolean
 }
 
 /**
@@ -259,6 +262,7 @@ export class CircuitView implements MapView {
         bolts: [],
         shapedAt: 0,
         count: -1,
+        hissed: false,
       })
     }
     this.sparks = scene.add
@@ -371,6 +375,11 @@ export class CircuitView implements MapView {
       fx.tipA.setAlpha(charge * charge * 0.8 * shimmer)
       fx.tipB.setAlpha(charge * charge * 0.8 * shimmer)
       fx.cap.setAlpha(charge * 0.25)
+      if (s.phase !== 'charge') fx.hissed = false
+      else if (!fx.hissed && s.charge > HISS_FROM) {
+        fx.hissed = true
+        if (this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 2)) playSfx('crackle')
+      }
       if (s.phase === 'charge' && s.charge > STREAMER_FROM) {
         // 细火花：从两尖朝对面探出去，蓄得越满探得越远
         const reach = (s.charge - STREAMER_FROM) / (1 - STREAMER_FROM)
