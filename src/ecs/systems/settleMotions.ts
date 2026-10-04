@@ -5,7 +5,8 @@ import { sourceOf } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
 import { hit } from './shared/damage'
 import { applyAbilityEffects, applyBlast, applyOnHit, struckOf } from './shared/effects'
-import { abilityOnHit, motionFx } from '../store'
+import { abilityDef, abilityOnHit, motionFx } from '../store'
+import { BLAST_M, breachAt, covered } from '../utils/pass'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
@@ -16,7 +17,7 @@ function dashHits(sim: Sim, m: number, e: number): void {
   const y = Transform.y[m]!
   const stamp = Motion.stamp[m]!
   const damage = Motion.dmg[m]!
-  for (const t of targetsWithin(sim, src, x, y, SprintShape.radius[e]!)) {
+  for (const t of covered(sim, src, x, y, targetsWithin(sim, src, x, y, SprintShape.radius[e]!))) {
     if (MotionHit.stamp[t.eid] === stamp) continue
     MotionHit.stamp[t.eid] = stamp
     const s = struckOf(t.eid)
@@ -33,6 +34,7 @@ function landHits(sim: Sim, m: number, e: number): void {
   const color = Payload.color[e]!
   const damage = Motion.dmg[m]!
   applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
+  breachAt(sim, x, y, BLAST_M, radius, abilityDef[e]?.breach ?? 0)
   playSfx('boom')
   spawnFxCircle(sim, x, y, radius, {
     fill: color,

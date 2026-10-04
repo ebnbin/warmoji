@@ -120,7 +120,7 @@ export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, 
       const hy = y - s.holeY
       const hd = Math.hypot(hx, hy) || 1
       const rise = (gasAt(s, x + (hx / hd) * step, y + (hy / hd) * step) - rho) / step
-      const cloud = smooth(0.4, 0.56, rho)
+      const cloud = smooth(0.36, 0.53, rho)
       const core = smooth(0.6, 0.74, rho)
       const soft = fbm(x / 2.8, y / 2.8, s.seed + 4, 3)
       const wisp = ridge(fbm(x / 4.6, y / 4.6, s.seed + 5, 3)) ** 3 * smooth(0.3, 0.46, rho)
@@ -131,7 +131,7 @@ export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, 
       const lanes = smooth(0.58, 0.78, fbm((x - 3) / 5.5, (y + 5) / 5.5, s.seed + 21, 4)) * 0.55
       const g = cellNearest(x / 3, y / 3, s.seed + 23)
       const globule = g.h > 0.965 ? smooth(0.3, 0.08, Math.hypot(g.dx, g.dy)) * 0.6 : 0
-      let d = Math.max(core * 0.8, lanes, globule)
+      let d = Math.max(core * 0.6, lanes, globule)
       for (const p of pillars) {
         const c = pillarAt(p, x, y)
         if (c.d > d) d = c.d
@@ -178,7 +178,8 @@ export function bandBuffer(s: NebulaSheet, band: SheetBand): Uint8ClampedArray<A
  * 空腔里看到的是球壳下半部的内壁：从镜头经过这个像素往下的光线先被黑洞按 α = 2r_s/b + (15π/16)(r_s/b)² 弯折（b 是光线离黑洞最近的距离），
  * 再打到内壁上，所以黑洞周围的星云被扭曲，正对黑洞后面那一片成像成爱因斯坦环；b 小于阴影半径的光线掉进黑洞，是黑的。
  * 内壁上是一层稀薄的电离气体，透过云团之间的空隙看得到后面暗的尘埃和嵌在星云里的星：气体被吸积盘照亮，亮度按到黑洞的距离平方反比、
- * 入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；发的是 Hα 的玫瑰红，全电离了就不再更亮。
+ * 入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；全电离了就不再更亮。氢复合发的 Hα、Hβ、Hγ 按 2.86 : 1 : 0.47 混成粉色，
+ * 再加上星云的连续谱；挡在前面的尘埃按波长消光，蓝光比红光挡得多，尘埃多的地方偏红。
  * 薄层斜着看光程更长，碗沿更亮。壳层的密度从内壁往外涨：光深到 1 的那一层是看得见的内壁（碗按它的半径画），再往外光照不进去，迅速暗成厚厚的尘埃；外缘以外是无穷远处的星。
  * 吸积盘是平面上的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨；
  * 盘面的光按引力红移与横向多普勒 g = √(1 − 3r_s/2r) 变红变暗，颜色取黑体色
@@ -219,11 +220,16 @@ const float DISK_GAIN = 1.8;
 const float LIMB_MAX = 2.4;
 const float ION_SAT = 1.2;
 const vec4 SHEET_MEAN = vec4(0.22, 0.3, 0.05, 1.0);
-const vec3 H_ALPHA = vec3(0.82, 0.24, 0.28);
-const vec3 FRONT = vec3(1.0, 0.46, 0.44);
-const vec3 SELF_GLOW = vec3(0.07, 0.03, 0.035);
-const vec3 WALL = vec3(0.02, 0.013, 0.013);
-const vec3 DUST = vec3(0.3, 0.19, 0.13);
+const vec3 H_ALPHA = vec3(1.0, 0.0, 0.03);
+const vec3 H_BETA = vec3(0.0, 0.75, 1.0);
+const vec3 H_GAMMA = vec3(0.3, 0.0, 1.0);
+const vec3 BALMER = (H_ALPHA * 2.86 + H_BETA + H_GAMMA * 0.47) / 3.0 * 0.74 + vec3(0.26);
+const vec3 EXTINCTION = vec3(1.0, 1.25, 1.46);
+const float DUST_TAU = 1.0;
+const vec3 FRONT = vec3(1.0, 0.64, 0.8);
+const vec3 SELF_GLOW = vec3(0.14, 0.06, 0.09);
+const vec3 WALL = vec3(0.045, 0.022, 0.042);
+const vec3 DUST = vec3(0.27, 0.17, 0.17);
 
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -360,12 +366,12 @@ void main ()
     float dm = length(M);
     flux += uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
     float lit = ionized(flux);
-    vec3 gas = nb.r * limb * (SELF_GLOW + H_ALPHA * lit * 0.6);
+    vec3 gas = nb.r * limb * (SELF_GLOW + BALMER * lit * 0.8);
     vec3 front = nb.b * lit * FRONT * 0.6 * skin;
     float dust = nb.g;
     vec2 starAt = mix(sky, s, floorOn);
     vec3 star = starTint(starAt) * stars(starAt);
-    vec3 onFloor = (WALL + star * 0.5 * (1.0 - blur)) * (1.0 - dust) + gas * (1.0 - 0.75 * dust) + DUST * dust * (0.05 + flux * 0.12) + front;
+    vec3 onFloor = (WALL + star * 0.5 * (1.0 - blur)) * (1.0 - dust) + gas * exp(-dust * DUST_TAU * EXTINCTION) + DUST * dust * (0.08 + flux * 0.12) + front;
     float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - dust);
     vec3 inShell = mix(DUST * 0.12 * (0.4 + nb.r), star, clear) + gas + front;
     col = floorOn * onFloor + shellOn * inShell + (1.0 - floorOn - shellOn) * star;

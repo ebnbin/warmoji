@@ -31,7 +31,8 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   bounded: '有界竞技场（方形场地）',
   oldRiver: '单屏河道（万物随水流漂移）',
   void: '环面竞技场（四壁传送门，出这头即现那头）',
-  ruins: '断壁废墟（墙挡人 / 挡弹 / 挡视线）',
+  oldRuins: '旧残垣（断壁废墟；墙挡人 / 挡弹 / 挡视线）',
+  ruins: '残垣（山顶台地上塌了大半的石砌院落；墙按剩下的高度挡人、挡子弹、挡视线，看不见的敌人不会被自动瞄准、只剩淡影；封门的木板只有穿透的子弹打得过；冲锋、爆炸与几种技能能打出缺口，没了支撑的墙整片塌下，落石砸人·敌我通吃，碎石拖慢脚步，尘雾一时挡住视线；怪物从看不见的地方来）',
   daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
   space: '深空星海（圆形禁锢场谁也逃不出；天体直线横扫敌我通吃）',
   ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
@@ -42,6 +43,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   cave: '溶洞（部分露天；光照随真实的昼夜变化，看得清的范围随之涨落；入夜点起火把；怪物只从暗处出来；洞壁、石柱挡人挡子弹）',
   nebula: '星云（空心星云的空腔，没有太阳；黑洞的万有引力作用于一切，周围那圈弯过来的光大致就是走不出来的地方，掉进视界被吞掉·敌我通吃，吞下的东西让它长大；壳层的引力把一切拉回空腔；流星从壳层甩出横穿空腔，撞上就挨打）',
   nebulaOld: '旧星云（空心的星云；黑洞的万有引力作用于一切，越近越强，掉进视界被吞噬·敌我通吃；壳层的引力越往外越强，谁也出不去）',
+  desert: '沙漠（约 32×32、四边首尾相接的沙海，镜头跟着走看不到边；沙丘与标志物成对，分不清来没来过，标志物挡人不挡子弹；爬坡、松沙耗体力，背阴处回得快；走过留下印子，越累越深·敌我通吃，过一会儿就被风吹平）',
   floe: '浮冰（南极海上一块近似方形的浮冰，每局形状不同；积雪踩得住、光冰与新冰打滑，滑出冰缘落进冰水冻伤·敌我通吃；阵风刮来时新冰上站不住）',
 }
 
@@ -57,8 +59,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
     `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${tireless ? ' · 不知疲倦' : ''}`,
   ]
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
-  if (e.phasesWalls) lines.push('穿墙：无视断壁直取队伍')
-  if (e.breaksWalls) lines.push('破墙：冲撞碾碎沿途断壁')
+  if (e.phasesWalls) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
   if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
   if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)

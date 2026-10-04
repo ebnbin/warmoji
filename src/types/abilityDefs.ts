@@ -12,6 +12,8 @@ interface ProjectileSpec {
   readonly homingDeg?: number
   /** 飞完不消失，落在地上 ms，等着被召回 */
   readonly linger?: number
+  /** 抛射：从出手处抛向瞄准的地方，最高处比两头的连线高出这么多米；越过比它矮的障碍，落下来才打得到身体。不写是平射 */
+  readonly arc?: number
 }
 export interface HeldVisual {
   readonly emoji: string
@@ -34,6 +36,8 @@ interface BlastEffect {
   readonly ratio: number
   readonly knockback: number
   readonly ring?: BlastRing
+  /** 破坏力：炸掉多少立方米的完好砌体（按材质的强度折算） */
+  readonly breach?: number
 }
 interface SlowEffect {
   readonly kind: 'slow'
@@ -694,6 +698,8 @@ interface AbilityBase {
   readonly color?: number
   readonly fxRadius?: number
   readonly piercesWalls?: boolean
+  /** 破坏力：这一下能打掉多少立方米的完好砌体（按材质的强度折算）；弹体撞上障碍、近战与爆炸打到的范围、冲刺一路撞上的都算 */
+  readonly breach?: number
   /** 可以攒几次：冷却按次恢复 */
   readonly charges?: number
   /** 出手后 windowMs 内可以接下一段；冷却在最后一段打完或窗口关闭后才走 */

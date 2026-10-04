@@ -28,10 +28,10 @@ import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/oldRiver'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
+import { Airborne, Alive, Boss, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
-import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
+import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/oldRuins'
 import { hit } from '../systems/shared/damage'
 import { despawnEnemy, die } from '../systems/shared/combat'
 import { cullProjectile } from '../systems/shared/projectile'
@@ -46,9 +46,16 @@ import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { river } from '../river/world'
+import { ruins } from '../ruins/world'
+import { phases } from '../utils/pass'
+import type { Crossing, Probe } from '../utils/pass'
+import type { ObstacleId } from '../../types/obstacles'
 import type { RiverState } from '../river/world'
 import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
+import { desert } from '../desert/world'
+import type { DesertState } from '../desert/world'
+import type { RuinsState } from '../ruins/world'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -94,14 +101,16 @@ export interface WorldState {
   volcano: VolcanoState | null
   ship: ShipState | null
   river: RiverState | null
+  ruins: RuinsState | null
   nebula: NebulaState | null
   floe: FloeState | null
   cave: CaveState | null
+  desert: DesertState | null
   meadow: MeadowState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null, meadow: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null }
 }
 
 export interface WorldHooks {
@@ -125,8 +134,16 @@ export interface WorldHooks {
   /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
-  wallHit(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
-  smashWall(sim: Sim, x: number, y: number): void
+  /** 线段 a→b 上第一处探测在它里面、又要贯穿才过得去的实心（贯穿几次按 utils/pass 的 passCost）；不写就按 wallHit */
+  trace?(sim: Sim, probe: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null
+  /** 线段第一次碰上墙的地方：碰上的一律当作岩体挡下；写了 trace 的不看它 */
+  wallHit?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
+  /** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里，按材质的强度折算能打掉多少，返回实际用掉的；不写就什么也打不坏 */
+  breach?(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number
+  /** 弹体或出手撞上了障碍：给画面崩点碎屑 */
+  impact?(sim: Sim, x: number, y: number, material: ObstacleId): void
+  /** 引擎不调用：破坏一律走 breach */
+  smashWall?(sim: Sim, x: number, y: number): void
   wanderDir(sim: Sim, eid: number, dx: number, dy: number): Point
   fleeDir(sim: Sim, eid: number, awayX: number, awayY: number): Point
   /** 飞行物出了这里就消失 */
@@ -185,10 +202,6 @@ const bounded: WorldHooks = {
   chaseDir(_sim, eid, tx, ty) {
     return norm(tx - Transform.x[eid]!, ty - Transform.y[eid]!)
   },
-  wallHit() {
-    return null
-  },
-  smashWall() {},
   wanderDir(sim, eid, dx, dy) {
     const margin = 0.6 * UNIT
     const x = Transform.x[eid]!
@@ -279,7 +292,7 @@ const ice: WorldHooks = {
   },
 }
 
-const ruins: WorldHooks = {
+const oldRuins: WorldHooks = {
   ...bounded,
   onStart(sim) {
     const cfg = MAPS[sim.mapId].walls
@@ -299,12 +312,12 @@ const ruins: WorldHooks = {
   constrainBody(sim, eid, from, next) {
     const box = bounded.constrainBody(sim, eid, from, next)
     const w = sim.worldState.walls
-    if (!w || hasComponent(sim.world, eid, Phasing) || hasComponent(sim.world, eid, BreaksWalls)) return box
+    if (!w || phases(sim.world, eid, 'wall')) return box
     return w.grid.separateCircle(box.x, box.y, Math.min(Radius.v[eid]!, MAPS[sim.mapId].walls!.bodyRadiusCapU * UNIT))
   },
   chaseDir(sim, eid, tx, ty) {
     const w = sim.worldState.walls
-    if (!w || hasComponent(sim.world, eid, Phasing)) return bounded.chaseDir(sim, eid, tx, ty)
+    if (!w || phases(sim.world, eid, 'wall')) return bounded.chaseDir(sim, eid, tx, ty)
     const dir = w.flow?.sampleDir(Transform.x[eid]!, Transform.y[eid]!)
     if (dir && (dir.x !== 0 || dir.y !== 0)) return dir
     return bounded.chaseDir(sim, eid, tx, ty)
@@ -319,18 +332,28 @@ const ruins: WorldHooks = {
     }
     return d
   },
-  wallHit(sim, ax, ay, bx, by) {
-    return sim.worldState.walls?.grid.segmentHit(ax, ay, bx, by) ?? null
+  trace(sim, _probe, ax, ay, bx, by) {
+    const hit = sim.worldState.walls?.grid.segmentHit(ax, ay, bx, by)
+    if (!hit) return null
+    const len = Math.hypot(bx - ax, by - ay)
+    const t = len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
+    return { t0: t, t1: t, material: 'wall' }
   },
-  smashWall(sim, x, y) {
+  /** 破坏力碰上的墙格整格碎掉，不论多少 */
+  breach(sim, x, y, _z, r) {
     const w = sim.worldState.walls
-    if (!w) return
-    const cx = w.grid.cellX(x)
-    const cy = w.grid.cellY(y)
-    if (!w.grid.isBlockedCell(cx, cy)) return
-    w.grid.setBlocked(cx, cy, false)
-    w.smashed.push(cy * w.grid.cols + cx)
-    w.flowCellX = -1
+    if (!w) return 0
+    const g = w.grid
+    const half = g.cellPx / 2
+    for (let cy = g.cellY(y - r); cy <= g.cellY(y + r); cy++) {
+      for (let cx = g.cellX(x - r); cx <= g.cellX(x + r); cx++) {
+        if (!g.isBlockedCell(cx, cy) || Math.hypot((cx + 0.5) * g.cellPx - x, (cy + 0.5) * g.cellPx - y) > r + half) continue
+        g.setBlocked(cx, cy, false)
+        w.smashed.push(cy * g.cols + cx)
+        w.flowCellX = -1
+      }
+    }
+    return 0
   },
   spawnPoint(sim, boss) {
     const w = sim.worldState.walls
@@ -1449,7 +1472,7 @@ const cave: WorldHooks = {
     return inPool(caveOf(sim).layout, x, y) ? wadeOf(sim) : groundOf(sim)
   },
   constrainBody(sim, eid, from, next) {
-    if (hasComponent(sim.world, eid, Phasing)) return bounded.constrainBody(sim, eid, from, next)
+    if (phases(sim.world, eid, 'rock')) return bounded.constrainBody(sim, eid, from, next)
     return pushOut(caveOf(sim).layout.rock, next.x, next.y, Radius.v[eid]!)
   },
   basin(sim) {
@@ -1459,7 +1482,7 @@ const cave: WorldHooks = {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = norm(tx - x, ty - y)
-    if (hasComponent(sim.world, eid, Phasing)) return d
+    if (phases(sim.world, eid, 'rock')) return d
     const s = caveOf(sim)
     const rock = s.layout.rock
     const rad = Radius.v[eid]!
@@ -1467,8 +1490,12 @@ const cave: WorldHooks = {
     const f = flowDir(s.flow, x, y) ?? d
     return glide(rock, x, y, f.x, f.y, rad + 0.3 * UNIT)
   },
-  wallHit(sim, ax, ay, bx, by) {
-    return rockHit(caveOf(sim).layout.rock, ax, ay, bx, by)
+  trace(sim, _probe, ax, ay, bx, by) {
+    const hit = rockHit(caveOf(sim).layout.rock, ax, ay, bx, by)
+    if (!hit) return null
+    const len = Math.hypot(bx - ax, by - ay)
+    const t = len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
+    return { t0: t, t1: t, material: 'rock' }
   },
   wanderDir(sim, eid, dx, dy) {
     const rock = caveOf(sim).layout.rock
@@ -1651,7 +1678,8 @@ const torus: WorldHooks = {
 const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   bounded,
   daynight: bounded,
-  ruins: ruins,
+  oldRuins,
+  ruins,
   ice,
   oldRiver,
   void: torus,
@@ -1664,6 +1692,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   floe,
   cave,
   meadow,
+  desert,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()
@@ -1671,7 +1700,7 @@ const BUILT = new Map<WorldHooks, WorldHooks>()
 /** 地图的规则，叠上能力造出的地形 */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
-  const base = def.ice ? ice : def.walls ? ruins : BY_KIND[def.kind]!
+  const base = def.ice ? ice : def.walls ? oldRuins : BY_KIND[def.kind]!
   let hooks = BUILT.get(base)
   if (!hooks) {
     hooks = withBuilt(base)

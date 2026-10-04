@@ -732,6 +732,179 @@ export interface MeadowConfig {
   /** 栅栏外吃草的羊有几只 */
   readonly sheep: readonly [number, number]
 }
+/** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
+export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
+
+/**
+ * 沙漠：一片四边首尾相接的沙海，地图的四边是回绕的接缝，镜头跟着队长走、看不到边。沙丘与标志物都是一对一对的：
+ * 同一个摆在横竖各隔半圈的两处，再加上整圈的回绕，怎么走都分不清是回到了原地还是到了另一处。
+ * 赶路按坡度与沙的松实算代谢，背阴处歇着回得快；标志物挡人不挡子弹；身体走过的地方留下脚印，越累越深，见底时拖着脚走，过一会儿被风吹平。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface DesertConfig {
+  readonly meterPerU: number
+  /** 镜头的长边最多看多少格：看到的范围小于环面的一圈，每样东西只画离队长最近的那一份 */
+  readonly viewMaxU: number
+  /** 太阳的仰角（度），方位与角色的光一致 */
+  readonly sunDeg: number
+  /**
+   * 沙丘：几对、每座最高处多高（米）；每座由几团圆润的沙包横着风排开、融成一道缓丘，沙包迎风坡最陡处的坡度是 stossSlope、背风坡最陡处是 leeSlope（正切）；
+   * 沙包横着风的半宽是它顺风长的 width 倍；各座沙丘在盛行风两侧最多偏 turnDeg 度
+   */
+  readonly dunes: {
+    readonly pairs: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly lobes: readonly [number, number]
+    readonly stossSlope: number
+    readonly leeSlope: number
+    readonly width: number
+    readonly turnDeg: number
+  }
+  /** 盛行风吹去的方向在背着太阳的方向两侧最多偏多少度：背风坡多半背着太阳 */
+  readonly windSpreadDeg: number
+  /** 丘间的缓缓起伏：幅度（米）与一圈里起伏几次 */
+  readonly swell: { readonly heightM: number; readonly waves: number }
+  /** 丘间的沙：松的程度在 loose 的范围里按一圈 patches 片斑块起伏，实一点的地方颜色偏深偏红、走起来省力 */
+  readonly flats: { readonly loose: readonly [number, number]; readonly patches: number }
+  /** 标志物：几对（每对一模一样，横竖各隔半圈），彼此至少隔多远（格） */
+  readonly landmarks: { readonly pairs: number; readonly gapU: number }
+  /**
+   * 走路的代谢按 Minetti 的坡度曲线：松沙上每米是硬地的 softSand 倍，被踩实的沙最多省掉多出来的 packRelief；
+   * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍
+   */
+  readonly gait: {
+    readonly softSand: number
+    readonly packRelief: number
+    readonly maxPower: number
+    readonly downhillMax: number
+  }
+  /** 背阴处歇着的体力回复倍率；向阳处按地图的体力回复 */
+  readonly shadeRegen: number
+  /**
+   * 脚印：印子贴图每格多少个格子。标准身体在松沙上一步踩多深（米），实沙上只踩下去 firm 倍，累到见底时深到 tired 倍，体力低于 dragFrom 开始拖着脚；
+   * 步幅与脚长占身体半径的比例；印子与踩实的沙过多少秒被风吹平；一步把那里的沙踩实多少；各种敌人的步态，没写的按光脚，队员穿着靴子
+   */
+  readonly tracks: {
+    readonly perU: number
+    readonly depthM: number
+    readonly firm: number
+    readonly tired: number
+    readonly dragFrom: number
+    readonly stride: number
+    readonly foot: number
+    readonly lifeS: number
+    readonly pack: number
+    readonly gaits: Partial<Record<EnemyKind, DesertGait>>
+  }
+}
+/**
+ * 残垣：山顶台地上一座塌了大半的石砌院落——中间是回廊院，四周一圈房间，一角是塔楼。墙按一层层石块砌成，各处剩多高按砌体的物理来：
+ * 高过膝盖挡人、高过胸口挡子弹、高过眼睛挡视线（按 obstacles 的身高比例）；打掉的石块以上失去支撑一起塌下，陡过砌法的地方塌成台阶，
+ * 塌下来的落石砸人、在墙脚按休止角堆成碎石、扬起挡视线的尘雾。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface RuinsConfig {
+  readonly meterPerU: number
+  /** 砌体格子的边长，格：每格记剩几层石块、封着的木板与地上的碎石 */
+  readonly cellU: number
+  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地边到地图边留 padU 格的山坡；窄过两倍 neckU 的缝填掉 */
+  readonly site: {
+    readonly marginU: readonly [number, number]
+    readonly waveU: number
+    readonly padU: number
+    readonly neckU: number
+  }
+  /**
+   * 院落的平面：整体转过 tiltDeg 度；回廊院中间的庭院多大、回廊多宽，四周房间的进深与开间（格）；门洞多宽，通到院外的门几道，
+   * 连通以外每道墙再开门的概率；外墙、内墙、塔楼的墙与柱廊矮墙的厚（格）
+   */
+  readonly plan: {
+    readonly tiltDeg: readonly [number, number]
+    readonly garthU: readonly [number, number]
+    readonly walkU: number
+    readonly depthU: readonly [number, number]
+    readonly roomU: readonly [number, number]
+    readonly doorU: readonly [number, number]
+    readonly gates: readonly [number, number]
+    readonly loops: number
+    readonly wallU: {
+      readonly outer: number
+      readonly inner: number
+      readonly tower: number
+      readonly parapet: number
+    }
+  }
+  /** 砌体：一层石块高 courseM 米、密度（千克/米³）；同一处砌体里横竖相隔 bond 格以内的两格最多差一层才立得住；原本多高（米）：外墙、内墙、塔楼、柱廊的矮墙与石柱 */
+  readonly masonry: {
+    readonly courseM: number
+    readonly density: number
+    readonly bond: number
+    readonly heightM: {
+      readonly outer: readonly [number, number]
+      readonly inner: readonly [number, number]
+      readonly tower: readonly [number, number]
+      readonly parapet: number
+      readonly column: number
+    }
+  }
+  /** 柱廊：石柱的底半径与柱距（格），每边拆掉几个柱间的矮墙当入口 */
+  readonly arcade: {
+    readonly radiusU: number
+    readonly spacingU: number
+    readonly entries: readonly [number, number]
+  }
+  /**
+   * 年久失修：墙顶按低频噪声（波长 waveU 格）往下塌，剩原高的 keep 那么多；几处半径 razeU 格的地方拆到只剩墙基；开局前再预演几次多大的破坏（立方米）。
+   * 石柱折断、倒下的比例；塌下来的石块留在墙脚的比例（其余早被搬走）
+   */
+  readonly decay: {
+    readonly waveU: number
+    readonly keep: readonly [number, number]
+    readonly razed: readonly [number, number]
+    readonly razeU: readonly [number, number]
+    readonly breaches: readonly [number, number]
+    readonly breachM3: readonly [number, number]
+    readonly broken: number
+    readonly fallen: number
+    readonly rubble: number
+  }
+  /** 封门的木板：几道门洞、多高（米）、多厚（格） */
+  readonly timber: {
+    readonly doors: readonly [number, number]
+    readonly heightM: number
+    readonly thickU: number
+  }
+  /** 碎石：休止角（度）；碎石深 fullM 米时走起来最慢：黏滞与每走一格多耗的体力 */
+  readonly rubble: {
+    readonly reposeDeg: number
+    readonly fullM: number
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /** 落石：每千焦的冲击打掉多少血；落在身体半径外多远（格）也砸得到 */
+  readonly fall: {
+    readonly damagePerKJ: number
+    readonly radiusU: number
+  }
+  /** 尘雾：每塌下一立方米扬起多少（消光系数乘面积，米），摊开的半径（格），多久落下一半（秒）；视线攒下的光学厚度到 opaqueTau 就看不穿 */
+  readonly dust: {
+    readonly perM3: number
+    readonly spreadU: number
+    readonly halfLifeS: number
+    readonly opaqueTau: number
+  }
+  /** 台地边外的树：树冠半径（格）、树高（米）、撒树的格子间距（格） */
+  readonly trees: {
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly gapU: number
+  }
+  /** 撞墙时身体的半径最多按这么大算（格）：大个子也挤得过门洞 */
+  readonly bodyCapU: number
+  /** 门洞、柱间与开局时墙上塌出的缺口最窄多宽（格）：塌出来更窄的缺口补回刚好挡人的高度 */
+  readonly gapU: number
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -742,7 +915,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'meadow'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -763,6 +936,8 @@ export interface MapDef {
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
   readonly river?: RiverConfig
+  readonly desert?: DesertConfig
+  readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
@@ -770,7 +945,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse'
 
 export interface DecorInstance {
   emoji: string

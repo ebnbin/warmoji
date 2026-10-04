@@ -61,6 +61,8 @@ import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { RiverView } from './river/view'
 import { MeadowView } from './meadow/view'
+import { DesertView } from './desert/view'
+import { RuinsView } from './ruins/view'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -529,7 +531,7 @@ class NebulaOldView extends BoundedView {
   }
 }
 
-class RuinsView extends BoundedView {
+class OldRuinsView extends BoundedView {
   private tiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
 
   onSimReady(v: ViewCtx, sim: Sim): void {
@@ -1845,7 +1847,7 @@ const HALO_EDGE = 4
 /** 开局最多几个线程分着画星云 */
 const NEBULA_THREADS = 4
 /** 着色器的曝光：光的强度乘它再按 1 − e^(−x) 压进画面 */
-const NEBULA_EXPOSURE = 1.9
+const NEBULA_EXPOSURE = 2.1
 /** 星尘：多少粒，终端漂移 g·t 的停止时间（秒） */
 const DUST_COUNT = 240
 const DUST_STOP_S = 0.35
@@ -3470,6 +3472,7 @@ export function viewFor(mapId: MapId): MapView {
 const MAKE: Record<MapDef['kind'], () => MapView> = {
   bounded: () => new BoundedView(),
   daynight: () => new DayNightView(),
+  oldRuins: () => new OldRuinsView(),
   ruins: () => new RuinsView(),
   ice: () => new IceView(),
   oldRiver: () => new OldRiverView(),
@@ -3483,4 +3486,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   floe: () => new FloeView(),
   cave: () => new CaveView(),
   meadow: () => new MeadowView(),
+  desert: () => new DesertView(),
 }

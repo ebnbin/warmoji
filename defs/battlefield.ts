@@ -1,10 +1,25 @@
 import type { BattlefieldTuning } from '../src/types/battlefield'
 
+const DESERT_EVENTS = [
+  { id: 'desert_gale', emoji: '1f32c', name: '疾风助战', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+  { id: 'desert_mirage', emoji: '2728', name: '海市蜃楼', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+  { id: 'desert_sand', emoji: '1f3dc', name: '流沙陷步', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+  { id: 'desert_storm', emoji: '1f32a', name: '沙暴蔽日', desc: '全队伤害 -22%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { damage: 0.78 } } } },
+] as const
+
 const RIVER_EVENTS = [
   { id: 'river_flow', emoji: '1f6f6', name: '顺流而行', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
   { id: 'river_spring', emoji: '1f4a7', name: '活水灌注', desc: '全队攻速 +28%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.78 } } } },
   { id: 'river_under', emoji: '1f531', name: '逆流阻滞', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
   { id: 'river_whirl', emoji: '1f300', name: '漩涡搅扰', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+] as const
+
+const RUINS_EVENTS = [
+  { id: 'ruins_ambush', emoji: '1f3f9', name: '断壁伏击', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+  { id: 'ruins_rampart', emoji: '1f9f1', name: '残垣回响', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+  { id: 'ruins_dust', emoji: '1f32b', name: '尘幕蔽敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+  { id: 'ruins_rubble', emoji: '1faa8', name: '碎砾绊足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+  { id: 'ruins_collapse', emoji: '1f4a8', name: '塌方扬尘', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
 ] as const
 
 export const BATTLEFIELD = {
@@ -22,12 +37,8 @@ export const BATTLEFIELD = {
       { id: 'forest_vines', emoji: '1f33f', name: '藤蔓缠足', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'forest_spore', emoji: '1f344', name: '孢子狂化', desc: '敌人移速 +30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { enemy: { mul: { moveSpeed: 1.3 } } } },
     ],
-    desert: [
-      { id: 'desert_gale', emoji: '1f32c', name: '疾风助战', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
-      { id: 'desert_mirage', emoji: '2728', name: '海市蜃楼', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
-      { id: 'desert_sand', emoji: '1f3dc', name: '流沙陷步', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
-      { id: 'desert_storm', emoji: '1f32a', name: '沙暴蔽日', desc: '全队伤害 -22%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { damage: 0.78 } } } },
-    ],
+    oldDesert: DESERT_EVENTS,
+    desert: DESERT_EVENTS,
     oldRiver: RIVER_EVENTS,
     river: RIVER_EVENTS,
     void: [
@@ -37,13 +48,8 @@ export const BATTLEFIELD = {
       { id: 'factory_jam', emoji: '1f529', name: '传动卡壳', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'factory_oil', emoji: '1f6e2', name: '油污黏脚', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
-    ruins: [
-      { id: 'ruins_ambush', emoji: '1f3f9', name: '断壁伏击', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
-      { id: 'ruins_rampart', emoji: '1f9f1', name: '残垣回响', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
-      { id: 'ruins_dust', emoji: '1f32b', name: '尘幕蔽敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
-      { id: 'ruins_rubble', emoji: '1faa8', name: '碎砾绊足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
-      { id: 'ruins_collapse', emoji: '1f4a8', name: '塌方扬尘', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
-    ],
+    oldRuins: RUINS_EVENTS,
+    ruins: RUINS_EVENTS,
     daynight: [
       { id: 'daynight_dawn', emoji: '1f305', name: '破晓锋芒', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'daynight_sun', emoji: '2600', name: '烈阳灼敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
