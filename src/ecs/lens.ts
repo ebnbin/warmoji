@@ -122,7 +122,7 @@ export class Lens {
         cy = clampSpan(cy, b.y, b.h, H / zoom)
       }
     } else if (f.edge === 'wrap') {
-      const r = cellOf(f.map, anchor)
+      const r = f.fit ? f.map : cellOf(f.map, anchor)
       port = fitIn(area, r.w, r.h)
       zoom = Math.min(port.w / r.w, port.h / r.h)
       cx = r.x + r.w / 2
