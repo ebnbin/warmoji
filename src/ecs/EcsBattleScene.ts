@@ -39,6 +39,8 @@ import { remapSim } from './systems/shared/remap'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
+import { Lens, LENS_MODES } from './lens'
+import type { LensMode } from './lens'
 import { makeSim } from './sim'
 import { abilityRequires, bodyLook, modDef, statBase } from './store'
 import { foldBody, lastingStats, setStatLayer, statsOf } from './utils/stats'
@@ -81,7 +83,7 @@ import type { Burst } from './outbox'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
-import { defineDevFlag } from '../devtools'
+import { defineDevChoice, defineDevFlag } from '../devtools'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { gainTeamXp } from './systems/shared/combat'
 import { hit } from './systems/shared/damage'
@@ -96,6 +98,22 @@ import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
 const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
+const LENS_LABELS: Record<LensMode, string> = { follow: '跟随', map: '完整地图', reach: '可见范围' }
+const lensChoice = defineDevChoice({
+  id: 'battle.lens',
+  group: '战斗',
+  label: '镜头',
+  desc: '后两档不跟随队长，整张图放进一屏',
+  options: LENS_MODES.map((id) => ({ id, label: LENS_LABELS[id] })),
+  default: 'follow',
+})
+
+function lensMode(): LensMode {
+  const id = lensChoice()
+  const mode = LENS_MODES.find((m) => m === id)
+  if (!mode) throw new Error(`没有这种镜头模式：${id}`)
+  return mode
+}
 
 /** 出怪口按种类上色 */
 const GATE_COLORS = [0x00e5ff, 0xffd740, 0x69f0ae, 0xff6e40, 0xe040fb, 0xb2ff59, 0xff4081, 0x40c4ff] as const
@@ -160,7 +178,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private bursts!: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter>
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
-  private camAnchor!: Phaser.GameObjects.Zone
+  /** 跟随时镜头对准的地方：队长，换人时从上一任那里滑过来 */
+  private anchor: Point = { x: 0, y: 0 }
+  private lens!: Lens
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
   private mapW = 0
@@ -364,22 +384,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
-    this.camAnchor = this.add.zone(0, 0, 1, 1)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, anchor: this.camAnchor, w: 0, h: 0 }
+    this.lens = new Lens(this)
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.build(this.ctx)
 
-    this.camAnchor.setPosition(origin.x, origin.y)
-    this.map.camera(this.ctx)
+    this.anchor = { x: origin.x, y: origin.y }
+    this.lens.frame(this.map.framing(this.ctx))
 
-    this.timeStopFx = mainCameraOnly(
-      this.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
-        .setScrollFactor(0)
-        .setDepth(88),
-    )
+    this.timeStopFx = this.lens.cover(this.add.rectangle(0, 0, 1, 1, TIMESTOP.chillColor, 0).setDepth(88))
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     const kb = this.input.keyboard
@@ -429,7 +444,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const paint = new Presentation()
     this.paint = paint
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites)
-    this.cues = new CueLayer(this, this.world)
+    this.cues = new CueLayer(this, this.world, (r) => this.lens.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
     new TriBatch(this, LayerType.Paint, 40, (o, m) => place(o, m, paint.pointer))
@@ -450,7 +465,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       petals: burstEmitter(this, [0xffc1d9, 0xffe4ee, 0xf8bbd0, 0xffffff], 100, 1200, { gravityY: 55, rotate: { min: 0, max: 360 } }),
       sand: burstEmitter(this, [0xe8c27a, 0xd9a85b, 0xf3dca5, 0xc8954a], 120, 700, { gravityY: 160 }),
     }
-    const origin = { x: this.camAnchor.x, y: this.camAnchor.y }
+    const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
@@ -726,14 +741,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.resize(this.ctx)
+    this.lens.frame(this.map.framing(this.ctx))
     if (w === fromW && h === fromH) return
     if (sim) {
       sim.mapW = w
       sim.mapH = h
       remapSim(sim, fromW, fromH, w, h)
-      this.camAnchor.setPosition(leaderX(sim), leaderY(sim))
+      this.anchor = { x: leaderX(sim), y: leaderY(sim) }
     } else {
-      this.camAnchor.setPosition(origin.x, origin.y)
+      this.anchor = { x: origin.x, y: origin.y }
     }
   }
 
@@ -827,9 +843,19 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 
 
+  /** 镜头每帧都要摆：战斗还没开始、已经结束也一样 */
+  private aimLens(delta: number): void {
+    this.lens.setMode(lensMode())
+    this.lens.setFollowZoom(this.map.followZoom?.(this.ctx) ?? 1)
+    this.lens.step(this.anchor, delta)
+  }
+
   update(_time: number, delta: number): void {
     const sim = this.sim
-    if (!this.ready || !sim) return
+    if (!this.ready || !sim) {
+      this.aimLens(delta)
+      return
+    }
     sim.dtMs = delta
     sim.wdtMs = delta * worldTimeScale(sim)
     if (this.ending) {
@@ -837,6 +863,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)
+      this.aimLens(delta)
       return
     }
     const leftMs = timeLeftMs(sim)
@@ -854,11 +881,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.teamDir = keyed ? norm(kx, ky) : stick
     sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
 
-    const wv = this.cameras.main.worldView
-    sim.view.x = wv.x
-    sim.view.y = wv.y
-    sim.view.right = wv.right
-    sim.view.bottom = wv.bottom
+    const seen = this.lens.visible()
+    sim.view.x = seen.x
+    sim.view.y = seen.y
+    sim.view.right = seen.x + seen.w
+    sim.view.bottom = seen.y + seen.h
     stepFrame(sim)
     if (sim.leader !== this.shownLeader) {
       this.shownLeader = sim.leader
@@ -872,7 +899,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.drainOutbox()
     if (sim.characterHitCount > this.seenHitCount) {
       this.seenHitCount = sim.characterHitCount
-      if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
+      if (this.hitShakeOn) this.lens.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.paint?.step(sim)
     this.drawDevTargets(sim)
@@ -884,7 +911,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return
     }
     const camOff = handoverCamOffset(sim)
-    this.camAnchor.setPosition(leaderX(sim) + camOff.x, leaderY(sim) + camOff.y)
+    this.anchor.x = leaderX(sim) + camOff.x
+    this.anchor.y = leaderY(sim) + camOff.y
+    this.aimLens(delta)
     this.map.step(this.ctx, sim, delta)
     this.fog?.show(leaderX(sim), leaderY(sim), sim.fight.rules.vision * UNIT, VISION_FOG_ALPHA)
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0

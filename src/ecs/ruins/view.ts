@@ -1,10 +1,9 @@
 import Phaser from 'phaser'
 import { removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { MAP, rollDecor } from '../../data/maps'
+import { rollDecor } from '../../data/maps'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
-import { safeInsets, viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
 import { playSfx } from '../../audio/sfx'
 import { loadSettings } from '../../save/settings'
@@ -25,6 +24,7 @@ import type { PaintTask } from './painter'
 import type { Collapse, RuinsState } from './world'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 
@@ -148,12 +148,7 @@ export class RuinsView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG)
-        .setScrollFactor(0)
-        .setDepth(-2),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     const scene = v.scene
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
     if (!scene.textures.exists(CHIP_KEY)) canvasTexture(scene, CHIP_KEY, 24, 24, (ctx) => drawChip(ctx, 24))
@@ -165,14 +160,8 @@ export class RuinsView implements MapView {
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
-  /** 镜头最多看到地图外多远：默认边距，再加上这一边的设备安全区 */
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
-    const m = MAP.cameraMargin * UNIT
-    const s = safeInsets
-    cam.setZoom(viewport.renderScale)
-    cam.setBounds(-m - s.left, -m - s.top, v.w + m * 2 + s.left + s.right, v.h + m * 2 + s.top + s.bottom)
-    cam.startFollow(v.anchor)
+  framing(v: ViewCtx): Framing {
+    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
   }
 
   /** 野花与蘑菇只撒在台地上空着的地面：不压墙、不压木板与厚碎石 */
@@ -431,7 +420,7 @@ export class RuinsView implements MapView {
       this.splinters?.explode(Math.min(24, 6 + Math.round(c.timber * 400)), c.x, c.y)
       playSfx('splinter')
     }
-    if (this.shake && c.volume > 0.6) scene.cameras.main.shake(260 + Math.min(500, c.volume * 120), Math.min(0.006, 0.0015 + c.volume * 0.0012))
+    if (this.shake && c.volume > 0.6) v.lens.shake(260 + Math.min(500, c.volume * 120), Math.min(0.006, 0.0015 + c.volume * 0.0012))
     const puffs = Math.min(60, Math.round(4 + c.volume * 22))
     const spread = v.def.ruins!.dust.spreadU * UNIT * 0.6
     for (let k = 0; k < puffs; k++) {
@@ -562,9 +551,7 @@ export class RuinsView implements MapView {
     }
   }
 
-  resize(v: ViewCtx): void {
-    this.camera(v)
-  }
+  resize(): void {}
 
   destroy(v: ViewCtx): void {
     this.painter?.close()
