@@ -25,7 +25,7 @@ import type { Sim } from '../sim'
 import type { DesertConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
-const BG = 0x8a6a45
+const BG = 0xbb9157
 const GROUND_KEY = 'desert-ground'
 const TRACKS_KEY = 'desert-tracks'
 const INFO_KEY = 'desert-info'
@@ -247,13 +247,13 @@ export class DesertView implements MapView {
         speed: { min: 6, max: 26 },
         scale: { start: 0.08, end: 0.3 },
         alpha: { start: 0.42, end: 0 },
-        tint: [0xd9b88a, 0xcaa574],
+        tint: [0xf6e3a6, 0xedcd86],
         emitting: false,
       })
       .setDepth(1.5)
     this.solidGfx = scene.add.graphics().setDepth(WALLS_DEPTH).setVisible(false)
     this.visuals.push(this.ragShadow, this.ragGfx, this.puffs, this.solidGfx)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.2, 0x140a04)
+    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.12, 0x140a04)
     this.step(v, sim, 0)
   }
 

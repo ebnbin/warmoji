@@ -16,8 +16,8 @@ export type Target =
   | { readonly kind: 'curve' }
   | { readonly kind: 'step'; readonly list: Step[]; readonly index: number; readonly step: Step }
   | { readonly kind: 'phase'; readonly list: Phase[]; readonly index: number; readonly phase: Phase; readonly stage: Stage }
-  | { readonly kind: 'spawn'; readonly list: Spawn[]; readonly index: number; readonly spawn: Spawn }
-  | { readonly kind: 'squad'; readonly list: WaveSquad[]; readonly index: number; readonly squad: WaveSquad }
+  | { readonly kind: 'spawn'; readonly list: Spawn[]; readonly index: number; readonly spawn: Spawn; readonly stage: Stage }
+  | { readonly kind: 'squad'; readonly list: WaveSquad[]; readonly index: number; readonly squad: WaveSquad; readonly stage: Stage }
   | { readonly kind: 'end'; readonly list: End[]; readonly index: number; readonly end: End }
 
 /** 导航里的一项 */
@@ -57,11 +57,11 @@ function stageNodes(f: Stage, at: Path): Node[] {
     const head: Node = { at: pat, parent: at, depth: 2, icon: ICON.phase, title: `第 ${p + 1} 阶段`, meta: phase.ends.map(endText).join('，'), target: { kind: 'phase', list: f.phases, index: p, phase, stage: f } }
     const spawns = phase.spawns.flatMap((spawn, i): Node[] => {
       const sat = [...pat, 'spawns', i]
-      const self: Node = { at: sat, parent: pat, depth: 3, icon: SPAWN_KINDS[spawn.kind].icon, ...spawnText(spawn), target: { kind: 'spawn', list: phase.spawns, index: i, spawn } }
+      const self: Node = { at: sat, parent: pat, depth: 3, icon: SPAWN_KINDS[spawn.kind].icon, ...spawnText(spawn), target: { kind: 'spawn', list: phase.spawns, index: i, spawn, stage: f } }
       if (spawn.kind !== 'waves') return [self]
       return [
         self,
-        ...spawn.squads.map((squad, k): Node => ({ at: [...sat, 'squads', k], parent: sat, depth: 4, icon: ICON.squad, title: `第 ${k + 1} 组 · ${squad.count} 只`, meta: who(squad), target: { kind: 'squad', list: spawn.squads, index: k, squad } })),
+        ...spawn.squads.map((squad, k): Node => ({ at: [...sat, 'squads', k], parent: sat, depth: 4, icon: ICON.squad, title: `第 ${k + 1} 组 · ${squad.count} 只`, meta: who(squad), target: { kind: 'squad', list: spawn.squads, index: k, squad, stage: f } })),
       ]
     })
     const ends = phase.ends.map((end, i): Node => ({ at: [...pat, 'ends', i], parent: pat, depth: 3, icon: END_KINDS[end.kind].icon, title: endText(end), target: { kind: 'end', list: phase.ends, index: i, end } }))

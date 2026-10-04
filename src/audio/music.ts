@@ -33,6 +33,8 @@ const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
 const AEOLIAN = [0, 2, 3, 5, 7, 8, 10] as const
 const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const
+/** 阳音阶：日本民谣里明亮的五声音阶 */
+const YO = [0, 2, 5, 7, 9] as const
 
 interface Voice {
   wave: BgmNote['wave']
@@ -866,6 +868,55 @@ function buildDunes(): BgmScore {
   )
 }
 
+/** 樱庭：慢一点的阳音阶，筝拨着五声的分解和弦，尺八似的笛子吹着长音，隔两小节一声铃，鼓点轻得几乎听不见 */
+function buildSakura(): BgmScore {
+  const roots = [0, 3, 2, 1, 0, 3, 4, 2, 3, 2, 1, 0, 3, 4, 2, 0]
+  const pluck = [0, 2, 3, 5, 3, 2, 5, 7]
+  return track(
+    {
+      bpm: 88,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 62,
+      scale: YO,
+      echo: { delaySec: (60 / 88) * 0.75, feedback: 0.3, level: 0.3 },
+    },
+    (b) => {
+      const koto: Voice = { wave: 'triangle', vol: 0.075, attack: 0.003, release: 0.12, octave: 0, echo: true }
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.01, release: 0.2, octave: -1 }
+      const flute: Voice = { wave: 'sine', vol: 0.12, attack: 0.05, release: 0.22, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.03, attack: 0.003, release: 0.3, octave: 2, echo: true }
+      roots.forEach((r, bar) => {
+        pluck.forEach((d, s) => b.note(koto, bar, s, r + d, 1))
+        b.note(bass, bar, 0, r, 3)
+        b.note(bass, bar, 4, r + 3, 3)
+        if (bar % 2 === 0) b.note(bell, bar, 6, r + 5, 2)
+      })
+      b.line(flute, [
+        [0, 0, 4, 3], [0, 3, 3, 1], [0, 4, 2, 4],
+        [1, 0, 3, 2], [1, 2, 4, 2], [1, 4, 5, 4],
+        [2, 0, 4, 3], [2, 3, 3, 1], [2, 4, 2, 2], [2, 6, 1, 2],
+        [3, 0, 2, 8],
+        [4, 0, 5, 3], [4, 3, 4, 1], [4, 4, 3, 2], [4, 6, 4, 2],
+        [5, 0, 5, 4], [5, 4, 7, 4],
+        [6, 0, 6, 2], [6, 2, 5, 2], [6, 4, 4, 2], [6, 6, 3, 2],
+        [7, 0, 4, 8],
+        [8, 0, 7, 3], [8, 3, 6, 1], [8, 4, 5, 4],
+        [9, 0, 6, 2], [9, 2, 7, 2], [9, 4, 8, 4],
+        [10, 0, 7, 3], [10, 3, 6, 1], [10, 4, 5, 2], [10, 6, 4, 2],
+        [11, 0, 5, 8],
+        [12, 0, 3, 2], [12, 2, 4, 2], [12, 4, 5, 2], [12, 6, 4, 2],
+        [13, 0, 3, 3], [13, 3, 2, 1], [13, 4, 1, 4],
+        [14, 0, 2, 4], [14, 4, 1, 2], [14, 6, 0, 2],
+        [15, 0, 0, 8],
+      ])
+      b.drums('tom', 'x.......', 0, 16, 0.06)
+      b.drums('hat', '..x...x.', 0, 16, 0.02)
+    },
+  )
+}
+
 /** 电路板：方波琶音像时钟一样一格一格地跳，锯齿波的低音按拍子脉动，十六分的踩镲不停，隔一小节一下嗞的高音 */
 function buildCircuit(): BgmScore {
   const chords = [0, 0, 5, 5, 3, 3, 4, 4, 0, 0, 5, 5, 3, 4, 6, 4]
@@ -932,6 +983,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   floe: buildFloe,
   cave: buildCave,
   meadow: buildMeadow,
+  sakura: buildSakura,
   desert: buildDunes,
   circuit: buildCircuit,
 }

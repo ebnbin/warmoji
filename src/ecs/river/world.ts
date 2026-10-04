@@ -1,22 +1,25 @@
-import { hasComponent, query, removeEntity } from 'bitecs'
+import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Airborne, Alive, CharScale, Drive, Hp, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Transform, Uid } from '../components'
-import { die } from '../systems/shared/combat'
+import { ENEMY_BODY } from '../../data/abilities'
+import { Alive, Phys, Radius, Transform, Uid } from '../components'
 import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
+import { roomFor } from '../worlds/gates'
 import { riverPlan } from './layout'
+import { riverMarks } from './marks'
 import { flowAt, sinkAt, solveWater } from './water'
-import { drift, swept } from './bodies'
+import { holds, wade, washOut } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
+import type { Landmark } from '../worlds/gates'
 import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
@@ -28,11 +31,12 @@ const FALL_U = 0.25
 const FALLS_TINT = 0x9fd8ff
 
 /**
- * 河流此刻的状态：按种子生成的地图，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定，
+ * 河流此刻的状态：按种子生成的地图与它上面的地标，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定，
  * 以及哪些身体正在水里站不住、随水漂着（按实体记，uid 对不上就是换了实体）
  */
 export interface RiverState {
   readonly plan: RiverPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   water: Water | null
   ready: Promise<void>
   readonly swimming: Map<number, number>
@@ -82,7 +86,8 @@ export function riverOf(sim: Sim): RiverState {
   let s = sim.worldState.river
   if (!s) {
     const cfg = cfgOf(sim)
-    const state: RiverState = { plan: riverPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), swimming: new Map() }
+    const plan = riverPlanFor(cfg, sim.run.decorSeed)
+    const state: RiverState = { plan, marks: riverMarks(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -107,11 +112,6 @@ function groundOf(sim: Sim): Surface {
 
 const FLOW: Flow = { h: 0, u: 0, v: 0 }
 
-/** 身体本来的大小：角色的判定半径里乘了队长倍率，那只是画面上突出队长，受力不算它 */
-function bodyRadius(sim: Sim, eid: number): number {
-  return hasComponent(sim.world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!
-}
-
 /** (x, y) 像素处有没有水：水深够不够算湿 */
 function wetAt(sim: Sim, s: RiverState, x: number, y: number): boolean {
   return !!s.water && flowAt(s.water, x / UNIT, y / UNIT, FLOW).h >= cfgOf(sim).body.wetM
@@ -127,7 +127,7 @@ function alongWall(s: RiverState, x: number, y: number, dx: number, dy: number, 
   return { x: -n.y * side, y: n.x * side }
 }
 
-/** 干地上离壁至少 room 像素的一点：从 p 往外一圈圈找，找不到就原样退回壁外 */
+/** 干地上离壁至少 room 像素、没越过断崖边的一点：从 p 往外一圈圈找，找不到就原样退回壁外 */
 function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
   const b = s.plan.basin
   for (let r = 0; r <= 6 * UNIT; r += 0.5 * UNIT) {
@@ -135,7 +135,7 @@ function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2
       const q = { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
-      if (roomAt(b, q.x, q.y) >= room && !wetAt(sim, s, q.x, q.y)) return q
+      if (roomAt(b, q.x, q.y) >= room && !wetAt(sim, s, q.x, q.y) && overFalls(s, q.x, q.y) < 0) return q
     }
   }
   return keepOut(b, p.x, p.y, room)
@@ -161,25 +161,12 @@ function overFalls(s: RiverState, x: number, y: number): number {
  */
 function plunge(sim: Sim, s: RiverState): void {
   const src = hazardSource('falls', FALLS_TINT)
-  const st = sim.run.stats
   for (const eid of [...query(sim.world, [Phys, Transform, Radius])]) {
     const k = overFalls(s, Transform.x[eid]!, Transform.y[eid]!)
-    if (k < 0 || hasComponent(sim.world, eid, Shard)) continue
-    if (hasComponent(sim.world, eid, Pickup)) {
-      removeEntity(sim.world, eid)
-      continue
-    }
-    if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || Motion.kind[eid] === MOTION.arc || Motion.kind[eid] === MOTION.transit) continue
+    if (k < 0) continue
     const o = s.plan.outlets[k]!
     const side = (Transform.x[eid]! / UNIT - o.x) * -o.ny + (Transform.y[eid]! / UNIT - o.y) * o.nx
-    Transform.x[eid] = (o.x + o.nx * (FALL_U + 1) - o.ny * side) * UNIT
-    Transform.y[eid] = (o.y + o.ny * (FALL_U + 1) + o.nx * side) * UNIT
-    if (hasComponent(sim.world, eid, Slot)) {
-      const slot = Slot.v[eid]!
-      if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + Hp.v[eid]!
-      st.hazardDamage.falls = (st.hazardDamage.falls ?? 0) + Hp.v[eid]!
-    }
-    die(sim, eid, src, Phys.vx[eid]!, Phys.vy[eid]!)
+    washOut(sim, eid, src, (o.x + o.nx * (FALL_U + 1) - o.ny * side) * UNIT, (o.y + o.ny * (FALL_U + 1) + o.nx * side) * UNIT)
   }
 }
 
@@ -216,34 +203,18 @@ export const river: WorldHooks = {
   effort() {
     return 1
   },
-  /** 掉落物落进水里跟落叶一样顺水漂，被吸向队伍的速度照加；碎片照常 */
+  /** 见 wade */
   contact(sim, eid, dt, x, y, vx, vy, out) {
     const s = riverOf(sim)
-    const w = s.water
-    if (!w || hasComponent(sim.world, eid, Shard)) return false
-    const cfg = cfgOf(sim)
-    flowAt(w, x / UNIT, y / UNIT, FLOW)
-    const g = sim.hooks.surface(sim, x, y)
-    const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
-    if (hasComponent(sim.world, eid, Pickup)) {
-      if (FLOW.h < cfg.body.wetM) return false
-      drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, dt)
-      return true
-    }
-    const uid = Uid.v[eid]!
-    const was = s.swimming.get(eid) === uid
-    if (FLOW.h < cfg.body.wetM || !swept(cfg, bodyRadius(sim, eid), Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
-      s.swimming.delete(eid)
-      return false
-    }
-    s.swimming.set(eid, uid)
-    drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]! * cfg.body.swim, Drive.y[eid]! * cfg.body.swim, k, dt)
-    return true
+    return !!s.water && wade(sim, cfgOf(sim), s.water, s.swimming, eid, dt, x, y, vx, vy, out)
   },
   constrainBody(sim, eid, _from, next) {
     return keepOut(riverOf(sim).plan.basin, next.x, next.y, Radius.v[eid]!)
   },
   basin(sim) {
+    return riverOf(sim).plan.basin
+  },
+  ground(sim) {
     return riverOf(sim).plan.basin
   },
   chaseDir(sim, eid, tx, ty) {
@@ -294,6 +265,17 @@ export const river: WorldHooks = {
   },
   settle(sim, p) {
     return dryNear(sim, riverOf(sim), p, SPAWN.edgeInset * UNIT)
+  },
+  /** 站得下、没越过断崖边；落在水里的要这么大的身体在那里站得住 */
+  canSpawn(sim, x, y, radius) {
+    const s = riverOf(sim)
+    return roomFor(s.plan.basin, x, y, radius) && overFalls(s, x, y) < 0 && (!s.water || holds(cfgOf(sim), s.water, x, y, radius, ENEMY_BODY.mass))
+  },
+  landmarks(sim) {
+    return riverOf(sim).marks
+  },
+  lean() {
+    return ZERO
   },
   onStart(sim) {
     riverOf(sim)

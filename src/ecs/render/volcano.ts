@@ -2,7 +2,6 @@ import { UNIT } from '../../util/units'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
-import { Rng } from '../../util/rng'
 import { awayFromWall, roomAt } from '../worlds/basin'
 import type { LavaField } from '../worlds/volcano'
 import type { VolcanoConfig } from '../../types/maps'
@@ -77,20 +76,6 @@ function soften(src: ArrayLike<number>, cols: number, rows: number, out: Float32
   }
 }
 
-/** 冒硫磺蒸汽的喷气孔：山脚外朝盆地的那一侧有几个，落在盆地里，只是布景 */
-export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Point[] {
-  const rng = new Rng(f.seed ^ 0x51f0)
-  const out: Point[] = []
-  const base = Math.atan2(f.inY, f.inX)
-  for (let k = 0; k < count * 8 && out.length < count; k++) {
-    const a = base + (rng.next() * 2 - 1) * 1.3
-    const r = (cfg.cone.blockU + 0.8 + rng.next() * 5) * UNIT
-    const p = { x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r }
-    if (roomAt(f.basin, p.x, p.y) >= 0.6 * UNIT) out.push(p)
-  }
-  return out
-}
-
 const LIGHT_X = SUN.x
 const LIGHT_Y = SUN.y
 const LIGHT_Z = SUN.z
@@ -126,9 +111,18 @@ export interface CellRect {
   readonly r1: number
 }
 
+/** 地面上要画的地标，像素：喷气孔，与崖脚的洞口（口子正中在崖脚，n 朝盆地，r 是口子的半宽） */
+export interface GroundMarks {
+  readonly vents: readonly Point[]
+  readonly caves: readonly { readonly x: number; readonly y: number; readonly nx: number; readonly ny: number; readonly r: number }[]
+}
+
+/** 洞往崖里伸进去多深，格 */
+const CAVE_DEPTH_U = 1
+
 /** 发给画地面的线程：先 setup 一次，每批活先给 state（当下的地形与岩石），再一块一块要 paint */
 export type GroundJob =
-  | { readonly kind: 'setup'; readonly field: GroundField; readonly cfg: VolcanoConfig; readonly vents: readonly Point[]; readonly ppc: number }
+  | { readonly kind: 'setup'; readonly field: GroundField; readonly cfg: VolcanoConfig; readonly marks: GroundMarks; readonly ppc: number }
   | { readonly kind: 'state'; readonly ground: Float32Array; readonly rockAt: Float32Array }
   | { readonly kind: 'paint'; readonly index: number; readonly rect: CellRect }
 
@@ -145,15 +139,15 @@ export interface GroundPiece {
 }
 
 /**
- * 地表：盆地里是火山灰地面，火山是红褐色的火山渣，凝固的熔岩是玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
- * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺。
+ * 地表：盆地里是灰黑的火山灰地面，火山是红褐色的火山渣，凝固的熔岩是偏冷的黑色玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
+ * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺；崖脚的洞口黑洞洞的，深处透着熔岩的暗红。
  * ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子，out 里按这块的范围逐行排。
  */
 export function paintGround(
   f: GroundField,
   cfg: VolcanoConfig,
   ppc: number,
-  vents: readonly Point[],
+  marks: GroundMarks,
   masks: RockMasks,
   out: Uint8ClampedArray,
   c0: number,
@@ -165,7 +159,8 @@ export function paintGround(
   const seed = f.seed
   const cone = cfg.cone
   const mountain = cone.blockU * (1 + cone.blockJitter)
-  const sulfur = vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
+  const sulfur = marks.vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
+  const caves = marks.caves.map((c) => ({ x: c.x / UNIT, y: c.y / UNIT, nx: c.nx, ny: c.ny, w: c.r / UNIT }))
   const sr = 1.4 / cfg.cellU
   const lxy = Math.hypot(LIGHT_X, LIGHT_Y)
   const sunU = LIGHT_X / lxy / cfg.cellU
@@ -196,9 +191,10 @@ export function paintGround(
       const shade = 0.5 - steep * 0.18 - cliff * 0.12 + lambert * (0.75 + steep * 0.35 + cliff * 0.25)
       const big = fbm(wx / 5, wy / 5, seed + 3, 2)
       const grain = valueNoise(wx * 5.5, wy * 5.5, seed + 9) * 0.5 + valueNoise(wx * 13, wy * 13, seed + 11) * 0.5
-      let r = 58 + big * 22 + grain * 13
-      let g = 48 + big * 17 + grain * 10
-      let b = 44 + big * 13 + grain * 9
+      const ash = big * 20 + grain * 12
+      let r = 54 + ash
+      let g = 59 + ash
+      let b = 63 + ash
       const crust = smooth(0.45, 0.66, fbm(wx / 3.2, wy / 3.2, seed + 25, 2)) * smooth(cone.blockU, cone.blockU + 3, dU)
       if (crust > 0) {
         const wide = smooth(0.05, 0.012, cellEdge(wx * 0.55, wy * 0.55, seed + 21)) * (0.2 + 0.8 * valueNoise(wx * 1.3, wy * 1.3, seed + 29))
@@ -214,9 +210,9 @@ export function paintGround(
         g += (58 - g) * cinder
         b += (40 - b) * cinder
         const summit = smooth(cone.craterU + 1.6, cone.craterU + 0.1, dU) * 0.6
-        r += (140 - r) * summit
-        g += (112 - g) * summit
-        b += (98 - b) * summit
+        r += (131 - r) * summit
+        g += (136 - g) * summit
+        b += (141 - b) * summit
         if (steep > 0) {
           const a = Math.atan2(oy, ox)
           const scree = fbm(Math.cos(a) * 14 + 5, Math.sin(a) * 14 + dU * 0.35, seed + 81, 2)
@@ -231,9 +227,9 @@ export function paintGround(
         b += (56 - b) * lip * 0.55
         if (dU < cone.craterU) {
           const pit = smooth(cone.craterU * 0.95, cone.craterU * 0.5, dU)
-          r += (30 - r) * pit
-          g += (15 - g) * pit
-          b += (12 - b) * pit
+          r += (19 - r) * pit
+          g += (24 - g) * pit
+          b += (28 - b) * pit
         }
       }
       const high = smooth(0, 0.4, -edgeU) * smooth(mountain - 0.3, mountain + 1.5, dU)
@@ -242,9 +238,10 @@ export function paintGround(
         const joint = 0.64 + 0.36 * smooth(0.008, 0.06, cellEdge(wx * 1.7, wy * 1.7, seed + 121))
         const rift = 0.45 + 0.55 * smooth(0, 0.035, cellEdge(wx * 0.45, wy * 0.45, seed + 171))
         const dust = smooth(0.5, 0.78, fbm(wx / 3, wy / 3, seed + 131, 2)) * 0.35
-        let hr = (46 + q.h * 16 + grain * 10) * (1 - dust) + 92 * dust
-        let hg = (41 + q.h * 13 + grain * 9) * (1 - dust) + 84 * dust
-        let hb = (42 + q.h * 12 + grain * 9) * (1 - dust) + 78 * dust
+        const stone = q.h * 15 + grain * 10
+        let hr = (45 + stone) * (1 - dust) + 94 * dust
+        let hg = (50 + stone) * (1 - dust) + 99 * dust
+        let hb = (54 + stone) * (1 - dust) + 104 * dust
         if (cliff > 0) {
           const n = awayFromWall(f.basin, wx * UNIT, wy * UNIT)
           const fall = valueNoise((wx * -n.y + wy * n.x) * 4.5, (wx * n.x + wy * n.y) * 0.8, seed + 161)
@@ -274,9 +271,10 @@ export function paintGround(
           1 -
           0.32 * smooth(0.05, 0.012, cellEdge(wx * 0.9, wy * 0.9, seed + 33)) * (0.45 + 0.55 * valueNoise(wx * 1.6, wy * 1.6, seed + 39)) -
           0.14 * smooth(0.035, 0.008, cellEdge(wx * 2.1, wy * 2.1, seed + 35)) * smooth(0.5, 0.8, fbm(wx / 1.4, wy / 1.4, seed + 37, 2))
-        const rr = (33 + grain * 16 + ropes * 7 + big * 6 + (1 - young) * (20 + big * 10)) * joint
-        const rg = (30 + grain * 14 + ropes * 6 + big * 5 + (1 - young) * (15 + big * 8)) * joint
-        const rb = (34 + grain * 15 + ropes * 8 + big * 6 + (1 - young) * (9 + big * 6)) * joint
+        const basalt = grain * 16 + ropes * 7 + big * 6 + (1 - young) * (18 + big * 10)
+        const rr = (32 + basalt) * joint
+        const rg = (37 + basalt) * joint
+        const rb = (41 + basalt) * joint
         r += (rr - r) * rock
         g += (rg - g) * rock
         b += (rb - b) * rock
@@ -289,6 +287,24 @@ export function paintGround(
       r *= dark
       g *= dark
       b *= dark
+      for (const c of caves) {
+        const dx = wx - c.x
+        const dy = wy - c.y
+        if (dx * dx + dy * dy > (c.w + CAVE_DEPTH_U) ** 2) continue
+        const into = -(dx * c.nx + dy * c.ny)
+        const across = (dx * -c.ny + dy * c.nx) / c.w
+        const e = Math.hypot(across, Math.max(0, into) / CAVE_DEPTH_U)
+        if (into < -0.15 || e > 1.1) continue
+        const hole = smooth(1, 0.78, e) * smooth(-0.15, 0.05, into)
+        const glow = smooth(0.25, 1, into / CAVE_DEPTH_U) * 0.6
+        r += (14 + 80 * glow - r) * hole
+        g += (10 + 24 * glow - g) * hole
+        b += (9 + 10 * glow - b) * hole
+        const lip = smooth(0.82, 0.97, e) * smooth(1.1, 0.97, e) * smooth(-0.15, 0.1, into)
+        r *= 1 + lip * 0.25
+        g *= 1 + lip * 0.25
+        b *= 1 + lip * 0.25
+      }
       const fan = edgeU < 2.2 && edgeU > -1.2 ? smooth(0.3, 0.75, fbm(wx / 2.5, wy / 2.5, seed + 151, 2)) : 0
       const reach = 0.3 + 0.9 * fan
       const band = smooth(reach + 0.3, reach * 0.4, Math.abs(edgeU + 0.05 - reach * 0.4))
@@ -303,9 +319,9 @@ export function paintGround(
             const lit = Math.max(0, (q.dx / size) * LIGHT_X + (q.dy / size) * LIGHT_Y + lz * LIGHT_Z)
             const tone = 0.35 + lit * 0.95
             const k = smooth(1, 0.82, d)
-            r += ((66 + q.h * 18) * tone - r) * k
-            g += ((56 + q.h * 12) * tone - g) * k
-            b += ((52 + q.h * 10) * tone - b) * k
+            r += ((63 + q.h * 15) * tone - r) * k
+            g += ((68 + q.h * 15) * tone - g) * k
+            b += ((72 + q.h * 15) * tone - b) * k
           } else {
             const k = 1 - 0.35 * smooth(1.4, 1, d)
             r *= k

@@ -13,6 +13,7 @@ import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { circuitPlan, copperAt, segDist } from './layout'
 import type { CircuitPlan } from './layout'
 import type { Basin } from '../worlds/basin'
+import type { Landmark } from '../worlds/gates'
 import type { CircuitConfig, MapId } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
@@ -20,6 +21,7 @@ import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
+const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 /** 电路板按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x3c1d7e
 /** 画面一次最多记这么多处冒火花的地方 */
@@ -363,6 +365,18 @@ export const circuit: WorldHooks = {
   },
   settle(sim, p) {
     return openNear(circuitOf(sim).plan, p, SPAWN.edgeInset * UNIT)
+  },
+  ground(sim) {
+    return sim.hooks.basin(sim)
+  },
+  canSpawn() {
+    return true
+  },
+  landmarks() {
+    return NO_MARKS
+  },
+  lean() {
+    return ZERO
   },
   /** 坑位挨电时顺着往队长那边挪，挪到不挨电为止；一路都挨电（队长自己站在电上）就不挪 */
   seat(sim, from, at) {

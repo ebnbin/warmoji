@@ -1,11 +1,12 @@
 import type { FieldPickupDef } from '../types/battlefield'
+import type { EntranceLook } from '../types/maps'
 import type { Banner } from '../types/runs'
 
 export interface Burst {
   x: number
   y: number
   count: number
-  kind: 'death' | 'coin' | 'puff'
+  kind: 'death' | 'coin' | EntranceLook
 }
 
 export interface Outbox {

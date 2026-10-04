@@ -39,6 +39,7 @@ import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
+import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/ecs/sakura/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/ecs/circuit/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
@@ -47,7 +48,7 @@ import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
-import type { EnemyDef } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef, NebulaOldConfig } from '../src/types/maps'
 import type { MutatorDef, RunDef } from '../src/types/runs'
@@ -176,6 +177,41 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(st.gmT > 0, `maps.${id}.ship 压上 ${DIFFICULTY.spawn.maxAlive} 个身体后初稳性高须仍为正`)
   need(heel < deckEdgeAngle(c, st), `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时倾 ${deg(heel)}，超过甲板边入水的 ${deg(deckEdgeAngle(c, st))}`)
   need(Math.tan(heel) > f.body.static, `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时只倾 ${deg(heel)}，闲着的身体滑不起来`)
+}
+
+/**
+ * 出怪口：吸附半径为正；每种的权重为正、限速为正、只出的敌人都存在；抛入的才写抛得到多远、只能摆在地标上，整片地面上的只能钻出或落下；
+ * 头目出怪口接得住这张图的头目；配比里的每种敌人都有出怪口接
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  const g = m.gates
+  if (!g) continue
+  const kinds = Object.entries(g.kinds)
+  const at = `maps.${id}.gates`
+  need(g.snapU > 0 && kinds.length > 0, `${at} 的吸附半径须为正、至少一种出怪口`)
+  need(g.lean === undefined || (g.lean.mul >= 1 && g.lean.full > 0), `${at}.lean 的倍率不小于 1、偏满的量为正`)
+  for (const [k, d] of kinds) {
+    const p = `${at}.kinds.${k}`
+    need(d.weight > 0 && (d.perSec ?? 1) > 0 && (d.snapU ?? 1) > 0, `${p} 的权重、限速与吸附半径须为正`)
+    need(d.only === undefined || (d.only.length > 0 && d.only.every((e) => ENEMIES[e] !== undefined)), `${p}.only 须引用存在的敌人`)
+    need((d.enter === 'lob') === (d.reachU !== undefined) && (d.reachU ?? 1) > 0, `${p} 抛入的才写抛得到多远，且须为正`)
+    need(d.enter !== 'lob' || d.at.kind === 'mark', `${p} 抛入的出怪口只能摆在地标上`)
+    need(d.at.kind !== 'ground' || d.enter === 'rise' || d.enter === 'drop', `${p} 摆在整片地面上的只能钻出或落下`)
+    if (d.at.kind === 'rim') need(d.at.segU > 0 && (d.at.away?.minU ?? 0) >= 0, `${p} 的段长须为正，离地标的距离不为负`)
+    if (d.at.kind === 'nooks') need(d.at.spacingU > 0 && (d.at.away?.minU ?? 0) >= 0, `${p} 的间距须为正，离地标的距离不为负`)
+  }
+  const takes = (e: EnemyKind): boolean => kinds.some(([, d]) => d.only === undefined || d.only.includes(e))
+  const boss = g.boss === undefined ? undefined : g.kinds[g.boss]
+  need(g.boss === undefined || (boss !== undefined && (boss.only?.includes(m.boss) ?? true)), `${at}.boss 须是这张图的一种出怪口，接得住头目 ${m.boss}`)
+  for (const row of [...m.mix, ...(m.dayMix ?? []), ...(m.nightMix ?? [])]) need(takes(row.kind), `${at} 没有出怪口接配比里的 ${row.kind}`)
+}
+
+/** 进场动作：时长为正，高度与距离不为负，落点的距离范围从正数起 */
+{
+  const e = FEEL.entrance
+  need(e.walk.ms > 0 && e.climb.ms > 0 && e.drop.ms > 0 && e.lob.minMs > 0, 'feel.entrance 的时长须为正')
+  need(e.walk.heightU >= 0 && e.climb.heightU >= 0 && e.drop.heightU >= 0 && e.lob.heightPerU >= 0 && e.lob.msPerU >= 0 && e.climb.outU >= 0, 'feel.entrance 的高度、距离不为负')
+  for (const [name, r] of [['walk', e.walk.distU], ['climb', e.climb.distU]] as const) need(r[0] > 0 && r[0] <= r[1], `feel.entrance.${name}.distU 须从正数起、下限不大于上限`)
 }
 
 /**
@@ -358,6 +394,53 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
+  }
+}
+
+/**
+ * 樱庭：参数说得通；槛下的溪比槛顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
+ * 开局站位离边够远，桥两头落在能走的地方，石槛顶没有塌下去的缺口
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'sakura') === (m.sakura !== undefined), `maps.${id} 是樱庭当且仅当写了 sakura`)
+  const s = m.sakura
+  if (!s) continue
+  const at = `maps.${id}.sakura`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { wall, forest: fo, stream: st, flow: f, rocks: rk, sill: sl, bridge: bg, trees: tr, body: b } = s
+  need(s.meterPerU > 0 && s.cellU > 0 && s.sizeU > 0 && s.neckU > 0, `${at} 的米每格、地形格子、地图边长与窄缝须为正`)
+  need(s.areaU2[0] > 0 && range(s.areaU2, false) && s.areaU2[1] < s.sizeU * s.sizeU, `${at}.areaU2 须是比整张地图小的正的范围`)
+  need(wall.insetU[0] > wall.thickU / 2 && range(wall.insetU, false) && wall.skewDeg >= 0 && wall.skewDeg < 30 && wall.kinkDeg >= 0 && wall.kinkDeg < 30, `${at}.wall 的墙身离地图边至少半个墙厚，整条斜与中途拐都不到 30 度`)
+  need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
+  need(fo.insetU[0] > 0 && range(fo.insetU, false) && fo.bendU >= 0 && fo.waveU > 0 && fo.scallopU >= 0 && range(fo.lobes, true) && range(fo.lobeU, false) && fo.lobeWidthU[0] > 0 && range(fo.lobeWidthU, false), `${at}.forest 的林缘离地图边、弯的幅度与波长、林舌草湾的大小须说得通`)
+  need(st.slantDeg > 0 && st.slantDeg < 45 && st.turnDeg >= 0 && st.meanderU >= 0 && st.minBend >= 1 && st.wallGapU >= 0, `${at}.stream 的斜角在 (0, 45) 度里，偏角与蜿蜒不为负、弯道半径至少一个水面宽、离寺墙不为负`)
+  need(f.discharge > 0 && f.widthCoef > 0 && f.depthCoef > 0 && f.manning > 0 && f.bedShape >= 1, `${at}.flow 的流量、水力几何系数与糙率须为正，断面形状指数不小于 1`)
+  need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `${at}.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出溪岸`)
+  need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `${at}.flow 的溪岸须有高有宽，滩地不往溪里倾`)
+  need(rk.radiusU[0] > 0 && range(rk.radiusU, false) && range(rk.gapU, false) && rk.gapU[1] < b.radiusU && rk.heightM > 0, `${at}.rocks 的石头有大小，石缝窄过身子的半径，石顶露出水面`)
+  need(sl.rampU > 0 && sl.dropM + 0.3 > SINK_M && sl.postU > 0 && sl.heightM > 0, `${at}.sill 的槛前有坡，槛下的溪比槛顶低过 ${SINK_M} 米（水流到那里才算落下去），竹栅有桩距有高`)
+  need(bg.widthU > s.neckU * 2 && bg.rampU > 0 && bg.riseM > 0 && bg.at[0] > 0 && range(bg.at, false) && bg.at[1] < 1, `${at}.bridge 的桥面须比窄缝宽、坡道与拱有长有高，架在溪的 (0, 1) 段`)
+  need(tr.crownU[0] > tr.overhangU && range(tr.crownU, false) && tr.heightM[0] > 0 && range(tr.heightM, false) && range(tr.inside, true) && tr.templeGapU > 0, `${at}.trees 的树冠须比能走进去的那截大，树高为正，空地上的棵数为非负整数范围，寺里的间距为正`)
+  need(b.kg > 0 && b.radiusU > 0 && b.heightM > 0 && b.density > 0 && b.drag > 0, `${at}.body 的体重、半径、身高、密度与阻力系数须为正`)
+  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.mu > 0, `${at}.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂与脚底摩擦系数为正`)
+  need(b.swim >= 0 && b.wetM > 0, `${at}.body 的划水不为负，湿地水深为正`)
+  for (let k = 0; k < 8; k++) {
+    const plan = sakuraPlan(s, k * 7919 + 13)
+    const where = `${at} 第 ${k} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 3 * UNIT, `${where} 的开局站位离边不到三格`)
+    const br = plan.bridge
+    for (const sgn of [-1, 1]) {
+      const x = br.x + br.ax * sgn * (br.half - 0.3)
+      const y = br.y + br.ay * sgn * (br.half - 0.3)
+      need(roomAt(plan.basin, x * UNIT, y * UNIT) > 0.5 * UNIT && Math.abs(bridgeLocal(br, x, y).a) < br.half, `${where} 的桥头没落在能走的地方`)
+    }
+    const t = plan.terrain
+    let notch = 0
+    for (let i = 0; i < t.z.length; i++) {
+      const wl = weirLocal(plan.weir, t.x0 + ((i % t.cols) + 0.5) * t.cell, t.y0 + (Math.floor(i / t.cols) + 0.5) * t.cell)
+      if (wl.side < plan.weir.half && wl.along >= 0 && wl.along < CREST_U - 0.05 && t.z[i]! < plan.weir.crest - 0.01) notch++
+    }
+    need(notch === 0, `${where} 的石槛顶有 ${notch} 格塌了下去，水会从缺口漏走`)
   }
 }
 

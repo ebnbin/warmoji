@@ -18,12 +18,16 @@ export interface Banner {
   readonly sub: string
 }
 
-/** 敌人从哪来，不写是队长看得见的刷怪点：far 是离队伍远的刷怪点，ring 在队长周围 dist 格围成一圈，behind 在队长身后 dist 格，point 是地图中心起偏 dx、dy 格再散开 spread 格 */
+/**
+ * 敌人从哪来，不写是队长看得见的刷怪点：far 是离队伍远的刷怪点，ring 在队长周围 dist 格围成一圈，behind 在队长身后 dist 格，point 是地图中心起偏 dx、dy 格再散开 spread 格，
+ * gate 是这张图的那一种出怪口。有出怪口的地图上，前几种定下的点再吸附到附近的出怪口
+ */
 export type SpawnAt =
   | { readonly kind: 'far' }
   | { readonly kind: 'ring'; readonly dist: number }
   | { readonly kind: 'behind'; readonly dist: number }
   | { readonly kind: 'point'; readonly dx: number; readonly dy: number; readonly spread?: number }
+  | { readonly kind: 'gate'; readonly gate: string }
 
 /** 配比里的一种敌人与它的权重 */
 export interface MixEntry {

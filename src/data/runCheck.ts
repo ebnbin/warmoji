@@ -19,7 +19,8 @@ export interface Issue {
 /** 查关卡要用到的资料：构建期取自 defs，运行时取自生成的 assets */
 export interface RunCatalog {
   readonly enemies: Readonly<Record<string, EnemyDef>>
-  readonly maps: Readonly<Record<string, unknown>>
+  /** 地图：只看它的名字与有哪几种出怪口 */
+  readonly maps: Readonly<Record<string, { readonly name: string; readonly gates?: { readonly kinds: Readonly<Record<string, unknown>> } }>>
   readonly pools: Readonly<Record<string, readonly { readonly polarity: Polarity }[]>>
   readonly characters: Readonly<Record<string, { readonly tags: readonly CharacterTag[] }>>
   readonly maxCharLevel: number
@@ -115,12 +116,6 @@ export function runChecks(cat: RunCatalog): RunChecks {
     return found
   }
 
-  /** 站位的距离与散开范围 */
-  const checkAt = (at: SpawnAt | undefined, path: Path): void => {
-    if (at?.kind === 'ring' || at?.kind === 'behind') need(at.dist > 0, path, '站位距离须为正')
-    if (at?.kind === 'point') need((at.spread ?? 0) >= 0, path, '散开范围不为负')
-  }
-
   const isBoss = (kind: EnemyKind | undefined): boolean => kind !== undefined && cat.enemies[kind]?.role === 'boss'
 
   /** 配比：不为空，引用非头目的敌人，权重为正 */
@@ -131,6 +126,18 @@ export function runChecks(cat: RunCatalog): RunChecks {
 
   /** 查一批敌人时的上下文：在哪张图上打（一场、一局都没写是 undefined），这一场是不是按阶段写的，这一阶段的配比 */
   type Where = { readonly map: string | undefined; readonly staged: boolean; readonly mix: readonly MixEntry[] | undefined }
+
+  /** 站位的距离与散开范围；指定出怪口的，这一场得定下地图、那张图有这种出怪口 */
+  const checkAt = (at: SpawnAt | undefined, where: Where, path: Path): void => {
+    if (at?.kind === 'ring' || at?.kind === 'behind') need(at.dist > 0, path, '站位距离须为正')
+    if (at?.kind === 'point') need((at.spread ?? 0) >= 0, path, '散开范围不为负')
+    if (at?.kind !== 'gate') return
+    if (where.map === undefined) {
+      need(false, path, '指定出怪口的一场须定下地图')
+      return
+    }
+    need(cat.maps[where.map]?.gates?.kinds[at.gate] !== undefined, path, `${where.map} 没有这种出怪口：${at.gate}`)
+  }
 
   /** 一批敌人的特征：指定的敌人存在，指定了就不再写配比；按阶段写的一场里没指定敌人的得有配比可抽；换走法须指定敌人；几率与倍率在范围内；要带的效果这张图的效果池里有 */
   const checkTraits = (t: GroupTraits, where: Where, path: Path): void => {
@@ -154,7 +161,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
     checkTraits(sq, where, path)
     const e = sq.escort
     need(e === undefined || (cat.enemies[e.enemy] !== undefined && !isBoss(e.enemy) && e.count >= 1 && (e.stats?.mul?.maxHp ?? 1) > 0), [...path, 'escort'], '护卫须引用非头目的敌人、至少一只，血量倍率为正')
-    checkAt(sq.at, path)
+    checkAt(sq.at, where, path)
   }
 
   /** 这一阶段可能出现的敌人种类，连同巢穴生出的与死后分裂出的；有按地图抽的就说不准，是 null */
@@ -222,7 +229,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
         need((s.cap ?? 1) >= 1, sp, '连续刷怪上限至少为 1')
         need(!isBoss(s.enemy), sp, '连续刷怪不能刷头目，头目按一队放出')
         checkTraits(s, at, sp)
-        checkAt(s.at, sp)
+        checkAt(s.at, at, sp)
       } else if (s.kind === 'batch') {
         need(s.atMs >= 0, sp, '一队敌人登场时刻不为负')
         need(s.every === undefined || s.every > 0, sp, '一再放出的间隔须为正')

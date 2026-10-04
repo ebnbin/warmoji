@@ -11,4 +11,10 @@ export const FEEL = {
   rejoin: { dropMs: 320, height: 3, fadeInMs: 120, bounceMs: 380, squash: 0.3, ringRadius: 1.1 },
   // 装置架起与退场的时长
   emplace: { popMs: 220, retireMs: 240 },
+  entrance: {
+    walk: { ms: 480, heightU: 0.3, distU: [1.2, 2.4] },
+    climb: { ms: 560, heightU: 0.9, distU: [1, 2.2], outU: 0.7 },
+    drop: { ms: 420, heightU: 2.6 },
+    lob: { minMs: 700, msPerU: 70, heightPerU: 0.3 },
+  },
 } as const satisfies FeelTuning

@@ -14,8 +14,8 @@ import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
-import { Alive, Due, ENEMY_SET, Meteor, Phys, Pickup, Stats, Transform, Uid, VisOff } from './components'
-import { meteorPath } from './store'
+import { Alive, Due, ENEMY_SET, Meteor, Phys, Pickup, Stats, Telegraph, Transform, Uid, VisOff } from './components'
+import { meteorPath, telegraphDef, telegraphEntry } from './store'
 import { captureRadiusU } from './worlds/nebulaOld'
 import { ringPoint } from './worlds/space'
 import { leaderX, leaderY } from './utils/team'
@@ -24,11 +24,12 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/oldRiver'
 import { fitAspectRect } from './worlds/torus'
-import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
+import { drawBomb, drawPuff, drawSpark, encodeLava, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
 import type { CellRect, GroundPiece, LavaShown } from './render/volcano'
 import { GroundPainter } from './render/groundPainter'
 import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
+import { gatesNow } from './worlds/gates'
 import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, WAVE_TILE, WET_PPU } from './render/ship'
 import { SUN } from '../data/light'
 import { deckPoint, makeDeck as makeDeckFrame, shipSizeU } from './worlds/ship'
@@ -61,6 +62,7 @@ import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { RiverView } from './river/view'
 import { MeadowView } from './meadow/view'
+import { SakuraView } from './sakura/view'
 import { CircuitView } from './circuit/view'
 import { DesertView } from './desert/view'
 import { RuinsView } from './ruins/view'
@@ -1044,10 +1046,13 @@ class VolcanoView extends BoundedView {
     const f = s.field
     const cfg = v.def.volcano!
     const scene = v.scene
-    const vents = fumaroles(f, cfg, 5)
+    const vents = s.vents
     const ppc = groundPpc(cfg)
     const field = { basin: f.basin, cols: f.cols, rows: f.rows, cell: f.cell, x0: f.x0, y0: f.y0, ground: f.ground, rockAt: f.rockAt, craterX: f.craterX, craterY: f.craterY, seed: f.seed }
-    const painter = new GroundPainter(field, cfg, vents, ppc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
+    const caves = gatesNow(sim)
+      .filter((g) => g.def.at.kind === 'nooks')
+      .map((g) => ({ x: g.ax, y: g.ay, nx: g.nx, ny: g.ny, r: g.r }))
+    const painter = new GroundPainter(field, cfg, { vents, caves }, ppc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const tex = canvasTexture(scene, GROUND_KEY, f.cols * ppc, f.rows * ppc)
     const rows = Array.from({ length: f.rows }, (_, r): CellRect => ({ c0: 0, r0: r, c1: f.cols, r1: r + 1 }))
@@ -1113,7 +1118,7 @@ class VolcanoView extends BoundedView {
         scale: { start: 0.7, end: 2.8 },
         alpha: { start: 0.3, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0x8a8480, 0x9c9591, 0x7a7471],
+        tint: [0x959a9e, 0xa9adb2, 0x83878c],
       })
       .setDepth(35)
     this.column = scene.add
@@ -1125,7 +1130,7 @@ class VolcanoView extends BoundedView {
         scale: { start: 0.8, end: 3.2 },
         alpha: { start: 0.42, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0x57504d, 0x6a615d, 0x9a4a2c],
+        tint: [0x5a5e62, 0x6e7276, 0x9a4a2c],
         emitting: false,
       })
       .setDepth(36)
@@ -1150,7 +1155,7 @@ class VolcanoView extends BoundedView {
         speedY: { min: 8, max: 22 },
         scale: { min: 0.18, max: 0.42 },
         alpha: { start: 0.55, end: 0 },
-        tint: [0x9e9690, 0x7d7571, 0xbdb4ad],
+        tint: [0xaaafb3, 0x84898d, 0xccd1d6],
         emitZone: {
           type: 'random',
           source: {
@@ -1195,7 +1200,7 @@ class VolcanoView extends BoundedView {
         speedY: { min: -14, max: -4 },
         scale: { start: 0.18, end: 0.6 },
         alpha: { start: 0.4, end: 0 },
-        tint: [0x3a3230, 0x4d4441],
+        tint: [0x383c40, 0x4d5155],
         emitting: false,
       })
       .setDepth(33)
@@ -1409,7 +1414,7 @@ class VolcanoView extends BoundedView {
   }
 }
 
-const SHIP_BG = 0x04121a
+const SHIP_BG = 0x056b6b
 const WAVE_KEY = 'ship-wave'
 const EDGE_KEY = 'ship-edge'
 const WET_KEY = 'ship-wet'
@@ -1420,7 +1425,6 @@ const BALL_KEY = 'ship-ball'
 const GULL_KEY = 'ship-gull'
 const LANTERN_KEY = 'ship-lantern'
 const SHIP_PUFF_KEY = 'ship-puff'
-const SHIP_GLOW_KEY = 'ship-glow'
 /** 风从左舷偏船尾吹来，往右舷偏船头吹：船上的方向（沿船长、横过船宽） */
 const SHIP_WIND = { s: 0.3, t: 0.95 }
 const GULL_SCALE = (1.4 * UNIT) / 96
@@ -1438,9 +1442,6 @@ interface Lantern {
   vAcross: number
   vAlong: number
   readonly body: Phaser.GameObjects.Image
-  readonly glow: Phaser.GameObjects.Image
-  readonly pool: Phaser.GameObjects.Image
-  readonly flicker: number
 }
 
 /** 一只海鸥绕着船上空的一点盘旋，偶尔扇几下翅膀 */
@@ -1500,25 +1501,25 @@ function drawGull(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   ctx.fill()
 }
 
-/** 从上往下看的吊灯：黑铁的灯罩顶，四周透出暖黄的光 */
+/** 从上往下看的吊灯：黑铁的灯罩顶，四周一圈映着天光的玻璃；白天不点 */
 function drawLantern(ctx: CanvasRenderingContext2D, size: number): void {
   const c = size / 2
-  const glow = ctx.createRadialGradient(c, c, size * 0.05, c, c, c)
-  glow.addColorStop(0, 'rgba(255,236,170,1)')
-  glow.addColorStop(0.45, 'rgba(255,190,90,0.9)')
-  glow.addColorStop(1, 'rgba(255,150,60,0)')
-  ctx.fillStyle = glow
-  ctx.fillRect(0, 0, size, size)
-  ctx.fillStyle = '#1b1612'
-  ctx.beginPath()
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2
-    const x = c + Math.cos(a) * size * 0.2
-    const y = c + Math.sin(a) * size * 0.2
-    if (k === 0) ctx.moveTo(x, y)
-    else ctx.lineTo(x, y)
+  const hexagon = (r: number): void => {
+    ctx.beginPath()
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2
+      const x = c + Math.cos(a) * size * r
+      const y = c + Math.sin(a) * size * r
+      if (k === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
   }
-  ctx.closePath()
+  ctx.fillStyle = 'rgba(214,230,232,0.85)'
+  hexagon(0.3)
+  ctx.fill()
+  ctx.fillStyle = '#1b1612'
+  hexagon(0.2)
   ctx.fill()
   ctx.fillStyle = '#6a5436'
   ctx.beginPath()
@@ -1527,8 +1528,8 @@ function drawLantern(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * 船：海面由着色器画，风浪两层交错、夕照、白浪、船舷、水线白沫、船头浪与尾流；甲板是一张程序画出的木板贴图；
- * 桅杆、帆桁、索具与帆按高度随船的横摇纵摇甩开，影子背着夕阳投在甲板上；吊灯按单摆挂着，灯光在甲板上跟着晃；
+ * 船：海面由着色器画，正午的松石绿浅海、风浪两层交错、白浪、船舷、水线白沫、船头浪与尾流；甲板是一张程序画出的木板贴图；
+ * 桅杆、帆桁、索具与帆按高度随船的横摇纵摇甩开，影子背着太阳投在甲板上；吊灯按单摆挂着，白天不点；
  * 炮弹顺坡滚，低的一侧舷边溅浪花，海鸥在桅顶上空盘旋。船长沿进场时屏幕的长边摆，之后不再随屏幕转
  */
 class ShipView extends BoundedView {
@@ -1572,7 +1573,6 @@ class ShipView extends BoundedView {
     )
     const scene = v.scene
     if (!scene.textures.exists(SHIP_PUFF_KEY)) canvasTexture(scene, SHIP_PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
-    if (!scene.textures.exists(SHIP_GLOW_KEY)) canvasTexture(scene, SHIP_GLOW_KEY, 64, 64, (ctx) => drawSpark(ctx, 64))
     if (!scene.textures.exists(BALL_KEY)) canvasTexture(scene, BALL_KEY, 48, 48, (ctx) => drawBall(ctx, 48))
     if (!scene.textures.exists(GULL_KEY)) canvasTexture(scene, GULL_KEY, 96, 48, (ctx) => drawGull(ctx, 96, 48))
     if (!scene.textures.exists(LANTERN_KEY)) canvasTexture(scene, LANTERN_KEY, 48, 48, (ctx) => drawLantern(ctx, 48))
@@ -1687,14 +1687,10 @@ class ShipView extends BoundedView {
     ]
     const rng = new Rng(seed ^ 0x1a77)
     for (const hg of hangs) {
-      const pool = scene.add.image(0, 0, SHIP_GLOW_KEY).setDepth(-0.7).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a3c).setAlpha(0.3).setScale((6.5 * UNIT) / 64)
-      const glow = scene.add.image(0, 0, SHIP_GLOW_KEY).setDepth(32).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffb35c).setAlpha(0.55).setScale((1.6 * UNIT) / 64)
       const body = scene.add.image(0, 0, LANTERN_KEY).setDepth(32.1).setScale((0.62 * UNIT) / 48)
-      this.lanterns.push({ ...hg, across: 0, along: 0, vAcross: 0, vAlong: 0, body, glow, pool, flicker: rng.next() * 10 })
-      this.visuals.push(pool, glow, body)
+      this.lanterns.push({ ...hg, across: 0, along: 0, vAcross: 0, vAlong: 0, body })
+      this.visuals.push(body)
     }
-    const sky = deckPoint(deck, Math.max(1.6, h.stern * h.lengthU * 0.3) + 3.6, 0)
-    this.visuals.push(scene.add.image(sky.x, sky.y, SHIP_GLOW_KEY).setDepth(-0.7).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa850).setAlpha(0.35).setScale((3 * UNIT) / 64))
     for (let i = 0; i < 3; i++) {
       const m = masts[Math.floor(rng.next() * masts.length)]!
       const img = scene.add.image(0, 0, GULL_KEY).setDepth(37).setScale(GULL_SCALE).setAlpha(0.88)
@@ -1712,7 +1708,7 @@ class ShipView extends BoundedView {
       })
       .setDepth(34)
     this.visuals.push(this.spray)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.24, 0x000000)
+    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.12, 0x000000)
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -1771,10 +1767,7 @@ class ShipView extends BoundedView {
       const ls = l.s + hookUp * Math.sin(pitch) + (l.cord * Math.sin(l.along)) / mpu
       const lt = l.t + hookUp * Math.sin(roll) + (l.cord * Math.sin(l.across)) / mpu
       const p = deckPoint(deck, ls, lt)
-      const f = 0.92 + 0.08 * Math.sin(now / 90 + l.flicker) * Math.sin(now / 37 + l.flicker * 3)
       l.body.setPosition(p.x, p.y)
-      l.glow.setPosition(p.x, p.y).setAlpha(0.5 * f)
-      l.pool.setPosition(p.x, p.y).setAlpha(0.28 * f)
     }
     for (const gl of this.gulls) {
       gl.a += gl.w * dt
@@ -3255,7 +3248,7 @@ class CaveView extends BoundedView {
     }
   }
 
-  /** 黑暗里的敌人：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
+  /** 黑暗里的敌人与快要出来的敌人（在它进场的起点）：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
   private stepEyes(scene: Phaser.Scene, sim: Sim, s: CaveState, adapt: number): void {
     const cfg = MAPS[sim.mapId].cave!
     const spots: Point[] = []
@@ -3269,17 +3262,18 @@ class CaveView extends BoundedView {
     let used = 0
     if (spots.length > 0) {
       const view = sim.view
-      for (const eid of query(sim.world, ENEMY_SET)) {
-        if (!Alive.v[eid]) continue
-        const x = Transform.x[eid]!
-        const y = Transform.y[eid]!
+      // 从上面落下来的还不在地上
+      const lurking = [...query(sim.world, [Telegraph, Transform])]
+        .filter((t) => telegraphEntry[t]?.enter !== 'drop')
+        .map((t) => ({ eid: t, x: telegraphEntry[t]?.sx ?? Transform.x[t]!, y: telegraphEntry[t]?.sy ?? Transform.y[t]!, h: telegraphDef[t]!.size * (Telegraph.boss[t] ? 0.2 : 0.3) }))
+      const bodies = [...query(sim.world, ENEMY_SET)].filter((eid) => Alive.v[eid]).map((eid) => ({ eid, x: Transform.x[eid]!, y: Transform.y[eid]!, h: Transform.h[eid]! }))
+      for (const { eid, x, y, h } of [...bodies, ...lurking]) {
         if (x < view.x || x > view.right || y < view.y || y > view.bottom) continue
         const torch = torchesLux(cfg.torch, spots, lits, x, y)
         const e = (diffuseLux(s.light, x, y) + directLux(s.layout, s.sky, x, y, 0) + torch) / adapt
         const shown = (1 - smoothCave(0.06, 0.25, e)) * smoothCave(0.004, 0.05, torch)
         if (shown <= 0.02) continue
         const blink = Math.sin(sim.elapsedMs / 1700 + eid * 1.7) > 0.96 ? 0 : 1
-        const h = Transform.h[eid]!
         for (const side of [-1, 1]) {
           let img = this.eyes[used]
           if (!img) {
@@ -3487,6 +3481,7 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   floe: () => new FloeView(),
   cave: () => new CaveView(),
   meadow: () => new MeadowView(),
+  sakura: () => new SakuraView(),
   desert: () => new DesertView(),
   circuit: () => new CircuitView(),
 }

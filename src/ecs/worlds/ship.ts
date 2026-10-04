@@ -4,10 +4,11 @@ import type { Rng } from '../../util/rng'
 import type { Friction, ShipConfig } from '../../types/maps'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
-import { bulgeU, GRAVITY, halfBeamAt, hydrostatics, stability, stepAxis, waveSlope, waveTerms } from '../../data/ship'
+import { bulgeU, GRAVITY, halfBeamAt, hatchesOf, hydrostatics, skylightOf, stability, stepAxis, waveSlope, waveTerms } from '../../data/ship'
 import type { Axis, Hydrostatics, WaveTerm } from '../../data/ship'
 import { awayFromWall, keepOut, makeBasin, roomAt } from './basin'
 import type { Basin } from './basin'
+import type { Landmark } from './gates'
 
 /** 地图的长边与短边，格：船壳外四周都留 seaU 格海面 */
 export function shipSizeU(cfg: ShipConfig): { long: number; short: number } {
@@ -26,6 +27,8 @@ export interface Deck {
   readonly sy: number
   readonly basin: Basin
   readonly masts: readonly Point[]
+  /** 给出怪口的地标：格栅舱口与船尾天窗 */
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
 }
 
 /** 地图上一点在船上的位置，格：s 沿船长从横板中线往船头，t 横过船宽往右舷为正 */
@@ -69,7 +72,8 @@ export function makeDeck(cfg: ShipConfig, mapW: number, mapH: number): Deck {
   const rows = Math.ceil(mapH / cell)
   const keep = { x: ox + bx * ((h.masts[0]! + h.masts[1]!) / 2) * h.lengthU * UNIT, y: oy + by * ((h.masts[0]! + h.masts[1]!) / 2) * h.lengthU * UNIT }
   const basin = makeBasin(open, 0, 0, cols, rows, cell, keep, h.neckU * UNIT)
-  return { ox, oy, bx, by, sx, sy, basin, masts }
+  const hatch = (g: { s: number; len: number; wid: number }): Landmark => ({ x: ox + bx * g.s * UNIT, y: oy + by * g.s * UNIT, r: (Math.min(g.len, g.wid) / 2) * UNIT, nx: 0, ny: 0 })
+  return { ox, oy, bx, by, sx, sy, basin, masts, marks: { hatch: hatchesOf(h).map(hatch), skylight: [hatch(skylightOf(h))] } }
 }
 
 /** 甲板上散着的一颗炮弹，像素 */

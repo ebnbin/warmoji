@@ -9,3 +9,4 @@ export const POP = FEEL.pop
 export const DOWN = FEEL.down
 export const REJOIN = FEEL.rejoin
 export const EMPLACE = FEEL.emplace
+export const ENTRANCE = FEEL.entrance
