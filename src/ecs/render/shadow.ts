@@ -5,7 +5,7 @@ import { Alive, Drop, Faction, Held, Mounted, Pickup, Proj, Projectile, Radius, 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
-import { SUN } from '../../data/light'
+import { AWAY } from '../../data/light'
 import { paintedEmojiOn } from '../../emoji/style'
 import { bottomAt, footY } from '../utils/ground'
 import { EcsLayer, LayerType } from './layer'
@@ -54,9 +54,8 @@ export class EcsShadowBatch extends EcsLayer {
     this.world = world
     this.atlas = atlas
     this.color = shadow.color
-    const away = Math.hypot(SUN.x, SUN.y)
-    this.kx = (-SUN.x / away) * shadow.length
-    this.ky = (-SUN.y / away) * shadow.length
+    this.kx = AWAY.x * shadow.length
+    this.ky = AWAY.y * shadow.length
     scene.add.existing(this)
     this.enableFilters()
     this.filtersForceComposite = true

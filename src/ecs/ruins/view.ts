@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import { removeEntity } from 'bitecs'
-import { UNIT } from '../../util/units'
+import { LIFT_PER_M, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
-import { SUN } from '../../data/light'
+import { AWAY, SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { Rng } from '../../util/rng'
 import { playSfx } from '../../audio/sfx'
@@ -46,8 +46,6 @@ const TILE_PX = 64
 const REPAINT_MS = 200
 /** 风往哪吹，像素/秒：扬尘顺风飘 */
 const WIND = { x: 10, y: -4 }
-/** 抛起的东西高出地面一米，画面上抬起多少像素 */
-const LIFT_PX_PER_M = UNIT * 0.5
 /** 开发者工具里「显示碰撞边界」的开关 */
 const DEV_WALLS = 'battle.walls'
 /** 鸽子停在多高（米）以上的墙头 */
@@ -304,7 +302,7 @@ export class RuinsView implements MapView {
       }
     }
     s.impacts.length = 0
-    this.stepStones(dt)
+    this.stepStones(v, dt)
     this.stepPigeons(sim, s, dt)
     this.stepDevWalls(v, s)
   }
@@ -436,11 +434,12 @@ export class RuinsView implements MapView {
     for (const p of this.pigeons) if (Math.hypot(p.x - c.x, p.y - c.y) < SCARE_COLLAPSE_U * UNIT) p.scared = 1
   }
 
-  /** 落石：按自由落体从墙上的高度落下，横着飞到落点；地上的影子随高度变淡；落地崩起碎石和一小团土 */
-  private stepStones(dt: number): void {
+  /** 落石：按自由落体从墙上的高度落下，横着飞到落点；地上的影子随高度变淡、背着太阳挪开；落地崩起碎石和一小团土 */
+  private stepStones(v: ViewCtx, dt: number): void {
     const g = this.stoneGfx
     if (!g) return
     g.clear()
+    const reach = v.def.light?.shadow?.length ?? 0
     const kept: Stone[] = []
     for (const st of this.stones) {
       st.t += dt * 1000
@@ -456,10 +455,11 @@ export class RuinsView implements MapView {
         continue
       }
       kept.push(st)
-      st.img.setPosition(x, y - z * LIFT_PX_PER_M).setRotation(st.img.rotation + st.spin * dt)
+      const lift = z * LIFT_PER_M
+      st.img.setPosition(x, y - lift).setRotation(st.img.rotation + st.spin * dt)
       const r = st.img.displayWidth * 0.4
       g.fillStyle(0x000000, 0.28 * (1 - Math.min(0.7, z / 4)))
-      g.fillEllipse(x, y, r * 2.2, r * 1.1)
+      g.fillEllipse(x + AWAY.x * reach * lift, y + AWAY.y * reach * lift, r * 2.2, r * 1.1)
     }
     this.stones = kept
   }
@@ -472,7 +472,7 @@ export class RuinsView implements MapView {
     if (this.pigeons.length === 0) return
     const m = s.m
     const hc = m.courseM
-    const lift = LIFT_PX_PER_M
+    const lift = LIFT_PER_M
     let scaredAny = false
     for (const p of this.pigeons) {
       if (!p.to) {

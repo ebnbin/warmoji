@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { hasComponent, removeEntity } from 'bitecs'
-import { UNIT } from '../util/units'
+import { LIFT_PER_M, UNIT } from '../util/units'
 import { MAP, MAPS, rollDecor } from '../data/maps'
 import { viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
@@ -31,7 +31,7 @@ import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
 import { gatesNow } from './worlds/gates'
 import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, WAVE_TILE, WET_PPU } from './render/ship'
-import { SUN } from '../data/light'
+import { AWAY, SUN } from '../data/light'
 import { deckPoint, makeDeck as makeDeckFrame, shipSizeU } from './worlds/ship'
 import type { ShipState } from './worlds/ship'
 import { GRAVITY, halfBeamAt } from '../data/ship'
@@ -905,13 +905,15 @@ const LAVA_KEY = 'volcano-lava'
 const AUX_KEY = 'volcano-aux'
 /** 风把烟和灰往哪吹，像素/秒 */
 const WIND = { x: 22, y: -9 }
-const GRAVITY_PX = 12 * UNIT
+/** 火山弹往下落的重力加速度，米/秒² */
+const VOLCANO_GRAVITY = 9.81
 
 interface Bomb {
   x: number
   y: number
   vx: number
   vy: number
+  /** 离地多高，米；vz 是往上的速度，米/秒 */
   z: number
   vz: number
   r: number
@@ -1287,13 +1289,14 @@ class VolcanoView extends BoundedView {
     return { x: 0, y: 0, vx: 0, vy: 0, z: 0, vz: 0, r: 0, spin: 0, rock, glow }
   }
 
-  /** 火山弹：喷发时从火山口抛出，按重力画弧，影子留在地上；落地溅起火星，砸出一小片渐暗的红光 */
+  /** 火山弹：喷发时从火山口抛出，按重力画弧，影子背着太阳落在地上；落地溅起火星，砸出一小片渐暗的红光 */
   private stepBombs(v: ViewCtx, s: VolcanoState, delta: number, now: number): void {
     const g = this.bombGfx
     const sg = this.splatGfx
     if (!g || !sg) return
     const f = s.field
     const dt = delta / 1000
+    const reach = v.def.light?.shadow?.length ?? 0
     if (s.phase === 'erupt') {
       this.bombAcc += dt * 13 * this.u.erupt
       while (this.bombAcc >= 1) {
@@ -1305,8 +1308,8 @@ class VolcanoView extends BoundedView {
         b.y = f.craterY + (Math.random() - 0.5) * UNIT
         b.vx = Math.cos(a) * sp
         b.vy = Math.sin(a) * sp
-        b.z = 0.2 * UNIT
-        b.vz = (7 + Math.random() * 5) * UNIT
+        b.z = 0.4
+        b.vz = 6 + Math.random() * 4
         b.r = 7 + Math.random() * 9
         b.spin = (Math.random() * 2 - 1) * 8
         b.rock.setRotation(Math.random() * Math.PI * 2)
@@ -1318,7 +1321,7 @@ class VolcanoView extends BoundedView {
     for (const b of this.bombs) {
       b.x += b.vx * dt
       b.y += b.vy * dt
-      b.vz -= GRAVITY_PX * dt
+      b.vz -= VOLCANO_GRAVITY * dt
       b.z += b.vz * dt
       if (b.z <= 0) {
         this.sparks?.explode(10, b.x, b.y)
@@ -1330,13 +1333,14 @@ class VolcanoView extends BoundedView {
         continue
       }
       kept.push(b)
-      const lift = Math.min(1, b.z / (4 * UNIT))
-      const scale = (b.r * 2 * (1 + lift * 0.5)) / 32
-      g.fillStyle(0x000000, 0.3 * (1 - lift * 0.55))
-      g.fillEllipse(b.x, b.y, b.r * 2.4 * (1 - lift * 0.3), b.r * 1.2 * (1 - lift * 0.3))
-      b.rock.setPosition(b.x, b.y - b.z).setScale(scale).setRotation(b.rock.rotation + b.spin * dt)
-      b.glow.setPosition(b.x, b.y - b.z).setScale(scale * 2.6).setAlpha(0.55)
-      if (Math.random() < dt * 30) this.trail?.emitParticleAt(b.x, b.y - b.z, 1)
+      const high = Math.min(1, b.z / 4)
+      const lift = b.z * LIFT_PER_M
+      const scale = (b.r * 2 * (1 + high * 0.5)) / 32
+      g.fillStyle(0x000000, 0.3 * (1 - high * 0.55))
+      g.fillEllipse(b.x + AWAY.x * reach * lift, b.y + AWAY.y * reach * lift, b.r * 2.4 * (1 - high * 0.3), b.r * 1.2 * (1 - high * 0.3))
+      b.rock.setPosition(b.x, b.y - lift).setScale(scale).setRotation(b.rock.rotation + b.spin * dt)
+      b.glow.setPosition(b.x, b.y - lift).setScale(scale * 2.6).setAlpha(0.55)
+      if (Math.random() < dt * 30) this.trail?.emitParticleAt(b.x, b.y - lift, 1)
     }
     this.bombs = kept
     sg.clear()
@@ -2324,6 +2328,7 @@ interface Drop {
   y: number
   vx: number
   vy: number
+  /** 离水面多高，米；vz 是往上的速度，米/秒 */
   z: number
   vz: number
   age: number
@@ -2644,7 +2649,7 @@ class FloeView extends BoundedView {
     for (let k = 0; k < 16; k++) {
       const a = Math.random() * Math.PI * 2
       const sp = (1 + Math.random() * 2.5) * UNIT
-      this.drops.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8, z: r * 0.3, vz: (2.5 + Math.random() * 3) * UNIT, age: 0, life: 0.9 })
+      this.drops.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8, z: 0.05, vz: 2.2 + Math.random() * 2.2, age: 0, life: 0.9 })
     }
   }
 
@@ -2701,14 +2706,14 @@ class FloeView extends BoundedView {
     const drops: Drop[] = []
     for (const d of this.drops) {
       d.age += dt
-      d.vz -= 12 * UNIT * dt
+      d.vz -= FLOE_GRAVITY * dt
       d.z += d.vz * dt
       d.x += d.vx * dt
       d.y += d.vy * dt
       if (d.age >= d.life || d.z < 0) continue
       drops.push(d)
       sp.fillStyle(0xe6f6fa, 0.85 * (1 - d.age / d.life))
-      sp.fillCircle(d.x, d.y - d.z, 2.6)
+      sp.fillCircle(d.x, d.y - d.z * LIFT_PER_M, 2.6)
     }
     this.drops = drops
   }

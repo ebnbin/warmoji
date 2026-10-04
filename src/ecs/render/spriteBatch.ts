@@ -4,14 +4,11 @@ import { Depth, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../com
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
-import { SUN } from '../../data/light'
+import { AWAY } from '../../data/light'
 import { paintedEmojiOn } from '../../emoji/style'
 import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 export { SPRITE_BANDS } from './bands'
-
-/** 背着太阳的方向，画面上的单位向量 */
-const AWAY = { x: -SUN.x / Math.hypot(SUN.x, SUN.y), y: -SUN.y / Math.hypot(SUN.x, SUN.y) }
 
 /** 状态色乘上一个角受的光：t 从迎光的 0 到背光的 1，在 sun 与 shade 之间插 */
 function litTint(color: number, sun: number, shade: number, t: number, alpha: number): number {
