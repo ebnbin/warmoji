@@ -25,7 +25,7 @@ import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import type { MeadowConfig } from '../../types/maps'
 
-const BG = 0x0d1510
+const BG = 0x1a221e
 const GROUND_KEY = 'meadow-ground'
 const CANOPY_KEY = 'meadow-canopy'
 const MASK_KEY = 'meadow-mask'

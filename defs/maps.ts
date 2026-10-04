@@ -165,9 +165,9 @@ export const MAPS = {
     kind: 'meadow',
     stamina: { exertion: 0.4, regen: 1.2 },
     palette: {
-      bgFrom: 'hsl(96 30% 30%)',
-      bgTo: 'hsl(150 32% 12%)',
-      map: hslToInt(92, 0.34, 0.4),
+      bgFrom: 'hsl(112 23% 42%)',
+      bgTo: 'hsl(158 28% 17%)',
+      map: hslToInt(107, 0.33, 0.56),
       shadow: 0x000000,
     },
     decor: {

@@ -547,15 +547,15 @@ const PICK = { i: 0, k: 0 }
 
 /** 几种野花：花瓣与花心的颜色 */
 const FLOWER_PETAL = [
-  [242, 240, 230],
-  [246, 206, 46],
+  [255, 255, 246],
+  [255, 223, 64],
   [150, 138, 214],
   [228, 168, 192],
   [214, 86, 138],
 ] as const
 const FLOWER_EYE = [
-  [236, 192, 52],
-  [214, 164, 28],
+  [255, 212, 72],
+  [239, 186, 54],
   [112, 98, 182],
   [244, 214, 226],
   [240, 160, 190],
@@ -585,9 +585,9 @@ function meadowGrass(sc: PaintScene, prep: Prepared, x: number, y: number, tex: 
   const mid = fbm(x / 2.2, y / 2.2, seed + 5, 2)
   const dr = clamp01(smooth(0.42, 0.74, patch) * 0.75 - lush * 0.45 + dry)
   const green = clamp01(0.5 + (mid - 0.5) * 1.2 + lush * 0.3)
-  let r = (94 + (66 - 94) * green + (150 - 94) * dr) * tex
-  let g = (126 + (106 - 126) * green + (140 - 126) * dr) * tex
-  let b = (50 + (42 - 50) * green + (78 - 50) * dr) * tex
+  let r = (114 + (80 - 114) * green + (188 - 114) * dr) * tex
+  let g = (167 + (142 - 167) * green + (188 - 167) * dr) * tex
+  let b = (84 + (73 - 84) * green + (114 - 84) * dr) * tex
   // 野花：成片地开，每片有一种开得最多
   const bloomAt = 0.5 + (0.5 - fl.cover) * 0.3
   const dens = smooth(bloomAt - 0.02, bloomAt + 0.12, fbm(x / fl.patchU, y / fl.patchU, seed + 19, 2)) * (1 - lush * 0.7) * bloom
@@ -709,9 +709,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
               const pinna = 0.55 + 0.45 * Math.abs(Math.sin(cu * 55 + Math.sign(cv) * 1.2))
               const lit = 0.8 + 0.35 * clamp01(0.5 - cv / frond)
               const a = fern * smooth(frond, frond * 0.6, Math.abs(cv)) * pinna
-              mr += (76 * lit - mr) * a
-              mg += (112 * lit - mg) * a
-              mb += (42 * lit - mb) * a
+              mr += (92 * lit - mr) * a
+              mg += (149 * lit - mg) * a
+              mb += (74 * lit - mb) * a
             }
           }
         }
@@ -723,17 +723,17 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       // 牧场：羊啃过的草短而匀，羊踩出一条条小道；栅栏底下一溜没啃到的高草
       if (wPasture > 0) {
         const p2 = fbm(x / 5, y / 5, seed + 81, 2)
-        let pr = (122 + (p2 - 0.5) * 30) * (0.94 + 0.1 * grain)
-        let pg = (136 + (p2 - 0.5) * 22) * (0.94 + 0.1 * grain)
-        let pb = (70 + (p2 - 0.5) * 12) * (0.94 + 0.1 * grain)
+        let pr = (150 + (p2 - 0.5) * 37) * (0.94 + 0.1 * grain)
+        let pg = (180 + (p2 - 0.5) * 28) * (0.94 + 0.1 * grain)
+        let pb = (106 + (p2 - 0.5) * 15) * (0.94 + 0.1 * grain)
         const track = smooth(0.02, 0, Math.abs(fbm(x / 3.2, y / 3.2, seed + 83, 2) - 0.5)) * 0.3
-        pr += (150 - pr) * track
-        pg += (138 - pg) * track
-        pb += (100 - pb) * track
+        pr += (195 - pr) * track
+        pg += (187 - pg) * track
+        pb += (136 - pb) * track
         const rough = smooth(0.45, 0.1, Math.abs(fence)) * (0.7 + 0.3 * tuft)
-        pr += (78 * tex - pr) * rough
-        pg += (104 * tex - pg) * rough
-        pb += (46 * tex - pb) * rough
+        pr += (96 * tex - pr) * rough
+        pg += (139 * tex - pg) * rough
+        pb += (75 * tex - pb) * rough
         r += pr * wPasture
         g += pg * wPasture
         b += pb * wPasture
@@ -742,28 +742,28 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       // 林子里：针叶铺地，一片片苔藓，落着球果
       if (wForest > 0) {
         const needle = 0.82 + 0.3 * valueNoise(x * 14 + y * 3, y * 14 - x * 3, seed + 87)
-        let fr = 66 * needle
-        let fg = 52 * needle
-        let fb = 38 * needle
+        let fr = 82 * needle
+        let fg = 67 * needle
+        let fb = 53 * needle
         const moss = smooth(0.5, 0.68, fbm(x / 2.5, y / 2.5, seed + 91, 2))
-        fr += (62 * needle - fr) * moss
-        fg += (86 * needle - fg) * moss
-        fb += (42 * needle - fb) * moss
+        fr += (78 * needle - fr) * moss
+        fg += (116 * needle - fg) * moss
+        fb += (68 * needle - fb) * moss
         const cone = cellNearest(x * 2.2, y * 2.2, seed + 93)
         if (cone.h > 0.7) {
           const d = Math.hypot(cone.dx * 1.6, cone.dy)
           const a = smooth(0.12, 0.08, d)
-          fr += (92 - fr) * a
-          fg += (64 - fg) * a
-          fb += (40 - fb) * a
+          fr += (112 - fr) * a
+          fg += (82 - fg) * a
+          fb += (57 - fb) * a
         }
         // 林子里那段小路
         const td = nearestSeg(prep.trail, prep.trailBuckets, x, y, PICK)
         if (td < 0.15) {
           const a = smooth(0.15, -0.05, td + (valueNoise(x * 4, y * 4, seed + 95) - 0.5) * 0.12)
-          fr += (98 * (0.9 + 0.2 * grain) - fr) * a
-          fg += (80 * (0.9 + 0.2 * grain) - fg) * a
-          fb += (60 * (0.9 + 0.2 * grain) - fb) * a
+          fr += (119 * (0.9 + 0.2 * grain) - fr) * a
+          fg += (100 * (0.9 + 0.2 * grain) - fg) * a
+          fb += (79 * (0.9 + 0.2 * grain) - fb) * a
         }
         r += fr * wForest
         g += fg * wForest
@@ -781,9 +781,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           g += (g * 1.04 - g) * edge * 0.6
           b += (b * 0.9 - b) * edge * 0.6
           const soil = (0.88 + 0.22 * grain) * (0.94 + 0.12 * valueNoise(x * 9, y * 9, seed + 99))
-          r += (132 * soil - r) * core
-          g += (108 * soil - g) * core
-          b += (78 * soil - b) * core
+          r += (162 * soil - r) * core
+          g += (136 * soil - g) * core
+          b += (104 * soil - b) * core
         }
       }
 
@@ -801,17 +801,17 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           const ny = lg.ux * (t / taper)
           const lit = clamp01(nx * LX + ny * LY + nz * LZ)
           const bark = 0.8 + 0.3 * valueNoise(s * 1.5, t * 14, seed + 101) + 0.12 * smooth(0.04, 0, cellEdge(s * 2, t * 6, seed + 103))
-          let lr = 92 * bark
-          let lgc = 70 * bark
-          let lb = 52 * bark
+          let lr = 111 * bark
+          let lgc = 88 * bark
+          let lb = 69 * bark
           const moss = smooth(0.55, 0.75, fbm(s * 0.9, t * 3, seed + 105, 2)) * smooth(0.2, 0.9, nz)
-          lr += (78 - lr) * moss
-          lgc += (102 - lgc) * moss
-          lb += (46 - lb) * moss
+          lr += (96 - lr) * moss
+          lgc += (136 - lgc) * moss
+          lb += (74 - lb) * moss
           const snap = smooth(half - 0.25, half - 0.05, s * -lg.root)
-          lr += (170 - lr) * snap * (0.6 + 0.4 * valueNoise(t * 20, s * 8, seed + 107))
-          lgc += (138 - lgc) * snap * 0.8
-          lb += (96 - lb) * snap * 0.8
+          lr += (199 - lr) * snap * (0.6 + 0.4 * valueNoise(t * 20, s * 8, seed + 107))
+          lgc += (165 - lgc) * snap * 0.8
+          lb += (121 - lb) * snap * 0.8
           const k = 0.45 + 0.8 * lit
           r = lr * k
           g = lgc * k
@@ -828,16 +828,16 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         if (plate * plate + span * span < ragged) {
           const root = smooth(0.06, 0, Math.abs(Math.sin(Math.atan2(rt, rs) * 7 + rs * 6))) * 0.5
           const k = 0.6 + 0.35 * clamp01(0.5 - plate * 0.5)
-          r = (88 + root * 40) * k
-          g = (66 + root * 26) * k
-          b = (46 + root * 14) * k
+          r = (106 + root * 44) * k
+          g = (83 + root * 29) * k
+          b = (63 + root * 16) * k
         }
         const pit = ((rs * lg.root + 0.75) / 0.42) ** 2 + (rt / 0.95) ** 2
         if (pit < 1 && rs * lg.root < -0.2) {
           const k = 0.55 + 0.3 * Math.sqrt(pit)
-          r = 72 * k
-          g = 56 * k
-          b = 40 * k
+          r = 88 * k
+          g = 71 * k
+          b = 55 * k
         }
       }
 
@@ -849,9 +849,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         if (s < tr.len * 0.5 && t < tr.wid * 0.5) {
           const rim = s > tr.len * 0.5 - 0.07 || t > tr.wid * 0.5 - 0.07
           const sky = 0.8 + 0.3 * smooth(0, tr.wid * 0.5, t)
-          r = rim ? 118 : 74 * sky
-          g = rim ? 96 : 94 * sky
-          b = rim ? 70 : 104 * sky
+          r = rim ? 143 : 74 * sky
+          g = rim ? 120 : 94 * sky
+          b = rim ? 92 : 104 * sky
         }
       }
       // 栅栏的木头：风吹日晒发灰的圆木，按太阳打光，边上一圈暗线把它从草里勾出来；门柱颜色深一些
@@ -870,9 +870,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           const weather = 0.85 + 0.25 * valueNoise(x * 18, y * 18, seed + 111)
           const k = (0.5 + 0.75 * lit) * weather * (1 - 0.45 * smooth(-0.025, 0.01, wd))
           const dark = PICK.k === 2
-          r += ((dark ? 110 : 150) * k - r) * a
-          g += ((dark ? 88 : 136) * k - g) * a
-          b += ((dark ? 64 : 112) * k - b) * a
+          r += ((dark ? 132 : 201) * k - r) * a
+          g += ((dark ? 109 : 187) * k - g) * a
+          b += ((dark ? 84 : 160) * k - b) * a
         }
       }
 
@@ -941,9 +941,9 @@ function tierEdge(sp: Spruce, k: number, j: number, ang: number): number {
 
 /** 几种树冠的颜色：背阴与向阳 */
 const CROWN = {
-  spruce: { dark: [22, 48, 40], lit: [80, 116, 78] },
-  birch: { dark: [74, 100, 46], lit: [158, 176, 86] },
-  shrub: { dark: [48, 74, 36], lit: [112, 140, 62] },
+  spruce: { dark: [35, 66, 60], lit: [102, 154, 114] },
+  birch: { dark: [92, 135, 76], lit: [193, 232, 130] },
+  shrub: { dark: [62, 101, 61], lit: [137, 186, 100] },
 } as const
 
 /**
@@ -1055,9 +1055,9 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           continue
         }
         const k = (0.72 + 0.4 * valueNoise(x * 6, y * 6, seed + 131)) * (1 - 0.3 * smooth(1.5, 7, depth))
-        out[o] = 20 * k
-        out[o + 1] = 36 * k
-        out[o + 2] = 30 * k
+        out[o] = 34 * k
+        out[o + 1] = 53 * k
+        out[o + 2] = 48 * k
         out[o + 3] = fill * 255
         continue
       }
@@ -1085,9 +1085,9 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       const a = Math.max(alpha, fill)
       const under = fill * (1 - alpha)
       const uk = 0.8
-      out[o] = ((cr + 50 * shine) * k * alpha + 20 * uk * under) / a
-      out[o + 1] = ((cg + 50 * shine) * k * alpha + 36 * uk * under) / a
-      out[o + 2] = ((cb + 20 * shine) * k * alpha + 30 * uk * under) / a
+      out[o] = ((cr + 50 * shine) * k * alpha + 34 * uk * under) / a
+      out[o + 1] = ((cg + 50 * shine) * k * alpha + 53 * uk * under) / a
+      out[o + 2] = ((cb + 20 * shine) * k * alpha + 48 * uk * under) / a
       out[o + 3] = a * 255
     }
   }
