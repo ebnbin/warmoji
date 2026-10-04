@@ -228,6 +228,20 @@ export const MAPS = {
       density: [0.004, 0.008],
     },
     mix: RIVER_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'petals',
+      boss: 'rocks',
+      kinds: {
+        grove: { name: '樱林', at: { kind: 'nooks', spacingU: 7, away: { mark: 'ports', minU: 2.5 } }, enter: 'walk', look: 'petals', weight: 3, perSec: 1.5, only: ['zombie', 'ghost', 'blob', 'slime', 'snake'] },
+        thicket: { name: '林缘', at: { kind: 'rim', segU: 3, away: { mark: 'ports', minU: 2.5 } }, enter: 'climb', look: 'petals', weight: 1.5, perSec: 1, only: ['zombie', 'blob', 'slime', 'snake'] },
+        wall: { name: '寺墙', at: { kind: 'mark' }, enter: 'climb', weight: 2, perSec: 1, only: ['ghost', 'zombie'] },
+        bank: { name: '溪岸', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 3, perSec: 1.5, only: ['snake', 'puffer', 'turtle', 'siren', 'crab'] },
+        rocks: { name: '石组', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 1, only: ['croc'] },
+        lawn: { name: '落花', at: { kind: 'ground' }, enter: 'rise', look: 'petals', weight: 1 },
+      },
+    },
     finalWaveSub: '巨鳄顺着溪游了下来——别跟它在深水里纠缠！',
     sakura: {
       meterPerU: 0.5,
