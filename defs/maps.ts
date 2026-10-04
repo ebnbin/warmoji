@@ -180,6 +180,7 @@ export const MAPS = {
       map: hslToInt(107, 0.33, 0.56),
       shadow: 0x000000,
     },
+    light: { sun: 0xfffaf0, shade: 0xc5cdbb, shadow: { color: 0x0f1a08, alpha: 0.4, length: 0.85 } },
     decor: {
       emojis: ['1f33c', '1fabb', '1f340'],
       sizeU: [0.3, 0.45],
@@ -231,6 +232,7 @@ export const MAPS = {
       map: hslToInt(88, 0.32, 0.42),
       shadow: 0x000000,
     },
+    light: { sun: 0xfffaf6, shade: 0xd1c2c4, shadow: { color: 0x2a1216, alpha: 0.38, length: 0.55 } },
     decor: {
       emojis: ['1f338'],
       sizeU: [0.26, 0.38],
@@ -413,6 +415,7 @@ export const MAPS = {
       map: hslToInt(40, 0.2, 0.42),
       shadow: 0x000000,
     },
+    light: { sun: 0xfcfbf2, shade: 0xbabdad, shadow: { color: 0x10140c, alpha: 0.42, length: 0.85 } },
     decor: {
       emojis: ['1f33c', '1f344', '1f33f'],
       sizeU: [0.3, 0.5],
@@ -617,6 +620,7 @@ export const MAPS = {
       map: hslToInt(209, 0.05, 0.3),
       shadow: 0x000000,
     },
+    light: { sun: 0xf6ebe4, shade: 0xa29793, shadow: { color: 0x080404, alpha: 0.45, length: 0.85 } },
     decor: {
       emojis: ['1faa8', '1f9b4', '1f480'],
       sizeU: [0.3, 0.8],
@@ -687,6 +691,7 @@ export const MAPS = {
       map: hslToInt(32, 0.27, 0.63),
       shadow: 0x000000,
     },
+    light: { sun: 0xfffaf0, shade: 0xcdc0b0, shadow: { color: 0x22140a, alpha: 0.42, length: 0.85 } },
     decor: {
       emojis: ['1faa2', '1faa3', '1f9ed'],
       sizeU: [0.5, 0.8],
@@ -739,6 +744,7 @@ export const MAPS = {
       map: hslToInt(200, 0.22, 0.86),
       shadow: 0x000000,
     },
+    light: { sun: 0xffffff, shade: 0xc4d2e0, shadow: { color: 0x1a3a66, alpha: 0.38, length: 1.5 } },
     decor: {
       emojis: ['2744', '1f9ca'],
       sizeU: [0.3, 0.7],
@@ -929,6 +935,7 @@ export const MAPS = {
       map: hslToInt(42, 0.84, 0.69),
       shadow: 0x000000,
     },
+    light: { sun: 0xfff8ea, shade: 0xdac1a3, shadow: { color: 0x3a200c, alpha: 0.42, length: 1.05 } },
     decor: {
       emojis: ['1f9b4'],
       sizeU: [0.3, 0.5],
@@ -986,6 +993,7 @@ export const MAPS = {
       map: hslToInt(178, 0.32, 0.15),
       shadow: 0x000000,
     },
+    light: { sun: 0xf8fcfb, shade: 0xb8c4c5, shadow: { color: 0x010605, alpha: 0.42, length: 0.6 } },
     decor: {
       emojis: ['26a1'],
       sizeU: [0.3, 0.5],

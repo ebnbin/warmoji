@@ -90,6 +90,16 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
 }
 
+/** 单位的光：光色与影子色是 24 位颜色，影子有浓度、往外铺得开 */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  const l = m.light
+  if (!l) continue
+  const rgb = (c: number): boolean => Number.isInteger(c) && c >= 0 && c <= 0xffffff
+  need(rgb(l.sun) && rgb(l.shade) && rgb(l.shadow.color), `maps.${id}.light 的颜色须是 24 位 RGB`)
+  need(l.shadow.alpha > 0 && l.shadow.alpha <= 1, `maps.${id}.light.shadow.alpha 须在 (0, 1] 内`)
+  need(l.shadow.length > 0, `maps.${id}.light.shadow.length 须为正`)
+}
+
 /** 旧星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'nebulaOld') === (m.nebulaOld !== undefined), `maps.${id} 是旧星云当且仅当写了 nebulaOld`)

@@ -1040,6 +1040,20 @@ export interface GatesConfig {
   readonly lean?: { readonly mul: number; readonly full: number }
   readonly kinds: Readonly<Record<string, GateKind>>
 }
+/**
+ * 战场上的精灵在这张图上受的光与身体投的影，光从 data/light.ts 的太阳来：精灵迎光的一半乘 sun，过了中心往背光的一角渐渐乘到 shade；
+ * 影子是身体的剪影顺着太阳的方位铺在地上，长度是精灵高度的 length 倍，整层按 alpha 叠上去
+ */
+export interface UnitLight {
+  readonly sun: number
+  readonly shade: number
+  readonly shadow: {
+    readonly color: number
+    readonly alpha: number
+    readonly length: number
+  }
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -1048,6 +1062,8 @@ export interface MapDef {
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
+  /** 开着新画风时战场上的精灵怎么受光、身体怎么投影；不写的地图照旧平光、没有影子 */
+  readonly light?: UnitLight
   readonly decor: MapDecor
   readonly drift?: readonly string[]
   readonly mix: readonly EnemyMixRow[]

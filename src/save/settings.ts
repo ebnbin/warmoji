@@ -34,7 +34,7 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   { key: 'damageNumbers', icon: '1f522', label: '伤害数字', desc: '敌人受击时飘出伤害数值' },
   { key: 'hitShake', icon: '1f4f3', label: '受击震屏', desc: '队员受到伤害时轻微抖动画面' },
   { key: 'showSkinTone', icon: '1f44b_1f3fd', label: '肤色 emoji', desc: '图鉴与 Studio 全部页展示含肤色的 emoji 变体' },
-  { key: 'paintedEmoji', icon: '1f3a8', label: '新画风 emoji', desc: '画过的角色、敌人与武器改用贴近地图画风的手绘版，其余仍是 Twemoji' },
+  { key: 'paintedEmoji', icon: '1f3a8', label: '新画风 emoji', desc: '新画风的地图上单位跟着地图的光受光、投影；画过的角色、敌人与武器改用贴近地图画风的手绘版，其余仍是 Twemoji' },
 ]
 
 function sanitizeSettings(raw: unknown): Settings {

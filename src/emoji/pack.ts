@@ -1,4 +1,7 @@
-const EMOJI_HEADER = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
+/** 一张 emoji 的画框边长，SVG 单位 */
+export const EMOJI_BOX = 36
+
+const EMOJI_HEADER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${EMOJI_BOX} ${EMOJI_BOX}">`
 
 export interface EmojiPack {
   readonly ids: readonly string[]

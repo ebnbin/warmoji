@@ -4,6 +4,7 @@ import type { Scratch } from './tri'
 
 export enum LayerType {
   Sprite = 'EcsSpriteBatch',
+  Shadow = 'EcsShadowBatch',
   Ring = 'EcsRingBatch',
   Shape = 'EcsShapeBatch',
   DamageText = 'DamageTextBatch',
