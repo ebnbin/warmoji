@@ -580,9 +580,9 @@ export const MAPS = {
     kind: 'ship',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
-      bgFrom: 'hsl(205 38% 22%)',
-      bgTo: 'hsl(222 45% 7%)',
-      map: hslToInt(28, 0.32, 0.34),
+      bgFrom: 'hsl(180 58% 29%)',
+      bgTo: 'hsl(182 80% 12%)',
+      map: hslToInt(32, 0.27, 0.63),
       shadow: 0x000000,
     },
     decor: {

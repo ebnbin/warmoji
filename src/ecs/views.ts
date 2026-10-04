@@ -1408,7 +1408,7 @@ class VolcanoView extends BoundedView {
   }
 }
 
-const SHIP_BG = 0x04121a
+const SHIP_BG = 0x056b6b
 const WAVE_KEY = 'ship-wave'
 const EDGE_KEY = 'ship-edge'
 const WET_KEY = 'ship-wet'
@@ -1419,7 +1419,6 @@ const BALL_KEY = 'ship-ball'
 const GULL_KEY = 'ship-gull'
 const LANTERN_KEY = 'ship-lantern'
 const SHIP_PUFF_KEY = 'ship-puff'
-const SHIP_GLOW_KEY = 'ship-glow'
 /** 风从左舷偏船尾吹来，往右舷偏船头吹：船上的方向（沿船长、横过船宽） */
 const SHIP_WIND = { s: 0.3, t: 0.95 }
 const GULL_SCALE = (1.4 * UNIT) / 96
@@ -1437,9 +1436,6 @@ interface Lantern {
   vAcross: number
   vAlong: number
   readonly body: Phaser.GameObjects.Image
-  readonly glow: Phaser.GameObjects.Image
-  readonly pool: Phaser.GameObjects.Image
-  readonly flicker: number
 }
 
 /** 一只海鸥绕着船上空的一点盘旋，偶尔扇几下翅膀 */
@@ -1499,25 +1495,25 @@ function drawGull(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   ctx.fill()
 }
 
-/** 从上往下看的吊灯：黑铁的灯罩顶，四周透出暖黄的光 */
+/** 从上往下看的吊灯：黑铁的灯罩顶，四周一圈映着天光的玻璃；白天不点 */
 function drawLantern(ctx: CanvasRenderingContext2D, size: number): void {
   const c = size / 2
-  const glow = ctx.createRadialGradient(c, c, size * 0.05, c, c, c)
-  glow.addColorStop(0, 'rgba(255,236,170,1)')
-  glow.addColorStop(0.45, 'rgba(255,190,90,0.9)')
-  glow.addColorStop(1, 'rgba(255,150,60,0)')
-  ctx.fillStyle = glow
-  ctx.fillRect(0, 0, size, size)
-  ctx.fillStyle = '#1b1612'
-  ctx.beginPath()
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2
-    const x = c + Math.cos(a) * size * 0.2
-    const y = c + Math.sin(a) * size * 0.2
-    if (k === 0) ctx.moveTo(x, y)
-    else ctx.lineTo(x, y)
+  const hexagon = (r: number): void => {
+    ctx.beginPath()
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2
+      const x = c + Math.cos(a) * size * r
+      const y = c + Math.sin(a) * size * r
+      if (k === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
   }
-  ctx.closePath()
+  ctx.fillStyle = 'rgba(214,230,232,0.85)'
+  hexagon(0.3)
+  ctx.fill()
+  ctx.fillStyle = '#1b1612'
+  hexagon(0.2)
   ctx.fill()
   ctx.fillStyle = '#6a5436'
   ctx.beginPath()
@@ -1526,8 +1522,8 @@ function drawLantern(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * 船：海面由着色器画，风浪两层交错、夕照、白浪、船舷、水线白沫、船头浪与尾流；甲板是一张程序画出的木板贴图；
- * 桅杆、帆桁、索具与帆按高度随船的横摇纵摇甩开，影子背着夕阳投在甲板上；吊灯按单摆挂着，灯光在甲板上跟着晃；
+ * 船：海面由着色器画，正午的松石绿浅海、风浪两层交错、白浪、船舷、水线白沫、船头浪与尾流；甲板是一张程序画出的木板贴图；
+ * 桅杆、帆桁、索具与帆按高度随船的横摇纵摇甩开，影子背着太阳投在甲板上；吊灯按单摆挂着，白天不点；
  * 炮弹顺坡滚，低的一侧舷边溅浪花，海鸥在桅顶上空盘旋。船长沿进场时屏幕的长边摆，之后不再随屏幕转
  */
 class ShipView extends BoundedView {
@@ -1571,7 +1567,6 @@ class ShipView extends BoundedView {
     )
     const scene = v.scene
     if (!scene.textures.exists(SHIP_PUFF_KEY)) canvasTexture(scene, SHIP_PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
-    if (!scene.textures.exists(SHIP_GLOW_KEY)) canvasTexture(scene, SHIP_GLOW_KEY, 64, 64, (ctx) => drawSpark(ctx, 64))
     if (!scene.textures.exists(BALL_KEY)) canvasTexture(scene, BALL_KEY, 48, 48, (ctx) => drawBall(ctx, 48))
     if (!scene.textures.exists(GULL_KEY)) canvasTexture(scene, GULL_KEY, 96, 48, (ctx) => drawGull(ctx, 96, 48))
     if (!scene.textures.exists(LANTERN_KEY)) canvasTexture(scene, LANTERN_KEY, 48, 48, (ctx) => drawLantern(ctx, 48))
@@ -1686,14 +1681,10 @@ class ShipView extends BoundedView {
     ]
     const rng = new Rng(seed ^ 0x1a77)
     for (const hg of hangs) {
-      const pool = scene.add.image(0, 0, SHIP_GLOW_KEY).setDepth(-0.7).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a3c).setAlpha(0.3).setScale((6.5 * UNIT) / 64)
-      const glow = scene.add.image(0, 0, SHIP_GLOW_KEY).setDepth(32).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffb35c).setAlpha(0.55).setScale((1.6 * UNIT) / 64)
       const body = scene.add.image(0, 0, LANTERN_KEY).setDepth(32.1).setScale((0.62 * UNIT) / 48)
-      this.lanterns.push({ ...hg, across: 0, along: 0, vAcross: 0, vAlong: 0, body, glow, pool, flicker: rng.next() * 10 })
-      this.visuals.push(pool, glow, body)
+      this.lanterns.push({ ...hg, across: 0, along: 0, vAcross: 0, vAlong: 0, body })
+      this.visuals.push(body)
     }
-    const sky = deckPoint(deck, Math.max(1.6, h.stern * h.lengthU * 0.3) + 3.6, 0)
-    this.visuals.push(scene.add.image(sky.x, sky.y, SHIP_GLOW_KEY).setDepth(-0.7).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa850).setAlpha(0.35).setScale((3 * UNIT) / 64))
     for (let i = 0; i < 3; i++) {
       const m = masts[Math.floor(rng.next() * masts.length)]!
       const img = scene.add.image(0, 0, GULL_KEY).setDepth(37).setScale(GULL_SCALE).setAlpha(0.88)
@@ -1711,7 +1702,7 @@ class ShipView extends BoundedView {
       })
       .setDepth(34)
     this.visuals.push(this.spray)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.24, 0x000000)
+    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.12, 0x000000)
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -1770,10 +1761,7 @@ class ShipView extends BoundedView {
       const ls = l.s + hookUp * Math.sin(pitch) + (l.cord * Math.sin(l.along)) / mpu
       const lt = l.t + hookUp * Math.sin(roll) + (l.cord * Math.sin(l.across)) / mpu
       const p = deckPoint(deck, ls, lt)
-      const f = 0.92 + 0.08 * Math.sin(now / 90 + l.flicker) * Math.sin(now / 37 + l.flicker * 3)
       l.body.setPosition(p.x, p.y)
-      l.glow.setPosition(p.x, p.y).setAlpha(0.5 * f)
-      l.pool.setPosition(p.x, p.y).setAlpha(0.28 * f)
     }
     for (const gl of this.gulls) {
       gl.a += gl.w * dt
