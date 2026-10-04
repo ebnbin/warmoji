@@ -55,6 +55,12 @@ export function drift(cfg: Wading, out: BodyStep, x: number, y: number, vx: numb
 
 const FLOW: Flow = { h: 0, u: 0, v: 0 }
 
+/** 半径 radius 像素、质量倍率 massMul 的身体刚落在 (x, y) 像素处站得住：干地，或者水里推不倒、冲不走 */
+export function holds(cfg: Wading, w: Water, x: number, y: number, radius: number, massMul: number): boolean {
+  flowAt(w, x / UNIT, y / UNIT, FLOW)
+  return FLOW.h < cfg.body.wetM || !swept(cfg, radius, massMul, FLOW.h, FLOW.u, FLOW.v, false)
+}
+
 /** 身体本来的大小：角色的判定半径里乘了队长倍率，那只是画面上突出队长，受力不算它 */
 function bodyRadius(sim: Sim, eid: number): number {
   return hasComponent(sim.world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!

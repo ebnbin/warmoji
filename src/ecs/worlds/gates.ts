@@ -273,7 +273,10 @@ function slide(g: Gate, p: Point, by: number): Point {
   return { x: g.ax + dx * t, y: g.ay + dy * t }
 }
 
-/** p 吸附到这一处的距离与吸附到的点：口子取口心，段取最近的点，整片地面与抛得到的圈里就是 p 自己；抛不到是 null */
+/**
+ * p 吸附到这一处的距离与吸附到的点：口子取口心，段取最近的点，整片地面与抛得到的圈里就是 p 自己；抛不到是 null。
+ * 有朝向的口子与段只吸它面前那一侧的点：墙后、栅栏外的出生点不会被挪到墙这边来
+ */
 function hitOf(g: Gate, p: Point): { readonly d: number; readonly x: number; readonly y: number } | null {
   switch (g.shape) {
     case 'area':
@@ -281,9 +284,11 @@ function hitOf(g: Gate, p: Point): { readonly d: number; readonly x: number; rea
     case 'reach':
       return Math.hypot(p.x - g.ax, p.y - g.ay) <= g.r ? { d: 0, x: p.x, y: p.y } : null
     case 'point':
+      if ((p.x - g.ax) * g.nx + (p.y - g.ay) * g.ny < 0) return null
       return { d: Math.max(0, Math.hypot(p.x - g.ax, p.y - g.ay) - g.r), x: g.ax, y: g.ay }
     case 'segment': {
       const q = slide(g, p, 0)
+      if ((p.x - q.x) * g.nx + (p.y - q.y) * g.ny < 0) return null
       return { d: Math.hypot(p.x - q.x, p.y - q.y), x: q.x, y: q.y }
     }
   }

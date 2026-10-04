@@ -1,5 +1,6 @@
 import { UNIT } from '../../util/units'
 import { roomAt } from '../worlds/basin'
+import type { Basin } from '../worlds/basin'
 import type { Landmark } from '../worlds/gates'
 import type { RiverConfig } from '../../types/maps'
 import type { Reach } from './channel'
@@ -32,6 +33,24 @@ function every(r: Reach, step: number, from: number): number[] {
 }
 
 /**
+ * 一段河道两岸的水边，像素，朝岸上：沿河每隔一段一处，弧长不到 from 格的、skip（格）说不要的、往岸上走不出一段能走的地面的不摆
+ */
+export function bankMarks(r: Reach, basin: Basin, from: number, skip: (x: number, y: number) => boolean): Landmark[] {
+  const out: Landmark[] = []
+  for (const i of every(r, BANK_STEP_U, from)) {
+    for (const side of [1, -1]) {
+      const nx = -r.ty[i]! * side
+      const ny = r.tx[i]! * side
+      const x = r.x[i]! + nx * r.half[i]!
+      const y = r.y[i]! + ny * r.half[i]!
+      if (skip(x, y) || roomAt(basin, (x + nx * SHORE_U) * UNIT, (y + ny * SHORE_U) * UNIT) < 0.5 * UNIT) continue
+      out.push({ x: x * UNIT, y: y * UNIT, r: BANK_R_U * UNIT, nx, ny })
+    }
+  }
+  return out
+}
+
+/**
  * 河流的地标，像素，按地图一次定下：ports 是瀑布下的深潭与两个断崖边（林子里的口子躲开它们）；bank 是两岸的水边，朝岸上；
  * falls 是瀑布顶；mist 是两个断崖边两侧的崖沿，朝空地里；deep 是河道的深泓
  */
@@ -46,17 +65,7 @@ export function riverMarks(cfg: RiverConfig, plan: RiverPlan): Record<string, La
   const deep: Landmark[] = []
   plan.reaches.forEach((r, k) => {
     // 主河道从深潭中心起，潭里没有岸
-    const from = k === 0 ? inlet.poolR + 1 : 0
-    for (const i of every(r, BANK_STEP_U, from)) {
-      for (const side of [1, -1]) {
-        const nx = -r.ty[i]! * side
-        const ny = r.tx[i]! * side
-        const x = r.x[i]! + nx * r.half[i]!
-        const y = r.y[i]! + ny * r.half[i]!
-        if (nearLip(x, y) || roomAt(plan.basin, (x + nx * SHORE_U) * UNIT, (y + ny * SHORE_U) * UNIT) < 0.5 * UNIT) continue
-        bank.push({ x: x * UNIT, y: y * UNIT, r: BANK_R_U * UNIT, nx, ny })
-      }
-    }
+    bank.push(...bankMarks(r, plan.basin, k === 0 ? inlet.poolR + 1 : 0, nearLip))
     for (const i of every(r, DEEP_STEP_U, 0)) {
       const off = r.shift[i]! * r.half[i]!
       const x = r.x[i]! - r.ty[i]! * off

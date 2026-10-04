@@ -13,7 +13,7 @@ import { roomFor } from '../worlds/gates'
 import { riverPlan } from './layout'
 import { riverMarks } from './marks'
 import { flowAt, sinkAt, solveWater } from './water'
-import { swept, wade, washOut } from './bodies'
+import { holds, wade, washOut } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
@@ -269,11 +269,7 @@ export const river: WorldHooks = {
   /** 站得下、没越过断崖边；落在水里的要这么大的身体在那里站得住 */
   canSpawn(sim, x, y, radius) {
     const s = riverOf(sim)
-    if (!roomFor(s.plan.basin, x, y, radius) || overFalls(s, x, y) >= 0) return false
-    if (!s.water) return true
-    const cfg = cfgOf(sim)
-    flowAt(s.water, x / UNIT, y / UNIT, FLOW)
-    return FLOW.h < cfg.body.wetM || !swept(cfg, radius, ENEMY_BODY.mass, FLOW.h, FLOW.u, FLOW.v, false)
+    return roomFor(s.plan.basin, x, y, radius) && overFalls(s, x, y) < 0 && (!s.water || holds(cfgOf(sim), s.water, x, y, radius, ENEMY_BODY.mass))
   },
   landmarks(sim) {
     return riverOf(sim).marks

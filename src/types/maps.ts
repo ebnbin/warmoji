@@ -997,8 +997,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
