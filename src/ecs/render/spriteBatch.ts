@@ -124,16 +124,8 @@ export class EcsSpriteBatch extends EcsLayer {
     spriteMatrix.applyITRS(x, y, rot, 1, 1)
     this.camMatrix.multiply(spriteMatrix, calc)
 
-    const hw = (flipX ? -1 : 1) * w * 0.5
+    let hw = (flipX ? -1 : 1) * w * 0.5
     const hh = h * 0.5
-    const x0 = calc.getX(-hw, -hh)
-    const y0 = calc.getY(-hw, -hh)
-    const x1 = calc.getX(-hw, hh)
-    const y1 = calc.getY(-hw, hh)
-    const x2 = calc.getX(hw, -hh)
-    const y2 = calc.getY(hw, -hh)
-    const x3 = calc.getX(hw, hh)
-    const y3 = calc.getY(hw, hh)
 
     this.atlas.uvInto(frame, this.uv)
     let u0 = this.uv[0]!
@@ -149,19 +141,40 @@ export class EcsSpriteBatch extends EcsLayer {
       else v0 = vm
     }
 
+    const light = this.lit && effect === 0 ? this.light : undefined
+    // 背着太阳的方向转进精灵自己的坐标，按对角线的一半归一
+    let ax = 0
+    let ay = 0
+    if (light) {
+      const c = Math.cos(rot)
+      const s = Math.sin(rot)
+      const r = Math.hypot(hw, hh) || 1
+      ax = (c * AWAY.x + s * AWAY.y) / r
+      ay = (c * AWAY.y - s * AWAY.x) / r
+      // 四边形沿 TL–BR 剖成两个三角形：这条对角线顺着光时，几何与贴图一起左右镜像，换成横着光的那条，暗面才压得进背光的一角
+      if (Math.abs(hw * ax + hh * ay) > Math.abs(hw * ax - hh * ay)) {
+        hw = -hw
+        const u = u0
+        u0 = u1
+        u1 = u
+      }
+    }
+
+    const x0 = calc.getX(-hw, -hh)
+    const y0 = calc.getY(-hw, -hh)
+    const x1 = calc.getX(-hw, hh)
+    const y1 = calc.getY(-hw, hh)
+    const x2 = calc.getX(hw, -hh)
+    const y2 = calc.getY(hw, -hh)
+    const x3 = calc.getX(hw, hh)
+    const y3 = calc.getY(hw, hh)
     const tex = this.atlas.pageGlTexture(this.atlas.page(frame))
-    const light = this.light
-    if (!this.lit || !light || effect !== 0) {
+    if (!light) {
       const tint = packTint(color, alpha)
       node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, effect, tint, tint, tint, tint, this.renderOptions)
       return
     }
-    // 四个角偏离中心的那段投到背光方向上，按对角线的一半归一：迎光的角最亮，背光的角最暗
-    const c = Math.cos(rot)
-    const s = Math.sin(rot)
-    const r = Math.hypot(hw, hh) || 1
-    const ax = (c * AWAY.x + s * AWAY.y) / r
-    const ay = (c * AWAY.y - s * AWAY.x) / r
+    // 每个角偏离中心的那段投到背光方向上：迎光的一半保持 sun，过了中心才往背光的一角渐渐乘到 shade
     const { sun, shade } = light
     node.batch(
       drawingContext,
@@ -169,10 +182,10 @@ export class EcsSpriteBatch extends EcsLayer {
       x0, y0, x1, y1, x2, y2, x3, y3,
       u0, v0, u1 - u0, v1 - v0,
       effect,
-      litTint(color, sun, shade, 0.5 - 0.5 * (hw * ax + hh * ay), alpha),
-      litTint(color, sun, shade, 0.5 - 0.5 * (hw * ax - hh * ay), alpha),
-      litTint(color, sun, shade, 0.5 + 0.5 * (hw * ax - hh * ay), alpha),
-      litTint(color, sun, shade, 0.5 + 0.5 * (hw * ax + hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, -hw * ax - hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, -hw * ax + hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, hw * ax - hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, hw * ax + hh * ay), alpha),
       this.renderOptions,
     )
   }
