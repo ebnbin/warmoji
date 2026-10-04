@@ -1,5 +1,12 @@
 import type { BattlefieldTuning } from '../src/types/battlefield'
 
+const DESERT_EVENTS = [
+  { id: 'desert_gale', emoji: '1f32c', name: '疾风助战', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+  { id: 'desert_mirage', emoji: '2728', name: '海市蜃楼', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+  { id: 'desert_sand', emoji: '1f3dc', name: '流沙陷步', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+  { id: 'desert_storm', emoji: '1f32a', name: '沙暴蔽日', desc: '全队伤害 -22%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { damage: 0.78 } } } },
+] as const
+
 const RIVER_EVENTS = [
   { id: 'river_flow', emoji: '1f6f6', name: '顺流而行', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
   { id: 'river_spring', emoji: '1f4a7', name: '活水灌注', desc: '全队攻速 +28%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.78 } } } },
@@ -23,12 +30,8 @@ export const BATTLEFIELD = {
       { id: 'forest_vines', emoji: '1f33f', name: '藤蔓缠足', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'forest_spore', emoji: '1f344', name: '孢子狂化', desc: '敌人移速 +30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { enemy: { mul: { moveSpeed: 1.3 } } } },
     ],
-    desert: [
-      { id: 'desert_gale', emoji: '1f32c', name: '疾风助战', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
-      { id: 'desert_mirage', emoji: '2728', name: '海市蜃楼', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
-      { id: 'desert_sand', emoji: '1f3dc', name: '流沙陷步', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
-      { id: 'desert_storm', emoji: '1f32a', name: '沙暴蔽日', desc: '全队伤害 -22%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { damage: 0.78 } } } },
-    ],
+    oldDesert: DESERT_EVENTS,
+    desert: DESERT_EVENTS,
     oldRiver: RIVER_EVENTS,
     river: RIVER_EVENTS,
     void: [

@@ -772,10 +772,56 @@ function buildCave(): BgmScore {
   )
 }
 
+/** 沙漠：一圈一圈走不出去——低音持续不断，琶音绕着同一个音型打转，旋律走了一大圈又落回开头那个音 */
+function buildDunes(): BgmScore {
+  const chords = [0, 0, 1, 1, 0, 0, 6, 6, 5, 5, 6, 6, 1, 1, 0, 0]
+  return track(
+    {
+      bpm: 84,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 50,
+      scale: PHRYGIAN_DOM,
+      echo: { delaySec: (60 / 84) * 0.75, feedback: 0.42, level: 0.42 },
+    },
+    (b) => {
+      const drone: Voice = { wave: 'sine', vol: 0.11, attack: 0.5, release: 1.4, octave: -1 }
+      const bass: Voice = { wave: 'triangle', vol: 0.15, attack: 0.015, release: 0.12, octave: -2 }
+      const sand: Voice = { wave: 'triangle', vol: 0.045, attack: 0.01, release: 0.08, octave: 0 }
+      const lead: Voice = { wave: 'sawtooth', vol: 0.07, attack: 0.05, release: 0.22, octave: 1, echo: true }
+      b.pad(drone, chords, [0, 2])
+      b.bass(bass, chords, 'r.....o.')
+      b.arp(sand, chords, [0, 1, 2, 1, 0, 1, 3, 1])
+      b.line(lead, [
+        [0, 0, 4, 4], [0, 4, 3, 2], [0, 6, 2, 2],
+        [1, 0, 1, 6], [1, 6, 2, 2],
+        [2, 0, 4, 3], [2, 3, 5, 1], [2, 4, 4, 4],
+        [3, 0, 3, 2], [3, 2, 2, 2], [3, 4, 1, 4],
+        [4, 0, 0, 8],
+        [5, 4, 4, 2], [5, 6, 5, 2],
+        [6, 0, 6, 4], [6, 4, 5, 2], [6, 6, 4, 2],
+        [7, 0, 5, 8],
+        [8, 0, 7, 3], [8, 3, 8, 1], [8, 4, 7, 4],
+        [9, 0, 6, 2], [9, 2, 5, 2], [9, 4, 4, 4],
+        [10, 0, 5, 4], [10, 4, 6, 4],
+        [11, 0, 4, 8],
+        [12, 0, 2, 2], [12, 2, 1, 2], [12, 4, 2, 4],
+        [13, 0, 3, 4], [13, 4, 2, 2], [13, 6, 1, 2],
+        [14, 0, 1, 4], [14, 4, 0, 4],
+        [15, 0, 0, 6],
+      ])
+      b.drums('tom', 'x.....x.', 0, 16, 0.2)
+      b.drums('hat', '....x...', 4, 16, 0.035)
+      b.drums('kick', 'x.......', 8, 16, 0.12)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
-  desert: buildDesert,
+  oldDesert: buildDesert,
   oldRiver: buildRiver,
   void: buildVoid,
   oldRuins: buildOldRuins,
@@ -790,6 +836,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   river: buildRiver,
   floe: buildFloe,
   cave: buildCave,
+  desert: buildDunes,
 }
 
 const cache = new Map<BgmId, BgmScore>()

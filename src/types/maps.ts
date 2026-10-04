@@ -664,6 +664,71 @@ export interface RiverConfig {
     readonly wetM: number
   }
 }
+/** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
+export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
+
+/**
+ * 沙漠：一片四边首尾相接的沙海，地图的四边是回绕的接缝，镜头跟着队长走、看不到边。沙丘与标志物都是一对一对的：
+ * 同一个摆在横竖各隔半圈的两处，再加上整圈的回绕，怎么走都分不清是回到了原地还是到了另一处。
+ * 赶路按坡度与沙的松实算代谢，背阴处歇着回得快；标志物挡人不挡子弹；身体走过的地方留下脚印，越累越深，见底时拖着脚走，过一会儿被风吹平。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface DesertConfig {
+  readonly meterPerU: number
+  /** 镜头的长边最多看多少格：看到的范围小于环面的一圈，每样东西只画离队长最近的那一份 */
+  readonly viewMaxU: number
+  /** 太阳的仰角（度），方位与角色的光一致 */
+  readonly sunDeg: number
+  /**
+   * 沙丘：几对、每座最高处多高（米）；每座由几团圆润的沙包横着风排开、融成一道缓丘，沙包迎风坡最陡处的坡度是 stossSlope、背风坡最陡处是 leeSlope（正切）；
+   * 沙包横着风的半宽是它顺风长的 width 倍；各座沙丘在盛行风两侧最多偏 turnDeg 度
+   */
+  readonly dunes: {
+    readonly pairs: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly lobes: readonly [number, number]
+    readonly stossSlope: number
+    readonly leeSlope: number
+    readonly width: number
+    readonly turnDeg: number
+  }
+  /** 盛行风吹去的方向在背着太阳的方向两侧最多偏多少度：背风坡多半背着太阳 */
+  readonly windSpreadDeg: number
+  /** 丘间的缓缓起伏：幅度（米）与一圈里起伏几次 */
+  readonly swell: { readonly heightM: number; readonly waves: number }
+  /** 丘间的沙：松的程度在 loose 的范围里按一圈 patches 片斑块起伏，实一点的地方颜色偏深偏红、走起来省力 */
+  readonly flats: { readonly loose: readonly [number, number]; readonly patches: number }
+  /** 标志物：几对（每对一模一样，横竖各隔半圈），彼此至少隔多远（格） */
+  readonly landmarks: { readonly pairs: number; readonly gapU: number }
+  /**
+   * 走路的代谢按 Minetti 的坡度曲线：松沙上每米是硬地的 softSand 倍，被踩实的沙最多省掉多出来的 packRelief；
+   * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍
+   */
+  readonly gait: {
+    readonly softSand: number
+    readonly packRelief: number
+    readonly maxPower: number
+    readonly downhillMax: number
+  }
+  /** 背阴处歇着的体力回复倍率；向阳处按地图的体力回复 */
+  readonly shadeRegen: number
+  /**
+   * 脚印：印子贴图每格多少个格子。标准身体在松沙上一步踩多深（米），实沙上只踩下去 firm 倍，累到见底时深到 tired 倍，体力低于 dragFrom 开始拖着脚；
+   * 步幅与脚长占身体半径的比例；印子与踩实的沙过多少秒被风吹平；一步把那里的沙踩实多少；各种敌人的步态，没写的按光脚，队员穿着靴子
+   */
+  readonly tracks: {
+    readonly perU: number
+    readonly depthM: number
+    readonly firm: number
+    readonly tired: number
+    readonly dragFrom: number
+    readonly stride: number
+    readonly foot: number
+    readonly lifeS: number
+    readonly pack: number
+    readonly gaits: Partial<Record<EnemyKind, DesertGait>>
+  }
+}
 /**
  * 残垣：山顶台地上一座塌了大半的石砌院落——中间是回廊院，四周一圈房间，一角是塔楼。墙按一层层石块砌成，各处剩多高按砌体的物理来：
  * 高过膝盖挡人、高过胸口挡子弹、高过眼睛挡视线（按 obstacles 的身高比例）；打掉的石块以上失去支撑一起塌下，陡过砌法的地方塌成台阶，
@@ -782,7 +847,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -803,6 +868,7 @@ export interface MapDef {
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
   readonly river?: RiverConfig
+  readonly desert?: DesertConfig
   readonly ruins?: RuinsConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string

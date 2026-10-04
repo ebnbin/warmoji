@@ -34,10 +34,11 @@ import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
 import { bodyField } from '../src/ecs/ruins/masonry.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
-import { UNIT } from '../src/util/units.ts'
+import { UNIT, VIEW } from '../src/util/units.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
+import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
@@ -309,6 +310,50 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
   need(view.dayU / 2 <= side / 2 + MAP_DEFAULTS.cameraMargin, `maps.${id}.cave.view.dayU 须让白天的镜头落在地图与边距以内`)
+}
+
+/**
+ * 沙漠：地图是边长为 2 的幂的正方形，地面、印子与地形的贴图才按一圈平铺得上；镜头看到的长边比一圈小，平常的屏幕不用拉近；
+ * 最大的沙丘从脊线中点往哪边伸都不到半圈（按离它最近的那一份算高才对）；坡度、休止角、走路的代谢说得通；平时的风吹不起沙、沙暴吹得起，
+ * 一场沙暴在下一场之前刮完；标准身体的印子平时留得住一阵，沙暴最猛时累到见底的印子也在一阵里填平；印子贴图记得下一小时落下的沙
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'desert') === (m.desert !== undefined), `maps.${id} 是沙漠当且仅当写了 desert`)
+  const d = m.desert
+  if (!d) continue
+  const at = `maps.${id}.desert`
+  const w = m.size?.w ?? MAP_DEFAULTS.width
+  const h = m.size?.h ?? MAP_DEFAULTS.height
+  const pow2 = (n: number): boolean => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0
+  const span = (r: readonly [number, number]): boolean => r[0] > 0 && r[0] <= r[1]
+  const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 1 && r[0] <= r[1]
+  need(w === h && pow2(w), `${at} 的地图须是边长为 2 的幂的正方形：环面按一圈平铺，贴图要能重复`)
+  need(pow2(d.tracks.perU), `${at}.tracks.perU 须是 2 的幂：印子贴图按一圈平铺`)
+  need(d.meterPerU > 0 && d.sunDeg > 5 && d.sunDeg < 85, `${at} 的米每格须为正、太阳的仰角在 5 到 85 度之间`)
+  need(d.viewMaxU >= VIEW.minLong / UNIT && d.viewMaxU <= w - 4, `${at}.viewMaxU 须不小于平常屏幕的长边 ${VIEW.minLong / UNIT} 格、比一圈小 4 格以上：每样东西只画一份`)
+  const dc = d.dunes
+  need(ints(dc.pairs) && ints(dc.lobes) && span(dc.heightM), `${at}.dunes 的对数与沙包数须为正整数范围、高为正的范围`)
+  need(dc.stossSlope > 0 && dc.stossSlope < dc.leeSlope && dc.leeSlope < Math.tan((33 * Math.PI) / 180), `${at}.dunes 迎风坡须比背风坡缓，背风坡须缓过 33 度的休止角：沙丘是圆的，没有落沙坡`)
+  need(dc.width > 0 && dc.turnDeg >= 0 && dc.turnDeg < 90, `${at}.dunes 的宽须为正、朝向的偏离在 0 到 90 度之间`)
+  const bump = 8 / (3 * Math.sqrt(3))
+  const back = (bump * dc.heightM[1]) / dc.stossSlope
+  const front = (bump * dc.heightM[1]) / dc.leeSlope
+  const half = (dc.width * (back + front)) / 2
+  const reachU = Math.hypot(front * 0.65 + Math.max(back, front), ((dc.lobes[1] - 1) * half * 1.1) / 2 + half) / d.meterPerU
+  need(reachU < w / 2 - 1, `${at}.dunes 最大的沙丘伸出中心 ${reachU.toFixed(1)} 格，须不到半圈 ${w / 2} 格`)
+  need(d.windSpreadDeg >= 0 && d.windSpreadDeg <= 180, `${at}.windSpreadDeg 须在 0 到 180 度之间`)
+  need(d.swell.heightM >= 0 && Number.isInteger(d.swell.waves) && d.swell.waves >= 1, `${at}.swell 的幅度不为负、一圈起伏的次数为正整数`)
+  need(span(d.flats.loose) && d.flats.loose[1] < 1 && Number.isInteger(d.flats.patches) && d.flats.patches >= 1, `${at}.flats 的松实须在 (0, 1) 内由实到松、斑块数为正整数`)
+  need(Number.isInteger(d.landmarks.pairs) && d.landmarks.pairs >= 1 && d.landmarks.gapU > 0, `${at}.landmarks 的对数为正整数、间隔为正`)
+  need(2 * d.landmarks.pairs * Math.PI * (d.landmarks.gapU / 2) ** 2 < w * h, `${at}.landmarks 摆不下：${2 * d.landmarks.pairs} 样标志物彼此隔 ${d.landmarks.gapU} 格`)
+  const g = d.gait
+  need(g.softSand >= 1 && g.packRelief >= 0 && g.packRelief < 1 && g.maxPower > 1 && g.downhillMax >= 1, `${at}.gait 的松沙倍率不小于 1、踩实在 [0, 1) 内、最大出力大于 1、下坡倍率不小于 1`)
+  need(d.shadeRegen > m.stamina.regen, `${at}.shadeRegen 须大于向阳处的回复 ${m.stamina.regen}`)
+  const t = d.tracks
+  need(t.depthM > 0 && t.firm > 0 && t.firm <= 1 && t.tired >= 1 && t.dragFrom > 0 && t.dragFrom <= 1, `${at}.tracks 的深浅须为正，实沙的比例在 (0, 1] 内，累的倍率不小于 1`)
+  need(t.depthM * t.tired * 1.15 < HEIGHT_SPAN, `${at}.tracks 标准身体累到见底时冲刺踩出的印子须浅于印子贴图记得下的 ${HEIGHT_SPAN} 米`)
+  need(t.stride > 0 && t.foot > 0 && t.pack > 0 && t.pack <= 1 && t.lifeS > 0, `${at}.tracks 的步幅、脚长、踩实与留存的秒数须为正`)
+  need(TIME_QUANT * 65535 >= 3600, `${at}.tracks 印子贴图记得下的时刻只够 ${((TIME_QUANT * 65535) / 60).toFixed(0)} 分钟，须够打满一个钟头`)
 }
 
 /** 身体的体力上限须为正、体力回复不为负 */
