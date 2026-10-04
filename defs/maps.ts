@@ -177,6 +177,21 @@ export const MAPS = {
       density: [0.012, 0.018],
     },
     mix: MEADOW_MIX,
+    gates: {
+      snapU: 4,
+      fallback: 'rise',
+      look: 'leaves',
+      boss: 'brush',
+      kinds: {
+        woods: { name: '林间', at: { kind: 'nooks', spacingU: 6, away: { mark: 'bare', minU: 2 } }, enter: 'walk', look: 'leaves', weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'slime', 'mushroom'] },
+        brush: { name: '林缘', at: { kind: 'rim', segU: 3, away: { mark: 'bare', minU: 2.5 } }, enter: 'climb', look: 'leaves', weight: 1.5, perSec: 1, only: ['zombie', 'snake', 'rat', 'treant'] },
+        log: { name: '倒木', at: { kind: 'mark' }, enter: 'climb', look: 'leaves', snapU: 5, weight: 3, perSec: 1, only: ['zombie', 'boar', 'slime', 'mushroom'] },
+        fence: { name: '栅栏', at: { kind: 'mark' }, enter: 'climb', weight: 2, perSec: 1, only: ['zombie', 'locust', 'rat', 'snake'] },
+        bank: { name: '坡顶', at: { kind: 'mark' }, enter: 'lob', look: 'leaves', reachU: 9, weight: 2, perSec: 1, only: ['locust', 'boar', 'zombie'] },
+        swarm: { name: '蝗群', at: { kind: 'ground' }, enter: 'drop', look: 'leaves', weight: 2, only: ['locust'] },
+        grass: { name: '草丛', at: { kind: 'ground' }, enter: 'rise', look: 'leaves', weight: 1 },
+      },
+    },
     finalWaveSub: '蛛后从林子里爬出来了——草地开阔，绕着它打！',
     meadow: {
       meterPerU: 0.5,

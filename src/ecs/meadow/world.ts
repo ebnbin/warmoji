@@ -6,7 +6,9 @@ import { Radius, Transform } from '../components'
 import { fleeSteer } from '../systems/shared/steer'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
+import { roomFor } from '../worlds/gates'
 import { meadowPlan } from './layout'
+import { meadowMarks } from './marks'
 import type { MeadowPlan } from './layout'
 import type { Basin } from '../worlds/basin'
 import type { MapId, MeadowConfig } from '../../types/maps'
@@ -17,13 +19,13 @@ import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
-const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 /** 草甸按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x6d3ad0
 
-/** 草甸此刻的状态：只有按种子生成的地图，没有会变的东西 */
+/** 草甸此刻的状态：只有按种子生成的地图与它上面的地标，没有会变的东西 */
 export interface MeadowState {
   readonly plan: MeadowPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
 }
 
 function cfgOf(sim: Sim): MeadowConfig {
@@ -38,7 +40,8 @@ export function meadowPlanFor(cfg: MeadowConfig, decorSeed: number): MeadowPlan 
 export function meadowOf(sim: Sim): MeadowState {
   let s = sim.worldState.meadow
   if (!s) {
-    s = { plan: meadowPlanFor(cfgOf(sim), sim.run.decorSeed) }
+    const plan = meadowPlanFor(cfgOf(sim), sim.run.decorSeed)
+    s = { plan, marks: meadowMarks(plan) }
     sim.worldState.meadow = s
   }
   return s
@@ -171,13 +174,13 @@ export const meadow: WorldHooks = {
     return openNear(meadowOf(sim).plan, p, SPAWN.edgeInset * UNIT)
   },
   ground(sim) {
-    return sim.hooks.basin(sim)
+    return meadowOf(sim).plan.basin
   },
-  canSpawn() {
-    return true
+  canSpawn(sim, x, y, radius) {
+    return roomFor(meadowOf(sim).plan.basin, x, y, radius)
   },
-  landmarks() {
-    return NO_MARKS
+  landmarks(sim) {
+    return meadowOf(sim).marks
   },
   lean() {
     return ZERO
