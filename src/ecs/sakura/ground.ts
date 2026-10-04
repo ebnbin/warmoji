@@ -1,7 +1,7 @@
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellNearest, fbm, valueNoise } from '../../util/noise'
-import { bridgeLocal, deckHeight, wallDist, weirLocal } from './layout'
+import { BASIN_WALL_U, bridgeLocal, CREST_U, deckHeight, PATH_HALF_U, wallDist, weirLocal } from './layout'
 import type { Bridge, SakuraPlan, Tree } from './layout'
 import type { SakuraConfig } from '../../types/maps'
 
@@ -13,11 +13,6 @@ export const SHADE_PPU = 8
 const FIELD_U = 0.125
 /** 花团与影子按这么大（格）的格子分桶，画一个像素只看附近几桶 */
 const BUCKET_U = 2
-/** 路面半宽，格（与布局一致） */
-const PATH_HALF_U = 0.55
-/** 堰顶平的那段多长、堰下的石壁多厚，格（与布局一致） */
-const CREST_U = 0.35
-const BASIN_WALL_U = 0.35
 /** 瓦顶：屋脊比墙头高出多少米、院门的瓦顶再高多少米、院门的屋檐比墙的宽出多少（格） */
 const ROOF_RISE_M = 0.35
 const GATE_RISE_M = 0.45

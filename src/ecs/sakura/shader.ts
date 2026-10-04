@@ -1,6 +1,7 @@
 import { at, GRAVITY, project } from '../river/channel'
 import { WATER_CELL_U } from '../river/water'
 import { WATER_GLSL } from '../river/shader'
+import { CREST_U } from './layout'
 import type { Along } from '../river/channel'
 import type { Water } from '../river/water'
 import type { SakuraPlan } from './layout'
@@ -16,8 +17,6 @@ const SPREAD = 4
 /** 跌水沟里的水多快（米/秒）；出了堰顶这么多格以内翻白，往外慢慢平下来 */
 const DITCH_SPEED = 1.4
 const DITCH_WHITE_U = 4
-/** 堰顶平的那段多长，格（与布局一致） */
-const CREST_U = 0.35
 
 /** 给水面着色器的三张数据图，不透明（画布会按透明度预乘，数据必须满 alpha）：地形高程（细格子）、水面高程、流速与乱流 */
 interface WaterImages {

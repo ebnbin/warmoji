@@ -21,10 +21,10 @@ const OUTSIDE_U = 14
 const OUTSIDE_NARROW = 0.8
 const OUTSIDE_HEAD_M = 0.12
 /** 堰顶平的那一段多长，格；堰下的跌水潭两边石壁多厚，格 */
-const CREST_U = 0.35
-const BASIN_WALL_U = 0.35
+export const CREST_U = 0.35
+export const BASIN_WALL_U = 0.35
 /** 路面半宽，格 */
-const PATH_HALF_U = 0.55
+export const PATH_HALF_U = 0.55
 /** 生成不出合格的院子就换一组随机数重来，最多这么多次 */
 const TRIES = 80
 /** 身体中心越过堰顶这么远（格）就被冲下去了 */
@@ -637,7 +637,7 @@ function terrainOf(cfg: SakuraConfig, k: Sketch, seed: number, x0: number, y0: n
       const wl = weirLocal(wr, x, y)
       if (wl.side < wr.half + f.bankU && wl.along > -wc.rampU && wl.along <= CREST_U && wr.crest > g) g += (wr.crest - g) * smooth(-wc.rampU, -wc.rampU * 0.35, wl.along)
       project(k.downstream, x, y, tmp)
-      if (tmp.s > CREST_U - 0.05 && tmp.d < wr.half + f.bankU + 0.5) {
+      if (tmp.s > CREST_U - 0.05 && wl.along > CREST_U - 0.05 && tmp.d < wr.half + f.bankU + 0.5) {
         const ditch = at(k.downstream.half, tmp)
         if (tmp.d < ditch) {
           nearLevel = at(k.downstream.level, tmp)

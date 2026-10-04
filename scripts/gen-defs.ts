@@ -39,7 +39,7 @@ import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
-import { bridgeLocal, sakuraPlan, SINK_M, WASH_U } from '../src/ecs/sakura/layout.ts'
+import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, WASH_U, weirLocal } from '../src/ecs/sakura/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -363,7 +363,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 
 /**
  * 樱庭：参数说得通；堰顶外留出的那段长过冲走的判定，堰下的跌水沟比堰顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
- * 开局站位离边够远，溪两岸各有一扇院门，桥两头落在能走的地方
+ * 开局站位离边够远，溪两岸各有一扇院门，桥两头落在能走的地方，堰顶没有塌下去的缺口
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'sakura') === (m.sakura !== undefined), `maps.${id} 是樱庭当且仅当写了 sakura`)
@@ -399,6 +399,13 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       const y = br.y + br.ay * sgn * (br.half - 0.3)
       need(roomAt(plan.basin, x * UNIT, y * UNIT) > 0.5 * UNIT && Math.abs(bridgeLocal(br, x, y).a) < br.half, `${where} 的桥头没落在能走的地方`)
     }
+    const t = plan.terrain
+    let notch = 0
+    for (let i = 0; i < t.z.length; i++) {
+      const wl = weirLocal(plan.weir, t.x0 + ((i % t.cols) + 0.5) * t.cell, t.y0 + (Math.floor(i / t.cols) + 0.5) * t.cell)
+      if (wl.side < plan.weir.half && wl.along >= 0 && wl.along < CREST_U - 0.05 && t.z[i]! < plan.weir.crest - 0.01) notch++
+    }
+    need(notch === 0, `${where} 的堰顶有 ${notch} 格塌了下去，水会从缺口漏进跌水沟`)
   }
 }
 
