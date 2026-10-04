@@ -156,6 +156,8 @@ export interface WorldHooks {
   center(sim: Sim): Point
   /** 把一个点收进敌人能站、能走到队伍的范围 */
   settle(sim: Sim, p: Point): Point
+  /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
+  seat?(sim: Sim, from: Point, at: Point): Point
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }

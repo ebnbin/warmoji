@@ -26,6 +26,10 @@ const PLAN_SEED = 0x3c1d7e
 const ZAP_CAP = 32
 const SHOCK_TINT = 0x5ff4ff
 const ARC_TINT = 0xb9a8ff
+/** 挪坑位时按这么大的身体（格）、再多留这么远（格）算；电极蓄电蓄过这么多就让开 */
+const SEAT_BODY_U = 0.45
+const SEAT_MARGIN_U = 0.2
+const SEAT_ARC_FROM = 0.4
 
 /** 一条网络此刻：通没通电（0 或 1）、电从电源沿铜冲到了多远（格）、离通电还有多近（0 到 1，只有时钟线有） */
 export interface NetState {
@@ -261,6 +265,21 @@ function openNear(plan: CircuitPlan, p: Point, room: number): Point {
   return { x: plan.start.x * UNIT, y: plan.start.y * UNIT }
 }
 
+/** 队员站在这里会不会挨电：脚下的铜通着电、快通电，或旁边的电极在蓄电、放电 */
+function risky(s: CircuitState, cfg: CircuitConfig, x: number, y: number): boolean {
+  const foot = (SEAT_BODY_U * cfg.shock.footFrac) + SEAT_MARGIN_U
+  const c = copperAt(s.plan.copper, x / UNIT, y / UNIT)
+  if (c && c.dist < foot) {
+    const n = s.nets[c.net]!
+    if (n.level > 0 || n.warn > 0) return true
+  }
+  return s.plan.gaps.some((g, i) => {
+    const st = s.gaps[i]!
+    if (st.phase === 'rest' || (st.phase === 'charge' && st.charge < SEAT_ARC_FROM)) return false
+    return segDist(g.a.x, g.a.y, g.b.x, g.b.y, x / UNIT, y / UNIT) < cfg.arc.reachU + SEAT_BODY_U + SEAT_MARGIN_U
+  })
+}
+
 /** 离带电的铜至少一格 */
 function clearOfCopper(plan: CircuitPlan, p: Point): boolean {
   const c = copperAt(plan.copper, p.x / UNIT, p.y / UNIT)
@@ -357,6 +376,20 @@ export const circuit: WorldHooks = {
   },
   settle(sim, p) {
     return openNear(circuitOf(sim).plan, p, SPAWN.edgeInset * UNIT)
+  },
+  /** 坑位挨电时顺着往队长那边挪，挪到不挨电为止；一路都挨电（队长自己站在电上）就不挪 */
+  seat(sim, from, at) {
+    const cfg = cfgOf(sim)
+    const s = circuitOf(sim)
+    if (!risky(s, cfg, at.x, at.y)) return at
+    const dx = from.x - at.x
+    const dy = from.y - at.y
+    const n = Math.ceil(Math.hypot(dx, dy) / (0.25 * UNIT))
+    for (let k = 1; k <= n; k++) {
+      const p = { x: at.x + (dx * k) / n, y: at.y + (dy * k) / n }
+      if (!risky(s, cfg, p.x, p.y)) return p
+    }
+    return at
   },
   onStart(sim) {
     circuitOf(sim)

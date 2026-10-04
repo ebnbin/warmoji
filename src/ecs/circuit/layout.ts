@@ -1208,13 +1208,16 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   d.copper.push([...linkShapes, { kind: 'plate', p: plate }])
   d.nets.push({ kind: 'button', sources: [linkPts[0]!], driver: 0 })
   const button: Button = { x: bm.x, y: bm.y, r: bc.padU, net: plate.net, plate }
-  // MOS 管摆在连线旁边
-  const lm = { x: (linkPts[0]!.x + linkPts[1]!.x) / 2, y: (linkPts[0]!.y + linkPts[1]!.y) / 2 }
-  const side = toMap(o, westSide ? 0 : 1.9, westSide ? 1.9 : 0)
-  const qx = lm.x + side.x - o.cx
-  const qy = lm.y + side.y - o.cy
-  const q1 = makeSot(mpu, 'Q1', '702', qx, qy, o.ux !== 0 ? (westSide ? 0 : 1) : westSide ? 1 : 0, true)
-  if (d.copper.flat().every((s) => shapeDist(s, q1.x, q1.y) > 1.4) && partDist(q1, cx, cy) > cfg.plazaU + 0.5) d.parts.push(q1)
+  // MOS 管摆在铜板上连线进来的那一角外侧，离开关的字远一点；两侧都摆不下就不摆
+  const qAxis: 0 | 1 = (westSide ? o.ux : o.vx) !== 0 ? 0 : 1
+  const qSpots = [-1, 1].map((sgn) =>
+    westSide ? toMap(o, pc.u - pw / 2 + 1.1, pc.v + sgn * (ph / 2 + 2)) : toMap(o, pc.u + sgn * (pw / 2 + 2), pc.v + ph / 2 - 1.1),
+  )
+  const q1 =
+    qSpots
+      .map((q) => makeSot(mpu, 'Q1', '702', q.x, q.y, qAxis, true))
+      .find((q) => arenaRoom(arena, q.x, q.y) > 2 && partDist(q, cx, cy) > cfg.plazaU + 0.5 && d.copper.flat().every((sh) => shapeDist(sh, q.x, q.y) > Math.max(q.bw, q.bh) + 0.3) && d.parts.every((p) => spaced([p, q], 1.2))) ?? null
+  if (q1) d.parts.push(q1)
 
   // 电弧：过道当中，一根电极从罩壁伸出来，一根从芯片那边伸过去，尖对着尖
   const gaps: Gap[] = []
@@ -1262,7 +1265,7 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     refLabel(d, p, 0.95, -end)
   }
   for (const p of [led, res]) refLabel(d, p, 0.6, -1)
-  if (d.parts.includes(q1)) refLabel(d, q1, 0.6, 1)
+  if (q1) refLabel(d, q1, 0.6, 1)
   // 网络名印在离电源不远的一段横平竖直的线旁边、背着开局空地的那一侧
   const beside = (s: string, line: readonly Point[], off: number): void => {
     const size = 0.8

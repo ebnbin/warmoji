@@ -18,13 +18,15 @@ export function followersOf(sim: Sim): number[] {
   return sim.characters.filter((e) => e !== sim.leader && Alive.v[e] === 1)
 }
 
-/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上 */
+/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上；落在会伤人的地方由地图挪开 */
 export function seatPoints(sim: Sim, n: number): Point[] {
   const cx = leaderX(sim)
   const cy = leaderY(sim)
-  return fanSlots(n, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) =>
-    sim.hooks.constrainBody(sim, sim.leader, { x: cx, y: cy }, { x: cx + o.x, y: cy + o.y }),
-  )
+  const from = { x: cx, y: cy }
+  return fanSlots(n, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) => {
+    const at = sim.hooks.constrainBody(sim, sim.leader, from, { x: cx + o.x, y: cy + o.y })
+    return sim.hooks.seat ? sim.hooks.seat(sim, from, at) : at
+  })
 }
 
 /** 在空位里挑离自己最近的；只有近出滞后量才换，当前位已被别人占了则必须换 */

@@ -100,8 +100,9 @@ void main ()
   float w = warn * (1.0 - level);
   float march = smoothstep(0.45, 0.95, sin(along * 3.2 - uTime * (7.0 + 9.0 * w)));
   float blink = 0.55 + 0.45 * step(0.0, sin(uTime * (10.0 + 26.0 * w)));
-  vec3 hint = neon * w * blink * (cover * (0.1 + 0.75 * march) + spill * 0.18 * march);
-  gl_FragColor = vec4(col * a + glow + spark + hint, a);
+  float ah = cover * w * blink * (0.12 + 0.62 * march);
+  vec3 hint = neon * ah + neon * w * blink * spill * 0.2 * march;
+  gl_FragColor = vec4(col * a + glow + spark + hint, a + ah * (1.0 - a));
 }
 `
 
