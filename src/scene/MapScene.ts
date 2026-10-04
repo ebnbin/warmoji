@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { browserStorage } from '../util/storage'
+import { browserStorage, StorageKey } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { CHARACTERS } from '../data/characters'
@@ -30,7 +30,11 @@ const LABS: readonly RunId[] = RUN_IDS.filter((id) => RUNS[id].map !== undefined
 const JOURNEYS: readonly RunId[] = RUN_IDS.filter((id) => RUNS[id].map === undefined && fightsOf(RUNS[id]).every((f) => f.map !== undefined))
 const TAB_RUNS: readonly RunId[] = RUN_IDS.filter((id) => !LABS.includes(id))
 const LAB_TAB = { key: 'labs', emoji: '1f9ea', name: '实验关' } as const
-type Mode = RunId | typeof LAB_TAB.key
+/** 沙盒排在最前，按这个顺序列新画风的地图，开局同试炼场；其余要选地图的页签只列剩下的旧地图 */
+const BOX_TAB = { key: 'box', emoji: '1f3d6', name: '沙盒', run: 'sandbox' } as const
+const BOX_MAPS: readonly MapId[] = ['meadow', 'desert', 'sakura', 'floe', 'volcano', 'ship', 'cave', 'ruins', 'circuit', 'nebula']
+const OLD_MAPS: readonly MapId[] = MAP_IDS.filter((id) => !BOX_MAPS.includes(id))
+type Mode = RunId | typeof LAB_TAB.key | typeof BOX_TAB.key
 const isJourney = (mode: Mode): mode is RunId => JOURNEYS.some((id) => id === mode)
 const CHAPTER_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'] as const
 const chapterName = (i: number, c: Chapter): string => `第${CHAPTER_NUMS[i] ?? i + 1}章 · ${MAPS[c.map].name}`
@@ -39,9 +43,10 @@ const MUTATOR_ROW = { h: 68, gap: 8 } as const
 
 export class MapScene extends Phaser.Scene {
   private preserveOnRestart = false
-  private selectedId: MapId = MAP_IDS[0]!
+  private boxId: MapId = BOX_MAPS[0]!
+  private oldId: MapId = OLD_MAPS[0]!
   private labId: RunId | undefined = LABS[0]
-  private mode: Mode = TAB_RUNS[0]!
+  private mode: Mode = BOX_TAB.key
   /** 远征页签里正在看的章 */
   private chapter = 0
   private frame!: PageFrame
@@ -64,6 +69,7 @@ export class MapScene extends Phaser.Scene {
       ...Object.values(GROUP_ICONS).map((id) => ({ id })),
       { id: RANDOM_SLOT, outline: 'player' as const },
       { id: LAB_TAB.emoji },
+      { id: BOX_TAB.emoji },
       ...MUTATOR_IDS.map((id) => ({ id: MUTATORS[id].emoji })),
       ...RUN_IDS.map((id) => ({ id: RUNS[id].emoji })),
       ...LABS.flatMap((id) => {
@@ -82,7 +88,8 @@ export class MapScene extends Phaser.Scene {
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
     if (!preserved) {
-      this.selectedId = loadMap(browserStorage())
+      this.boxId = loadMap(browserStorage(), StorageKey.BoxMap, BOX_MAPS)
+      this.oldId = loadMap(browserStorage(), StorageKey.Map, OLD_MAPS)
       this.mutators = loadMutators(browserStorage())
     }
     this.bests = loadLabs(browserStorage())
@@ -93,7 +100,7 @@ export class MapScene extends Phaser.Scene {
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, { title: labs ? '选择关卡' : journey ? `${RUNS[mode].name}路线` : '选择地图', back: () => this.scene.start(SceneKey.Menu) })
-    const tabs: TabItem<Mode>[] = TAB_RUNS.map((id) => ({ key: id, label: `{${RUNS[id].emoji}} ${RUNS[id].name}` }))
+    const tabs: TabItem<Mode>[] = [{ key: BOX_TAB.key, label: `{${BOX_TAB.emoji}} ${BOX_TAB.name}` }, ...TAB_RUNS.map((id) => ({ key: id, label: `{${RUNS[id].emoji}} ${RUNS[id].name}` }))]
     if (LABS.length > 0) tabs.push({ key: LAB_TAB.key, label: `{${LAB_TAB.emoji}} ${LAB_TAB.name}` })
     new Tabs<Mode>(this, { x: f.left, y: f.subY, w: f.right - f.left }, {
       items: tabs,
@@ -142,13 +149,15 @@ export class MapScene extends Phaser.Scene {
         }),
       )
     } else {
+      const box = mode === BOX_TAB.key
       const grid = (this.mapGrid = new EmojiGrid<MapId>(this, f.list))
       grid.onTap = (key): void => {
-        this.selectedId = key
-        saveMap(browserStorage(), this.selectedId)
+        if (box) this.boxId = key
+        else this.oldId = key
+        saveMap(browserStorage(), box ? StorageKey.BoxMap : StorageKey.Map, key)
         this.refresh()
       }
-      grid.setItems(MAP_IDS.map((id) => ({ key: id, emoji: MAPS[id].emoji })))
+      grid.setItems((box ? BOX_MAPS : OLD_MAPS).map((id) => ({ key: id, emoji: MAPS[id].emoji })))
     }
 
     this.confirm = new Button(this, f.centerX, f.footerY, { label: '', keys: ['ENTER', 'SPACE'], onTap: () => this.start() })
@@ -163,9 +172,18 @@ export class MapScene extends Phaser.Scene {
     })
   }
 
+  private get selectedId(): MapId {
+    return this.mode === BOX_TAB.key ? this.boxId : this.oldId
+  }
+
+  private runId(): RunId | undefined {
+    const mode = this.mode
+    return mode === LAB_TAB.key ? this.labId : mode === BOX_TAB.key ? BOX_TAB.run : mode
+  }
+
   private start(): void {
     const mode = this.mode
-    const id = mode === LAB_TAB.key ? this.labId : mode
+    const id = this.runId()
     if (!id) return
     const run = beginRun(id, this.selectedId, mode === LAB_TAB.key || isJourney(mode) ? this.applied(id) : [])
     skipFilled(run)
@@ -183,7 +201,7 @@ export class MapScene extends Phaser.Scene {
     else chosen.delete(mutator)
     this.mutators = MUTATOR_IDS.filter((m) => chosen.has(m))
     saveMutators(browserStorage(), this.mutators)
-    const id = this.mode === LAB_TAB.key ? this.labId : this.mode
+    const id = this.runId()
     if (id) this.showHeat(id)
   }
 
@@ -195,7 +213,7 @@ export class MapScene extends Phaser.Scene {
     this.confirm.setLabel(heat > 0 ? `${go} · 热度 ${heat}` : go)
   }
 
-  private renderMap(mode: RunId): void {
+  private renderMap(mode: RunId, tab: { readonly name: string; readonly emoji: string } = RUNS[mode]): void {
     const view = this.detail.clear()
     const def = MAPS[this.selectedId]
     const width = this.frame.detail.w - 48
@@ -206,8 +224,7 @@ export class MapScene extends Phaser.Scene {
     flow.heading('玩法', GROUP_ICONS.play)
     for (const line of mapPlayLines(def)) flow.text(line)
     flow.text(`终波头目 ${bossFor(this.selectedId).name}`, { color: 'muted' })
-    const run = RUNS[mode]
-    flow.gap(10).heading(run.name, run.emoji).text(run.desc)
+    flow.gap(10).heading(tab.name, tab.emoji).text(RUNS[mode].desc)
     flow.finish()
   }
 
@@ -323,6 +340,11 @@ export class MapScene extends Phaser.Scene {
       return
     }
     this.mapGrid?.setSelected(this.selectedId)
+    if (this.mode === BOX_TAB.key) {
+      this.confirm.setLabel(`进入${BOX_TAB.name}`)
+      this.renderMap(BOX_TAB.run, BOX_TAB)
+      return
+    }
     const run = RUNS[this.mode]
     this.confirm.setLabel(run.steps[0]?.kind === 'recruit' ? '招募首发' : `进入${run.name}`)
     this.renderMap(this.mode)

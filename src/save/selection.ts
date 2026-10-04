@@ -1,25 +1,23 @@
 import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
-import { MAP_IDS } from '../data/maps'
 import { MUTATOR_IDS } from '../data/mutators'
 import type { MapId } from '../types/maps'
 import type { MutatorId } from '../types/runs'
 
-function sanitizeMapId(id: unknown): MapId {
-  return MAP_IDS.find((m) => m === id) ?? MAP_IDS[0]!
-}
+type MapKey = StorageKey.Map | StorageKey.BoxMap
 
-export function loadMap(storage: StringStorage | undefined): MapId {
+export function loadMap(storage: StringStorage | undefined, key: MapKey, maps: readonly MapId[]): MapId {
   try {
-    return sanitizeMapId(storage?.getItem(StorageKey.Map))
+    const id = storage?.getItem(key)
+    return maps.find((m) => m === id) ?? maps[0]!
   } catch {
-    return sanitizeMapId(undefined)
+    return maps[0]!
   }
 }
 
-export function saveMap(storage: StringStorage | undefined, id: MapId): void {
+export function saveMap(storage: StringStorage | undefined, key: MapKey, id: MapId): void {
   try {
-    storage?.setItem(StorageKey.Map, id)
+    storage?.setItem(key, id)
   } catch {
   }
 }
