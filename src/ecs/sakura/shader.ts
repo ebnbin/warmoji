@@ -1,7 +1,7 @@
 import { at, GRAVITY, project } from '../river/channel'
 import { WATER_CELL_U } from '../river/water'
 import { WATER_GLSL } from '../river/shader'
-import { CREST_U } from './layout'
+import { CREST_U, weirLocal } from './layout'
 import type { Along } from '../river/channel'
 import type { Water } from '../river/water'
 import type { SakuraPlan } from './layout'
@@ -40,7 +40,8 @@ function put16(out: Uint8ClampedArray, o: number, z: number): void {
 /**
  * 编码水面：地形高程照搬；水面高程与流速按 WATER_CELL_U 的格子铺满整片地形，有解出来的稳态水流就用它；
  * 没有的地方只有院墙外的上游溪沟（按设计水位与曼宁流速铺）与堰下的跌水沟（一沟翻白的急水）；干地上的水位与流速从水边往外推几圈，
- * 推出去的水位不高过那里的地面。乱流取弗劳德数与流速的剪切：水急水浅的浅滩、堰顶、水门下都翻白
+ * 推出去的水位不高过那里的地面。堰顶比一格水面窄，堰顶下缘那一格的水面接着堰顶上的临界水深，落差留到白水帘底下，插值才不在堰顶上干出缺口。
+ * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、堰顶、水门下都翻白
  */
 export function encodeWater(cfg: SakuraConfig, plan: SakuraPlan, w: Water): WaterImages {
   const t = plan.terrain
@@ -60,6 +61,8 @@ export function encodeWater(cfg: SakuraConfig, plan: SakuraPlan, w: Water): Wate
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
   const up = plan.upstream
   const down = plan.downstream
+  const wr = plan.weir
+  const overCrest = wr.crest + ((wr.level - wr.crest) * 2) / 3
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       const i = cy * cols + cx
@@ -79,6 +82,15 @@ export function encodeWater(cfg: SakuraConfig, plan: SakuraPlan, w: Water): Wate
       }
       const x = t.x0 + (cx + 0.5) * WATER_CELL_U
       const y = t.y0 + (cy + 0.5) * WATER_CELL_U
+      const wl = weirLocal(wr, x, y)
+      if (wl.along > 0 && wl.along < CREST_U + WATER_CELL_U && wl.side < wr.half) {
+        eta[i] = overCrest
+        u[i] = DITCH_SPEED * wr.tx
+        v[i] = DITCH_SPEED * wr.ty
+        wet[i] = 1
+        white[i] = 1
+        continue
+      }
       project(down, x, y, tmp)
       if (tmp.s > CREST_U && tmp.d < at(down.half, tmp)) {
         eta[i] = at(down.level, tmp)
