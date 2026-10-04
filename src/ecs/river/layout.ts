@@ -1,5 +1,5 @@
 import { UNIT } from '../../util/units'
-import { cellNearest, fbm } from '../../util/noise'
+import { fbm } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import { makeBasin } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
@@ -21,13 +21,10 @@ const UPSTREAM_NARROW = 0.68
 const FALL_SPREAD = 1.15
 /** 深潭的边沿着方位角起伏，半径最多差这么多（比例） */
 const POOL_WOBBLE = 0.32
-/** 岩石区的石头最高高出地面多少米 */
-export const ROCK_M = 1.1
 /** 重力加速度，米/秒² */
 export const GRAVITY = 9.81
 /** 出水口的岩坎前这么多（比例）是从河床升上来的坡，其余是平的坎顶 */
 const SILL_RAMP = 0.6
-const STONE: Stone = { h: 0, gx: 0, gy: 0, id: 0, big: false }
 /** 生成不出合格的河网就换一组随机数重来，最多这么多次 */
 const TRIES = 60
 
@@ -113,17 +110,9 @@ export interface Tree {
   readonly h: number
 }
 
-/** 一块石头：圆心、半径（格）与顶面高程（米） */
-export interface Boulder {
-  readonly x: number
-  readonly y: number
-  readonly r: number
-  readonly top: number
-}
-
 /**
  * 地形，格子 (0, 0) 的左上角在 (x0, y0) 格：高程（米）；画地面用的几张场：最近那段河道（或崖上溪沟）的设计水位（米）、
- * 离它水边多远（格，水里为负）、凸岸边滩有多显，离空地边多远（格，空地里为正）、林子的浓度、离深谷边多远（格，谷里为正）
+ * 离它水边多远（格，水里为负）、凸岸边滩有多显，离空地边多远（格，空地里为正）、离深谷边多远（格，谷里为正）
  */
 export interface Terrain {
   readonly cols: number
@@ -136,7 +125,6 @@ export interface Terrain {
   readonly edge: Float32Array
   readonly bar: Float32Array
   readonly clear: Float32Array
-  readonly forest: Float32Array
   readonly gorge: Float32Array
 }
 
@@ -155,7 +143,7 @@ interface Shape {
 
 /**
  * 按种子生成的河流地图，格与米：地图 w × h 格，空地的轮廓、主河道与大小两股（reaches[0..2]）、崖上的溪沟、两条深谷，
- * 地形高程、能走的地面（像素，含河面与断崖外那一小段）、树与石头，开局时队伍站的地方
+ * 地形高程、能走的地面（像素，含河面与断崖外那一小段）、树，开局时队伍站的地方
  */
 export interface RiverPlan {
   readonly w: number
@@ -169,7 +157,6 @@ export interface RiverPlan {
   readonly terrain: Terrain
   readonly basin: Basin
   readonly trees: readonly Tree[]
-  readonly boulders: readonly Boulder[]
   readonly start: Point
 }
 
@@ -502,53 +489,6 @@ function upland(plan: Pick<RiverPlan, 'shape' | 'upstream'>, aIn: number, span: 
   return Math.max(sector, smooth(hw + 5, hw + 3, tmp.d))
 }
 
-/** 岩石区的一块石头：相对高（石缝里为零）、石面每格的坡（相对高）、它是哪块（哈希）、是不是大石 */
-export interface Stone {
-  h: number
-  gx: number
-  gy: number
-  id: number
-  big: boolean
-}
-
-function dome(q: { dx: number; dy: number; h: number }, scale: number, rad: number, lift: number, big: boolean, out: Stone): void {
-  const r = rad / scale
-  const x = q.dx / scale
-  const y = q.dy / scale
-  const d2 = (x * x + y * y) / (r * r)
-  if (d2 >= 1) return
-  const nz = Math.sqrt(1 - d2)
-  const h = lift * nz
-  if (h <= out.h) return
-  const k = lift / (r * r * Math.max(nz, 0.2))
-  out.h = h
-  out.gx = -x * k
-  out.gy = -y * k
-  out.id = q.h
-  out.big = big
-}
-
-/** 岩石区堆着大小两层圆顶的石头，每处取高的那块；地形与地面按同一个种子各算一次 */
-export function stoneAt(seed: number, x: number, y: number, out: Stone): Stone {
-  out.h = 0
-  out.gx = 0
-  out.gy = 0
-  out.id = 0
-  out.big = false
-  const a = cellNearest(x * 0.7, y * 0.7, seed)
-  dome(a, 0.7, 0.42 + 0.22 * a.h, 0.55 + 0.45 * a.h, true, out)
-  const b = cellNearest(x * 1.7, y * 1.7, seed + 7)
-  dome(b, 1.7, 0.36 + 0.16 * b.h, 0.22 + 0.2 * b.h, false, out)
-  return out
-}
-
-/** 林子还是岩石：二维噪声大于阈值是林子；崖与深谷一带都是岩石 */
-function forestness(cfg: RiverConfig, seed: number, x: number, y: number): number {
-  const n = fbm(x / 7 + 3.1, y / 7 + 11.7, seed, 3)
-  const t = 1 - cfg.trees.forest
-  return smooth(t - 0.035, t + 0.035, n * 0.5 + 0.25 + (fbm(x / 2.2, y / 2.2, seed + 17, 2) - 0.5) * 0.12)
-}
-
 /** 离一组深谷多近：深谷里（从断崖边往外、在谷宽以内）为正，格 */
 function gorgeDepthAt(plan: Pick<RiverPlan, 'gorges'>, x: number, y: number, tmp: Along): number {
   let best = -Infinity
@@ -716,9 +656,9 @@ function fits(cfg: RiverConfig, sh: Shape, reaches: readonly Reach[], ports: rea
 
 /**
  * 地形高程（米）：每段河道各自算出断面、岸坡与滩地，平滑取最低；崖下挖出深潭；进水口背后的空地外立起崖与崖顶的台地，台地上刻出溪沟；
- * 出水口外是深谷，断崖边前垫起一道岩坎；空地外的岩石区隆起成块的岩石，林子里地面略高
+ * 出水口外是深谷，断崖边前垫起一道岩坎；空地外的林子里地面略高
  */
-function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y0: number, cols: number, rows: number): Terrain {
+function terrainOf(cfg: RiverConfig, d: Draft, x0: number, y0: number, cols: number, rows: number): Terrain {
   const cell = cfg.cellU
   const n = cols * rows
   const z = new Float32Array(n)
@@ -726,7 +666,6 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
   const edgeF = new Float32Array(n)
   const barF = new Float32Array(n)
   const clear = new Float32Array(n)
-  const forest = new Float32Array(n)
   const gorge = new Float32Array(n)
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
   const f = cfg.flow
@@ -759,12 +698,10 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
       const inside = clearingDepth(d.shape, x, y)
       const out = -inside
       const up = out > 0 ? upland(d, d.aIn, d.span, x, y, tmp) : 0
-      const fo = forestness(cfg, forestSeed, x, y)
       const i = cy * cols + cx
       if (out > 0) {
         const rise = smooth(0, fl.cliffU, out) * (fl.cliffM + (fbm(x / 3, y / 3, seed + 7, 2) - 0.5) * 0.5) * up
-        const block = stoneAt(seed + 9, x, y, STONE).h * smooth(0, 1.4, out) * (1 - fo)
-        g = Math.max(g, nearLevel + f.bankM) + rise + block * ROCK_M + fo * 0.08 * smooth(0, 1, out)
+        g = Math.max(g, nearLevel + f.bankM) + rise + 0.08 * smooth(0, 1, out)
         if (up > 0 && out > fl.cliffU * 0.95) {
           project(d.upstream, x, y, tmp)
           if (tmp.s > 0.05) {
@@ -793,30 +730,10 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
       edgeF[i] = nearD
       barF[i] = bar
       clear[i] = inside
-      forest[i] = fo
       gorge[i] = Math.max(-20, gd)
     }
   }
-  return { cols, rows, cell, x0, y0, z, level, edge: edgeF, bar: barF, clear, forest, gorge }
-}
-
-/** 石头顶出地面：圆顶，边上贴着地面 */
-function stampBoulders(t: Terrain, boulders: readonly Boulder[]): void {
-  const { cols, rows, cell, x0, y0, z } = t
-  for (const b of boulders) {
-    const c0 = Math.max(0, Math.floor((b.x - b.r - x0) / cell))
-    const c1 = Math.min(cols - 1, Math.ceil((b.x + b.r - x0) / cell))
-    const r0 = Math.max(0, Math.floor((b.y - b.r - y0) / cell))
-    const r1 = Math.min(rows - 1, Math.ceil((b.y + b.r - y0) / cell))
-    for (let cy = r0; cy <= r1; cy++) {
-      for (let cx = c0; cx <= c1; cx++) {
-        const dd = len(x0 + (cx + 0.5) * cell - b.x, y0 + (cy + 0.5) * cell - b.y) / b.r
-        if (dd >= 1) continue
-        const i = cy * cols + cx
-        z[i] = Math.max(z[i]!, b.top - (b.top - z[i]!) * (1 - Math.sqrt(1 - dd * dd)) ** 1.5)
-      }
-    }
-  }
+  return { cols, rows, cell, x0, y0, z, level, edge: edgeF, bar: barF, clear, gorge }
 }
 
 /** 地形上 (x, y) 格处双线性插值的高程 */
@@ -846,9 +763,9 @@ function waterEdgeAt(reaches: readonly Reach[], x: number, y: number, tmp: Along
 }
 
 /**
- * 树：林子里按泊松盘撒树冠，靠空地的一排树冠伸进空地；再从空地边长出几条林舌，空地里种几丛树和几棵孤树，都离河岸、出入口有一段距离
+ * 树：空地外的林子里按泊松盘撒树冠，靠空地的一排树冠伸进空地；再从空地边长出几条林舌，空地里种几丛树和几棵孤树，都离河岸、出入口有一段距离
  */
-function plantTrees(cfg: RiverConfig, rng: Rng, d: Draft, forestSeed: number, x0: number, y0: number, x1: number, y1: number): Tree[] {
+function plantTrees(cfg: RiverConfig, rng: Rng, d: Draft, x0: number, y0: number, x1: number, y1: number): Tree[] {
   const t = cfg.trees
   const trees: Tree[] = []
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
@@ -868,7 +785,6 @@ function plantTrees(cfg: RiverConfig, rng: Rng, d: Draft, forestSeed: number, x0
     const r = between(rng, t.crownU)
     const out = -clearingDepth(d.shape, x, y)
     if (out < r * 0.35) continue
-    if (forestness(cfg, forestSeed, x, y) < 0.5) continue
     if (upland(d, d.aIn, d.span, x, y, tmp) > 0.2 && out < cfg.falls.cliffU + r * 0.8) continue
     if (gorgeDepthAt(d, x, y, tmp) > -r - 0.8) continue
     project(d.upstream, x, y, tmp)
@@ -890,7 +806,6 @@ function plantTrees(cfg: RiverConfig, rng: Rng, d: Draft, forestSeed: number, x0
   for (let k = 0, made = 0; k < 40 && made < tongues; k++) {
     const a = rng.next() * Math.PI * 2
     const e = edgeAlong(d.shape, a)
-    if (forestness(cfg, forestSeed, e.x, e.y) < 0.5) continue
     const o = outwardAt(d.shape, e.x, e.y)
     const count = 2 + Math.floor(rng.next() * 3)
     const bendA = (rng.next() * 2 - 1) * 0.5
@@ -942,56 +857,11 @@ function plantTrees(cfg: RiverConfig, rng: Rng, d: Draft, forestSeed: number, x0
   return trees
 }
 
-/** 石头：河里几块露出水面的大石，空地上几块，都不挡死河道、不堵出入口 */
-function placeBoulders(cfg: RiverConfig, rng: Rng, d: Draft): Boulder[] {
-  const rc = cfg.rocks
-  const out: Boulder[] = []
-  const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
-  const ports: Point[] = [{ x: d.inlet.poolX, y: d.inlet.poolY }, ...d.outlets]
-  const clear = (x: number, y: number, r: number): boolean => {
-    for (const b of out) if (len(b.x - x, b.y - y) < b.r + r + 1.2) return false
-    for (const p of ports) if (len(p.x - x, p.y - y) < r + 3.5) return false
-    return true
-  }
-  const inRiver = Math.round(between(rng, rc.inRiver))
-  for (let k = 0, made = 0; k < 80 && made < inRiver; k++) {
-    const r = d.reaches[Math.floor(rng.next() * d.reaches.length)]!
-    const L = r.s[r.s.length - 1]!
-    const s = 2 + rng.next() * (L - 4)
-    const i = Math.min(r.x.length - 1, Math.round(s / (L / (r.x.length - 1))))
-    const half = r.half[i]!
-    const rad = between(rng, rc.radiusU) * Math.min(1, half / 3)
-    const lat = (rng.next() * 2 - 1) * (half - rad) * 0.7
-    const x = r.x[i]! - r.ty[i]! * lat
-    const y = r.y[i]! + r.tx[i]! * lat
-    if (!clear(x, y, rad)) continue
-    let crowded = false
-    for (const o of d.reaches) {
-      if (o === r) continue
-      project(o, x, y, tmp)
-      if (Math.abs(tmp.n) < at(o.half, tmp) + 2) crowded = true
-    }
-    if (crowded) continue
-    out.push({ x, y, r: rad, top: r.level[i]! + between(rng, rc.heightM) })
-    made++
-  }
-  const onLand = Math.round(between(rng, rc.onLand))
-  for (let k = 0, made = 0; k < 80 && made < onLand; k++) {
-    const x = d.shape.cx + (rng.next() * 2 - 1) * d.shape.r0
-    const y = d.shape.cy + (rng.next() * 2 - 1) * d.shape.r0
-    const rad = between(rng, rc.radiusU)
-    if (clearingDepth(d.shape, x, y) < rad + 1.5 || waterEdgeAt(d.reaches, x, y, tmp) < rad + cfg.flow.bankU + 1 || !clear(x, y, rad)) continue
-    out.push({ x, y, r: rad, top: NaN })
-    made++
-  }
-  return out
-}
-
 /**
- * 能走的地面：空地里扣掉树冠（伸进空地的树冠下留 overhangU 能走）、石头与深谷，再加上出水口断崖外那一小段（水能把东西冲过去）；
+ * 能走的地面：空地里扣掉树冠（伸进空地的树冠下留 overhangU 能走）与深谷，再加上出水口断崖外那一小段（水能把东西冲过去）；
  * 只留与开局站位连通的一块
  */
-function basinOf(cfg: RiverConfig, d: Draft, trees: readonly Tree[], boulders: readonly Boulder[], start: Point, x0: number, y0: number, cols: number, rows: number, cellU: number): Basin {
+function basinOf(cfg: RiverConfig, d: Draft, trees: readonly Tree[], start: Point, x0: number, y0: number, cols: number, rows: number, cellU: number): Basin {
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
   const over = cfg.trees.overhangU
   const lip = (x: number, y: number): boolean => {
@@ -1010,14 +880,13 @@ function basinOf(cfg: RiverConfig, d: Draft, trees: readonly Tree[], boulders: r
     if (lip(x, y)) return true
     if (clearingDepth(d.shape, x, y) <= 0) return false
     for (const t of trees) if (len(t.x - x, t.y - y) < t.r - over) return false
-    for (const b of boulders) if (len(b.x - x, b.y - y) < b.r) return false
     return gorgeDepthAt(d, x, y, tmp) < -0.6
   }
   return makeBasin(open, x0 * UNIT, y0 * UNIT, cols, rows, cellU * UNIT, { x: start.x * UNIT, y: start.y * UNIT }, cfg.clearing.neckU * UNIT)
 }
 
 /** 开局站位：离河岸、树和空地边都至少几格的干地上，挑离空地中心最近的一处 */
-function startOf(cfg: RiverConfig, d: Draft, trees: readonly Tree[], boulders: readonly Boulder[]): Point | null {
+function startOf(cfg: RiverConfig, d: Draft, trees: readonly Tree[]): Point | null {
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
   let best: Point | null = null
   let bestD = Infinity
@@ -1030,7 +899,6 @@ function startOf(cfg: RiverConfig, d: Draft, trees: readonly Tree[], boulders: r
       if (waterEdgeAt(d.reaches, x, y, tmp) < cfg.flow.bankU + 2.5) continue
       let ok = true
       for (const t of trees) if (len(t.x - x, t.y - y) < t.r + 2) ok = false
-      for (const b of boulders) if (len(b.x - x, b.y - y) < b.r + 2) ok = false
       if (!ok) continue
       const dd = len(gx, gy)
       if (dd < bestD) {
@@ -1086,22 +954,19 @@ function bounds(sh: Shape): { x0: number; y0: number; x1: number; y1: number } {
   return { x0, y0, x1, y1 }
 }
 
-/** 定好形状的一张图：河网、树、石头与开局站位，还没算地形 */
+/** 定好形状的一张图：河网、树与开局站位，还没算地形 */
 interface Sketch {
   readonly d: Draft
   readonly w: number
   readonly h: number
   readonly trees: readonly Tree[]
-  readonly boulders: readonly Boulder[]
   readonly start: Point
-  readonly forestSeed: number
 }
 
 /** 按半径 r0 定形状：河网不合格就换随机数重来 */
 function sketch(cfg: RiverConfig, seed: number, r0: number): Sketch | null {
   const rng = new Rng(scramble(seed))
   const shapeSeed = Math.floor(rng.next() * 0x7fffffff)
-  const forestSeed = Math.floor(rng.next() * 0x7fffffff)
   for (let k = 0; k < TRIES; k++) {
     const raw = network(cfg, rng, r0, shapeSeed + k * 131)
     if (!raw) continue
@@ -1110,17 +975,16 @@ function sketch(cfg: RiverConfig, seed: number, r0: number): Sketch | null {
     const w = Math.ceil(box.x1 - box.x0 + pad * 2)
     const h = Math.ceil(box.y1 - box.y0 + pad * 2)
     const d = shiftDraft(raw, (w - (box.x1 - box.x0)) / 2 - box.x0, (h - (box.y1 - box.y0)) / 2 - box.y0)
-    const boulders = placeBoulders(cfg, rng, d)
-    const trees = plantTrees(cfg, rng, d, forestSeed, -TERRAIN_PAD_U - 2, -TERRAIN_PAD_U - 2, w + TERRAIN_PAD_U + 2, h + TERRAIN_PAD_U + 2)
-    const start = startOf(cfg, d, trees, boulders)
-    if (start) return { d, w, h, trees, boulders, start, forestSeed }
+    const trees = plantTrees(cfg, rng, d, -TERRAIN_PAD_U - 2, -TERRAIN_PAD_U - 2, w + TERRAIN_PAD_U + 2, h + TERRAIN_PAD_U + 2)
+    const start = startOf(cfg, d, trees)
+    if (start) return { d, w, h, trees, start }
   }
   return null
 }
 
 /** 能走的地面按 cell 格的格子栅格化，量出面积，格² */
 function measured(cfg: RiverConfig, k: Sketch, cell: number): { basin: Basin; area: number } {
-  const basin = basinOf(cfg, k.d, k.trees, k.boulders, k.start, -cell, -cell, Math.ceil(k.w / cell) + 2, Math.ceil(k.h / cell) + 2, cell)
+  const basin = basinOf(cfg, k.d, k.trees, k.start, -cell, -cell, Math.ceil(k.w / cell) + 2, Math.ceil(k.h / cell) + 2, cell)
   let cells = 0
   for (let i = 0; i < basin.room.length; i++) if (basin.room[i]! > 0) cells++
   return { basin, area: cells * cell * cell }
@@ -1145,13 +1009,10 @@ export function riverPlan(cfg: RiverConfig, seed: number): RiverPlan {
     if (Math.abs(area - want) < (hi - lo) * 0.3) break
     r0 *= Math.sqrt(want / area)
   }
-  const { d, w, h, trees, start, forestSeed } = k!
-  const rng = new Rng(scramble(seed) ^ 0x2b0d)
-  const terrain = terrainOf(cfg, d, forestSeed, -TERRAIN_PAD_U, -TERRAIN_PAD_U, Math.ceil((w + TERRAIN_PAD_U * 2) / cfg.cellU), Math.ceil((h + TERRAIN_PAD_U * 2) / cfg.cellU))
-  const boulders = k!.boulders.map((b) => (Number.isNaN(b.top) ? { ...b, top: heightAt(terrain, b.x, b.y) + between(rng, cfg.rocks.heightM) } : b))
-  stampBoulders(terrain, boulders)
-  const { basin } = measured(cfg, { ...k!, boulders }, BASIN_CELL_U)
-  const plan: RiverPlan = { w, h, shape: d.shape, reaches: d.reaches, upstream: d.upstream, gorges: d.gorges, inlet: d.inlet, outlets: d.outlets, terrain, basin, trees, boulders, start }
+  const { d, w, h, trees, start } = k!
+  const terrain = terrainOf(cfg, d, -TERRAIN_PAD_U, -TERRAIN_PAD_U, Math.ceil((w + TERRAIN_PAD_U * 2) / cfg.cellU), Math.ceil((h + TERRAIN_PAD_U * 2) / cfg.cellU))
+  const { basin } = measured(cfg, k!, BASIN_CELL_U)
+  const plan: RiverPlan = { w, h, shape: d.shape, reaches: d.reaches, upstream: d.upstream, gorges: d.gorges, inlet: d.inlet, outlets: d.outlets, terrain, basin, trees, start }
   last = { cfg, seed, plan }
   return plan
 }

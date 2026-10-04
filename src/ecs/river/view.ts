@@ -177,7 +177,7 @@ export class RiverView implements MapView {
     const c = textureSize(t, 'canopy')
     const ground = canvasTexture(scene, GROUND_KEY, g.w, g.h)
     const canopy = canvasTexture(scene, CANOPY_KEY, c.w, c.h)
-    const painter = new RiverPainter({ cfg, terrain: t, trees: plan.trees, boulders: plan.boulders, seed: plan.shape.seed }, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
+    const painter = new RiverPainter({ cfg, terrain: t, trees: plan.trees, seed: plan.shape.seed }, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const tasks: PaintTask[] = []
     for (let y = 0; y < c.h; y += STRIP_PX) tasks.push({ layer: 'canopy', rect: { x0: 0, y0: y, x1: c.w, y1: Math.min(c.h, y + STRIP_PX) } })

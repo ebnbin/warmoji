@@ -1,9 +1,8 @@
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
-import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
+import { cellNearest, fbm, valueNoise } from '../../util/noise'
 import type { RiverConfig } from '../../types/maps'
-import { ROCK_M, stoneAt } from './layout'
-import type { Boulder, Stone, Terrain, Tree } from './layout'
+import type { Terrain, Tree } from './layout'
 
 /** 树冠贴图每格多少像素：树冠边是软的，用不着地面那么细 */
 export const CANOPY_PPU = 16
@@ -32,7 +31,6 @@ export interface PaintScene {
   readonly cfg: RiverConfig
   readonly terrain: Terrain
   readonly trees: readonly Tree[]
-  readonly boulders: readonly Boulder[]
   readonly seed: number
 }
 
@@ -172,60 +170,10 @@ function field(t: Terrain, a: Float32Array, x: number, y: number): number {
   return p + (q - p) * fx + (r - p) * fy + (p - q - r + s) * fx * fy
 }
 
-/** 一处的卵石：大小两层，取高的那颗；返回它朝太阳的亮度、它是哪颗（哈希）、石面的覆盖（石缝里为零）与它的高 */
-interface Cobble {
-  lit: number
-  h: number
-  inside: number
-  top: number
-}
-
-function oneCobble(x: number, y: number, scale: number, seed: number, lift: number, out: Cobble): void {
-  const q = cellNearest(x * scale, y * scale, seed)
-  const rad = 0.3 + 0.24 * q.h
-  const d = Math.sqrt(q.dx * q.dx + q.dy * q.dy) / rad
-  if (d >= 1) return
-  const nz = Math.sqrt(1 - d * d) * 0.7
-  if (nz * lift <= out.top) return
-  const nl = 1 / Math.sqrt((q.dx / rad) ** 2 + (q.dy / rad) ** 2 + nz * nz)
-  out.lit = Math.max(0, ((q.dx / rad) * LX + (q.dy / rad) * LY + nz * LZ) * nl)
-  out.h = q.h
-  out.inside = smooth(1, 0.82, d)
-  out.top = nz * lift
-}
-
-function cobble(x: number, y: number, scale: number, seed: number, out: Cobble): Cobble {
-  out.lit = 0
-  out.h = 0
-  out.inside = 0
-  out.top = 0
-  oneCobble(x, y, scale * 2.3, seed + 3, 0.5, out)
-  oneCobble(x, y, scale, seed, 1, out)
-  return out
-}
-
-const COBBLE: Cobble = { lit: 0, h: 0, inside: 0, top: 0 }
-
-const STONE: Stone = { h: 0, gx: 0, gy: 0, id: 0, big: false }
-
-/** 几种石色：暖灰、冷灰、带铁锈的褐灰 */
-const STONES = [
-  [124, 120, 110],
-  [104, 108, 108],
-  [118, 106, 92],
-] as const
-
-/** 几种野花的颜色：白、黄、淡紫 */
-const FLOWERS = [
-  [236, 232, 222],
-  [228, 200, 74],
-  [184, 160, 214],
-] as const
-
 /**
- * 地面：空地里是草地，一片片深浅不一，近水更绿，零星开着成簇的野花；近水是湿的泥岸，凸岸堆着卵石滩，水下的河床铺着卵石、缓处长着青苔；
- * 空地外按林子的浓度是林下的落叶地或堆着圆石的岩坡，石头上长着地衣、石缝里长着苔藓；进水口背后是台地与崖壁，出水口外是深谷，越往下雾越重；
- * 空地里的大石顶出地面。按高度场打光，小石头另按石面的弧度打光，往太阳方向找挡光的地形投影，树冠背着太阳投下软影；离空地越远越暗。
+ * 地面：空地里是草地，一片片深浅不一，近水更绿；近水是湿的泥岸，凸岸的边滩是细沙，水下的河床是细沙、缓处长着青苔；
+ * 空地外是林下的落叶地；进水口背后是台地与崖壁，出水口外是深谷，越往下雾越重。
+ * 按高度场打光，往太阳方向找挡光的地形投影，树冠背着太阳投下软影；离空地越远越暗。
  * 只画 rect 那一块，out 里按这块的范围逐行排
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
@@ -257,13 +205,12 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       const ax = fu - Math.floor(fu)
       const ay = fv - Math.floor(fv)
       const z = lerp2(t.z, ci, t.cols, ax, ay)
-      let zx = (field(t, t.z, x + e, y) - field(t, t.z, x - e, y)) / (2 * e * mpu)
-      let zy = (field(t, t.z, x, y + e) - field(t, t.z, x, y - e)) / (2 * e * mpu)
+      const zx = (field(t, t.z, x + e, y) - field(t, t.z, x - e, y)) / (2 * e * mpu)
+      const zy = (field(t, t.z, x, y + e) - field(t, t.z, x, y - e)) / (2 * e * mpu)
       const level = lerp2(t.level, ci, t.cols, ax, ay)
       const edge = lerp2(t.edge, ci, t.cols, ax, ay)
       const bar = lerp2(t.bar, ci, t.cols, ax, ay)
       const clear = lerp2(t.clear, ci, t.cols, ax, ay)
-      const forest = lerp2(t.forest, ci, t.cols, ax, ay)
       const gorge = lerp2(t.gorge, ci, t.cols, ax, ay)
       const under = level - z
       const patch = fbm(x / 7, y / 7, seed + 3, 2)
@@ -276,7 +223,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       let g = 0
       let b = 0
 
-      // 草地：大片的深浅按低频噪声，近水更绿、高处更干；草叶顺着风斜着长；野花成簇地开
+      // 草地：大片的深浅按低频噪声，近水更绿、高处更干；草叶顺着风斜着长
       if (outside < 0.999 && bed < 0.999) {
         const lush = smooth(3.5, 0.6, edge)
         const dry = clamp01(smooth(0.4, 0.72, patch) * 0.85 - lush * 0.45 + smooth(0.5, 2, z - level) * 0.2)
@@ -290,60 +237,31 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         r *= k
         g *= k
         b *= k
-        const bloom = smooth(0.64, 0.7, fbm(x / 2.8, y / 2.8, seed + 19, 2))
-        if (bloom > 0) {
-          const dot = cellNearest(x * 5.5, y * 5.5, seed + 17)
-          const d = Math.sqrt(dot.dx * dot.dx + dot.dy * dot.dy)
-          if (d < 0.2 && dot.h < bloom * 0.85) {
-            const c = FLOWERS[Math.floor(fbm(x / 9, y / 9, seed + 21, 1) * 2.999)]!
-            const a = smooth(0.2, 0.1, d)
-            r += (c[0] - r) * a
-            g += (c[1] - g) * a
-            b += (c[2] - b) * a
-          }
-        }
       }
 
-      // 河岸：离水边越近越湿越暗；凸岸的边滩与浅处是卵石
+      // 河岸：离水边越近越湿越暗；凸岸的边滩是细沙
       const shore = smooth(cfg.flow.bankU + 0.6 + wob, -0.15, edge)
       if (shore > 0) {
         const wet = smooth(0.7 + wob * 0.6, -0.05, edge)
-        const sr = 92 + (60 - 92) * wet
-        const sg = 76 + (51 - 76) * wet
-        const sb = 54 + (40 - 54) * wet
-        const pb = cobble(x, y, 3.4, seed + 21, COBBLE)
-        const stony = clamp01(smooth(0.25, 0.7, bar + (patch - 0.5) * 0.6) + smooth(0.62, 0.8, mid) * 0.5)
-        const pr = (132 + 34 * pb.h) * (0.55 + 0.55 * pb.lit) * (1 - 0.3 * wet)
-        const pg = (124 + 28 * pb.h) * (0.55 + 0.55 * pb.lit) * (1 - 0.3 * wet)
-        const pbb = (108 + 24 * pb.h) * (0.55 + 0.55 * pb.lit) * (1 - 0.3 * wet)
-        const st = stony * pb.inside
-        r += (sr + (pr - sr) * st - r) * shore
-        g += (sg + (pg - sg) * st - g) * shore
-        b += (sb + (pbb - sb) * st - b) * shore
+        const sandy = clamp01(smooth(0.25, 0.7, bar + (patch - 0.5) * 0.6)) * (1 - 0.3 * wet)
+        r += (92 + (60 - 92) * wet + (150 - 92) * sandy - r) * shore
+        g += (76 + (51 - 76) * wet + (136 - 76) * sandy - g) * shore
+        b += (54 + (40 - 54) * wet + (110 - 54) * sandy - b) * shore
       }
 
-      // 河床：卵石更大更圆，缓处、深处蒙着一层青苔
+      // 河床：细沙，缓处、深处蒙着一层青苔
       if (bed > 0) {
-        const pb = cobble(x + 13.7, y + 5.1, 2.4, seed + 23, COBBLE)
         const moss = clamp01(smooth(0.2, 0.7, under) * 0.6 + smooth(0.55, 0.75, patch) * 0.4)
-        const lit = 0.5 + 0.55 * pb.lit
-        let br = (112 + 30 * pb.h) * lit
-        let bg = (104 + 24 * pb.h) * lit
-        let bb = (88 + 22 * pb.h) * lit
-        br += (66 * lit - br) * moss
-        bg += (80 * lit - bg) * moss
-        bb += (48 * lit - bb) * moss
-        const gap = 1 - pb.inside
         const sand = 0.8 + 0.3 * grain
-        br += (104 * sand - br) * gap
-        bg += (94 * sand - bg) * gap
-        bb += (74 * sand - bb) * gap
+        const br = 104 * sand + (66 - 104 * sand) * moss
+        const bg = 94 * sand + (80 - 94 * sand) * moss
+        const bb = 74 * sand + (48 - 74 * sand) * moss
         r += (br - r) * bed
         g += (bg - g) * bed
         b += (bb - b) * bed
       }
 
-      // 空地外：林下是落叶与腐殖土；岩坡上堆着圆石，石面有细碎的斑点、顶上长地衣，石缝里是苔藓与泥；崖面上是竖着的水痕
+      // 空地外：林下是落叶与腐殖土；崖面上是竖着的水痕
       if (outside > 0) {
         const leaf = cellNearest(x * 4.5, y * 4.5, seed + 41)
         const ld = Math.sqrt(leaf.dx * leaf.dx + leaf.dy * leaf.dy)
@@ -357,22 +275,6 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           fg = (tone < 0.35 ? 66 : tone < 0.7 ? 60 : 70) * fade
           fb = 35 * fade
         }
-        const st = stoneAt(seed + 9, x, y, STONE)
-        const c = STONES[Math.floor(st.id * 2.999)]!
-        const speck = 1 + (valueNoise(x * 24, y * 24, seed + 31) - 0.5) * 0.16 + (valueNoise(x * 5, y * 5, seed + 33) - 0.5) * 0.12
-        let rr = c[0] * speck
-        let rg = c[1] * speck
-        let rb = c[2] * speck
-        const top = st.big ? st.h / 1.0 : st.h / 0.42
-        const lichen = smooth(0.5, 0.85, top) * smooth(0.45, 0.62, fbm(x * 1.3, y * 1.3, seed + 35, 2)) * 0.5
-        rr += (172 - rr) * lichen
-        rg += (168 - rg) * lichen
-        rb += (128 - rb) * lichen
-        const crevice = smooth(0.18, 0, st.h)
-        const moss = smooth(0.4, 0.7, fbm(x / 2.6, y / 2.6, seed + 37, 2))
-        rr += (52 + 8 * moss - rr) * crevice
-        rg += (50 + 22 * moss - rg) * crevice
-        rb += (36 + 4 * moss - rb) * crevice
         const slope = Math.sqrt(zx * zx + zy * zy)
         const cliff = smooth(0.9, 2.5, slope)
         if (cliff > 0) {
@@ -381,42 +283,13 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           const streak = valueNoise(across * 3.5, down * 0.6, seed + 39) * 0.6 + valueNoise(across * 9, down * 1.2, seed + 41) * 0.4
           const ledge = smooth(0.4, 0.6, valueNoise(across * 0.8, down * 2.4, seed + 43))
           const kk = (0.7 + 0.5 * streak) * (0.85 + 0.2 * ledge)
-          rr += (96 * kk - rr) * cliff
-          rg += (90 * kk - rg) * cliff
-          rb += (82 * kk - rb) * cliff
+          fr += (96 * kk - fr) * cliff
+          fg += (90 * kk - fg) * cliff
+          fb += (82 * kk - fb) * cliff
         }
-        const fo = clamp01(forest * (1 - cliff))
-        const micro = (1 - fo) * outside * (st.big ? 0.6 : 1)
-        if (micro > 0) {
-          zx -= (st.gx * micro * ROCK_M) / mpu
-          zy -= (st.gy * micro * ROCK_M) / mpu
-        }
-        const contact = 0.72 + 0.28 * smooth(0, 0.2, st.h)
-        rr *= contact
-        rg *= contact
-        rb *= contact
-        r += (fr + (rr - fr) * (1 - fo) - r) * outside
-        g += (fg + (rg - fg) * (1 - fo) - g) * outside
-        b += (fb + (rb - fb) * (1 - fo) - b) * outside
-      }
-
-      // 空地里的大石：圆顶，石面上有细裂纹与地衣，贴地的一圈沾着泥
-      for (const bo of sc.boulders) {
-        const dd = Math.sqrt((x - bo.x) ** 2 + (y - bo.y) ** 2) / bo.r
-        if (dd >= 1.05) continue
-        const rock = smooth(1.05, 0.9, dd)
-        const crack = smooth(0.05, 0.012, cellEdge(x * 2.4, y * 2.4, seed + 53)) * 0.3
-        const lichen = smooth(0.6, 0.75, fbm(x * 1.4, y * 1.4, seed + 55, 2)) * 0.45
-        let rr = (126 + grain * 18) * (1 - crack)
-        let rg = (121 + grain * 16) * (1 - crack)
-        let rb = (110 + grain * 14) * (1 - crack)
-        rr += (170 - rr) * lichen
-        rg += (164 - rg) * lichen
-        rb += (128 - rb) * lichen
-        const foot = smooth(0.7, 1, dd) * 0.4
-        r += (rr * (1 - foot) - r) * rock
-        g += (rg * (1 - foot) - g) * rock
-        b += (rb * (1 - foot) - b) * rock
+        r += (fr - r) * outside
+        g += (fg - g) * outside
+        b += (fb - b) * outside
       }
 
       // 深谷：越往下雾越重，谷底发灰发蓝；瀑布砸下去的地方翻着白水

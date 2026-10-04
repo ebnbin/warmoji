@@ -624,21 +624,13 @@ export interface RiverConfig {
     readonly lipU: number
     readonly sillU: number
   }
-  /** 树：树冠半径（格）、伸进空地的树冠下有多宽能走；林子按二维噪声和岩石分地盘，林子占多少；伸进空地的林舌、空地里的树丛与孤树各几处 */
+  /** 树：树冠半径（格）、伸进空地的树冠下有多宽能走；伸进空地的林舌、空地里的树丛与孤树各几处 */
   readonly trees: {
     readonly crownU: readonly [number, number]
     readonly overhangU: number
-    readonly forest: number
     readonly tongues: readonly [number, number]
     readonly groves: readonly [number, number]
     readonly lone: readonly [number, number]
-  }
-  /** 石头：河里与空地上各几块，半径（格），露出水面或地面多高（米） */
-  readonly rocks: {
-    readonly inRiver: readonly [number, number]
-    readonly onLand: readonly [number, number]
-    readonly radiusU: readonly [number, number]
-    readonly heightM: readonly [number, number]
   }
   /**
    * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
