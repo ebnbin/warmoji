@@ -872,9 +872,9 @@ export const MAPS = {
     finalWaveSub: '失控核心闯进了电路板——把它引到通电的铜线上！',
     circuit: {
       mmPerU: 1,
-      sizeU: 44,
+      sizeU: 42,
       padU: 7,
-      areaU2: [1050, 1500],
+      areaU2: [950, 1300],
       neckU: 0.35,
       frame: { insetU: [1.8, 2.6], chamferU: [2.4, 4.8], heightMM: 1.6 },
       plazaU: 4.5,

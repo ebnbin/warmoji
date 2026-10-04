@@ -1290,7 +1290,7 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     const nx = (b.y - a.y) / bestLen
     const ny = -(b.x - a.x) / bestLen
     const sgn = (px - cx) * nx + (py - cy) * ny >= 0 ? 1 : -1
-    const r = off + 0.15 + (Math.abs(nx) > 0.5 ? textWidth(s, size) / 2 : size / 2)
+    const r = off + 0.45 + (Math.abs(nx) > 0.5 ? textWidth(s, size) / 2 : size / 2)
     d.labels.push({ s, x: px + nx * sgn * r, y: py + ny * sgn * r, size, rot: 0 })
   }
   beside('+5V', railBus[0]!, railW / 2)
