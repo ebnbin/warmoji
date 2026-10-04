@@ -148,7 +148,7 @@ export class RuinsView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     const scene = v.scene
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
     if (!scene.textures.exists(CHIP_KEY)) canvasTexture(scene, CHIP_KEY, 24, 24, (ctx) => drawChip(ctx, 24))
@@ -213,7 +213,7 @@ export class RuinsView implements MapView {
     this.ground = { tex: ground, seen: state.n, seenT: state.timber, dirty: new Uint8Array(cols * rows), cols, rows, busy: false }
     this.effects(v)
     this.roost(v, s)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.74, 0.22, 0x000000)
+    v.lens.screen.vignette(0.74, 0.22, 0x000000)
   }
 
   /** 扬尘、碎石与木屑的粒子，落石的影子 */
@@ -420,7 +420,7 @@ export class RuinsView implements MapView {
       this.splinters?.explode(Math.min(24, 6 + Math.round(c.timber * 400)), c.x, c.y)
       playSfx('splinter')
     }
-    if (this.shake && c.volume > 0.6) v.lens.shake(260 + Math.min(500, c.volume * 120), Math.min(0.006, 0.0015 + c.volume * 0.0012))
+    if (this.shake && c.volume > 0.6) v.lens.screen.shake(260 + Math.min(500, c.volume * 120), Math.min(0.006, 0.0015 + c.volume * 0.0012))
     const puffs = Math.min(60, Math.round(4 + c.volume * 22))
     const spread = v.def.ruins!.dust.spreadU * UNIT * 0.6
     for (let k = 0; k < puffs; k++) {

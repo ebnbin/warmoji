@@ -21,8 +21,7 @@ import type { TrackTex } from './stamp'
 import type { DesertState } from './world'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
-import { inRect } from '../lens'
-import type { Framing, Rect } from '../lens'
+import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { DesertConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -48,8 +47,8 @@ const RAG_SHADOW_DEPTH = -0.5
 /** 开发工具里"显示碰撞边界"的开关：打开时标志物挡人的轮廓和别的地图的岩壁一样勾在一切之上 */
 const WALLS_FLAG = 'battle.walls'
 const WALLS_DEPTH = 1001
-/** 脚下扬起的沙最多每秒这么多团：人多的时候不糊成一片 */
-const PUFFS_PER_S = 40
+/** 脚下扬起的沙每格²每秒最多这么多团：人多的时候不糊成一片，一圈里各处一样 */
+const PUFFS_PER_U2_S = 0.18
 
 /** 一样标志物在画面上的东西：树冠或杆头的图，杆子顶上的破布条 */
 interface LandmarkFx {
@@ -159,7 +158,7 @@ export class DesertView implements MapView {
 
   build(v: ViewCtx): void {
     const scene = v.scene
-    this.visuals.push(v.lens.cover(scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-3)))
+    this.visuals.push(v.lens.screen.cover(scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-3)))
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
   }
 
@@ -257,7 +256,7 @@ export class DesertView implements MapView {
       .setDepth(1.5)
     this.solidGfx = scene.add.graphics().setDepth(WALLS_DEPTH).setVisible(false)
     this.visuals.push(this.ragShadow, this.ragGfx, this.puffs, this.solidGfx)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.12, 0x140a04)
+    v.lens.screen.vignette(0.75, 0.12, 0x140a04)
     this.step(v, sim, 0)
   }
 
@@ -291,7 +290,7 @@ export class DesertView implements MapView {
     if (!s || !g || !this.tracks) return
     const now = sim.elapsedMs
     const dt = Math.min(delta, 50) / 1000
-    const view = v.lens.view()
+    const view = v.lens.screen.view()
     const pad = GROUND_PAD_U * UNIT
     const x0 = view.x - pad / 2
     const y0 = view.y - pad / 2
@@ -304,18 +303,19 @@ export class DesertView implements MapView {
     u.rect[2] = w
     u.rect[3] = h
     u.track[3] = s.tracks.now
-    this.stampTracks(v, s, v.lens.visible(), dt)
+    this.stampTracks(v, s, dt)
     this.placeLandmarks(s, { x: view.x + view.w / 2, y: view.y + view.h / 2 }, now)
   }
 
-  /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；镜头里松沙上的脚步扬起一小团沙 */
-  private stampTracks(v: ViewCtx, s: DesertState, view: Rect, dt: number): void {
+  /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；松沙上的脚步扬起一小团沙 */
+  private stampTracks(v: ViewCtx, s: DesertState, dt: number): void {
     const t = this.tracks!
     const at = s.tracks.now
-    this.puffBudget = Math.min(PUFFS_PER_S, this.puffBudget + dt * PUFFS_PER_S)
+    const cap = PUFFS_PER_U2_S * s.plan.sizeU * s.plan.sizeU
+    this.puffBudget = Math.min(cap, this.puffBudget + dt * cap)
     for (const p of s.tracks.prints) {
       stampPrint(t.data, p, UNIT, at)
-      if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither' && inRect(view, p.x, p.y)) {
+      if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither') {
         this.puffBudget--
         this.puffs?.emitParticleAt(p.x, p.y, p.drag > 0.3 || p.gait === 'burrow' ? 2 : 1)
       }

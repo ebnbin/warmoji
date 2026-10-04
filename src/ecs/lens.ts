@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { MAP } from '../data/maps'
 import { safeInsets, viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
-import { UNIT } from '../util/units'
+import { FRAME_U, UNIT } from '../util/units'
 import { fitAspectRect } from './worlds/torus'
 import type { Point } from '../util/vec'
 
@@ -15,18 +15,42 @@ export interface Rect {
 }
 
 /**
- * 一张图怎么被拍：map 是地图矩形，玩法都在里面；edge 是它的边，clamp 跟随时镜头停在地图外 cameraMargin 格，open 不设边，
- * wrap 四边回绕、一圈就是地图矩形；fit 的图平时就整张放进一屏、不跟随
+ * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；
+ * clamp 跟随时镜头停在地图外 cameraMargin 格再加设备安全区；open 不设边；wrap 四边回绕、一圈就是地图矩形；
+ * fit 的图平时就整张放进一屏、不跟随
  */
 export interface Framing {
   readonly map: Rect
-  readonly edge: 'clamp' | 'open' | 'wrap'
+  readonly edge: 'frame' | 'clamp' | 'open' | 'wrap'
   readonly fit?: boolean
 }
 
-/** follow 跟着锚点走；map 固定拍地图矩形；reach 固定拍跟随时屏幕最远能看到的范围，不设边的图按 openMargin 算 */
-export const LENS_MODES = ['follow', 'map', 'reach'] as const
+/** 沙盒地图的方框，像素 */
+export const FRAME: Rect = { x: 0, y: 0, w: FRAME_U * UNIT, h: FRAME_U * UNIT }
+
+/** follow 跟着锚点走；map 固定把地图矩形整张放进一屏 */
+export const LENS_MODES = ['follow', 'map'] as const
 export type LensMode = (typeof LENS_MODES)[number]
+
+/**
+ * 屏幕层：跟着屏幕走、不属于地图的东西都经它——铺满屏幕的底色与遮罩、暗角、闪屏、震屏，
+ * 以及要知道此刻拍到哪里的效果：在镜头里撒的氛围粒子、看不见就不做的反馈
+ */
+export interface Screen {
+  /** 铺满屏幕的底色或遮罩：不随镜头走，随缩放保持铺满，只让主镜头画 */
+  cover<T extends Phaser.GameObjects.Rectangle>(rect: T): T
+  /** 屏幕四周压暗，只压主镜头 */
+  vignette(radius: number, strength: number, color: number): Phaser.Filters.Vignette | undefined
+  flash(ms: number, r: number, g: number, b: number): void
+  /** 所有镜头一起震；正在震时再要震就不理，同 Phaser */
+  shake(ms: number, intensity: number): void
+  /** 主镜头此刻拍到的世界范围 */
+  view(): Rect
+  /** 屏幕上此刻看得到的世界范围：镜像镜头拍到的那几圈也算 */
+  visible(): Rect
+  /** 世界里 (x, y) 往外 pad 像素以内有没有落进主镜头 */
+  sees(x: number, y: number, pad?: number): boolean
+}
 
 /** 环面固定取景时，八台镜像镜头各比主镜头偏几圈 */
 const MIRRORS = [
@@ -62,7 +86,8 @@ interface Quake {
  * 震屏所有镜头一起震，屏幕上的幅度按跟随时的缩放算；盖满屏幕的底色与遮罩随缩放保持铺满
  */
 export class Lens {
-  private framing: Framing = { map: { x: 0, y: 0, w: 1, h: 1 }, edge: 'clamp' }
+  readonly screen: Screen
+  private framing: Framing = { map: FRAME, edge: 'frame' }
   private mode: LensMode = 'follow'
   private followZoom = 1
   private mirrors: Phaser.Cameras.Scene2D.Camera[] = []
@@ -82,6 +107,22 @@ export class Lens {
       this.mirrors = []
       this.covers.length = 0
     })
+    this.screen = {
+      cover: (rect) => this.cover(rect),
+      vignette: (radius, strength, color) => (this.alive ? scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, radius, strength, color) : undefined),
+      flash: (ms, r, g, b) => {
+        if (this.alive) scene.cameras.main.flash(ms, r, g, b)
+      },
+      shake: (ms, intensity) => {
+        if (!this.quake) this.quake = { elapsed: 0, ms, intensity }
+      },
+      view: () => this.view(),
+      visible: () => this.visible(),
+      sees: (x, y, pad = 0) => {
+        const v = this.view()
+        return x >= v.x - pad && x <= v.x + v.w + pad && y >= v.y - pad && y <= v.y + v.h + pad
+      },
+    }
   }
 
   /** 开局或屏幕变了：换上这张图的取景，下一次 step 起生效 */
@@ -104,16 +145,16 @@ export class Lens {
     const W = this.scene.scale.width
     const H = this.scene.scale.height
     const f = this.framing
-    const follow = this.mode === 'follow'
-    const area: Port = follow ? { x: 0, y: 0, w: W, h: H } : safeArea(W, H)
+    const follow = this.mode === 'follow' && !f.fit
+    const area: Port = this.mode === 'follow' ? { x: 0, y: 0, w: W, h: H } : safeArea(W, H)
     const followZoom = viewport.renderScale * this.followZoom
     let port: Port = { x: 0, y: 0, w: W, h: H }
     let zoom: number
     let cx: number
     let cy: number
     let wrap = false
-    if (follow && !f.fit) {
-      zoom = followZoom
+    if (follow) {
+      zoom = f.edge === 'frame' ? Math.max(followZoom, W / f.map.w, H / f.map.h) : followZoom
       cx = anchor.x
       cy = anchor.y
       if (f.edge === 'clamp') {
@@ -129,27 +170,27 @@ export class Lens {
       cy = r.y + r.h / 2
       wrap = true
     } else {
-      const r = this.target()
+      const r = f.map
       zoom = Math.min(area.w / r.w, area.h / r.h)
       cx = r.x + r.w / 2 - (area.x + area.w / 2 - W / 2) / zoom
       cy = r.y + r.h / 2 - (area.y + area.h / 2 - H / 2) / zoom
     }
     const q = this.tremor(dtMs, port, f.fit ? zoom : followZoom, zoom)
-    this.place(port, zoom, cx + q.x, cy + q.y, wrap)
+    cx += q.x
+    cy += q.y
+    if (follow && f.edge === 'frame') {
+      cx = clampSpan(cx, f.map.x, f.map.w, W / zoom)
+      cy = clampSpan(cy, f.map.y, f.map.h, H / zoom)
+    }
+    this.place(port, zoom, cx, cy, wrap)
   }
 
-  /** 所有镜头一起震；正在震时再要震就不理，同 Phaser */
-  shake(ms: number, intensity: number): void {
-    if (this.quake) return
-    this.quake = { elapsed: 0, ms, intensity }
+  /** 只让主镜头画：自己已按周期铺满一圈的东西，镜像镜头不再画一遍 */
+  mainOnly<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+    return mainCameraOnly(obj)
   }
 
-  flash(ms: number, r: number, g: number, b: number): void {
-    if (this.alive) this.scene.cameras.main.flash(ms, r, g, b)
-  }
-
-  /** 盖满屏幕的底色或遮罩：不随镜头走，随缩放保持铺满，只让主镜头画 */
-  cover<T extends Phaser.GameObjects.Rectangle>(rect: T): T {
+  private cover<T extends Phaser.GameObjects.Rectangle>(rect: T): T {
     mainCameraOnly(rect).setScrollFactor(0)
     this.covers.push(rect)
     rect.once(Phaser.GameObjects.Events.DESTROY, () => {
@@ -160,39 +201,25 @@ export class Lens {
     return rect
   }
 
-  /** 只让主镜头画：自己已按周期铺满一圈的东西，镜像镜头不再画一遍 */
-  mainOnly<T extends Phaser.GameObjects.GameObject>(obj: T): T {
-    return mainCameraOnly(obj)
-  }
-
-  /** 主镜头此刻拍到的世界范围 */
-  view(): Rect {
+  private view(): Rect {
     const w = this.port.w / this.zoom
     const h = this.port.h / this.zoom
     return { x: this.cx - w / 2, y: this.cy - h / 2, w, h }
   }
 
-  /** 屏幕上此刻看得到的世界范围：镜像镜头拍到的那几圈也算 */
-  visible(): Rect {
+  private visible(): Rect {
     const v = this.view()
     if (this.mirrors.length === 0) return v
     const m = this.framing.map
     return { x: v.x - m.w, y: v.y - m.h, w: v.w + m.w * 2, h: v.h + m.h * 2 }
   }
 
-  /** 跟随时镜头停在哪：地图外 cameraMargin 格，再加上这一边的设备安全区 */
+  /** 旧图跟随时镜头停在哪：地图外 cameraMargin 格，再加上这一边的设备安全区 */
   private bounds(): Rect {
     const m = this.framing.map
     const g = MAP.cameraMargin * UNIT
     const s = safeInsets
     return { x: m.x - g - s.left, y: m.y - g - s.top, w: m.w + g * 2 + s.left + s.right, h: m.h + g * 2 + s.top + s.bottom }
-  }
-
-  /** 固定取景时框住的范围 */
-  private target(): Rect {
-    const f = this.framing
-    if (this.mode !== 'reach' || f.fit) return f.map
-    return grow(f.map, (f.edge === 'open' ? MAP.openMargin : MAP.cameraMargin) * UNIT)
   }
 
   /** 这一帧震屏把镜头挪多少，世界像素：屏幕上的幅度按 Phaser 的震法在缩放 base 下算，再换到此刻的缩放 */
@@ -244,10 +271,6 @@ export class Lens {
   }
 }
 
-export function inRect(r: Rect, x: number, y: number): boolean {
-  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
-}
-
 function setPort(cam: Phaser.Cameras.Scene2D.Camera, p: Port): void {
   if (cam.x !== p.x || cam.y !== p.y || cam.width !== p.w || cam.height !== p.h) cam.setViewport(p.x, p.y, p.w, p.h)
 }
@@ -263,10 +286,6 @@ function safeArea(w: number, h: number): Port {
   const k = viewport.renderScale
   const s = safeInsets
   return { x: s.left * k, y: s.top * k, w: w - (s.left + s.right) * k, h: h - (s.top + s.bottom) * k }
-}
-
-function grow(r: Rect, d: number): Rect {
-  return { x: r.x - d, y: r.y - d, w: r.w + d * 2, h: r.h + d * 2 }
 }
 
 /** 环面上 p 落在哪一圈 */

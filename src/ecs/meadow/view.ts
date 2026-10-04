@@ -146,7 +146,7 @@ export class MeadowView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     ensureCritters(v.scene)
   }
 
@@ -204,7 +204,7 @@ export class MeadowView implements MapView {
     this.seeds(v, plan)
     this.flockAt = 6000 + Math.random() * 10000
     this.bleatAt = BLEAT_MS.min
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.2, 0x000000)
+    v.lens.screen.vignette(0.72, 0.2, 0x000000)
   }
 
   /** 草浪：遮罩标出哪里是草，着色器顺着风吹出一道道亮的草浪 */
@@ -279,7 +279,7 @@ export class MeadowView implements MapView {
 
   /** 顺风飘的蒲公英种子：在镜头里随处冒出来 */
   private seeds(v: ViewCtx, plan: MeadowPlan): void {
-    const cam = v.scene.cameras.main
+    const screen = v.lens.screen
     const sp = 1.2 * UNIT
     this.visuals.push(
       v.scene.add
@@ -295,8 +295,9 @@ export class MeadowView implements MapView {
             type: 'random',
             source: {
               getRandomPoint: (p: Phaser.Types.Math.Vector2Like): void => {
-                p.x = cam.worldView.x + Math.random() * cam.worldView.width
-                p.y = cam.worldView.y + Math.random() * cam.worldView.height
+                const view = screen.view()
+                p.x = view.x + Math.random() * view.w
+                p.y = view.y + Math.random() * view.h
               },
             },
           },
@@ -321,8 +322,6 @@ export class MeadowView implements MapView {
     const dt = Math.min(delta, 50) / 1000
     const now = sim.elapsedMs
     this.u.time = now / 1000
-    const cam = v.scene.cameras.main
-    const view = cam.worldView
     const lead = sim.leader
     const lx = Transform.x[lead]! / UNIT
     const ly = Transform.y[lead]! / UNIT
@@ -371,7 +370,7 @@ export class MeadowView implements MapView {
     }
     if (now >= this.bleatAt) {
       this.bleatAt = now + BLEAT_MS.min + Math.random() * (BLEAT_MS.max - BLEAT_MS.min)
-      if (this.sheep.some((s) => view.contains(s.x * UNIT, s.y * UNIT))) playSfx('bleat')
+      if (this.sheep.some((s) => v.lens.screen.sees(s.x * UNIT, s.y * UNIT))) playSfx('bleat')
     }
     // 蝴蝶：围着自己那片花飞来飞去，有身体走近就惊起飞开
     for (const b of this.butterflies) {
@@ -433,10 +432,9 @@ export class MeadowView implements MapView {
     const scene = v.scene
     if (now >= this.flockAt && this.birds.length === 0) {
       this.flockAt = now + FLOCK_MS.min + Math.random() * (FLOCK_MS.max - FLOCK_MS.min)
-      const view = scene.cameras.main.worldView
       const edge = plan.trees.filter((t) => {
         const L = toLocal(plan.frame, t.x, t.y, this.local)
-        return forestDepth(plan.edges, L.a, L.b) < 2.5 && view.contains(t.x * UNIT, t.y * UNIT)
+        return forestDepth(plan.edges, L.a, L.b) < 2.5 && v.lens.screen.sees(t.x * UNIT, t.y * UNIT)
       })
       const from = edge[Math.floor(Math.random() * edge.length)]
       if (from) {

@@ -128,7 +128,7 @@ export class SakuraView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     ensurePetal(v.scene)
   }
 
@@ -211,7 +211,7 @@ export class SakuraView implements MapView {
     }
     this.ripples = scene.add.graphics().setDepth(2)
     this.visuals.push(this.ripples)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.78, 0.18, 0x2a160c)
+    v.lens.screen.vignette(0.78, 0.18, 0x2a160c)
   }
 
   /** 水面：三张数据图与水面上的影子喂给着色器 */
@@ -304,8 +304,7 @@ export class SakuraView implements MapView {
 
   /** 镜头里的樱树上飘下一片花瓣 */
   private blossom(v: ViewCtx, plan: SakuraPlan): void {
-    const view = v.scene.cameras.main.worldView
-    const seen = plan.trees.filter((t: Tree) => view.contains(t.x * UNIT, t.y * UNIT))
+    const seen = plan.trees.filter((t: Tree) => v.lens.screen.sees(t.x * UNIT, t.y * UNIT))
     const t = seen[Math.floor(Math.random() * seen.length)]
     if (!t) return
     const a = Math.random() * Math.PI * 2

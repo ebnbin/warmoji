@@ -65,11 +65,12 @@ import { SakuraView } from './sakura/view'
 import { CircuitView } from './circuit/view'
 import { DesertView } from './desert/view'
 import { RuinsView } from './ruins/view'
-import type { Framing, Lens } from './lens'
+import type { Framing, Lens, Rect, Screen } from './lens'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
-const FOG_SPAN = 9000
+/** 黑幕比镜头拍到的范围多铺一点，取整时不露缝 */
+const FOG_SLACK = 1.02
 const WATER_COLOR = 0x0b2a45
 const WATER_VIGNETTE = 0x1e6fd0
 const BANK_COLOR = 0x54402a
@@ -84,7 +85,7 @@ export interface ViewCtx {
   readonly world: EcsWorld
   readonly run: RunState
   readonly def: MapDef
-  /** 战斗镜头：地图不自己动镜头，震屏、闪屏、盖满屏幕的底色与遮罩都经它 */
+  /** 战斗镜头：地图不自己动镜头；跟着屏幕走的东西（底色与遮罩、暗角、闪屏、震屏、按镜头撒的粒子）都经它的屏幕层 */
   readonly lens: Lens
   w: number
   h: number
@@ -185,14 +186,17 @@ abstract class SingleScreenView extends BoundedView {
 }
 
 
-/** 一片盖住全场的黑幕，只在一个圆里透出来 */
+/** 视野外的黑幕：属于屏幕层，铺满镜头拍到的范围，只在一个圆里透出来 */
 export class Fog {
   private readonly rect: Phaser.GameObjects.Rectangle
   private readonly shape: Phaser.GameObjects.Graphics
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly screen: Screen,
+  ) {
     // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
-    this.rect = mainCameraOnly(scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false))
+    this.rect = mainCameraOnly(scene.add.rectangle(0, 0, 1, 1, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false))
     this.shape = scene.add.graphics().setVisible(false)
     this.rect.enableFilters()
     this.rect.filters?.internal.addMask(this.shape, true)
@@ -202,13 +206,18 @@ export class Fog {
     return [this.rect, this.shape]
   }
 
-  /** 以 (x, y) 为圆心、radius 为半径透出来，其余盖上 alpha 的黑 */
+  /** 以 (x, y) 为圆心、radius 为半径透出来，镜头拍到的其余地方盖上 alpha 的黑 */
   show(x: number, y: number, radius: number, alpha: number): void {
     if (alpha <= 0.001) return void this.rect.setVisible(false)
     this.shape.clear()
     this.shape.fillStyle(0xffffff)
     this.shape.fillCircle(x, y, radius)
-    this.rect.setPosition(x, y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
+    const r = this.screen.view()
+    // 按整格放大，镜头慢慢缩放时不必每帧改尺寸
+    const w = Math.ceil((r.w * FOG_SLACK) / UNIT) * UNIT
+    const h = Math.ceil((r.h * FOG_SLACK) / UNIT) * UNIT
+    if (w !== this.rect.width || h !== this.rect.height) this.rect.setSize(w, h)
+    this.rect.setPosition(r.x + r.w / 2, r.y + r.h / 2).setFillStyle(FOG_COLOR, alpha).setVisible(true)
   }
 }
 
@@ -218,7 +227,7 @@ class DayNightView extends BoundedView {
 
   build(v: ViewCtx): void {
     super.build(v)
-    this.fog = new Fog(v.scene)
+    this.fog = new Fog(v.scene, v.lens.screen)
     this.visuals.push(...this.fog.objects)
   }
 
@@ -244,13 +253,13 @@ class IceView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, WATER_COLOR).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, WATER_COLOR).setDepth(-2)))
     super.build(v)
     const g = v.scene.add.graphics().setDepth(-1)
     g.lineStyle(3, 0xdff3ff, 0.85)
     g.strokeRect(0, 0, v.w, v.h)
     this.visuals.push(g)
-    this.vignette = v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, WATER_VIGNETTE, 0).setDepth(90))
+    this.vignette = v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, WATER_VIGNETTE, 0).setDepth(90))
     this.visuals.push(this.vignette)
   }
 
@@ -280,7 +289,7 @@ class SpaceView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, v.def.palette.map).setDepth(-1)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, v.def.palette.map).setDepth(-1)))
     const r = fieldRadius(v)
     const ring = v.scene.add.graphics().setDepth(2)
     ring.lineStyle(5, 0x9c6bff, 0.7)
@@ -382,7 +391,7 @@ class NebulaOldView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, v.def.palette.map).setDepth(-1)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, v.def.palette.map).setDepth(-1)))
     const { wall, rim } = nebulaOldRadii(v)
     const gas = v.scene.add.graphics().setDepth(-0.9)
     const rng = new Rng(v.run.decorSeed ^ 0x9a5)
@@ -984,11 +993,11 @@ class VolcanoView extends BoundedView {
   private shake = true
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, VOLCANO_BG).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, VOLCANO_BG).setDepth(-2)))
     if (!v.scene.textures.exists(PUFF_KEY)) canvasTexture(v.scene, PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
     if (!v.scene.textures.exists(SPARK_KEY)) canvasTexture(v.scene, SPARK_KEY, 16, 16, (ctx) => drawSpark(ctx, 16))
     if (!v.scene.textures.exists(BOMB_KEY)) canvasTexture(v.scene, BOMB_KEY, 32, 32, (ctx) => drawBomb(ctx, 32))
-    this.light = v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, 0xff4a1a, 0).setDepth(85).setVisible(false))
+    this.light = v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, 0xff4a1a, 0).setDepth(85).setVisible(false))
     this.visuals.push(this.light)
     this.shake = loadSettings(browserStorage()).hitShake
   }
@@ -1099,7 +1108,7 @@ class VolcanoView extends BoundedView {
         emitting: false,
       })
       .setDepth(37)
-    const cam = scene.cameras.main
+    const screen = v.lens.screen
     this.ash = scene.add
       .particles(0, 0, SPARK_KEY, {
         lifespan: 7000,
@@ -1113,8 +1122,9 @@ class VolcanoView extends BoundedView {
           type: 'random',
           source: {
             getRandomPoint: (p: Phaser.Types.Math.Vector2Like): void => {
-              p.x = (Math.random() - 0.5) * cam.worldView.width * 1.4
-              p.y = (Math.random() - 0.5) * cam.worldView.height * 1.4
+              const view = screen.view()
+              p.x = (Math.random() - 0.5) * view.w * 1.4
+              p.y = (Math.random() - 0.5) * view.h * 1.4
             },
           },
         },
@@ -1160,7 +1170,7 @@ class VolcanoView extends BoundedView {
     this.bombGfx = scene.add.graphics().setDepth(1.7)
     this.splatGfx = scene.add.graphics().setDepth(1.6).setBlendMode(Phaser.BlendModes.ADD)
     this.visuals.push(this.plume, this.column, this.embers, this.ash, this.sparks, this.trail, this.bombGfx, this.splatGfx)
-    this.vignette = scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.7, 0.22, 0x000000)
+    this.vignette = v.lens.screen.vignette(0.7, 0.22, 0x000000)
   }
 
   /** 把熔岩场编码进两张数据图 */
@@ -1226,18 +1236,18 @@ class VolcanoView extends BoundedView {
     this.u.erupt = erupt
     if (s.phase !== this.phase) this.enterPhase(v, s)
     this.phase = s.phase
-    const cam = v.scene.cameras.main
+    const view = v.lens.screen.view()
     if (s.phase === 'warn' && this.shake && now >= this.shakeAt) {
       this.shakeAt = now + 280
-      v.lens.shake(300, 0.0005 + 0.0022 * warn)
+      v.lens.screen.shake(300, 0.0005 + 0.0022 * warn)
     }
     if (this.light) {
       const a = s.phase === 'warn' ? warn * (0.03 + 0.02 * Math.sin(now / 90)) : s.phase === 'erupt' ? 0.02 + 0.06 * erupt * (0.8 + 0.2 * Math.sin(now / 70)) : 0
       setOverlayFill(this.light, 0xff4a1a, a)
     }
     if (this.vignette) this.vignette.strength = 0.22 + 0.1 * Math.max(warn, erupt)
-    this.emitEmbers(f, cam, delta)
-    this.ash?.setPosition(cam.midPoint.x, cam.midPoint.y)
+    this.emitEmbers(f, view, delta)
+    this.ash?.setPosition(view.x + view.w / 2, view.y + view.h / 2)
     this.stepBombs(v, s, delta, now)
   }
 
@@ -1248,8 +1258,8 @@ class VolcanoView extends BoundedView {
     if (s.phase === 'warn') playSfx('rumble')
     if (s.phase === 'erupt') {
       playSfx('erupt')
-      v.lens.flash(260, 255, 150, 70)
-      if (this.shake) v.lens.shake(750, 0.007)
+      v.lens.screen.flash(260, 255, 150, 70)
+      if (this.shake) v.lens.screen.shake(750, 0.007)
       this.column?.start()
       this.sparks?.explode(40, s.field.craterX, s.field.craterY)
       this.bombAcc = 6
@@ -1258,14 +1268,13 @@ class VolcanoView extends BoundedView {
   }
 
   /** 镜头里随机挑几处热熔岩冒火星：每秒按镜头面积撒点，落在越热的熔岩上越容易冒 */
-  private emitEmbers(f: VolcanoState['field'], cam: Phaser.Cameras.Scene2D.Camera, delta: number): void {
+  private emitEmbers(f: VolcanoState['field'], view: Rect, delta: number): void {
     const em = this.embers
     if (!em) return
-    const view = cam.worldView
-    this.emberAcc += (delta / 1000) * ((view.width * view.height) / (UNIT * UNIT)) * 0.35
+    this.emberAcc += (delta / 1000) * ((view.w * view.h) / (UNIT * UNIT)) * 0.35
     for (; this.emberAcc >= 1; this.emberAcc--) {
-      const x = view.x + Math.random() * view.width
-      const y = view.y + Math.random() * view.height
+      const x = view.x + Math.random() * view.w
+      const y = view.y + Math.random() * view.h
       const cx = Math.floor((x - f.x0) / f.cell)
       const cy = Math.floor((y - f.y0) / f.cell)
       if (cx < 0 || cy < 0 || cx >= f.cols || cy >= f.rows) continue
@@ -1517,7 +1526,7 @@ class ShipView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, SHIP_BG).setDepth(-3)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, SHIP_BG).setDepth(-3)))
     const scene = v.scene
     if (!scene.textures.exists(SHIP_PUFF_KEY)) canvasTexture(scene, SHIP_PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
     if (!scene.textures.exists(BALL_KEY)) canvasTexture(scene, BALL_KEY, 48, 48, (ctx) => drawBall(ctx, 48))
@@ -1655,7 +1664,7 @@ class ShipView extends BoundedView {
       })
       .setDepth(34)
     this.visuals.push(this.spray)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.12, 0x000000)
+    v.lens.screen.vignette(0.72, 0.12, 0x000000)
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -1871,7 +1880,7 @@ class NebulaView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, NEBULA_BG).setDepth(-3)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, NEBULA_BG).setDepth(-3)))
     const scene = v.scene
     if (!scene.textures.exists(NEBULA_CLOUD_KEY)) canvasTexture(scene, NEBULA_CLOUD_KEY, 64, 64, (ctx) => drawCloud(ctx, 64))
     if (!scene.textures.exists(NEBULA_GLINT_KEY)) canvasTexture(scene, NEBULA_GLINT_KEY, 32, 32, (ctx) => drawGlint(ctx, 32))
@@ -1929,8 +1938,8 @@ class NebulaView extends BoundedView {
               set('uRect', [x0, y0, side, side])
               set('uUnit', UNIT)
               set('uCenter', [L.cx, L.cy])
-              const view = scene.cameras.main.worldView
-              set('uCam', [view.centerX, view.centerY, cfg.cameraU])
+              const view = v.lens.screen.view()
+              set('uCam', [view.x + view.w / 2, view.y + view.h / 2, cfg.cameraU])
               set('uSheet', [sheet.x0, sheet.y0, sheet.sizeU, sheet.sizeU])
               set('uShell', [sheet.wallU, cfg.shell.outerU, cfg.shell.innerU, cfg.shell.rise])
               set('uHole', [sheet.holeX, sheet.holeY, u.rs, cfg.disk.outerRs])
@@ -1997,13 +2006,13 @@ class NebulaView extends BoundedView {
       .setDepth(33.2)
     this.visuals.push(this.dustGfx, this.streamGfx, this.tailGfx, this.halo, this.knot, this.coma, this.core, this.wake, this.sparks, this.debris)
     this.dust = []
-    for (let i = 0; i < DUST_COUNT; i++) this.dust.push(this.speck(s, cfg, scene.cameras.main, true))
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.26, 0x000000)
+    for (let i = 0; i < DUST_COUNT; i++) this.dust.push(this.speck(s, cfg, v.lens.screen, true))
+    v.lens.screen.vignette(0.72, 0.26, 0x000000)
     this.syncUniforms(s, cfg, sim.elapsedMs)
   }
 
   /** 新撒一粒星尘：多半撒在镜头附近，免得都漂在看不见的地方 */
-  private speck(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, cam: Phaser.Cameras.Scene2D.Camera, anywhere: boolean): Speck {
+  private speck(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, screen: Screen, anywhere: boolean): Speck {
     const L = s.layout
     const lim = (cfg.shell.innerU - 0.3) * UNIT
     let x = 0
@@ -2015,9 +2024,9 @@ class NebulaView extends BoundedView {
         x = L.cx + Math.cos(a) * r
         y = L.cy + Math.sin(a) * r
       } else {
-        const view = cam.worldView
-        x = view.x - UNIT * 2 + Math.random() * (view.width + UNIT * 4)
-        y = view.y - UNIT * 2 + Math.random() * (view.height + UNIT * 4)
+        const view = screen.view()
+        x = view.x - UNIT * 2 + Math.random() * (view.w + UNIT * 4)
+        y = view.y - UNIT * 2 + Math.random() * (view.h + UNIT * 4)
       }
       if (Math.hypot(x - L.cx, y - L.cy) < lim && !inNebulaHorizon(s, x, y)) break
     }
@@ -2045,18 +2054,17 @@ class NebulaView extends BoundedView {
     const cfg = v.def.nebula!
     const now = sim.elapsedMs
     const dt = Math.min(delta, 50) / 1000
-    const cam = v.scene.cameras.main
     this.syncUniforms(s, cfg, now)
     const lum = luminosity(s, cfg, now)
     const shadow = SHADOW_RS * s.rs * UNIT
     if (this.halo) this.halo.setDisplaySize(shadow * HALO_EDGE * 2, shadow * HALO_EDGE * 2).setAlpha(Math.min(0.5, 0.1 * Math.sqrt(lum)))
-    this.stepDust(s, cfg, cam, dt, lum)
+    this.stepDust(s, cfg, v.lens.screen, dt, lum)
     this.stepStreams(s, now)
     this.stepMeteor(v, s, cfg, now, lum)
   }
 
   /** 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。离黑洞或飞过的流星越近被照得越亮 */
-  private stepDust(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, cam: Phaser.Cameras.Scene2D.Camera, dt: number, lum: number): void {
+  private stepDust(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, screen: Screen, dt: number, lum: number): void {
     const g = this.dustGfx!
     g.clear()
     const L = s.layout
@@ -2079,7 +2087,7 @@ class NebulaView extends BoundedView {
         if (inNebulaHorizon(s, p.x, p.y)) break
       }
       if (inNebulaHorizon(s, p.x, p.y) || Math.hypot(p.x - L.cx, p.y - L.cy) > lim) {
-        p = this.speck(s, cfg, cam, false)
+        p = this.speck(s, cfg, screen, false)
         this.dust[i] = p
       }
       const dU = Math.hypot(p.x - L.hx, p.y - L.hy) / UNIT
@@ -2147,8 +2155,7 @@ class NebulaView extends BoundedView {
         this.sparks?.explode(36, e.x, e.y)
         this.debris?.explode(10, e.x, e.y)
         playSfx('shatter')
-        const view = v.scene.cameras.main.worldView
-        if (this.shake && view.contains(e.x, e.y)) v.lens.shake(260, 0.003)
+        if (this.shake && v.lens.screen.sees(e.x, e.y)) v.lens.screen.shake(260, 0.003)
       } else this.debris?.explode(5, e.x, e.y)
     }
     const phase = m ? m.phase : 'none'
@@ -2426,7 +2433,7 @@ class FloeView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, FLOE_SEA).setDepth(-3)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, FLOE_SEA).setDepth(-3)))
     this.fitFrost(v, viewport.logicalWidth / viewport.logicalHeight)
     this.frost = v.scene.add.image(0, 0, FROST_KEY).setDepth(89).setAlpha(0)
     this.visuals.push(this.frost)
@@ -2534,7 +2541,7 @@ class FloeView extends BoundedView {
     this.spray = scene.add.graphics().setDepth(34)
     this.high = scene.add.graphics().setDepth(36)
     this.visuals.push(this.wet, this.low, this.cover, this.waterline, this.spray, this.high)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.8, 0.08, 0x0a1622)
+    v.lens.screen.vignette(0.8, 0.08, 0x0a1622)
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -2559,9 +2566,9 @@ class FloeView extends BoundedView {
     const lead = sim.leader
     const cold = lead >= 0 && inWater(s, lead, Uid.v[lead]!)
     this.chill = Math.min(1, Math.max(0, this.chill + (cold ? dt / 3 : -dt / 2)))
-    const view = v.scene.cameras.main.worldView
-    this.fitFrost(v, view.width / view.height)
-    this.frost?.setAlpha(this.chill * 0.9).setPosition(view.centerX, view.centerY).setDisplaySize(view.width, view.height)
+    const view = v.lens.screen.view()
+    this.fitFrost(v, view.w / view.h)
+    this.frost?.setAlpha(this.chill * 0.9).setPosition(view.x + view.w / 2, view.y + view.h / 2).setDisplaySize(view.w, view.h)
   }
 
   /** 霜按镜头的宽高比画：拉伸会把六十度的冰花拉歪 */
@@ -2588,19 +2595,19 @@ class FloeView extends BoundedView {
 
   /** 风吹雪：按风速的三次方在镜头里撒雪，从上风那一侧吹进来；贴地的拖成短线，少数飞起来的是小点 */
   private blow(v: ViewCtx, cfg: FloeConfig, speed: number, angle: number, dt: number): void {
-    const cam = v.scene.cameras.main.worldView
+    const cam = v.lens.screen.view()
     const lift = Math.max(0, speed - DRIFT_FROM_MS) / DRIFT_SPAN_MS
     const c = Math.cos(angle)
     const s = Math.sin(angle)
     const px = UNIT / cfg.meterPerU
-    this.flakeAcc += dt * ((cam.width * cam.height) / (UNIT * UNIT)) * (0.05 + 1.1 * lift * lift * lift)
+    this.flakeAcc += dt * ((cam.w * cam.h) / (UNIT * UNIT)) * (0.05 + 1.1 * lift * lift * lift)
     for (; this.flakeAcc >= 1; this.flakeAcc--) {
       const high = Math.random() < 0.22
       const pace = speed * (high ? 0.9 : 0.5) * (0.7 + Math.random() * 0.5) * px
       const back = Math.random() * 0.6
       this.flakes.push({
-        x: cam.x + Math.random() * cam.width - c * back * cam.width,
-        y: cam.y + Math.random() * cam.height - s * back * cam.height,
+        x: cam.x + Math.random() * cam.w - c * back * cam.w,
+        y: cam.y + Math.random() * cam.h - s * back * cam.h,
         vx: c * pace + (Math.random() - 0.5) * 0.4 * px,
         vy: s * pace + (Math.random() - 0.5) * 0.4 * px,
         age: 0,
@@ -2847,7 +2854,7 @@ class CaveView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, CAVE_BG).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, CAVE_BG).setDepth(-2)))
     const scene = v.scene
     if (!scene.textures.exists(CAVE_FLAME_KEY)) canvasTexture(scene, CAVE_FLAME_KEY, 32, 48, (ctx) => drawFlame(ctx, 32, 48))
     if (!scene.textures.exists(CAVE_HALO_KEY)) canvasTexture(scene, CAVE_HALO_KEY, 64, 64, (ctx) => drawCaveHalo(ctx, 64))
@@ -3045,7 +3052,7 @@ class CaveView extends BoundedView {
       .setDepth(28)
     this.rippleGfx = scene.add.graphics().setDepth(-0.4)
     this.visuals.push(this.embers, this.smoke, this.rippleGfx)
-    this.vignette = scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.78, 0.18, 0x0a0604)
+    this.vignette = v.lens.screen.vignette(0.78, 0.18, 0x0a0604)
     this.sunDeg = s.sky.sun.elev / DEG_CAVE
     this.viewU = viewU(cfg.view, s.light.hallLux)
     this.adapt = Math.max(cfg.view.brightLux, s.light.hallLux)
@@ -3302,7 +3309,7 @@ class CaveView extends BoundedView {
     const g = this.rippleGfx
     if (!g) return
     const L = s.layout
-    const cam = v.scene.cameras.main.worldView
+    const screen = v.lens.screen
     if (now >= this.dripAt) {
       this.dripAt = now + 450 + Math.random() * 900
       const pools = L.pools.length
@@ -3323,10 +3330,8 @@ class CaveView extends BoundedView {
         y = st.y
         pool = false
       }
-      if (x > cam.x && x < cam.right && y > cam.y && y < cam.bottom) {
-        this.ripples.push({ x, y, at: now, r: (pool ? 0.9 : 0.3) * UNIT, pool })
-        playSfx('drip')
-      }
+      this.ripples.push({ x, y, at: now, r: (pool ? 0.9 : 0.3) * UNIT, pool })
+      if (screen.sees(x, y)) playSfx('drip')
     }
     g.clear()
     this.ripples = this.ripples.filter((r) => now - r.at < 1400)
