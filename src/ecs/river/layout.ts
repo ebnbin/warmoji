@@ -25,6 +25,11 @@ const POOL_WOBBLE = 0.32
 export const GRAVITY = 9.81
 /** 出水口的岩坎前这么多（比例）是从河床升上来的坡，其余是平的坎顶 */
 const SILL_RAMP = 0.6
+/** 深谷的谷壁从谷边外 WALL_OUT 格起、到谷边里 WALL_IN 格落到谷底 */
+const WALL_OUT = 0.7
+const WALL_IN = 0.35
+/** 断崖边往外这么远（格）落到谷底：宽过两个地形格，斜着的崖边才不在格子上拼出台阶 */
+const BRINK_U = 0.5
 /** 生成不出合格的河网就换一组随机数重来，最多这么多次 */
 const TRIES = 60
 
@@ -489,14 +494,16 @@ function upland(plan: Pick<RiverPlan, 'shape' | 'upstream'>, aIn: number, span: 
   return Math.max(sector, smooth(hw + 5, hw + 3, tmp.d))
 }
 
-/** 离一组深谷多近：深谷里（从断崖边往外、在谷宽以内）为正，格 */
+/**
+ * 离一组深谷多近：深谷里（从断崖边往外、在谷宽以内）为正，格；断崖边那头按离崖边多远连续地过渡，往外 BRINK_U 格从谷壁的起点落到谷底
+ */
 function gorgeDepthAt(plan: Pick<RiverPlan, 'gorges'>, x: number, y: number, tmp: Along): number {
   let best = -Infinity
   for (const g of plan.gorges) {
     if (!nearBox(g, x, y, 4)) continue
     project(g, x, y, tmp)
-    if (tmp.s <= 0) continue
-    best = Math.max(best, at(g.half, tmp) - Math.abs(tmp.n))
+    const ahead = tmp.s > 0 ? tmp.s : (x - g.x[0]!) * g.tx[0]! + (y - g.y[0]!) * g.ty[0]!
+    best = Math.max(best, Math.min(at(g.half, tmp) - Math.abs(tmp.n), (ahead / BRINK_U) * (WALL_OUT + WALL_IN) - WALL_OUT))
   }
   return best
 }
@@ -717,12 +724,15 @@ function terrainOf(cfg: RiverConfig, d: Draft, x0: number, y0: number, cols: num
       }
       for (const o of d.outlets) {
         const along = (x - o.x) * o.nx + (y - o.y) * o.ny
-        if (along <= -fl.sillU || along >= 0 || Math.abs((x - o.x) * -o.ny + (y - o.y) * o.nx) >= o.half + f.bankU) continue
-        if (o.crest > g) g += (o.crest - g) * smooth(-fl.sillU, -fl.sillU * (1 - SILL_RAMP), along)
+        const side = Math.abs((x - o.x) * -o.ny + (y - o.y) * o.nx)
+        if (along <= -fl.sillU || along >= BRINK_U || side >= o.half + f.bankU) continue
+        // 水面宽度以内坎顶一直平到断崖边外，谷壁再从坎顶落下去：崖边不会比坎顶高
+        if (along >= 0 && side < o.half) g = o.crest
+        else if (o.crest > g) g += (o.crest - g) * smooth(-fl.sillU, -fl.sillU * (1 - SILL_RAMP), along)
       }
       const gd = gorgeDepthAt(d, x, y, tmp)
-      if (gd > -0.7) {
-        const wall = smooth(-0.7, 0.35, gd)
+      if (gd > -WALL_OUT) {
+        const wall = smooth(-WALL_OUT, WALL_IN, gd)
         g = g + (Math.min(g, nearLevel) - fl.gorgeM - g) * wall
       }
       z[i] = g

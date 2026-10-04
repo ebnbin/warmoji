@@ -343,9 +343,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       const haze = smooth(0.8, 6, below) * inGorge
       if (haze > 0) {
         const mist = 0.92 + 0.12 * fbm(x / 1.5, y / 1.5, seed + 57, 2)
-        r += (226 * mist - r) * haze * 0.85
-        g += (210 * mist - g) * haze * 0.85
-        b += (230 * mist - b) * haze * 0.85
+        r += (238 * mist - r) * haze * 0.9
+        g += (222 * mist - g) * haze * 0.9
+        b += (238 * mist - b) * haze * 0.9
       }
 
       // 光：朝太阳的坡亮、背阴的坡暗；往太阳方向找挡光的地形；树影偏紫；深谷里暗一些；离空地越远越融进粉白的雾
@@ -358,7 +358,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const dd = Math.sqrt((x - c.x) * (x - c.x) + (y - c.y) * (y - c.y))
         shade = Math.max(shade, smooth(c.r + soft, c.r - soft, dd) * 0.36)
       }
-      const lit = (0.74 + 0.36 * lambert) * (1 - 0.25 * smooth(1, 7, below) * inGorge)
+      const lit = (0.74 + 0.36 * lambert) * (1 - 0.15 * smooth(1, 7, below) * inGorge)
       const far = 0.6 * smooth(2, 9, -clear)
       out[o] = r * lit * (1 - shade * 0.32) + (250 - r * lit * (1 - shade * 0.32)) * far
       out[o + 1] = g * lit * (1 - shade * 0.46) + (232 - g * lit * (1 - shade * 0.46)) * far

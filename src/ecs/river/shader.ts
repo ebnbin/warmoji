@@ -35,7 +35,7 @@ function put16(out: Uint8ClampedArray, o: number, z: number): void {
  * 编码水面：地形高程照搬；水面高程与流速按 WATER_CELL_U 的格子铺满整片地形，有解出来的稳态水流就用它，
  * 没有的地方只有崖上的溪沟（它不在解的范围里），按设计水位与曼宁流速（水深的三分之二次方）铺；干地上的水位与流速从水边往外推几圈，让岸线落在地形上，
  * 推出去的水位不高过那里的地面（崖壁、断崖底下没有水）。
- * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、绕过石头的水都翻白
+ * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、流向转得急的地方都翻白
  */
 export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterImages {
   const t = plan.terrain
@@ -303,7 +303,7 @@ void main ()
   vec2 gb = vec2(0.0);
   float lines = 0.0;
   float wsum = 0.0;
-  // 条纹的方向取这一点自己的流向：取块中心的，流向转得急的地方（石头周围、分叉口）就拼出折角
+  // 条纹的方向取这一点自己的流向：取块中心的，流向转得急的地方（分叉口、急弯）就拼出折角
   vec2 dir = speed > 0.02 ? vel / speed : vec2(0.7071, 0.7071);
   vec2 acr = vec2(-dir.y, dir.x);
   float stretch = 1.0 + 2.8 * clamp(speed / 1.6, 0.0, 1.0);
@@ -361,7 +361,7 @@ void main ()
   if (curtain > 0.0) {
     float h = clamp(-inAlong / uInSize.z, 0.0, 1.0);
     float fall = vnoise(vec2(inSide * 5.0, inAlong * 1.4 - uTime * 4.5)) * 0.55 + vnoise(vec2(inSide * 13.0, inAlong * 3.0 - uTime * 8.0)) * 0.45;
-    vec3 sheet = mix(vec3(0.74, 0.86, 0.92), vec3(1.0, 0.98, 0.99), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
+    vec3 sheet = mix(vec3(0.84, 0.91, 0.96), vec3(1.0, 0.98, 0.99), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
     sheet = mix(sheet, vec3(0.92, 0.93, 0.97), smoothstep(0.85, 1.0, h) * 0.6);
     float a = curtain * (0.62 + 0.38 * fall) * (0.75 + 0.25 * (1.0 - h));
     col = (col * alpha * (1.0 - a) + sheet * a) / max(alpha + a * (1.0 - alpha), 0.001);
@@ -369,7 +369,7 @@ void main ()
   }
   if (drop > 0.0) {
     float fall = vnoise(vec2(dropSide * 5.0, dropAlong * 1.5 - uTime * 5.0)) * 0.6 + vnoise(vec2(dropSide * 13.0, dropAlong * 3.0 - uTime * 8.0)) * 0.4;
-    vec3 sheet = mix(vec3(0.76, 0.86, 0.92), vec3(1.0, 0.97, 0.99), smoothstep(0.25, 0.75, fall));
+    vec3 sheet = mix(vec3(0.86, 0.92, 0.96), vec3(1.0, 0.97, 0.99), smoothstep(0.25, 0.75, fall));
     float a = drop * (0.5 + 0.5 * fall) * (1.0 - smoothstep(0.6, 2.8, dropAlong) * 0.75);
     col = (col * alpha * (1.0 - a) + sheet * a) / max(alpha + a * (1.0 - alpha), 0.001);
     alpha = alpha + a * (1.0 - alpha);

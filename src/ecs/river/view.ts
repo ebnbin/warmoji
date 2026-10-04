@@ -24,7 +24,6 @@ import type { MapView, ViewCtx } from '../views'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 
-const BG = 0xf7dfe8
 const GROUND_KEY = 'river-ground'
 const CANOPY_KEY = 'river-canopy'
 const BED_KEY = 'river-bed'
@@ -233,7 +232,7 @@ export class RiverView implements MapView {
   build(v: ViewCtx): void {
     this.visuals.push(
       v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG)
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, v.def.palette.map)
         .setScrollFactor(0)
         .setDepth(-2),
     )

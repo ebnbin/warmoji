@@ -117,7 +117,7 @@ function wetAt(sim: Sim, s: RiverState, x: number, y: number): boolean {
   return !!s.water && flowAt(s.water, x / UNIT, y / UNIT, FLOW).h >= cfgOf(sim).body.wetM
 }
 
-/** 离壁 reach 像素以内几乎正对着壁走时改为顺着壁走：树、石头、崖与深谷都挡路 */
+/** 离壁 reach 像素以内几乎正对着壁走时改为顺着壁走：树、崖与深谷都挡路 */
 function alongWall(s: RiverState, x: number, y: number, dx: number, dy: number, reach: number): Point {
   const b = s.plan.basin
   if (roomAt(b, x, y) > reach) return { x: dx, y: dy }
@@ -184,7 +184,7 @@ function plunge(sim: Sim, s: RiverState): void {
 }
 
 /**
- * 河流：能走的是林子、岩石与崖围着的一片空地，河面也能走；树、石头、崖与深谷是硬边界，身体走到跟前就停住、顺着壁面滑。
+ * 樱川：能走的是樱花林与崖围着的一片空地，河面也能走；树、崖与深谷是硬边界，身体走到跟前就停住、顺着壁面滑。
  * 水里站不住的身体随水漂、自己划水（见 swept 与 drift），站得住的跟在岸上一样，掉落物顺水漂；被冲过断崖边就落进深谷
  */
 export const river: WorldHooks = {
@@ -216,7 +216,7 @@ export const river: WorldHooks = {
   effort() {
     return 1
   },
-  /** 掉落物落进水里跟落叶一样顺水漂，被吸向队伍的速度照加；碎片照常 */
+  /** 掉落物落进水里跟花瓣一样顺水漂，被吸向队伍的速度照加；碎片照常 */
   contact(sim, eid, dt, x, y, vx, vy, out) {
     const s = riverOf(sim)
     const w = s.water

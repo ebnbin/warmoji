@@ -33,6 +33,8 @@ const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
 const AEOLIAN = [0, 2, 3, 5, 7, 8, 10] as const
 const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const
+/** 阳音阶：日本民谣里明亮的五声音阶 */
+const YO = [0, 2, 5, 7, 9] as const
 
 interface Voice {
   wave: BgmNote['wave']
@@ -274,38 +276,46 @@ function buildDesert(): BgmScore {
   )
 }
 
+/** 樱川：阳音阶上的筝在每小节按根音拨一串，笛子唱一支慢慢的民谣调，八音盒似的铃隔小节点两下；鼓只轻轻打着拍 */
 function buildRiver(): BgmScore {
-  const chords = [0, 4, 5, 3, 0, 4, 5, 3, 5, 2, 3, 4, 0, 3, 4, 0]
+  const roots = [0, 3, 2, 1, 0, 3, 4, 2, 3, 2, 1, 0, 3, 4, 2, 0]
+  const pluck = [0, 2, 4, 5, 4, 2, 5, 7]
   return track(
-    { bpm: 168, stepsPerBeat: 1, stepsPerBar: 6, bars: 16, rootMidi: 55, scale: MAJOR },
+    { bpm: 104, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 62, scale: YO, echo: { delaySec: (60 / 104) * 0.75, feedback: 0.3, level: 0.35 } },
     (b) => {
-      const bass: Voice = { wave: 'sine', vol: 0.17, attack: 0.015, release: 0.1, octave: -1 }
-      const water: Voice = { wave: 'triangle', vol: 0.085, attack: 0.008, release: 0.06, octave: 0 }
-      const sparkle: Voice = { wave: 'triangle', vol: 0.04, attack: 0.006, release: 0.05, octave: 2 }
-      const lead: Voice = { wave: 'sine', vol: 0.14, attack: 0.02, release: 0.12, octave: 1 }
-      b.bass(bass, chords, 'r..f..')
-      b.arp(water, chords, [0, 1, 2, 3, 2, 1])
-      b.arp(sparkle, chords, [3, 4, 5], 8, 16)
-      b.line(lead, [
-        [0, 0, 2, 3], [0, 3, 1, 3],
-        [1, 0, 1, 2], [1, 2, 2, 2], [1, 4, 3, 2],
-        [2, 0, 4, 6],
-        [3, 0, 3, 3], [3, 3, 2, 3],
-        [4, 0, 2, 3], [4, 3, 4, 3],
-        [5, 0, 5, 4], [5, 4, 4, 2],
-        [6, 0, 2, 3], [6, 3, 1, 3],
-        [7, 0, 0, 6],
-        [8, 0, 4, 3], [8, 3, 5, 3],
-        [9, 0, 6, 4], [9, 4, 5, 2],
-        [10, 0, 7, 3], [10, 3, 5, 3],
-        [11, 0, 4, 3], [11, 3, 1, 3],
-        [12, 0, 2, 3], [12, 3, 1, 3],
-        [13, 0, 3, 3], [13, 3, 2, 3],
-        [14, 0, 1, 4], [14, 4, 2, 2],
-        [15, 0, 0, 6],
+      const koto: Voice = { wave: 'triangle', vol: 0.085, attack: 0.004, release: 0.25, octave: 0, echo: true }
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.01, release: 0.2, octave: -1 }
+      const flute: Voice = { wave: 'sine', vol: 0.12, attack: 0.08, release: 0.3, octave: 1 }
+      const bell: Voice = { wave: 'triangle', vol: 0.035, attack: 0.003, release: 0.4, octave: 2, echo: true }
+      roots.forEach((r, bar) => {
+        b.note(bass, bar, 0, r, 4)
+        b.note(bass, bar, 4, r + 2, 4)
+        pluck.forEach((d, step) => b.note(koto, bar, step, r + d, 1))
+        if (bar % 2 === 1) {
+          b.note(bell, bar, 1, r + 4, 1)
+          b.note(bell, bar, 5, r + 7, 1)
+        }
+      })
+      b.line(flute, [
+        [0, 0, 5, 2], [0, 2, 4, 2], [0, 4, 3, 4],
+        [1, 0, 2, 2], [1, 2, 3, 2], [1, 4, 4, 4],
+        [2, 0, 5, 3], [2, 3, 6, 1], [2, 4, 5, 4],
+        [3, 0, 4, 2], [3, 2, 3, 2], [3, 4, 2, 4],
+        [4, 0, 3, 2], [4, 2, 4, 2], [4, 4, 5, 4],
+        [5, 0, 6, 3], [5, 3, 5, 1], [5, 4, 4, 4],
+        [6, 0, 3, 2], [6, 2, 2, 2], [6, 4, 1, 4],
+        [7, 0, 2, 8],
+        [8, 0, 7, 2], [8, 2, 6, 2], [8, 4, 5, 4],
+        [9, 0, 6, 2], [9, 2, 5, 2], [9, 4, 4, 4],
+        [10, 0, 5, 3], [10, 3, 4, 1], [10, 4, 3, 4],
+        [11, 0, 2, 8],
+        [12, 0, 3, 2], [12, 2, 4, 2], [12, 4, 5, 2], [12, 6, 6, 2],
+        [13, 0, 7, 4], [13, 4, 6, 4],
+        [14, 0, 5, 2], [14, 2, 4, 2], [14, 4, 3, 4],
+        [15, 0, 0, 8],
       ])
-      b.drums('kick', 'x.....', 0, 16, 0.16)
-      b.drums('hat', 'x.x.x.', 0, 16, 0.05)
+      b.drums('tom', 'x...x...', 0, 16, 0.1)
+      b.drums('hat', '..x...x.', 0, 16, 0.025)
     },
   )
 }
