@@ -185,7 +185,7 @@ export const MAPS = {
       areaU2: [760, 1040],
       neckU: 0.35,
       turf: { reliefM: 0.16, waveU: 7, riseM: 0.035 },
-      bank: { insetU: [3.5, 6.5], bendU: 2.6, waveU: 12, jagU: 0.12, spurs: [0, 2], spurU: [1.2, 3], spurWidthU: [1.5, 3.5], slopeU: [1.3, 1.8], heightM: [1.4, 1.9] },
+      bank: { insetU: [3.5, 6.5], bendU: 2.6, waveU: 12, spurs: [0, 2], spurU: [1.2, 3], spurWidthU: [2.5, 5], heightM: [3, 4], riseM: [0.8, 0.95] },
       forest: { insetU: [1.5, 5.5], bendU: 2.4, waveU: 9, scallopU: 0.45, lobes: [0, 2], lobeU: [1.5, 3.5], lobeWidthU: [1.6, 3], crownU: [1.3, 2.3], heightM: [4.5, 6.5], edgeU: [0.5, 1], birch: 0.25, overhangU: 0.4 },
       trail: { notchU: 1.6, widthU: 1.3, logU: [5, 6.5] },
       fence: { insetU: [1.5, 3], skewDeg: 6, kinkDeg: 6, postU: 2.6, heightM: 1.1, gateU: 2.2, farChance: 0.35 },

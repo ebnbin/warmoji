@@ -111,7 +111,7 @@ export interface Bump {
 
 /**
  * 草甸的边，本地坐标，格。陡坡在 a 小的一边；对边（far）与 b 大的侧边（high）里恰好一条是栅栏、另一条是林子，b 小的侧边（low）总是林子。
- * 坡脚与林缘按噪声弯，再叠上往草地鼓出来、往里凹进去的几处与林舌、草湾；坡面宽 width（格）、坡高 height（米）的范围；
+ * 坡脚与林缘按噪声弯，再叠上往草地鼓出来、往里凹进去的几处与林舌、草湾；坡高 height（米）与坡面平均每格升多少（rise，米）的范围；
  * 栅栏几乎是直的：整条斜 skew（斜率）、过了 kinkAt 再拐 kink（斜率）。林间小路在林缘上凹进去一块，notch 是路口、进林子的方向与凹槽的深与半宽
  */
 export interface Edges {
@@ -123,9 +123,8 @@ export interface Edges {
     readonly inset: number
     readonly bend: number
     readonly wave: number
-    readonly jag: number
-    readonly width: readonly [number, number]
     readonly height: readonly [number, number]
+    readonly rise: readonly [number, number]
   }
   readonly forest: { readonly far: number; readonly low: number; readonly high: number; readonly bend: number; readonly wave: number; readonly scallop: number }
   readonly bumps: readonly Bump[]
@@ -143,24 +142,19 @@ function bulge(e: Edges, k: number, u: number): number {
 /** 坡脚在 b 处离陡坡那条地图边多远，格 */
 export function footAt(e: Edges, b: number): number {
   const c = e.bank
-  return c.inset + c.bend * swing(b / c.wave + 3.7, 1.9, e.seed + 51, 3) + c.jag * swing(b / 1.2 + 0.4, 8.2, e.seed + 53, 2) - bulge(e, 0, b)
+  return c.inset + c.bend * swing(b / c.wave + 3.7, 1.9, e.seed + 51, 3) - bulge(e, 0, b)
 }
 
-/** 陡坡在 b 处高矮的起伏，0 到 1，顺着坡脚慢慢变 */
-function swell(e: Edges, b: number): number {
-  return clamp01((fbm(b / 7, 1.3, e.seed + 61, 2) - 0.3) * 2.5)
-}
-
-/** 坡面在 b 处从坡脚到坡顶多宽，格：坡高的地方坡面也宽 */
-export function bankWidth(e: Edges, b: number): number {
-  const w = e.bank.width
-  return w[0] + (w[1] - w[0]) * (0.7 * swell(e, b) + 0.3 * clamp01((fbm(b / 3.5, 4.1, e.seed + 63, 2) - 0.3) * 2.5))
-}
-
-/** 坡顶在 b 处比坡脚高多少，米 */
+/** 坡顶在 b 处比坡脚高多少，米：顺着坡脚慢慢变 */
 export function bankHeight(e: Edges, b: number): number {
   const h = e.bank.height
-  return h[0] + (h[1] - h[0]) * swell(e, b)
+  return h[0] + (h[1] - h[0]) * clamp01((fbm(b / 7, 1.3, e.seed + 61, 2) - 0.3) * 2.5)
+}
+
+/** 坡面在 b 处从坡脚到坡顶多宽，格：坡高除以坡面平均每格升多少，陡缓也顺着坡脚慢慢变 */
+export function bankWidth(e: Edges, b: number): number {
+  const r = e.bank.rise
+  return bankHeight(e, b) / (r[0] + (r[1] - r[0]) * clamp01((fbm(b / 5, 4.1, e.seed + 63, 2) - 0.3) * 2.5))
 }
 
 /** 坡面的剖面：出了坡脚、占坡面宽 t 处升到坡高的多少；坡脚与坡顶都圆滑地接上平地 */
@@ -451,7 +445,7 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
     seed,
     far: fenceFar ? 'fence' : 'forest',
     high: fenceFar ? 'forest' : 'fence',
-    bank: { inset: between(rng, c.insetU), bend: c.bendU * (0.6 + rng.next() * 0.6), wave: c.waveU, jag: c.jagU, width: c.slopeU, height: c.heightM },
+    bank: { inset: between(rng, c.insetU), bend: c.bendU * (0.6 + rng.next() * 0.6), wave: c.waveU, height: c.heightM, rise: c.riseM },
     forest: { far: between(rng, fo.insetU), low: between(rng, fo.insetU), high: between(rng, fo.insetU), bend: fo.bendU * (0.6 + rng.next() * 0.6), wave: fo.waveU, scallop: fo.scallopU },
     bumps,
     fence: {
@@ -462,6 +456,8 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
     },
     notch: NO_NOTCH,
   }
+  // 坡顶得画得进地面贴图，外面还留一格草甸
+  for (let b = -cfg.padU; b <= S + cfg.padU; b += 0.25) if (footAt(base, b) - bankWidth(base, b) < 1 - cfg.padU) return null
   // 林间小路开在一条林缘的中段：栅栏在侧边时多半开在对边的林子上
   const onFar = !fenceFar && rng.next() < 0.7
   const onHigh = fenceFar && rng.next() < 0.5

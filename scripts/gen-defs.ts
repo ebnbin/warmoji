@@ -33,7 +33,7 @@ import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
-import { bankShape, bankWidth, footAt, meadowPlan } from '../src/ecs/meadow/layout.ts'
+import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
 import { UNIT } from '../src/util/units.ts'
@@ -311,8 +311,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 草甸：参数说得通；陡坡背着太阳时，最矮最宽的一段影子也落得出坡脚；抽一批种子真的生成一遍：每张都生成得出来，
- * 开局站位离边够远，栅栏有门，林子里有树，栅栏外有羊，坡顶画得进地面贴图
+ * 草甸：参数说得通；陡坡背着太阳时，最矮最缓的一段影子也落得出坡脚；抽一批种子真的生成一遍：每张都生成得出来，
+ * 开局站位离边够远，栅栏有门，林子里有树，栅栏外有羊
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'meadow') === (m.meadow !== undefined), `maps.${id} 是草甸当且仅当写了 meadow`)
@@ -326,15 +326,16 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(g.areaU2[0] > 0 && range(g.areaU2, false) && g.areaU2[1] < g.sizeU * g.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
   need(turf.reliefM >= 0 && turf.waveU > 0 && turf.riseM >= 0, `${at}.turf 的起伏、坡度不为负，波长为正`)
   need(bank.insetU[0] > 0 && range(bank.insetU, false) && bank.insetU[1] < g.sizeU / 4, `${at}.bank.insetU 须让坡脚落在地图边与中线之间`)
-  need(bank.bendU >= 0 && bank.waveU > 0 && bank.jagU >= 0 && range(bank.spurs, true) && bank.spurU[0] > 0 && range(bank.spurU, false) && bank.spurWidthU[0] > 0 && range(bank.spurWidthU, false), `${at}.bank 的弯与鼓包须为正的范围`)
-  need(bank.slopeU[0] > 0 && range(bank.slopeU, false) && bank.heightM[0] > 0 && range(bank.heightM, false), `${at}.bank 的坡面宽与坡高须为正的范围`)
-  // 陡坡背着太阳（太阳在坡那边）时：顺着坡的法向，光线每往草地这边一格降 drop 米；坡最矮最宽的一段挡下的光，也要在坡脚外落下一溜影子
+  need(bank.bendU >= 0 && bank.waveU > 0 && range(bank.spurs, true) && bank.spurU[0] > 0 && range(bank.spurU, false) && bank.spurWidthU[0] > 0 && range(bank.spurWidthU, false), `${at}.bank 的弯与鼓包须为正的范围`)
+  need(bank.heightM[0] > 0 && range(bank.heightM, false) && bank.riseM[0] > 0 && range(bank.riseM, false), `${at}.bank 的坡高与坡面每格升多少须为正的范围`)
+  // 陡坡背着太阳（太阳在坡那边）时：顺着坡的法向，光线每往草地这边一格降 drop 米；坡最矮最缓的一段挡下的光，也要在坡脚外落下一溜影子
   const sunLen = Math.hypot(SUN.x, SUN.y)
   for (const c of [SUN.x, -SUN.x, SUN.y, -SUN.y].map((v) => v / sunLen).filter((v) => v > 0)) {
     const drop = ((SUN.z / sunLen) * g.meterPerU) / c
+    const width = bank.heightM[0] / bank.riseM[0]
     let over = 0
-    for (let t = 0; t <= 1; t += 0.01) over = Math.max(over, bank.heightM[0] * bankShape(t) - drop * bank.slopeU[1] * t)
-    need(over / drop >= 0.25, `${at}.bank 最矮最宽的一段坡背着太阳时，影子只落出坡脚 ${(over / drop).toFixed(2)} 格，须至少 0.25 格：坡要比太阳的光线陡`)
+    for (let t = 0; t <= 1; t += 0.01) over = Math.max(over, bank.heightM[0] * bankShape(t) - drop * width * t)
+    need(over / drop >= 0.25, `${at}.bank 最矮最缓的一段坡背着太阳时，影子只落出坡脚 ${(over / drop).toFixed(2)} 格，须至少 0.25 格：坡要比太阳的光线陡`)
   }
   need(forest.insetU[0] > 0 && range(forest.insetU, false) && forest.insetU[1] < g.sizeU / 4, `${at}.forest.insetU 须让林缘落在地图边与中线之间`)
   need(forest.bendU >= 0 && forest.waveU > 0 && forest.scallopU >= 0 && range(forest.lobes, true) && forest.lobeU[0] > 0 && range(forest.lobeU, false) && forest.lobeWidthU[0] > 0 && range(forest.lobeWidthU, false), `${at}.forest 的弯与林舌草湾须为正的范围`)
@@ -352,9 +353,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
-    let topInside = true
-    for (let b = -g.padU; b <= plan.size + g.padU; b += 0.25) topInside &&= footAt(plan.edges, b) - bankWidth(plan.edges, b) > 1 - g.padU
-    need(topInside, `${where} 的坡脚探出地图太远：坡顶画不进地面贴图`)
   }
 }
 

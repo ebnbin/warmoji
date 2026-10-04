@@ -680,19 +680,19 @@ export interface MeadowConfig {
   /** 草地的起伏（米）与波长（格）；整片从坡脚往外每格降低多少米 */
   readonly turf: { readonly reliefM: number; readonly waveU: number; readonly riseM: number }
   /**
-   * 陡坡：坡脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），再参差 jagU；另有 spurs 处往草地鼓出来或往里凹进去，
-   * 鼓出或凹进 spurU 格、宽约 spurWidthU 格。坡面从坡脚到坡顶 slopeU 格宽，坡顶比坡脚高 heightM 米；坡顶往外是高一层的草甸
+   * 陡坡：坡脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU）；另有 spurs 处往草地鼓出来或往里凹进去，
+   * 鼓出或凹进 spurU 格、宽约 spurWidthU 格。坡顶比坡脚高 heightM 米，坡面平均每格升 riseM 米，坡面多宽由这两样定；
+   * 坡顶是圆圆的肩，坡脚缓缓弯回平地，坡顶往外是高一层的草甸
    */
   readonly bank: {
     readonly insetU: readonly [number, number]
     readonly bendU: number
     readonly waveU: number
-    readonly jagU: number
     readonly spurs: readonly [number, number]
     readonly spurU: readonly [number, number]
     readonly spurWidthU: readonly [number, number]
-    readonly slopeU: readonly [number, number]
     readonly heightM: readonly [number, number]
+    readonly riseM: readonly [number, number]
   }
   /**
    * 针叶林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进草地的林舌或凹进林子的草湾，
