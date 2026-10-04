@@ -1,5 +1,5 @@
-import { at, GRAVITY, project } from './channel'
-import { clearingDepth, heightAt, poolAt } from './layout'
+import { at, GRAVITY, heightAt, project } from './channel'
+import { clearingDepth, poolAt } from './layout'
 import type { Along, Reach } from './channel'
 import type { RiverPlan } from './layout'
 import type { RiverConfig } from '../../types/maps'

@@ -665,6 +665,71 @@ export interface RiverConfig {
   readonly body: WadeConfig
 }
 /**
+ * 樱庭：瓦顶土墙围着的一座日式庭院，樱花开着。一条溪从一面院墙下的水门流进来，弯弯地穿过院子，在另一面院墙前漫过一道低石堰、从墙下流走；
+ * 溪的水流沿用河流的机制，溪上架着一座木桥。院墙、堰下石壁与树干挡人；院子的形状、溪的走向与出入口都由种子定。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface SakuraConfig {
+  readonly meterPerU: number
+  /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
+  readonly cellU: number
+  /**
+   * 院子：院墙里能走的地面连同溪面的面积（格²）；院子的长宽比；四个墙角各自偏离长方形最多 jitterU 格，整座院子最多转 skewDeg 度；
+   * 地图边离院墙 padU 格；窄过两倍 neckU 的缝与尖角不能走
+   */
+  readonly garden: {
+    readonly areaU2: readonly [number, number]
+    readonly aspect: readonly [number, number]
+    readonly jitterU: number
+    readonly skewDeg: number
+    readonly padU: number
+    readonly neckU: number
+  }
+  /** 院墙：墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；院门宽（格） */
+  readonly wall: {
+    readonly thickU: number
+    readonly heightM: number
+    readonly eaveU: number
+    readonly gateU: number
+  }
+  /**
+   * 溪：水门离墙角至少 cornerU 格；出水口在对面那面墙的概率，其余时候在相邻的一面；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍，
+   * 溪岸离院墙至少 edgeGapU 格（水门附近除外）
+   */
+  readonly stream: {
+    readonly cornerU: number
+    readonly opposite: number
+    readonly meanderU: number
+    readonly minBend: number
+    readonly edgeGapU: number
+  }
+  /** 溪的流量（米³/秒），河道按流量定；院子里地面的起伏多少米 */
+  readonly flow: ChannelConfig & { readonly discharge: number; readonly reliefM: number }
+  /** 石堰：堰顶离出水那面院墙多远（格）、堰前从河床升上堰顶的坡多长（格）、堰下比堰顶低多少米；堰顶外还能被冲过去的那一段多长（格） */
+  readonly weir: {
+    readonly backU: number
+    readonly rampU: number
+    readonly dropM: number
+    readonly lipU: number
+  }
+  /** 木桥：桥面宽（格）、两头落地的坡道多长（格）、桥面正中拱起多高（米）；架在溪的哪一段（弧长的比例） */
+  readonly bridge: {
+    readonly widthU: number
+    readonly rampU: number
+    readonly riseM: number
+    readonly at: readonly [number, number]
+  }
+  /** 樱花树：院子里几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；院墙外沿着墙种的树隔多远（格） */
+  readonly trees: {
+    readonly inside: readonly [number, number]
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly overhangU: number
+    readonly outsideGapU: number
+  }
+  readonly body: WadeConfig
+}
+/**
  * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
  * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
  */
@@ -915,7 +980,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -939,13 +1004,14 @@ export interface MapDef {
   readonly desert?: DesertConfig
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
+  readonly sakura?: SakuraConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse' | 'weir'
 
 export interface DecorInstance {
   emoji: string

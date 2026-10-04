@@ -1,0 +1,471 @@
+import Phaser from 'phaser'
+import { hasComponent, query, removeEntity } from 'bitecs'
+import { UNIT } from '../../util/units'
+import { MAP, rollDecor } from '../../data/maps'
+import { SUN } from '../../data/light'
+import { GROUND_PPU } from '../../data/texel'
+import { safeInsets, viewport } from '../../util/apply'
+import { Rng } from '../../util/rng'
+import { spawnDecor } from '../entities/decor'
+import { Airborne, Alive, Depth, Phys, Pickup, Radius, Transform, Uid } from '../components'
+import { roomAt } from '../worlds/basin'
+import { flowAt } from '../river/water'
+import { Wakes } from '../river/wakes'
+import { CANOPY_PPU, groundArea, textureSize } from './ground'
+import { SakuraPainter } from './painter'
+import { encodeWater, WATER_FRAG, Z_MIN, Z_SPAN } from './shader'
+import { BRIDGE_PPU, drawBridge } from './bridge'
+import { drawKoi, drawPetal, KOI_COATS } from './critters'
+import { bridgeLocal, insideDepth, weirLocal } from './layout'
+import { sakuraOf, sakuraPlanFor } from './world'
+import type { PaintTask } from './painter'
+import type { PaintLayer, PaintPiece, PaintScene } from './ground'
+import type { Flow, Water } from '../river/water'
+import type { SakuraPlan, Tree } from './layout'
+import type { EcsAtlas } from '../atlas'
+import type { MapView, ViewCtx } from '../views'
+import type { Sim } from '../sim'
+import type { Point } from '../../util/vec'
+
+const BG = 0x2b231f
+const KEYS: Record<PaintLayer, string> = { ground: 'sakura-ground', canopy: 'sakura-canopy', shade: 'sakura-shade' }
+const BED_KEY = 'sakura-bed'
+const LEVEL_KEY = 'sakura-level'
+const FLOW_KEY = 'sakura-flow'
+const BRIDGE_KEY = 'sakura-bridge'
+const PETAL_KEY = 'sakura-petal'
+const KOI_KEY = 'sakura-koi'
+/** 开局最多几个线程分着画 */
+const PAINT_THREADS = 4
+/** 贴图按这么多像素高的条分块交给线程 */
+const STRIP_PX = 64
+/** 桥画在这一层：水面与水上的花瓣之上，站在地上与水里的身体之下；桥下的身体挪到 UNDER_Z，画在桥下 */
+const BRIDGE_DEPTH = 4
+const UNDER_Z = 3.5
+/** 水上漂着几片花瓣、漂多久（秒）还没漂走就换一片 */
+const AFLOAT = 150
+const AFLOAT_LIFE_S = 40
+/** 树上飘落的花瓣：镜头里同时最多几片、多久飘下一片（秒）、落地后多久淡去（秒） */
+const FALLING = 36
+const FALL_EVERY_S = 0.14
+const LANDED_S = 2.5
+/** 花瓣多大（格） */
+const PETAL_U = 0.16
+const PETAL_PX = 32
+const PETAL_TINTS = [0xffffff, 0xfff0f4, 0xffe2ea, 0xfad0dc] as const
+/** 几条锦鲤，多长（格）；贴图大小 */
+const KOI = 4
+const KOI_U = 0.85
+const KOI_PX = { w: 96, h: 40 } as const
+
+interface Afloat {
+  x: number
+  y: number
+  rot: number
+  spin: number
+  age: number
+  readonly img: Phaser.GameObjects.Image
+}
+
+interface Falling {
+  x: number
+  y: number
+  z: number
+  vz: number
+  sway: number
+  phase: number
+  rot: number
+  landed: number
+  readonly img: Phaser.GameObjects.Image
+}
+
+interface Koi {
+  x: number
+  y: number
+  heading: number
+  turn: number
+  speed: number
+  phase: number
+  readonly img: Phaser.GameObjects.Image
+}
+
+function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
+  if (scene.textures.exists(key)) scene.textures.remove(key)
+  const tex = scene.textures.createCanvas(key, w, h)!
+  if (draw) draw(tex.getContext())
+  upload(tex)
+  return tex
+}
+
+/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
+function upload(tex: Phaser.Textures.CanvasTexture): void {
+  tex.refresh()
+  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
+}
+
+/** 花瓣与锦鲤的贴图只画一次，之后每局都用 */
+function ensureCritters(scene: Phaser.Scene): void {
+  if (!scene.textures.exists(PETAL_KEY)) canvasTexture(scene, PETAL_KEY, PETAL_PX, PETAL_PX, (ctx) => drawPetal(ctx, PETAL_PX))
+  if (!scene.textures.exists(KOI_KEY)) {
+    const tex = canvasTexture(scene, KOI_KEY, KOI_PX.w * KOI_COATS.length, KOI_PX.h, (ctx) =>
+      KOI_COATS.forEach((c, k) => {
+        ctx.save()
+        ctx.translate(k * KOI_PX.w, 0)
+        drawKoi(ctx, KOI_PX.w, KOI_PX.h, c)
+        ctx.restore()
+      }),
+    )
+    KOI_COATS.forEach((_, k) => tex.add(k, 0, k * KOI_PX.w, 0, KOI_PX.w, KOI_PX.h))
+  }
+}
+
+/**
+ * 樱庭：地面、树冠与瓦顶、水面上的影子是开局在后台线程画好的贴图；溪水由着色器按解出来的水深与流速画。
+ * 木桥架在溪上，桥下漂过的身体画在桥下；锦鲤在溪里游，花瓣从樱树上飘下来，落进水里的顺着水流漂，漂到堰上就被冲下去。树冠与瓦顶盖在一切之上
+ */
+export class SakuraView implements MapView {
+  private visuals: Phaser.GameObjects.GameObject[] = []
+  private decorEids: number[] = []
+  private plan?: SakuraPlan
+  private painter?: SakuraPainter
+  private readonly u = { time: 0 }
+  private afloat: Afloat[] = []
+  private falling: Falling[] = []
+  private koi: Koi[] = []
+  private spots: Point[] = []
+  private ripples?: Phaser.GameObjects.Graphics
+  private readonly wakes = new Wakes()
+  private fallAt = 0
+  /** 挪到桥下画的身体原来的 z（按实体记，uid 对不上就是换了实体） */
+  private readonly lowered = new Map<number, { z: number; uid: number }>()
+  private readonly flow: Flow = { h: 0, u: 0, v: 0 }
+
+  private planOf(v: ViewCtx): SakuraPlan {
+    if (!this.plan) this.plan = sakuraPlanFor(v.def.sakura!, v.run.decorSeed)
+    return this.plan
+  }
+
+  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
+    const p = this.planOf(v)
+    return { w: p.w * UNIT, h: p.h * UNIT, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
+  }
+
+  build(v: ViewCtx): void {
+    this.visuals.push(
+      v.scene.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG)
+        .setScrollFactor(0)
+        .setDepth(-2),
+    )
+    ensureCritters(v.scene)
+  }
+
+  /** 镜头最多看到地图外多远：默认边距，再加上这一边的设备安全区 */
+  camera(v: ViewCtx): void {
+    const cam = v.scene.cameras.main
+    const m = MAP.cameraMargin * UNIT
+    const s = safeInsets
+    cam.setZoom(viewport.renderScale)
+    cam.setBounds(-m - s.left, -m - s.top, v.w + m * 2 + s.left + s.right, v.h + m * 2 + s.top + s.bottom)
+    cam.startFollow(v.anchor)
+  }
+
+  /** 零星的落樱：只落在院子里的干地上，不落在路上、桥上，离墙有一点距离 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const plan = this.planOf(v)
+    const rng = new Rng(v.run.decorSeed)
+    const th = v.def.sakura!.wall.thickU / 2 + v.def.sakura!.wall.eaveU
+    for (const d of rollDecor(v.def.decor, () => rng.next(), Math.round(plan.w), Math.round(plan.h))) {
+      if (insideDepth(plan.walls, d.xU, d.yU) < th + 0.3) continue
+      const bl = bridgeLocal(plan.bridge, d.xU, d.yU)
+      if (Math.abs(bl.a) < plan.bridge.half + 0.3 && Math.abs(bl.t) < plan.bridge.width + 0.3) continue
+      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: d.xU * UNIT, y: d.yU * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+    }
+  }
+
+  async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
+    const s = sakuraOf(sim)
+    const plan = s.plan
+    const cfg = v.def.sakura!
+    const scene = v.scene
+    const sc: PaintScene = { cfg, plan }
+    const layers: PaintLayer[] = ['canopy', 'ground', 'shade']
+    const tex = {} as Record<PaintLayer, Phaser.Textures.CanvasTexture>
+    const sizes = {} as Record<PaintLayer, { w: number; h: number }>
+    for (const l of layers) {
+      sizes[l] = textureSize(sc, l)
+      tex[l] = canvasTexture(scene, KEYS[l], sizes[l].w, sizes[l].h)
+    }
+    const painter = new SakuraPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
+    this.painter = painter
+    const tasks: PaintTask[] = []
+    for (const layer of layers) {
+      const sz = sizes[layer]
+      for (let y = 0; y < sz.h; y += STRIP_PX) tasks.push({ layer, rect: { x0: 0, y0: y, x1: sz.w, y1: Math.min(sz.h, y + STRIP_PX) } })
+    }
+    const put = (p: PaintPiece): void => {
+      tex[p.layer].getContext().putImageData(new ImageData(p.pixels, p.rect.x1 - p.rect.x0, p.rect.y1 - p.rect.y0), p.rect.x0, p.rect.y0)
+    }
+    await Promise.all([painter.paint(tasks, put), s.ready])
+    painter.close()
+    if (this.painter !== painter) return
+    this.painter = undefined
+    const water = s.water
+    if (!water) return
+    for (const l of layers) upload(tex[l])
+    const ga = groundArea(sc)
+    this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, KEYS.ground).setOrigin(0, 0).setDisplaySize((sizes.ground.w / GROUND_PPU) * UNIT, (sizes.ground.h / GROUND_PPU) * UNIT).setDepth(-1))
+    this.water(v, plan, water)
+    this.bridge(v, plan)
+    this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, KEYS.canopy).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(20))
+    this.decorEids = this.decorEids.filter((eid) => {
+      const x = Transform.x[eid]!
+      const y = Transform.y[eid]!
+      const keep = roomAt(plan.basin, x, y) >= 0.4 * UNIT && flowAt(water, x / UNIT, y / UNIT, this.flow).h <= 0
+      if (!keep) removeEntity(v.world, eid)
+      return keep
+    })
+    const wr = plan.weir
+    for (let i = 0; i < water.h.length; i++) {
+      if (water.h[i]! <= 0.08 || water.sink[i]! >= 0) continue
+      const x = ((i % water.cols) + 0.5) * water.cell
+      const y = (Math.floor(i / water.cols) + 0.5) * water.cell
+      if (weirLocal(wr, x, y).along > -1.5) continue
+      this.spots.push({ x, y })
+    }
+    const rng = new Rng(v.run.decorSeed ^ 0x9e7a1)
+    for (let k = 0; k < AFLOAT; k++) {
+      const img = scene.add.image(0, 0, PETAL_KEY).setDepth(1.6).setTint(PETAL_TINTS[k % PETAL_TINTS.length]!)
+      const p: Afloat = { x: 0, y: 0, rot: 0, spin: 0, age: 0, img }
+      this.drift(p, rng.next())
+      p.age = rng.next() * AFLOAT_LIFE_S
+      this.afloat.push(p)
+      this.visuals.push(img)
+    }
+    this.swim(v, plan, water)
+    this.ripples = scene.add.graphics().setDepth(2)
+    this.visuals.push(this.ripples)
+    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.78, 0.18, 0x2a160c)
+  }
+
+  /** 水面：三张数据图与水面上的影子喂给着色器 */
+  private water(v: ViewCtx, plan: SakuraPlan, water: Water): void {
+    const cfg = v.def.sakura!
+    const scene = v.scene
+    const img = encodeWater(cfg, plan, water)
+    const put = (key: string, data: Uint8ClampedArray<ArrayBuffer>, w: number, h: number): void => {
+      canvasTexture(scene, key, w, h, (ctx) => ctx.putImageData(new ImageData(data, w, h), 0, 0))
+    }
+    put(BED_KEY, img.bed, img.bedCols, img.bedRows)
+    put(LEVEL_KEY, img.level, img.cols, img.rows)
+    put(FLOW_KEY, img.flow, img.cols, img.rows)
+    const t = plan.terrain
+    const sunLen = Math.hypot(SUN.x, SUN.y, SUN.z)
+    const u = this.u
+    const wr = plan.weir
+    const inl = plan.inlet
+    this.visuals.push(
+      scene.add
+        .shader(
+          {
+            name: 'SakuraWater',
+            fragmentSource: WATER_FRAG,
+            setupUniforms: (set: (name: string, value: unknown) => void) => {
+              set('uBed', 0)
+              set('uLevel', 1)
+              set('uFlow', 2)
+              set('uShade', 3)
+              set('uTime', u.time)
+              set('uArea', [t.x0, t.y0, t.cols * t.cell, t.rows * t.cell])
+              set('uCode', [Z_MIN, Z_SPAN, cfg.meterPerU])
+              set('uWeir', [wr.x, wr.y, wr.tx, wr.ty])
+              set('uWeirHalf', wr.half + 0.15)
+              set('uIn', [inl.x, inl.y, inl.dx, inl.dy])
+              set('uInSize', [inl.half, cfg.wall.thickU / 2])
+              set('uSun', [SUN.x / sunLen, SUN.y / sunLen, SUN.z / sunLen])
+            },
+          },
+          t.x0 * UNIT,
+          t.y0 * UNIT,
+          t.cols * t.cell * UNIT,
+          t.rows * t.cell * UNIT,
+          [BED_KEY, LEVEL_KEY, FLOW_KEY, KEYS.shade],
+        )
+        .setOrigin(0, 0)
+        .setDepth(1.5),
+    )
+  }
+
+  /** 木桥：一张画好的贴图，顺着桥面转过去 */
+  private bridge(v: ViewCtx, plan: SakuraPlan): void {
+    const b = plan.bridge
+    const w = Math.ceil(2 * b.half * BRIDGE_PPU)
+    const h = Math.ceil(2 * b.width * BRIDGE_PPU)
+    canvasTexture(v.scene, BRIDGE_KEY, w, h, (ctx) => drawBridge(ctx, b, v.def.sakura!.meterPerU))
+    this.visuals.push(
+      v.scene.add
+        .image(b.x * UNIT, b.y * UNIT, BRIDGE_KEY)
+        .setDisplaySize(2 * b.half * UNIT, 2 * b.width * UNIT)
+        .setRotation(Math.atan2(b.ay, b.ax))
+        .setDepth(BRIDGE_DEPTH),
+    )
+  }
+
+  /** 锦鲤：在溪里水深的地方慢慢游，离堰与水门都远 */
+  private swim(v: ViewCtx, plan: SakuraPlan, water: Water): void {
+    const deep = this.spots.filter((p) => flowAt(water, p.x, p.y, this.flow).h > 0.6 && weirLocal(plan.weir, p.x, p.y).along < -4)
+    const rng = new Rng(plan.seed ^ 0x6b01)
+    for (let k = 0; k < KOI && deep.length > 0; k++) {
+      const p = deep[Math.floor(rng.next() * deep.length)]!
+      const img = v.scene.add.image(0, 0, KOI_KEY, k % KOI_COATS.length).setDepth(1.55).setAlpha(0.88).setDisplaySize(KOI_U * UNIT, KOI_U * UNIT * (KOI_PX.h / KOI_PX.w))
+      this.visuals.push(img)
+      this.koi.push({ x: p.x, y: p.y, heading: rng.next() * Math.PI * 2, turn: 0, speed: 0.6, phase: rng.next() * 10, img })
+    }
+  }
+
+  /** 一片花瓣落在水上随便一处 */
+  private drift(p: Afloat, r: number): void {
+    const s = this.spots[Math.floor(r * this.spots.length)]
+    if (!s) return
+    p.x = (s.x + (Math.random() - 0.5) * 0.4) * UNIT
+    p.y = (s.y + (Math.random() - 0.5) * 0.4) * UNIT
+    p.rot = Math.random() * Math.PI * 2
+    p.spin = (Math.random() * 2 - 1) * 0.8
+    p.age = 0
+  }
+
+  /** 镜头里的樱树上飘下一片花瓣 */
+  private blossom(v: ViewCtx, plan: SakuraPlan): void {
+    const view = v.scene.cameras.main.worldView
+    const seen = plan.trees.filter((t: Tree) => view.contains(t.x * UNIT, t.y * UNIT))
+    const t = seen[Math.floor(Math.random() * seen.length)]
+    if (!t) return
+    const a = Math.random() * Math.PI * 2
+    const d = Math.sqrt(Math.random()) * t.r
+    const img = v.scene.add.image(0, 0, PETAL_KEY).setDepth(21).setTint(PETAL_TINTS[Math.floor(Math.random() * PETAL_TINTS.length)]!)
+    this.visuals.push(img)
+    this.falling.push({ x: t.x + Math.cos(a) * d, y: t.y + Math.sin(a) * d, z: t.h * (0.6 + 0.3 * Math.random()), vz: 0.9 + Math.random() * 0.5, sway: 0.25 + Math.random() * 0.35, phase: Math.random() * 10, rot: Math.random() * Math.PI * 2, landed: -1, img })
+  }
+
+  step(v: ViewCtx, sim: Sim, delta: number): void {
+    const s = sakuraOf(sim)
+    const water = s.water
+    const plan = this.plan
+    if (!water || !this.ripples || !plan) return
+    const cfg = v.def.sakura!
+    const dt = Math.min(delta, 50) / 1000
+    this.u.time = sim.elapsedMs / 1000
+    const toPx = UNIT / cfg.meterPerU
+    const f = this.flow
+    const wr = plan.weir
+    // 水上的花瓣顺着水流漂，缓水里打着转慢慢聚起来；漂过堰顶就冲下去了，换一片
+    for (const p of this.afloat) {
+      flowAt(water, p.x / UNIT, p.y / UNIT, f)
+      p.age += dt
+      if (f.h < 0.02 || p.age > AFLOAT_LIFE_S || weirLocal(wr, p.x / UNIT, p.y / UNIT).along > 0.3) this.drift(p, Math.random())
+      p.x += f.u * toPx * dt
+      p.y += f.v * toPx * dt
+      p.rot += p.spin * dt * (0.3 + Math.hypot(f.u, f.v))
+      const fade = Math.min(1, p.age / 1.2)
+      p.img.setPosition(p.x, p.y).setRotation(p.rot).setAlpha(0.92 * fade).setDisplaySize(PETAL_U * UNIT, PETAL_U * UNIT)
+    }
+    // 树上飘下的花瓣：没有风，左右轻轻摆着落下；落进水里就接着在水上漂，落在地上的过一会儿淡去
+    this.fallAt -= dt
+    if (this.fallAt <= 0 && this.falling.length < FALLING) {
+      this.fallAt = FALL_EVERY_S
+      this.blossom(v, plan)
+    }
+    const mpu = cfg.meterPerU
+    this.falling = this.falling.filter((p) => {
+      if (p.landed < 0) {
+        p.phase += dt
+        p.z -= p.vz * dt
+        const sx = Math.sin(p.phase * 2.1) * p.sway
+        const sy = Math.cos(p.phase * 1.7) * p.sway * 0.6
+        p.rot += dt * 2.4
+        if (p.z <= 0) {
+          flowAt(water, p.x / UNIT, p.y / UNIT, f)
+          if (f.h > 0.05) {
+            const old = this.afloat.reduce((a, b) => (b.age > a.age ? b : a), this.afloat[0]!)
+            old.x = p.x * UNIT
+            old.y = p.y * UNIT
+            old.age = 0
+            p.img.destroy()
+            this.visuals = this.visuals.filter((o) => o !== p.img)
+            return false
+          }
+          p.landed = 0
+        }
+        const flip = 0.45 + 0.55 * Math.abs(Math.sin(p.phase * 3.3))
+        p.img.setPosition((p.x + sx * dt) * UNIT, (p.y + sy * dt - (p.z / mpu) * 0.08) * UNIT).setRotation(p.rot).setDisplaySize(PETAL_U * UNIT, PETAL_U * UNIT * flip)
+        p.x += sx * dt
+        p.y += sy * dt
+        return true
+      }
+      p.landed += dt
+      p.img.setDepth(1.2).setAlpha(Math.max(0, 1 - p.landed / LANDED_S))
+      if (p.landed < LANDED_S) return true
+      p.img.destroy()
+      this.visuals = this.visuals.filter((o) => o !== p.img)
+      return false
+    })
+    // 锦鲤：在深水里慢慢游，碰到浅处与岸就拐回去；尾巴一摆一摆
+    for (const k of this.koi) {
+      k.phase += dt
+      if (Math.random() < dt * 0.25) k.turn = (Math.random() * 2 - 1) * 1.2
+      k.heading += k.turn * dt * 0.6
+      const ahead = { x: k.x + Math.cos(k.heading) * 0.9, y: k.y + Math.sin(k.heading) * 0.9 }
+      flowAt(water, ahead.x, ahead.y, f)
+      if (f.h < 0.5 || weirLocal(wr, ahead.x, ahead.y).along > -4) k.heading += Math.PI * dt * 1.5
+      flowAt(water, k.x, k.y, f)
+      const sp = k.speed * (0.8 + 0.2 * Math.sin(k.phase * 0.7))
+      k.x += (Math.cos(k.heading) * sp + f.u / mpu * 0.15) * dt
+      k.y += (Math.sin(k.heading) * sp + f.v / mpu * 0.15) * dt
+      k.img.setPosition(k.x * UNIT, k.y * UNIT).setRotation(k.heading + Math.sin(k.phase * 5) * 0.08)
+    }
+    const aboard = s.aboard
+    this.wakes.draw(this.ripples, sim, water, s.swimming, cfg, this.u.time, (eid) => aboard.get(eid) === Uid.v[eid])
+    this.underBridge(sim, plan)
+  }
+
+  /** 桥下的身体画在桥板底下：在桥面架在水上那段的范围里、又不在桥上的，z 挪到 UNDER_Z；出来了按原样放回 */
+  private underBridge(sim: Sim, plan: SakuraPlan): void {
+    const s = sakuraOf(sim)
+    const b = plan.bridge
+    const seen = new Set<number>()
+    for (const eid of query(sim.world, [Phys, Transform, Radius, Depth])) {
+      if (hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Pickup)) continue
+      if (s.aboard.get(eid) === Uid.v[eid] || !Alive.v[eid]) continue
+      const q = bridgeLocal(b, Transform.x[eid]! / UNIT, Transform.y[eid]! / UNIT)
+      if (Math.abs(q.a) >= b.span || Math.abs(q.t) > b.width + Radius.v[eid]! / UNIT) continue
+      seen.add(eid)
+      if (Depth.z[eid]! !== UNDER_Z && !sim.characters.includes(eid)) this.lowered.set(eid, { z: Depth.z[eid]!, uid: Uid.v[eid]! })
+      Depth.z[eid] = UNDER_Z
+    }
+    for (const [eid, was] of this.lowered) {
+      if (seen.has(eid)) continue
+      if (Uid.v[eid] === was.uid && Depth.z[eid] === UNDER_Z) Depth.z[eid] = was.z
+      this.lowered.delete(eid)
+    }
+  }
+
+  resize(v: ViewCtx): void {
+    this.camera(v)
+  }
+
+  destroy(v: ViewCtx): void {
+    this.painter?.close()
+    this.painter = undefined
+    for (const o of this.visuals) o.destroy()
+    for (const eid of this.decorEids) removeEntity(v.world, eid)
+    this.visuals = []
+    this.decorEids = []
+    this.afloat = []
+    this.falling = []
+    this.koi = []
+    this.spots = []
+    this.lowered.clear()
+    this.ripples = undefined
+    for (const key of [...Object.values(KEYS), BED_KEY, LEVEL_KEY, FLOW_KEY, BRIDGE_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+  }
+}

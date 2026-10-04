@@ -144,38 +144,8 @@ export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterI
   return { bed, bedCols: t.cols, bedRows: t.rows, level, flow, cols, rows }
 }
 
-/**
- * 水面的片元着色器，四边形盖住整片地形，坐标以格计、y 朝下；四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。
- * 水深是水面高程减地形高程：岸线按地形的细格子切出来。水越深越暗越绿，浅处透出河床，浅水里有晃动的焦散；
- * 水面的细浪顺着流速漂（两相交替的流动贴图），流得越急浪越碎，按太阳打出高光、映出天色；乱流处翻白，白沫顺水拉成条。
- * 进水口的崖面上挂着一道水帘，崖脚砸出一圈白沫；出水口的断崖边水往下一折，白水落进深谷。输出按预乘透明度
- */
-export const WATER_FRAG = `
-#pragma phaserTemplate(shaderName)
-#pragma phaserTemplate(extensions)
-#pragma phaserTemplate(features)
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-#pragma phaserTemplate(fragmentDefine)
-varying vec2 outTexCoord;
-#pragma phaserTemplate(outVariables)
-#pragma phaserTemplate(fragmentHeader)
-uniform sampler2D uBed;
-uniform sampler2D uLevel;
-uniform sampler2D uFlow;
-uniform float uTime;
-uniform vec4 uArea;
-uniform vec3 uCode;
-uniform vec4 uOut0;
-uniform vec4 uOut1;
-uniform vec2 uOutHalf;
-uniform vec4 uIn;
-uniform vec4 uInSize;
-uniform vec3 uSun;
-
+/** 两张水面着色器共用的 GLSL：哈希、值噪声、细胞噪声、一块里的细浪，与顺着流速漂的细浪 */
+export const WATER_GLSL = `
 /** 细浪按这么大（格）的块各取各的花纹，块与块之间按方差不变混合 */
 const float TILE = 1.5;
 
@@ -216,10 +186,6 @@ float cells(vec2 p) {
   return d2 - d1;
 }
 
-float decode(vec4 c) {
-  return uCode.x + (c.r * 65280.0 + c.g * 255.0) / 65535.0 * uCode.y;
-}
-
 /** 值噪声与它的梯度 */
 vec3 vnoiseD(vec2 p) {
   vec2 i = floor(p);
@@ -244,6 +210,86 @@ vec2 waves(vec2 d, vec2 dir, vec2 acr, float stretch, vec2 jit) {
   return dir * (g.x / stretch) + acr * g.y;
 }
 
+/**
+ * 顺着流速漂的细浪（两相交替的流动贴图）：p 是这一点（格），v 是流速（格/秒），vel 与 speed 是米/秒的流速与快慢，rough 是乱流；
+ * 返回浪面的坡度，lines 是顺流拉长的条纹，qa、qb 是两相各自漂过的位置、w 是两相的混合比，别的花纹接着用
+ */
+vec2 ripples(vec2 p, vec2 v, vec2 vel, float speed, float rough, out float lines, out vec2 qa, out vec2 qb, out float w) {
+  float period = 1.2;
+  float ph = fract(uTime / period);
+  float ph2 = fract(ph + 0.5);
+  w = abs(1.0 - 2.0 * ph);
+  qa = p - v * ph * period;
+  qb = p - v * ph2 * period;
+  vec2 tg = p / TILE - 0.5;
+  vec2 t0 = floor(tg);
+  vec2 tf = fract(tg);
+  vec2 ga = vec2(0.0);
+  vec2 gb = vec2(0.0);
+  lines = 0.0;
+  float wsum = 0.0;
+  // 条纹的方向取这一点自己的流向：取块中心的，流向转得急的地方（石头周围、分叉口）就拼出折角
+  vec2 dir = speed > 0.02 ? vel / speed : vec2(0.7071, 0.7071);
+  vec2 acr = vec2(-dir.y, dir.x);
+  float stretch = 1.0 + 2.8 * clamp(speed / 1.6, 0.0, 1.0);
+  for (int k = 0; k < 4; k++) {
+    vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
+    vec2 cell = t0 + o;
+    vec2 c = (cell + 0.5) * TILE;
+    vec2 wo = mix(1.0 - tf, tf, o);
+    float wk = wo.x * wo.y;
+    vec2 jit = hash2(cell) * 41.0;
+    ga += waves(qa - c, dir, acr, stretch, jit) * wk;
+    gb += waves(qb - c, dir, acr, stretch, jit + 17.0) * wk;
+    float la = vnoise(vec2(dot(qa - c, dir) * 0.7, dot(qa - c, acr) * 7.0) + jit);
+    float lb = vnoise(vec2(dot(qb - c, dir) * 0.7, dot(qb - c, acr) * 7.0) + jit + 23.0);
+    lines += (mix(la, lb, w) - 0.5) * wk;
+    wsum += wk * wk;
+  }
+  float keep = inversesqrt(wsum * (w * w + (1.0 - w) * (1.0 - w)));
+  lines = clamp(0.5 + lines * keep, 0.0, 1.0);
+  float amp = 0.025 + 0.09 * clamp(speed / 2.0, 0.0, 1.0) + 0.16 * rough;
+  return mix(ga, gb, w) * keep * amp;
+}
+`
+
+/**
+ * 水面的片元着色器，四边形盖住整片地形，坐标以格计、y 朝下；四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。
+ * 水深是水面高程减地形高程：岸线按地形的细格子切出来。水越深越暗越绿，浅处透出河床，浅水里有晃动的焦散；
+ * 水面的细浪顺着流速漂（两相交替的流动贴图），流得越急浪越碎，按太阳打出高光、映出天色；乱流处翻白，白沫顺水拉成条。
+ * 进水口的崖面上挂着一道水帘，崖脚砸出一圈白沫；出水口的断崖边水往下一折，白水落进深谷。输出按预乘透明度
+ */
+export const WATER_FRAG = `
+#pragma phaserTemplate(shaderName)
+#pragma phaserTemplate(extensions)
+#pragma phaserTemplate(features)
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+#pragma phaserTemplate(fragmentDefine)
+varying vec2 outTexCoord;
+#pragma phaserTemplate(outVariables)
+#pragma phaserTemplate(fragmentHeader)
+uniform sampler2D uBed;
+uniform sampler2D uLevel;
+uniform sampler2D uFlow;
+uniform float uTime;
+uniform vec4 uArea;
+uniform vec3 uCode;
+uniform vec4 uOut0;
+uniform vec4 uOut1;
+uniform vec2 uOutHalf;
+uniform vec4 uIn;
+uniform vec4 uInSize;
+uniform vec3 uSun;
+
+float decode(vec4 c) {
+  return uCode.x + (c.r * 65280.0 + c.g * 255.0) / 65535.0 * uCode.y;
+}
+
+${WATER_GLSL}
 void main ()
 {
   vec2 tc = outTexCoord;
@@ -291,41 +337,11 @@ void main ()
     return;
   }
 
-  float period = 1.2;
-  float ph = fract(uTime / period);
-  float ph2 = fract(ph + 0.5);
-  float w = abs(1.0 - 2.0 * ph);
-  vec2 qa = p - v * ph * period;
-  vec2 qb = p - v * ph2 * period;
-  vec2 tg = p / TILE - 0.5;
-  vec2 t0 = floor(tg);
-  vec2 tf = fract(tg);
-  vec2 ga = vec2(0.0);
-  vec2 gb = vec2(0.0);
-  float lines = 0.0;
-  float wsum = 0.0;
-  // 条纹的方向取这一点自己的流向：取块中心的，流向转得急的地方（石头周围、分叉口）就拼出折角
-  vec2 dir = speed > 0.02 ? vel / speed : vec2(0.7071, 0.7071);
-  vec2 acr = vec2(-dir.y, dir.x);
-  float stretch = 1.0 + 2.8 * clamp(speed / 1.6, 0.0, 1.0);
-  for (int k = 0; k < 4; k++) {
-    vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
-    vec2 cell = t0 + o;
-    vec2 c = (cell + 0.5) * TILE;
-    vec2 wo = mix(1.0 - tf, tf, o);
-    float wk = wo.x * wo.y;
-    vec2 jit = hash2(cell) * 41.0;
-    ga += waves(qa - c, dir, acr, stretch, jit) * wk;
-    gb += waves(qb - c, dir, acr, stretch, jit + 17.0) * wk;
-    float la = vnoise(vec2(dot(qa - c, dir) * 0.7, dot(qa - c, acr) * 7.0) + jit);
-    float lb = vnoise(vec2(dot(qb - c, dir) * 0.7, dot(qb - c, acr) * 7.0) + jit + 23.0);
-    lines += (mix(la, lb, w) - 0.5) * wk;
-    wsum += wk * wk;
-  }
-  float keep = inversesqrt(wsum * (w * w + (1.0 - w) * (1.0 - w)));
-  lines = clamp(0.5 + lines * keep, 0.0, 1.0);
-  float amp = 0.025 + 0.09 * clamp(speed / 2.0, 0.0, 1.0) + 0.16 * rough;
-  vec2 slope = mix(ga, gb, w) * keep * amp;
+  float lines;
+  vec2 qa;
+  vec2 qb;
+  float w;
+  vec2 slope = ripples(p, v, vel, speed, rough, lines, qa, qb, w);
   vec3 n = normalize(vec3(-slope, 1.0));
   float wet = smoothstep(0.0, 0.012, depth);
 

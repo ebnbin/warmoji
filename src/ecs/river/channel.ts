@@ -1,4 +1,4 @@
-import { fbm } from '../../util/noise'
+import { fbm } from '../../util/noise.ts'
 import type { Rng } from '../../util/rng'
 import type { ChannelConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -303,4 +303,30 @@ export function reachGround(cfg: Channel, r: Reach, p: Along): number {
   const bw = bankWidth(cfg, sh, Math.sign(p.n))
   const out = a - half
   return lv + cfg.flow.bankM * smooth(0, bw, out) + cfg.flow.floodSlope * Math.max(0, out - bw)
+}
+
+/** 一张按格子铺的高程（米）：格子 (0, 0) 的左上角在 (x0, y0) 格，边长 cell 格 */
+export interface Heights {
+  readonly cols: number
+  readonly rows: number
+  readonly cell: number
+  readonly x0: number
+  readonly y0: number
+  readonly z: Float32Array
+}
+
+/** 地形上 (x, y) 格处双线性插值的高程 */
+export function heightAt(t: Heights, x: number, y: number): number {
+  const u = Math.min(t.cols - 1.001, Math.max(0, (x - t.x0) / t.cell - 0.5))
+  const v = Math.min(t.rows - 1.001, Math.max(0, (y - t.y0) / t.cell - 0.5))
+  const ix = Math.floor(u)
+  const iy = Math.floor(v)
+  const fx = u - ix
+  const fy = v - iy
+  const i = iy * t.cols + ix
+  const a = t.z[i]!
+  const b = t.z[i + 1]!
+  const c = t.z[i + t.cols]!
+  const e = t.z[i + t.cols + 1]!
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + e) * fx * fy
 }

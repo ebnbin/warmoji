@@ -39,6 +39,7 @@ import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
+import { bridgeLocal, sakuraPlan, SINK_M, WASH_U } from '../src/ecs/sakura/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -357,6 +358,46 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
+  }
+}
+
+/**
+ * 樱庭：参数说得通；堰顶外留出的那段长过冲走的判定，堰下的跌水沟比堰顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
+ * 开局站位离边够远，溪两岸各有一扇院门，桥两头落在能走的地方
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'sakura') === (m.sakura !== undefined), `maps.${id} 是樱庭当且仅当写了 sakura`)
+  const s = m.sakura
+  if (!s) continue
+  const at = `maps.${id}.sakura`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { garden: g, wall, stream: st, flow: f, weir: wr, bridge: bg, trees: tr, body: b } = s
+  need(s.meterPerU > 0 && s.cellU > 0, `${at} 的米每格、地形格子须为正`)
+  need(g.areaU2[0] > 0 && range(g.areaU2, false) && g.aspect[0] > 0 && range(g.aspect, false), `${at}.garden 的面积与长宽比须为正的范围`)
+  need(g.jitterU >= 0 && g.skewDeg >= 0 && g.skewDeg < 30 && g.padU > 0 && g.neckU > 0, `${at}.garden 的墙角偏移不为负、整座院子转不到 30 度，地图边留白与窄缝为正`)
+  need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
+  need(st.cornerU > 0 && st.opposite >= 0 && st.opposite <= 1 && st.meanderU >= 0 && st.minBend >= 1 && st.edgeGapU >= 0, `${at}.stream 的水门离墙角为正、对面墙的概率在 [0, 1] 内，蜿蜒不为负、弯道半径至少一个水面宽`)
+  need(f.discharge > 0 && f.widthCoef > 0 && f.depthCoef > 0 && f.manning > 0 && f.bedShape >= 1, `${at}.flow 的流量、水力几何系数与糙率须为正，断面形状指数不小于 1`)
+  need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `${at}.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出溪岸`)
+  need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `${at}.flow 的溪岸须有高有宽，滩地不往溪里倾`)
+  need(wr.backU > wr.lipU && wr.rampU > 0 && wr.lipU > WASH_U, `${at}.weir 的堰顶离墙远过堰顶外能被冲过去的那段，那段长过冲走的判定（${WASH_U} 格），堰前有坡`)
+  need(wr.dropM + 0.25 > SINK_M, `${at}.weir.dropM 须让跌水沟比堰顶低过 ${SINK_M} 米：水流到那里才算落下去`)
+  need(bg.widthU > g.neckU * 2 && bg.rampU > 0 && bg.riseM > 0 && bg.at[0] > 0 && range(bg.at, false) && bg.at[1] < 1, `${at}.bridge 的桥面须比窄缝宽、坡道与拱有长有高，架在溪的 (0, 1) 段`)
+  need(tr.crownU[0] > tr.overhangU && range(tr.crownU, false) && tr.heightM[0] > 0 && range(tr.heightM, false) && range(tr.inside, true) && tr.outsideGapU > 0, `${at}.trees 的树冠须比能走进去的那截大，树高为正，院里的棵数为非负整数范围，墙外的间距为正`)
+  need(b.kg > 0 && b.radiusU > 0 && b.heightM > 0 && b.density > 0 && b.drag > 0, `${at}.body 的体重、半径、身高、密度与阻力系数须为正`)
+  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.mu > 0, `${at}.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂与脚底摩擦系数为正`)
+  need(b.swim >= 0 && b.wetM > 0, `${at}.body 的划水不为负，湿地水深为正`)
+  for (let k = 0; k < 8; k++) {
+    const plan = sakuraPlan(s, k * 7919 + 13)
+    const where = `${at} 第 ${k} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 3 * UNIT, `${where} 的开局站位离边不到三格`)
+    need(plan.gates.length === 2, `${where} 的溪两岸没有各开一扇院门`)
+    const br = plan.bridge
+    for (const sgn of [-1, 1]) {
+      const x = br.x + br.ax * sgn * (br.half - 0.3)
+      const y = br.y + br.ay * sgn * (br.half - 0.3)
+      need(roomAt(plan.basin, x * UNIT, y * UNIT) > 0.5 * UNIT && Math.abs(bridgeLocal(br, x, y).a) < br.half, `${where} 的桥头没落在能走的地方`)
+    }
   }
 }
 

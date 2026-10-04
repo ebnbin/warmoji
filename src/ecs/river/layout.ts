@@ -2,7 +2,7 @@ import { UNIT } from '../../util/units'
 import { cellNearest, fbm } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import { makeBasin } from '../worlds/basin'
-import { at, boxOf, crestOf, hydraulics, makeReach, nearBox, project, reachGround, route } from './channel'
+import { at, boxOf, crestOf, heightAt, hydraulics, makeReach, nearBox, project, reachGround, route } from './channel'
 import type { Basin } from '../worlds/basin'
 import type { Along, Reach } from './channel'
 import type { RiverConfig } from '../../types/maps'
@@ -536,22 +536,6 @@ function stampBoulders(t: Terrain, boulders: readonly Boulder[]): void {
       }
     }
   }
-}
-
-/** 地形上 (x, y) 格处双线性插值的高程 */
-export function heightAt(t: Terrain, x: number, y: number): number {
-  const u = Math.min(t.cols - 1.001, Math.max(0, (x - t.x0) / t.cell - 0.5))
-  const v = Math.min(t.rows - 1.001, Math.max(0, (y - t.y0) / t.cell - 0.5))
-  const ix = Math.floor(u)
-  const iy = Math.floor(v)
-  const fx = u - ix
-  const fy = v - iy
-  const i = iy * t.cols + ix
-  const a = t.z[i]!
-  const b = t.z[i + 1]!
-  const c = t.z[i + t.cols]!
-  const e = t.z[i + t.cols + 1]!
-  return a + (b - a) * fx + (c - a) * fy + (a - b - c + e) * fx * fy
 }
 
 /** 离河道多远：到最近一段河道水边的距离，格，水里为负 */
