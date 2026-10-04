@@ -98,6 +98,7 @@ import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
 const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
+const showGrid = defineDevFlag({ id: 'battle.grid', group: '战斗', label: '显示坐标网格', desc: '每格一条白线；红线是 y = 0，绿线是 x = 0，两条相交处就是原点' })
 const LENS_LABELS: Record<LensMode, string> = { follow: '跟随', map: '完整地图', reach: '可见范围' }
 const lensChoice = defineDevChoice({
   id: 'battle.lens',
@@ -189,6 +190,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private devGfx?: Phaser.GameObjects.Graphics
   private wallGfx?: Phaser.GameObjects.Graphics
   private gateGfx?: Phaser.GameObjects.Graphics
+  private gridGfx?: Phaser.GameObjects.Graphics
   /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
   private fog?: Fog
   /** 升级弹窗开着，战斗停着 */
@@ -227,6 +229,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.devGfx = undefined
     this.wallGfx = undefined
     this.gateGfx = undefined
+    this.gridGfx = undefined
     this.fog = undefined
     this.choosing = false
     this.settling = false
@@ -372,6 +375,27 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         if (gate.nx !== 0 || gate.ny !== 0) g.lineBetween(gate.ax, gate.ay, gate.ax + gate.nx * 0.8 * UNIT, gate.ay + gate.ny * 0.8 * UNIT)
       }
     }
+  }
+
+  /** 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色；盖在战斗画面之上、碰撞边界与出怪口之下 */
+  private drawDevGrid(): void {
+    if (!showGrid()) {
+      this.gridGfx?.setVisible(false)
+      return
+    }
+    const g = (this.gridGfx ??= this.lens.mainOnly(this.add.graphics().setDepth(1000)))
+    g.clear()
+    g.setVisible(true)
+    const r = this.lens.view()
+    const right = r.x + r.w
+    const bottom = r.y + r.h
+    g.lineStyle(0.03 * UNIT, 0xffffff, 0.45)
+    for (let x = Math.floor(r.x / UNIT) * UNIT; x <= right; x += UNIT) g.lineBetween(x, r.y, x, bottom)
+    for (let y = Math.floor(r.y / UNIT) * UNIT; y <= bottom; y += UNIT) g.lineBetween(r.x, y, right, y)
+    g.lineStyle(0.05 * UNIT, 0xff1744, 1)
+    g.lineBetween(r.x, 0, right, 0)
+    g.lineStyle(0.05 * UNIT, 0x00e676, 1)
+    g.lineBetween(0, r.y, 0, bottom)
   }
 
   create(): void {
@@ -843,11 +867,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 
 
-  /** 镜头每帧都要摆：战斗还没开始、已经结束也一样 */
+  /** 镜头每帧都要摆：战斗还没开始、已经结束也一样；坐标网格跟着镜头重画 */
   private aimLens(delta: number): void {
     this.lens.setMode(lensMode())
     this.lens.setFollowZoom(this.map.followZoom?.(this.ctx) ?? 1)
     this.lens.step(this.anchor, delta)
+    this.drawDevGrid()
   }
 
   update(_time: number, delta: number): void {

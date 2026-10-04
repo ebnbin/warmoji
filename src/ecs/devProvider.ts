@@ -106,6 +106,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
     },
     devFlagItem('battle.targets'),
     devFlagItem('battle.walls'),
+    devFlagItem('battle.grid'),
     devFlagItem('battle.gates'),
     devFlagItem('ecs.profile'),
     { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },
