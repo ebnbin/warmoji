@@ -2,7 +2,8 @@ import Phaser from 'phaser'
 import { MAP } from '../data/maps'
 import { safeInsets, viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
-import { FRAME_U, UNIT } from '../util/units'
+import { UNIT } from '../util/units'
+import { FRAME } from './frame'
 import { fitAspectRect } from './worlds/torus'
 import type { Point } from '../util/vec'
 
@@ -24,9 +25,6 @@ export interface Framing {
   readonly edge: 'frame' | 'clamp' | 'open' | 'wrap'
   readonly fit?: boolean
 }
-
-/** 沙盒地图的方框，像素 */
-export const FRAME: Rect = { x: 0, y: 0, w: FRAME_U * UNIT, h: FRAME_U * UNIT }
 
 /** follow 跟着锚点走；map 固定把地图矩形整张放进一屏 */
 export const LENS_MODES = ['follow', 'map'] as const

@@ -66,6 +66,7 @@ import { CircuitView } from './circuit/view'
 import { DesertView } from './desert/view'
 import { RuinsView } from './ruins/view'
 import type { Framing, Lens, Rect, Screen } from './lens'
+import { FRAME, FRAME_MID } from './frame'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -991,6 +992,14 @@ class VolcanoView extends BoundedView {
   private phase: EruptionPhase = 'dormant'
   private shakeAt = 0
   private shake = true
+
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
+  }
+
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
+  }
 
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, VOLCANO_BG).setDepth(-2)))

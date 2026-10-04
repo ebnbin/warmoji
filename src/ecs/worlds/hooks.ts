@@ -5,6 +5,7 @@ import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
+import { centered, FRAME_MID } from '../frame'
 import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
@@ -718,7 +719,8 @@ function volcanoOf(sim: Sim): VolcanoState {
   let s = sim.worldState.volcano
   if (!s) {
     const cfg = volcanoCfg(sim)
-    const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
+    const size = MAPS[sim.mapId].size!
+    const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, centered(size.w, size.h), FRAME_MID)
     const vents = fumaroles(field, cfg, VENT_COUNT)
     s = { field, vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s

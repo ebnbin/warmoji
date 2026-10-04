@@ -192,7 +192,7 @@ export interface NebulaConfig {
  * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
  */
 export interface VolcanoConfig {
-  /** 地形格子的边长，高度与厚度也以格计；地形铺满镜头能看到的地图外一圈 */
+  /** 地形格子的边长，高度与厚度也以格计；地形铺满方框 */
   readonly cellU: number
   readonly rim: {
     /** 盆地的边离方形地图的边多远：按噪声在两者之间起伏，起伏的波长 waveU；方形的角按 cornerU 的半径磨圆 */
