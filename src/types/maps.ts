@@ -689,9 +689,8 @@ export interface SakuraConfig {
  */
 export interface MeadowConfig {
   readonly meterPerU: number
-  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  /** 地图是 sizeU 见方的方形，摆在方框正中；地面画满方框 */
   readonly sizeU: number
-  readonly padU: number
   /** 能走的草地有多大，格²：生成出来不在这个范围里就换一组随机数 */
   readonly areaU2: readonly [number, number]
   /** 窄过两倍 neckU 的缝与尖角不能走 */

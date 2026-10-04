@@ -34,7 +34,7 @@ import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
 import { bodyField } from '../src/ecs/ruins/masonry.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
-import { UNIT, VIEW } from '../src/util/units.ts'
+import { FRAME_U, SAFE_U, SPAWN_CLEAR_U, UNIT, VIEW } from '../src/util/units.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
@@ -324,7 +324,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const { bank, forest, trail, fence, flowers, turf } = g
   need(g.meterPerU > 0 && g.sizeU > 0 && g.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
-  need(g.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(g.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(g.areaU2[0] > 0 && range(g.areaU2, false) && g.areaU2[1] < g.sizeU * g.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
   need(turf.reliefM >= 0 && turf.waveU > 0 && turf.riseM >= 0, `${at}.turf 的起伏、坡度不为负，波长为正`)
   need(bank.insetU[0] > 0 && range(bank.insetU, false) && bank.insetU[1] < g.sizeU / 4, `${at}.bank.insetU 须让坡脚落在地图边与中线之间`)
@@ -352,7 +352,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (let s = 0; s < 24; s++) {
     const plan = meadowPlan(g, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
   }

@@ -206,7 +206,6 @@ export const MAPS = {
     meadow: {
       meterPerU: 0.5,
       sizeU: 36,
-      padU: 7,
       areaU2: [760, 1040],
       neckU: 0.35,
       turf: { reliefM: 0.16, waveU: 7, riseM: 0.035 },

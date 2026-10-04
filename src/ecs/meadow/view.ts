@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { UNIT } from '../../util/units'
+import { FRAME_U, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
@@ -9,7 +9,7 @@ import { playSfx } from '../../audio/sfx'
 import { spawnDecor } from '../entities/decor'
 import { Airborne, Alive, Pickup, Radius, Transform } from '../components'
 import { roomAt } from '../worlds/basin'
-import { CANOPY_PPU, grassMask, groundArea, MASK_PPU, textureSize } from './ground'
+import { CANOPY_PPU, grassMask, GROUND_AREA, MASK_PPU, textureSize } from './ground'
 import { MeadowPainter } from './painter'
 import { GRASS_FRAG } from './shader'
 import { bankWidth, beyondFence, footAt, forestDepth, polylineDist, toLocal, toMap } from './layout'
@@ -20,10 +20,10 @@ import type { Area, PaintLayer, PaintPiece, PaintScene } from './ground'
 import type { Local, MeadowPlan } from './layout'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { FRAME } from '../lens'
 import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
-import type { MeadowConfig } from '../../types/maps'
 
 const BG = 0x1a221e
 const GROUND_KEY = 'meadow-ground'
@@ -142,7 +142,7 @@ export class MeadowView implements MapView {
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const p = this.planOf(v)
-    return { w: p.size * UNIT, h: p.size * UNIT, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
+    return { w: FRAME.w, h: FRAME.h, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
   }
 
   build(v: ViewCtx): void {
@@ -150,19 +150,20 @@ export class MeadowView implements MapView {
     ensureCritters(v.scene)
   }
 
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   /** 野花只开在草地上，不长在路上，离边有一点距离 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const plan = this.planOf(v)
     const rng = new Rng(v.run.decorSeed)
+    const o = (FRAME_U - plan.size) / 2
     for (const d of rollDecor(v.def.decor, () => rng.next(), plan.size, plan.size)) {
-      const x = d.xU * UNIT
-      const y = d.yU * UNIT
+      const x = (o + d.xU) * UNIT
+      const y = (o + d.yU) * UNIT
       if (roomAt(plan.basin, x, y) < (d.sizeU / 2 + 0.3) * UNIT) continue
-      if (plan.paths.some((p) => polylineDist(p, d.xU, d.yU) < 0.6)) continue
+      if (plan.paths.some((p) => polylineDist(p, o + d.xU, o + d.yU) < 0.6)) continue
       this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x, y, size: d.sizeU * UNIT, rot: d.rotation * 0.3, alpha: d.alpha, z: 1 }))
     }
   }
@@ -172,7 +173,7 @@ export class MeadowView implements MapView {
     const cfg = v.def.meadow!
     const scene = v.scene
     const sc: PaintScene = { cfg, plan }
-    const sizes: Record<PaintLayer, { w: number; h: number }> = { ground: textureSize(sc, 'ground'), canopy: textureSize(sc, 'canopy') }
+    const sizes: Record<PaintLayer, { w: number; h: number }> = { ground: textureSize('ground'), canopy: textureSize('canopy') }
     const tex: Record<PaintLayer, Phaser.Textures.CanvasTexture> = {
       ground: canvasTexture(scene, GROUND_KEY, sizes.ground.w, sizes.ground.h),
       canopy: canvasTexture(scene, CANOPY_KEY, sizes.canopy.w, sizes.canopy.h),
@@ -192,7 +193,7 @@ export class MeadowView implements MapView {
     if (this.painter !== painter) return
     this.painter = undefined
     for (const t of Object.values(tex)) upload(t)
-    const ga = groundArea(sc)
+    const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((sizes.ground.w / GROUND_PPU) * UNIT, (sizes.ground.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.grass(v, sc, plan, ga)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, CANOPY_KEY).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(20))
@@ -252,9 +253,10 @@ export class MeadowView implements MapView {
   private flutter(v: ViewCtx, plan: MeadowPlan): void {
     const scene = v.scene
     const rng = new Rng(plan.seed ^ 0xb7f1)
+    const o = (FRAME_U - plan.size) / 2
     for (let i = 0, tries = 0; i < BUTTERFLIES && tries < 400; tries++) {
-      const x = rng.next() * plan.size
-      const y = rng.next() * plan.size
+      const x = o + rng.next() * plan.size
+      const y = o + rng.next() * plan.size
       if (roomAt(plan.basin, x * UNIT, y * UNIT) < 1.5 * UNIT) continue
       const img = scene.add
         .image(x * UNIT, y * UNIT, BUTTERFLY_KEY)
@@ -267,14 +269,21 @@ export class MeadowView implements MapView {
     }
   }
 
-  /** 坡上那层草甸上空盘旋的鹰：圈心在坡顶往外几格，绕着圈时不时飞到下面草地的上空 */
+  /** 坡上那层草甸上空盘旋的鹰：圈心在坡顶往外几格，绕着圈时不时飞到下面草地的上空；鹰连同它的影子都不飞出方框 */
   private soar(v: ViewCtx, plan: MeadowPlan): void {
     const rng = new Rng(plan.seed ^ 0x4a3c)
     const b = plan.size * (0.2 + rng.next() * 0.6)
     const c = toMap(plan.frame, footAt(plan.edges, b) - bankWidth(plan.edges, b) - 1.5 - rng.next() * 2, b)
+    const mpu = v.def.meadow!.meterPerU
+    const sx = (-SUN.x / SUN.z / mpu) * HAWK.altM
+    const sy = (-SUN.y / SUN.z / mpu) * HAWK.altM
+    const rx = HAWK.radius + HAWK.span
+    const ry = HAWK.radius * 0.8 + HAWK.span
+    const cx = Math.min(Math.max(c.x, rx - Math.min(0, sx)), FRAME_U - rx - Math.max(0, sx))
+    const cy = Math.min(Math.max(c.y, ry - Math.min(0, sy)), FRAME_U - ry - Math.max(0, sy))
     const img = v.scene.add.image(0, 0, HAWK_KEY).setDepth(36)
     this.visuals.push(img)
-    this.hawk = { a: rng.next() * Math.PI * 2, cx: c.x, cy: c.y, img }
+    this.hawk = { a: rng.next() * Math.PI * 2, cx, cy, img }
   }
 
   /** 顺风飘的蒲公英种子：在镜头里随处冒出来 */
@@ -306,10 +315,9 @@ export class MeadowView implements MapView {
     )
   }
 
-  /** 这一点在不在牧场里：栅栏外、林子外、离坡脚一格以上，在画过的地方以内 */
-  private inPasture(plan: MeadowPlan, cfg: MeadowConfig, x: number, y: number): boolean {
-    const pad = cfg.padU - 1
-    if (x < -pad || y < -pad || x > plan.size + pad || y > plan.size + pad) return false
+  /** 这一点在不在牧场里：栅栏外、林子外、离坡脚一格以上，离方框边一格以上 */
+  private inPasture(plan: MeadowPlan, x: number, y: number): boolean {
+    if (x < 1 || y < 1 || x > FRAME_U - 1 || y > FRAME_U - 1) return false
     const L = toLocal(plan.frame, x, y, this.local)
     return beyondFence(plan.edges, L.a, L.b) > 0.9 && forestDepth(plan.edges, L.a, L.b) < -0.9 && L.a - footAt(plan.edges, L.b) > 1
   }
@@ -338,7 +346,7 @@ export class MeadowView implements MapView {
         const nx = s.x + Math.cos(s.heading) * 0.35 * dt
         const ny = s.y + Math.sin(s.heading) * 0.35 * dt
         const crowded = this.sheep.some((o) => o !== s && Math.hypot(o.x - nx, o.y - ny) < 1.5 && Math.hypot(o.x - nx, o.y - ny) < Math.hypot(o.x - s.x, o.y - s.y))
-        if (this.inPasture(plan, cfg, nx, ny) && !crowded) {
+        if (this.inPasture(plan, nx, ny) && !crowded) {
           s.x = nx
           s.y = ny
         } else {
@@ -451,7 +459,7 @@ export class MeadowView implements MapView {
         playSfx('chirp')
       }
     }
-    const reach = plan.size + 20
+    const reach = FRAME_U + 20
     this.birds = this.birds.filter((b) => {
       b.x += b.vx * dt
       b.y += b.vy * dt
