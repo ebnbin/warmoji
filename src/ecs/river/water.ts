@@ -1,5 +1,7 @@
-import { at, clearingDepth, GRAVITY, heightAt, poolAt, project } from './layout'
-import type { Along, Reach, RiverPlan } from './layout'
+import { at, GRAVITY, project } from './channel'
+import { clearingDepth, heightAt, poolAt } from './layout'
+import type { Along, Reach } from './channel'
+import type { RiverPlan } from './layout'
 import type { RiverConfig } from '../../types/maps'
 
 /** 浅水方程的格子边长，格 */
@@ -99,9 +101,8 @@ function hll(hl: number, ul: number, vl: number, hr: number, ur: number, vr: num
 }
 
 /**
- * 在河床上解二维浅水方程直到稳态：有限体积，界面上按静水重构（Audusse）保持静水平衡与水深非负，HLL 通量，曼宁摩阻半隐式；
- * 瀑布的水按流量从崖脚那一条砸进深潭，带着崖上溪水的水平流速（下落时水平方向不受力）；落进深谷的水就此离开。
- * 从按设计水位铺好的静水起算（比带着设计流速起算收敛得快：不会先冲出一大股再慢慢补回来），进出水平衡、水面不再变就停
+ * 河流的格子：河床取地形，深谷里比断崖边低过 DROP 的格子是汇；瀑布的水按流量从崖脚那一条砸进深潭，带着崖上溪水的水平流速（下落时水平方向不受力）；
+ * 从按设计水位铺好的静水起算（比带着设计流速起算收敛得快：不会先冲出一大股再慢慢补回来）
  */
 export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
   const mpu = cfg.meterPerU
@@ -111,8 +112,6 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
   const dx = WATER_CELL_U * mpu
   const z = new Float64Array(n)
   const h = new Float64Array(n)
-  const hu = new Float64Array(n)
-  const hv = new Float64Array(n)
   const sink = new Int8Array(n).fill(-1)
   const src = new Float64Array(n)
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
@@ -149,8 +148,40 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
     }
   }
   if (splash === 0) throw new Error('瀑布没落在深潭里')
-  const jet = plan.upstream.speed
   for (let i = 0; i < n; i++) src[i] = (src[i]! * q) / (splash * dx * dx)
+  return solveGrid({ cols, rows, cell: WATER_CELL_U, meterPerU: mpu, manning: cfg.flow.manning, z, h, src, jet: plan.upstream.speed, dir: { x: inlet.nx, y: inlet.ny }, sink, q })
+}
+
+/**
+ * 一张待解的格子：格子 (0, 0) 的左上角在地图原点，边长 cell 格；河床高程与起算的水深（米），水深解的时候就地改写；
+ * 进水 src（每格每秒灌进多少米水深）带着速度 jet（米/秒）朝 dir 冲出来；sink 标出水一流到就离开的格子（属于第几个出水口，−1 不是）；
+ * 进水的总流量 q（米³/秒），出水与它持平才算稳态
+ */
+export interface Grid {
+  readonly cols: number
+  readonly rows: number
+  readonly cell: number
+  readonly meterPerU: number
+  readonly manning: number
+  readonly z: Float64Array
+  readonly h: Float64Array
+  readonly src: Float64Array
+  readonly jet: number
+  readonly dir: { readonly x: number; readonly y: number }
+  readonly sink: Int8Array
+  readonly q: number
+}
+
+/**
+ * 在河床上解二维浅水方程直到稳态：有限体积，界面上按静水重构（Audusse）保持静水平衡与水深非负，HLL 通量，曼宁摩阻半隐式；
+ * 汇里的水就此离开。进出水平衡、水面不再变就停
+ */
+export function solveGrid(grid: Grid): Water {
+  const { cols, rows, z, h, src, sink, q, jet, dir } = grid
+  const n = cols * rows
+  const dx = grid.cell * grid.meterPerU
+  const hu = new Float64Array(n)
+  const hv = new Float64Array(n)
   const ah = new Float64Array(n)
   const ahu = new Float64Array(n)
   const ahv = new Float64Array(n)
@@ -159,7 +190,7 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
     return d > DRY ? (m[i]! * d) / (d * d + THIN * THIN) : 0
   }
   const g2 = 0.5 * GRAVITY
-  const fr = GRAVITY * cfg.flow.manning ** 2
+  const fr = GRAVITY * grid.manning ** 2
   let t = 0
   let window = 0
   let windowOut = 0
@@ -234,8 +265,8 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
     for (let a = 0; a < m; a++) {
       const i = list[a]!
       let d = h[i]! + k * ah[i]! + dt * src[i]!
-      let mu = hu[i]! + k * ahu[i]! + dt * src[i]! * jet * inlet.nx
-      let mv = hv[i]! + k * ahv[i]! + dt * src[i]! * jet * inlet.ny
+      let mu = hu[i]! + k * ahu[i]! + dt * src[i]! * jet * dir.x
+      let mv = hv[i]! + k * ahv[i]! + dt * src[i]! * jet * dir.y
       if (sink[i]! >= 0) {
         gone += Math.max(0, d)
         d = 0
@@ -280,7 +311,7 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
     uf[i] = vel(i, hu)
     vf[i] = vel(i, hv)
   }
-  return { cols, rows, cell: WATER_CELL_U, z: zf, h: hf, u: uf, v: vf, sink }
+  return { cols, rows, cell: grid.cell, z: zf, h: hf, u: uf, v: vf, sink }
 }
 
 /** 水深（米）与流速（米/秒，地图坐标） */

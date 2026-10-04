@@ -560,6 +560,45 @@ export interface OldRiverConfig {
   readonly waveSlow: number
   readonly waveFast: number
 }
+/** 按流量 Q（米³/秒）定的河道：水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米），坡降由曼宁糙率反算 */
+export interface ChannelConfig {
+  readonly widthCoef: number
+  readonly depthCoef: number
+  readonly manning: number
+  /** 横断面的形状指数：水深按 1 − |ξ|^bedShape 从深泓往两岸收 */
+  readonly bedShape: number
+  /** 弯顶的深潭、过渡段的浅滩相对平均的水深倍率；深泓往凹岸偏到半宽的 thalwegShift 倍 */
+  readonly pool: number
+  readonly riffle: number
+  readonly thalwegShift: number
+  /** 河岸高出水面多少米、岸坡多宽（格）；岸顶以外的滩地每格升多少米 */
+  readonly bankM: number
+  readonly bankU: number
+  readonly floodSlope: number
+}
+/**
+ * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
+ * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
+ * 或者干脆浮起来，就站不住、随水漂
+ */
+export interface WadeConfig {
+  readonly kg: number
+  readonly radiusU: number
+  readonly heightM: number
+  readonly density: number
+  readonly drag: number
+  /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
+  readonly legs: number
+  readonly hip: number
+  /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
+  readonly lever: number
+  /** 脚底踩在湿河床上的静摩擦系数 */
+  readonly mu: number
+  /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
+  readonly swim: number
+  /** 水深不到这个（米）算干地 */
+  readonly wetM: number
+}
 /**
  * 河流：林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。
  * 河道按流量定宽深、按曼宁公式定坡降，水流是浅水方程在这副河床上的稳态解；空地的形状、河的走向与出入口都由种子定。
@@ -595,25 +634,8 @@ export interface RiverConfig {
     readonly minBend: number
     readonly edgeGapU: number
   }
-  /** 水力几何：流量（米³/秒）按 share 分给大股；水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米）；坡降由曼宁糙率反算 */
-  readonly flow: {
-    readonly discharge: number
-    readonly share: number
-    readonly widthCoef: number
-    readonly depthCoef: number
-    readonly manning: number
-    /** 横断面的形状指数：水深按 1 − |ξ|^bedShape 从深泓往两岸收 */
-    readonly bedShape: number
-    /** 弯顶的深潭、过渡段的浅滩相对平均的水深倍率；深泓往凹岸偏到半宽的 thalwegShift 倍 */
-    readonly pool: number
-    readonly riffle: number
-    readonly thalwegShift: number
-    /** 河岸高出水面多少米、岸坡多宽（格）；岸顶以外的滩地每格升多少米，起伏多少米 */
-    readonly bankM: number
-    readonly bankU: number
-    readonly floodSlope: number
-    readonly reliefM: number
-  }
+  /** 流量（米³/秒）按 share 分给大股，河道按流量定；滩地起伏多少米 */
+  readonly flow: ChannelConfig & { readonly discharge: number; readonly share: number; readonly reliefM: number }
   /** 瀑布：进水口的崖高与崖面的进深、崖下深潭的深（米）与半径（相对主河道水面宽）；出水口外深谷的深，断崖外还能被冲过去的那一段多长（格），断崖边前那道岩坎多长（格） */
   readonly falls: {
     readonly cliffM: number
@@ -640,29 +662,7 @@ export interface RiverConfig {
     readonly radiusU: readonly [number, number]
     readonly heightM: readonly [number, number]
   }
-  /**
-   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
-   * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
-   * 或者干脆浮起来，就站不住、随水漂
-   */
-  readonly body: {
-    readonly kg: number
-    readonly radiusU: number
-    readonly heightM: number
-    readonly density: number
-    readonly drag: number
-    /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
-    readonly legs: number
-    readonly hip: number
-    /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
-    readonly lever: number
-    /** 脚底踩在湿河床上的静摩擦系数 */
-    readonly mu: number
-    /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
-    readonly swim: number
-    /** 水深不到这个（米）算干地 */
-    readonly wetM: number
-  }
+  readonly body: WadeConfig
 }
 /**
  * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；

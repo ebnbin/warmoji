@@ -1,6 +1,7 @@
-import { at, GRAVITY, project } from './layout'
+import { at, GRAVITY, project } from './channel'
 import { WATER_CELL_U } from './water'
-import type { Along, RiverPlan } from './layout'
+import type { Along } from './channel'
+import type { RiverPlan } from './layout'
 import type { Water } from './water'
 import type { RiverConfig } from '../../types/maps'
 
