@@ -18,11 +18,13 @@ function ensureFxDot(scene: Phaser.Scene): string {
   return DOT_KEY
 }
 
+/** more 补上或改掉默认的几项：往哪边坠、怎么叠色 */
 export function burstEmitter(
   scene: Phaser.Scene,
   tints: number[],
   speedMax: number,
   lifespanMax = 460,
+  more: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig = {},
 ): Phaser.GameObjects.Particles.ParticleEmitter {
   return scene.add
     .particles(0, 0, ensureFxDot(scene), {
@@ -32,6 +34,7 @@ export function burstEmitter(
       alpha: { start: 1, end: 0.2 },
       tint: tints,
       emitting: false,
+      ...more,
     })
     .setDepth(20)
 }

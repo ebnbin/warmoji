@@ -47,7 +47,7 @@ import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
-import type { EnemyDef } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef, NebulaOldConfig } from '../src/types/maps'
 import type { MutatorDef, RunDef } from '../src/types/runs'
@@ -176,6 +176,41 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(st.gmT > 0, `maps.${id}.ship 压上 ${DIFFICULTY.spawn.maxAlive} 个身体后初稳性高须仍为正`)
   need(heel < deckEdgeAngle(c, st), `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时倾 ${deg(heel)}，超过甲板边入水的 ${deg(deckEdgeAngle(c, st))}`)
   need(Math.tan(heel) > f.body.static, `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时只倾 ${deg(heel)}，闲着的身体滑不起来`)
+}
+
+/**
+ * 出怪口：吸附半径为正；每种的权重为正、限速为正、只出的敌人都存在；抛入的才写抛得到多远、只能摆在地标上，整片地面上的只能钻出或落下；
+ * 头目出怪口接得住这张图的头目；配比里的每种敌人都有出怪口接
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  const g = m.gates
+  if (!g) continue
+  const kinds = Object.entries(g.kinds)
+  const at = `maps.${id}.gates`
+  need(g.snapU > 0 && kinds.length > 0, `${at} 的吸附半径须为正、至少一种出怪口`)
+  need(g.lean === undefined || (g.lean.mul >= 1 && g.lean.full > 0), `${at}.lean 的倍率不小于 1、偏满的量为正`)
+  for (const [k, d] of kinds) {
+    const p = `${at}.kinds.${k}`
+    need(d.weight > 0 && (d.perSec ?? 1) > 0 && (d.snapU ?? 1) > 0, `${p} 的权重、限速与吸附半径须为正`)
+    need(d.only === undefined || (d.only.length > 0 && d.only.every((e) => ENEMIES[e] !== undefined)), `${p}.only 须引用存在的敌人`)
+    need((d.enter === 'lob') === (d.reachU !== undefined) && (d.reachU ?? 1) > 0, `${p} 抛入的才写抛得到多远，且须为正`)
+    need(d.enter !== 'lob' || d.at.kind === 'mark', `${p} 抛入的出怪口只能摆在地标上`)
+    need(d.at.kind !== 'ground' || d.enter === 'rise' || d.enter === 'drop', `${p} 摆在整片地面上的只能钻出或落下`)
+    if (d.at.kind === 'rim') need(d.at.segU > 0 && (d.at.away?.minU ?? 0) >= 0, `${p} 的段长须为正，离地标的距离不为负`)
+    if (d.at.kind === 'nooks') need(d.at.spacingU > 0 && (d.at.away?.minU ?? 0) >= 0, `${p} 的间距须为正，离地标的距离不为负`)
+  }
+  const takes = (e: EnemyKind): boolean => kinds.some(([, d]) => d.only === undefined || d.only.includes(e))
+  const boss = g.boss === undefined ? undefined : g.kinds[g.boss]
+  need(g.boss === undefined || (boss !== undefined && (boss.only?.includes(m.boss) ?? true)), `${at}.boss 须是这张图的一种出怪口，接得住头目 ${m.boss}`)
+  for (const row of [...m.mix, ...(m.dayMix ?? []), ...(m.nightMix ?? [])]) need(takes(row.kind), `${at} 没有出怪口接配比里的 ${row.kind}`)
+}
+
+/** 进场动作：时长为正，高度与距离不为负，落点的距离范围从正数起 */
+{
+  const e = FEEL.entrance
+  need(e.walk.ms > 0 && e.climb.ms > 0 && e.drop.ms > 0 && e.lob.minMs > 0, 'feel.entrance 的时长须为正')
+  need(e.walk.heightU >= 0 && e.climb.heightU >= 0 && e.drop.heightU >= 0 && e.lob.heightPerU >= 0 && e.lob.msPerU >= 0 && e.climb.outU >= 0, 'feel.entrance 的高度、距离不为负')
+  for (const [name, r] of [['walk', e.walk.distU], ['climb', e.climb.distU]] as const) need(r[0] > 0 && r[0] <= r[1], `feel.entrance.${name}.distU 须从正数起、下限不大于上限`)
 }
 
 /**

@@ -14,6 +14,12 @@ export const ICON = {
   random: '1f3b2',
   remove: '274c',
   leader: '1f451',
+  near: '1f440',
+  far: '1f52d',
+  ring: '2b55',
+  behind: '1f519',
+  point: '1f4cd',
+  gate: '1f6aa',
 } as const
 
 interface Kind<T> {

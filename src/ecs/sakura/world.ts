@@ -3,13 +3,16 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
+import { ENEMY_BODY } from '../../data/abilities'
 import { Airborne, Alive, Phys, Pickup, Radius, Transform, Uid } from '../components'
 import { fleeSteer } from '../systems/shared/steer'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { project } from '../river/channel'
 import { flowAt } from '../river/water'
-import { wade } from '../river/bodies'
+import { holds, wade } from '../river/bodies'
+import { roomFor } from '../worlds/gates'
+import { sakuraMarks } from './marks'
 import { bridgeLocal, sakuraPlan } from './layout'
 import { solveSakura } from './water'
 import type { Along } from '../river/channel'
@@ -18,6 +21,7 @@ import type { Bridge, SakuraPlan } from './layout'
 import type { MapId, SakuraConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
+import type { Landmark } from '../worlds/gates'
 import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
@@ -26,11 +30,12 @@ const NO_GHOSTS: Point[] = []
 const PLAN_SEED = 0x5a4c1e
 
 /**
- * 樱庭此刻的状态：按种子生成的地图，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
+ * 樱庭此刻的状态：按种子生成的地图与它上面的地标，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
  * 哪些身体正在水里站不住、随水漂着，哪些正走在桥上（按实体记，uid 对不上就是换了实体）；见过的掉落物
  */
 export interface SakuraState {
   readonly plan: SakuraPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   water: Water | null
   ready: Promise<void>
   readonly swimming: Map<number, number>
@@ -82,7 +87,8 @@ export function sakuraOf(sim: Sim): SakuraState {
   let s = sim.worldState.sakura
   if (!s) {
     const cfg = cfgOf(sim)
-    const state: SakuraState = { plan: sakuraPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), swimming: new Map(), aboard: new Map(), seen: new Map() }
+    const plan = sakuraPlanFor(cfg, sim.run.decorSeed)
+    const state: SakuraState = { plan, marks: sakuraMarks(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map(), aboard: new Map(), seen: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -303,6 +309,20 @@ export const sakura: WorldHooks = {
   },
   settle(sim, p) {
     return dryNear(sim, sakuraOf(sim), p, SPAWN.edgeInset * UNIT)
+  },
+  ground(sim) {
+    return sim.hooks.basin(sim)
+  },
+  /** 站得下；落在水里的要这么大的身体在那里站得住 */
+  canSpawn(sim, x, y, radius) {
+    const s = sakuraOf(sim)
+    return roomFor(s.plan.basin, x, y, radius) && (!s.water || holds(cfgOf(sim), s.water, x, y, radius, ENEMY_BODY.mass))
+  },
+  landmarks(sim) {
+    return sakuraOf(sim).marks
+  },
+  lean() {
+    return ZERO
   },
   onStart(sim) {
     sakuraOf(sim)

@@ -19,7 +19,7 @@ self.onmessage = (e: MessageEvent<GroundJob>) => {
   if (!state) throw new Error('画地面的线程还没收到 state')
   const { c0, r0, c1, r1 } = job.rect
   const pixels = groundBuffer(job.rect, setup.ppc)
-  paintGround({ ...setup.field, ground: state.ground, rockAt: state.rockAt }, setup.cfg, setup.ppc, setup.vents, state.masks, pixels, c0, r0, c1, r1)
+  paintGround({ ...setup.field, ground: state.ground, rockAt: state.rockAt }, setup.cfg, setup.ppc, setup.marks, state.masks, pixels, c0, r0, c1, r1)
   const piece: GroundPiece = { index: job.index, rect: job.rect, pixels }
   self.postMessage(piece, { transfer: [pixels.buffer] })
 }

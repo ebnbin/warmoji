@@ -69,6 +69,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
       },
     },
     { kind: 'text', label: '关卡', mono: true, read: () => battle.devPhaseText() },
+    { kind: 'text', label: '出怪口', mono: true, read: () => battle.devGateText() },
     {
       kind: 'buttons',
       label: '生成',
@@ -105,6 +106,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
     },
     devFlagItem('battle.targets'),
     devFlagItem('battle.walls'),
+    devFlagItem('battle.gates'),
     devFlagItem('ecs.profile'),
     { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },
     { kind: 'buttons', buttons: [{ label: '重置剖析', run: resetPipelineProfile }] },

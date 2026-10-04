@@ -5,6 +5,7 @@ import type { Point } from '../../util/vec'
 import type { CaveConfig } from '../../types/maps'
 import { daysAt, moonAt, moonDirectLux, moonSkyLux, phaseAngle, skyLux, sunAt, sunDirectLux, SYNODIC_DAYS, torchLux } from '../../data/cave'
 import type { SkyDir } from '../../data/cave'
+import type { Landmark } from './gates'
 
 const DEG = Math.PI / 180
 
@@ -1286,6 +1287,9 @@ export function flowDir(F: CaveFlow, x: number, y: number): Point | null {
 
 export interface CaveState {
   readonly layout: CaveLayout
+  /** 出怪口用的地标（见 caveMarks）与白天的那一份：白天亮着的几组是空的 */
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
+  readonly dayMarks: Readonly<Record<string, readonly Landmark[]>>
   readonly light: CaveLight
   readonly flow: CaveFlow
   readonly sky: CaveSky
@@ -1299,11 +1303,51 @@ export interface CaveState {
   flowIn: number
 }
 
+/** 支洞的洞道上每隔这么远记一处，格 */
+const TUNNEL_STEP_U = 1
+/** 暗室、水潭、天窗当口子时取它多大的一圈（占半径的比例） */
+const MARK_SHARE = 0.5
+
+/**
+ * 溶洞的地标，像素：alcove 是支洞深处的暗室，朝洞道往外；tunnel 是支洞洞道上一路的点（石缝躲开它们）；
+ * pool、glow 是水潭与荧光丛，skylight 是主天窗以外的天窗，main 是主天窗，这四组只在入夜后出怪
+ */
+function caveMarks(L: CaveLayout): Record<string, Landmark[]> {
+  const circle = (x: number, y: number, r: number): Landmark => ({ x, y, r, nx: 0, ny: 0 })
+  const alcove = L.alcoves.map((a): Landmark => {
+    const end = a.path[a.path.length - 1]!
+    const back = a.path[a.path.length - 2]!
+    const d = Math.hypot(back.x - end.x, back.y - end.y) || 1
+    return { x: end.x, y: end.y, r: a.pocket * MARK_SHARE, nx: (back.x - end.x) / d, ny: (back.y - end.y) / d }
+  })
+  const tunnel: Landmark[] = []
+  for (const a of L.alcoves) {
+    for (let i = 0; i + 1 < a.path.length; i++) {
+      const p = a.path[i]!
+      const q = a.path[i + 1]!
+      const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / (TUNNEL_STEP_U * UNIT)))
+      for (let k = 0; k < n; k++) tunnel.push(circle(p.x + ((q.x - p.x) * k) / n, p.y + ((q.y - p.y) * k) / n, 0))
+    }
+    const end = a.path[a.path.length - 1]!
+    tunnel.push(circle(end.x, end.y, 0))
+  }
+  return {
+    alcove,
+    tunnel,
+    pool: L.pools.map((p) => circle(p.x, p.y, Math.min(p.rx, p.ry) * MARK_SHARE)),
+    glow: L.glows.map((g) => circle(g.x, g.y, g.r)),
+    skylight: L.openings.slice(1).map((o) => circle(o.x, o.y, o.r * MARK_SHARE)),
+    main: L.openings.slice(0, 1).map((o) => circle(o.x, o.y, o.r * MARK_SHARE)),
+  }
+}
+
 export function makeCaveState(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rng, sec: number): CaveState {
   const layout = makeCave(cfg, w, h, margin, rng)
   const light = makeLight(layout, cfg, margin)
   const age0 = rng.next() * SYNODIC_DAYS
   const sky = skyAt(cfg, sec, age0, { hour: 0, days: 0, sun: { x: 0, y: -1, elev: 0 }, moon: { x: 0, y: -1, elev: 0 }, age: 0, phase: 0, sunLux: 0, skyLux: 0, moonLux: 0, moonSkyLux: 0 })
   stepLight(light, layout, cfg, sky)
-  return { layout, light, flow: makeFlow(layout), sky, age0, torches: new Map(), lightIn: 0, flowIn: 0 }
+  const marks = caveMarks(layout)
+  const dayMarks = { ...marks, pool: [], glow: [], skylight: [], main: [] }
+  return { layout, marks, dayMarks, light, flow: makeFlow(layout), sky, age0, torches: new Map(), lightIn: 0, flowIn: 0 }
 }

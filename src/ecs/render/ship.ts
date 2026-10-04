@@ -4,7 +4,7 @@ import { GROUND_PPU } from '../../data/texel'
 import { fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import type { ShipConfig } from '../../types/maps'
-import { bulgeU, halfBeamAt } from '../../data/ship'
+import { bulgeU, halfBeamAt, hatchesOf, helmOf, skylightOf } from '../../data/ship'
 import { deckPoint } from '../worlds/ship'
 import type { Deck } from '../worlds/ship'
 import type { Point } from '../../util/vec'
@@ -560,11 +560,7 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
   const bw = h.bulwarkU
   const L = h.lengthU
   const railAt = (s: number): number => halfBeamAt(h, s) + bw
-  for (let i = 0; i + 1 < masts.length; i++) {
-    const a = masts[i]!.s
-    const b = masts[i + 1]!.s
-    grating(ctx, (a + b) / 2, Math.min(3.4, (b - a) * 0.34), Math.min(3, h.beamU * 0.17), light)
-  }
+  for (const g of hatchesOf(h)) grating(ctx, g.s, g.len, g.wid, light)
   ctx.lineCap = 'round'
   for (const m of masts) {
     dropShadow(ctx, light, 0.08, () => {
@@ -616,7 +612,7 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
     }
   }
   // 船尾：舵轮、罗经柜、天窗
-  const helm = Math.max(1.6, h.stern * L * 0.3)
+  const helm = helmOf(h)
   dropShadow(ctx, light, 0.12, () => ctx.fillRect(helm - 0.3, -0.35, 0.6, 0.7))
   ctx.fillStyle = TIMBER
   ctx.fillRect(helm - 0.3, -0.35, 0.6, 0.7)
@@ -645,7 +641,7 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
   ctx.beginPath()
   ctx.arc(bin, 0, 0.22, 0, Math.PI * 2)
   ctx.fill()
-  const sky = helm + 3.6
+  const sky = skylightOf(h).s
   dropShadow(ctx, light, 0.12, () => ctx.fillRect(sky - 0.8, -0.6, 1.6, 1.2))
   ctx.fillStyle = TIMBER
   ctx.fillRect(sky - 0.8, -0.6, 1.6, 1.2)
