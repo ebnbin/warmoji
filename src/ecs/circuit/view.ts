@@ -329,17 +329,18 @@ export class CircuitView implements MapView {
       const x = b.x * UNIT
       const y = b.y * UNIT
       const r = b.r * UNIT
+      const touch = b.touch * UNIT
       if (s.phase === 'ready') {
         const k = 0.5 + 0.5 * Math.sin((now / 1000) * BREATHE)
         g.lineStyle(0.12 * UNIT, NEON, 0.25 + 0.3 * k)
         g.strokeCircle(x, y, r * 1.02)
         g.fillStyle(NEON, 0.05 + 0.06 * k)
-        g.fillCircle(x, y, r * 0.66)
+        g.fillCircle(x, y, touch)
       } else if (s.phase === 'travel' || s.phase === 'live') {
         g.lineStyle(0.16 * UNIT, 0xe8ffff, 0.9)
         g.strokeCircle(x, y, r * 1.02)
         g.fillStyle(NEON, 0.35)
-        g.fillCircle(x, y, r * 0.66)
+        g.fillCircle(x, y, touch)
       } else {
         const k = Math.min(1, (now - s.since) / cfg.rearmMs)
         g.lineStyle(0.1 * UNIT, NEON, 0.12)

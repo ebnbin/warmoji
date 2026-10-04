@@ -884,7 +884,7 @@ export const MAPS = {
       rail: { widthU: [1.5, 1.9] },
       clock: { traces: [2, 3], widthU: 0.85, pitchU: 1.27, offMs: 2600, warnMs: 1100, onMs: 2200, surgeU: 36 },
       arc: { count: [2, 3], gapU: [1.8, 2.5], restMs: 1800, chargeMs: 3600, arcMs: 380, reachU: 0.45, teamDamage: 30, enemyDamage: 60 },
-      button: { padU: 1, plateU: [4.4, 5.6], reachU: [2.4, 3.6], linkU: 9, holdMs: 3200, rearmMs: 4800 },
+      button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], linkU: 9, holdMs: 3200, rearmMs: 4800 },
     },
     boss: 'mecha',
   },

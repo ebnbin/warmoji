@@ -785,11 +785,12 @@ export interface CircuitConfig {
     readonly enemyDamage: number
   }
   /**
-   * 开关：触摸盘的半径（格），连着的铜板边长（格），盘到铜板的连线多长（格）；有人站上去，电以每秒 linkU 格从开关沿线传过去，
-   * 铜板全通之后再通 holdMs，断开后 rearmMs 内再踩也不通
+   * 开关：触摸盘的半径（格），盘中间那块圆金的半径（格），连着的铜板边长（格），盘到铜板的连线多长（格）；
+   * 身体中心踩进圆金，电以每秒 linkU 格从开关沿线传过去，铜板全通之后再通 holdMs，断开后 rearmMs 内再踩也不通
    */
   readonly button: {
     readonly padU: number
+    readonly touchU: number
     readonly plateU: readonly [number, number]
     readonly reachU: readonly [number, number]
     readonly linkU: number

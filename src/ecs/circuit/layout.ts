@@ -12,6 +12,8 @@ const BASIN_CELL_U = 0.25
 export const COPPER_CELL_U = 0.125
 /** 离带电的铜这么远（格）以外不记：光晕和触电都够不着 */
 export const COPPER_REACH_U = 3
+/** 铜外的电走到了哪按附近的铜远近加权取：高斯的宽，格 */
+const SPILL_SIGMA_U = 0.4
 /** 电流着色器把沿铜的距离按这么长（格）编进两个通道，网络状态图能放这么多条网络 */
 export const ALONG_SPAN_U = 32
 export const NET_SLOTS = 16
@@ -210,11 +212,12 @@ export interface Gap {
   readonly phaseMs: number
 }
 
-/** 触摸开关：盘心与半径（格），它管的网络，连着的铜板 */
+/** 触摸开关：盘心与半径（格），盘中间那块圆金的半径（格，身体中心踩进来才算按下），它管的网络，连着的铜板 */
 export interface Button {
   readonly x: number
   readonly y: number
   readonly r: number
+  readonly touch: number
   readonly net: number
   readonly plate: Plate
 }
@@ -861,8 +864,11 @@ function fanOut(d: Draft, p: Part, used: ReadonlySet<Pad>, free: (x: number, y: 
   }
 }
 
-/** 网络的铜按细格子栅格化：每格离最近的网络多远，铜里沿铜从电源走过来的距离，铜外取最近那片铜上的 */
-function rasterCopper(arena: Arena, copper: readonly Shape[][], nets: readonly { sources: readonly Point[] }[]): { grid: CopperGrid; lengths: number[] } {
+/**
+ * 网络的铜按细格子栅格化：每格离最近的网络多远，铜里沿铜从电源走过来的距离，铜外取附近同一网络的铜。
+ * 触摸盘从铜里扣掉，站在盘上的身体只碰得到盘外的铜；元件本体盖住的格子不算铜，霓虹不画到元件上
+ */
+function rasterCopper(arena: Arena, copper: readonly Shape[][], nets: readonly { sources: readonly Point[] }[], parts: readonly Part[], buttons: readonly Button[]): { grid: CopperGrid; lengths: number[] } {
   const cell = COPPER_CELL_U
   const reach = COPPER_REACH_U
   const x0 = Math.floor(arena.x0 - reach)
@@ -892,6 +898,30 @@ function rasterCopper(arena: Arena, copper: readonly Shape[][], nets: readonly {
       }
     }
   })
+  for (const b of buttons) {
+    const c0 = Math.max(0, Math.floor((b.x - b.r - 1 - x0) / cell))
+    const c1 = Math.min(cols - 1, Math.ceil((b.x + b.r + 1 - x0) / cell))
+    const r0 = Math.max(0, Math.floor((b.y - b.r - 1 - y0) / cell))
+    const r1 = Math.min(rows - 1, Math.ceil((b.y + b.r + 1 - y0) / cell))
+    for (let cy = r0; cy <= r1; cy++) {
+      for (let cx = c0; cx <= c1; cx++) {
+        const i = cy * cols + cx
+        if (net[i]! >= 0) dist[i] = Math.max(dist[i]!, b.r - Math.hypot(x0 + (cx + 0.5) * cell - b.x, y0 + (cy + 0.5) * cell - b.y))
+      }
+    }
+  }
+  for (const p of parts) {
+    const c0 = Math.max(0, Math.ceil((p.x - p.hw - x0) / cell - 0.5))
+    const c1 = Math.min(cols - 1, Math.floor((p.x + p.hw - x0) / cell - 0.5))
+    const r0 = Math.max(0, Math.ceil((p.y - p.hh - y0) / cell - 0.5))
+    const r1 = Math.min(rows - 1, Math.floor((p.y + p.hh - y0) / cell - 0.5))
+    for (let cy = r0; cy <= r1; cy++) {
+      for (let cx = c0; cx <= c1; cx++) {
+        net[cy * cols + cx] = -1
+        dist[cy * cols + cx] = reach
+      }
+    }
+  }
   // 铜里：从电源所在的格子起，按八邻域在同一网络的铜里走
   const lengths = nets.map(() => 0)
   const heap = new Heap()
@@ -939,23 +969,7 @@ function rasterCopper(arena: Arena, copper: readonly Shape[][], nets: readonly {
     if (!Number.isFinite(along[i]!)) along[i] = 0
     lengths[k] = Math.max(lengths[k]!, along[i]!)
   }
-  // 铜外：从铜的边一圈圈往外，取走过来的那一格的
-  const queue: number[] = []
-  for (let i = 0; i < n; i++) if (net[i]! >= 0 && dist[i]! <= 0) queue.push(i)
-  for (let q = 0; q < queue.length; q++) {
-    const i = queue[q]!
-    const x = i % cols
-    const y = (i - x) / cols
-    for (let k = 0; k < 8; k += 2) {
-      const nx = x + DIR_X[k]!
-      const ny = y + DIR_Y[k]!
-      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue
-      const j = ny * cols + nx
-      if (net[j] !== net[i] || dist[j]! <= 0 || Number.isFinite(along[j]!)) continue
-      along[j] = along[i]!
-      queue.push(j)
-    }
-  }
+  smoothAlong(cols, rows, net, dist, along, nets.length)
   for (let i = 0; i < n; i++) {
     if (net[i]! >= 0 && dist[i]! < reach && Number.isFinite(along[i]!)) continue
     net[i] = -1
@@ -963,6 +977,65 @@ function rasterCopper(arena: Arena, copper: readonly Shape[][], nets: readonly {
     along[i] = 0
   }
   return { grid: { x0, y0, cell, cols, rows, net, dist, along }, lengths }
+}
+
+/** 铜外每格的电走到了哪：附近同一网络的铜按远近（高斯）加权平均；只取最近那片铜的话，铜块交界的地方光会起一道缝 */
+function smoothAlong(cols: number, rows: number, net: Int8Array, dist: Float32Array, along: Float32Array, nets: number): void {
+  const rad = Math.ceil(COPPER_REACH_U / COPPER_CELL_U)
+  const raw = Array.from({ length: rad * 2 + 1 }, (_, t) => Math.exp(-(((t - rad) * COPPER_CELL_U) ** 2) / (2 * SPILL_SIGMA_U * SPILL_SIGMA_U)))
+  const total = raw.reduce((a, b) => a + b, 0)
+  const kernel = raw.map((v) => v / total)
+  const boxes = Array.from({ length: nets }, () => ({ x0: cols, y0: rows, x1: -1, y1: -1 }))
+  for (let i = 0; i < cols * rows; i++) {
+    const b = boxes[net[i]!]
+    if (!b || dist[i]! > 0) continue
+    const x = i % cols
+    const y = (i - x) / cols
+    b.x0 = Math.min(b.x0, x)
+    b.y0 = Math.min(b.y0, y)
+    b.x1 = Math.max(b.x1, x)
+    b.y1 = Math.max(b.y1, y)
+  }
+  boxes.forEach((b, k) => {
+    if (b.x1 < 0) return
+    const bx = Math.max(0, b.x0 - rad)
+    const by = Math.max(0, b.y0 - rad)
+    const w = Math.min(cols - 1, b.x1 + rad) - bx + 1
+    const h = Math.min(rows - 1, b.y1 + rad) - by + 1
+    const mass = new Float32Array(w * h)
+    const sum = new Float32Array(w * h)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (by + y) * cols + bx + x
+        if (net[i] !== k || dist[i]! > 0) continue
+        mass[y * w + x] = 1
+        sum[y * w + x] = along[i]!
+      }
+    }
+    const blur = (src: Float32Array, dx: number, dy: number): Float32Array => {
+      const out = new Float32Array(w * h)
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let acc = 0
+          for (let t = -rad; t <= rad; t++) {
+            const sx = x + t * dx
+            const sy = y + t * dy
+            if (sx >= 0 && sy >= 0 && sx < w && sy < h) acc += kernel[t + rad]! * src[sy * w + sx]!
+          }
+          out[y * w + x] = acc
+        }
+      }
+      return out
+    }
+    const m = blur(blur(mass, 1, 0), 0, 1)
+    const a = blur(blur(sum, 1, 0), 0, 1)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (by + y) * cols + bx + x
+        if (net[i] === k && dist[i]! > 0 && m[y * w + x]! > 0) along[i] = a[y * w + x]! / m[y * w + x]!
+      }
+    }
+  })
 }
 
 /** 罩外的布景：一圈排得密密的贴片件、几颗芯片和电感，空处打过孔 */
@@ -1115,18 +1188,29 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     d.parts.push(p)
     return p
   }
-  const l1c = beyond(u1, 0, -1, 1.1, 2)
-  const l1 = extra(makeCoil(mpu, 'L1', '4R7', l1c.x, l1c.y, 4, 2, axisOf(0, 1), true), u1)
-  if (l1) {
-    const c1c = beyond(l1, 0, -1, 0.8, 1)
-    extra(makeChip(mpu, 'cap', '1206', 'C1', '', c1c.x, c1c.y, axisOf(0, 1), true), l1)
+  const coil = (): Part | null => {
+    const at = beyond(u1, 0, -1, 1.1, 2)
+    const l1 = extra(makeCoil(mpu, 'L1', '4R7', at.x, at.y, 4, 2, axisOf(0, 1), true), u1)
+    if (l1) {
+      const c1c = beyond(l1, 0, -1, 0.8, 1)
+      extra(makeChip(mpu, 'cap', '1206', 'C1', '', c1c.x, c1c.y, axisOf(0, 1), true), l1)
+    }
+    return l1
   }
-  const y1c = beyond(u2, -1, 0, 1.2, 1.6)
-  const y1 = extra(makeXtal(mpu, 'Y1', '16.000', y1c.x, y1c.y, axisOf(1, 0), true), u2)
-  if (y1) {
-    const c2c = beyond(y1, -1, 0, 0.7, 0.8)
-    extra(makeChip(mpu, 'cap', '0603', 'C2', '', c2c.x, c2c.y, axisOf(1, 0), true), y1)
+  const xtal = (): Part | null => {
+    const at = beyond(u2, -1, 0, 1.2, 1.6)
+    const y1 = extra(makeXtal(mpu, 'Y1', '16.000', at.x, at.y, axisOf(1, 0), true), u2)
+    if (y1) {
+      const c2c = beyond(y1, -1, 0, 0.7, 0.8)
+      extra(makeChip(mpu, 'cap', '0603', 'C2', '', c2c.x, c2c.y, axisOf(1, 0), true), y1)
+    }
+    return y1
   }
+  // 电感与晶振都伸进左上角，挤不下两样时随机谁先占
+  const xtalFirst = rng.next() < 0.5
+  const early = xtalFirst ? xtal() : null
+  const l1 = coil()
+  const y1 = xtalFirst ? early : xtal()
   const c5c = beyond(u4, 1, 0, 0.9, 1)
   extra(makeChip(mpu, 'cap', '0805', 'C5', '', c5c.x, c5c.y, axisOf(1, 0), true), u4)
   const u5Along = u5Wall === 'S' ? { du: 1, dv: 0 } : { du: 0, dv: -1 }
@@ -1180,6 +1264,7 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   if (Math.hypot(bm.x - cx, bm.y - cy) < cfg.plazaU + bc.padU + 0.6) return null
   if (arenaRoom(arena, bm.x, bm.y) < bc.padU + 1.5 || plateDist(plate, cx, cy) < cfg.plazaU + PLAZA_KEEP_U + 1) return null
   for (const p of d.parts) if (partDist(p, bm.x, bm.y) < bc.padU + 1.2) return null
+  for (const s of d.copper.flat()) if (shapeDist(s, bm.x, bm.y) < bc.padU + NET_GAP_U) return null
   for (const corner of [
     [plate.x0, plate.y0],
     [plate.x1, plate.y0],
@@ -1195,7 +1280,7 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   const lw = cfg.clock.widthU
   const padEdge: Pad = { x: bm.x, y: bm.y, hw: bc.padU + 0.15, hh: bc.padU + 0.15, nx: o.ux * toPlate.du + o.vx * toPlate.dv, ny: o.uy * toPlate.du + o.vy * toPlate.dv, lead: false }
   const entry = toMap(o, westSide ? pc.u - pw / 2 : bu.u, westSide ? bu.v : pc.v + ph / 2)
-  // 连线是一条直线：从盘外 0.35 格起（站在盘上的身体碰不到它），伸进铜板里一点
+  // 连线是一条直线：从盘边起，伸进铜板里一点
   const linkPts: Point[] = [padOut(padEdge, 0.2), { x: entry.x - padEdge.nx * 0.3, y: entry.y - padEdge.ny * 0.3 }]
   const linkTrace: Trace = { pts: linkPts, w: lw, net: plate.net }
   const linkShapes = traceShapes(linkTrace)
@@ -1207,11 +1292,13 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   d.traces.push(linkTrace)
   d.copper.push([...linkShapes, { kind: 'plate', p: plate }])
   d.nets.push({ kind: 'button', sources: [linkPts[0]!], driver: 0 })
-  const button: Button = { x: bm.x, y: bm.y, r: bc.padU, net: plate.net, plate }
+  const button: Button = { x: bm.x, y: bm.y, r: bc.padU, touch: bc.touchU, net: plate.net, plate }
   // MOS 管摆在铜板上连线进来的那一角外侧，离开关的字远一点；两侧都摆不下就不摆
   const qAxis: 0 | 1 = (westSide ? o.ux : o.vx) !== 0 ? 0 : 1
+  const qShape = makeSot(mpu, 'Q1', '702', 0, 0, qAxis, true)
+  const qOff = Math.max(qShape.bw, qShape.bh) + 0.6
   const qSpots = [-1, 1].map((sgn) =>
-    westSide ? toMap(o, pc.u - pw / 2 + 1.1, pc.v + sgn * (ph / 2 + 2)) : toMap(o, pc.u + sgn * (pw / 2 + 2), pc.v + ph / 2 - 1.1),
+    westSide ? toMap(o, pc.u - pw / 2 + 1.1, pc.v + sgn * (ph / 2 + qOff)) : toMap(o, pc.u + sgn * (pw / 2 + qOff), pc.v + ph / 2 - 1.1),
   )
   const q1 =
     qSpots
@@ -1517,7 +1604,7 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   // 基准点与罩外四角的安装孔
   const fiducials = [toMap(o, -o.hu + 2.6, o.hv - 2.6), toMap(o, o.hu - 2.6, -o.hv + 2.6)].filter((p) => !occupied(p.x, p.y, 1.2))
 
-  const { grid: copper, lengths } = rasterCopper(arena, d.copper, d.nets)
+  const { grid: copper, lengths } = rasterCopper(arena, d.copper, d.nets, d.parts, [button])
   const nets: Net[] = d.nets.map((nt, i) => ({ kind: nt.kind, sources: nt.sources, driver: nt.driver, length: lengths[i]! }))
   const clocks: Clock[] = [{ nets: [clockNet], led: { x: led.x, y: led.y }, chip: { x: u3.x, y: u3.y }, phaseMs: rng.next() * (cfg.clock.offMs + cfg.clock.warnMs + cfg.clock.onMs) }]
   return {

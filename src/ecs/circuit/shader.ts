@@ -77,9 +77,10 @@ void main ()
   float front = decode16(na.gb) * uSpan;
   vec2 p = uArea.xy + vec2(tc.x, 1.0 - tc.y) * uArea.zw;
   float travelling = step(front, uSpan * 0.99);
-  float lit = level * smoothstep(front + 0.2, front - 0.2, along);
-  float head = level * travelling * exp(-pow((along - front) / 0.45, 2.0));
-  float cover = smoothstep(0.035, -0.035, d);
+  float lit = level * (1.0 - smoothstep(front - 0.2, front + 0.2, along));
+  float ahead = (along - front) / 0.45;
+  float head = level * travelling * exp(-ahead * ahead);
+  float cover = 1.0 - smoothstep(-0.035, 0.035, d);
   float depth = -d;
   // 一道道亮纹顺着电流从电源往外淌
   float flow = 0.72 + 0.28 * sin(along * 2.4 - uTime * 9.0);
@@ -95,7 +96,8 @@ void main ()
   float a = cover * clamp(lit * 0.95 + head, 0.0, 1.0);
   float spill = exp(-max(d, 0.0) / 0.38) * (1.0 - cover);
   vec3 glow = neon * spill * lit * 0.5 * flow;
-  vec3 spark = hot * head * (cover * 0.9 + spill * 1.1);
+  float halo = exp(-max(d, 0.0) / 0.2) * (1.0 - cover);
+  vec3 spark = hot * head * (cover * 0.9 + halo * 1.1);
   // 预警：一节节青光顺着线往外爬，越临近通电爬得越快、闪得越急
   float w = warn * (1.0 - level);
   float march = smoothstep(0.45, 0.95, sin(along * 3.2 - uTime * (7.0 + 9.0 * w)));

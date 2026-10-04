@@ -620,7 +620,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         for (const b of plan.buttons) {
           const r = Math.hypot(x - b.x, y - b.y)
           button = Math.min(button, r - b.r)
-          touch = Math.min(touch, r - b.r * 0.64, Math.abs(r - b.r * 0.92) - b.r * 0.08)
+          touch = Math.min(touch, r - b.touch, Math.abs(r - b.r * 0.92) - b.r * 0.08)
         }
         let fid = Infinity
         for (const f of plan.fiducials) fid = Math.min(fid, Math.hypot(x - f.x, y - f.y) - 0.5)

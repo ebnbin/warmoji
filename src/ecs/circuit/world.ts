@@ -163,7 +163,7 @@ function step(sim: Sim, s: CircuitState, cfg: CircuitConfig, live: readonly numb
     const ns = s.nets[b.net]!
     const len = plan.nets[b.net]!.length
     if (st.phase === 'ready') {
-      const r = b.r * UNIT
+      const r = b.touch * UNIT
       if (live.some((eid) => (Transform.x[eid]! - b.x * UNIT) ** 2 + (Transform.y[eid]! - b.y * UNIT) ** 2 <= r * r)) {
         st.phase = 'travel'
         st.since = now

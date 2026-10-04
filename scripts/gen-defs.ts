@@ -39,7 +39,7 @@ import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
-import { ALONG_SPAN_U, circuitPlan, NET_SLOTS } from '../src/ecs/circuit/layout.ts'
+import { ALONG_SPAN_U, circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/ecs/circuit/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -362,8 +362,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 电路板：参数说得通——过道与两尖之间走得过标准身体，时钟线的线距比线宽宽；抽一批种子真的生成一遍：每块都生成得出来，
- * 开局站位四周空着，每条带电的网络都编得进电流着色器，电弧的处数在范围里
+ * 电路板：参数说得通——过道与两尖之间走得过标准身体，时钟线的线距比线宽宽，队长和小怪站在开关的圆金上脚碰不到盘外带电的铜（栅格再差一格也碰不到）；
+ * 抽一批种子真的生成一遍：每块都生成得出来，开局站位四周空着，每条带电的网络都编得进电流着色器，电弧的处数在范围里
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'circuit') === (m.circuit !== undefined), `maps.${id} 是电路板当且仅当写了 circuit`)
@@ -387,6 +387,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(arc.restMs >= 0 && arc.chargeMs > 0 && arc.arcMs > 0 && arc.teamDamage > 0 && arc.enemyDamage > 0, `${at}.arc 的节拍与伤害须为正`)
   need(button.padU > 0 && button.plateU[0] > button.padU && range(button.plateU, false) && button.reachU[0] > 0 && range(button.reachU, false), `${at}.button 的开关、铜板与连线须为正，铜板比开关大`)
   need(button.linkU > 0 && button.holdMs > 0 && button.rearmMs >= 0, `${at}.button 的电走多快、通多久须为正`)
+  const feet = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0)) * shock.footFrac
+  need(button.touchU > 0 && button.padU - button.touchU > feet + COPPER_CELL_U, `${at}.button.touchU 须为正，离盘边比队长和小怪的脚宽出一格栅格：站在开关上碰不到带电的铜`)
   for (let s = 0; s < 16; s++) {
     const plan = circuitPlan(c, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
