@@ -13,7 +13,7 @@ const DEG = Math.PI / 180
 export const TERRAIN_PAD_U = 6
 /** 能走的地面按这么细的格子算距离场，格 */
 const BASIN_CELL_U = 0.25
-/** 身子离墙身、林缘至少这么远（格）：不贴进墙里、杜鹃丛里 */
+/** 身子离墙身、林缘至少这么远（格）：不贴进墙里、林子里 */
 const WALL_CLEAR_U = 0.12
 const EDGE_CLEAR_U = 0.15
 /** 几条林缘交汇的内角按这么大（格）磨圆 */
@@ -40,6 +40,14 @@ export const CREST_U = 0.35
 export const PATH_HALF_U = 0.55
 /** 寺墙两头伸进林子这么远（格）：墙头藏在树下 */
 const WALL_INTO_FOREST_U = 2.5
+/** 林缘按这么细的格子（格）找出那条线上的一处处 */
+const RIM_STEP_U = 0.5
+/** 画出来的树冠的边大约在半径的这么多倍处：外圈的花团鼓出一圈参差 */
+const CROWN_EDGE = 0.9
+/** 林缘上每一处都有树冠的边探出林缘至少这么远（格），盖过能走的地面的边 */
+const RIM_MARGIN_U = 0.3
+/** 林缘上的樱花树心至少隔开两半径之和的这么多倍：挨得很紧，树冠叠成一道 */
+const RIM_OVERLAP = 0.35
 /** 生成不出合格的地图就换一组随机数重来，最多这么多次 */
 const TRIES = 120
 /** 槛下比槛顶低过这么多（米）的格子，水一流进去就落下去了 */
@@ -295,13 +303,12 @@ export interface Bridge {
   readonly level: number
 }
 
-/** 一棵樱花或一丛杜鹃：树冠的圆心、半径（格）与高（米）；inside 是种在空地上的樱花，树干挡人 */
+/** 一棵樱花：树冠的圆心、半径（格）与高（米）；inside 是种在空地上的那几棵，树冠往里 overhangU 格以内挡人 */
 export interface Tree {
   readonly x: number
   readonly y: number
   readonly r: number
   readonly h: number
-  readonly kind: 'cherry' | 'azalea'
   readonly inside: boolean
 }
 
@@ -319,7 +326,7 @@ export interface Terrain extends Heights {
 
 /**
  * 按种子生成的樱庭，格与米：地图 w × h 格；本地坐标系与边（寺墙、樱林）、墙身的两段与院门；石组到石槛之间的主溪、石组以上与石槛以下伸出地图的两段；
- * 上游的石组、下游的石槛与竹栅、木桥；从院门到桥头的路与对岸通进林子的小路；樱花与杜鹃；地形、能走的地面（像素）、开局时队伍站的地方；画画用的种子
+ * 上游的石组、下游的石槛与竹栅、木桥；从院门到桥头的路；樱花；地形、能走的地面（像素）、开局时队伍站的地方；画画用的种子
  */
 export interface SakuraPlan {
   readonly w: number
@@ -336,7 +343,7 @@ export interface SakuraPlan {
   readonly weir: Weir
   readonly fence: Fence
   readonly bridge: Bridge
-  readonly paths: readonly (readonly Point[])[]
+  readonly path: readonly Point[]
   readonly trees: readonly Tree[]
   readonly terrain: Terrain
   readonly basin: Basin
@@ -429,6 +436,20 @@ class Crowd {
     let list = this.cells.get(k)
     if (!list) this.cells.set(k, (list = []))
     list.push(t)
+  }
+
+  /** (x, y) 有没有被哪棵树的树冠盖住：离树心不到半径的 cover 倍 */
+  covered(x: number, y: number, cover: number): boolean {
+    const cx = Math.floor(x / this.span)
+    const cy = Math.floor(y / this.span)
+    for (let j = -2; j <= 2; j++) {
+      for (let i = -2; i <= 2; i++) {
+        const list = this.cells.get((cy + j + 512) * 4096 + cx + i + 512)
+        if (!list) continue
+        for (const t of list) if (len(t.x - x, t.y - y) < t.r * cover) return true
+      }
+    }
+    return false
   }
 
   /** 半径 r 的树冠放在 (x, y) 会不会和已有的挤得太紧：圆心距小过两半径之和的 overlap 倍 */
@@ -798,11 +819,8 @@ function pathOf(rng: Rng, from: Point, tf: Point, to: Point, tt: Point): Point[]
   })
 }
 
-/**
- * 院门与路：门开在寺墙挨着空地的那段中间；门里的路弯到这一岸的桥头，对岸的桥头再有一条小路通进林子（伸进林缘一截）。
- * 路不下水、不进林子（小路的尽头除外）；布置不下就是 null
- */
-function gateOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges, r: Reach, bridge: Bridge): { gate: Gate; paths: Point[][] } | null {
+/** 院门与路：门开在寺墙挨着空地的那段中间；门里的路弯到这一岸的桥头，不下水、不进林子；布置不下就是 null */
+function gateOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges, r: Reach, bridge: Bridge): { gate: Gate; path: Point[] } | null {
   const S = e.size
   const th = cfg.wall.thickU / 2
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
@@ -827,39 +845,11 @@ function gateOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges, r: Reach, bridg
     if (skip) return true
     return waterEdge(r, q.x, q.y, tmp) > 0.5 && forestDepth(e, L.a, L.b) < -0.4 && wallSide(e, L.a, L.b) > th + 0.3
   }
-  let main: Point[] | null = null
-  for (let k = 0; k < 4 && !main; k++) {
+  for (let k = 0; k < 4; k++) {
     const pts = pathOf(rng, from, nrm, end(near), { x: -bridge.ax * near, y: -bridge.ay * near })
-    if (pts.every((q, i) => dry(q, i < 3 || i > pts.length - 4))) main = pts
+    if (pts.every((q, i) => dry(q, i < 3 || i > pts.length - 4))) return { gate, path: pts }
   }
-  if (!main) return null
-  // 对岸：顺着桥往外，在前方 ±50 度里找最近的林缘，小路伸进林子一截
-  const far = end(-near)
-  const out = { x: -bridge.ax * near, y: -bridge.ay * near }
-  let best: { at: Point; into: Point; d: number } | null = null
-  for (let deg = -50; deg <= 50; deg += 10) {
-    const c = Math.cos(deg * DEG)
-    const s = Math.sin(deg * DEG)
-    const dx = out.x * c - out.y * s
-    const dy = out.x * s + out.y * c
-    for (let d = 1.5; d < 26; d += 0.25) {
-      const q = { x: far.x + dx * d, y: far.y + dy * d }
-      if (waterEdge(r, q.x, q.y, tmp) < 0.8) break
-      toLocal(f, q.x, q.y, L)
-      if (wallSide(e, L.a, L.b) < th + 1.5) break
-      if (forestDepth(e, L.a, L.b) >= 0) {
-        if (!best || d < best.d) best = { at: q, into: { x: dx, y: dy }, d }
-        break
-      }
-    }
-  }
-  const paths = [main]
-  if (best) {
-    const tip = { x: best.at.x + best.into.x * 1.4, y: best.at.y + best.into.y * 1.4 }
-    const trail = pathOf(rng, far, out, tip, best.into)
-    if (trail.every((q) => waterEdge(r, q.x, q.y, tmp) > 0.5)) paths.push(trail)
-  }
-  return { gate, paths }
+  return null
 }
 
 /** 定好形状的一张图：边、墙、溪与三样水上的东西、桥、门与路、树与开局站位，还没算地形 */
@@ -875,18 +865,60 @@ interface Sketch {
   readonly weir: Weir
   readonly fence: Fence
   readonly bridge: Bridge
-  readonly paths: Point[][]
+  readonly path: Point[]
   readonly trees: Tree[]
   readonly start: Point
 }
 
+/** 林缘上的一处：位置与往林子里的单位法线 */
+interface Rim {
+  readonly x: number
+  readonly y: number
+  readonly nx: number
+  readonly ny: number
+}
+
+/** 林缘（进林子的深度为 0 的那条线）上的一处处：在 [lo, hi]² 上按 RIM_STEP_U 的格子找过零点，大约每 RIM_STEP_U 格一处 */
+function rimOf(f: Frame, e: Edges, lo: number, hi: number): Rim[] {
+  const n = Math.ceil((hi - lo) / RIM_STEP_U) + 1
+  const d = new Float64Array(n * n)
+  const L: Local = { a: 0, b: 0 }
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      toLocal(f, lo + i * RIM_STEP_U, lo + j * RIM_STEP_U, L)
+      d[j * n + i] = forestDepth(e, L.a, L.b)
+    }
+  }
+  const out: Rim[] = []
+  const add = (x: number, y: number): void => {
+    toLocal(f, x, y, L)
+    const h = 0.05
+    const g = dirToMap(f, forestDepth(e, L.a + h, L.b) - forestDepth(e, L.a - h, L.b), forestDepth(e, L.a, L.b + h) - forestDepth(e, L.a, L.b - h))
+    const gl = len(g.x, g.y) || 1
+    out.push({ x, y, nx: g.x / gl, ny: g.y / gl })
+  }
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const v = d[j * n + i]!
+      if (i + 1 < n) {
+        const w = d[j * n + i + 1]!
+        if (v < 0 !== w < 0) add(lo + (i + v / (v - w)) * RIM_STEP_U, lo + j * RIM_STEP_U)
+      }
+      if (j + 1 < n) {
+        const w = d[(j + 1) * n + i]!
+        if (v < 0 !== w < 0) add(lo + i * RIM_STEP_U, lo + (j + v / (v - w)) * RIM_STEP_U)
+      }
+    }
+  }
+  return out
+}
+
 /**
- * 樱花与杜鹃：空地上几棵樱花，离溪岸、桥、路、院门、寺墙、林缘与彼此都留开地方；三面林子里密密地种满樱花，树冠最多探进空地 overhangU；
- * 林缘一圈杜鹃丛；寺墙外（寺里）隔几格一棵樱花，树冠探过墙头。树都不种在溪里，让开小路伸进林子那截、石组与竹栅
+ * 樱花：空地上几棵，离溪岸、桥、路、院门、寺墙、林缘与彼此都留开地方；林缘上一棵挨一棵，画出来的树冠连成一道，探出林缘 RIM_MARGIN_U 到 overhangU；
+ * 林缘后面的林子里密密地种满；寺墙外（寺里）隔几格一棵，树冠探过墙头。树都不种在溪里，让开石组与竹栅
  */
 function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'start'>): Tree[] {
   const tc = cfg.trees
-  const fo = cfg.forest
   const f = s.frame
   const e = s.edges
   const S = e.size
@@ -902,12 +934,16 @@ function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'star
   }
   const reaches = [s.stream, s.upstream, s.downstream]
   const wet = (x: number, y: number): number => Math.min(...reaches.map((r) => waterEdge(r, x, y, tmp)))
-  const trail = s.paths[1]
   const clear = (x: number, y: number, r: number): boolean => {
-    if (trail && polylineDist(trail, x, y) < r * 0.55 + 0.6) return false
     for (const st of s.rocks.stones) if (len(st.x - x, st.y - y) < st.r + r * 0.4 + 0.3) return false
     const fl = weirLocal(s.weir, x, y)
     return !(fl.side < s.fence.span + 0.4 && Math.abs(fl.along - CREST_U / 2) < r * 0.5 + 0.4)
+  }
+  /** 林子里能种一棵半径 r 的樱花：画出来的树冠探进空地不过 overhangU，在寺墙空地那边，不下水，让开石组与竹栅，不和已有的挤过 overlap */
+  const fits = (x: number, y: number, r: number, overlap: number): boolean => {
+    toLocal(f, x, y, L)
+    if (forestDepth(e, L.a, L.b) < r * CROWN_EDGE - tc.overhangU || wallSide(e, L.a, L.b) < th + 0.4) return false
+    return wet(x, y) >= r * 0.35 && clear(x, y, r) && !crowd.crowded(x, y, r, overlap)
   }
   // 空地上的樱花
   const want = Math.round(between(rng, tc.inside))
@@ -920,37 +956,39 @@ function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'star
     const p = toMap(f, a, b)
     if (waterEdge(s.stream, p.x, p.y, tmp) < cfg.flow.bankU + r - tc.overhangU + 0.4) continue
     if (bridgeDist(s.bridge, p.x, p.y) < r + 0.6) continue
-    if (s.paths.some((l) => polylineDist(l, p.x, p.y) < PATH_HALF_U + r - tc.overhangU + 0.2)) continue
+    if (polylineDist(s.path, p.x, p.y) < PATH_HALF_U + r - tc.overhangU + 0.2) continue
     if (len(s.gate.x - p.x, s.gate.y - p.y) < s.gate.half + r + 1.2) continue
     if (crowd.crowded(p.x, p.y, r, 1.05)) continue
-    add({ x: p.x, y: p.y, r, h: height(r), kind: 'cherry', inside: true })
+    add({ x: p.x, y: p.y, r, h: height(r), inside: true })
     made++
   }
-  // 林子里的樱花：密密的，树冠挨着树冠
+  // 林缘上的樱花：林缘上一处往空地那边 RIM_MARGIN_U 还没被树冠盖住，就顺着法线往林子里种一棵，树冠的边盖过那里；种不下就换小一点的
   const lo = -TERRAIN_PAD_U
   const hi = S + TERRAIN_PAD_U
+  const rims = rimOf(f, e, lo, hi)
+  for (let i = rims.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1))
+    ;[rims[i], rims[j]] = [rims[j]!, rims[i]!]
+  }
+  for (const p of rims) {
+    if (crowd.covered(p.x - p.nx * RIM_MARGIN_U, p.y - p.ny * RIM_MARGIN_U, CROWN_EDGE)) continue
+    for (const k of [1, 0.8, 0.62]) {
+      const r = between(rng, tc.crownU) * k
+      const back = r * CROWN_EDGE - RIM_MARGIN_U - (tc.overhangU - RIM_MARGIN_U) * rng.next()
+      const x = p.x + p.nx * back
+      const y = p.y + p.ny * back
+      if (!fits(x, y, r, RIM_OVERLAP)) continue
+      add({ x, y, r, h: height(r), inside: false })
+      break
+    }
+  }
+  // 林缘后面的林子：密密的，树冠挨着树冠
   const area = (hi - lo) * (hi - lo)
   for (let k = 0; k < area * 1.2; k++) {
     const x = lo + rng.next() * (hi - lo)
     const y = lo + rng.next() * (hi - lo)
     const r = between(rng, tc.crownU)
-    toLocal(f, x, y, L)
-    if (forestDepth(e, L.a, L.b) < r - tc.overhangU) continue
-    if (wallSide(e, L.a, L.b) < th + 0.4) continue
-    if (wet(x, y) < r * 0.35 || !clear(x, y, r) || crowd.crowded(x, y, r, 0.68)) continue
-    add({ x, y, r, h: height(r), kind: 'cherry', inside: false })
-  }
-  // 林缘一圈杜鹃丛
-  for (let k = 0; k < area * 1.2; k++) {
-    const x = lo + rng.next() * (hi - lo)
-    const y = lo + rng.next() * (hi - lo)
-    toLocal(f, x, y, L)
-    const depth = forestDepth(e, L.a, L.b)
-    if (depth < -tc.overhangU * 0.4 || depth > 1.6) continue
-    const r = between(rng, fo.azaleaU)
-    if (depth < r - tc.overhangU * 1.2 || wallSide(e, L.a, L.b) < th + 0.4) continue
-    if (wet(x, y) < r * 0.6 || !clear(x, y, r) || crowd.crowded(x, y, r, 0.62)) continue
-    add({ x, y, r, h: 0.5 + r * 0.9, kind: 'azalea', inside: false })
+    if (fits(x, y, r, 0.64)) add({ x, y, r, h: height(r), inside: false })
   }
   // 寺墙外的樱花：隔几格一棵，树冠探过墙头
   for (let b = e.wall.from + rng.next() * tc.templeGapU; b < e.wall.to; b += tc.templeGapU * (0.8 + rng.next() * 0.4)) {
@@ -958,7 +996,7 @@ function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'star
     const a = wallA(e, b) - th - r * (0.3 + rng.next() * 0.9)
     const p = toMap(f, a, b)
     if (crowd.crowded(p.x, p.y, r, 0.7)) continue
-    add({ x: p.x, y: p.y, r, h: height(r), kind: 'cherry', inside: false })
+    add({ x: p.x, y: p.y, r, h: height(r), inside: false })
   }
   return trees
 }
@@ -986,7 +1024,7 @@ function startOf(cfg: SakuraConfig, s: Omit<Sketch, 'start'>): Point | null {
   return best
 }
 
-/** 能走的地面：寺墙里（离墙身留一点）、林缘外，扣掉空地上樱花的树干一圈（树冠下 overhangU 能走进去）；溪面能走，石组与竹栅那两条线外不能。只留与开局站位连通的一块 */
+/** 能走的地面：寺墙里（离墙身留一点）、林缘外，扣掉空地上樱花的树冠（树冠下 overhangU 能走进去）；溪面能走，石组与竹栅那两条线外不能。只留与开局站位连通的一块 */
 function basinOf(cfg: SakuraConfig, k: Sketch, x0: number, y0: number, cols: number, rows: number, cellU: number): Basin {
   const th = cfg.wall.thickU / 2
   const L: Local = { a: 0, b: 0 }

@@ -105,24 +105,12 @@ export function textureSize(sc: PaintScene, layer: PaintLayer): { w: number; h: 
   return { w: Math.round(a.w * PPU[layer]), h: Math.round(a.h * PPU[layer]) }
 }
 
-/** 一团花或一个小丘：圆心、半径（格）、顶高（米），属于第几棵树 */
+/** 一团花：圆心、半径（格）、顶高（米），属于第几棵树 */
 interface Puff {
   readonly x: number
   readonly y: number
   readonly r: number
   readonly top: number
-  readonly tree: number
-}
-
-/** 一截枝：从 a 到 b、半粗（格），两头的高（米），属于第几棵树 */
-interface Limb {
-  readonly ax: number
-  readonly ay: number
-  readonly bx: number
-  readonly by: number
-  readonly w: number
-  readonly za: number
-  readonly zb: number
   readonly tree: number
 }
 
@@ -167,9 +155,10 @@ function segDist(ax: number, ay: number, bx: number, by: number, x: number, y: n
   return SEG
 }
 
-/** 花团的影子按顶高的这么多倍挪开，最多挪这么远（格）：树影落在树冠旁边，不拖到空地另一头 */
+/** 花团的影子按顶高的这么多倍挪开，最多挪这么远（格）：树影从树冠背光的一边露出一弯，连着树冠；树影最深遮掉多少阳光 */
 const TREE_SHADOW = 0.42
-const TREE_SHADOW_U = 2.6
+const TREE_SHADOW_U = 1.3
+const TREE_SHADE = 0.4
 
 /** 花团的影子落在哪：顺着背光的方向挪开 */
 function puffShadow(sh: { x: number; y: number }, p: Puff): { x: number; y: number } {
@@ -184,87 +173,41 @@ function shadowPerM(cfg: SakuraConfig): { x: number; y: number } {
 }
 
 /**
- * 一棵樱花从上往下看：几根主枝从树干往四周平着伸出去，半路分出侧枝；花一团团开满枝头，外圈的花团排出一圈参差的边，
- * 团与团之间偶尔露出深色的枝；按树的序号定，每次画都一样
+ * 一棵樱花从上往下看：花开满了，树冠是一朵云——外圈一圈花团挨着排出鼓鼓的边，有的方向伸得远、有的缩回来一点，
+ * 里圈与树顶的花团一层比一层高。按树的序号定，每次画都一样
  */
-function crownOf(t: Tree, k: number, mpu: number, puffs: Puff[], limbs: Limb[]): void {
+function crownOf(t: Tree, k: number, mpu: number, puffs: Puff[]): void {
   const R = t.r
   const H = t.h
-  const m = 5 + Math.floor(hash1(k, 1) * 3)
   const base = hash1(k, 2) * Math.PI * 2
-  const first = limbs.length
-  for (let i = 0; i < m; i++) {
-    let ang = base + ((i + (hash1(k, 10 + i) - 0.5) * 0.55) * Math.PI * 2) / m
-    const L = R * (0.72 + 0.2 * hash1(k, 20 + i))
-    const bend = (hash1(k, 30 + i) - 0.5) * 0.6
-    let px = t.x + Math.cos(ang) * R * 0.05
-    let py = t.y + Math.sin(ang) * R * 0.05
-    let pz = H * 0.42
-    for (let j = 0; j < 3; j++) {
-      ang += bend * 0.45
-      const seg = L / 3
-      const nx = px + Math.cos(ang) * seg
-      const ny = py + Math.sin(ang) * seg
-      const nz = pz + H * 0.12
-      limbs.push({ ax: px, ay: py, bx: nx, by: ny, w: R * (0.08 - j * 0.02), za: pz, zb: nz, tree: k })
-      if (j === 1 && hash1(k, 40 + i) > 0.3) {
-        const fa = ang + (hash1(k, 50 + i) > 0.5 ? 1 : -1) * (0.5 + 0.35 * hash1(k, 60 + i))
-        const fl = L * (0.32 + 0.2 * hash1(k, 70 + i))
-        limbs.push({ ax: nx, ay: ny, bx: nx + Math.cos(fa) * fl, by: ny + Math.sin(fa) * fl, w: R * 0.03, za: nz, zb: nz + H * 0.08, tree: k })
-      }
-      px = nx
-      py = ny
-      pz = nz
-    }
-  }
-  /** 一团花：离树心不出树冠，顶高按枝的高再加上花团自己的厚 */
+  /** 一团花：离树心不出树冠，顶高再加上花团自己的厚 */
   const add = (cx: number, cy: number, r0: number, z: number): void => {
     const dist = len(cx - t.x, cy - t.y)
     const r = Math.min(r0, R - dist)
     if (r < R * 0.08) return
     puffs.push({ x: cx, y: cy, r, top: z + r * mpu * 0.9, tree: k })
   }
-  // 顺着枝开满：花一直开到枝梢，越往外越贴着枝，树冠的边就顺着主枝伸出一瓣瓣
-  for (let li = first; li < limbs.length; li++) {
-    const lb = limbs[li]!
-    const l = len(lb.bx - lb.ax, lb.by - lb.ay)
-    const nx = -(lb.by - lb.ay) / l
-    const ny = (lb.bx - lb.ax) / l
-    const n = Math.max(1, Math.round(l / (R * 0.13)))
-    for (let q = 0; q < n; q++) {
-      const u = clamp01((q + 0.5 + (hash1(k * 7 + li, q) - 0.5) * 0.6) / n)
-      const ex = lb.ax + (lb.bx - lb.ax) * u
-      const ey = lb.ay + (lb.by - lb.ay) * u
-      const out = len(ex - t.x, ey - t.y) / R
-      const j = (hash1(k * 3 + li, q + 9) - 0.5) * R * 0.34 * (1 - 0.5 * out)
-      add(ex + nx * j, ey + ny * j, R * (0.17 + 0.09 * hash1(k * 5 + li, q + 3)) * (1.1 - 0.25 * out), lb.za + (lb.zb - lb.za) * u)
-    }
+  // 外圈：一圈花团挨着排出鼓鼓的边，伸出去多远按方位缓缓起伏
+  const n = 12 + Math.floor(hash1(k, 4) * 3)
+  const p2 = hash1(k, 5) * Math.PI * 2
+  const p3 = hash1(k, 6) * Math.PI * 2
+  for (let q = 0; q < n; q++) {
+    const a = base + ((q + 0.5 + (hash1(k, 210 + q) - 0.5) * 0.4) / n) * Math.PI * 2
+    const d = R * (0.64 + 0.07 * hash1(k, 220 + q)) * (1 + 0.1 * Math.sin(2 * a + p2) + 0.07 * Math.sin(3 * a + p3))
+    add(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, R * (0.3 + 0.06 * hash1(k, 230 + q)), H * (0.62 + 0.08 * hash1(k, 240 + q)))
   }
-  // 树心一圈也挤满花，只在外圈一瓣瓣之间留出缝，露出枝和地
+  // 里圈：高一层
   const ring = 7 + Math.floor(hash1(k, 3) * 3)
   for (let q = 0; q < ring; q++) {
     const a = base + ((q + 0.5) / ring) * Math.PI * 2 + (hash1(k, 110 + q) - 0.5) * 0.4
-    const d = R * (0.3 + 0.18 * hash1(k, 120 + q))
-    add(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, R * (0.22 + 0.06 * hash1(k, 130 + q)), H * (0.76 + 0.1 * hash1(k, 140 + q)))
+    const d = R * (0.32 + 0.1 * hash1(k, 120 + q))
+    add(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, R * (0.28 + 0.06 * hash1(k, 130 + q)), H * (0.74 + 0.08 * hash1(k, 140 + q)))
   }
   // 树顶：靠近树心的几团最高
   for (let q = 0; q < 4; q++) {
     const a = hash1(k, 80 + q) * Math.PI * 2
-    const d = R * (0.1 + 0.25 * hash1(k, 90 + q))
-    add(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, R * (0.26 + 0.08 * hash1(k, 95 + q)), H * (0.86 + 0.1 * hash1(k, 99 + q)))
-  }
-}
-
-/** 一丛杜鹃从上往下看：修剪成一个圆鼓鼓的丘，边上几个小丘鼓出来；按序号定 */
-function azaleaOf(t: Tree, k: number, puffs: Puff[]): void {
-  const R = t.r
-  puffs.push({ x: t.x, y: t.y, r: R * 0.74, top: t.h, tree: k })
-  const m = 5 + Math.floor(hash1(k, 1) * 3)
-  const base = hash1(k, 2) * Math.PI * 2
-  for (let i = 0; i < m; i++) {
-    const a = base + ((i + (hash1(k, 10 + i) - 0.5) * 0.5) * Math.PI * 2) / m
-    const d = R * (0.48 + 0.12 * hash1(k, 20 + i))
-    puffs.push({ x: t.x + Math.cos(a) * d, y: t.y + Math.sin(a) * d, r: R * (0.4 + 0.1 * hash1(k, 30 + i)), top: t.h * (0.72 + 0.12 * hash1(k, 40 + i)), tree: k })
+    const d = R * (0.04 + 0.14 * hash1(k, 90 + q))
+    add(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, R * (0.28 + 0.08 * hash1(k, 95 + q)), H * (0.86 + 0.08 * hash1(k, 99 + q)))
   }
 }
 
@@ -313,10 +256,8 @@ function sampleTerrain(sc: PaintScene, a: Float32Array, x: number, y: number): n
 /** 画之前先算一次的东西 */
 export interface Prepared {
   readonly puffs: readonly Puff[]
-  readonly limbs: readonly Limb[]
   readonly tint: readonly number[]
   readonly crowns: Buckets
-  readonly branches: Buckets
   readonly dapple: Buckets
   readonly wallShade: Field
   readonly pathSegs: readonly { readonly ax: number; readonly ay: number; readonly bx: number; readonly by: number }[]
@@ -342,17 +283,6 @@ function roofHeight(sc: PaintScene, x: number, y: number): number {
   return top
 }
 
-/** 几种杜鹃的花色：玫红、桃红、珊瑚粉、淡粉、白 */
-const AZALEAS = [
-  [214, 62, 132],
-  [232, 104, 156],
-  [236, 128, 140],
-  [244, 182, 206],
-  [248, 238, 240],
-] as const
-/** 各种杜鹃花色出现的权重 */
-const AZALEA_ODDS = [0.34, 0.3, 0.14, 0.14, 0.08] as const
-
 export function prepare(sc: PaintScene): Prepared {
   const area = groundArea(sc)
   const { plan, cfg } = sc
@@ -360,22 +290,11 @@ export function prepare(sc: PaintScene): Prepared {
   const t = plan.terrain
   const th = cfg.wall.thickU / 2
   const puffs: Puff[] = []
-  const limbs: Limb[] = []
-  plan.trees.forEach((tr, k) => (tr.kind === 'cherry' ? crownOf(tr, k, mpu, puffs, limbs) : azaleaOf(tr, k, puffs)))
-  // 樱花按序号定浓淡（两成是浓粉的八重樱）；杜鹃按权重挑一种花色
-  const tint = plan.trees.map((tr, k) => {
-    if (tr.kind === 'cherry') return hash1(k, 7) < 0.22 ? 0.7 + 0.3 * hash1(k, 8) : 0.15 * hash1(k, 8)
-    let u = hash1(k, 9)
-    for (let i = 0; i < AZALEA_ODDS.length; i++) {
-      u -= AZALEA_ODDS[i]!
-      if (u < 0) return i
-    }
-    return 0
-  })
+  plan.trees.forEach((tr, k) => crownOf(tr, k, mpu, puffs))
+  // 按序号定浓淡：两成是浓粉的八重樱，其余是近白的染井吉野
+  const tint = plan.trees.map((_, k) => (hash1(k, 7) < 0.22 ? 0.7 + 0.3 * hash1(k, 8) : 0.15 * hash1(k, 8)))
   const crowns = buckets(area)
   puffs.forEach((p, i) => file(crowns, i, p.x - p.r * 1.1, p.y - p.r * 1.1, p.x + p.r * 1.1, p.y + p.r * 1.1))
-  const branches = buckets(area)
-  limbs.forEach((l, i) => file(branches, i, Math.min(l.ax, l.bx) - l.w, Math.min(l.ay, l.by) - l.w, Math.max(l.ax, l.bx) + l.w, Math.max(l.ay, l.by) + l.w))
   // 花团的影子：按顶高顺着背光的方向挪开，斑斑驳驳地落在地上
   const sh = shadowPerM(cfg)
   const dapple = buckets(area)
@@ -404,38 +323,37 @@ export function prepare(sc: PaintScene): Prepared {
     }
   }
   const pathSegs: { ax: number; ay: number; bx: number; by: number }[] = []
-  for (const line of plan.paths) for (let i = 0; i + 1 < line.length; i++) pathSegs.push({ ax: line[i]!.x, ay: line[i]!.y, bx: line[i + 1]!.x, by: line[i + 1]!.y })
+  const line = plan.path
+  for (let i = 0; i + 1 < line.length; i++) pathSegs.push({ ax: line[i]!.x, ay: line[i]!.y, bx: line[i + 1]!.x, by: line[i + 1]!.y })
   const pathBuckets = buckets(area)
   pathSegs.forEach((s, i) => file(pathBuckets, i, Math.min(s.ax, s.bx) - 1, Math.min(s.ay, s.by) - 1, Math.max(s.ax, s.bx) + 1, Math.max(s.ay, s.by) + 1))
-  // 落花有多厚：林子里与林缘铺满，樱花树下最厚，墙根、水边积着一溜，空地上被风吹成一片一片，别处也零零星星
+  // 落花有多厚：林缘铺满、往林子里渐渐稀了，樱花树冠底下最厚，墙根、水边积着一溜，空地上被风吹成一片一片，别处也零零星星
   const pc = Math.ceil(area.w / PETAL_FIELD_U) + 1
   const pr = Math.ceil(area.h / PETAL_FIELD_U) + 1
   const pv = new Float32Array(pc * pr)
-  const cherries = plan.trees.filter((tr) => tr.kind === 'cherry')
   for (let j = 0; j < pr; j++) {
     for (let i = 0; i < pc; i++) {
       const x = area.x0 + i * PETAL_FIELD_U
       const y = area.y0 + j * PETAL_FIELD_U
       let d = 0.3 + 0.7 * smooth(0.24, 0.62, fbm(x / 6.5, y / 6.5, plan.seed + 31, 3))
       d = Math.max(d, 0.55 * smooth(0.48, 0.76, fbm(x / 2.4 + 9, y / 2.4, plan.seed + 33, 2)))
-      for (const tr of cherries) {
+      for (const tr of plan.trees) {
         const q = len(tr.x - x, tr.y - y) / tr.r
-        if (q < 2.4) d = Math.max(d, smooth(2.4, 0.7, q))
+        if (q < 1.5) d = Math.max(d, smooth(1.5, 0.8, q))
       }
-      d = Math.max(d, smooth(-2.2, 0.6, sampleTerrain(sc, t.forest, x, y)))
+      const fo = sampleTerrain(sc, t.forest, x, y)
+      d = Math.max(d, smooth(-2.2, 0.6, fo))
       const w = sampleTerrain(sc, t.wall, x, y)
       if (w > 0) d = Math.max(d, 0.75 * smooth(th + 1.6, th + 0.3, w))
       const e = sampleTerrain(sc, t.edge, x, y)
       if (e > 0) d = Math.max(d, 0.6 * smooth(1.6, 0.15, e))
-      pv[j * pc + i] = Math.min(1, d)
+      pv[j * pc + i] = Math.min(1, d) * (1 - 0.6 * smooth(0.6, 2.6, fo))
     }
   }
   return {
     puffs,
-    limbs,
     tint,
     crowns,
-    branches,
     dapple,
     wallShade: { x0: area.x0, y0: area.y0, cell: FIELD_U, cols, rows, v },
     pathSegs,
@@ -455,7 +373,7 @@ function pathAt(prep: Prepared, x: number, y: number): number {
   return best
 }
 
-/** 花团投在地上的斑驳影子有多深：在第几团的影子里，取最深的 */
+/** 樱花投在地上的树影有多深：一团团花的影子连成一片，边上软，里头透一点光；取最深的 */
 function dappleAt(sc: PaintScene, prep: Prepared, x: number, y: number): number {
   const sh = shadowPerM(sc.cfg)
   let s = 0
@@ -463,7 +381,7 @@ function dappleAt(sc: PaintScene, prep: Prepared, x: number, y: number): number 
     const p = prep.puffs[i]!
     const c = puffShadow(sh, p)
     const d = len(x - c.x, y - c.y)
-    if (d < p.r + 0.12) s = Math.max(s, smooth(p.r + 0.12, p.r * 0.7, d) * 0.22 * (0.55 + 0.45 * valueNoise(x * 2.6, y * 2.6, i)))
+    if (d < p.r + 0.1) s = Math.max(s, smooth(p.r + 0.1, p.r * 0.72, d) * TREE_SHADE * (0.86 + 0.14 * valueNoise(x * 2.6, y * 2.6, i)))
   }
   return s
 }
@@ -539,10 +457,10 @@ function petalAt(x: number, y: number, scale: number, seed: number, dens: number
 const PC = [0, 0, 0]
 
 /**
- * 地面：空地上是浅浅的草，大半被落花盖着——树下、林缘、墙根与水边积得最厚，空地上被风吹成一片一片的粉，草只从花瓣之间露出来；
- * 林子里的地上铺满落花，越往里越暗。寺墙外是寺里耙得整整齐齐的白砂，也落着花。碎石小路从院门弯到桥头，对岸一条小路通进林子。
+ * 地面：空地上是浅浅的草，大半被落花盖着——樱花树冠底下、林缘、墙根与水边积得最厚，空地上被风吹成一片一片的粉，草只从花瓣之间露出来；
+ * 过了林缘就是林子里的阴处，落花往里渐渐稀了，越往里越暗。寺墙外是寺里耙得整整齐齐的白砂，也落着花。碎石小路从院门弯到桥头。
  * 溪岸是草坡，水边一溜湿土，溪底是细沙与小卵石；下游的石槛顶是一排切石，伸到两岸（上游的石组顶出水面，画在树冠那层）。
- * 按地形打光：岸坡朝太阳的亮、背阴的暗；寺墙、院门、桥与竹栅按高度投下影子，樱花与杜鹃投下斑驳的影子。只画 rect 那一块
+ * 按地形打光：岸坡朝太阳的亮、背阴的暗；寺墙、院门、桥与竹栅按高度投下影子，樱花投下一团团的树影。只画 rect 那一块
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const area = groundArea(sc)
@@ -587,11 +505,11 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       r += (gray - r) * 0.22
       g += (gray - g) * 0.22
       b += (gray - b) * 0.22
-      // 林子里：落花底下是深色的土
+      // 林子里：落花底下是深色的土，带一点紫
       const woods = smooth(-0.2, 0.8, forest)
-      r += (98 * fine - r) * woods
+      r += (104 * fine - r) * woods
       g += (84 * fine - g) * woods
-      b += (70 * fine - b) * woods
+      b += (80 * fine - b) * woods
       // 寺里：耙出顺着墙的细纹的白砂
       if (temple > 0) {
         const rake = 0.94 + 0.07 * Math.sin((wall / 0.2) * Math.PI * 2 + valueNoise(x * 0.8, y * 0.8, seed + 41) * 1.5)
@@ -672,7 +590,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         g = 160 * k
         b = 148 * k
       }
-      // 光：地形朝向；寺墙、院门、桥、竹栅与花的影子；墙根、林缘下暗一点，林子里越往里越暗
+      // 光：地形朝向；寺墙、院门、桥、竹栅与树的影子；墙根暗一点；过了林缘是林子里的阴处，往里很快暗下去
       const nz = 1 / Math.sqrt(zx * zx + zy * zy + 1)
       const lambert = Math.max(0, (-zx * LX - zy * LY + LZ) * nz)
       const zs = depth > 0 ? level : z
@@ -682,7 +600,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         bridgeShadow(plan.bridge, cfg.flow.bankM, zs, mpu, x, y),
         fenceShadow(fe, prep.stakes, wr.crest, cfg.sill.heightM, mpu, zs, x, y),
       )
-      const ao = (1 - 0.18 * smooth(th + 1.2, th, Math.abs(wall))) * (1 - 0.2 * smooth(-1.2, 0.5, forest)) * (1 - 0.35 * smooth(1.5, 7, forest))
+      const ao = (1 - 0.18 * smooth(th + 1.2, th, Math.abs(wall))) * (1 - 0.2 * smooth(-1.2, 0.3, forest)) * (1 - 0.42 * smooth(0, 2.5, forest))
       const sky = AMBIENT * (0.75 + 0.25 * nz) * ao
       const sun = DIRECT * lambert * (1 - shade) * ao
       out[o] = r * (sky * SKY.r + sun * SUNLIGHT.r) * GRADE.r
@@ -693,20 +611,29 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
   }
 }
 
-/** 樱花的花色：背阴、中间、向阳与花心，tint 从染井吉野的近白淡粉到八重樱的浓粉 */
-function blossom(tint: number): { dark: number[]; mid: number[]; lit: number[]; eye: number[] } {
+/** 樱花的花色：背阴、中间、向阳、花心与描边，tint 从染井吉野的近白淡粉到八重樱的浓粉 */
+function blossom(tint: number): { dark: number[]; mid: number[]; lit: number[]; eye: number[]; ink: number[] } {
   const mix = (a: readonly number[], b: readonly number[]): number[] => a.map((v, i) => v + (b[i]! - v) * tint)
   return {
-    dark: mix([226, 172, 176], [212, 124, 146]),
-    mid: mix([252, 222, 228], [246, 180, 202]),
-    lit: mix([255, 246, 244], [255, 228, 236]),
-    eye: mix([238, 160, 156], [222, 116, 132]),
+    dark: mix([232, 164, 184], [214, 122, 154]),
+    mid: mix([252, 218, 228], [246, 180, 204]),
+    lit: mix([255, 248, 248], [255, 232, 240]),
+    eye: mix([226, 128, 146], [206, 88, 124]),
+    ink: mix([142, 70, 100], [128, 48, 88]),
   }
 }
 
+/** 花团的边柔和多宽（格）；一棵树的树冠外缘的描边多宽（格）；树冠里高的花团压在矮一截的花团上，压住的那道边勾多宽（格），差多高（米）起勾、多高勾满 */
+const PUFF_SOFT_U = 0.045
+const OUTLINE_U = 0.085
+const FOLD_U = 0.05
+const FOLD_M = [0.5, 1] as const
+/** 打光时整棵树冠的圆顶占几成，其余是一团团花自己的起伏 */
+const DOME = 0.6
+
 /**
- * 树冠、瓦顶与石组：樱花是一团团的花，花团里一朵朵五瓣的小花，花心深粉；向阳的一面近白、背阴的一面深粉，低处被上面的花团压着更暗；
- * 花团之间露出深色的枝。杜鹃修剪成圆圆的丘，细碎的深绿叶子上开满一朵朵玫红、桃红或白的花，向阳的顶上花最密。
+ * 树冠、瓦顶与石组：樱花是一团团的花，花团里一朵朵五瓣的小花，花心深粉；向阳的一面近白、背阴的一面深玫红，低处被上面的花团压着更暗；
+ * 每棵树的树冠外缘勾一道深色的线（压在别的树上也勾），树冠里高处的花团压住矮一截的那道边勾一道浅一点的线。
  * 寺墙与院门的瓦顶从屋脊往两边斜下去，一垄垄筒瓦与板瓦，屋檐一排瓦当；上游的石组一块块顶出水面。按太阳打光。边缘柔和，像素带透明度，只画 rect 那一块
  */
 export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
@@ -718,7 +645,7 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
   const w = rect.x1 - rect.x0
   const th = cfg.wall.thickU / 2
   const eave = th + cfg.wall.eaveU
-  const pal = prep.tint.map((v, k) => (plan.trees[k]!.kind === 'cherry' ? blossom(v) : null))
+  const pal = prep.tint.map(blossom)
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
       const x = area.x0 + (px + 0.5) / ppu
@@ -744,9 +671,11 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           ua = ra
         }
       }
-      // 花团：取罩住这一点最高的那团
+      // 花团：取罩住这一点最高的那团，记下第二高的与离最高那团的边多远
       let best = -Infinity
+      let second = -Infinity
       let alpha = 0
+      let rim = 0
       let pi = -1
       let nx = 0
       let ny = 0
@@ -761,38 +690,51 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const p = prep.puffs[i]!
         const dx = x - p.x
         const dy = y - p.y
-        const re = p.r * (0.9 + 0.12 * (fd < petal ? 1 : 0) - 0.1 * smooth(0.45, 0.7, cd))
+        const re = p.r * (0.96 - 0.1 * smooth(0.45, 0.7, cd))
         const d2 = dx * dx + dy * dy
         if (d2 >= re * re) continue
+        const d = Math.sqrt(d2)
         const cz = Math.sqrt(re * re - d2)
         const hgt = p.top - re * mpu + cz * mpu
-        alpha = Math.max(alpha, smooth(re, re - 0.06, Math.sqrt(d2)))
-        if (hgt <= best) continue
+        alpha = Math.max(alpha, smooth(re, re - PUFF_SOFT_U, d))
+        if (hgt <= best) {
+          second = Math.max(second, hgt)
+          continue
+        }
+        second = best
         best = hgt
         pi = i
+        rim = re - d
         nx = dx / re
         ny = dy / re
         nzz = cz / re
       }
       if (pi >= 0) {
         const p = prep.puffs[pi]!
-        const c = pal[p.tree]
-        if (!c) {
-          azalea(prep.tint[p.tree]!, x, y, nx, ny, nzz, seed, p.tree, PC)
-          over(out, o, PC[0]! * GRADE.r, PC[1]! * GRADE.g, PC[2]! * GRADE.b, alpha, ur, ug, ub, ua)
-          continue
+        const c = pal[p.tree]!
+        // 离这棵树的树冠外缘多远：这棵树罩住这一点的花团里，离边最远的那团
+        let inner = 0
+        for (const j of near(prep.crowns, x, y)) {
+          const q = prep.puffs[j]!
+          if (q.tree !== p.tree) continue
+          inner = Math.max(inner, q.r * (0.96 - 0.1 * smooth(0.45, 0.7, cd)) - len(x - q.x, y - q.y))
         }
-        // 花团由一个个小簇鼓起来，按小簇的面打光；小簇之间的缝暗一点
-        const tx = nx + cl.dx * 0.55
-        const ty = ny + cl.dy * 0.55
-        const l = Math.sqrt(tx * tx + ty * ty + nzz * nzz)
-        const lit = clamp01(((tx * LX + ty * LY + nzz * LZ) / l + 0.35) / 1.35)
+        // 整棵树冠是一个扁扁的圆顶，花团与花团里的小簇在上面鼓起来：按三者合起来的面打光；小簇之间的缝暗一点
+        const tree = plan.trees[p.tree]!
+        const ux = (x - tree.x) / tree.r
+        const uy = (y - tree.y) / tree.r
+        const dome = Math.sqrt(Math.max(0.04, 1 - ux * ux - uy * uy))
+        const tx = ux * 0.7 * DOME + nx * (1 - DOME) + cl.dx * 0.3
+        const ty = uy * 0.7 * DOME + ny * (1 - DOME) + cl.dy * 0.3
+        const tz = dome * DOME + nzz * (1 - DOME)
+        const l = Math.sqrt(tx * tx + ty * ty + tz * tz)
+        const lit = clamp01(((tx * LX + ty * LY + tz * LZ) / l + 0.35) / 1.35)
         let top = -Infinity
         for (const j of near(prep.crowns, x, y)) if (prep.puffs[j]!.tree === p.tree) top = Math.max(top, prep.puffs[j]!.top)
         const low = smooth(0, 1.4, top - best)
-        const crease = smooth(0.42, 0.66, cd) * 0.14
-        const between = fd < petal ? 0 : 0.08
-        const k = (1 - 0.16 * low) * (1 - crease) * (1 - between)
+        const crease = smooth(0.42, 0.66, cd) * 0.1
+        const between = fd < petal ? 0 : 0.06
+        const k = (1 - 0.14 * low) * (1 - crease) * (1 - between)
         const warmth = lit * lit
         let r = c.dark[0]! + (c.lit[0]! - c.dark[0]!) * warmth
         let g = c.dark[1]! + (c.lit[1]! - c.dark[1]!) * warmth
@@ -805,6 +747,13 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         r *= k * (1 + vary * 0.4)
         g *= k * (1 + vary)
         b *= k * (1 + vary * 0.5)
+        // 向阳的一面一朵朵花更亮，近白
+        if (fd < petal) {
+          const e = smooth(petal, petal * 0.5, fd) * 0.35 * smooth(0.45, 0.9, lit)
+          r += (c.lit[0]! - r) * e
+          g += (c.lit[1]! - g) * e
+          b += (c.lit[2]! - b) * e
+        }
         // 花心：一点深粉，亮面上看得见
         if (fd < petal * 0.26) {
           const e = smooth(petal * 0.26, petal * 0.1, fd) * (0.15 + 0.25 * lit)
@@ -812,72 +761,19 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           g += (c.eye[1]! - g) * e
           b += (c.eye[2]! - b) * e
         }
+        // 描边：树冠外缘一道深色的线；高处的花团压在矮一截的花团上，那道边勾得浅一点
+        const outline = smooth(OUTLINE_U, OUTLINE_U * 0.4, inner)
+        const fold = second > -Infinity ? smooth(FOLD_U, FOLD_U * 0.3, rim) * smooth(FOLD_M[0], FOLD_M[1], best - second) * 0.5 : 0
+        const ink = Math.max(outline, fold)
+        r += (c.ink[0]! - r) * ink
+        g += (c.ink[1]! - g) * ink
+        b += (c.ink[2]! - b) * ink
         over(out, o, r * GRADE.r, g * GRADE.g, b * GRADE.b, alpha, ur, ug, ub, ua)
-        continue
-      }
-      // 枝：深色的树皮，朝太阳的一侧亮一点
-      let limb = -1
-      let lt = 0
-      for (const i of near(prep.branches, x, y)) {
-        const lb = prep.limbs[i]!
-        const s = segDist(lb.ax, lb.ay, lb.bx, lb.by, x, y)
-        const wdt = lb.w * (1 - 0.35 * s.t)
-        if (s.d < wdt) {
-          limb = i
-          const ex = lb.bx - lb.ax
-          const ey = lb.by - lb.ay
-          const el = len(ex, ey) || 1
-          lt = ((x - lb.ax) * -ey + (y - lb.ay) * ex) / el / wdt
-        }
-      }
-      if (limb >= 0) {
-        const lb = prep.limbs[limb]!
-        const ex = (lb.bx - lb.ax) / (len(lb.bx - lb.ax, lb.by - lb.ay) || 1)
-        const ey = (lb.by - lb.ay) / (len(lb.bx - lb.ax, lb.by - lb.ay) || 1)
-        const side = clamp01(0.5 + 0.5 * lt * (-ey * TO_SUN.x + ex * TO_SUN.y))
-        const bark = 0.82 + 0.3 * valueNoise(x * 30, y * 30, seed + 107)
-        const k = (0.55 + 0.6 * side) * bark
-        over(out, o, 72 * k * GRADE.r, 54 * k * GRADE.g, 50 * k * GRADE.b, smooth(1, 0.8, Math.abs(lt)), ur, ug, ub, ua)
         continue
       }
       over(out, o, 0, 0, 0, 0, ur, ug, ub, ua)
     }
   }
-}
-
-/**
- * 杜鹃丘上一点的颜色，写进 out：细碎的叶子深绿、朝太阳的亮一点；一朵朵五瓣的花开在叶子上，向阳的顶上开得密、背阴的下沿稀，
- * 花心深一点。kind 是花色，(nx, ny, nz) 是小丘在这一点的法线
- */
-function azalea(kind: number, x: number, y: number, nx: number, ny: number, nz: number, seed: number, tree: number, out: number[]): void {
-  const leaf = cellNearest(x / 0.07, y / 0.07, seed + 121)
-  const lx = nx + leaf.dx * 0.6
-  const ly = ny + leaf.dy * 0.6
-  const ll = Math.sqrt(lx * lx + ly * ly + nz * nz)
-  const lit = clamp01(((lx * LX + ly * LY + nz * LZ) / ll + 0.3) / 1.3)
-  const k = 0.55 + 0.6 * lit
-  let r = (52 + 30 * leaf.h) * k
-  let g = (76 + 36 * leaf.h) * k
-  let b = (42 + 16 * leaf.h) * k
-  const fc = cellNearest(x / 0.13, y / 0.13, seed + 123 + tree)
-  const cover = 0.62 + 0.34 * clamp01(nz * 1.3) * (0.7 + 0.3 * lit)
-  if (fc.h < cover) {
-    const fa = Math.atan2(fc.dy, fc.dx)
-    const rad = 0.5 * (0.82 + 0.18 * Math.cos(5 * fa + fc.h * 30))
-    const d = len(fc.dx, fc.dy)
-    if (d < rad) {
-      const col = AZALEAS[kind]!
-      const shade = (0.7 + 0.42 * lit) * (0.94 + 0.12 * fract(fc.h * 9.1))
-      const eye = smooth(rad * 0.35, rad * 0.12, d) * 0.35
-      const a = smooth(rad, rad * 0.8, d)
-      r += (col[0] * shade * (1 - eye) - r) * a
-      g += (col[1] * shade * (1 - eye * 1.2) - g) * a
-      b += (col[2] * shade * (1 - eye * 0.8) - b) * a
-    }
-  }
-  out[0] = r
-  out[1] = g
-  out[2] = b
 }
 
 /** 颜色 (r, g, b) 按透明度 a 叠在底下的 (ur, ug, ub, ua) 上，写进 out[o..o+3]：贴图按不预乘的透明度存 */

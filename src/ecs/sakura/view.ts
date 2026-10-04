@@ -44,7 +44,7 @@ const STRIP_PX = 64
 const BRIDGE_DEPTH = 4
 const UNDER_Z = 3.5
 /** 水上漂着几片花瓣、漂多久（秒）还没漂走就换一片 */
-const AFLOAT = 150
+const AFLOAT = 210
 const AFLOAT_LIFE_S = 40
 /** 树上飘落的花瓣：镜头里同时最多几片、多久飘下一片（秒）、落地后多久淡去（秒） */
 const FALLING = 36

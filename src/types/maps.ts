@@ -665,7 +665,7 @@ export interface RiverConfig {
   readonly body: WadeConfig
 }
 /**
- * 樱庭：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘一圈杜鹃丛；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
+ * 樱庭：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘上的樱花一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
  * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流沿用河流的机制，溪上架着一座木桥；
  * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
  */
@@ -694,7 +694,7 @@ export interface SakuraConfig {
   }
   /**
    * 樱林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进空地的林舌或凹进林子的草湾，
-   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格；林缘一圈杜鹃丛的半径（格）
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格
    */
   readonly forest: {
     readonly insetU: readonly [number, number]
@@ -704,7 +704,6 @@ export interface SakuraConfig {
     readonly lobes: readonly [number, number]
     readonly lobeU: readonly [number, number]
     readonly lobeWidthU: readonly [number, number]
-    readonly azaleaU: readonly [number, number]
   }
   /**
    * 溪：从进林缘到出林缘的走向离横竖方向至少 slantDeg 度，两头进出林子时再各偏最多 turnDeg 度；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍；
