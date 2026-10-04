@@ -120,8 +120,10 @@ function overSpan(b: Bridge, x: number, y: number): boolean {
   return Math.abs(p.a) < b.span && Math.abs(p.t) <= b.width
 }
 
-/** 走在桥上的身体不出栏杆：横着桥面离桥心不超过半宽减身子的半径 */
-function railing(b: Bridge, p: Point, rad: number): Point {
+/** 走在桥上的身体不出栏杆：这一步从桥面上走，横着桥面离桥心就不超过半宽减身子的半径；从桥外挪过来的（瞬移、被抛开）不拦 */
+function railing(b: Bridge, from: Point, p: Point, rad: number): Point {
+  const f = bridgeLocal(b, from.x / UNIT, from.y / UNIT)
+  if (Math.abs(f.a) >= b.span || Math.abs(f.t) > b.width + 0.05) return p
   const q = bridgeLocal(b, p.x / UNIT, p.y / UNIT)
   if (Math.abs(q.a) >= b.span) return p
   const lim = Math.max(0.05, b.width - rad / UNIT)
@@ -265,11 +267,11 @@ export const sakura: WorldHooks = {
     if (!s.water || s.aboard.get(eid) === Uid.v[eid]) return false
     return wade(sim, cfgOf(sim), s.water, s.swimming, eid, dt, x, y, vx, vy, out)
   },
-  constrainBody(sim, eid, _from, next) {
+  constrainBody(sim, eid, from, next) {
     const s = sakuraOf(sim)
     const r = Radius.v[eid]!
     const p = keepOut(s.plan.basin, next.x, next.y, r)
-    return s.aboard.get(eid) === Uid.v[eid] ? railing(s.plan.bridge, p, r) : p
+    return s.aboard.get(eid) === Uid.v[eid] ? railing(s.plan.bridge, from, p, r) : p
   },
   basin(sim) {
     return sakuraOf(sim).plan.basin
