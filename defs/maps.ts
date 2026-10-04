@@ -219,7 +219,7 @@ export const MAPS = {
       cellU: 0.25,
       garden: { areaU2: [880, 1040], aspect: [0.8, 1.25], jitterU: 1, skewDeg: 7, padU: 2.5, neckU: 0.35 },
       wall: { thickU: 0.6, heightM: 1.6, eaveU: 0.55, gateU: 2.4 },
-      stream: { cornerU: 6, opposite: 0.6, meanderU: 2.4, minBend: 1.6, edgeGapU: 2.5 },
+      stream: { cornerU: 6, opposite: 0.6, turnAt: [0.52, 0.75], meanderU: 2.4, minBend: 1.6, edgeGapU: 2.5 },
       flow: { discharge: 4, widthCoef: 1.55, depthCoef: 0.69, manning: 0.035, bedShape: 8, pool: 1.35, riffle: 0.8, thalwegShift: 0.35, bankM: 0.45, bankU: 1, floodSlope: 0.015, reliefM: 0.1 },
       weir: { backU: 2.2, rampU: 1.5, dropM: 1, lipU: 1.2 },
       bridge: { widthU: 2.6, rampU: 1.4, riseM: 0.6, at: [0.3, 0.7] },

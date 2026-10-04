@@ -693,12 +693,13 @@ export interface SakuraConfig {
     readonly gateU: number
   }
   /**
-   * 溪：水门离墙角至少 cornerU 格；出水口在对面那面墙的概率，其余时候在相邻的一面；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍，
-   * 溪岸离院墙至少 edgeGapU 格（水门附近除外）
+   * 溪：水门离墙角至少 cornerU 格；出水口在对面那面墙的概率，其余时候在相邻的一面，两个水门各离共用的墙角多远（占短的那面墙长的比例）；
+   * 蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍，溪岸离院墙至少 edgeGapU 格（水门附近除外）
    */
   readonly stream: {
     readonly cornerU: number
     readonly opposite: number
+    readonly turnAt: readonly [number, number]
     readonly meanderU: number
     readonly minBend: number
     readonly edgeGapU: number

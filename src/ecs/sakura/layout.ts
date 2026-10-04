@@ -251,21 +251,26 @@ interface Sketch {
 
 /**
  * 溪：进水口在随机一面墙上，出水口在对面或相邻的一面墙上，都离墙角至少 cornerU；中线是两端垂直于墙的曲线，叠上两端为零的缓弯。
- * 弯太急、溪岸贴着院墙就减小蜿蜒再来，减到不弯还不行就换一对水门
+ * 相邻的两个水门离共用的墙角差不多远，溪绕着墙角拐成一道圆弧。弯太急、溪岸贴着院墙就减小蜿蜒再来，减到不弯还不行就换一对水门
  */
 function streamOf(cfg: SakuraConfig, rng: Rng, walls: readonly Wall[], seed: number): { stream: Reach; inlet: Port; outlet: Port } | null {
   const st = cfg.stream
   const th = cfg.wall.thickU / 2
   const iw = Math.floor(rng.next() * 4)
-  const ow = rng.next() < st.opposite ? (iw + 2) % 4 : (iw + (rng.next() < 0.5 ? 1 : 3)) % 4
+  const opposite = rng.next() < st.opposite
+  const ow = opposite ? (iw + 2) % 4 : (iw + (rng.next() < 0.5 ? 1 : 3)) % 4
   const a = walls[iw]!
   const b = walls[ow]!
-  const pick = (w: Wall): number => {
-    const m = Math.min(0.45, st.cornerU / w.len)
-    return m + (1 - 2 * m) * rng.next()
+  const margin = (w: Wall): number => Math.min(0.45, st.cornerU / w.len)
+  const pick = (w: Wall): number => margin(w) + (1 - 2 * margin(w)) * rng.next()
+  // 相邻时，共用的墙角是进水那面墙的尾、出水那面墙的头（出水的在顺时针下一面），或者反过来
+  const fromCorner = (w: Wall, tail: boolean): number => {
+    const t = (Math.min(a.len, b.len) * between(rng, st.turnAt)) / w.len
+    return Math.min(1 - margin(w), Math.max(margin(w), tail ? 1 - t : t))
   }
-  const pIn = onWall(a, pick(a))
-  const pOut = onWall(b, pick(b))
+  const next = ow === (iw + 1) % 4
+  const pIn = onWall(a, opposite ? pick(a) : fromCorner(a, next))
+  const pOut = onWall(b, opposite ? pick(b) : fromCorner(b, !next))
   const span = len(pOut.x - pIn.x, pOut.y - pIn.y)
   const minSide = Math.min(...walls.map((w) => w.len))
   if (span < minSide * 0.55) return null
@@ -273,8 +278,11 @@ function streamOf(cfg: SakuraConfig, rng: Rng, walls: readonly Wall[], seed: num
   const s1 = { x: pOut.x + b.nx * th, y: pOut.y + b.ny * th }
   const t0 = { x: a.nx, y: a.ny }
   const t1 = { x: -b.nx, y: -b.ny }
+  // 拐弯时按圆弧取两端切向的长短：转角 θ 的圆弧，两端切向是弦长的 2·tan(θ/4)/sin(θ/2) 倍
+  const turn = Math.acos(Math.max(-1, Math.min(1, t0.x * t1.x + t0.y * t1.y)))
+  const reach = opposite ? undefined : (2 * Math.tan(turn / 4)) / Math.sin(turn / 2)
   for (const m of [1, 0.6, 0.3, 0]) {
-    const r = makeReach(cfg, route(rng, s0, t0, s1, t1, st.meanderU * m * (0.3 + 0.7 * rng.next()), seed + 41), cfg.flow.discharge, 0, seed + 43, 0)
+    const r = makeReach(cfg, route(rng, s0, t0, s1, t1, st.meanderU * m * (0.3 + 0.7 * rng.next()), seed + 41, reach), cfg.flow.discharge, 0, seed + 43, 0)
     if (fits(cfg, walls, r)) {
       const n = r.x.length
       return {
@@ -351,7 +359,7 @@ function bridgeOf(cfg: SakuraConfig, rng: Rng, walls: readonly Wall[], r: Reach,
     let i = 0
     while (i < n - 2 && r.s[i + 1]! < s) i++
     let calm = true
-    for (let j = 0; j < n; j++) if (Math.abs(r.s[j]! - s) < 2.5 && Math.abs(r.curv[j]!) * r.half[j]! * 2 > 0.25) calm = false
+    for (let j = 0; j < n; j++) if (Math.abs(r.s[j]! - s) < 2.5 && Math.abs(r.curv[j]!) * r.half[j]! * 2 > 0.45) calm = false
     if (!calm) continue
     const half = r.half[i]!
     const span = half + cfg.flow.bankU + 0.35

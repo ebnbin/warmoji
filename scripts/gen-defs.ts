@@ -377,6 +377,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(g.jitterU >= 0 && g.skewDeg >= 0 && g.skewDeg < 30 && g.padU > 0 && g.neckU > 0, `${at}.garden 的墙角偏移不为负、整座院子转不到 30 度，地图边留白与窄缝为正`)
   need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
   need(st.cornerU > 0 && st.opposite >= 0 && st.opposite <= 1 && st.meanderU >= 0 && st.minBend >= 1 && st.edgeGapU >= 0, `${at}.stream 的水门离墙角为正、对面墙的概率在 [0, 1] 内，蜿蜒不为负、弯道半径至少一个水面宽`)
+  need(st.turnAt[0] > 0 && range(st.turnAt, false) && st.turnAt[1] < 1, `${at}.stream.turnAt 须是 (0, 1) 里的范围：相邻的水门落在墙上`)
   need(f.discharge > 0 && f.widthCoef > 0 && f.depthCoef > 0 && f.manning > 0 && f.bedShape >= 1, `${at}.flow 的流量、水力几何系数与糙率须为正，断面形状指数不小于 1`)
   need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `${at}.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出溪岸`)
   need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `${at}.flow 的溪岸须有高有宽，滩地不往溪里倾`)
