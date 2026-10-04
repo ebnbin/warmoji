@@ -2862,6 +2862,14 @@ class CaveView extends BoundedView {
     return this.viewU > 0 ? Math.min(viewport.logicalWidth, viewport.logicalHeight) / (this.viewU * UNIT) : 1
   }
 
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
+  }
+
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
+  }
+
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, CAVE_BG).setDepth(-2)))
     const scene = v.scene

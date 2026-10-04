@@ -263,7 +263,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 溶洞：洞厅能走的地方约有标准的 32×32 那么大；洞厅、支洞与天窗都落得进地图；太阳每天升起又落下，时间放慢的窗口罩住天黑那段；正午天窗下的天光亮过熄火把的门槛，
+ * 溶洞：地图放得进方框的安全区；洞厅、支洞与天窗都落得进地图；太阳每天升起又落下，时间放慢的窗口罩住天黑那段；正午天窗下的天光亮过熄火把的门槛，
  * 星光暗过刷怪的门槛；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍
  */
 const DEG = Math.PI / 180
@@ -281,9 +281,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const { hall, skylights: s, alcoves: a, formations: f, pools: p, sky, light, torch, view } = c
   need(hall.insetU[0] > 0 && span(hall.insetU) && hall.waveU > 0 && hall.cornerU >= 0 && hall.neckU > 0 && hall.wallU > 0, `maps.${id}.cave.hall 的边距、波长、窄缝与洞壁宽须为正，磨角不为负`)
   need(hall.ceilingM > f.stalagmiteM[1] && hall.ceilingM > s.rubbleM, `maps.${id}.cave.hall.ceilingM 须高过最高的石笋与碎石坡`)
-  const inset = hall.insetU[0] + hall.insetU[1]
-  const floor = (mapW - inset) * (mapH - inset)
-  need(floor >= 0.9 * STANDARD_SIDE_U ** 2 && floor <= 1.15 * STANDARD_SIDE_U ** 2, `maps.${id}.cave 洞厅按平均边距算约 ${Math.round(floor)} 格²，须在 ${STANDARD_SIDE_U}×${STANDARD_SIDE_U} 上下`)
+  need(Math.max(mapW, mapH) <= FRAME_U - SAFE_U * 2, `maps.${id}.cave 的地图须放得进方框的安全区`)
   need(a.outU + a.pocketU + 1.2 < side / 2 - 4, `maps.${id}.cave.alcoves 往外走的深度须让洞厅中间留得出地方`)
   need(s.mainU[0] > 0 && span(s.mainU) && s.mainOffsetU[0] >= 0 && span(s.mainOffsetU) && s.jitter >= 0 && s.jitter < 0.5 && s.gapU >= 0, `maps.${id}.cave.skylights 的半径与偏移须为正、起伏在 0 到 0.5 之间`)
   need(s.mainOffsetU[1] + s.mainU[1] * (1 + s.jitter) < side / 2 - Math.max(hall.insetU[1], a.outU + a.pocketU + 1.2) - 1, `maps.${id}.cave.skylights 的主天窗须整个开在洞厅上方`)
@@ -309,7 +307,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(reach >= view.nightU / 2, `maps.${id}.cave 火把只照得清 ${reach.toFixed(1)} 格，盖不住夜里镜头短边的一半 ${view.nightU / 2} 格`)
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
-  need(view.dayU / 2 <= side / 2 + MAP_DEFAULTS.cameraMargin, `maps.${id}.cave.view.dayU 须让白天的镜头落在地图与边距以内`)
+  need(view.dayU <= FRAME_U, `maps.${id}.cave.view.dayU 须让白天的镜头落在方框以内`)
 }
 
 /**

@@ -26,7 +26,7 @@ function scale(c: Rgb, k: number): void {
   c[2] *= k
 }
 
-/** 地面贴图、高度图、天窗图与照度场都盖住同一块：地图连同镜头能看到的一圈，像素 */
+/** 地面贴图、高度图、天窗图与照度场都盖住同一块：整个方框，像素 */
 export interface Field {
   readonly x0: number
   readonly y0: number
@@ -35,7 +35,7 @@ export interface Field {
 }
 
 export function fieldOf(L: CaveLayout): Field {
-  return { x0: L.rock.x0, y0: L.rock.y0, w: L.w - 2 * L.rock.x0, h: L.h - 2 * L.rock.y0 }
+  return { x0: L.rock.x0, y0: L.rock.y0, w: L.rock.cols * L.rock.cell, h: L.rock.rows * L.rock.cell }
 }
 
 /** 烘进固有色的小起伏（碎石、石块、石笋）按头顶略偏画面上方的光打：洞里的光多半从天窗往下来 */

@@ -4,7 +4,7 @@ import { ENEMIES, SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
-import { MAP, MAPS } from '../../data/maps'
+import { MAPS } from '../../data/maps'
 import { centered, FRAME_MID } from '../frame'
 import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
@@ -1506,7 +1506,8 @@ function caveCfg(sim: Sim): CaveConfig {
 function caveOf(sim: Sim): CaveState {
   let s = sim.worldState.cave
   if (!s) {
-    s = makeCaveState(caveCfg(sim), sim.mapW, sim.mapH, MAP.cameraMargin * UNIT, new Rng(sim.run.decorSeed ^ 0x3c4e), clockSec(sim))
+    const size = MAPS[sim.mapId].size!
+    s = makeCaveState(caveCfg(sim), centered(size.w, size.h), new Rng(sim.run.decorSeed ^ 0x3c4e), clockSec(sim))
     sim.worldState.cave = s
   }
   return s
