@@ -673,9 +673,9 @@ export const MAPS = {
     kind: 'nebula',
     stamina: { exertion: 0.4, regen: 0.9 },
     palette: {
-      bgFrom: 'hsl(330 26% 10%)',
-      bgTo: 'hsl(255 40% 3%)',
-      map: hslToInt(330, 0.24, 0.1),
+      bgFrom: 'hsl(330 38% 16%)',
+      bgTo: 'hsl(290 34% 5%)',
+      map: hslToInt(330, 0.34, 0.16),
       shadow: 0x000000,
     },
     decor: {
