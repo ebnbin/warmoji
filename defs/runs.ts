@@ -181,7 +181,7 @@ const EXPEDITION = {
         clockSec: 190,
         phases: [
           {
-            intro: { title: '第二章 · 残垣', sub: '墙挡人、挡弹，也挡视线；清空三面来敌' },
+            intro: { title: '第二章 · 残垣', sub: '高墙挡人挡弹也挡视线，矮墙只挡人——躲在矮墙后开火；清空三面来敌' },
             spawns: [
               {
                 kind: 'waves',
@@ -258,7 +258,7 @@ const EXPEDITION = {
                 kind: 'batch',
                 atMs: 1500,
                 squad: { count: 1, enemy: 'rhino', stats: { mul: { maxHp: 0.55, damage: 0.8 } } },
-                banner: { title: '暴龙现身', sub: '它会冲锋撞人，横着躲开；跺地前退出圈外' },
+                banner: { title: '暴龙现身', sub: '它冲锋时连墙一起撞穿，横着躲开、别贴着墙；跺地前退出圈外' },
               },
             ],
             ends: [{ kind: 'boss' }],
@@ -422,7 +422,7 @@ const LABS = {
     name: '猎杀令',
     desc: '一分钟内击杀 150 只；二十秒后敌人变多，四十秒后开始有敌人从身后摸上来',
     note: '击杀数当胜利条件、到点就输：逼着主动找怪打，躲着拖时间没用',
-    map: 'desert',
+    map: 'oldDesert',
     team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['area'] }, { tags: ['mobile'] }], level: 2 },
     start: { wave: 5, sec: 150 },
     stars: [{ kind: 'time', ms: 50_000 }, { kind: 'downs', count: 0 }],
@@ -712,7 +712,7 @@ const LABS = {
     name: '三关连闯',
     desc: '两人出发，连过猎杀、据点、头目三关；关与关之间招一名新队员、逛一次商店；一关打完时还倒着的队员，这一局都回不来',
     note: '同一局里每一场的过关条件都不同；永久减员让每一关的伤亡都带到后面',
-    map: 'desert',
+    map: 'oldDesert',
     team: { slots: [{ tags: ['damage', 'ranged'] }, { tags: ['defense'] }], level: 1 },
     rules: { between: 'permadeath' },
     coins: 40,
@@ -793,7 +793,7 @@ const LABS = {
     name: '众矢之的',
     desc: '你操控的法师就是队长，不能换人；所有敌人都冲着他来，他倒下就输。撑过 60 秒',
     note: '队长倒下就输、不能换人：玩家本人成了要护住的目标，躲闪比输出要紧',
-    map: 'desert',
+    map: 'oldDesert',
     team: { slots: ['mage', 'guard', 'panda', 'medic'], level: 2 },
     rules: { leader: { lock: true, critical: true } },
     start: { wave: 5, sec: 120 },
@@ -911,7 +911,7 @@ const LABS = {
     name: '新兵营',
     desc: '队员永远是 1 级、不能放主动技能；商店只卖普通和稀有道具、不能刷新。两人出发打三场，场与场之间招人、逛商店',
     note: '把升级、技能和刷新都锁住：成长只剩买什么，打法只剩走位和站位',
-    map: 'desert',
+    map: 'oldDesert',
     team: { slots: [{ tags: ['damage'] }, { tags: ['defense'] }], level: 1 },
     rules: { maxLevel: 1, skills: false, shop: { rarity: { max: 'rare' }, reroll: false } },
     coins: 60,

@@ -560,6 +560,45 @@ export interface OldRiverConfig {
   readonly waveSlow: number
   readonly waveFast: number
 }
+/** 按流量 Q（米³/秒）定的河道：水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米），坡降由曼宁糙率反算 */
+export interface ChannelConfig {
+  readonly widthCoef: number
+  readonly depthCoef: number
+  readonly manning: number
+  /** 横断面的形状指数：水深按 1 − |ξ|^bedShape 从深泓往两岸收 */
+  readonly bedShape: number
+  /** 弯顶的深潭、过渡段的浅滩相对平均的水深倍率；深泓往凹岸偏到半宽的 thalwegShift 倍 */
+  readonly pool: number
+  readonly riffle: number
+  readonly thalwegShift: number
+  /** 河岸高出水面多少米、岸坡多宽（格）；岸顶以外的滩地每格升多少米 */
+  readonly bankM: number
+  readonly bankU: number
+  readonly floodSlope: number
+}
+/**
+ * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
+ * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
+ * 或者干脆浮起来，就站不住、随水漂
+ */
+export interface WadeConfig {
+  readonly kg: number
+  readonly radiusU: number
+  readonly heightM: number
+  readonly density: number
+  readonly drag: number
+  /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
+  readonly legs: number
+  readonly hip: number
+  /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
+  readonly lever: number
+  /** 脚底踩在湿河床上的静摩擦系数 */
+  readonly mu: number
+  /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
+  readonly swim: number
+  /** 水深不到这个（米）算干地 */
+  readonly wetM: number
+}
 /**
  * 河流：林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。
  * 河道按流量定宽深、按曼宁公式定坡降，水流是浅水方程在这副河床上的稳态解；空地的形状、河的走向与出入口都由种子定。
@@ -595,25 +634,8 @@ export interface RiverConfig {
     readonly minBend: number
     readonly edgeGapU: number
   }
-  /** 水力几何：流量（米³/秒）按 share 分给大股；水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米）；坡降由曼宁糙率反算 */
-  readonly flow: {
-    readonly discharge: number
-    readonly share: number
-    readonly widthCoef: number
-    readonly depthCoef: number
-    readonly manning: number
-    /** 横断面的形状指数：水深按 1 − |ξ|^bedShape 从深泓往两岸收 */
-    readonly bedShape: number
-    /** 弯顶的深潭、过渡段的浅滩相对平均的水深倍率；深泓往凹岸偏到半宽的 thalwegShift 倍 */
-    readonly pool: number
-    readonly riffle: number
-    readonly thalwegShift: number
-    /** 河岸高出水面多少米、岸坡多宽（格）；岸顶以外的滩地每格升多少米，起伏多少米 */
-    readonly bankM: number
-    readonly bankU: number
-    readonly floodSlope: number
-    readonly reliefM: number
-  }
+  /** 流量（米³/秒）按 share 分给大股，河道按流量定；滩地起伏多少米 */
+  readonly flow: ChannelConfig & { readonly discharge: number; readonly share: number; readonly reliefM: number }
   /** 瀑布：进水口的崖高与崖面的进深、崖下深潭的深（米）与半径（相对主河道水面宽）；出水口外深谷的深，断崖外还能被冲过去的那一段多长（格），断崖边前那道岩坎多长（格） */
   readonly falls: {
     readonly cliffM: number
@@ -640,29 +662,332 @@ export interface RiverConfig {
     readonly radiusU: readonly [number, number]
     readonly heightM: readonly [number, number]
   }
+  readonly body: WadeConfig
+}
+/**
+ * 樱庭：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘上的樱花一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
+ * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流沿用河流的机制，溪上架着一座木桥；
+ * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface SakuraConfig {
+  readonly meterPerU: number
+  /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
+  readonly cellU: number
+  /** 地图是 sizeU 见方的方形 */
+  readonly sizeU: number
+  /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
   /**
-   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
-   * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
-   * 或者干脆浮起来，就站不住、随水漂
+   * 寺墙：墙身中线离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；
+   * 院门宽（格）
    */
-  readonly body: {
-    readonly kg: number
-    readonly radiusU: number
+  readonly wall: {
+    readonly insetU: readonly [number, number]
+    readonly skewDeg: number
+    readonly kinkDeg: number
+    readonly thickU: number
     readonly heightM: number
-    readonly density: number
-    readonly drag: number
-    /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
-    readonly legs: number
-    readonly hip: number
-    /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
-    readonly lever: number
-    /** 脚底踩在湿河床上的静摩擦系数 */
-    readonly mu: number
-    /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
-    readonly swim: number
-    /** 水深不到这个（米）算干地 */
-    readonly wetM: number
+    readonly eaveU: number
+    readonly gateU: number
   }
+  /**
+   * 樱林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进空地的林舌或凹进林子的草湾，
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格
+   */
+  readonly forest: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly scallopU: number
+    readonly lobes: readonly [number, number]
+    readonly lobeU: readonly [number, number]
+    readonly lobeWidthU: readonly [number, number]
+  }
+  /**
+   * 溪：从进林缘到出林缘的走向离横竖方向至少 slantDeg 度，两头进出林子时再各偏最多 turnDeg 度；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍；
+   * 溪岸离寺墙至少 wallGapU 格
+   */
+  readonly stream: {
+    readonly slantDeg: number
+    readonly turnDeg: number
+    readonly meanderU: number
+    readonly minBend: number
+    readonly wallGapU: number
+  }
+  /** 溪的流量（米³/秒），河道按流量定；空地上地面的起伏多少米 */
+  readonly flow: ChannelConfig & { readonly discharge: number; readonly reliefM: number }
+  /** 上游的石组：石头的半径（格）、石缝多宽（格）、石顶比水面高多少米 */
+  readonly rocks: {
+    readonly radiusU: readonly [number, number]
+    readonly gapU: readonly [number, number]
+    readonly heightM: number
+  }
+  /** 下游的石槛：槛前从河床升上槛顶的坡多长（格）、槛下的溪比槛顶低多少米；槛上的竹栅：竹桩隔多远（格）、多高（米） */
+  readonly sill: {
+    readonly rampU: number
+    readonly dropM: number
+    readonly postU: number
+    readonly heightM: number
+  }
+  /** 木桥：桥面宽（格）、两头落地的坡道多长（格）、桥面正中拱起多高（米）；架在溪的哪一段（弧长的比例） */
+  readonly bridge: {
+    readonly widthU: number
+    readonly rampU: number
+    readonly riseM: number
+    readonly at: readonly [number, number]
+  }
+  /** 樱花：空地上几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；寺墙外（寺里）的樱花隔多远一棵（格） */
+  readonly trees: {
+    readonly inside: readonly [number, number]
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly overhangU: number
+    readonly templeGapU: number
+  }
+  readonly body: WadeConfig
+}
+/**
+ * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
+ * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
+ */
+export interface MeadowConfig {
+  readonly meterPerU: number
+  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  readonly sizeU: number
+  readonly padU: number
+  /** 能走的草地有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /** 草地的起伏（米）与波长（格）；整片从坡脚往外每格降低多少米 */
+  readonly turf: { readonly reliefM: number; readonly waveU: number; readonly riseM: number }
+  /**
+   * 陡坡：坡脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU）；另有 spurs 处往草地鼓出来或往里凹进去，
+   * 鼓出或凹进 spurU 格、宽约 spurWidthU 格。坡顶比坡脚高 heightM 米，坡面平均每格升 riseM 米，坡面多宽由这两样定；
+   * 坡顶是圆圆的肩，坡脚缓缓弯回平地，坡顶往外是高一层的草甸
+   */
+  readonly bank: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly spurs: readonly [number, number]
+    readonly spurU: readonly [number, number]
+    readonly spurWidthU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly riseM: readonly [number, number]
+  }
+  /**
+   * 针叶林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进草地的林舌或凹进林子的草湾，
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格；大树的树冠半径（格）与树高（米），林缘一圈灌木与小树的树冠半径（格），其中白桦占多少；树冠最多探进草地 overhangU 格
+   */
+  readonly forest: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly scallopU: number
+    readonly lobes: readonly [number, number]
+    readonly lobeU: readonly [number, number]
+    readonly lobeWidthU: readonly [number, number]
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly edgeU: readonly [number, number]
+    readonly birch: number
+    readonly overhangU: number
+  }
+  /** 林间小路：路口凹进林缘多深、多宽（格）；横在路上的倒木多长（格） */
+  readonly trail: { readonly notchU: number; readonly widthU: number; readonly logU: readonly [number, number] }
+  /**
+   * 牧场的木栅栏：离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；桩距（格）、桩高（米）与门宽（格）；
+   * 栅栏在陡坡对面那条边的概率，其余时候在一条侧边
+   */
+  readonly fence: {
+    readonly insetU: readonly [number, number]
+    readonly skewDeg: number
+    readonly kinkDeg: number
+    readonly postU: number
+    readonly heightM: number
+    readonly gateU: number
+    readonly farChance: number
+  }
+  /** 野花：成片开花的地方占草地的多少，花片的尺度（格） */
+  readonly flowers: { readonly cover: number; readonly patchU: number }
+  /** 栅栏外吃草的羊有几只 */
+  readonly sheep: readonly [number, number]
+}
+/** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
+export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
+
+/**
+ * 沙漠：一片四边首尾相接的沙海，地图的四边是回绕的接缝，镜头跟着队长走、看不到边。沙丘与标志物都是一对一对的：
+ * 同一个摆在横竖各隔半圈的两处，再加上整圈的回绕，怎么走都分不清是回到了原地还是到了另一处。
+ * 赶路按坡度与沙的松实算代谢，背阴处歇着回得快；标志物挡人不挡子弹；身体走过的地方留下脚印，越累越深，见底时拖着脚走，过一会儿被风吹平。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface DesertConfig {
+  readonly meterPerU: number
+  /** 镜头的长边最多看多少格：看到的范围小于环面的一圈，每样东西只画离队长最近的那一份 */
+  readonly viewMaxU: number
+  /** 太阳的仰角（度），方位与角色的光一致 */
+  readonly sunDeg: number
+  /**
+   * 沙丘：几对、每座最高处多高（米）；每座由几团圆润的沙包横着风排开、融成一道缓丘，沙包迎风坡最陡处的坡度是 stossSlope、背风坡最陡处是 leeSlope（正切）；
+   * 沙包横着风的半宽是它顺风长的 width 倍；各座沙丘在盛行风两侧最多偏 turnDeg 度
+   */
+  readonly dunes: {
+    readonly pairs: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly lobes: readonly [number, number]
+    readonly stossSlope: number
+    readonly leeSlope: number
+    readonly width: number
+    readonly turnDeg: number
+  }
+  /** 盛行风吹去的方向在背着太阳的方向两侧最多偏多少度：背风坡多半背着太阳 */
+  readonly windSpreadDeg: number
+  /** 丘间的缓缓起伏：幅度（米）与一圈里起伏几次 */
+  readonly swell: { readonly heightM: number; readonly waves: number }
+  /** 丘间的沙：松的程度在 loose 的范围里按一圈 patches 片斑块起伏，实一点的地方颜色偏深偏红、走起来省力 */
+  readonly flats: { readonly loose: readonly [number, number]; readonly patches: number }
+  /** 标志物：几对（每对一模一样，横竖各隔半圈），彼此至少隔多远（格） */
+  readonly landmarks: { readonly pairs: number; readonly gapU: number }
+  /**
+   * 走路的代谢按 Minetti 的坡度曲线：松沙上每米是硬地的 softSand 倍，被踩实的沙最多省掉多出来的 packRelief；
+   * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍
+   */
+  readonly gait: {
+    readonly softSand: number
+    readonly packRelief: number
+    readonly maxPower: number
+    readonly downhillMax: number
+  }
+  /** 背阴处歇着的体力回复倍率；向阳处按地图的体力回复 */
+  readonly shadeRegen: number
+  /**
+   * 脚印：印子贴图每格多少个格子。标准身体在松沙上一步踩多深（米），实沙上只踩下去 firm 倍，累到见底时深到 tired 倍，体力低于 dragFrom 开始拖着脚；
+   * 步幅与脚长占身体半径的比例；印子与踩实的沙过多少秒被风吹平；一步把那里的沙踩实多少；各种敌人的步态，没写的按光脚，队员穿着靴子
+   */
+  readonly tracks: {
+    readonly perU: number
+    readonly depthM: number
+    readonly firm: number
+    readonly tired: number
+    readonly dragFrom: number
+    readonly stride: number
+    readonly foot: number
+    readonly lifeS: number
+    readonly pack: number
+    readonly gaits: Partial<Record<EnemyKind, DesertGait>>
+  }
+}
+/**
+ * 残垣：山顶台地上一座塌了大半的石砌院落——中间是回廊院，四周一圈房间，一角是塔楼。墙按一层层石块砌成，各处剩多高按砌体的物理来：
+ * 高过膝盖挡人、高过胸口挡子弹、高过眼睛挡视线（按 obstacles 的身高比例）；打掉的石块以上失去支撑一起塌下，陡过砌法的地方塌成台阶，
+ * 塌下来的落石砸人、在墙脚按休止角堆成碎石、扬起挡视线的尘雾。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface RuinsConfig {
+  readonly meterPerU: number
+  /** 砌体格子的边长，格：每格记剩几层石块、封着的木板与地上的碎石 */
+  readonly cellU: number
+  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地边到地图边留 padU 格的山坡；窄过两倍 neckU 的缝填掉 */
+  readonly site: {
+    readonly marginU: readonly [number, number]
+    readonly waveU: number
+    readonly padU: number
+    readonly neckU: number
+  }
+  /**
+   * 院落的平面：整体转过 tiltDeg 度；回廊院中间的庭院多大、回廊多宽，四周房间的进深与开间（格）；门洞多宽，通到院外的门几道，
+   * 连通以外每道墙再开门的概率；外墙、内墙、塔楼的墙与柱廊矮墙的厚（格）
+   */
+  readonly plan: {
+    readonly tiltDeg: readonly [number, number]
+    readonly garthU: readonly [number, number]
+    readonly walkU: number
+    readonly depthU: readonly [number, number]
+    readonly roomU: readonly [number, number]
+    readonly doorU: readonly [number, number]
+    readonly gates: readonly [number, number]
+    readonly loops: number
+    readonly wallU: {
+      readonly outer: number
+      readonly inner: number
+      readonly tower: number
+      readonly parapet: number
+    }
+  }
+  /** 砌体：一层石块高 courseM 米、密度（千克/米³）；同一处砌体里横竖相隔 bond 格以内的两格最多差一层才立得住；原本多高（米）：外墙、内墙、塔楼、柱廊的矮墙与石柱 */
+  readonly masonry: {
+    readonly courseM: number
+    readonly density: number
+    readonly bond: number
+    readonly heightM: {
+      readonly outer: readonly [number, number]
+      readonly inner: readonly [number, number]
+      readonly tower: readonly [number, number]
+      readonly parapet: number
+      readonly column: number
+    }
+  }
+  /** 柱廊：石柱的底半径与柱距（格），每边拆掉几个柱间的矮墙当入口 */
+  readonly arcade: {
+    readonly radiusU: number
+    readonly spacingU: number
+    readonly entries: readonly [number, number]
+  }
+  /**
+   * 年久失修：墙顶按低频噪声（波长 waveU 格）往下塌，剩原高的 keep 那么多；几处半径 razeU 格的地方拆到只剩墙基；开局前再预演几次多大的破坏（立方米）。
+   * 石柱折断、倒下的比例；塌下来的石块留在墙脚的比例（其余早被搬走）
+   */
+  readonly decay: {
+    readonly waveU: number
+    readonly keep: readonly [number, number]
+    readonly razed: readonly [number, number]
+    readonly razeU: readonly [number, number]
+    readonly breaches: readonly [number, number]
+    readonly breachM3: readonly [number, number]
+    readonly broken: number
+    readonly fallen: number
+    readonly rubble: number
+  }
+  /** 封门的木板：几道门洞、多高（米）、多厚（格） */
+  readonly timber: {
+    readonly doors: readonly [number, number]
+    readonly heightM: number
+    readonly thickU: number
+  }
+  /** 碎石：休止角（度）；碎石深 fullM 米时走起来最慢：黏滞与每走一格多耗的体力 */
+  readonly rubble: {
+    readonly reposeDeg: number
+    readonly fullM: number
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /** 落石：每千焦的冲击打掉多少血；落在身体半径外多远（格）也砸得到 */
+  readonly fall: {
+    readonly damagePerKJ: number
+    readonly radiusU: number
+  }
+  /** 尘雾：每塌下一立方米扬起多少（消光系数乘面积，米），摊开的半径（格），多久落下一半（秒）；视线攒下的光学厚度到 opaqueTau 就看不穿 */
+  readonly dust: {
+    readonly perM3: number
+    readonly spreadU: number
+    readonly halfLifeS: number
+    readonly opaqueTau: number
+  }
+  /** 台地边外的树：树冠半径（格）、树高（米）、撒树的格子间距（格） */
+  readonly trees: {
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly gapU: number
+  }
+  /** 撞墙时身体的半径最多按这么大算（格）：大个子也挤得过门洞 */
+  readonly bodyCapU: number
+  /** 门洞、柱间与开局时墙上塌出的缺口最窄多宽（格）：塌出来更窄的缺口补回刚好挡人的高度 */
+  readonly gapU: number
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
 }
 export interface TorusConfig {
   readonly arenaLong: number
@@ -723,7 +1048,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -746,13 +1071,17 @@ export interface MapDef {
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
   readonly river?: RiverConfig
+  readonly desert?: DesertConfig
+  readonly ruins?: RuinsConfig
+  readonly meadow?: MeadowConfig
+  readonly sakura?: SakuraConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse'
 
 export interface DecorInstance {
   emoji: string

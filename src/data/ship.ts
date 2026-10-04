@@ -31,7 +31,7 @@ export function helmOf(h: Hull): number {
   return Math.max(1.6, h.stern * h.lengthU * 0.3)
 }
 
-/** 舵轮往船头 3.6 格的天窗，透着舱里的灯光 */
+/** 舵轮往船头 3.6 格的天窗 */
 export function skylightOf(h: Hull): Hatch {
   return { s: helmOf(h) + 3.6, len: 1.6, wid: 1.2 }
 }

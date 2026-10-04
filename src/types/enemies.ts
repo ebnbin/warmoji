@@ -125,7 +125,6 @@ export interface NpcDef extends BodyRules {
   }
   readonly kbImmune?: boolean
   readonly phasesWalls?: boolean
-  readonly breaksWalls?: boolean
   /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换 */
   readonly forms?: readonly FormDef[]
   /** 坐骑：先扣它的生命，扣光后切到 form 形态 */

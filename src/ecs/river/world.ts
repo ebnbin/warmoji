@@ -1,11 +1,10 @@
-import { hasComponent, query, removeEntity } from 'bitecs'
+import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
-import { Airborne, Alive, CharScale, Drive, Hp, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Transform, Uid } from '../components'
-import { die } from '../systems/shared/combat'
+import { Alive, Phys, Radius, Transform, Uid } from '../components'
 import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
 import { leaderPoint } from '../utils/team'
@@ -14,7 +13,7 @@ import { roomFor } from '../worlds/gates'
 import { riverPlan } from './layout'
 import { riverMarks } from './marks'
 import { flowAt, sinkAt, solveWater } from './water'
-import { drift, swept } from './bodies'
+import { swept, wade, washOut } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
@@ -113,11 +112,6 @@ function groundOf(sim: Sim): Surface {
 
 const FLOW: Flow = { h: 0, u: 0, v: 0 }
 
-/** 身体本来的大小：角色的判定半径里乘了队长倍率，那只是画面上突出队长，受力不算它 */
-function bodyRadius(sim: Sim, eid: number): number {
-  return hasComponent(sim.world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!
-}
-
 /** (x, y) 像素处有没有水：水深够不够算湿 */
 function wetAt(sim: Sim, s: RiverState, x: number, y: number): boolean {
   return !!s.water && flowAt(s.water, x / UNIT, y / UNIT, FLOW).h >= cfgOf(sim).body.wetM
@@ -167,25 +161,12 @@ function overFalls(s: RiverState, x: number, y: number): number {
  */
 function plunge(sim: Sim, s: RiverState): void {
   const src = hazardSource('falls', FALLS_TINT)
-  const st = sim.run.stats
   for (const eid of [...query(sim.world, [Phys, Transform, Radius])]) {
     const k = overFalls(s, Transform.x[eid]!, Transform.y[eid]!)
-    if (k < 0 || hasComponent(sim.world, eid, Shard)) continue
-    if (hasComponent(sim.world, eid, Pickup)) {
-      removeEntity(sim.world, eid)
-      continue
-    }
-    if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || Motion.kind[eid] === MOTION.arc || Motion.kind[eid] === MOTION.transit) continue
+    if (k < 0) continue
     const o = s.plan.outlets[k]!
     const side = (Transform.x[eid]! / UNIT - o.x) * -o.ny + (Transform.y[eid]! / UNIT - o.y) * o.nx
-    Transform.x[eid] = (o.x + o.nx * (FALL_U + 1) - o.ny * side) * UNIT
-    Transform.y[eid] = (o.y + o.ny * (FALL_U + 1) + o.nx * side) * UNIT
-    if (hasComponent(sim.world, eid, Slot)) {
-      const slot = Slot.v[eid]!
-      if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + Hp.v[eid]!
-      st.hazardDamage.falls = (st.hazardDamage.falls ?? 0) + Hp.v[eid]!
-    }
-    die(sim, eid, src, Phys.vx[eid]!, Phys.vy[eid]!)
+    washOut(sim, eid, src, (o.x + o.nx * (FALL_U + 1) - o.ny * side) * UNIT, (o.y + o.ny * (FALL_U + 1) + o.nx * side) * UNIT)
   }
 }
 
@@ -222,29 +203,10 @@ export const river: WorldHooks = {
   effort() {
     return 1
   },
-  /** 掉落物落进水里跟落叶一样顺水漂，被吸向队伍的速度照加；碎片照常 */
+  /** 见 wade */
   contact(sim, eid, dt, x, y, vx, vy, out) {
     const s = riverOf(sim)
-    const w = s.water
-    if (!w || hasComponent(sim.world, eid, Shard)) return false
-    const cfg = cfgOf(sim)
-    flowAt(w, x / UNIT, y / UNIT, FLOW)
-    const g = sim.hooks.surface(sim, x, y)
-    const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
-    if (hasComponent(sim.world, eid, Pickup)) {
-      if (FLOW.h < cfg.body.wetM) return false
-      drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, dt)
-      return true
-    }
-    const uid = Uid.v[eid]!
-    const was = s.swimming.get(eid) === uid
-    if (FLOW.h < cfg.body.wetM || !swept(cfg, bodyRadius(sim, eid), Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
-      s.swimming.delete(eid)
-      return false
-    }
-    s.swimming.set(eid, uid)
-    drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]! * cfg.body.swim, Drive.y[eid]! * cfg.body.swim, k, dt)
-    return true
+    return !!s.water && wade(sim, cfgOf(sim), s.water, s.swimming, eid, dt, x, y, vx, vy, out)
   },
   constrainBody(sim, eid, _from, next) {
     return keepOut(riverOf(sim).plan.basin, next.x, next.y, Radius.v[eid]!)

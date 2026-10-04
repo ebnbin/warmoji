@@ -2,7 +2,8 @@ import { UNIT } from '../../util/units'
 import { roomAt } from '../worlds/basin'
 import type { Landmark } from '../worlds/gates'
 import type { RiverConfig } from '../../types/maps'
-import type { RiverPlan, Reach } from './layout'
+import type { Reach } from './channel'
+import type { RiverPlan } from './layout'
 
 /** 岸上的口子沿河每隔这么远一处、口子的半径，格 */
 const BANK_STEP_U = 3.5

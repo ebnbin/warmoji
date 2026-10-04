@@ -33,6 +33,8 @@ const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
 const AEOLIAN = [0, 2, 3, 5, 7, 8, 10] as const
 const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const
+/** 阳音阶：日本民谣里明亮的五声音阶 */
+const YO = [0, 2, 5, 7, 9] as const
 
 interface Voice {
   wave: BgmNote['wave']
@@ -351,7 +353,7 @@ function buildVoid(): BgmScore {
   )
 }
 
-function buildRuins(): BgmScore {
+function buildOldRuins(): BgmScore {
   const chords = [0, 6, 3, 5, 0, 6, 4, 5, 3, 6, 0, 5, 4, 6, 3, 0]
   return track(
     {
@@ -391,6 +393,54 @@ function buildRuins(): BgmScore {
       b.drums('kick', 'x.......', 0, 16, 0.22)
       b.drums('hat', '....x...', 0, 16, 0.04)
       b.drums('tom', '......x.', 8, 16, 0.1)
+    },
+  )
+}
+
+function buildRuins(): BgmScore {
+  const chords = [0, 0, 3, 3, 6, 6, 4, 4, 0, 0, 5, 3, 6, 4, 0, 0]
+  return track(
+    {
+      bpm: 72,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 72) * 0.75, feedback: 0.38, level: 0.36 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.16, attack: 0.03, release: 0.4, octave: -1 }
+      const drone: Voice = { wave: 'sine', vol: 0.035, attack: 0.9, release: 1.6, octave: 0 }
+      const lute: Voice = { wave: 'triangle', vol: 0.05, attack: 0.003, release: 0.18, octave: 0 }
+      const pipe: Voice = { wave: 'sine', vol: 0.085, attack: 0.06, release: 0.3, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.035, attack: 0.002, release: 1.2, octave: 2, echo: true }
+      b.bass(bass, chords, 'r---o---')
+      b.pad(drone, chords, [0, 4], 0.004)
+      b.arp(lute, chords, [0, 1, 2, 1, 3, 1, 2, 1], 2, 14)
+      b.line(pipe, [
+        [0, 4, 4, 4],
+        [1, 0, 3, 2], [1, 2, 2, 2], [1, 4, 0, 4],
+        [2, 0, 3, 6], [2, 6, 4, 2],
+        [3, 0, 5, 4], [3, 4, 3, 4],
+        [4, 0, 6, 4], [4, 4, 5, 2], [4, 6, 4, 2],
+        [5, 0, 3, 8],
+        [6, 0, 4, 3], [6, 3, 5, 1], [6, 4, 6, 4],
+        [7, 0, 4, 8],
+        [8, 4, 7, 4],
+        [9, 0, 6, 2], [9, 2, 5, 2], [9, 4, 4, 4],
+        [10, 0, 5, 6], [10, 6, 3, 2],
+        [11, 0, 2, 4], [11, 4, 3, 4],
+        [12, 0, 1, 4], [12, 4, 2, 4],
+        [13, 0, 4, 6],
+        [14, 0, 0, 8],
+      ])
+      b.line(bell, [
+        [0, 0, 7, 4], [4, 0, 9, 4], [8, 0, 7, 4], [12, 0, 6, 4], [15, 4, 7, 4],
+      ])
+      b.drums('tom', 'o.......', 0, 16, 0.08)
+      b.drums('kick', '....x...', 4, 14, 0.07)
+      b.drums('hat', '......o.', 8, 14, 0.03)
     },
   )
 }
@@ -724,12 +774,156 @@ function buildCave(): BgmScore {
   )
 }
 
+/** 草甸：明快的大调三拍子，三角波的笛声领着唱，拨弦似的琶音一路流下去，低音踏着根音与五音，轻轻的鼓点像在草地上走 */
+function buildMeadow(): BgmScore {
+  const chords = [0, 3, 4, 0, 5, 3, 1, 4, 0, 3, 4, 5, 3, 4, 1, 0]
+  return track(
+    {
+      bpm: 100,
+      stepsPerBeat: 2,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 55,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 100) * 0.75, feedback: 0.28, level: 0.22 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.16, attack: 0.01, release: 0.12, octave: -1 }
+      const pluck: Voice = { wave: 'triangle', vol: 0.06, attack: 0.004, release: 0.08, octave: 0 }
+      const flute: Voice = { wave: 'sine', vol: 0.13, attack: 0.03, release: 0.16, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.035, attack: 0.003, release: 0.2, octave: 2, echo: true }
+      b.bass(bass, chords, 'r...o.')
+      b.arp(pluck, chords, [0, 1, 2, 3, 2, 1])
+      b.line(flute, [
+        [0, 0, 4, 2], [0, 2, 5, 1], [0, 3, 4, 1], [0, 4, 2, 2],
+        [1, 0, 3, 3], [1, 3, 5, 3],
+        [2, 0, 6, 2], [2, 2, 5, 2], [2, 4, 4, 2],
+        [3, 0, 2, 6],
+        [4, 0, 5, 2], [4, 2, 7, 2], [4, 4, 6, 2],
+        [5, 0, 5, 3], [5, 3, 3, 3],
+        [6, 0, 4, 2], [6, 2, 3, 2], [6, 4, 1, 2],
+        [7, 0, 4, 6],
+        [8, 0, 7, 2], [8, 2, 8, 1], [8, 3, 7, 1], [8, 4, 6, 2],
+        [9, 0, 5, 3], [9, 3, 7, 3],
+        [10, 0, 8, 2], [10, 2, 9, 2], [10, 4, 8, 2],
+        [11, 0, 7, 6],
+        [12, 0, 5, 2], [12, 2, 6, 2], [12, 4, 5, 2],
+        [13, 0, 4, 3], [13, 3, 6, 3],
+        [14, 0, 5, 2], [14, 2, 3, 2], [14, 4, 1, 2],
+        [15, 0, 0, 6],
+      ])
+      for (let bar = 0; bar < chords.length; bar += 2) b.note(bell, bar, 3, chords[bar]! + 7, 1)
+      b.drums('kick', 'x.....', 0, 16, 0.16)
+      b.drums('hat', '..o.o.', 0, 16, 0.035)
+      b.drums('snare', '...x..', 4, 16, 0.06)
+      b.drums('tom', '....xx', 7, 8, 0.08)
+      b.drums('tom', '...x.x', 15, 16, 0.09)
+    },
+  )
+}
+
+/** 沙漠：一圈一圈走不出去——低音持续不断，琶音绕着同一个音型打转，旋律走了一大圈又落回开头那个音 */
+function buildDunes(): BgmScore {
+  const chords = [0, 0, 1, 1, 0, 0, 6, 6, 5, 5, 6, 6, 1, 1, 0, 0]
+  return track(
+    {
+      bpm: 84,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 50,
+      scale: PHRYGIAN_DOM,
+      echo: { delaySec: (60 / 84) * 0.75, feedback: 0.42, level: 0.42 },
+    },
+    (b) => {
+      const drone: Voice = { wave: 'sine', vol: 0.11, attack: 0.5, release: 1.4, octave: -1 }
+      const bass: Voice = { wave: 'triangle', vol: 0.15, attack: 0.015, release: 0.12, octave: -2 }
+      const sand: Voice = { wave: 'triangle', vol: 0.045, attack: 0.01, release: 0.08, octave: 0 }
+      const lead: Voice = { wave: 'sawtooth', vol: 0.07, attack: 0.05, release: 0.22, octave: 1, echo: true }
+      b.pad(drone, chords, [0, 2])
+      b.bass(bass, chords, 'r.....o.')
+      b.arp(sand, chords, [0, 1, 2, 1, 0, 1, 3, 1])
+      b.line(lead, [
+        [0, 0, 4, 4], [0, 4, 3, 2], [0, 6, 2, 2],
+        [1, 0, 1, 6], [1, 6, 2, 2],
+        [2, 0, 4, 3], [2, 3, 5, 1], [2, 4, 4, 4],
+        [3, 0, 3, 2], [3, 2, 2, 2], [3, 4, 1, 4],
+        [4, 0, 0, 8],
+        [5, 4, 4, 2], [5, 6, 5, 2],
+        [6, 0, 6, 4], [6, 4, 5, 2], [6, 6, 4, 2],
+        [7, 0, 5, 8],
+        [8, 0, 7, 3], [8, 3, 8, 1], [8, 4, 7, 4],
+        [9, 0, 6, 2], [9, 2, 5, 2], [9, 4, 4, 4],
+        [10, 0, 5, 4], [10, 4, 6, 4],
+        [11, 0, 4, 8],
+        [12, 0, 2, 2], [12, 2, 1, 2], [12, 4, 2, 4],
+        [13, 0, 3, 4], [13, 4, 2, 2], [13, 6, 1, 2],
+        [14, 0, 1, 4], [14, 4, 0, 4],
+        [15, 0, 0, 6],
+      ])
+      b.drums('tom', 'x.....x.', 0, 16, 0.2)
+      b.drums('hat', '....x...', 4, 16, 0.035)
+      b.drums('kick', 'x.......', 8, 16, 0.12)
+    },
+  )
+}
+
+/** 樱庭：慢一点的阳音阶，筝拨着五声的分解和弦，尺八似的笛子吹着长音，隔两小节一声铃，鼓点轻得几乎听不见 */
+function buildSakura(): BgmScore {
+  const roots = [0, 3, 2, 1, 0, 3, 4, 2, 3, 2, 1, 0, 3, 4, 2, 0]
+  const pluck = [0, 2, 3, 5, 3, 2, 5, 7]
+  return track(
+    {
+      bpm: 88,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 62,
+      scale: YO,
+      echo: { delaySec: (60 / 88) * 0.75, feedback: 0.3, level: 0.3 },
+    },
+    (b) => {
+      const koto: Voice = { wave: 'triangle', vol: 0.075, attack: 0.003, release: 0.12, octave: 0, echo: true }
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.01, release: 0.2, octave: -1 }
+      const flute: Voice = { wave: 'sine', vol: 0.12, attack: 0.05, release: 0.22, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.03, attack: 0.003, release: 0.3, octave: 2, echo: true }
+      roots.forEach((r, bar) => {
+        pluck.forEach((d, s) => b.note(koto, bar, s, r + d, 1))
+        b.note(bass, bar, 0, r, 3)
+        b.note(bass, bar, 4, r + 3, 3)
+        if (bar % 2 === 0) b.note(bell, bar, 6, r + 5, 2)
+      })
+      b.line(flute, [
+        [0, 0, 4, 3], [0, 3, 3, 1], [0, 4, 2, 4],
+        [1, 0, 3, 2], [1, 2, 4, 2], [1, 4, 5, 4],
+        [2, 0, 4, 3], [2, 3, 3, 1], [2, 4, 2, 2], [2, 6, 1, 2],
+        [3, 0, 2, 8],
+        [4, 0, 5, 3], [4, 3, 4, 1], [4, 4, 3, 2], [4, 6, 4, 2],
+        [5, 0, 5, 4], [5, 4, 7, 4],
+        [6, 0, 6, 2], [6, 2, 5, 2], [6, 4, 4, 2], [6, 6, 3, 2],
+        [7, 0, 4, 8],
+        [8, 0, 7, 3], [8, 3, 6, 1], [8, 4, 5, 4],
+        [9, 0, 6, 2], [9, 2, 7, 2], [9, 4, 8, 4],
+        [10, 0, 7, 3], [10, 3, 6, 1], [10, 4, 5, 2], [10, 6, 4, 2],
+        [11, 0, 5, 8],
+        [12, 0, 3, 2], [12, 2, 4, 2], [12, 4, 5, 2], [12, 6, 4, 2],
+        [13, 0, 3, 3], [13, 3, 2, 1], [13, 4, 1, 4],
+        [14, 0, 2, 4], [14, 4, 1, 2], [14, 6, 0, 2],
+        [15, 0, 0, 8],
+      ])
+      b.drums('tom', 'x.......', 0, 16, 0.06)
+      b.drums('hat', '..x...x.', 0, 16, 0.02)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
-  desert: buildDesert,
+  oldDesert: buildDesert,
   oldRiver: buildRiver,
   void: buildVoid,
+  oldRuins: buildOldRuins,
   ruins: buildRuins,
   daynight: buildDayNight,
   space: buildSpace,
@@ -741,6 +935,9 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   river: buildRiver,
   floe: buildFloe,
   cave: buildCave,
+  meadow: buildMeadow,
+  sakura: buildSakura,
+  desert: buildDunes,
 }
 
 const cache = new Map<BgmId, BgmScore>()

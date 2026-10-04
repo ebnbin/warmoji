@@ -92,6 +92,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       Bolt.pierce[e] = s.pierce ?? 0
       Bolt.homingDeg[e] = s.projectile.homingDeg ?? 0
       Bolt.linger[e] = s.projectile.linger ?? 0
+      Bolt.arc[e] = s.projectile.arc ?? 0
     },
   },
   segment: {

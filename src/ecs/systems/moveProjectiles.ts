@@ -1,17 +1,21 @@
 import { hasComponent, query } from 'bitecs'
-import { Barrier, Faction, Homing, Linger, PrevPos, Proj, PROJ_SET, Radius, Tint, Transform, Vel } from '../components'
+import { Barrier, Faction, Homing, Linger, PrevPos, Proj, PROJ_SET, Radius, Tint, Transform, Vel, VisOff } from '../components'
 import { projHitUids, projSrc, barrierSrc } from '../store'
-import { crossing, hostileTo } from '../entities/barrier'
+import { crossing } from '../entities/barrier'
 import { cullProjectile } from './shared/projectile'
 import { isSameEntity } from '../utils/identity'
 import { nearestTarget } from '../utils/targets'
 import { flying, WORLD_SOURCE } from '../utils/source'
+import { boltProbe, breachAt, FLAT_SHOT_M, impactAt, lobZ, shotPass } from '../utils/pass'
 import { ballistic } from './shared/body'
+import { UNIT } from '../../util/units'
 import type { BodyStep } from './shared/body'
 import type { Sim } from '../sim'
 
 const REFLECT_LIFE_MS = 1400
 const FLIGHT: BodyStep = { x: 0, y: 0, vx: 0, vy: 0 }
+/** 抛射高出平射一米，画面上抬起多少像素 */
+const LIFT_PX_PER_M = UNIT * 0.5
 
 /** 追踪弹转向最近的敌人，每秒最多转 Homing.turn */
 function steer(sim: Sim, eid: number, dt: number): void {
@@ -45,32 +49,31 @@ function home(sim: Sim, eid: number): boolean {
   return true
 }
 
-/** 挡弹的墙：敌方弹体穿过就消失，会反弹的墙把它弹回去并归自己 */
-function barriers(sim: Sim, eid: number, x0: number, y0: number, x1: number, y1: number): boolean {
-  for (const b of query(sim.world, [Barrier])) {
-    if (!Barrier.shots[b] || !hostileTo(b, Faction.v[eid]!)) continue
-    const n = crossing(sim, b, x0, y0, x1, y1)
-    if (!n) continue
-    if (!Barrier.reflect[b]) return false
-    const vx = Vel.x[eid]!
-    const vy = Vel.y[eid]!
-    const dot = vx * n.x + vy * n.y
-    Vel.x[eid] = vx - 2 * dot * n.x
-    Vel.y[eid] = vy - 2 * dot * n.y
-    Transform.x[eid] = x0
-    Transform.y[eid] = y0
-    Faction.v[eid] = Faction.v[b]!
-    const src = barrierSrc[b]
-    if (src) projSrc[eid] = flying(src)
-    projHitUids[eid] = new Set()
-    Proj.dieAt[eid] = sim.elapsedMs + REFLECT_LIFE_MS
-    Tint.color[eid] = Barrier.color[b]!
-    return true
-  }
-  return true
+/** 会反弹的技能墙把弹体弹回去并归自己 */
+function reflect(sim: Sim, eid: number, b: number, x0: number, y0: number, x1: number, y1: number): void {
+  const n = crossing(sim, b, x0, y0, x1, y1) ?? { x: -Vel.x[eid]!, y: -Vel.y[eid]! }
+  const nl = Math.hypot(n.x, n.y) || 1
+  const nx = n.x / nl
+  const ny = n.y / nl
+  const vx = Vel.x[eid]!
+  const vy = Vel.y[eid]!
+  const dot = vx * nx + vy * ny
+  Vel.x[eid] = vx - 2 * dot * nx
+  Vel.y[eid] = vy - 2 * dot * ny
+  Transform.x[eid] = x0
+  Transform.y[eid] = y0
+  Faction.v[eid] = Faction.v[b]!
+  const src = barrierSrc[b]
+  if (src) projSrc[eid] = flying(src)
+  projHitUids[eid] = new Set()
+  Proj.dieAt[eid] = sim.elapsedMs + REFLECT_LIFE_MS
+  Tint.color[eid] = Barrier.color[b]!
 }
 
-/** 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速，穿过挡弹的墙时消失或被反弹 */
+/**
+ * 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速；这一步的轨迹先截在第一个挡住它的障碍上（地图的按高度与贯穿，敌方的技能墙一律挡），
+ * 截下的这一段照常判命中，判完就消失（会落地的落在那里），撞上时带着的破坏力打在障碍上；会反弹的技能墙把它弹回去。抛射的按飞了多远抬高，抛到地方落地
+ */
 export function moveProjectiles(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   for (const eid of [...query(sim.world, PROJ_SET)]) {
@@ -95,13 +98,34 @@ export function moveProjectiles(sim: Sim): void {
       stepY = FLIGHT.y - ay
       if (Proj.spin[eid] === 0 && (FLIGHT.vx !== 0 || FLIGHT.vy !== 0)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
     }
+    let len = Math.hypot(stepX, stepY)
+    if (!Proj.through[eid] && len > 0) {
+      const p = shotPass(sim, Faction.v[eid]!, boltProbe(eid, len), ax, ay, ax + stepX, ay + stepY)
+      const b = p.block
+      if (b && b.barrier >= 0 && Barrier.reflect[b.barrier]) {
+        reflect(sim, eid, b.barrier, ax, ay, ax + stepX, ay + stepY)
+        PrevPos.x[eid] = ax
+        PrevPos.y[eid] = ay
+        continue
+      }
+      Proj.pierce[eid] = Proj.pierce[eid]! - p.spent
+      if (b) {
+        stepX *= b.t
+        stepY *= b.t
+        len *= b.t
+        Proj.dieAt[eid] = sim.elapsedMs
+        impactAt(sim, b)
+        breachAt(sim, b.x, b.y, Proj.arc[eid]! > 0 ? lobZ(Proj.arc[eid]!, Math.min(1, (Proj.flown[eid]! + len) / Proj.reach[eid]!)) : FLAT_SHOT_M, Proj.radius[eid]!, Proj.breach[eid]!)
+      }
+    }
     const moved = sim.hooks.wrap(sim, ax + stepX, ay + stepY)
     Transform.x[eid] = moved.x
     Transform.y[eid] = moved.y
     PrevPos.x[eid] = moved.x - stepX
     PrevPos.y[eid] = moved.y - stepY
+    Proj.flown[eid] = Proj.flown[eid]! + len
+    if (Proj.arc[eid]! > 0) VisOff.y[eid] = -Math.max(0, lobZ(Proj.arc[eid]!, Math.min(1, Proj.flown[eid]! / Proj.reach[eid]!)) - FLAT_SHOT_M) * LIFT_PX_PER_M
     if (Proj.spin[eid] !== 0) Transform.rot[eid] = Transform.rot[eid]! + Proj.spin[eid]! * dt
     else if (hasComponent(sim.world, eid, Homing) || hasComponent(sim.world, eid, Linger)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
-    if (!barriers(sim, eid, ax, ay, ax + stepX, ay + stepY)) cullProjectile(sim, eid)
   }
 }

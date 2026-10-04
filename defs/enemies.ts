@@ -275,6 +275,7 @@ const CREEPER = {
       color: 0xff5252,
       fireSfx: 'boom',
       shape: { kind: 'disc', radius: 3.8, at: 'self' },
+      breach: 1.2,
       onSelf: [{ kind: 'vanish' }],
     },
   ],
@@ -327,7 +328,7 @@ const TURTLE = {
       firstDelayMs: 1500,
       aim: 'nearest',
       damage: 7,
-      shape: { kind: 'bolt', projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      shape: { kind: 'bolt', projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0, arc: 2.2 }, lifeMs: 5000 },
       repeat: { count: 3, spreadDeg: 36 },
     },
   ],
@@ -1004,7 +1005,6 @@ const RUINS_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  breaksWalls: true,
   drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
@@ -1018,6 +1018,7 @@ const RUINS_BOSS = {
       fireSfx: 'whoosh',
       damage: 18,
       shape: { kind: 'sprint', distance: 9, ms: 1100, radius: 1.1, seek: true },
+      breach: 2.4,
       onSelf: [{ kind: 'unstoppable', durationMs: 1200 }],
       onHit: [{ kind: 'shove', distance: 3, ms: 280, onWall: [{ kind: 'stun', durationMs: 1500 }, { kind: 'damage', amount: 12 }] }],
     },

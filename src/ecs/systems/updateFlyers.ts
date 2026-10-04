@@ -8,9 +8,10 @@ import { hit } from './shared/damage'
 import { applyOnHit, struckOf } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
+import { impactAt, reachBlock } from '../utils/pass'
 import type { Sim } from '../sim'
 
-/** 飞返体：去程沿直线缓动到射程尽头，回程追着持有者；去程回程各打每个身体一次 */
+/** 飞返体：去程沿直线缓动到射程尽头（撞上障碍就提早折回），回程追着持有者；去程回程各打每个身体一次 */
 export function updateFlyers(sim: Sim): void {
   const dt = sim.wdtMs
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
@@ -20,12 +21,22 @@ export function updateFlyers(sim: Sim): void {
       continue
     }
     Transform.rot[f] = Transform.rot[f]! + (FlyerShape.spinDegPerSec[e]! * DEG2RAD * dt) / 1000
+    const src = sourceOf(sim, e)
     if (Flyer.phase[f] === 0) {
       Flyer.t[f] = Math.min(1, Flyer.t[f]! + dt / FlyerShape.outMs[e]!)
       const ease = Math.sin((Flyer.t[f]! * Math.PI) / 2)
+      const x0 = Transform.x[f]!
+      const y0 = Transform.y[f]!
       Transform.x[f] = Flyer.launchX[f]! + (Flyer.destX[f]! - Flyer.launchX[f]!) * ease
       Transform.y[f] = Flyer.launchY[f]! + (Flyer.destY[f]! - Flyer.launchY[f]!) * ease
-      if (Flyer.t[f]! >= 1) {
+      // 去程撞上障碍就从那里往回飞
+      const wall = src.blocked ? reachBlock(sim, x0, y0, Transform.x[f]!, Transform.y[f]!) : null
+      if (wall) {
+        Transform.x[f] = x0 + (wall.x - x0) * 0.9
+        Transform.y[f] = y0 + (wall.y - y0) * 0.9
+        impactAt(sim, wall)
+      }
+      if (wall || Flyer.t[f]! >= 1) {
         Flyer.phase[f] = 1
         flyerHits[f]!.clear()
       }
@@ -44,7 +55,6 @@ export function updateFlyers(sim: Sim): void {
     const magnet = FlyerShape.coinMagnet[e]!
     if (magnet > 0) sim.frameAttractors.push({ x: Transform.x[f]!, y: Transform.y[f]!, r2: magnet * magnet })
     const struck = flyerHits[f]!
-    const src = sourceOf(sim, e)
     const radius = FlyerShape.radius[e]!
     for (const t of targetsWithin(sim, src, Transform.x[f]!, Transform.y[f]!, radius)) {
       if (struck.has(Uid.v[t.eid]!)) continue

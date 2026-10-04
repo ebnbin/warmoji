@@ -94,7 +94,7 @@ import { wallLoops } from './worlds/basin'
 import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
-const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆' })
+const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
 const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
 
 /** 出怪口按种类上色 */
