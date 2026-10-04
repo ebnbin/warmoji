@@ -13,7 +13,7 @@ export const COPPER_CELL_U = 0.125
 /** 离带电的铜这么远（格）以外不记：光晕和触电都够不着 */
 export const COPPER_REACH_U = 3
 /** 电流着色器把沿铜的距离按这么长（格）编进两个通道，网络状态图能放这么多条网络 */
-export const ALONG_SPAN_U = 64
+export const ALONG_SPAN_U = 32
 export const NET_SLOTS = 16
 /** 布线按这么细的格子走，格 */
 const ROUTE_CELL_U = 0.25
@@ -79,8 +79,8 @@ export function arenaRoom(a: Arena, x: number, y: number): number {
   )
 }
 
-/** 元件：芯片、贴片电阻电容、发光管、电解电容、电感、MOS 管和电极；都是正着摆的 */
-export type PartKind = 'ic' | 'sot' | 'res' | 'cap' | 'led' | 'can' | 'coil' | 'electrode'
+/** 元件：芯片、贴片电阻电容、发光管、电解电容、电感、晶振、MOS 管和电极；都是正着摆的 */
+export type PartKind = 'ic' | 'sot' | 'res' | 'cap' | 'led' | 'can' | 'coil' | 'xtal' | 'electrode'
 
 /** 焊盘：中心与半宽半高（格），朝哪边伸出去；lead 是芯片的引脚压在上面 */
 export interface Pad {
@@ -158,6 +158,24 @@ export interface Mark {
   readonly dash: number
 }
 
+/** 贴在板上的条码纸：中心、宽高（格），竖着贴时 rot 为 1；印的编号 */
+export interface Sticker {
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+  readonly rot: 0 | 1
+  readonly code: string
+}
+
+/** 板面上的一块长方形，格 */
+export interface Box {
+  readonly x0: number
+  readonly y0: number
+  readonly x1: number
+  readonly y1: number
+}
+
 /** 丝印的高压警示：三角里一道闪电，中心与边长（格） */
 export interface Warning {
   readonly x: number
@@ -232,11 +250,21 @@ export interface CircuitPlan {
   readonly warnings: readonly Warning[]
   readonly fiducials: readonly Point[]
   readonly holes: readonly Point[]
+  readonly testpoints: readonly Point[]
+  readonly sticker: Sticker | null
+  /** 标题那一块不铺铜 */
+  readonly keepout: Box
   readonly nets: readonly Net[]
   readonly clocks: readonly Clock[]
   readonly gaps: readonly Gap[]
   readonly buttons: readonly Button[]
   readonly copper: CopperGrid
+}
+
+/** 单位方向 */
+function norm2(x: number, y: number): Point {
+  const l = Math.hypot(x, y) || 1
+  return { x: x / l, y: y / l }
 }
 
 /** 点到线段的距离 */
@@ -431,6 +459,14 @@ function makeCoil(mpu: number, ref: string, mark: string, cx: number, cy: number
   )
   const reach = padOff + 0.9 / mpu
   return { kind: 'coil', x: cx, y: cy, hw: h, hh: h, z: zMM / mpu, axis, bw: axis === 0 ? reach : h, bh: axis === 0 ? h : reach, pads, ref, mark, dx: 0, dy: 0, inside }
+}
+
+/** 贴片晶振：金属盖的小方块，四个角底下各一个焊盘，露出一点边 */
+function makeXtal(mpu: number, ref: string, mark: string, cx: number, cy: number, axis: 0 | 1, inside: boolean): Part {
+  const hw = (axis === 0 ? 3.2 : 2.5) / mpu / 2
+  const hh = (axis === 0 ? 2.5 : 3.2) / mpu / 2
+  const pads: Pad[] = [-1, 1].flatMap((sx) => [-1, 1].map((sy) => ({ x: cx + sx * (hw - 0.45 / mpu), y: cy + sy * (hh - 0.4 / mpu), hw: 0.6 / mpu, hh: 0.55 / mpu, nx: sx, ny: 0, lead: false })))
+  return { kind: 'xtal', x: cx, y: cy, hw, hh, z: 0.8 / mpu, axis, bw: hw + 0.15 / mpu, bh: hh + 0.15 / mpu, pads, ref, mark, dx: 0, dy: 0, inside }
 }
 
 /** 电极：一块根在 (bx, by) 的金属块，朝 (dx, dy) 伸出 ELECTRODE.len 格，尖是削出来的 */
@@ -1063,6 +1099,42 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   const res = makeChip(mpu, 'res', '0805', 'R1', '471', resC.x, resC.y, ledAxis, true)
   d.parts.push(led, res)
 
+  // 配套的小元件顺着芯片的长边排在它一头，不占过道：电源芯片旁一颗功率电感和一颗输出电容，负载芯片旁一颗晶振和一颗负载电容，
+  // 计数芯片与运放另一头各一颗去耦电容；挤到别的元件或开局空地就不放
+  const beyond = (ic: Part, du: number, dv: number, gap: number, half: number): Point => {
+    const dx = o.ux * du + o.vx * dv
+    const dy = o.uy * du + o.vy * dv
+    const ext = Math.abs(dx) * ic.bw + Math.abs(dy) * ic.bh
+    return { x: ic.x + dx * (ext + gap + half), y: ic.y + dy * (ext + gap + half) }
+  }
+  const axisOf = (du: number, dv: number): 0 | 1 => (o.ux * du + o.vx * dv !== 0 ? 0 : 1)
+  const fits = (p: Part, host: Part): boolean =>
+    partDist(p, cx, cy) > cfg.plazaU + 1 && arenaRoom(arena, p.x, p.y) > Math.max(p.bw, p.bh) + 1.2 && d.parts.every((q) => q === host || spaced([q, p], 2.8))
+  const extra = (p: Part, host: Part): Part | null => {
+    if (!fits(p, host)) return null
+    d.parts.push(p)
+    return p
+  }
+  const l1c = beyond(u1, 0, -1, 1.1, 2)
+  const l1 = extra(makeCoil(mpu, 'L1', '4R7', l1c.x, l1c.y, 4, 2, axisOf(0, 1), true), u1)
+  if (l1) {
+    const c1c = beyond(l1, 0, -1, 0.8, 1)
+    extra(makeChip(mpu, 'cap', '1206', 'C1', '', c1c.x, c1c.y, axisOf(0, 1), true), l1)
+  }
+  const y1c = beyond(u2, -1, 0, 1.2, 1.6)
+  const y1 = extra(makeXtal(mpu, 'Y1', '16.000', y1c.x, y1c.y, axisOf(1, 0), true), u2)
+  if (y1) {
+    const c2c = beyond(y1, -1, 0, 0.7, 0.8)
+    extra(makeChip(mpu, 'cap', '0603', 'C2', '', c2c.x, c2c.y, axisOf(1, 0), true), y1)
+  }
+  const c5c = beyond(u4, 1, 0, 0.9, 1)
+  extra(makeChip(mpu, 'cap', '0805', 'C5', '', c5c.x, c5c.y, axisOf(1, 0), true), u4)
+  const u5Along = u5Wall === 'S' ? { du: 1, dv: 0 } : { du: 0, dv: -1 }
+  const c6c = beyond(u5, u5Along.du, u5Along.dv, 0.9, 1)
+  extra(makeChip(mpu, 'cap', '0805', 'C6', '', c6c.x, c6c.y, axisOf(u5Along.du, u5Along.dv), true), u5)
+  const r2c = beyond(u5, -u5Along.du, -u5Along.dv, 0.9, 1)
+  extra(makeChip(mpu, 'res', '0805', 'R2', '103', r2c.x, r2c.y, axisOf(u5Along.du, u5Along.dv), true), u5)
+
   // 电源线
   const railFrom = facing(d, u1, 1, 0).at(-1)!
   const railTo = facing(d, u2, 0, 1).at(-1)!
@@ -1123,20 +1195,21 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   const lw = cfg.clock.widthU
   const padEdge: Pad = { x: bm.x, y: bm.y, hw: bc.padU + 0.15, hh: bc.padU + 0.15, nx: o.ux * toPlate.du + o.vx * toPlate.dv, ny: o.uy * toPlate.du + o.vy * toPlate.dv, lead: false }
   const entry = toMap(o, westSide ? pc.u - pw / 2 : bu.u, westSide ? bu.v : pc.v + ph / 2)
-  const plateEdge: Pad = { x: entry.x - padEdge.nx * 0.3, y: entry.y - padEdge.ny * 0.3, hw: 0.3, hh: 0.3, nx: -padEdge.nx, ny: -padEdge.ny, lead: false }
-  // 连线从盘外 0.35 格起：站在盘上的身体碰不到它
-  const linkStart = padOut(padEdge, 0.2)
-  const startPad: Pad = { ...padEdge, x: linkStart.x - padEdge.nx * 0.2, y: linkStart.y - padEdge.ny * 0.2, hw: 0.2, hh: 0.2 }
-  const link = routeBus(d, [startPad], [plateEdge], lw, 0, { ...hazardKeep, plaza: cfg.plazaU })
-  if (!link) return null
+  // 连线是一条直线：从盘外 0.35 格起（站在盘上的身体碰不到它），伸进铜板里一点
+  const linkPts: Point[] = [padOut(padEdge, 0.2), { x: entry.x - padEdge.nx * 0.3, y: entry.y - padEdge.ny * 0.3 }]
+  const linkTrace: Trace = { pts: linkPts, w: lw, net: plate.net }
+  const linkShapes = traceShapes(linkTrace)
+  for (const sh of linkShapes) {
+    for (const p of d.parts) if (shapeDist(sh, p.x, p.y) < Math.hypot(p.bw, p.bh) + PART_KEEP_U) return null
+    for (const other of d.copper.flat()) for (let t = 0; t <= 1; t += 0.1) if (shapeDist(other, linkPts[0]!.x + (linkPts[1]!.x - linkPts[0]!.x) * t, linkPts[0]!.y + (linkPts[1]!.y - linkPts[0]!.y) * t) < NET_GAP_U + lw / 2) return null
+  }
   d.plates.push(plate)
-  const linkTrace: Trace = { pts: link[0]!, w: lw, net: plate.net }
   d.traces.push(linkTrace)
-  d.copper.push([...traceShapes(linkTrace), { kind: 'plate', p: plate }])
-  d.nets.push({ kind: 'button', sources: [linkTrace.pts[0]!], driver: 0 })
+  d.copper.push([...linkShapes, { kind: 'plate', p: plate }])
+  d.nets.push({ kind: 'button', sources: [linkPts[0]!], driver: 0 })
   const button: Button = { x: bm.x, y: bm.y, r: bc.padU, net: plate.net, plate }
   // MOS 管摆在连线旁边
-  const lm = linkTrace.pts[Math.floor(linkTrace.pts.length / 2)]!
+  const lm = { x: (linkPts[0]!.x + linkPts[1]!.x) / 2, y: (linkPts[0]!.y + linkPts[1]!.y) / 2 }
   const side = toMap(o, westSide ? 0 : 1.9, westSide ? 1.9 : 0)
   const qx = lm.x + side.x - o.cx
   const qy = lm.y + side.y - o.cy
@@ -1190,34 +1263,50 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   }
   for (const p of [led, res]) refLabel(d, p, 0.6, -1)
   if (d.parts.includes(q1)) refLabel(d, q1, 0.6, 1)
-  // 网络名印在线旁、背着开局空地的那一侧，离电源 at 格处
-  const beside = (s: string, line: readonly Point[], at: number, off: number): void => {
-    let left = at
-    for (let i = 1; i < line.length; i++) {
+  // 网络名印在离电源不远的一段横平竖直的线旁边、背着开局空地的那一侧
+  const beside = (s: string, line: readonly Point[], off: number): void => {
+    const size = 0.8
+    let best = -1
+    let bestLen = 0
+    let acc = 0
+    for (let i = 1; i < line.length && acc < 9; i++) {
       const a = line[i - 1]!
       const b = line[i]!
       const len = Math.hypot(b.x - a.x, b.y - a.y)
-      if (left > len && i < line.length - 1) {
-        left -= len
-        continue
+      acc += len
+      if ((Math.abs(b.x - a.x) < 1e-6 || Math.abs(b.y - a.y) < 1e-6) && len > bestLen) {
+        best = i
+        bestLen = len
       }
-      const t = Math.min(1, left / (len || 1))
-      const px = a.x + (b.x - a.x) * t
-      const py = a.y + (b.y - a.y) * t
-      const nx = (b.y - a.y) / (len || 1)
-      const ny = -(b.x - a.x) / (len || 1)
-      const sgn = (px - cx) * nx + (py - cy) * ny >= 0 ? 1 : -1
-      const r = off + textWidth(s, 0.8) * 0.5 * Math.abs(nx) + 0.45 * Math.abs(ny)
-      d.labels.push({ s, x: px + nx * sgn * r, y: py + ny * sgn * r, size: 0.8, rot: 0 })
-      return
     }
+    if (best < 0 || bestLen < 1.5) return
+    const a = line[best - 1]!
+    const b = line[best]!
+    const px = (a.x + b.x) / 2
+    const py = (a.y + b.y) / 2
+    const nx = (b.y - a.y) / bestLen
+    const ny = -(b.x - a.x) / bestLen
+    const sgn = (px - cx) * nx + (py - cy) * ny >= 0 ? 1 : -1
+    const r = off + 0.15 + (Math.abs(nx) > 0.5 ? textWidth(s, size) / 2 : size / 2)
+    d.labels.push({ s, x: px + nx * sgn * r, y: py + ny * sgn * r, size, rot: 0 })
   }
-  beside('+5V', railBus[0]!, 2.6, railW / 2 + 0.35)
-  beside('CLK', bus[Math.floor(bus.length / 2)]!, 3, ((n - 1) * cfg.clock.pitchU + cfg.clock.widthU) / 2 + 0.35)
-  d.labels.push({ s: 'SW1', x: bm.x, y: bm.y - bc.padU - 0.9, size: 0.75, rot: 0 }, { s: 'TOUCH', x: bm.x, y: bm.y + bc.padU + 0.9, size: 0.65, rot: 0 })
+  beside('+5V', railBus[0]!, railW / 2)
+  beside('CLK', bus[0]!, (n - 1) * cfg.clock.pitchU + cfg.clock.widthU / 2)
+  // 开关的字印在背着连线的那一侧：TOUCH 正对着连线的反方向，SW1 在旁边
+  const away = { x: -padEdge.nx, y: -padEdge.ny }
+  const across = { x: -away.y, y: away.x }
+  const room = (sgn: number, size: number, s: string): Label => ({
+    s,
+    x: bm.x + across.x * sgn * (bc.padU + 0.75 + textWidth(s, size) * 0.5 * Math.abs(across.x)),
+    y: bm.y + across.y * sgn * (bc.padU + 0.75 + size * 0.5 * Math.abs(across.y)),
+    size,
+    rot: 0,
+  })
+  d.labels.push(room(1, 0.75, 'SW1'), room(-1, 0.65, 'TOUCH'))
   d.labels.push({ s: 'WARMOJI', x: cx, y: cy - 0.6, size: 1.25, rot: 0 }, { s: 'REV A  2026', x: cx, y: cy + 1.25, size: 0.6, rot: 0 })
   const tw = textWidth('WARMOJI', 1.25) / 2 + 0.9
   const box = { x0: cx - tw, y0: cy - 2.1, x1: cx + tw, y1: cy + 2.4 }
+  const keepout: Box = { x0: box.x0 - 0.35, y0: box.y0 - 0.35, x1: box.x1 + 0.35, y1: box.y1 + 0.35 }
   d.marks.push({
     pts: [
       { x: box.x0 + 0.5, y: box.y0 },
@@ -1254,6 +1343,17 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     for (const line of lines) d.traces.push({ pts: line, w: SIGNAL_U, net: -1 })
     for (const p of [...pa, ...pb]) used.add(p)
   }
+  // 芯片到它旁边的电感、晶振各一条细线
+  const nearestPad = (p: Part, to: Part): Pad => p.pads.reduce((m, q) => (Math.hypot(q.x - to.x, q.y - to.y) < Math.hypot(m.x - to.x, m.y - to.y) ? q : m))
+  const link2 = (a: Pad | undefined, b: Pad | undefined): void => {
+    if (!a || !b || used.has(a) || used.has(b)) return
+    const lines = routeBus(d, [a], [b], SIGNAL_U, 0, signalKeep)
+    if (!lines) return
+    d.traces.push({ pts: lines[0]!, w: SIGNAL_U, net: -1 })
+    used.add(a).add(b)
+  }
+  if (l1) link2(free(facing(d, u1, 1, 0))[0], nearestPad(l1, u1))
+  if (y1) link2(free(facing(d, u2, 0, 1))[0], nearestPad(y1, u2))
 
   // 能走的地面：屏蔽罩里、元件外，留下与开局空地连通的一块
   const inside = d.parts.filter((p) => p.inside)
@@ -1289,7 +1389,110 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     for (const v of d.vias) if (Math.hypot(x - v.x, y - v.y) < v.r + r) return true
     return false
   }
+  // 靠墙那排脚拉几条细线横过过道，到罩壁跟前打过孔下到内层
+  const lineFree = (a: Point, b: Point, r: number): boolean => {
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.2)
+    for (let i = 1; i <= n; i++) {
+      const t = i / n
+      const x = a.x + (b.x - a.x) * t
+      const y = a.y + (b.y - a.y) * t
+      if (d.parts.some((p) => partDist(p, x, y) < r)) return false
+    }
+    return true
+  }
+  for (const [ic, wall] of [
+    [u1, 'W'],
+    [u2, 'N'],
+    [u3, 'E'],
+    [u4, 'S'],
+    [u5, u5Wall],
+  ] as const) {
+    const inw = INWARD[wall]
+    for (const pad of facing(d, ic, -inw.du, -inw.dv)) {
+      if (used.has(pad) || rng.next() < 0.4) continue
+      const c = toCanon(o, pad.x, pad.y)
+      const wallAt = inw.du !== 0 ? -inw.du * o.hu : -inw.dv * o.hv
+      const reach = Math.abs((inw.du !== 0 ? c.u : c.v) - wallAt) - 1.1
+      if (reach < 1) continue
+      const end = padOut(pad, reach - (pad.nx !== 0 ? pad.hw : pad.hh))
+      if (!lineFree({ x: pad.x, y: pad.y }, end, 0.35) || occupied(end.x, end.y, 0.55)) continue
+      d.traces.push({ pts: [{ x: pad.x, y: pad.y }, end], w: SIGNAL_U * 0.9, net: -1 })
+      d.vias.push({ x: end.x, y: end.y, r: 0.36, hole: 0.16, open: false })
+      used.add(pad)
+    }
+  }
+  // 空着的地方拉几束细线过去，末端一排过孔下到内层
+  for (let k = 0, tries = 0; k < 3 && tries < 60; tries++) {
+    const t = { x: arena.x0 + 3 + rng.next() * (arena.x1 - arena.x0 - 6), y: arena.y0 + 3 + rng.next() * (arena.y1 - arena.y0 - 6) }
+    if (Math.hypot(t.x - cx, t.y - cy) < cfg.plazaU + 3 || arenaRoom(arena, t.x, t.y) < 2.5) continue
+    if (d.parts.some((p) => partDist(p, t.x, t.y) < 3.5) || d.copper.flat().some((sh) => shapeDist(sh, t.x, t.y) < 2.2)) continue
+    const ics = [u1, u2, u3, u4, u5].sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y))
+    let done = false
+    for (const ic of ics.slice(0, 2)) {
+      const dir = norm2(t.x - ic.x, t.y - ic.y)
+      const row = ic.pads.filter((p) => !used.has(p) && p.nx * dir.x + p.ny * dir.y > 0.3)
+      if (row.length < 2) continue
+      const kk = Math.min(row.length, 2 + Math.floor(rng.next() * 3))
+      const start = Math.floor(rng.next() * (row.length - kk + 1))
+      const pa = row
+        .sort((a, b) => (a.nx !== 0 ? a.y - b.y : a.x - b.x))
+        .slice(start, start + kk)
+      if (pa.some((p) => p.nx !== pa[0]!.nx || p.ny !== pa[0]!.ny)) continue
+      const pitch = kk > 1 ? Math.hypot(pa[kk - 1]!.x - pa[0]!.x, pa[kk - 1]!.y - pa[0]!.y) / (kk - 1) : 1
+      // 目标处排一行和出线一样间距的假焊盘：线头朝着芯片的方向斜过来，落在一排过孔上
+      const axisX = Math.abs(dir.x) >= Math.abs(dir.y)
+      const pb: Pad[] = Array.from({ length: kk }, (_, i) => {
+        const off = (i - (kk - 1) / 2) * pitch
+        return { x: t.x + (axisX ? 0 : off), y: t.y + (axisX ? off : 0), hw: 0.2, hh: 0.2, nx: axisX ? -Math.sign(dir.x) : 0, ny: axisX ? 0 : -Math.sign(dir.y), lead: false }
+      })
+      const lines = routeBus(d, pa, pb, SIGNAL_U, pitch, signalKeep)
+      if (!lines) continue
+      for (const line of lines) {
+        d.traces.push({ pts: line, w: SIGNAL_U, net: -1 })
+        const e = line[line.length - 1]!
+        d.vias.push({ x: e.x, y: e.y, r: 0.36, hole: 0.16, open: false })
+      }
+      for (const p of pa) used.add(p)
+      done = true
+      break
+    }
+    if (done) k++
+  }
   for (const p of [u1, u2, u3, u4, u5]) fanOut(d, p, used, (x, y, r) => !occupied(x, y, r) && Math.hypot(x - cx, y - cy) > cfg.plazaU + 1)
+  // 丝印字占着的地方
+  const onLabel = (x: number, y: number, m: number): boolean =>
+    d.labels.some((l) => {
+      const hw = textWidth(l.s, l.size) / 2 + m
+      const hh = l.size / 2 + m
+      return l.rot === 0 ? Math.abs(x - l.x) < hw && Math.abs(y - l.y) < hh : Math.abs(x - l.x) < hh && Math.abs(y - l.y) < hw
+    })
+  // 测试点：几块圆形的金，旁边印着编号
+  const testpoints: Point[] = []
+  for (let tries = 0; tries < 80 && testpoints.length < 4; tries++) {
+    const t = { x: arena.x0 + 2 + rng.next() * (arena.x1 - arena.x0 - 4), y: arena.y0 + 2 + rng.next() * (arena.y1 - arena.y0 - 4) }
+    if (arenaRoom(arena, t.x, t.y) < 2 || occupied(t.x, t.y, 1.3) || onLabel(t.x, t.y, 1) || onLabel(t.x + 1.6, t.y, 0.5) || d.copper.flat().some((sh) => shapeDist(sh, t.x, t.y) < 1.6)) continue
+    if (testpoints.some((q) => Math.hypot(q.x - t.x, q.y - t.y) < 6)) continue
+    testpoints.push(t)
+    const ring = Array.from({ length: 33 }, (_, i) => ({ x: t.x + Math.cos((i / 32) * Math.PI * 2) * 0.72, y: t.y + Math.sin((i / 32) * Math.PI * 2) * 0.72 }))
+    d.marks.push({ pts: ring, w: 0.08, dash: 0 })
+    d.labels.push({ s: `TP${testpoints.length}`, x: t.x + 0.95 + textWidth(`TP${testpoints.length}`, 0.6) / 2, y: t.y, size: 0.6, rot: 0 })
+  }
+  // 一张贴在板上的条码纸
+  let sticker: Sticker | null = null
+  for (let tries = 0; tries < 60 && !sticker; tries++) {
+    const rot: 0 | 1 = rng.next() < 0.5 ? 0 : 1
+    const w = 5.2
+    const h = 1.9
+    const t = { x: arena.x0 + 4 + rng.next() * (arena.x1 - arena.x0 - 8), y: arena.y0 + 4 + rng.next() * (arena.y1 - arena.y0 - 8) }
+    const hw = rot === 0 ? w / 2 : h / 2
+    const hh = rot === 0 ? h / 2 : w / 2
+    const spots = [t, { x: t.x - hw, y: t.y - hh }, { x: t.x + hw, y: t.y - hh }, { x: t.x - hw, y: t.y + hh }, { x: t.x + hw, y: t.y + hh }]
+    if (spots.some((q) => occupied(q.x, q.y, 0.6) || onLabel(q.x, q.y, 0.4) || arenaRoom(arena, q.x, q.y) < 1.5)) continue
+    if (d.copper.flat().some((sh) => shapeDist(sh, t.x, t.y) < Math.hypot(hw, hh) + 1)) continue
+    if (testpoints.some((q) => Math.abs(q.x - t.x) < hw + 1.5 && Math.abs(q.y - t.y) < hh + 1.5)) continue
+    const hex = Math.floor(rng.next() * 0xffffff).toString(16).toUpperCase().padStart(6, '0')
+    sticker = { x: t.x, y: t.y, w, h, rot, code: `SN${hex}` }
+  }
   const holes = [
     { x: -cfg.padU * 0.45, y: -cfg.padU * 0.45 },
     { x: S + cfg.padU * 0.45, y: -cfg.padU * 0.45 },
@@ -1329,6 +1532,9 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     warnings: d.warnings,
     fiducials,
     holes,
+    testpoints,
+    sticker,
+    keepout,
     nets,
     clocks,
     gaps,

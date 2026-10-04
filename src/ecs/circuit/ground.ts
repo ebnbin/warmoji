@@ -215,8 +215,8 @@ function bodyText(p: Part): Text | null {
   const long = p.axis === 0 ? p.hw * 2 : p.hh * 2
   const short = p.axis === 0 ? p.hh * 2 : p.hw * 2
   const units = lineUnits(p.mark.length)
-  const size = Math.min(short * (p.kind === 'ic' ? 0.26 : 0.5), ((long * 0.82) / units) * 6)
-  const color = p.kind === 'ic' || p.kind === 'sot' ? 1 : 2
+  const size = Math.min(short * (p.kind === 'ic' ? 0.26 : p.kind === 'xtal' ? 0.32 : 0.5), ((long * 0.82) / units) * 6)
+  const color = p.kind === 'ic' || p.kind === 'sot' || p.kind === 'xtal' ? 1 : 2
   return { s: p.mark, x: p.x, y: p.y, size, rot: p.axis === 0 ? 0 : 1, color }
 }
 
@@ -473,6 +473,13 @@ function partTop(sc: PaintScene, p: Part, x: number, y: number, aa: number, s: S
     tilt(s, p.axis === 0 ? Math.sign(dx) * u * 0.9 : 0, p.axis === 0 ? 0 : Math.sign(dy) * u * 0.9, 1)
     return true
   }
+  if (p.kind === 'xtal') {
+    // 晶振：冲压的金属盖，四边一圈压边
+    setSurf(s, ALU, 0.95 + 0.06 * valueNoise(x * 12, y * 12, seed + 55), 0.85, 28)
+    const e = Math.min(p.hw - Math.abs(dx), p.hh - Math.abs(dy))
+    if (e < 0.22) tilt(s, Math.abs(dx) / p.hw > Math.abs(dy) / p.hh ? Math.sign(dx) : 0, Math.abs(dx) / p.hw > Math.abs(dy) / p.hh ? 0 : Math.sign(dy), (0.22 - e) * 4)
+    return true
+  }
   if (p.kind === 'res') setSurf(s, RESISTOR, 1, 0.1, 10)
   else if (p.kind === 'cap') setSurf(s, CERAMIC, 0.94 + 0.08 * valueNoise(x * 14, y * 14, seed + 37), 0.08, 8)
   else if (p.kind === 'led') setSurf(s, LENS, 1, 0.5, 40)
@@ -526,7 +533,6 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
   const ppu = GROUND_PPU
   const aa = 0.5 / ppu
   const w = rect.x1 - rect.x0
-  const plazaR = sc.cfg.plazaU
   const S: Surf = { r: 0, g: 0, b: 0, nx: 0, ny: 0, nz: 1, metal: 0, shine: 8 }
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
@@ -618,10 +624,14 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         }
         let fid = Infinity
         for (const f of plan.fiducials) fid = Math.min(fid, Math.hypot(x - f.x, y - f.y) - 0.5)
+        let tp = Infinity
+        for (const t of plan.testpoints) tp = Math.min(tp, Math.hypot(x - t.x, y - t.y) - 0.45)
         let hole = Infinity
         for (const h of plan.holes) hole = Math.min(hole, Math.hypot(x - h.x, y - h.y) - 1.6)
-        gap = Math.min(expo, sig, pad, plate, via, button, fid - 0.6, hole - 0.2)
-        const pour = Math.hypot(x - plan.start.x, y - plan.start.y) < plazaR ? 0 : smooth(POUR_GAP_U - aa, POUR_GAP_U + aa, gap)
+        gap = Math.min(expo, sig, pad, plate, via, button, fid - 0.6, hole - 0.2, tp)
+        const ko = plan.keepout
+        const kept = Math.max(ko.x0 - x, x - ko.x1, ko.y0 - y, y - ko.y1)
+        const pour = smooth(POUR_GAP_U - aa, POUR_GAP_U + aa, Math.min(gap, kept - POUR_GAP_U))
         setSurf(S, MASK, tone, 0.18, 30)
         if (pour > 0) mixSurf(S, [POUR[0] * tone, POUR[1] * tone, POUR[2] * tone], pour)
         // 阻焊层下的细线：比铺铜略亮，铜比基材高一点，朝太阳那侧的边亮一线
@@ -662,7 +672,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           }
         }
         // 露着的铜一律沉金：带电的线、焊盘、铜板、触摸开关、基准点；铜边外阻焊开窗露出一线基材
-        const metal = Math.min(expo, pad, plate, touch, fid)
+        const metal = Math.min(expo, pad, plate, touch, fid, tp)
         let gold = 0
         if (metal < aa) {
           gold = smooth(aa, -aa, metal)
@@ -730,6 +740,33 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
             const speck = 0.9 + 0.1 * valueNoise(x * 50, y * 50, seed + 51)
             mixSurf(S, [SILK[0] * speck, SILK[1] * speck, SILK[2] * speck], ink * 0.92)
             S.metal = 0.05
+          }
+        }
+        // 条码纸：白纸贴在板上，一条条黑杠，底下印着编号
+        const st = plan.sticker
+        if (st) {
+          const lx = st.rot === 0 ? x - st.x : -(y - st.y)
+          const ly = st.rot === 0 ? y - st.y : x - st.x
+          const pe = Math.max(Math.abs(lx) - st.w / 2, Math.abs(ly) - st.h / 2)
+          if (pe < aa) {
+            const paper = smooth(aa, -aa, pe)
+            const fiber = 0.95 + 0.05 * valueNoise(x * 40, y * 40, seed + 57)
+            mixSurf(S, [222 * fiber, 220 * fiber, 210 * fiber], paper)
+            S.metal = 0.02
+            S.nx = 0
+            S.ny = 0
+            S.nz = 1
+            const bx = lx + st.w / 2 - 0.35
+            if (ly < 0.25 && ly > -st.h / 2 + 0.25 && bx > 0 && bx < st.w - 0.7) {
+              const bar = Math.floor(bx / 0.09)
+              const on = (Math.sin(bar * 12.9898 + st.code.length * 78.233) * 43758.5453) % 1
+              if (Math.abs(on) > 0.45) mixSurf(S, [26, 26, 28], paper)
+            }
+            const code: Text = { s: st.code, x: st.x + (st.rot === 0 ? 0 : -(st.h / 2 - 0.42)), y: st.y + (st.rot === 0 ? st.h / 2 - 0.42 : 0), size: 0.42, rot: st.rot, color: 0 }
+            const ink = inkAt(code, x, y, aa)
+            if (ink > 0) mixSurf(S, [30, 30, 32], ink * paper)
+          } else if (pe < 0.12) {
+            ao = Math.min(ao, 0.8 + 0.2 * (pe / 0.12))
           }
         }
         // 屏蔽罩外脚：焊在一圈金上，焊锡一坨一坨
