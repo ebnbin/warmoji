@@ -21,6 +21,8 @@ import type { TrackTex } from './stamp'
 import type { DesertState } from './world'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { inRect } from '../lens'
+import type { Framing, Rect } from '../lens'
 import type { Sim } from '../sim'
 import type { DesertConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -35,7 +37,7 @@ const DUST_KEY = 'desert-dust'
 const PAINT_THREADS = 4
 /** 沙地按这么多像素高的条分块交给线程 */
 const STRIP_PX = 32
-/** 地面四边形比镜头最宽时还多出这么多格：镜头一晃也盖得住 */
+/** 地面四边形比镜头拍到的范围宽出这么多格：镜头一晃也盖得住 */
 const GROUND_PAD_U = 6
 /** 印子贴图最快隔这么久（毫秒）重传一次改过的块 */
 const TRACK_UPLOAD_MS = 50
@@ -157,17 +159,19 @@ export class DesertView implements MapView {
 
   build(v: ViewCtx): void {
     const scene = v.scene
-    this.visuals.push(scene.add.rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG).setScrollFactor(0).setDepth(-3))
+    this.visuals.push(v.lens.cover(scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-3)))
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
   }
 
-  /** 镜头连续地跟着队长、不设边；屏幕太宽时拉近，看到的长边不超过 viewMaxU 格 */
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
+  /** 四边首尾相接：跟随时连续地跟着队长、不设边，固定取景时正好拍一圈 */
+  framing(v: ViewCtx): Framing {
+    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'wrap' }
+  }
+
+  /** 屏幕太宽时拉近：看到的长边不超过 viewMaxU 格 */
+  followZoom(v: ViewCtx): number {
     const longU = Math.max(viewport.logicalWidth, viewport.logicalHeight) / UNIT
-    cam.removeBounds()
-    cam.setZoom(viewport.renderScale * Math.max(1, longU / this.cfgOf(v).viewMaxU))
-    cam.startFollow(v.anchor)
+    return Math.max(1, longU / this.cfgOf(v).viewMaxU)
   }
 
   /** 布景也成对：横竖各隔半圈再摆一份，和沙丘、标志物一样分不出是哪一处 */
@@ -213,7 +217,7 @@ export class DesertView implements MapView {
     u.track[0] = data.cells
     const side = (cfg.viewMaxU + GROUND_PAD_U) * UNIT
     const sunLen = Math.hypot(plan.light.x, plan.light.y, plan.light.z)
-    this.ground = scene.add
+    this.ground = v.lens.mainOnly(scene.add
       .shader(
         {
           name: 'DesertGround',
@@ -236,7 +240,7 @@ export class DesertView implements MapView {
         [GROUND_KEY, TRACKS_KEY, INFO_KEY],
       )
       .setOrigin(0, 0)
-      .setDepth(-1)
+      .setDepth(-1))
     this.visuals.push(this.ground)
     this.landmarks(v, plan)
     this.ragShadow = scene.add.graphics().setDepth(RAG_SHADOW_DEPTH)
@@ -285,34 +289,33 @@ export class DesertView implements MapView {
     const s = sim.worldState.desert
     const g = this.ground
     if (!s || !g || !this.tracks) return
-    const cfg = this.cfgOf(v)
     const now = sim.elapsedMs
     const dt = Math.min(delta, 50) / 1000
-    const cam = v.scene.cameras.main
-    const view = cam.worldView
-    const mid = { x: view.centerX, y: view.centerY }
-    const side = (cfg.viewMaxU + GROUND_PAD_U) * UNIT
-    const x0 = mid.x - side / 2
-    const y0 = mid.y - side / 2
-    g.setPosition(x0, y0)
+    const view = v.lens.view()
+    const pad = GROUND_PAD_U * UNIT
+    const x0 = view.x - pad / 2
+    const y0 = view.y - pad / 2
+    const w = view.w + pad
+    const h = view.h + pad
+    g.setPosition(x0, y0).setSize(w, h)
     const u = this.u
     u.rect[0] = x0
     u.rect[1] = y0
-    u.rect[2] = side
-    u.rect[3] = side
+    u.rect[2] = w
+    u.rect[3] = h
     u.track[3] = s.tracks.now
-    this.stampTracks(v, s, view, dt)
-    this.placeLandmarks(s, mid, now)
+    this.stampTracks(v, s, v.lens.visible(), dt)
+    this.placeLandmarks(s, { x: view.x + view.w / 2, y: view.y + view.h / 2 }, now)
   }
 
   /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；镜头里松沙上的脚步扬起一小团沙 */
-  private stampTracks(v: ViewCtx, s: DesertState, view: Phaser.Geom.Rectangle, dt: number): void {
+  private stampTracks(v: ViewCtx, s: DesertState, view: Rect, dt: number): void {
     const t = this.tracks!
     const at = s.tracks.now
     this.puffBudget = Math.min(PUFFS_PER_S, this.puffBudget + dt * PUFFS_PER_S)
     for (const p of s.tracks.prints) {
       stampPrint(t.data, p, UNIT, at)
-      if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither' && view.contains(p.x, p.y)) {
+      if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither' && inRect(view, p.x, p.y)) {
         this.puffBudget--
         this.puffs?.emitParticleAt(p.x, p.y, p.drag > 0.3 || p.gait === 'burrow' ? 2 : 1)
       }
@@ -386,9 +389,7 @@ export class DesertView implements MapView {
     }
   }
 
-  resize(v: ViewCtx): void {
-    this.camera(v)
-  }
+  resize(): void {}
 
   destroy(v: ViewCtx): void {
     this.painter?.close()

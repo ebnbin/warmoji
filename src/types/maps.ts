@@ -1107,4 +1107,6 @@ export interface MapDefaults {
   readonly width: number
   readonly height: number
   readonly cameraMargin: number
+  /** 镜头不设边的图固定拍可见范围时，拍到地图外几格 */
+  readonly openMargin: number
 }

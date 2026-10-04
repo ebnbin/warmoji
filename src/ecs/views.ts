@@ -2,7 +2,8 @@ import Phaser from 'phaser'
 import { hasComponent, removeEntity } from 'bitecs'
 import { UNIT } from '../util/units'
 import { MAP, MAPS, rollDecor } from '../data/maps'
-import { safeInsets, viewport } from '../util/apply'
+import { viewport } from '../util/apply'
+import { mainCameraOnly } from '../util/camera'
 import { Rng } from '../util/rng'
 import { spawnDecor } from './entities/decor'
 import type { EcsAtlas } from './atlas'
@@ -23,7 +24,6 @@ import { spawnDriftDecor } from './entities/decor'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/oldRiver'
-import { fitAspectRect } from './worlds/torus'
 import { drawBomb, drawPuff, drawSpark, encodeLava, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
 import type { CellRect, GroundPiece, LavaShown } from './render/volcano'
 import { GroundPainter } from './render/groundPainter'
@@ -65,6 +65,7 @@ import { SakuraView } from './sakura/view'
 import { CircuitView } from './circuit/view'
 import { DesertView } from './desert/view'
 import { RuinsView } from './ruins/view'
+import type { Framing, Lens } from './lens'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -83,7 +84,8 @@ export interface ViewCtx {
   readonly world: EcsWorld
   readonly run: RunState
   readonly def: MapDef
-  readonly anchor: Phaser.GameObjects.Zone
+  /** 战斗镜头：地图不自己动镜头，震屏、闪屏、盖满屏幕的底色与遮罩都经它 */
+  readonly lens: Lens
   w: number
   h: number
   atlas?: EcsAtlas
@@ -92,7 +94,10 @@ export interface ViewCtx {
 export interface MapView {
   layout(v: ViewCtx): { w: number; h: number; origin: Point }
   build(v: ViewCtx): void
-  camera(v: ViewCtx): void
+  /** 这张图怎么被拍：开局与屏幕变了时各取一次 */
+  framing(v: ViewCtx): Framing
+  /** 跟随时的缩放倍率，1 是标准；每帧取一次，不写就是 1 */
+  followZoom?(v: ViewCtx): number
   decor(v: ViewCtx, atlas: EcsAtlas): void
   /** 要画很久的地图可以返回 Promise：画完之前战斗不开始 */
   onSimReady(v: ViewCtx, sim: Sim): void | Promise<void>
@@ -127,15 +132,9 @@ class BoundedView implements MapView {
     return new Phaser.Geom.Rectangle(0, 0, v.w, v.h)
   }
 
-  /** 镜头最多看到范围外多远：默认边距，再加上这一边的设备安全区 */
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
+  framing(v: ViewCtx): Framing {
     const f = this.field(v)
-    const m = MAP.cameraMargin * UNIT
-    const s = safeInsets
-    cam.setZoom(viewport.renderScale)
-    cam.setBounds(f.x - m - s.left, f.y - m - s.top, f.width + m * 2 + s.left + s.right, f.height + m * 2 + s.top + s.bottom)
-    cam.startFollow(v.anchor)
+    return { map: { x: f.x, y: f.y, w: f.width, h: f.height }, edge: 'clamp' }
   }
 
   decor(v: ViewCtx, atlas: EcsAtlas): void {
@@ -162,9 +161,7 @@ class BoundedView implements MapView {
 
   step(_v: ViewCtx, _sim: Sim, _delta: number): void {}
 
-  resize(v: ViewCtx): void {
-    this.camera(v)
-  }
+  resize(_v: ViewCtx): void {}
 
   destroy(v: ViewCtx): void {
     for (const o of this.visuals) o.destroy()
@@ -174,11 +171,15 @@ class BoundedView implements MapView {
   }
 }
 
+/** 地图按屏幕的大小定，整张一屏放下；屏幕变了就整张重画 */
 abstract class SingleScreenView extends BoundedView {
+  framing(v: ViewCtx): Framing {
+    return { ...super.framing(v), fit: true }
+  }
+
   resize(v: ViewCtx): void {
     this.destroy(v)
     this.build(v)
-    this.camera(v)
     if (v.atlas) this.decor(v, v.atlas)
   }
 }
@@ -191,7 +192,7 @@ export class Fog {
 
   constructor(scene: Phaser.Scene) {
     // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
-    this.rect = scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
+    this.rect = mainCameraOnly(scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false))
     this.shape = scene.add.graphics().setVisible(false)
     this.rect.enableFilters()
     this.rect.filters?.internal.addMask(this.shape, true)
@@ -213,6 +214,7 @@ export class Fog {
 
 class DayNightView extends BoundedView {
   private fog?: Fog
+  private zoom = 1
 
   build(v: ViewCtx): void {
     super.build(v)
@@ -220,10 +222,15 @@ class DayNightView extends BoundedView {
     this.visuals.push(...this.fog.objects)
   }
 
+  /** 正午看得最远，午夜收窄 */
+  followZoom(): number {
+    return this.zoom
+  }
+
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const dn = v.def.dayNight!
     const hour = hourAt(clockSec(sim), dn)
-    v.scene.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
+    this.zoom = dn.visionMid / visionGridsAt(hour, dn)
     this.fog?.show(leaderX(sim), leaderY(sim), fogRadiusAt(hour, dn) * UNIT, fogAlphaAt(hour, dn))
   }
 }
@@ -237,27 +244,19 @@ class IceView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_COLOR)
-        .setScrollFactor(0)
-        .setDepth(-2),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, WATER_COLOR).setDepth(-2)))
     super.build(v)
     const g = v.scene.add.graphics().setDepth(-1)
     g.lineStyle(3, 0xdff3ff, 0.85)
     g.strokeRect(0, 0, v.w, v.h)
     this.visuals.push(g)
-    this.vignette = v.scene.add
-      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_VIGNETTE, 0)
-      .setScrollFactor(0)
-      .setDepth(90)
+    this.vignette = v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, WATER_VIGNETTE, 0).setDepth(90))
     this.visuals.push(this.vignette)
   }
 
-  camera(v: ViewCtx): void {
-    v.scene.cameras.main.setZoom(viewport.renderScale)
-    v.scene.cameras.main.startFollow(v.anchor)
+  /** 冰外是海，游得出去，镜头不设边 */
+  framing(v: ViewCtx): Framing {
+    return { ...super.framing(v), edge: 'open' }
   }
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {
@@ -281,12 +280,7 @@ class SpaceView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, v.def.palette.map)
-        .setScrollFactor(0)
-        .setDepth(-1),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, v.def.palette.map).setDepth(-1)))
     const r = fieldRadius(v)
     const ring = v.scene.add.graphics().setDepth(2)
     ring.lineStyle(5, 0x9c6bff, 0.7)
@@ -388,12 +382,7 @@ class NebulaOldView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, v.def.palette.map)
-        .setScrollFactor(0)
-        .setDepth(-1),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, v.def.palette.map).setDepth(-1)))
     const { wall, rim } = nebulaOldRadii(v)
     const gas = v.scene.add.graphics().setDepth(-0.9)
     const rng = new Rng(v.run.decorSeed ^ 0x9a5)
@@ -658,12 +647,6 @@ class OldRiverView extends SingleScreenView {
     }
   }
 
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
-    cam.setZoom(viewport.renderScale / v.def.oldRiver!.viewScale)
-    cam.centerOn(v.w / 2, v.h / 2)
-  }
-
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const cfg = v.def.oldRiver!
     const r = riverRect(v.w, v.h, cfg.width * UNIT)
@@ -753,7 +736,6 @@ class OldRiverView extends SingleScreenView {
 }
 
 class TorusView extends SingleScreenView {
-  private mirrorCams: Phaser.Cameras.Scene2D.Camera[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
   private frameGlow?: Phaser.GameObjects.Graphics
 
@@ -804,29 +786,12 @@ class TorusView extends SingleScreenView {
 
     this.frameGlow = add.graphics().setDepth(3.6)
     this.visuals.push(this.frameGlow)
+    for (const o of this.visuals) v.lens.mainOnly(o)
   }
 
-  camera(v: ViewCtx): void {
-    const cw = Math.round(viewport.cssWidth * viewport.dpr)
-    const ch = Math.round(viewport.cssHeight * viewport.dpr)
-    const rect = fitAspectRect(cw, ch, v.w, v.h)
-    const zoom = rect.w / v.w
-    const cam = v.scene.cameras.main
-    cam.setViewport(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
-    cam.setZoom(zoom)
-    cam.centerOn(v.w / 2, v.h / 2)
-    const W = v.w
-    const H = v.h
-    for (const dx of [-1, 0, 1]) {
-      for (const dy of [-1, 0, 1]) {
-        if (dx === 0 && dy === 0) continue
-        const c = v.scene.cameras.add(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
-        c.setZoom(zoom)
-        c.centerOn(W / 2 + dx * W, H / 2 + dy * H)
-        this.mirrorCams.push(c)
-      }
-    }
-    for (const c of this.mirrorCams) c.ignore(this.visuals)
+  /** 出这头即现那头：一屏正好一圈，镜像镜头把越过边的半截画到对面 */
+  framing(v: ViewCtx): Framing {
+    return { ...super.framing(v), edge: 'wrap' }
   }
 
   decor(v: ViewCtx, atlas: EcsAtlas): void {
@@ -869,8 +834,6 @@ class TorusView extends SingleScreenView {
   }
 
   destroy(v: ViewCtx): void {
-    for (const c of this.mirrorCams) v.scene.cameras.remove(c)
-    this.mirrorCams = []
     this.frameTiles = []
     this.frameGlow = undefined
     super.destroy(v)
@@ -1021,20 +984,11 @@ class VolcanoView extends BoundedView {
   private shake = true
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, VOLCANO_BG)
-        .setScrollFactor(0)
-        .setDepth(-2),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, VOLCANO_BG).setDepth(-2)))
     if (!v.scene.textures.exists(PUFF_KEY)) canvasTexture(v.scene, PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
     if (!v.scene.textures.exists(SPARK_KEY)) canvasTexture(v.scene, SPARK_KEY, 16, 16, (ctx) => drawSpark(ctx, 16))
     if (!v.scene.textures.exists(BOMB_KEY)) canvasTexture(v.scene, BOMB_KEY, 32, 32, (ctx) => drawBomb(ctx, 32))
-    this.light = v.scene.add
-      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, 0xff4a1a, 0)
-      .setScrollFactor(0)
-      .setDepth(85)
-      .setVisible(false)
+    this.light = v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, 0xff4a1a, 0).setDepth(85).setVisible(false))
     this.visuals.push(this.light)
     this.shake = loadSettings(browserStorage()).hitShake
   }
@@ -1275,7 +1229,7 @@ class VolcanoView extends BoundedView {
     const cam = v.scene.cameras.main
     if (s.phase === 'warn' && this.shake && now >= this.shakeAt) {
       this.shakeAt = now + 280
-      cam.shake(300, 0.0005 + 0.0022 * warn)
+      v.lens.shake(300, 0.0005 + 0.0022 * warn)
     }
     if (this.light) {
       const a = s.phase === 'warn' ? warn * (0.03 + 0.02 * Math.sin(now / 90)) : s.phase === 'erupt' ? 0.02 + 0.06 * erupt * (0.8 + 0.2 * Math.sin(now / 70)) : 0
@@ -1289,14 +1243,13 @@ class VolcanoView extends BoundedView {
 
   /** 换阶段时改烟和灰的密度：发射频率一改就从头计时，所以只在这时改 */
   private enterPhase(v: ViewCtx, s: VolcanoState): void {
-    const cam = v.scene.cameras.main
     this.plume?.setFrequency(s.phase === 'dormant' ? 110 : s.phase === 'warn' ? 45 : 30)
     this.ash?.setFrequency(s.phase === 'erupt' ? 18 : 70)
     if (s.phase === 'warn') playSfx('rumble')
     if (s.phase === 'erupt') {
       playSfx('erupt')
-      cam.flash(260, 255, 150, 70)
-      if (this.shake) cam.shake(750, 0.007)
+      v.lens.flash(260, 255, 150, 70)
+      if (this.shake) v.lens.shake(750, 0.007)
       this.column?.start()
       this.sparks?.explode(40, s.field.craterX, s.field.craterY)
       this.bombAcc = 6
@@ -1564,12 +1517,7 @@ class ShipView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, SHIP_BG)
-        .setScrollFactor(0)
-        .setDepth(-3),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, SHIP_BG).setDepth(-3)))
     const scene = v.scene
     if (!scene.textures.exists(SHIP_PUFF_KEY)) canvasTexture(scene, SHIP_PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
     if (!scene.textures.exists(BALL_KEY)) canvasTexture(scene, BALL_KEY, 48, 48, (ctx) => drawBall(ctx, 48))
@@ -1923,12 +1871,7 @@ class NebulaView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, NEBULA_BG)
-        .setScrollFactor(0)
-        .setDepth(-3),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, NEBULA_BG).setDepth(-3)))
     const scene = v.scene
     if (!scene.textures.exists(NEBULA_CLOUD_KEY)) canvasTexture(scene, NEBULA_CLOUD_KEY, 64, 64, (ctx) => drawCloud(ctx, 64))
     if (!scene.textures.exists(NEBULA_GLINT_KEY)) canvasTexture(scene, NEBULA_GLINT_KEY, 32, 32, (ctx) => drawGlint(ctx, 32))
@@ -2205,7 +2148,7 @@ class NebulaView extends BoundedView {
         this.debris?.explode(10, e.x, e.y)
         playSfx('shatter')
         const view = v.scene.cameras.main.worldView
-        if (this.shake && view.contains(e.x, e.y)) v.scene.cameras.main.shake(260, 0.003)
+        if (this.shake && view.contains(e.x, e.y)) v.lens.shake(260, 0.003)
       } else this.debris?.explode(5, e.x, e.y)
     }
     const phase = m ? m.phase : 'none'
@@ -2483,20 +2426,15 @@ class FloeView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, FLOE_SEA)
-        .setScrollFactor(0)
-        .setDepth(-3),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, FLOE_SEA).setDepth(-3)))
     this.fitFrost(v, viewport.logicalWidth / viewport.logicalHeight)
     this.frost = v.scene.add.image(0, 0, FROST_KEY).setDepth(89).setAlpha(0)
     this.visuals.push(this.frost)
   }
 
-  camera(v: ViewCtx): void {
-    v.scene.cameras.main.setZoom(viewport.renderScale)
-    v.scene.cameras.main.startFollow(v.anchor)
+  /** 四面是海，游得出去，镜头不设边 */
+  framing(v: ViewCtx): Framing {
+    return { ...super.framing(v), edge: 'open' }
   }
 
   /** 装饰只撒在冰上，离冰缘留出它自己的大小 */
@@ -2903,13 +2841,13 @@ class CaveView extends BoundedView {
   private sunDeg = 0
   private vignette?: Phaser.Filters.Vignette
 
+  /** 洞里越亮看得越远：短边看到 viewU 格；洞里的光算出来之前按标准 */
+  followZoom(): number {
+    return this.viewU > 0 ? Math.min(viewport.logicalWidth, viewport.logicalHeight) / (this.viewU * UNIT) : 1
+  }
+
   build(v: ViewCtx): void {
-    this.visuals.push(
-      v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, CAVE_BG)
-        .setScrollFactor(0)
-        .setDepth(-2),
-    )
+    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, CAVE_BG).setDepth(-2)))
     const scene = v.scene
     if (!scene.textures.exists(CAVE_FLAME_KEY)) canvasTexture(scene, CAVE_FLAME_KEY, 32, 48, (ctx) => drawFlame(ctx, 32, 48))
     if (!scene.textures.exists(CAVE_HALO_KEY)) canvasTexture(scene, CAVE_HALO_KEY, 64, 64, (ctx) => drawCaveHalo(ctx, 64))
@@ -3160,11 +3098,8 @@ class CaveView extends BoundedView {
     u.skyBright = (sky.skyLux + sky.moonSkyLux) / adapt
     u.mist = smoothCave(-6, 4, sunDeg) * (1 - smoothCave(8, 25, sunDeg)) * (sky.hour < 12 ? 1 : 0.4)
     this.stepTorches(v, sim, s, dt, adapt)
-    // 镜头：洞里越亮看得越远；短边看到 viewU 格
     const want = viewU(cfg.view, s.light.hallLux)
     this.viewU += (want - this.viewU) * (1 - Math.exp(-dt / CAVE_VIEW_TAU))
-    const short = Math.min(viewport.logicalWidth, viewport.logicalHeight)
-    v.scene.cameras.main.setZoom((viewport.renderScale * short) / (this.viewU * UNIT))
     const dark = 1 - visibility(cfg.view, s.light.hallLux)
     if (this.vignette) this.vignette.strength = 0.18 + 0.22 * dark
     this.stepEyes(v.scene, sim, s, adapt)
