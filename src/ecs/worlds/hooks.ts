@@ -53,6 +53,8 @@ import type { ObstacleId } from '../../types/obstacles'
 import type { RiverState } from '../river/world'
 import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
+import { sakura } from '../sakura/world'
+import type { SakuraState } from '../sakura/world'
 import { desert } from '../desert/world'
 import type { DesertState } from '../desert/world'
 import type { RuinsState } from '../ruins/world'
@@ -107,10 +109,11 @@ export interface WorldState {
   cave: CaveState | null
   desert: DesertState | null
   meadow: MeadowState | null
+  sakura: SakuraState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null }
 }
 
 export interface WorldHooks {
@@ -1692,6 +1695,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   floe,
   cave,
   meadow,
+  sakura,
   desert,
 }
 
