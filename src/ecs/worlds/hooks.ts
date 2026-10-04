@@ -48,12 +48,10 @@ import { iceTraction } from '../systems/shared/squad'
 import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
-import { river } from '../river/world'
 import { ruins } from '../ruins/world'
 import { phases } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
-import type { RiverState } from '../river/world'
 import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
 import { sakura } from '../sakura/world'
@@ -107,7 +105,6 @@ export interface WorldState {
   hole: Point | null
   volcano: VolcanoState | null
   ship: ShipState | null
-  river: RiverState | null
   ruins: RuinsState | null
   nebula: NebulaState | null
   floe: FloeState | null
@@ -120,7 +117,7 @@ export interface WorldState {
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -1817,7 +1814,6 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   nebula,
   volcano,
   ship,
-  river,
   floe,
   cave,
   meadow,

@@ -979,7 +979,6 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   nebula: buildNebula,
   volcano: buildVolcano,
   ship: buildShip,
-  river: buildRiver,
   floe: buildFloe,
   cave: buildCave,
   meadow: buildMeadow,

@@ -1,9 +1,8 @@
-import { at, GRAVITY, project } from '../river/channel'
-import { WATER_CELL_U } from '../river/water'
-import { WATER_GLSL } from '../river/shader'
+import { at, GRAVITY, project } from './channel'
+import { WATER_CELL_U } from './water'
 import { CREST_U, weirLocal } from './layout'
-import type { Along } from '../river/channel'
-import type { Water } from '../river/water'
+import type { Along } from './channel'
+import type { Water } from './water'
 import type { SakuraPlan } from './layout'
 import type { SakuraConfig } from '../../types/maps'
 
@@ -167,6 +166,115 @@ export function encodeWater(cfg: SakuraConfig, plan: SakuraPlan, w: Water): Wate
   }
   return { bed, bedCols: t.cols, bedRows: t.rows, level, flow, cols, rows }
 }
+
+/** 溪水着色器里的 GLSL 函数：哈希、值噪声、细胞噪声、一块里的细浪，与顺着流速漂的细浪 */
+const WATER_GLSL = `
+/** 细浪按这么大（格）的块各取各的花纹，块与块之间按方差不变混合 */
+const float TILE = 1.5;
+
+vec2 hash2(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p) * 43758.5453);
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash2(i).x;
+  float b = hash2(i + vec2(1.0, 0.0)).x;
+  float c = hash2(i + vec2(0.0, 1.0)).x;
+  float d = hash2(i + vec2(1.0, 1.0)).x;
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float cells(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float d1 = 8.0;
+  float d2 = 8.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = hash2(i + g);
+      float d = length(g + o - f);
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+      } else if (d < d2) {
+        d2 = d;
+      }
+    }
+  }
+  return d2 - d1;
+}
+
+/** 值噪声与它的梯度 */
+vec3 vnoiseD(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  vec2 du = 6.0 * f * (1.0 - f);
+  float a = hash2(i).x;
+  float b = hash2(i + vec2(1.0, 0.0)).x;
+  float c = hash2(i + vec2(0.0, 1.0)).x;
+  float d = hash2(i + vec2(1.0, 1.0)).x;
+  float k = a - b - c + d;
+  return vec3(a + (b - a) * u.x + (c - a) * u.y + k * u.x * u.y, du * vec2(b - a + k * u.y, c - a + k * u.x));
+}
+
+/**
+ * 一块里的细浪的坡度：d 是离块中心的位移，在块中心的流向坐标里取噪声，顺流拉长，返回浪高对地图坐标的梯度。
+ * 流向坐标必须绕块中心转：绕远处的原点转，流向稍一变花纹就被挤成指纹
+ */
+vec2 waves(vec2 d, vec2 dir, vec2 acr, float stretch, vec2 jit) {
+  vec2 f = vec2(dot(d, dir) / stretch, dot(d, acr)) + jit;
+  vec2 g = vnoiseD(f * 1.7).yz * (0.65 * 1.7) + vnoiseD(f * 4.3 + 7.3).yz * (0.35 * 4.3);
+  return dir * (g.x / stretch) + acr * g.y;
+}
+
+/**
+ * 顺着流速漂的细浪（两相交替的流动贴图）：p 是这一点（格），v 是流速（格/秒），vel 与 speed 是米/秒的流速与快慢，rough 是乱流；
+ * 返回浪面的坡度，lines 是顺流拉长的条纹，qa、qb 是两相各自漂过的位置、w 是两相的混合比，别的花纹接着用
+ */
+vec2 ripples(vec2 p, vec2 v, vec2 vel, float speed, float rough, out float lines, out vec2 qa, out vec2 qb, out float w) {
+  float period = 1.2;
+  float ph = fract(uTime / period);
+  float ph2 = fract(ph + 0.5);
+  w = abs(1.0 - 2.0 * ph);
+  qa = p - v * ph * period;
+  qb = p - v * ph2 * period;
+  vec2 tg = p / TILE - 0.5;
+  vec2 t0 = floor(tg);
+  vec2 tf = fract(tg);
+  vec2 ga = vec2(0.0);
+  vec2 gb = vec2(0.0);
+  lines = 0.0;
+  float wsum = 0.0;
+  // 条纹的方向取这一点自己的流向：取块中心的，流向转得急的地方（石头周围）就拼出折角
+  vec2 dir = speed > 0.02 ? vel / speed : vec2(0.7071, 0.7071);
+  vec2 acr = vec2(-dir.y, dir.x);
+  float stretch = 1.0 + 2.8 * clamp(speed / 1.6, 0.0, 1.0);
+  for (int k = 0; k < 4; k++) {
+    vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
+    vec2 cell = t0 + o;
+    vec2 c = (cell + 0.5) * TILE;
+    vec2 wo = mix(1.0 - tf, tf, o);
+    float wk = wo.x * wo.y;
+    vec2 jit = hash2(cell) * 41.0;
+    ga += waves(qa - c, dir, acr, stretch, jit) * wk;
+    gb += waves(qb - c, dir, acr, stretch, jit + 17.0) * wk;
+    float la = vnoise(vec2(dot(qa - c, dir) * 0.7, dot(qa - c, acr) * 7.0) + jit);
+    float lb = vnoise(vec2(dot(qb - c, dir) * 0.7, dot(qb - c, acr) * 7.0) + jit + 23.0);
+    lines += (mix(la, lb, w) - 0.5) * wk;
+    wsum += wk * wk;
+  }
+  float keep = inversesqrt(wsum * (w * w + (1.0 - w) * (1.0 - w)));
+  lines = clamp(0.5 + lines * keep, 0.0, 1.0);
+  float amp = 0.025 + 0.09 * clamp(speed / 2.0, 0.0, 1.0) + 0.16 * rough;
+  return mix(ga, gb, w) * keep * amp;
+}
+`
 
 /**
  * 樱庭溪水的片元着色器，四边形盖住整片地形，坐标以格计、y 朝下；四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。

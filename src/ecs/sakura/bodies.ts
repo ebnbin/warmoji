@@ -1,12 +1,10 @@
-import { hasComponent, removeEntity } from 'bitecs'
+import { hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { Airborne, Alive, CharScale, Drive, Hp, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Transform, Uid } from '../components'
+import { CharScale, Drive, Phys, Pickup, Radius, Shard, Uid } from '../components'
 import { approach } from '../systems/shared/body'
-import { die } from '../systems/shared/combat'
 import { GRAVITY } from './channel'
 import { flowAt } from './water'
 import type { BodyStep } from '../systems/shared/body'
-import type { Source } from '../utils/source'
 import type { Flow, Water } from './water'
 import type { WadeConfig } from '../../types/maps'
 import type { Sim } from '../sim'
@@ -27,7 +25,7 @@ export interface Wading {
  * 浮力按没进水里的那截身高占的比例托起身体，脚下的压力 N = mg − 浮力；水的推力 ½ρ·Cd·迎水面积·w²，胯以下迎水的是两条腿，胯以上是整个身宽。
  * 浮起来了，推力绕脚掌的力矩大过 N 乘扶正力臂（推倒），或者推力大过 N 乘脚底的摩擦系数（滑走），就站不住；正在游的 swimming 要两样都降到 STEADY 倍以内才重新站得住
  */
-export function swept(cfg: Wading, radius: number, massMul: number, depth: number, wx: number, wy: number, swimming: boolean): boolean {
+function swept(cfg: Wading, radius: number, massMul: number, depth: number, wx: number, wy: number, swimming: boolean): boolean {
   const b = cfg.body
   const k = radius / UNIT / b.radiusU
   const mass = b.kg * massMul * k ** 3
@@ -48,7 +46,7 @@ export function swept(cfg: Wading, radius: number, massMul: number, depth: numbe
 }
 
 /** 随水漂：位置像素、速度像素/秒，速度以快慢 k 趋近水速 (wx, wy)（米/秒）加上自己相对水的速度 (dx, dy)（像素/秒） */
-export function drift(cfg: Wading, out: BodyStep, x: number, y: number, vx: number, vy: number, wx: number, wy: number, dx: number, dy: number, k: number, dt: number): void {
+function drift(cfg: Wading, out: BodyStep, x: number, y: number, vx: number, vy: number, wx: number, wy: number, dx: number, dy: number, k: number, dt: number): void {
   const toPx = UNIT / cfg.meterPerU
   approach(out, x, y, vx, vy, wx * toPx + dx, wy * toPx + dy, k, dt)
 }
@@ -89,26 +87,4 @@ export function wade(sim: Sim, cfg: Wading, w: Water, swimming: Map<number, numb
   swimming.set(eid, uid)
   drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]! * cfg.body.swim, Drive.y[eid]! * cfg.body.swim, k, dt)
   return true
-}
-
-/**
- * 被水冲出了地图：掉落物没了；角色倒下（复活时照常回到队伍里），敌人与召唤出的身体死去，按 src 记在这一种危险地形上，身体先挪到 (x, y)（像素，冲走的去处）；
- * 腾空的、被抛着的、穿行中的身体不沾水，碎片不管
- */
-export function washOut(sim: Sim, eid: number, src: Source, x: number, y: number): void {
-  if (hasComponent(sim.world, eid, Shard)) return
-  if (hasComponent(sim.world, eid, Pickup)) {
-    removeEntity(sim.world, eid)
-    return
-  }
-  if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || Motion.kind[eid] === MOTION.arc || Motion.kind[eid] === MOTION.transit) return
-  Transform.x[eid] = x
-  Transform.y[eid] = y
-  const st = sim.run.stats
-  if (hasComponent(sim.world, eid, Slot) && src.hazard) {
-    const slot = Slot.v[eid]!
-    if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + Hp.v[eid]!
-    st.hazardDamage[src.hazard] = (st.hazardDamage[src.hazard] ?? 0) + Hp.v[eid]!
-  }
-  die(sim, eid, src, Phys.vx[eid]!, Phys.vy[eid]!)
 }

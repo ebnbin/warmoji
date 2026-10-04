@@ -600,73 +600,8 @@ export interface WadeConfig {
   readonly wetM: number
 }
 /**
- * 河流：林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。
- * 河道按流量定宽深、按曼宁公式定坡降，水流是浅水方程在这副河床上的稳态解；空地的形状、河的走向与出入口都由种子定。
- * 物理量按米、千克、秒算，一格 meterPerU 米
- */
-export interface RiverConfig {
-  readonly meterPerU: number
-  /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
-  readonly cellU: number
-  /** 空地：能走的地面连同河面的面积，格²；轮廓按方位角的低阶起伏（相对半径，从二阶起）加二维噪声的起伏（格，波长 waveU） */
-  readonly clearing: {
-    readonly areaU2: readonly [number, number]
-    readonly lobes: readonly number[]
-    readonly wobbleU: number
-    readonly waveU: number
-    /** 地图的边离空地最远处多远 */
-    readonly padU: number
-    /** 窄过两倍 neckU 的缝和尖角不能走 */
-    readonly neckU: number
-  }
-  /** 河网：进水口在空地边上随机的方位；两个出水口在它对面 oppositeDeg 以内的一个、与旁边隔开 spreadDeg 的另一个，离进水口都至少 apartDeg */
-  readonly network: {
-    readonly oppositeDeg: number
-    readonly spreadDeg: readonly [number, number]
-    readonly apartDeg: number
-    /** 分叉点在进水口到两出水口中点的哪一段 */
-    readonly splitAt: readonly [number, number]
-    /** 大股、小股在分叉处偏离主河道的角度 */
-    readonly majorTurnDeg: readonly [number, number]
-    readonly minorTurnDeg: readonly [number, number]
-    /** 河道蜿蜒的幅度，格；弯道半径至少是河宽的 minBend 倍；河岸离空地边至少 edgeGapU */
-    readonly meanderU: number
-    readonly minBend: number
-    readonly edgeGapU: number
-  }
-  /** 流量（米³/秒）按 share 分给大股，河道按流量定；滩地起伏多少米 */
-  readonly flow: ChannelConfig & { readonly discharge: number; readonly share: number; readonly reliefM: number }
-  /** 瀑布：进水口的崖高与崖面的进深、崖下深潭的深（米）与半径（相对主河道水面宽）；出水口外深谷的深，断崖外还能被冲过去的那一段多长（格），断崖边前那道岩坎多长（格） */
-  readonly falls: {
-    readonly cliffM: number
-    readonly cliffU: number
-    readonly poolM: number
-    readonly poolR: number
-    readonly gorgeM: number
-    readonly lipU: number
-    readonly sillU: number
-  }
-  /** 树：树冠半径（格）、伸进空地的树冠下有多宽能走；林子按二维噪声和岩石分地盘，林子占多少；伸进空地的林舌、空地里的树丛与孤树各几处 */
-  readonly trees: {
-    readonly crownU: readonly [number, number]
-    readonly overhangU: number
-    readonly forest: number
-    readonly tongues: readonly [number, number]
-    readonly groves: readonly [number, number]
-    readonly lone: readonly [number, number]
-  }
-  /** 石头：河里与空地上各几块，半径（格），露出水面或地面多高（米） */
-  readonly rocks: {
-    readonly inRiver: readonly [number, number]
-    readonly onLand: readonly [number, number]
-    readonly radiusU: readonly [number, number]
-    readonly heightM: readonly [number, number]
-  }
-  readonly body: WadeConfig
-}
-/**
  * 樱庭：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘上的樱花一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
- * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流沿用河流的机制，溪上架着一座木桥；
+ * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流是浅水方程在溪床上的稳态解，溪上架着一座木桥；
  * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
  */
 export interface SakuraConfig {
@@ -1109,7 +1044,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1131,7 +1066,6 @@ export interface MapDef {
   readonly oldRiver?: OldRiverConfig
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
-  readonly river?: RiverConfig
   readonly desert?: DesertConfig
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
@@ -1143,7 +1077,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse' | 'shock' | 'arc'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc'
 
 export interface DecorInstance {
   emoji: string

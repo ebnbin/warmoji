@@ -1,5 +1,4 @@
 import { fbm } from '../../util/noise.ts'
-import type { Rng } from '../../util/rng'
 import type { ChannelConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
@@ -23,7 +22,7 @@ export interface Channel {
 }
 
 /**
- * 一段河道（或崖上的溪沟、崖下的深谷）的中线与断面，格与米：逐点的位置、单位切向、离起点的弧长、曲率（朝左法线 (−ty, tx) 转为正），
+ * 一段河道的中线与断面，格与米：逐点的位置、单位切向、离起点的弧长、曲率（朝左法线 (−ty, tx) 转为正），
  * 水面半宽（格）、深泓的水深（米）与它在断面上偏到哪（半宽的倍数，朝左为正）、设计水面高程（米）
  */
 export interface Reach {
@@ -37,8 +36,6 @@ export interface Reach {
   readonly depth: Float64Array
   readonly shift: Float64Array
   readonly level: Float64Array
-  /** 中线的外接框：x0, y0, x1, y1 */
-  readonly box: Float64Array
   /** 设计流量（米³/秒）、平均流速（米/秒）与水面坡降 */
   readonly q: number
   readonly speed: number
@@ -58,25 +55,6 @@ export function hermite(a: Point, ta: Point, b: Point, tb: Point, k: number, n: 
   return out
 }
 
-/** 端点与端点切向固定的曲线，叠上两端为零的蜿蜒：只留波长不短于九格的大弯，短河段弯得更缓 */
-export function route(rng: Rng, a: Point, ta: Point, b: Point, tb: Point, meander: number, seed: number): Point[] {
-  const L = len(b.x - a.x, b.y - a.y)
-  const n = Math.max(16, Math.ceil(L / 0.1))
-  const raw = hermite(a, ta, b, tb, L * 0.9, n)
-  const modes = [1, 2, 3].filter((m) => (2 * L) / m >= 9).map((m) => ({ m, amp: (rng.next() * 2 - 1) / m ** 1.3, ph: rng.next() * Math.PI * 2 }))
-  const fine = Math.min(1, L / 20)
-  return raw.map((p, i) => {
-    const t = i / n
-    const q = raw[Math.min(n, i + 1)]!
-    const o = raw[Math.max(0, i - 1)]!
-    const l = len(q.x - o.x, q.y - o.y) || 1
-    let off = 0
-    for (const md of modes) off += md.amp * Math.sin(md.m * Math.PI * t + md.ph)
-    off += (fbm(t * 3.5 * fine, 0.5, seed, 2) - 0.5) * 1.2 * fine
-    off *= meander * Math.sin(Math.PI * t) ** 2
-    return { x: p.x - ((q.y - o.y) / l) * off, y: p.y + ((q.x - o.x) / l) * off }
-  })
-}
 
 /** 按弧长等距重新取点，算出切向、弧长与曲率 */
 export function resample(pts: readonly Point[]): { x: Float64Array; y: Float64Array; tx: Float64Array; ty: Float64Array; s: Float64Array; curv: Float64Array } {
@@ -128,23 +106,6 @@ export function resample(pts: readonly Point[]): { x: Float64Array; y: Float64Ar
   return { x, y, tx, ty, s, curv }
 }
 
-export function boxOf(x: Float64Array, y: Float64Array): Float64Array {
-  const b = new Float64Array([Infinity, Infinity, -Infinity, -Infinity])
-  for (let i = 0; i < x.length; i++) {
-    b[0] = Math.min(b[0]!, x[i]!)
-    b[1] = Math.min(b[1]!, y[i]!)
-    b[2] = Math.max(b[2]!, x[i]!)
-    b[3] = Math.max(b[3]!, y[i]!)
-  }
-  return b
-}
-
-/** (x, y) 离一段中线的外接框有没有 pad 格那么近 */
-export function nearBox(r: Reach, x: number, y: number, pad: number): boolean {
-  const b = r.box
-  return x > b[0]! - pad && x < b[2]! + pad && y > b[1]! - pad && y < b[3]! + pad
-}
-
 /** 断面 1 − |ξ|^p 在 [−1, 1] 上 (1 − |ξ|^p)^(5/3) 的积分：曼宁公式里宽浅河道的过水能力 */
 function conveyanceShape(p: number): number {
   const n = 400
@@ -170,8 +131,8 @@ export function hydraulics(cfg: Channel, q: number): { half: number; dmax: numbe
 }
 
 /**
- * 出水口岩坎的坎顶高程（米）：流量 q 按临界流漫过半宽 half 格的坎顶时，坎上游的比能比坎顶高 1.5 倍临界水深 (q²/g)^(1/3)（q 按单宽），
- * 坎顶取设计水位 level 往下这么多，坎上游的水面就托在设计水位上（差一个几厘米的流速水头）
+ * 石槛的槛顶高程（米）：流量 q 按临界流漫过半宽 half 格的槛顶时，槛上游的比能比槛顶高 1.5 倍临界水深 (q²/g)^(1/3)（q 按单宽），
+ * 槛顶取设计水位 level 往下这么多，槛上游的水面就托在设计水位上（差一个几厘米的流速水头）
  */
 export function crestOf(cfg: Channel, q: number, half: number, level: number): number {
   const unit = q / (2 * half * cfg.meterPerU)
@@ -180,7 +141,7 @@ export function crestOf(cfg: Channel, q: number, half: number, level: number): n
 
 /**
  * 把中线做成河道：水面半宽沿程略有起伏，弯顶冲出深潭、两弯之间是浅滩，深泓偏向凹岸（按带正负的弯度平滑，过拐点时连续地换到另一岸）；
- * 水面从 level0 起按坡降往下游降，widen 让末端几格放宽（分叉处的河面更开阔）
+ * 水面从 level0 起按坡降往下游降，widen 让末端几格放宽
  */
 export function makeReach(cfg: Channel, pts: readonly Point[], q: number, level0: number, seed: number, widen: number, narrow = 1): Reach {
   const g = resample(pts)
@@ -211,7 +172,7 @@ export function makeReach(cfg: Channel, pts: readonly Point[], q: number, level0
     shift[i] = -f.thalwegShift * b
     level[i] = level0 - hy.slope * s * cfg.meterPerU
   }
-  return { ...g, half, depth, shift, level, box: boxOf(g.x, g.y), q, speed: hy.speed, slope: hy.slope }
+  return { ...g, half, depth, shift, level, q, speed: hy.speed, slope: hy.slope }
 }
 
 /** 找中线上的最近点先隔这么多点粗扫一遍，再在附近细扫 */

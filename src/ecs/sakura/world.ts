@@ -8,15 +8,14 @@ import { Airborne, Alive, Phys, Pickup, Radius, Transform, Uid } from '../compon
 import { fleeSteer } from '../systems/shared/steer'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
-import { project } from '../river/channel'
-import { flowAt } from '../river/water'
-import { holds, wade } from '../river/bodies'
+import { project } from './channel'
+import { holds, wade } from './bodies'
 import { roomFor } from '../worlds/gates'
 import { sakuraMarks } from './marks'
 import { bridgeLocal, sakuraPlan } from './layout'
-import { solveSakura } from './water'
-import type { Along } from '../river/channel'
-import type { Flow, Water } from '../river/water'
+import { flowAt, solveSakura } from './water'
+import type { Along } from './channel'
+import type { Flow, Water } from './water'
 import type { Bridge, SakuraPlan } from './layout'
 import type { MapId, SakuraConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -211,7 +210,7 @@ function board(sim: Sim, s: SakuraState): void {
 
 /**
  * 樱庭：能走的是寺墙与三面林缘围着的空地，溪面也能走；寺墙、林缘、空地上樱花的树干、上游的石组与下游的竹栅是硬边界，身体走到跟前就停住、顺着壁面滑。
- * 水里站不住的身体随水漂、自己划水，站得住的跟在岸上一样，掉落物顺水漂（都沿用河流，见 wade）；漂到下游的被水压在竹栅前，贴着竹栅挪到岸边才上得来。
+ * 水里站不住的身体随水漂、自己划水，站得住的跟在岸上一样，掉落物顺水漂（见 wade）；漂到下游的被水压在竹栅前，贴着竹栅挪到岸边才上得来。
  * 桥上的身体不沾水、出不了栏杆，桥下的照样漂
  */
 export const sakura: WorldHooks = {
