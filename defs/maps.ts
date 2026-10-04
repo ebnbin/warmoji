@@ -157,6 +157,16 @@ const CAVE_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
 ]
 
+const CIRCUIT_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'invader', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'blob', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'crab', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'slime', sinceWave: 3, base: 8, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1010,5 +1020,55 @@ export const MAPS = {
       },
     },
     boss: 'scorpion',
+  },
+  circuit: {
+    emoji: '26a1',
+    name: '电路板',
+    desc: '一块电路板上屏蔽罩围着的一小片：队伍和敌人缩得比芯片还小，芯片像楼，走线像路，丝印字铺满地面。镀金的裸铜线带电，碰到就触电，敌我都一样：电源线一直通着；时钟线跟着指示灯一通一断，通电前先闪；踩一下触摸开关，连线和连着的铜板一齐通电一阵；芯片和罩壁之间的过道里，两根电极隔一阵蓄满电，打出一道电弧。阻焊层底下的暗线不带电',
+    kind: 'circuit',
+    stamina: { exertion: 0.4, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(184 40% 16%)',
+      bgTo: 'hsl(198 46% 5%)',
+      map: hslToInt(178, 0.32, 0.15),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['26a1'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: CIRCUIT_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'wall',
+      kinds: {
+        wall: { name: '罩壁', at: { kind: 'rim', segU: 3, away: { mark: 'gap', minU: 2.5 } }, enter: 'climb', snapU: 6, weight: 4, perSec: 1.5, only: ['zombie', 'invader', 'crab', 'creeper', 'rat', 'mecha'] },
+        via: { name: '过孔', at: { kind: 'mark' }, enter: 'rise', look: 'glow', snapU: 4.5, weight: 1, perSec: 1, only: ['zombie', 'invader', 'blob', 'crab', 'slime', 'creeper', 'rat'] },
+        chip: { name: '芯片底下', at: { kind: 'mark' }, enter: 'walk', look: 'steam', snapU: 5, weight: 4, perSec: 1, only: ['invader', 'rat', 'crab', 'creeper'] },
+        board: { name: '板面', at: { kind: 'ground' }, enter: 'rise', look: 'glow', weight: 1 },
+      },
+    },
+    finalWaveSub: '失控核心翻过屏蔽罩闯了进来——把它引到通电的铜线上！',
+    circuit: {
+      mmPerU: 1,
+      sizeU: 42,
+      padU: 7,
+      areaU2: [950, 1300],
+      neckU: 0.35,
+      frame: { insetU: [1.8, 2.6], chamferU: [2.4, 4.8], heightMM: 1.6 },
+      plazaU: 4.5,
+      aisleU: [3.4, 4.2],
+      chipU: [2.6, 4],
+      shock: { teamDps: 30, enemyDps: 45, tickMs: 250, footFrac: 0.5 },
+      rail: { widthU: [1.5, 1.9] },
+      clock: { traces: [2, 3], widthU: 0.85, pitchU: 1.27, offMs: 2600, warnMs: 1100, onMs: 2200 },
+      arc: { count: [2, 3], gapU: [1.8, 2.5], restMs: 1800, chargeMs: 3600, arcMs: 380, reachU: 0.45, teamDamage: 30, enemyDamage: 60 },
+      button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], holdMs: 3200, rearmMs: 4800 },
+    },
+    boss: 'mecha',
   },
 } as const satisfies Record<string, MapDef>

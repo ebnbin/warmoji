@@ -58,6 +58,8 @@ import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
 import { sakura } from '../sakura/world'
 import type { SakuraState } from '../sakura/world'
+import { circuit } from '../circuit/world'
+import type { CircuitState } from '../circuit/world'
 import { desert } from '../desert/world'
 import type { DesertState } from '../desert/world'
 import type { RuinsState } from '../ruins/world'
@@ -113,11 +115,12 @@ export interface WorldState {
   desert: DesertState | null
   meadow: MeadowState | null
   sakura: SakuraState | null
+  circuit: CircuitState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -170,6 +173,8 @@ export interface WorldHooks {
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
   /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（船是倾角的度数，浮冰是风速）；不偏为零 */
   lean(sim: Sim): Point
+  /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
+  seat?(sim: Sim, from: Point, at: Point): Point
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
@@ -1818,6 +1823,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   meadow,
   sakura,
   desert,
+  circuit,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

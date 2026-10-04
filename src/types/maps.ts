@@ -816,6 +816,67 @@ export interface MeadowConfig {
   /** 栅栏外吃草的羊有几只 */
   readonly sheep: readonly [number, number]
 }
+/**
+ * 电路板：队伍和敌人缩小在一块电路板上，四周围着一圈金属屏蔽罩，芯片像楼、走线像路。一格 mmPerU 毫米：元件多高、影子多长按毫米算。
+ * 镀金的裸铜线带电，碰到就触电（敌我通吃）：电源线一直通电；时钟线按节拍一通一断，通电前先预警；开关线平时不通，有人踩上触摸开关，
+ * 电才从开关沿线一路通过去，连着的铜板通一阵。芯片和罩壁之间的过道里有一对电极，隔一阵蓄满电，在两极之间打出一道电弧。阻焊层底下的暗线不带电
+ */
+export interface CircuitConfig {
+  readonly mmPerU: number
+  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  readonly sizeU: number
+  readonly padU: number
+  /** 能走的板面有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝不能走 */
+  readonly neckU: number
+  /** 屏蔽罩：罩壁离地图边 insetU 格，四个角斜切掉 chamferU 格，罩壁高 heightMM 毫米 */
+  readonly frame: { readonly insetU: readonly [number, number]; readonly chamferU: readonly [number, number]; readonly heightMM: number }
+  /** 开局站的那片空地的半径（格）：里面没有元件，带电的铜离它至少再远一格 */
+  readonly plazaU: number
+  /** 靠墙的芯片和罩壁之间留出的过道有多宽（格），芯片离那面墙的中点多远（格） */
+  readonly aisleU: readonly [number, number]
+  readonly chipU: readonly [number, number]
+  /** 触电：身体半径的 footFrac 倍以内碰到带电的铜就算，每 tickMs 结算一次，按每秒伤害折算 */
+  readonly shock: { readonly teamDps: number; readonly enemyDps: number; readonly tickMs: number; readonly footFrac: number }
+  /** 电源线：一直通电，线宽（格） */
+  readonly rail: { readonly widthU: readonly [number, number] }
+  /** 时钟线：几条并排，线宽与线距（格），线距就是时钟芯片的脚距；按节拍断 offMs、预警 warnMs、通 onMs，一通整条同时通 */
+  readonly clock: {
+    readonly traces: readonly [number, number]
+    readonly widthU: number
+    readonly pitchU: number
+    readonly offMs: number
+    readonly warnMs: number
+    readonly onMs: number
+  }
+  /**
+   * 电弧：几处，两极的尖相隔 gapU 格；歇 restMs、蓄电 chargeMs、放电 arcMs，循环往复，各处错开；
+   * 放电时离电弧 reachU 格以内的身体挨一下
+   */
+  readonly arc: {
+    readonly count: readonly [number, number]
+    readonly gapU: readonly [number, number]
+    readonly restMs: number
+    readonly chargeMs: number
+    readonly arcMs: number
+    readonly reachU: number
+    readonly teamDamage: number
+    readonly enemyDamage: number
+  }
+  /**
+   * 开关：触摸盘的半径（格），盘中间那块圆金的半径（格），连着的铜板边长（格），盘到铜板的连线多长（格）；
+   * 身体中心踩进圆金，连线与铜板一齐通电 holdMs，断开后 rearmMs 内再踩也不通
+   */
+  readonly button: {
+    readonly padU: number
+    readonly touchU: number
+    readonly plateU: readonly [number, number]
+    readonly reachU: readonly [number, number]
+    readonly holdMs: number
+    readonly rearmMs: number
+  }
+}
 /** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
 export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
 
@@ -1048,7 +1109,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1075,13 +1136,14 @@ export interface MapDef {
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
   readonly sakura?: SakuraConfig
+  readonly circuit?: CircuitConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls' | 'collapse' | 'shock' | 'arc'
 
 export interface DecorInstance {
   emoji: string

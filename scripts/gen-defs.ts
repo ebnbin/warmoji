@@ -40,6 +40,7 @@ import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/ecs/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/ecs/sakura/layout.ts'
+import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/ecs/circuit/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -440,6 +441,43 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       if (wl.side < plan.weir.half && wl.along >= 0 && wl.along < CREST_U - 0.05 && t.z[i]! < plan.weir.crest - 0.01) notch++
     }
     need(notch === 0, `${where} 的石槛顶有 ${notch} 格塌了下去，水会从缺口漏走`)
+  }
+}
+
+/**
+ * 电路板：参数说得通——过道与两尖之间走得过标准身体，时钟线的线距比线宽宽，队长和小怪站在开关的圆金上脚碰不到盘外带电的铜（栅格再差一格也碰不到）；
+ * 抽一批种子真的生成一遍：每块都生成得出来，开局站位四周空着，带电网络的条数编得进电流着色器，电弧的处数在范围里
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'circuit') === (m.circuit !== undefined), `maps.${id} 是电路板当且仅当写了 circuit`)
+  const c = m.circuit
+  if (!c) continue
+  const at = `maps.${id}.circuit`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const body = TEAM_BASELINE.member.radius * 2
+  const { frame, shock, rail, clock, arc, button } = c
+  need(c.mmPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU > 0, `${at} 的毫米每格、地图边长、窄缝与开局空地须为正`)
+  need(c.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(c.areaU2[0] > 0 && range(c.areaU2, false) && c.areaU2[1] < c.sizeU * c.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
+  need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.insetU[1] < c.padU && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正，罩壁落在画了的地方里`)
+  need(range(c.aisleU, false) && c.aisleU[0] > body + c.neckU * 2 && range(c.chipU, false), `${at}.aisleU 须走得过标准身体，chipU 须为非负的范围`)
+  need(shock.teamDps > 0 && shock.enemyDps > 0 && shock.tickMs > 0 && shock.footFrac > 0 && shock.footFrac <= 1, `${at}.shock 的伤害与结算间隔须为正，脚的范围在 (0, 1] 内`)
+  need(rail.widthU[0] > 0 && range(rail.widthU, false), `${at}.rail.widthU 须为正的范围`)
+  need(clock.traces[0] >= 1 && range(clock.traces, true) && clock.widthU > 0 && clock.pitchU > clock.widthU, `${at}.clock 须至少一条线，线距比线宽宽`)
+  need(clock.offMs > 0 && clock.warnMs > 0 && clock.onMs > 0, `${at}.clock 的节拍须为正`)
+  need(arc.count[0] >= 1 && range(arc.count, true) && arc.count[1] <= 3, `${at}.arc.count 须在 1 到 3 处之间`)
+  need(arc.gapU[0] > body && range(arc.gapU, false) && arc.reachU >= 0, `${at}.arc.gapU 须走得过标准身体`)
+  need(arc.restMs >= 0 && arc.chargeMs > 0 && arc.arcMs > 0 && arc.teamDamage > 0 && arc.enemyDamage > 0, `${at}.arc 的节拍与伤害须为正`)
+  need(button.padU > 0 && button.plateU[0] > button.padU && range(button.plateU, false) && button.reachU[0] > 0 && range(button.reachU, false), `${at}.button 的开关、铜板与连线须为正，铜板比开关大`)
+  need(button.holdMs > 0 && button.rearmMs >= 0, `${at}.button 通多久须为正、歇多久不能为负`)
+  const feet = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0)) * shock.footFrac
+  need(button.touchU > 0 && button.padU - button.touchU > feet + COPPER_CELL_U, `${at}.button.touchU 须为正，离盘边比队长和小怪的脚宽出一格栅格：站在开关上碰不到带电的铜`)
+  for (let s = 0; s < 16; s++) {
+    const plan = circuitPlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+    need(plan.nets.length <= NET_SLOTS, `${where} 的带电网络太多，编不进电流着色器`)
+    need(plan.gaps.length >= arc.count[0] && plan.gaps.length <= arc.count[1], `${where} 的电弧处数不在范围里`)
   }
 }
 
