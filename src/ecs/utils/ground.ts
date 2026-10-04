@@ -7,6 +7,11 @@ import type { EcsWorld } from '../world'
 /** 精灵的高里 emoji 画框占的份额：四周垫了 EMOJI_PAD */
 export const ART = EMOJI_BOX / (EMOJI_BOX + 2 * EMOJI_PAD)
 
+/** 精灵的中心落在 y 时，画框下沿的画面纵坐标 */
+export function bottomAt(eid: number, y: number): number {
+  return y + (Transform.h[eid]! * ART) / 2
+}
+
 /** 弧线与悬空把身体在画面上抬起来，脚还落在原处的地上；扑刺只是贴着地往前冲 */
 export function lifted(world: EcsWorld, eid: number): boolean {
   return hasComponent(world, eid, Airborne) || (hasComponent(world, eid, Motion) && Motion.kind[eid] === MOTION.arc)
@@ -14,5 +19,5 @@ export function lifted(world: EcsWorld, eid: number): boolean {
 
 /** 身体的脚落在地上的画面纵坐标：画框的下沿，身体抬起时算原处的地 */
 export function footY(world: EcsWorld, eid: number): number {
-  return Transform.y[eid]! + (lifted(world, eid) ? 0 : VisOff.y[eid]!) + (Transform.h[eid]! * ART) / 2
+  return bottomAt(eid, Transform.y[eid]! + (lifted(world, eid) ? 0 : VisOff.y[eid]!))
 }

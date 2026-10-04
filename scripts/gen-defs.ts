@@ -95,7 +95,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const l = m.light
   if (!l) continue
   const rgb = (c: number): boolean => Number.isInteger(c) && c >= 0 && c <= 0xffffff
-  need(rgb(l.sun) && rgb(l.shade) && rgb(l.shadow.color), `maps.${id}.light 的颜色须是 24 位 RGB`)
+  need(rgb(l.sun) && rgb(l.shade), `maps.${id}.light 的颜色须是 24 位 RGB`)
+  if (!l.shadow) continue
+  need(rgb(l.shadow.color), `maps.${id}.light.shadow.color 须是 24 位 RGB`)
   need(l.shadow.alpha > 0 && l.shadow.alpha <= 1, `maps.${id}.light.shadow.alpha 须在 (0, 1] 内`)
   need(l.shadow.length > 0, `maps.${id}.light.shadow.length 须为正`)
 }
