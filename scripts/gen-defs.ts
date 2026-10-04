@@ -33,6 +33,9 @@ import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
+import { LIP_PPU, LIP_RANGE, LIP_STEP, lipAt, meadowPlan, VALLEY_OUT_U, VALLEY_SIDE_U } from '../src/ecs/meadow/layout.ts'
+import { roomAt } from '../src/ecs/worlds/basin.ts'
+import { UNIT, VIEW } from '../src/util/units.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
@@ -304,6 +307,52 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
   need(view.dayU / 2 <= side / 2 + MAP_DEFAULTS.cameraMargin, `maps.${id}.cave.view.dayU 须让白天的镜头落在地图与边距以内`)
+}
+
+/**
+ * 草甸：参数说得通；镜头往崖外最远看出去的地方也落在谷底的贴图里；抽一批种子真的生成一遍：每张都生成得出来，
+ * 开局站位离边够远，栅栏有门，林子里有树，栅栏外有羊
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'meadow') === (m.meadow !== undefined), `maps.${id} 是草甸当且仅当写了 meadow`)
+  const g = m.meadow
+  if (!g) continue
+  const at = `maps.${id}.meadow`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { cliff, forest, trail, fence, flowers, turf } = g
+  need(g.meterPerU > 0 && g.sizeU > 0 && g.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
+  need(g.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(g.areaU2[0] > 0 && range(g.areaU2, false) && g.areaU2[1] < g.sizeU * g.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
+  need(turf.reliefM >= 0 && turf.waveU > 0 && turf.riseM >= 0, `${at}.turf 的起伏、坡度不为负，波长为正`)
+  need(cliff.insetU[0] > 0 && range(cliff.insetU, false) && cliff.insetU[1] < g.sizeU / 4, `${at}.cliff.insetU 须让崖边落在地图边与中线之间`)
+  need(cliff.bendU >= 0 && cliff.waveU > 0 && cliff.jagU >= 0 && range(cliff.capes, true) && cliff.capeU[0] > 0 && range(cliff.capeU, false) && cliff.capeWidthU[0] > 0 && range(cliff.capeWidthU, false), `${at}.cliff 的弯与崖头崖湾须为正的范围`)
+  need(cliff.depthM > 0 && cliff.cameraU > 0 && cliff.lookU >= 0, `${at}.cliff 的谷深与镜高须为正、多看出去的距离不为负`)
+  need(forest.insetU[0] > 0 && range(forest.insetU, false) && forest.insetU[1] < g.sizeU / 4, `${at}.forest.insetU 须让林缘落在地图边与中线之间`)
+  need(forest.bendU >= 0 && forest.waveU > 0 && forest.scallopU >= 0 && range(forest.lobes, true) && forest.lobeU[0] > 0 && range(forest.lobeU, false) && forest.lobeWidthU[0] > 0 && range(forest.lobeWidthU, false), `${at}.forest 的弯与林舌草湾须为正的范围`)
+  need(forest.crownU[0] > 0 && range(forest.crownU, false) && forest.heightM[0] > 0 && range(forest.heightM, false) && forest.edgeU[0] > 0 && range(forest.edgeU, false), `${at}.forest 的树冠与树高须为正的范围`)
+  need(forest.birch >= 0 && forest.birch <= 1 && forest.overhangU >= 0 && forest.overhangU < forest.edgeU[0], `${at}.forest 的白桦占比须在 [0, 1] 内，树冠探进草地的那截比最小的树冠还小`)
+  need(trail.notchU > 0 && trail.widthU > g.neckU * 2 && trail.logU[0] > trail.widthU && range(trail.logU, false), `${at}.trail 的路口须走得进去、比窄缝宽，倒木比路口宽`)
+  need(fence.insetU[0] > 0 && range(fence.insetU, false) && fence.insetU[1] < g.sizeU / 4, `${at}.fence.insetU 须让栅栏落在地图边与中线之间`)
+  need(fence.skewDeg >= 0 && fence.skewDeg < 30 && fence.kinkDeg >= 0 && fence.kinkDeg < 30, `${at}.fence 的斜度与拐角须在 0 到 30 度之间`)
+  need(fence.postU > 0 && fence.heightM > 0 && fence.gateU > 0 && fence.farChance >= 0 && fence.farChance <= 1, `${at}.fence 的桩距、桩高与门宽须为正，在对边的概率在 [0, 1] 内`)
+  need(flowers.cover > 0 && flowers.cover < 1 && flowers.patchU > 0, `${at}.flowers 的覆盖须在 (0, 1) 内、花片的尺度为正`)
+  need(range(g.sheep, true), `${at}.sheep 须为非负整数范围`)
+  const k = cliff.cameraU / (cliff.cameraU + cliff.depthM / g.meterPerU)
+  const reach = Math.hypot(VIEW.minLong, VIEW.minShort) / 2 / UNIT / k
+  need(reach <= VALLEY_OUT_U && reach + MAP_DEFAULTS.cameraMargin + cliff.lookU <= VALLEY_SIDE_U, `${at}.cliff 的谷太深、镜头太低：崖外最远看到离镜头 ${reach.toFixed(0)} 格的谷底，超出了谷底贴图`)
+  for (let s = 0; s < 24; s++) {
+    const plan = meadowPlan(g, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
+    need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
+    need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
+    let packs = true
+    for (let b = -VALLEY_SIDE_U; b <= plan.size + VALLEY_SIDE_U; b += 1 / LIP_PPU) {
+      const l = lipAt(plan.edges, b)
+      packs &&= l > LIP_RANGE[0] && l < LIP_RANGE[1] && Math.abs(lipAt(plan.edges, b + 1 / LIP_PPU) - l) < LIP_STEP
+    }
+    need(packs, `${where} 的崖边离地图边太远或弯得太急，压不进给着色器的崖边贴图`)
+  }
 }
 
 /** 身体的体力上限须为正、体力回复不为负 */

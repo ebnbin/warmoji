@@ -13,6 +13,16 @@ const FOREST_MIX: readonly EnemyMixRow[] = [
   { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const MEADOW_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
+  { kind: 'locust', sinceWave: 1, base: 15, perWave: 0.8, min: 12, max: 30 },
+  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
+  { kind: 'boar', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'snake', sinceWave: 3, base: 8, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 const DESERT_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
   { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
@@ -148,6 +158,42 @@ const CAVE_MIX: readonly EnemyMixRow[] = [
 ]
 
 export const MAPS = {
+  meadow: {
+    emoji: '1f33c',
+    name: '草甸',
+    desc: '山间一片开满野花的草甸。一边是黑压压的针叶林，林间小路被倒下的大树堵住了；一边是牧场的木栅栏，门闩着，羊在外头吃草；一边走到头是断崖，崖下是很深的山谷，下山的木台阶塌了。这里没有别的规矩，放开手脚打就是',
+    kind: 'meadow',
+    stamina: { exertion: 0.4, regen: 1.2 },
+    palette: {
+      bgFrom: 'hsl(96 30% 30%)',
+      bgTo: 'hsl(150 32% 12%)',
+      map: hslToInt(92, 0.34, 0.4),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['1f33c', '1fabb', '1f340'],
+      sizeU: [0.3, 0.45],
+      alpha: [0.8, 0.92],
+      density: [0.012, 0.018],
+    },
+    mix: MEADOW_MIX,
+    finalWaveSub: '蛛后从林子里爬出来了——草地开阔，绕着它打！',
+    meadow: {
+      meterPerU: 0.5,
+      sizeU: 36,
+      padU: 7,
+      areaU2: [760, 1040],
+      neckU: 0.35,
+      turf: { reliefM: 0.16, waveU: 7, riseM: 0.035 },
+      cliff: { insetU: [2, 5.5], bendU: 2.6, waveU: 12, jagU: 0.22, capes: [0, 2], capeU: [1.2, 3], capeWidthU: [1.5, 3.5], depthM: 120, cameraU: 32, lookU: 10 },
+      forest: { insetU: [1.5, 5.5], bendU: 2.4, waveU: 9, scallopU: 0.45, lobes: [0, 2], lobeU: [1.5, 3.5], lobeWidthU: [1.6, 3], crownU: [1.3, 2.3], heightM: [4.5, 6.5], edgeU: [0.5, 1], birch: 0.25, overhangU: 0.4 },
+      trail: { notchU: 1.6, widthU: 1.3, logU: [5, 6.5] },
+      fence: { insetU: [1.5, 3], skewDeg: 6, kinkDeg: 6, postU: 2.6, heightM: 1.1, gateU: 2.2, farChance: 0.35 },
+      flowers: { cover: 0.24, patchU: 4 },
+      sheep: [3, 6],
+    },
+    boss: 'treant',
+  },
   forest: {
     emoji: '1f332',
     name: '黑森林',

@@ -724,6 +724,54 @@ function buildCave(): BgmScore {
   )
 }
 
+/** 草甸：明快的大调三拍子，三角波的笛声领着唱，拨弦似的琶音一路流下去，低音踏着根音与五音，轻轻的鼓点像在草地上走 */
+function buildMeadow(): BgmScore {
+  const chords = [0, 3, 4, 0, 5, 3, 1, 4, 0, 3, 4, 5, 3, 4, 1, 0]
+  return track(
+    {
+      bpm: 100,
+      stepsPerBeat: 2,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 55,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 100) * 0.75, feedback: 0.28, level: 0.22 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.16, attack: 0.01, release: 0.12, octave: -1 }
+      const pluck: Voice = { wave: 'triangle', vol: 0.06, attack: 0.004, release: 0.08, octave: 0 }
+      const flute: Voice = { wave: 'sine', vol: 0.13, attack: 0.03, release: 0.16, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.035, attack: 0.003, release: 0.2, octave: 2, echo: true }
+      b.bass(bass, chords, 'r...o.')
+      b.arp(pluck, chords, [0, 1, 2, 3, 2, 1])
+      b.line(flute, [
+        [0, 0, 4, 2], [0, 2, 5, 1], [0, 3, 4, 1], [0, 4, 2, 2],
+        [1, 0, 3, 3], [1, 3, 5, 3],
+        [2, 0, 6, 2], [2, 2, 5, 2], [2, 4, 4, 2],
+        [3, 0, 2, 6],
+        [4, 0, 5, 2], [4, 2, 7, 2], [4, 4, 6, 2],
+        [5, 0, 5, 3], [5, 3, 3, 3],
+        [6, 0, 4, 2], [6, 2, 3, 2], [6, 4, 1, 2],
+        [7, 0, 4, 6],
+        [8, 0, 7, 2], [8, 2, 8, 1], [8, 3, 7, 1], [8, 4, 6, 2],
+        [9, 0, 5, 3], [9, 3, 7, 3],
+        [10, 0, 8, 2], [10, 2, 9, 2], [10, 4, 8, 2],
+        [11, 0, 7, 6],
+        [12, 0, 5, 2], [12, 2, 6, 2], [12, 4, 5, 2],
+        [13, 0, 4, 3], [13, 3, 6, 3],
+        [14, 0, 5, 2], [14, 2, 3, 2], [14, 4, 1, 2],
+        [15, 0, 0, 6],
+      ])
+      for (let bar = 0; bar < chords.length; bar += 2) b.note(bell, bar, 3, chords[bar]! + 7, 1)
+      b.drums('kick', 'x.....', 0, 16, 0.16)
+      b.drums('hat', '..o.o.', 0, 16, 0.035)
+      b.drums('snare', '...x..', 4, 16, 0.06)
+      b.drums('tom', '....xx', 7, 8, 0.08)
+      b.drums('tom', '...x.x', 15, 16, 0.09)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -741,6 +789,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   river: buildRiver,
   floe: buildFloe,
   cave: buildCave,
+  meadow: buildMeadow,
 }
 
 const cache = new Map<BgmId, BgmScore>()

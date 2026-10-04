@@ -47,6 +47,8 @@ import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { river } from '../river/world'
 import type { RiverState } from '../river/world'
+import { meadow } from '../meadow/world'
+import type { MeadowState } from '../meadow/world'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -95,10 +97,11 @@ export interface WorldState {
   nebula: NebulaState | null
   floe: FloeState | null
   cave: CaveState | null
+  meadow: MeadowState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null, meadow: null }
 }
 
 export interface WorldHooks {
@@ -1660,6 +1663,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   river,
   floe,
   cave,
+  meadow,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()
