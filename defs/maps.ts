@@ -1040,7 +1040,19 @@ export const MAPS = {
       density: [0, 0],
     },
     mix: CIRCUIT_MIX,
-    finalWaveSub: '失控核心闯进了电路板——把它引到通电的铜线上！',
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'wall',
+      kinds: {
+        wall: { name: '罩壁', at: { kind: 'rim', segU: 3, away: { mark: 'gap', minU: 2.5 } }, enter: 'climb', snapU: 6, weight: 4, perSec: 1.5, only: ['zombie', 'invader', 'crab', 'creeper', 'rat', 'mecha'] },
+        via: { name: '过孔', at: { kind: 'mark' }, enter: 'rise', look: 'glow', snapU: 4.5, weight: 1, perSec: 1, only: ['zombie', 'invader', 'blob', 'crab', 'slime', 'creeper', 'rat'] },
+        chip: { name: '芯片底下', at: { kind: 'mark' }, enter: 'walk', look: 'steam', snapU: 5, weight: 4, perSec: 1, only: ['invader', 'rat', 'crab', 'creeper'] },
+        board: { name: '板面', at: { kind: 'ground' }, enter: 'rise', look: 'glow', weight: 1 },
+      },
+    },
+    finalWaveSub: '失控核心翻过屏蔽罩闯了进来——把它引到通电的铜线上！',
     circuit: {
       mmPerU: 1,
       sizeU: 42,

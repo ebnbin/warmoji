@@ -10,7 +10,9 @@ import { hazardSource } from '../utils/source'
 import { HIT } from '../utils/hitTags'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
+import { roomFor } from '../worlds/gates'
 import { circuitPlan, copperAt, segDist } from './layout'
+import { circuitMarks } from './marks'
 import type { CircuitPlan } from './layout'
 import type { Basin } from '../worlds/basin'
 import type { Landmark } from '../worlds/gates'
@@ -21,7 +23,6 @@ import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
-const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 /** 电路板按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x3c1d7e
 /** 画面一次最多记这么多处冒火花的地方 */
@@ -32,6 +33,8 @@ const ARC_TINT = 0xb9a8ff
 const SEAT_BODY_U = 0.45
 const SEAT_MARGIN_U = 0.2
 const SEAT_ARC_FROM = 0.4
+/** 出怪口挑落点时脚离铜、身体离电弧再多留这么远，格：通没通电都躲开，免得一落地就挨电 */
+const LANDING_MARGIN_U = 0.3
 
 /** 一条网络此刻：通没通电（0 或 1）、离通电还有多近（0 到 1，只有时钟线有） */
 export interface NetState {
@@ -58,9 +61,10 @@ export interface ButtonState {
   presses: number
 }
 
-/** 电路板此刻：按种子生成的板子，每条网络、每处电弧、每个开关的状态；上一次结算触电时挨电的身体在哪（格） */
+/** 电路板此刻：按种子生成的板子与它上面的地标，每条网络、每处电弧、每个开关的状态；上一次结算触电时挨电的身体在哪（格） */
 export interface CircuitState {
   readonly plan: CircuitPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly nets: NetState[]
   readonly gaps: GapState[]
   readonly buttons: ButtonState[]
@@ -84,6 +88,7 @@ export function circuitOf(sim: Sim): CircuitState {
     const plan = circuitPlanFor(cfgOf(sim), sim.run.decorSeed)
     s = {
       plan,
+      marks: circuitMarks(plan),
       nets: plan.nets.map(() => ({ level: 0, warn: 0 })),
       gaps: plan.gaps.map(() => ({ phase: 'rest' as GapPhase, charge: 0, count: 0, struck: new Set<number>() })),
       buttons: plan.buttons.map(() => ({ phase: 'ready' as ButtonPhase, since: 0, presses: 0 })),
@@ -269,6 +274,14 @@ function risky(s: CircuitState, cfg: CircuitConfig, x: number, y: number): boole
   })
 }
 
+/** 半径 radius 像素的身体落在 (x, y) 不挨电：脚离哪条网络的铜都够远，身体离每处电弧都够远 */
+function safeLanding(s: CircuitState, cfg: CircuitConfig, x: number, y: number, radius: number): boolean {
+  const r = radius / UNIT
+  const c = copperAt(s.plan.copper, x / UNIT, y / UNIT)
+  if (c && c.dist <= r * cfg.shock.footFrac + LANDING_MARGIN_U) return false
+  return s.plan.gaps.every((g) => segDist(g.a.x, g.a.y, g.b.x, g.b.y, x / UNIT, y / UNIT) > cfg.arc.reachU + r + LANDING_MARGIN_U)
+}
+
 /** 离带电的铜至少一格 */
 function clearOfCopper(plan: CircuitPlan, p: Point): boolean {
   const c = copperAt(plan.copper, p.x / UNIT, p.y / UNIT)
@@ -367,13 +380,14 @@ export const circuit: WorldHooks = {
     return openNear(circuitOf(sim).plan, p, SPAWN.edgeInset * UNIT)
   },
   ground(sim) {
-    return sim.hooks.basin(sim)
+    return circuitOf(sim).plan.basin
   },
-  canSpawn() {
-    return true
+  canSpawn(sim, x, y, radius) {
+    const s = circuitOf(sim)
+    return roomFor(s.plan.basin, x, y, radius) && safeLanding(s, cfgOf(sim), x, y, radius)
   },
-  landmarks() {
-    return NO_MARKS
+  landmarks(sim) {
+    return circuitOf(sim).marks
   },
   lean() {
     return ZERO
