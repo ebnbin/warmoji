@@ -1,29 +1,22 @@
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
-import { beyondFence, FACE_U, forestDepth, lipAt, toLocal, VALLEY_OUT_U, VALLEY_SIDE_U } from './layout'
+import { Rng } from '../../util/rng'
+import { beyondFence, footAt, forestDepth, toLocal, toMap, WALL_U } from './layout'
 import type { Local, MeadowPlan, Tree } from './layout'
 import type { MeadowConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
 /** 树冠贴图每格多少像素：树冠边是软的，用不着地面那么细 */
 export const CANOPY_PPU = 16
-/** 崖下谷底贴图每格多少像素：谷底按透视缩小到一成多，这么细就够了 */
-export const VALLEY_PPU = 8
 /** 草浪着色器用的草地遮罩每格多少像素 */
 export const MASK_PPU = 4
-/** 崖壁当作这么陡的坡来打光：正弦与余弦 */
-const FACE_SIN = Math.sin((72 * Math.PI) / 180)
-const FACE_COS = Math.cos((72 * Math.PI) / 180)
-/** 崖壁往外融进去的雾色：谷底在阳光里、在高地的影子里 */
-const FACE_MIST = [150, 164, 174] as const
-const FACE_MIST_SHADE = [84, 94, 106] as const
-/** 谷底落在高地的影子里时剩下几成光：开阔的山谷里天光补得多 */
-const VALLEY_SHADE = 0.62
-/** 谷底贴图比崖边最往里的地方再往崖里多铺这么远（格）：崖边以里画成崖壁的深处，视线钻到崖里时落在这里 */
-const INLAND_U = 6
-/** 着色器里钻到崖里的谷底采样点最多到崖边最往里的地方再往里这么远（格）：还在崖壁深处，又离贴图边上混进雾色的那一圈够远 */
-const CLAMP_U = 1
+/** 山脚碎石坡的坡顶比草地高多少，米：再往上是岩壁 */
+const SCREE_M = 0.6
+/** 往太阳方向最远找这么远（格）挡光的地形：岩壁两三米高，影子拖不了这么远 */
+const TERRAIN_SHADOW_U = 9
+/** 上山路口的石堆：半径（格）与高（米） */
+const CAIRN = { r: 0.24, h: 0.8 } as const
 /** 边界与高度的场按这么细的格子先算好，画的时候插值，格 */
 const FIELD_U = 0.25
 /** 树与投影按这么大（格）的格子分桶，画一个像素只看附近几桶 */
@@ -49,7 +42,7 @@ function hash1(a: number, b: number): number {
   return fract(Math.sin(a * 12.9898 + b * 78.233) * 43758.5453)
 }
 
-/** 画地面、树冠与谷底用到的那部分地图：只有数据，能整个发给画画的线程 */
+/** 画地面与树冠用到的那部分地图：只有数据，能整个发给画画的线程 */
 export interface PaintScene {
   readonly cfg: MeadowConfig
   readonly plan: MeadowPlan
@@ -71,7 +64,7 @@ export interface PixelRect {
   readonly y1: number
 }
 
-export type PaintLayer = 'ground' | 'canopy' | 'valley'
+export type PaintLayer = 'ground' | 'canopy'
 
 /** 发给画画的线程：先 setup 一次，再一块一块要 paint */
 export type PaintJob = { readonly kind: 'setup'; readonly scene: PaintScene } | { readonly kind: 'paint'; readonly index: number; readonly layer: PaintLayer; readonly rect: PixelRect }
@@ -95,66 +88,31 @@ export function groundArea(sc: PaintScene): Area {
   return { x0: -pad, y0: -pad, w: sc.plan.size + pad * 2, h: sc.plan.size + pad * 2 }
 }
 
-/** 太阳在崖里那一边：高地的影子往崖外落，崖壁与靠崖的谷底都在阴影里 */
-export function inShade(plan: MeadowPlan): boolean {
-  return LX * plan.frame.nx + LY * plan.frame.ny > 0
-}
-
-/** 崖边最往里的地方离断崖那条地图边多远（本地 a） */
-function deepestLip(sc: PaintScene): number {
-  let top = -Infinity
-  for (let b = -VALLEY_SIDE_U; b <= sc.plan.size + VALLEY_SIDE_U; b += 0.5) top = Math.max(top, lipAt(sc.plan.edges, b))
-  return top
-}
-
-/** 谷底贴图在地图平面上盖住的范围：从崖边最往里的地方再往里 INLAND_U 格起，往外铺 VALLEY_OUT_U 格，顺着崖边两头各多铺 VALLEY_SIDE_U 格 */
-export function valleyArea(sc: PaintScene): Area {
-  const f = sc.plan.frame
-  const S = sc.plan.size
-  const top = deepestLip(sc) + INLAND_U
-  const corners = [
-    [top, -VALLEY_SIDE_U],
-    [top, S + VALLEY_SIDE_U],
-    [top - VALLEY_OUT_U, -VALLEY_SIDE_U],
-    [top - VALLEY_OUT_U, S + VALLEY_SIDE_U],
-  ].map(([a, b]) => ({ x: f.ox + f.nx * a! + f.tx * b!, y: f.oy + f.ny * a! + f.ty * b! }))
-  const x0 = Math.min(...corners.map((c) => c.x))
-  const y0 = Math.min(...corners.map((c) => c.y))
-  return { x0, y0, w: Math.max(...corners.map((c) => c.x)) - x0, h: Math.max(...corners.map((c) => c.y)) - y0 }
-}
-
-/**
- * 着色器里谷底的采样点往崖里（本地 a）最多到哪：视线要是钻到了崖里（本该被朝着镜头的崖壁挡住），就夹回到这里，落在贴图里崖壁的深处，
- * 不会采到贴图外的雾色
- */
-export function valleyInland(sc: PaintScene): number {
-  return deepestLip(sc) + CLAMP_U
-}
-
-const PPU: Record<PaintLayer, number> = { ground: GROUND_PPU, canopy: CANOPY_PPU, valley: VALLEY_PPU }
-
-export function layerArea(sc: PaintScene, layer: PaintLayer): Area {
-  return layer === 'valley' ? valleyArea(sc) : groundArea(sc)
-}
+const PPU: Record<PaintLayer, number> = { ground: GROUND_PPU, canopy: CANOPY_PPU }
 
 /** 一层贴图的大小，像素 */
 export function textureSize(sc: PaintScene, layer: PaintLayer): { w: number; h: number } {
-  const a = layerArea(sc, layer)
+  const a = groundArea(sc)
   return { w: Math.round(a.w * PPU[layer]), h: Math.round(a.h * PPU[layer]) }
 }
 
-/** 地形上一格的场：崖边、林缘、栅栏各离多远（格），崖边在这里的斜率（顺着崖边每格往里多少格），地面多高（米）；格点 (i, j) 在 (x0 + i·cell, y0 + j·cell) */
+/**
+ * 地形上一格的场：离山脚多远（格，草地那边为正）、山脚在这里的斜率（顺着山脚每格往里多少格）、这一段山脚的碎石坡多宽（格），
+ * 林缘、栅栏各离多远（格），地面多高（米），被地形挡住多少太阳；格点 (i, j) 在 (x0 + i·cell, y0 + j·cell)
+ */
 interface Fields {
   readonly x0: number
   readonly y0: number
   readonly cell: number
   readonly cols: number
   readonly rows: number
-  readonly lip: Float32Array
+  readonly foot: Float32Array
   readonly slope: Float32Array
+  readonly apron: Float32Array
   readonly forest: Float32Array
   readonly fence: Float32Array
   readonly height: Float32Array
+  readonly shade: Float32Array
 }
 
 /** 一段投影或一段细东西：从 a 到 b、半宽 w（格），影子的浓淡 */
@@ -233,6 +191,15 @@ interface Spruce {
   readonly phase: readonly number[]
 }
 
+/** 山脚的一块石头：圆心、半径（格）与高（米）；新落下的发白，老的长着地衣 */
+interface Boulder {
+  readonly x: number
+  readonly y: number
+  readonly r: number
+  readonly h: number
+  readonly fresh: boolean
+}
+
 /** 画之前先算一次的东西 */
 export interface Prepared {
   readonly fields: Fields
@@ -247,10 +214,14 @@ export interface Prepared {
   readonly pathBuckets: Buckets
   readonly trail: readonly Segment[]
   readonly trailBuckets: Buckets
+  readonly climb: readonly Segment[]
+  readonly climbBuckets: Buckets
   readonly wood: readonly Segment[]
   readonly woodBuckets: Buckets
+  readonly stones: readonly Boulder[]
+  readonly stoneBuckets: Buckets
+  readonly cairn: Point
   readonly flowerCdf: readonly number[]
-  readonly valley: Valley
 }
 
 /** 每米高的东西在地上投下多长的影子（格）：背着太阳 */
@@ -258,10 +229,49 @@ function shadowPerM(cfg: MeadowConfig): Point {
   return { x: -LX / LZ / cfg.meterPerU, y: -LY / LZ / cfg.meterPerU }
 }
 
-/** 草地的高度，米：从崖边往林子那边缓缓抬高，加上起伏；林子里的地面略高 */
-function heightAt(sc: PaintScene, a: number, lip: number, forest: number, x: number, y: number): number {
+/** 上山路口在本地坐标里顺着山脚的位置 */
+function headB(plan: MeadowPlan): number {
+  return toLocal(plan.frame, plan.trailhead.x, plan.trailhead.y, { a: 0, b: 0 }).b
+}
+
+/** 一段山脚：碎石坡多宽（格）、岩壁多高（米）、岩壁在这里塌下去多少（0 到 1） */
+interface Wall {
+  readonly apron: number
+  readonly wallH: number
+  readonly notch: number
+}
+
+/** 顺着山脚 b 处这一段：上山路口那儿岩壁塌下去一个豁口，落石把碎石坡堆宽了 */
+function wallAt(sc: PaintScene, b: number, head: number): Wall {
+  const c = sc.cfg.cliff
+  const seed = sc.plan.seed
+  const fill = Math.exp(-(((b - head) / 1.8) ** 2))
+  const apron = c.screeU[0] + (c.screeU[1] - c.screeU[0]) * clamp01((fbm(b / 4.5, 1.3, seed + 211, 2) - 0.3) * 2.5) + 0.7 * fill
+  const wallH = c.heightM[0] + (c.heightM[1] - c.heightM[0]) * clamp01((fbm(b / 6, 7.7, seed + 213, 2) - 0.3) * 2.5)
+  return { apron, wallH, notch: 0.6 * Math.exp(-(((b - head) / 1.2) ** 2)) }
+}
+
+/** 山坡上顺着坡向的石棱与沟：顺着山脚 b、出了山脚 s 格处，石棱上大、沟里小，在 [0, 1] 里；棱与沟弯弯曲曲、时宽时窄 */
+function ribAt(seed: number, b: number, s: number): number {
+  const bb = b + (fbm(b * 0.3, s * 0.3, seed + 219, 2) - 0.5) * 2.2
+  return valueNoise(bb * 1.3, s * 0.35, seed + 215) * 0.7 + valueNoise(bb * 3.1, s * 0.6, seed + 217) * 0.3
+}
+
+/**
+ * 草地与山的高度，米。草地从山脚往外缓缓降低、带着起伏，林子里的地面略高；顺着山脚 b、出了山脚 s 格（顺着山脚的法向量量）：
+ * 碎石坡越往里越陡，接着一级岩壁，再往上是顺着坡向一道道石棱与沟的山坡
+ */
+function heightAt(sc: PaintScene, foot: number, b: number, s: number, wall: Wall, forest: number, x: number, y: number): number {
   const t = sc.cfg.turf
-  return t.riseM * Math.max(0, a - lip) + (fbm(x / t.waveU, y / t.waveU, sc.plan.seed + 5, 3) - 0.5) * 2 * t.reliefM + 0.25 * smooth(0, 3, forest)
+  const seed = sc.plan.seed
+  const base = (fbm(x / t.waveU, y / t.waveU, seed + 5, 3) - 0.5) * 2 * t.reliefM + 0.25 * smooth(0, 3, forest)
+  if (s <= 0) return base - t.riseM * foot
+  if (s < wall.apron) return base + SCREE_M * (s / wall.apron) ** 1.5
+  const w = s - wall.apron
+  if (w < WALL_U) return base + SCREE_M + wall.wallH * (1 - wall.notch) * smooth(0, WALL_U, w)
+  const up = w - WALL_U
+  // 豁口只在崖顶一截：往上一格多就回到整面山坡的高度
+  return base + SCREE_M + wall.wallH * (1 - wall.notch * smooth(1.4, 0, up)) + sc.cfg.cliff.riseM * up + (ribAt(seed, b, s) - 0.5) * 0.18 * smooth(0, 1.2, up)
 }
 
 function makeFields(sc: PaintScene): Fields {
@@ -270,35 +280,62 @@ function makeFields(sc: PaintScene): Fields {
   const cols = Math.ceil(area.w / cell) + 2
   const rows = Math.ceil(area.h / cell) + 2
   const n = cols * rows
-  const lip = new Float32Array(n)
+  const foot = new Float32Array(n)
   const slope = new Float32Array(n)
+  const apron = new Float32Array(n)
   const forest = new Float32Array(n)
   const fence = new Float32Array(n)
   const height = new Float32Array(n)
-  const e = sc.plan.edges
+  const shade = new Float32Array(n)
+  const plan = sc.plan
+  const e = plan.edges
+  const head = headB(plan)
   const L: Local = { a: 0, b: 0 }
-  // 断崖总沿着地图的一条边，b 只随行或列变：崖边按 b 记下来，同一个 b 只算一次
-  const lips = new Map<number, number>()
-  const lipOf = (b: number): number => {
-    let v = lips.get(b)
-    if (v === undefined) lips.set(b, (v = lipAt(e, b)))
+  // 山总沿着地图的一条边，b 只随行或列变：山脚与这一段的岩壁按 b 记下来，同一个 b 只算一次
+  const feet = new Map<number, number>()
+  const footOf = (b: number): number => {
+    let v = feet.get(b)
+    if (v === undefined) feet.set(b, (v = footAt(e, b)))
+    return v
+  }
+  const walls = new Map<number, Wall>()
+  const wallOf = (b: number): Wall => {
+    let v = walls.get(b)
+    if (v === undefined) walls.set(b, (v = wallAt(sc, b, head)))
     return v
   }
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       const x = area.x0 + i * cell
       const y = area.y0 + j * cell
-      toLocal(sc.plan.frame, x, y, L)
+      toLocal(plan.frame, x, y, L)
       const k = j * cols + i
-      const lp = lipOf(L.b)
-      lip[k] = L.a - lp
-      slope[k] = (lipOf(L.b + 0.05) - lipOf(L.b - 0.05)) / 0.1
-      forest[k] = forestDepth(e, L.a, L.b)
+      const ft = L.a - footOf(L.b)
+      const sl = (footOf(L.b + 0.05) - footOf(L.b - 0.05)) / 0.1
+      const w = wallOf(L.b)
+      const fd = forestDepth(e, L.a, L.b)
+      foot[k] = ft
+      slope[k] = sl
+      apron[k] = w.apron
+      forest[k] = fd
       fence[k] = beyondFence(e, L.a, L.b)
-      height[k] = heightAt(sc, L.a, lp, forest[k]!, x, y)
+      height[k] = heightAt(sc, ft, L.b, -ft / Math.sqrt(1 + sl * sl), w, fd, x, y)
     }
   }
-  return { x0: area.x0, y0: area.y0, cell, cols, rows, lip, slope, forest, fence, height }
+  const f: Fields = { x0: area.x0, y0: area.y0, cell, cols, rows, foot, slope, apron, forest, fence, height, shade }
+  // 每格往太阳方向找挡光的地形：岩壁与山坡比太阳的光线高出越多越暗
+  const rise = (LZ / SUN_LEN) * sc.cfg.meterPerU
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const x = area.x0 + i * cell
+      const y = area.y0 + j * cell
+      const z = height[j * cols + i]!
+      let over = 0
+      for (let st = cell; st <= TERRAIN_SHADOW_U; st += cell) over = Math.max(over, sample(f, height, x + TO_SUN.x * st, y + TO_SUN.y * st) - z - st * rise)
+      shade[j * cols + i] = smooth(0.02, 0.12, over)
+    }
+  }
+  return f
 }
 
 /** 场里 (x, y) 格处按格点双线性取值 */
@@ -332,8 +369,8 @@ function clumpsOf(tr: Tree, k: number): Clump[] {
   return out
 }
 
-/** 栅栏、门、台阶、饮水槽与倒木：顶视的木头与投在地上的影子 */
-function woodAndCasts(sc: PaintScene): { wood: Segment[]; casts: Segment[] } {
+/** 栅栏、门、饮水槽与倒木：顶视的木头与投在地上的影子；山脚的石头与路口的石堆也投下影子 */
+function woodAndCasts(sc: PaintScene, stones: readonly Boulder[], cairn: Point): { wood: Segment[]; casts: Segment[] } {
   const { plan, cfg } = sc
   const sh = shadowPerM(cfg)
   const wood: Segment[] = []
@@ -374,23 +411,6 @@ function woodAndCasts(sc: PaintScene): { wood: Segment[]; casts: Segment[] } {
     wood.push({ ax: p.x + p.lx, ay: p.y + p.ly, bx: q.x + q.lx, by: q.y + q.ly, w: 0.065, k: 4 })
     for (const h of rails) casts.push({ ax: p.x + sh.x * h, ay: p.y + sh.y * h, bx: q.x + sh.x * h, by: q.y + sh.y * h, w: 0.04, k: 0.15 })
   }
-  // 台阶：崖边一块木平台，两头各一根柱子与扶手，一边的扶手断了；平台外还挂着两级断了的台阶
-  const st = plan.stairs
-  const at = (o: number, s: number): Point => ({ x: st.x + st.ox * o + st.ux * s, y: st.y + st.oy * o + st.uy * s })
-  for (const side of [-1, 1]) {
-    const inner = at(-0.5, side * 0.68)
-    const outer = at(0.42, side * 0.68)
-    wood.push({ ax: inner.x, ay: inner.y, bx: inner.x, by: inner.y, w: 0.12, k: 2 })
-    casts.push({ ax: inner.x, ay: inner.y, bx: inner.x + sh.x * 1, by: inner.y + sh.y * 1, w: 0.08, k: 0.22 })
-    if (side < 0) {
-      wood.push({ ax: outer.x, ay: outer.y, bx: outer.x, by: outer.y, w: 0.12, k: 2 })
-      wood.push({ ax: inner.x, ay: inner.y, bx: outer.x, by: outer.y, w: 0.065, k: 4 })
-      casts.push({ ax: inner.x + sh.x, ay: inner.y + sh.y, bx: outer.x + sh.x, by: outer.y + sh.y, w: 0.04, k: 0.15 })
-    } else {
-      const stub = at(-0.08, side * 0.68)
-      wood.push({ ax: inner.x, ay: inner.y, bx: stub.x, by: stub.y, w: 0.065, k: 4 })
-    }
-  }
   // 饮水槽
   const tr = plan.trough
   if (tr) {
@@ -406,11 +426,14 @@ function woodAndCasts(sc: PaintScene): { wood: Segment[]; casts: Segment[] } {
   const rx = lg.x + lg.ux * lg.root * (lg.len * 0.5 + 0.15)
   const ry = lg.y + lg.uy * lg.root * (lg.len * 0.5 + 0.15)
   casts.push({ ax: rx - lg.uy * 0.9, ay: ry + lg.ux * 0.9, bx: rx + lg.uy * 0.9 + sh.x * 1.2, by: ry - lg.ux * 0.9 + sh.y * 1.2, w: 0.45, k: 0.5 })
+  // 石头与石堆：影子从脚下背着太阳拖出去
+  for (const s of stones) casts.push({ ax: s.x, ay: s.y, bx: s.x + sh.x * s.h * 0.6, by: s.y + sh.y * s.h * 0.6, w: s.r * 0.85, k: 0.4 })
+  casts.push({ ax: cairn.x, ay: cairn.y, bx: cairn.x + sh.x * CAIRN.h * 0.6, by: cairn.y + sh.y * CAIRN.h * 0.6, w: CAIRN.r * 0.7, k: 0.4 })
   return { wood, casts }
 }
 
-/** 路：草地上踩出来的路，加上门外伸进牧场的那段车辙；林子里的小路另算 */
-function pathSegments(sc: PaintScene): { paths: Segment[]; trail: Segment[] } {
+/** 路：草地上踩出来的路，加上门外伸进牧场的那段车辙；林子里的小路另算；山坡上还看得见那条之字形的上山小路，从岩壁的豁口往上拐出画面 */
+function pathSegments(sc: PaintScene, head: number): { paths: Segment[]; trail: Segment[]; climb: Segment[] } {
   const plan = sc.plan
   const paths: Segment[] = []
   for (const line of plan.paths) for (let i = 0; i + 1 < line.length; i++) paths.push({ ax: line[i]!.x, ay: line[i]!.y, bx: line[i + 1]!.x, by: line[i + 1]!.y, w: 0.3, k: 1 })
@@ -423,21 +446,53 @@ function pathSegments(sc: PaintScene): { paths: Segment[]; trail: Segment[] } {
   }
   const trail: Segment[] = []
   for (let i = 0; i + 1 < plan.trail.length; i++) trail.push({ ax: plan.trail[i]!.x, ay: plan.trail[i]!.y, bx: plan.trail[i + 1]!.x, by: plan.trail[i + 1]!.y, w: 0.34, k: 1 })
-  return { paths, trail }
+  const e = plan.edges
+  const rng = new Rng(plan.seed ^ 0x2c1f)
+  const pts: Point[] = []
+  let b = head
+  let s = wallAt(sc, head, head).apron + WALL_U - 0.15
+  let dir = rng.next() < 0.5 ? -1 : 1
+  pts.push(toMap(plan.frame, footAt(e, b) - s, b))
+  while (s < sc.cfg.padU + 6) {
+    const len = 2.2 + rng.next() * 1.4
+    const rise = 0.9 + rng.next() * 0.5
+    const steps = Math.ceil(len / 0.25)
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps
+      const bb = b + dir * len * t
+      pts.push(toMap(plan.frame, footAt(e, bb) - s - rise * t, bb))
+    }
+    b += dir * len
+    s += rise
+    dir = -dir
+  }
+  const climb: Segment[] = []
+  for (let i = 0; i + 1 < pts.length; i++) climb.push({ ax: pts[i]!.x, ay: pts[i]!.y, bx: pts[i + 1]!.x, by: pts[i + 1]!.y, w: 0.08, k: 1 })
+  return { paths, trail, climb }
 }
 
-/** 崖下的山谷：河、路与村子在哪；都顺着崖边走，按离崖脚多远（格）量 */
-interface Valley {
-  readonly river: number
-  readonly road: number
-  readonly village: number
-  readonly seed: number
-}
-
-function valleyOf(sc: PaintScene): Valley {
-  const s = sc.plan.seed
-  const S = sc.plan.size
-  return { river: 50 + hash1(s, 1) * 12, road: 12 + hash1(s, 2) * 6, village: -14 + hash1(s, 3) * (S + 28), seed: s + 909 }
+/** 山脚的石头：上山路口那儿新塌下来一片落石，堆在碎石坡上、堵着岩壁上的豁口；别处的碎石坡上零星躺着几块老石头 */
+function stonesOf(sc: PaintScene, head: number): Boulder[] {
+  const { plan, cfg } = sc
+  const e = plan.edges
+  const rng = new Rng(plan.seed ^ 0x5a17)
+  const out: Boulder[] = []
+  const put = (b: number, s: number, r: number, fresh: boolean): void => {
+    const p = toMap(plan.frame, footAt(e, b) - s, b)
+    if (out.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < (o.r + r) * 0.9)) return
+    out.push({ x: p.x, y: p.y, r, h: r * 2 * cfg.meterPerU * 0.9, fresh })
+  }
+  for (let i = 0; i < 80 && out.length < 18; i++) {
+    const b = head + (rng.next() + rng.next() - 1) * 2.6
+    const w = wallAt(sc, b, head)
+    put(b, 0.2 + rng.next() * (w.apron + WALL_U * 0.5 - 0.2), 0.1 + rng.next() * rng.next() * 0.24, true)
+  }
+  for (let b = -cfg.padU; b < plan.size + cfg.padU; b += 0.8) {
+    if (rng.next() > 0.3 || Math.abs(b - head) < 3.2) continue
+    const w = wallAt(sc, b, head)
+    put(b, 0.25 + rng.next() * (w.apron - 0.4), 0.1 + rng.next() * 0.14, false)
+  }
+  return out
 }
 
 export function prepare(sc: PaintScene): Prepared {
@@ -453,8 +508,13 @@ export function prepare(sc: PaintScene): Prepared {
   })
   const treeShadows = buckets(area)
   shadowAt.forEach((s, k) => file(treeShadows, k, s.x - s.r - s.soft, s.y - s.r - s.soft, s.x + s.r + s.soft, s.y + s.r + s.soft))
-  const { wood, casts } = woodAndCasts(sc)
-  const { paths, trail } = pathSegments(sc)
+  const head = headB(plan)
+  const stones = stonesOf(sc, head)
+  const stoneBuckets = buckets(area)
+  stones.forEach((s, k) => file(stoneBuckets, k, s.x - s.r - 0.1, s.y - s.r - 0.1, s.x + s.r + 0.1, s.y + s.r + 0.1))
+  const cairn = toMap(plan.frame, footAt(plan.edges, head + 0.6) + 0.42, head + 0.6)
+  const { wood, casts } = woodAndCasts(sc, stones, cairn)
+  const { paths, trail, climb } = pathSegments(sc, head)
   let acc = 0
   const flowerCdf = plan.flowers.map((w) => (acc += w))
   return {
@@ -478,10 +538,14 @@ export function prepare(sc: PaintScene): Prepared {
     pathBuckets: segmentBuckets(area, paths, 0.4),
     trail,
     trailBuckets: segmentBuckets(area, trail, 0.4),
+    climb,
+    climbBuckets: segmentBuckets(area, climb, 0.2),
     wood,
     woodBuckets: segmentBuckets(area, wood, 0.2),
+    stones,
+    stoneBuckets,
+    cairn,
     flowerCdf,
-    valley: valleyOf(sc),
   }
 }
 
@@ -531,10 +595,11 @@ function pickFlower(cdf: readonly number[], u: number): number {
 }
 
 /**
- * 地面：草地是一片片深浅不一的草，叶子顺着山风斜着长，成片地开着几种野花；靠林子的一边草更深更绿、长着蕨，靠崖的一边草短、露出带地衣的石头，
- * 崖边外是一圈往下去的岩壁，越往外越蒙在雾里，再往外透明、露出谷底。草地上有踩出来的路通向栅栏门、林间小路与崖边的台阶。
+ * 地面：草地是一片片深浅不一的草，叶子顺着山风斜着长，成片地开着几种野花；靠林子的一边草更深更绿、长着蕨，靠山的一边草短、散着碎石。
+ * 出了山脚是山：碎石坡、一级岩壁，再往上是石棱与沟交错的山坡，石缝里长着高山草甸，高处的洼地里积着残雪；上山路口新塌下来一片落石，
+ * 盖住碎石坡、堵着岩壁上的豁口，豁口上面那条之字形的上山小路还看得见。草地上有踩出来的路通向栅栏门、林间小路与上山路口，路口垒着一堆石头。
  * 栅栏外是羊啃过的牧场，草短而匀，有羊踩出的小道，栅栏底下一溜没啃到的高草；林子里是针叶与苔藓，小路被一棵倒下的云杉横着拦住。
- * 栅栏、门、台阶与饮水槽是木头的。按高度场打光，树、栅栏、倒木背着太阳投下影子；离草地越远越暗。只画 rect 那一块
+ * 栅栏、门与饮水槽是木头的。按高度场打光，往太阳方向找挡光的地形投下影子，树、栅栏、倒木与石头也背着太阳投下影子；离草地越远越暗。只画 rect 那一块
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const area = groundArea(sc)
@@ -549,39 +614,28 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
   const fl = cfg.flowers
   const bloomAt = 0.5 + (0.5 - fl.cover) * 0.3
   const lg = plan.log
-  const st = plan.stairs
   const tr = plan.trough
   const mpu = cfg.meterPerU
   const e = FIELD_U
   const frame = plan.frame
   const L: Local = { a: 0, b: 0 }
-  const mist = inShade(plan) ? FACE_MIST_SHADE : FACE_MIST
+  const head = headB(plan)
+  const snowAt = 0.72 - cfg.cliff.snow * 0.3
+  const cairn = prep.cairn
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
       const x = area.x0 + (px + 0.5) / ppu
       const y = area.y0 + (py + 0.5) / ppu
       const o = ((py - rect.y0) * w + px - rect.x0) * 4
-      const lip = sample(f, f.lip, x, y)
-      // 出了崖边多远（格，顺着崖边的法向量量），崖边以里是负的
-      const slope = lip < 0 ? sample(f, f.slope, x, y) : 0
-      const down = -lip / Math.sqrt(1 + slope * slope)
+      const foot = sample(f, f.foot, x, y)
+      // 出了山脚多远（格，顺着山脚的法向量量），草地这边是负的
+      const slope = foot < 0 ? sample(f, f.slope, x, y) : 0
+      const s = -foot / Math.sqrt(1 + slope * slope)
       const forest = sample(f, f.forest, x, y)
       const fence = sample(f, f.fence, x, y)
-      // 台阶伸出崖外的那截：平台的外半块与两级断台阶
-      const sx = x - st.x
-      const sy = y - st.y
-      const so = sx * st.ox + sy * st.oy
-      const ss = sx * st.ux + sy * st.uy
-      const deck = Math.abs(ss) < 0.72 && so > -0.55 && so < 0.42
-      const steps = Math.abs(ss) < 0.42 && so >= 0.42 && so < 1.15 - Math.abs(ss) * 0.4 + valueNoise(ss * 9, 3, seed) * 0.12
-      if (down >= FACE_U && !deck && !steps) {
-        out[o + 3] = 0
-        continue
-      }
       let r = 0
       let g = 0
       let b = 0
-      let alpha = 1
       const patch = fbm(x / 7, y / 7, seed + 3, 2)
       const mid = fbm(x / 2.2, y / 2.2, seed + 5, 2)
       const grain = valueNoise(x * 7, y * 7, seed + 9) * 0.5 + valueNoise(x * 17, y * 17, seed + 11) * 0.5
@@ -594,18 +648,18 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       const tuft = valueNoise(x * 3.3 + 7.1, y * 3.3, seed + 15)
       const tex = (0.93 + 0.08 * blade) * (0.94 + 0.12 * grain) * (0.93 + 0.12 * tuft)
 
-      // 草地：大片的深浅按低频噪声，靠林子更深更绿，靠崖更干更短
+      // 草地：大片的深浅按低频噪声，靠林子更深更绿，靠山更干更短
       if (wMeadow > 0) {
         const lush = smooth(-3, -0.4, forest)
-        const windswept = smooth(2.2, 0.3, lip)
-        const dry = clamp01(smooth(0.42, 0.74, patch) * 0.75 - lush * 0.45 + windswept * 0.25)
+        const stony = smooth(2.2, 0.3, foot)
+        const dry = clamp01(smooth(0.42, 0.74, patch) * 0.75 - lush * 0.45 + stony * 0.25)
         const green = clamp01(0.5 + (mid - 0.5) * 1.2 + lush * 0.3)
         let mr = (94 + (66 - 94) * green + (150 - 94) * dry) * tex
         let mg = (126 + (106 - 126) * green + (140 - 126) * dry) * tex
         let mb = (50 + (42 - 50) * green + (78 - 50) * dry) * tex
         // 野花：成片地开，每片有一种开得最多
         const bloom = fbm(x / fl.patchU, y / fl.patchU, seed + 19, 2)
-        const dens = smooth(bloomAt - 0.02, bloomAt + 0.12, bloom) * (1 - lush * 0.7) * smooth(0.4, 1.4, lip)
+        const dens = smooth(bloomAt - 0.02, bloomAt + 0.12, bloom) * (1 - lush * 0.7) * smooth(0.4, 1.4, foot)
         if (dens > 0) {
           const q = cellNearest(x * 4, y * 4, seed + 17)
           if (q.h < dens * 0.6) {
@@ -725,19 +779,18 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         }
       }
 
-      // 崖边：越靠边露出的石头越多，石面有裂纹与地衣
-      if (lip >= 0 && lip < 1.6) {
-        const exposed = smooth(1.3, 0.1, lip + (fbm(x * 0.9, y * 0.9, seed + 71, 2) - 0.5) * 0.9)
+      // 山脚下：草里散着从山上滚下来的碎石，越靠山越多，石面长着地衣
+      if (foot >= 0 && foot < 1.6) {
+        const exposed = smooth(1.3, 0.1, foot + (fbm(x * 0.9, y * 0.9, seed + 71, 2) - 0.5) * 0.9)
         const q = cellNearest(x * 1.6, y * 1.6, seed + 73)
         const dome = 1 - Math.sqrt(q.dx * q.dx + q.dy * q.dy) / (0.55 + 0.25 * q.h)
         const rock = smooth(0.05, 0.35, dome) * exposed
         if (rock > 0) {
           const c = STONES[Math.floor(q.h * 2.999)]!
-          const crack = smooth(0.05, 0.012, cellEdge(x * 2.4, y * 2.4, seed + 75)) * 0.32
-          const speck = 1 + (valueNoise(x * 24, y * 24, seed + 77) - 0.5) * 0.16
-          let rr = c[0] * speck * (1 - crack)
-          let rg = c[1] * speck * (1 - crack)
-          let rb = c[2] * speck * (1 - crack)
+          const speck = 1 + (valueNoise(x * 12, y * 12, seed + 77) - 0.5) * 0.16
+          let rr = c[0] * speck
+          let rg = c[1] * speck
+          let rb = c[2] * speck
           const lichen = smooth(0.58, 0.7, fbm(x * 1.4, y * 1.4, seed + 79, 2))
           const orange = fract(q.h * 17.3) > 0.7
           rr += ((orange ? 196 : 174) - rr) * lichen * 0.55
@@ -750,24 +803,70 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         }
       }
 
-      // 崖边外的岩壁：从上往下看是一圈往外去的岩面，竖着的水痕与岩缝顺着往下，几道岩坎上长着草；按岩壁朝哪打光，背着太阳的整圈都在阴影里。
-      // 崖沿最亮，向阳的那边一道亮边；往外越来越蒙在雾里，雾色接上谷底，最后透明、露出谷底。颜色在这里打好光
-      let selfLit = false
-      if (lip < 0) {
-        const sunward = ((frame.tx * slope - frame.nx) * LX + (frame.ty * slope - frame.ny) * LY) / Math.sqrt(1 + slope * slope)
-        const lit = 0.44 + 0.84 * Math.max(0, sunward * FACE_SIN + LZ * FACE_COS)
+      // 山：碎石坡、一级岩壁，再往上是顺着坡向一道道石棱与沟的山坡
+      if (s > -0.1) {
         toLocal(frame, x, y, L)
-        const streak = valueNoise(L.b * 3.5, down * 0.7, seed + 141) * 0.6 + valueNoise(L.b * 9, down * 1.4, seed + 143) * 0.4
-        const crack = smooth(0.06, 0, Math.abs(valueNoise(L.b * 1.8, down * 0.12, seed + 145) - 0.5))
-        const ledge = smooth(0.55, 0.7, valueNoise(L.b * 0.9, down * 3, seed + 147)) * smooth(0.45, 0.7, valueNoise(L.b * 4, down * 4, seed + 149))
-        const k = (0.78 + 0.4 * streak) * (1 - 0.35 * crack) * lit
-        const rim = smooth(0.16, 0, down) * (0.3 + 0.7 * clamp01(sunward / SUN_LEN)) * 46
-        const haze = smooth(FACE_U * 0.1, FACE_U, down) * 0.55
-        r = ((116 + (70 - 116) * ledge) * k + rim) * (1 - haze) + mist[0] * haze
-        g = ((110 + (92 - 110) * ledge) * k + rim) * (1 - haze) + mist[1] * haze
-        b = ((100 + (44 - 100) * ledge) * k + rim * 0.8) * (1 - haze) + mist[2] * haze
-        alpha = smooth(FACE_U, FACE_U * 0.4, down)
-        selfLit = true
+        const apron = sample(f, f.apron, x, y)
+        const top = apron + WALL_U
+        // 碎石坡：碎石块大大小小，越往下越大，石缝暗；上山路口那儿是新塌下来的石渣，发白，没长地衣
+        const q = cellNearest(x * (5 - 1.5 * smooth(0, apron, s)), y * (5 - 1.5 * smooth(0, apron, s)), seed + 151)
+        const c = STONES[Math.floor(q.h * 2.999)]!
+        const fresh = Math.exp(-(((L.b - head) / 1.9) ** 2)) * (0.65 + 0.35 * valueNoise(x * 3, y * 3, seed + 153))
+        const lit = 0.8 + 0.3 * clamp01((-q.dx * LX - q.dy * LY) * 1.8 + 0.4)
+        const gap = 1 - 0.3 * smooth(0.3, 0.5, Math.hypot(q.dx, q.dy))
+        const grit = 0.94 + 0.12 * valueNoise(x * 9, y * 9, seed + 155)
+        const k0 = lit * gap * grit * (1 - 0.3 * smooth(apron - 0.5, apron, s))
+        let mr = (c[0] + (172 - c[0]) * fresh) * k0
+        let mg = (c[1] + (168 - c[1]) * fresh) * k0
+        let mb = (c[2] + (158 - c[2]) * fresh) * k0
+        // 岩壁：顺着坡向一道道竖的水痕与裂缝，几道横的岩坎；崖脚压暗，崖顶一道亮边
+        const wWall = smooth(apron - 0.06, apron + 0.06, s)
+        if (wWall > 0) {
+          const face = (s - apron) / WALL_U
+          const streak = valueNoise(L.b * 5.5, s * 0.7, seed + 157) * 0.6 + valueNoise(L.b * 13, s * 1.1, seed + 159) * 0.4
+          const crack = smooth(0.8, 0.9, valueNoise(L.b * 3.3, s * 0.12, seed + 161)) * smooth(0.35, 0.6, valueNoise(L.b * 3.3 + 5.2, s * 1.6, seed + 179))
+          const ledge = smooth(0.62, 0.72, valueNoise(L.b * 0.8, s * 6, seed + 163))
+          const rim = smooth(0.82, 0.97, face) * (1 - smooth(0.97, 1.02, face))
+          const k = (0.72 + 0.42 * streak) * (1 - 0.3 * crack) * (0.78 + 0.22 * smooth(0, 0.35, face)) * (1 + 0.12 * ledge)
+          mr += ((126 + 40 * rim) * k - mr) * wWall
+          mg += ((120 + 40 * rim) * k - mg) * wWall
+          mb += ((110 + 36 * rim) * k - mb) * wWall
+        }
+        // 山坡：石棱上是裸岩，沟里是碎石，低处的石缝里长着高山草甸，越往上草越少；高处的沟里积着残雪；之字形的上山小路
+        const wUp = smooth(top - 0.06, top + 0.06, s)
+        if (wUp > 0) {
+          const up = s - top
+          const rib = ribAt(seed, L.b, s)
+          const streak = 0.9 + 0.2 * valueNoise(L.b * 9, s * 0.8, seed + 165)
+          const rock = STONES[Math.floor(valueNoise(x * 0.45, y * 0.45, seed + 167) * 2.999)]!
+          const kr = (0.82 + 0.36 * rib) * streak * (0.92 + 0.16 * grain)
+          let ur = rock[0] * kr
+          let ug = rock[1] * kr
+          let ub = rock[2] * kr
+          const turf = smooth(0.55, 0.65, fbm(x / 2, y / 2, seed + 169, 3) + 0.1 * smooth(5, 0.5, up) - 0.15 * rib) * 0.85
+          ur += (100 * tex - ur) * turf
+          ug += (110 * tex - ug) * turf
+          ub += (62 * tex - ub) * turf
+          const drift = smooth(snowAt, snowAt + 0.06, (0.55 - rib) + 0.35 * smooth(1.5, 7, up) + (valueNoise(x * 2.2, y * 2.2, seed + 171) - 0.5) * 0.1)
+          ur += (232 - ur) * drift
+          ug += (236 - ug) * drift
+          ub += (240 - ub) * drift
+          const cd = nearestSeg(prep.climb, prep.climbBuckets, x, y, PICK)
+          if (cd < 0.08) {
+            const a = smooth(0.08, -0.04, cd + (valueNoise(x * 6, y * 6, seed + 173) - 0.5) * 0.06) * (1 - drift) * 0.7
+            ur += (150 * (0.9 + 0.2 * grain) - ur) * a
+            ug += (136 * (0.9 + 0.2 * grain) - ug) * a
+            ub += (112 * (0.9 + 0.2 * grain) - ub) * a
+          }
+          mr += (ur - mr) * wUp
+          mg += (ug - mg) * wUp
+          mb += (ub - mb) * wUp
+        }
+        // 碎石往草里撒进来一点，交界参差
+        const into = smooth(-0.1, 0.18, s + (valueNoise(x * 2.5, y * 2.5, seed + 175) - 0.5) * 0.24)
+        r += (mr - r) * into
+        g += (mg - g) * into
+        b += (mb - b) * into
       }
 
       // 倒木：顺着树干的树皮纹，顶上长着苔藓；断开的那头露出发白的木茬，另一头翻起带泥的根盘
@@ -824,29 +923,6 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         }
       }
 
-      if (deck) {
-        const plank = 0.85 + 0.15 * smooth(0.012, 0.03, Math.abs(fract(ss / 0.18) - 0.5) * 0.18) + (valueNoise(so * 10, Math.floor(ss / 0.18) * 3.7, seed + 113) - 0.5) * 0.2
-        // 平台外半块掉了几块板，缝里看得见底下暗处的岩壁
-        if (so > 0.25 && Math.abs(ss) < 0.3 && valueNoise(ss * 6, 1, seed + 115) > 0.55) {
-          r *= 0.35
-          g *= 0.35
-          b *= 0.35
-        } else {
-          r = 120 * plank
-          g = 94 * plank
-          b = 66 * plank
-          alpha = 1
-          selfLit = false
-        }
-      } else if (steps) {
-        const tread = fract((so - 0.42) / 0.36)
-        const k = 0.55 + 0.35 * smooth(0, 0.3, tread)
-        r = 108 * k
-        g = 86 * k
-        b = 62 * k
-        alpha = 1
-        selfLit = false
-      }
       if (tr) {
         const dx = x - tr.x
         const dy = y - tr.y
@@ -860,7 +936,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           b = rim ? 70 : 104 * sky
         }
       }
-      // 栅栏与台阶的木头：风吹日晒发灰的圆木，按太阳打光，边上一圈暗线把它从草里勾出来；门柱与台阶的柱子颜色深一些
+      // 栅栏的木头：风吹日晒发灰的圆木，按太阳打光，边上一圈暗线把它从草里勾出来；门柱颜色深一些
       {
         const wd = nearestSeg(prep.wood, prep.woodBuckets, x, y, PICK)
         if (wd < 0.02) {
@@ -879,33 +955,63 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           r += ((dark ? 110 : 150) * k - r) * a
           g += ((dark ? 88 : 136) * k - g) * a
           b += ((dark ? 64 : 112) * k - b) * a
-          alpha = Math.max(alpha, a)
-          if (a > 0.5) selfLit = false
         }
       }
 
-      // 光：朝太阳的坡亮、背阴的坡暗；树影与栅栏、倒木的影子；林缘下暗一些，离草地越远越暗
+      // 光：朝太阳的坡亮、背阴的坡暗；山与岩壁挡住的地方落在影子里；树影与栅栏、倒木、石头的影子；林缘下暗一些，离草地越远越暗
       const zx = (sample(f, f.height, x + e, y) - sample(f, f.height, x - e, y)) / (2 * e * mpu)
       const zy = (sample(f, f.height, x, y + e) - sample(f, f.height, x, y - e)) / (2 * e * mpu)
       const lambert = Math.max(0, (-zx * LX - zy * LY + LZ) / Math.sqrt(zx * zx + zy * zy + 1))
-      let shade = 0
+      let shade = sample(f, f.shade, x, y) * 0.55
       for (const k of near(prep.treeShadows, x, y)) {
         const c = prep.shadowAt[k]!
         const d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2)
         shade = Math.max(shade, smooth(c.r + c.soft, c.r - c.soft, d) * 0.4)
       }
       for (const k of near(prep.castBuckets, x, y)) {
-        const s = prep.casts[k]!
-        const d = segDist(s, x, y)
-        shade = Math.max(shade, smooth(s.w + 0.05, s.w - 0.03, d) * s.k)
+        const c = prep.casts[k]!
+        const d = segDist(c, x, y)
+        shade = Math.max(shade, smooth(c.w + 0.05, c.w - 0.03, d) * c.k)
       }
       const under = 1 - 0.22 * smooth(-1.4, 0.4, forest)
-      const far = 1 - 0.38 * smooth(1.5, 7, forest)
-      const light = selfLit ? 1 - shade : (0.44 + 0.84 * lambert) * (1 - shade) * under * far
-      out[o] = r * light
-      out[o + 1] = g * light
-      out[o + 2] = b * light
-      out[o + 3] = alpha * 255
+      const far = (1 - 0.38 * smooth(1.5, 7, forest)) * (1 - 0.3 * smooth(3, 9, s))
+      const light = (0.44 + 0.84 * lambert) * (1 - shade) * under * far
+      r *= light
+      g *= light
+      b *= light
+      // 山脚的石头与路口的石堆自己按太阳打光，只落在山的影子里，不叫自己投下的影子盖住
+      const keep = (1 - sample(f, f.shade, x, y) * 0.55) * far
+      for (const k of near(prep.stoneBuckets, x, y)) {
+        const st = prep.stones[k]!
+        const dx = (x - st.x) / st.r
+        const dy = (y - st.y) / st.r
+        const d = Math.sqrt(dx * dx + dy * dy) * (1 + 0.22 * (valueNoise(Math.atan2(dy, dx) * 1.6 + k * 7.1, 0.5, seed + 177) - 0.5))
+        if (d >= 1.05) continue
+        const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, d) ** 2))
+        const lit = (0.55 + 0.55 * clamp01(dx * LX + dy * LY + nz * LZ)) * keep
+        const lichen = st.fresh ? 0 : smooth(0.55, 0.7, fbm(x * 2, y * 2, seed + 173, 2)) * 0.5
+        const a = smooth(1.05, 0.9, d)
+        r += (((st.fresh ? 170 : 124) + (170 - 124) * lichen) * lit - r) * a
+        g += (((st.fresh ? 166 : 120) + (166 - 120) * lichen) * lit - g) * a
+        b += (((st.fresh ? 156 : 110) + (118 - 110) * lichen) * lit - b) * a
+      }
+      {
+        const d = Math.hypot(x - cairn.x, y - cairn.y) / CAIRN.r
+        if (d < 1.05) {
+          const lit = (0.55 + 0.6 * clamp01(((x - cairn.x) / CAIRN.r) * LX + ((y - cairn.y) / CAIRN.r) * LY + LZ * 0.8)) * keep
+          const tier = d > 0.66 ? 0 : d > 0.36 ? 1 : 2
+          const seam = 1 - 0.4 * smooth(0.05, 0, Math.abs(d - 0.66)) - 0.4 * smooth(0.05, 0, Math.abs(d - 0.36))
+          const k = (0.72 + 0.14 * tier) * lit * seam
+          const a = smooth(1.05, 0.92, d)
+          r += (148 * k - r) * a
+          g += (144 * k - g) * a
+          b += (136 * k - b) * a
+        }
+      }
+      out[o] = r
+      out[o + 1] = g
+      out[o + 2] = b
+      out[o + 3] = 255
     }
   }
 }
@@ -1047,7 +1153,7 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         }
       }
       const depth = sample(f, f.forest, x, y)
-      const fill = smooth(0.5, 1.8, depth) * smooth(0.1, 0.8, sample(f, f.lip, x, y)) * 0.96
+      const fill = smooth(0.5, 1.8, depth) * smooth(0.1, 0.8, sample(f, f.foot, x, y)) * 0.96
       if (tree < 0 || alpha <= 0) {
         if (fill <= 0) {
           out[o + 3] = 0
@@ -1092,229 +1198,7 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
   }
 }
 
-/** 谷底的庄稼：牧草、麦子、麦茬、翻过的地、油菜、苜蓿 */
-const CROPS = [
-  [104, 140, 72],
-  [198, 178, 100],
-  [180, 162, 112],
-  [122, 98, 74],
-  [212, 198, 74],
-  [94, 130, 62],
-] as const
-const ROOFS = [
-  [156, 76, 56],
-  [134, 66, 50],
-  [96, 92, 96],
-] as const
-const HAZE = [178, 194, 208] as const
-/** 落在高地影子里的谷底上那层雾：雾里的空气也在影子里，暗一些 */
-const HAZE_SHADE = [118, 130, 146] as const
-
-/**
- * 村子里一处有没有房子：沿路按 5 格的格子撒房子，离村子中心越近越密；房子都盖在路靠崖的这一侧到河边留出的地之间，紧贴着路的那一溜不盖。
- * fromRoad 是离路多远（往离崖远的方向为正）；有就返回屋顶的颜色序号乘二、加上这一点在屋脊的哪一侧（0 离崖近、1 离崖远），没有是 −1
- */
-function houseAt(v: Valley, b: number, fromRoad: number): number {
-  if (fromRoad < -16 || fromRoad > v.road - 6) return -1
-  const cx = Math.floor(b / 5)
-  const cy = Math.floor(fromRoad / 5)
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      const hx = cx + i
-      const hy = cy + j
-      const centerB = (hx + 0.5) * 5 + (hash1(hx, hy + 7) - 0.5) * 1.2
-      const centerO = (hy + 0.5) * 5 + (hash1(hx + 3, hy) - 0.5) * 1.2
-      if (Math.abs(centerO) < 2.6 || centerO > v.road - 7) continue
-      const dist = Math.hypot(centerB - v.village, centerO * 1.4)
-      if (dist > 20 || hash1(hx * 1.7 + v.seed, hy * 2.3) > 0.9 - 0.65 * smooth(20, 5, dist)) continue
-      const hl = 1.5 + hash1(hx, hy) * 0.8
-      const hw = 1 + hash1(hy, hx) * 0.5
-      const db = b - centerB
-      const dO = fromRoad - centerO
-      if (Math.abs(db) < hl && Math.abs(dO) < hw) return Math.floor(hash1(hx + 11, hy) * 2.999) * 2 + (dO > 0 ? 1 : 0)
-    }
-  }
-  return -1
-}
-
-/** 谷底顺着崖边那个方向的东西：崖脚在哪、碎石坡与林子铺到哪、河与路在哪，只随顺着崖边的位置变，按像素的行或列算一次 */
-interface Along {
-  readonly lip: number
-  readonly river: number
-  readonly half: number
-  readonly road: number
-  readonly forest: number
-  readonly talus: number
-}
-
-function alongAt(v: Valley, e: MeadowPlan['edges'], b: number): Along {
-  const seed = v.seed
-  const swing = (x: number, y: number, k: number): number => (fbm(x, y, seed + k, 2) - 0.5) * 2.6
-  const river = v.river + 13 * swing(b / 70, 2.3, 5) + 4 * swing(b / 22, 7.1, 7)
-  return {
-    lip: lipAt(e, b),
-    river,
-    half: 3.4 + 1.2 * fbm(b / 30, 4.4, seed + 9, 2),
-    road: river - v.road + 3 * swing(b / 40, 9.9, 11),
-    forest: 22 + 8 * swing(b / 30, 1.7, 13),
-    talus: 7 + 3 * swing(b / 9, 5.3, 15),
-  }
-}
-
-/**
- * 崖下的山谷：崖脚一溜碎石坡，往外是坡上的林子，再往外是谷底的田：一块块牧草、麦子、翻过的地，田埂上长着树篱；
- * 一条河顺着山谷弯过去，河边有砾石滩，路沿着河走，路边有个小村子。按太阳打光，房子背着太阳投下影子；太阳在崖里那一边时，高地的影子落满靠崖的谷底。隔着一层淡蓝的雾。
- * 坐标是谷底所在的地图平面，按离崖脚多远与顺着崖边的位置量。只画 rect 那一块
- */
-export function paintValley(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
-  const area = valleyArea(sc)
-  const plan = sc.plan
-  const f = plan.frame
-  const v = prep.valley
-  const seed = v.seed
-  const ppu = VALLEY_PPU
-  const w = rect.x1 - rect.x0
-  const L: Local = { a: 0, b: 0 }
-  const e = plan.edges
-  // 太阳在谷底坐标（顺着崖边、离崖脚）里的方向：离崖脚的方向与本地的 a 相反
-  const sunA = LX * f.nx + LY * f.ny
-  const sunB = LX * f.tx + LY * f.ty
-  const sunLen = Math.hypot(sunA, sunB) || 1
-  const toSunB = sunB / sunLen
-  const toSunO = -sunA / sunLen
-  // 从谷底一点朝太阳走，升到崖顶那么高时挪了多远（本地）：那时还在崖边以里，这一点就被崖挡住、落在高地的影子里
-  const rise = sc.cfg.cliff.depthM / sc.cfg.meterPerU / LZ
-  const riseA = sunA * rise
-  const riseB = sunB * rise
-  const swell = (x: number, y: number): number => fbm(x / 26, y / 26, seed + 3, 2)
-  const cache = new Map<number, Along>()
-  const alongOf = (b: number): Along => {
-    const key = Math.round(b * ppu)
-    let c = cache.get(key)
-    if (!c) cache.set(key, (c = alongAt(v, e, key / ppu)))
-    return c
-  }
-  for (let py = rect.y0; py < rect.y1; py++) {
-    for (let px = rect.x0; px < rect.x1; px++) {
-      const x = area.x0 + (px + 0.5) / ppu
-      const y = area.y0 + (py + 0.5) / ppu
-      const o = ((py - rect.y0) * w + px - rect.x0) * 4
-      toLocal(f, x, y, L)
-      const bb = L.b
-      const al = alongOf(bb)
-      const away = al.lip - L.a
-      const grain = valueNoise(x * 3, y * 3, seed + 1)
-      let r: number
-      let g: number
-      let b: number
-      const rd = Math.abs(away - al.river)
-      if (away < 0.8) {
-        // 崖边以里是崖壁的深处：视线钻到崖里时落在这里，竖着的岩纹蒙着雾；出了崖脚接上碎石坡
-        const q = cellNearest(x * 0.9, y * 0.9, seed + 17)
-        const stone = (100 + 34 * smooth(0.5, 0.3, Math.hypot(q.dx, q.dy))) * (0.85 + 0.25 * grain)
-        const streak = valueNoise(bb * 2.2, away * 0.3, seed + 31) * 0.6 + valueNoise(bb * 5, away * 0.6, seed + 33) * 0.4
-        const rock = 0.6 + 0.3 * streak
-        const t = smooth(0, 0.8, away)
-        r = 112 * rock + (stone - 112 * rock) * t
-        g = 106 * rock + (stone * 0.955 - 106 * rock) * t
-        b = 98 * rock + (stone * 0.88 - 98 * rock) * t
-      } else if (away < al.talus) {
-        // 崖脚的碎石坡
-        const q = cellNearest(x * 0.9, y * 0.9, seed + 17)
-        const stone = smooth(0.5, 0.3, Math.hypot(q.dx, q.dy))
-        const k = 0.85 + 0.25 * grain
-        r = (100 + 34 * stone) * k
-        g = (96 + 30 * stone) * k
-        b = (88 + 26 * stone) * k
-      } else if (away < al.forest || (away > al.river + al.half + 26 && fbm(x / 18, y / 18, seed + 19, 2) > 0.52)) {
-        // 林子：一个个小树冠
-        const q = cellNearest(x * 0.6, y * 0.6, seed + 21)
-        const d = Math.hypot(q.dx, q.dy)
-        const crown = smooth(0.7, 0.2, d)
-        const lit = clamp01(0.5 + (-q.dx * LX - q.dy * LY) * 1.2)
-        const k = 0.55 + 0.6 * crown * lit
-        r = (40 + 18 * q.h) * k
-        g = (66 + 18 * q.h) * k
-        b = (46 + 10 * q.h) * k
-      } else {
-        // 田：顺着山谷拉长的一块块，每块一种庄稼，有自己的垄向；田埂上有的长着树篱
-        const fx = bb / 15
-        const fy = away / 7.5
-        const q = cellNearest(fx, fy, seed + 23)
-        const crop = CROPS[Math.floor(fract(q.h * 9.17) * (q.h > 0.92 ? 6 : 5))]!
-        const ang = q.h * 6.283
-        const rows = 0.95 + 0.05 * Math.sin((bb * Math.cos(ang) + away * Math.sin(ang)) * 7)
-        const k = (0.92 + 0.12 * grain) * rows
-        r = crop[0] * k
-        g = crop[1] * k
-        b = crop[2] * k
-        const edge = cellEdge(fx, fy, seed + 23)
-        if (edge < 0.05 && hash1(Math.floor(q.h * 997), 3) > 0.35) {
-          const hedge = smooth(0.05, 0.015, edge)
-          r += (50 - r) * hedge
-          g += (76 - g) * hedge
-          b += (44 - b) * hedge
-        }
-      }
-      // 路与河
-      const road = smooth(1.1, 0.7, Math.abs(away - al.road))
-      if (road > 0) {
-        r += (182 - r) * road
-        g += (166 - g) * road
-        b += (134 - b) * road
-      }
-      const bank = smooth(al.half + 1.8, al.half + 0.6, rd)
-      if (bank > 0) {
-        r += (172 - r) * bank
-        g += (164 - g) * bank
-        b += (146 - b) * bank
-      }
-      const water = smooth(al.half, al.half - 0.6, rd)
-      if (water > 0) {
-        const sparkle = smooth(0.82, 0.95, valueNoise(x * 2, y * 2, seed + 25))
-        r += (64 + 120 * sparkle - r) * water
-        g += (102 + 110 * sparkle - g) * water
-        b += (116 + 90 * sparkle - b) * water
-      }
-      // 村子：两坡的屋顶一面向阳一面背阴；朝太阳那边几格以内有房子就落在它的影子里
-      if (Math.abs(bb - v.village) < 26 && away > al.forest - 2 && away < al.river - al.half - 1) {
-        const roof = houseAt(v, bb, away - al.road)
-        if (roof >= 0) {
-          const c = ROOFS[Math.floor(roof / 2)]!
-          const k = (roof % 2 === 1) === toSunO > 0 ? 1.06 : 0.72
-          r = c[0] * k
-          g = c[1] * k
-          b = c[2] * k
-        } else {
-          for (const t of [0.8, 1.6, 2.4, 3.2]) {
-            const sb = bb + toSunB * t
-            const so = away + toSunO * t
-            if (houseAt(v, sb, so - alongOf(sb).road) >= 0) {
-              r *= 0.62
-              g *= 0.62
-              b *= 0.68
-              break
-            }
-          }
-        }
-      }
-      // 地势：谷底平，过了河往远处慢慢抬起，按坡向打光
-      const amp = 6 * smooth(al.river + 10, al.river + 60, away) + 1.5
-      const hx = (amp * (swell(x + 0.75, y) - swell(x - 0.75, y))) / 1.5
-      const hy = (amp * (swell(x, y + 0.75) - swell(x, y - 0.75))) / 1.5
-      const lambert = Math.max(0, (-hx * LX - hy * LY + LZ) / Math.sqrt(hx * hx + hy * hy + 1))
-      const shadow = smooth(-1.5, 1.5, L.a + riseA - alongOf(bb + riseB).lip)
-      const light = (0.98 + 0.55 * (lambert - LZ)) * (1 - (1 - VALLEY_SHADE) * shadow)
-      const haze = 0.3
-      out[o] = r * light * (1 - haze) + (HAZE[0] + (HAZE_SHADE[0] - HAZE[0]) * shadow) * haze
-      out[o + 1] = g * light * (1 - haze) + (HAZE[1] + (HAZE_SHADE[1] - HAZE[1]) * shadow) * haze
-      out[o + 2] = b * light * (1 - haze) + (HAZE[2] + (HAZE_SHADE[2] - HAZE[2]) * shadow) * haze
-      out[o + 3] = 255
-    }
-  }
-}
-
-/** 草浪着色器用的遮罩：草地与牧场为 1，路上淡一些，林子、石头与崖外为 0；按地面贴图的范围，每格 MASK_PPU 个像素，满 alpha */
+/** 草浪着色器用的遮罩：草地与牧场为 1，路上淡一些，林子与山上为 0；按地面贴图的范围，每格 MASK_PPU 个像素，满 alpha */
 export function grassMask(sc: PaintScene): { data: Uint8ClampedArray<ArrayBuffer>; w: number; h: number } {
   const area = groundArea(sc)
   const w = Math.round(area.w * MASK_PPU)
@@ -1327,10 +1211,10 @@ export function grassMask(sc: PaintScene): { data: Uint8ClampedArray<ArrayBuffer
       const x = area.x0 + (px + 0.5) / MASK_PPU
       const y = area.y0 + (py + 0.5) / MASK_PPU
       toLocal(sc.plan.frame, x, y, L)
-      const lip = L.a - lipAt(e, L.b)
+      const foot = L.a - footAt(e, L.b)
       const forest = forestDepth(e, L.a, L.b)
       const fence = Math.abs(beyondFence(e, L.a, L.b))
-      const m = smooth(0.3, 1.4, lip) * smooth(0.2, -0.8, forest) * (0.4 + 0.6 * smooth(0.1, 0.4, fence))
+      const m = smooth(0.3, 1.4, foot) * smooth(0.2, -0.8, forest) * (0.4 + 0.6 * smooth(0.1, 0.4, fence))
       const o = (py * w + px) * 4
       data[o] = m * 255
       data[o + 1] = 0

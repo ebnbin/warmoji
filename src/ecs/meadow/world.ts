@@ -55,7 +55,7 @@ function groundOf(sim: Sim): Surface {
   return g
 }
 
-/** 离边 reach 像素以内几乎正对着边走时改为顺着边走，免得顶在林缘、栅栏或崖边上不动；斜着撞上的由碰撞自己滑开 */
+/** 离边 reach 像素以内几乎正对着边走时改为顺着边走，免得顶在林缘、栅栏或山脚上不动；斜着撞上的由碰撞自己滑开 */
 function alongWall(b: Basin, x: number, y: number, dx: number, dy: number, reach: number): Point {
   if (roomAt(b, x, y) > reach) return { x: dx, y: dy }
   const n = awayFromWall(b, x, y)
@@ -79,8 +79,8 @@ function openNear(plan: MeadowPlan, p: Point, room: number): Point {
 }
 
 /**
- * 草甸：能走的是林子、栅栏和断崖围着的一片草地，场里没有障碍，也没有任何特殊规则。
- * 林缘、栅栏与崖边是硬边界，身体走到跟前就停住、顺着边滑，子弹照样飞过去
+ * 草甸：能走的是林子、栅栏和山崖围着的一片草地，场里没有障碍，也没有任何特殊规则。
+ * 林缘、栅栏与山脚是硬边界，身体走到跟前就停住、顺着边滑，子弹照样飞过去
  */
 export const meadow: WorldHooks = {
   torus: false,

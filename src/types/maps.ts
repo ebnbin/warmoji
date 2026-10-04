@@ -665,8 +665,8 @@ export interface RiverConfig {
   }
 }
 /**
- * 草甸：山间一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边走到头是断崖，崖下是很深的山谷；
- * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和崖边都是硬边界。一格 meterPerU 米：树高、影子与山谷的远近按米算
+ * 草甸：山脚下一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是往上的山崖；
+ * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和山脚都是硬边界。一格 meterPerU 米：树高、岩壁高与影子长短按米算
  */
 export interface MeadowConfig {
   readonly meterPerU: number
@@ -677,24 +677,25 @@ export interface MeadowConfig {
   readonly areaU2: readonly [number, number]
   /** 窄过两倍 neckU 的缝与尖角不能走 */
   readonly neckU: number
-  /** 草地的起伏（米）与波长（格）；整片从崖边往林子那边每格抬高多少米 */
+  /** 草地的起伏（米）与波长（格）；整片从山脚往外每格降低多少米 */
   readonly turf: { readonly reliefM: number; readonly waveU: number; readonly riseM: number }
   /**
-   * 断崖：崖边离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），崖边的石头再参差 jagU；另有 capes 处探出去的崖头或咬进来的崖湾，
-   * 探出或咬进 capeU 格、宽约 capeWidthU 格；崖下的谷底比草地低 depthM 米。
-   * 谷底按透视画：镜头在草地上方 cameraU 格，越深的东西显得越小、跟着镜头移得越慢；镜头在断崖那边最多多看出 lookU 格
+   * 山崖：山脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），石头再参差 jagU；另有 spurs 处探进草地的山嘴或凹进山里的山坳，
+   * 探出或凹进 spurU 格、宽约 spurWidthU 格。山脚先是 screeU 格宽的碎石坡，接着一级 heightM 米高的岩壁，再往上的山坡每格升 riseM 米；
+   * 山坡高处的洼地里积着残雪，snow 越大积得越多
    */
   readonly cliff: {
     readonly insetU: readonly [number, number]
     readonly bendU: number
     readonly waveU: number
     readonly jagU: number
-    readonly capes: readonly [number, number]
-    readonly capeU: readonly [number, number]
-    readonly capeWidthU: readonly [number, number]
-    readonly depthM: number
-    readonly cameraU: number
-    readonly lookU: number
+    readonly spurs: readonly [number, number]
+    readonly spurU: readonly [number, number]
+    readonly spurWidthU: readonly [number, number]
+    readonly screeU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly riseM: number
+    readonly snow: number
   }
   /**
    * 针叶林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进草地的林舌或凹进林子的草湾，
@@ -718,7 +719,7 @@ export interface MeadowConfig {
   readonly trail: { readonly notchU: number; readonly widthU: number; readonly logU: readonly [number, number] }
   /**
    * 牧场的木栅栏：离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；桩距（格）、桩高（米）与门宽（格）；
-   * 栅栏在断崖对面那条边的概率，其余时候在一条侧边
+   * 栅栏在山崖对面那条边的概率，其余时候在一条侧边
    */
   readonly fence: {
     readonly insetU: readonly [number, number]

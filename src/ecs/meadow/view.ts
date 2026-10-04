@@ -10,10 +10,10 @@ import { playSfx } from '../../audio/sfx'
 import { spawnDecor } from '../entities/decor'
 import { Airborne, Alive, Pickup, Radius, Transform } from '../components'
 import { roomAt } from '../worlds/basin'
-import { CANOPY_PPU, grassMask, groundArea, inShade, MASK_PPU, textureSize, valleyArea, valleyInland } from './ground'
+import { CANOPY_PPU, grassMask, groundArea, MASK_PPU, textureSize } from './ground'
 import { MeadowPainter } from './painter'
-import { GRASS_FRAG, VALLEY_FRAG } from './shader'
-import { beyondFence, forestDepth, lipAt, polylineDist, toLocal } from './layout'
+import { GRASS_FRAG } from './shader'
+import { beyondFence, footAt, forestDepth, polylineDist, toLocal, toMap } from './layout'
 import { meadowPlanFor } from './world'
 import { drawBird, drawButterfly, drawFluff, drawHawk, drawSheep, drawSheepHead } from './critters'
 import type { PaintTask } from './painter'
@@ -28,7 +28,6 @@ import type { MeadowConfig } from '../../types/maps'
 const BG = 0x0d1510
 const GROUND_KEY = 'meadow-ground'
 const CANOPY_KEY = 'meadow-canopy'
-const VALLEY_KEY = 'meadow-valley'
 const MASK_KEY = 'meadow-mask'
 const SHEEP_KEY = 'meadow-sheep'
 const HEAD_KEY = 'meadow-sheep-head'
@@ -53,18 +52,8 @@ const BIRD_U = 0.36
 const BIRD_SPEED_U = 7
 const BIRD_ALT_M = 2.6
 const FLOCK_MS = { min: 22000, max: 45000 } as const
-/** 鹰：在崖下多深的地方盘旋（占谷深的比例）、绕多大的圈（格）、多快（弧度/秒）、翅展（格） */
-const HAWK = { depth: 0.38, radius: 24, rate: 0.09, span: 2.6 } as const
-/** 谷底在高地影子里时，鹰也在影子里飞 */
-const HAWK_SHADE = 0x9da3ab
-/** 雾色：谷底贴图外与远处；谷底在高地影子里时暗一些 */
-const HAZE = [0.7, 0.76, 0.81] as const
-const HAZE_SHADE = [0.46, 0.51, 0.57] as const
-/** 半山腰那两层雾的颜色：在阳光里、在高地的影子里 */
-const MIST_TINT = [0.92, 0.94, 0.95] as const
-const MIST_TINT_SHADE = [0.68, 0.72, 0.77] as const
-/** 半山腰两层雾在谷深的几成处 */
-const MIST = [0.3, 0.62] as const
+/** 鹰：在山崖上空绕多大的圈（格）、多快（弧度/秒）、翅展（格）、离地多高（米，定影子落在哪） */
+const HAWK = { radius: 6.5, rate: 0.16, span: 1.9, altM: 4 } as const
 /** 羊多久叫一声（毫秒） */
 const BLEAT_MS = { min: 9000, max: 20000 } as const
 
@@ -127,16 +116,9 @@ function ensureCritters(scene: Phaser.Scene): void {
   if (!scene.textures.exists(FLUFF_KEY)) canvasTexture(scene, FLUFF_KEY, 16, 16, (ctx) => drawFluff(ctx, 16))
 }
 
-/** 镜头往断崖那边多看出去的距离，像素：其余三边按默认边距 */
-function lookOut(plan: MeadowPlan, cfg: MeadowConfig): { left: number; right: number; top: number; bottom: number } {
-  const f = plan.frame
-  const look = cfg.cliff.lookU * UNIT
-  return { left: f.nx > 0 ? look : 0, right: f.nx < 0 ? look : 0, top: f.ny > 0 ? look : 0, bottom: f.ny < 0 ? look : 0 }
-}
-
 /**
- * 草甸：地面、树冠与崖下的山谷是开局在后台线程画好的贴图；山谷压在地面底下，按透视跟着镜头慢慢移，半山腰飘着雾；草地上山风吹出一道道草浪。
- * 栅栏外几只羊在吃草，草地上蝴蝶围着花飞，林子里不时飞出一群小鸟掠过草地，崖下有只鹰在盘旋，蒲公英的种子顺风飘。树冠盖在一切之上
+ * 草甸：地面与树冠是开局在后台线程画好的贴图，山崖画在地面里，按高度场打光、投下影子；草地上山风吹出一道道草浪。
+ * 栅栏外几只羊在吃草，草地上蝴蝶围着花飞，林子里不时飞出一群小鸟掠过草地，山崖上空有只鹰在盘旋，蒲公英的种子顺风飘。树冠盖在一切之上
  */
 export class MeadowView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -173,16 +155,12 @@ export class MeadowView implements MapView {
     ensureCritters(v.scene)
   }
 
-  /** 镜头最多看到地图外多远：默认边距加设备安全区，断崖那边再多看出去一截 */
   camera(v: ViewCtx): void {
     const cam = v.scene.cameras.main
     const m = MAP.cameraMargin * UNIT
     const s = safeInsets
-    const look = lookOut(this.planOf(v), v.def.meadow!)
-    const left = m + s.left + look.left
-    const top = m + s.top + look.top
     cam.setZoom(viewport.renderScale)
-    cam.setBounds(-left, -top, v.w + left + m + s.right + look.right, v.h + top + m + s.bottom + look.bottom)
+    cam.setBounds(-m - s.left, -m - s.top, v.w + m * 2 + s.left + s.right, v.h + m * 2 + s.top + s.bottom)
     cam.startFollow(v.anchor)
   }
 
@@ -204,16 +182,15 @@ export class MeadowView implements MapView {
     const cfg = v.def.meadow!
     const scene = v.scene
     const sc: PaintScene = { cfg, plan }
-    const sizes: Record<PaintLayer, { w: number; h: number }> = { ground: textureSize(sc, 'ground'), canopy: textureSize(sc, 'canopy'), valley: textureSize(sc, 'valley') }
+    const sizes: Record<PaintLayer, { w: number; h: number }> = { ground: textureSize(sc, 'ground'), canopy: textureSize(sc, 'canopy') }
     const tex: Record<PaintLayer, Phaser.Textures.CanvasTexture> = {
       ground: canvasTexture(scene, GROUND_KEY, sizes.ground.w, sizes.ground.h),
       canopy: canvasTexture(scene, CANOPY_KEY, sizes.canopy.w, sizes.canopy.h),
-      valley: canvasTexture(scene, VALLEY_KEY, sizes.valley.w, sizes.valley.h),
     }
     const painter = new MeadowPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const tasks: PaintTask[] = []
-    for (const layer of ['valley', 'canopy', 'ground'] as const) {
+    for (const layer of ['canopy', 'ground'] as const) {
       const sz = sizes[layer]
       for (let y = 0; y < sz.h; y += STRIP_PX) tasks.push({ layer, rect: { x0: 0, y0: y, x1: sz.w, y1: Math.min(sz.h, y + STRIP_PX) } })
     }
@@ -226,8 +203,6 @@ export class MeadowView implements MapView {
     this.painter = undefined
     for (const t of Object.values(tex)) upload(t)
     const ga = groundArea(sc)
-    const va = valleyArea(sc)
-    this.valley(v, sc, va)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((sizes.ground.w / GROUND_PPU) * UNIT, (sizes.ground.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.grass(v, sc, plan, ga)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, CANOPY_KEY).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(20))
@@ -235,57 +210,11 @@ export class MeadowView implements MapView {
     this.visuals.push(this.shadows)
     this.herd(v, plan)
     this.flutter(v, plan)
-    this.soar(v, plan, cfg)
+    this.soar(v, plan)
     this.seeds(v, plan)
     this.flockAt = 6000 + Math.random() * 10000
     this.bleatAt = BLEAT_MS.min
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.2, 0x000000)
-  }
-
-  /** 崖下的山谷：一块四边形盖住镜头能去的地方，着色器按透视取谷底的贴图 */
-  private valley(v: ViewCtx, sc: PaintScene, va: Area): void {
-    const { plan, cfg } = sc
-    const scene = v.scene
-    const cam = scene.cameras.main
-    const f = plan.frame
-    const inland = valleyInland(sc)
-    const shade = inShade(plan)
-    const reach = cfg.cliff.lookU + MAP.cameraMargin + 6
-    const area = [-reach, -reach, plan.size + reach * 2, plan.size + reach * 2]
-    const depthU = cfg.cliff.depthM / cfg.meterPerU
-    const H = cfg.cliff.cameraU
-    const k = H / (H + depthU)
-    const mist = MIST.map((m) => H / (H + depthU * m))
-    const u = this.u
-    this.visuals.push(
-      scene.add
-        .shader(
-          {
-            name: 'MeadowValley',
-            fragmentSource: VALLEY_FRAG,
-            setupUniforms: (set: (name: string, value: unknown) => void) => {
-              set('uValley', 0)
-              set('uArea', area)
-              set('uRect', [va.x0, va.y0, va.w, va.h])
-              set('uCam', [cam.midPoint.x / UNIT, cam.midPoint.y / UNIT, k])
-              set('uFrame', [f.ox, f.oy, f.nx, f.ny])
-              set('uInland', inland)
-              set('uMist', mist)
-              set('uTime', u.time)
-              set('uWind', [plan.wind.x, plan.wind.y])
-              set('uHaze', shade ? HAZE_SHADE : HAZE)
-              set('uMistTint', shade ? MIST_TINT_SHADE : MIST_TINT)
-            },
-          },
-          area[0]! * UNIT,
-          area[1]! * UNIT,
-          area[2]! * UNIT,
-          area[3]! * UNIT,
-          [VALLEY_KEY],
-        )
-        .setOrigin(0, 0)
-        .setDepth(-1.5),
-    )
   }
 
   /** 草浪：遮罩标出哪里是草，着色器顺着山风吹出一道道亮的草浪 */
@@ -348,15 +277,14 @@ export class MeadowView implements MapView {
     }
   }
 
-  /** 崖下盘旋的鹰：圈心在离崖脚三四十格的谷里 */
-  private soar(v: ViewCtx, plan: MeadowPlan, cfg: MeadowConfig): void {
+  /** 山崖上空盘旋的鹰：圈心在山脚往山里几格，绕着圈时不时飞到草地上空 */
+  private soar(v: ViewCtx, plan: MeadowPlan): void {
     const rng = new Rng(plan.seed ^ 0x4a3c)
-    const f = plan.frame
     const b = plan.size * (0.2 + rng.next() * 0.6)
-    const a = lipAt(plan.edges, b) - (cfg.cliff.cameraU * 0.6 + 14 + rng.next() * 10)
-    const img = v.scene.add.image(0, 0, HAWK_KEY).setDepth(-1.4).setTint(inShade(plan) ? HAWK_SHADE : 0xffffff)
+    const c = toMap(plan.frame, footAt(plan.edges, b) - 2.5 - rng.next() * 2, b)
+    const img = v.scene.add.image(0, 0, HAWK_KEY).setDepth(36)
     this.visuals.push(img)
-    this.hawk = { a: rng.next() * Math.PI * 2, cx: f.ox + f.nx * a + f.tx * b, cy: f.oy + f.ny * a + f.ty * b, img }
+    this.hawk = { a: rng.next() * Math.PI * 2, cx: c.x, cy: c.y, img }
   }
 
   /** 顺风飘的蒲公英种子：在镜头里随处冒出来 */
@@ -387,12 +315,12 @@ export class MeadowView implements MapView {
     )
   }
 
-  /** 这一点在不在牧场里：栅栏外、林子外、离崖边一格以上，在画过的地方以内 */
+  /** 这一点在不在牧场里：栅栏外、林子外、离山脚一格以上，在画过的地方以内 */
   private inPasture(plan: MeadowPlan, cfg: MeadowConfig, x: number, y: number): boolean {
     const pad = cfg.padU - 1
     if (x < -pad || y < -pad || x > plan.size + pad || y > plan.size + pad) return false
     const L = toLocal(plan.frame, x, y, this.local)
-    return beyondFence(plan.edges, L.a, L.b) > 0.9 && forestDepth(plan.edges, L.a, L.b) < -0.9 && L.a - lipAt(plan.edges, L.b) > 1
+    return beyondFence(plan.edges, L.a, L.b) > 0.9 && forestDepth(plan.edges, L.a, L.b) < -0.9 && L.a - footAt(plan.edges, L.b) > 1
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -492,25 +420,24 @@ export class MeadowView implements MapView {
       g.fillCircle(b.x * UNIT + shx * alt, b.y * UNIT + shy * alt, BUTTERFLY_U * UNIT * 0.2)
     }
     this.flock(v, plan, now, dt, shx, shy)
-    // 鹰：崖下慢慢绕圈，按它的深度透视着跟镜头移，只在崖外露出来
-    const hk = this.hawk
-    if (hk) {
-      hk.a += HAWK.rate * dt
-      const vx = hk.cx + Math.cos(hk.a) * HAWK.radius
-      const vy = hk.cy + Math.sin(hk.a) * HAWK.radius * 0.8
-      const H = cfg.cliff.cameraU
-      const k = H / (H + (cfg.cliff.depthM / cfg.meterPerU) * HAWK.depth)
-      const cx = cam.midPoint.x / UNIT
-      const cy = cam.midPoint.y / UNIT
-      const heading = Math.atan2(Math.cos(hk.a) * 0.8, -Math.sin(hk.a))
-      hk.img
-        .setPosition((cx + (vx - cx) * k) * UNIT, (cy + (vy - cy) * k) * UNIT)
-        .setRotation(heading)
-        .setDisplaySize(HAWK.span * k * UNIT * 1.1, HAWK.span * k * UNIT)
+    // 鹰：在山崖上空慢慢绕圈，影子从山坡与草地上掠过
+    const eg = this.hawk
+    if (eg) {
+      eg.a += HAWK.rate * dt
+      const ex = eg.cx + Math.cos(eg.a) * HAWK.radius
+      const ey = eg.cy + Math.sin(eg.a) * HAWK.radius * 0.8
+      const heading = Math.atan2(Math.cos(eg.a) * 0.8, -Math.sin(eg.a))
+      eg.img.setPosition(ex * UNIT, ey * UNIT).setRotation(heading).setDisplaySize(HAWK.span * UNIT * 1.1, HAWK.span * UNIT)
+      g.fillStyle(0x000000, 0.14)
+      g.save()
+      g.translateCanvas(ex * UNIT + shx * HAWK.altM, ey * UNIT + shy * HAWK.altM)
+      g.rotateCanvas(heading)
+      g.fillEllipse(0, 0, HAWK.span * UNIT * 0.5, HAWK.span * UNIT * 0.9)
+      g.restore()
     }
   }
 
-  /** 一群小鸟：隔一阵从林缘飞出来，掠过草地，从崖边飞走；影子在地上跟着跑 */
+  /** 一群小鸟：隔一阵从林缘飞出来，掠过草地，往山那边飞走；影子在地上跟着跑 */
   private flock(v: ViewCtx, plan: MeadowPlan, now: number, dt: number, shx: number, shy: number): void {
     const g = this.shadows!
     const scene = v.scene
@@ -570,6 +497,6 @@ export class MeadowView implements MapView {
     this.birds = []
     this.hawk = undefined
     this.shadows = undefined
-    for (const key of [GROUND_KEY, CANOPY_KEY, VALLEY_KEY, MASK_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [GROUND_KEY, CANOPY_KEY, MASK_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }

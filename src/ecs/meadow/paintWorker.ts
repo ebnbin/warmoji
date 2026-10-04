@@ -1,4 +1,4 @@
-import { paintCanopy, paintGround, paintValley, pixelBuffer, prepare } from './ground'
+import { paintCanopy, paintGround, pixelBuffer, prepare } from './ground'
 import type { PaintJob, PaintPiece, PaintScene, Prepared } from './ground'
 
 let scene: PaintScene | undefined
@@ -14,8 +14,7 @@ self.onmessage = (e: MessageEvent<PaintJob>) => {
   if (!scene || !prep) throw new Error('画草甸的线程还没收到 setup')
   const pixels = pixelBuffer(job.rect)
   if (job.layer === 'ground') paintGround(scene, prep, pixels, job.rect)
-  else if (job.layer === 'canopy') paintCanopy(scene, prep, pixels, job.rect)
-  else paintValley(scene, prep, pixels, job.rect)
+  else paintCanopy(scene, prep, pixels, job.rect)
   const piece: PaintPiece = { index: job.index, layer: job.layer, rect: job.rect, pixels }
   self.postMessage(piece, { transfer: [pixels.buffer] })
 }

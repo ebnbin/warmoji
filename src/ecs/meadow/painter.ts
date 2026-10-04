@@ -1,4 +1,4 @@
-import { paintCanopy, paintGround, paintValley, pixelBuffer, prepare } from './ground'
+import { paintCanopy, paintGround, pixelBuffer, prepare } from './ground'
 import type { PaintJob, PaintLayer, PaintPiece, PaintScene, PixelRect } from './ground'
 
 /** 退回主线程画时每画这么久让一次主线程，毫秒 */
@@ -13,7 +13,7 @@ export interface PaintTask {
 }
 
 /**
- * 画草甸的地面、树冠与谷底：交给几个后台线程一块一块地分着画，画好一块交回一块；
+ * 画草甸的地面与树冠：交给几个后台线程一块一块地分着画，画好一块交回一块；
  * 开不了线程或线程出了错，剩下的活退回主线程画
  */
 export class MeadowPainter {
@@ -58,8 +58,7 @@ export class MeadowPainter {
       const { layer, rect } = tasks[index]!
       const pixels = pixelBuffer(rect)
       if (layer === 'ground') paintGround(this.scene, prep, pixels, rect)
-      else if (layer === 'canopy') paintCanopy(this.scene, prep, pixels, rect)
-      else paintValley(this.scene, prep, pixels, rect)
+      else paintCanopy(this.scene, prep, pixels, rect)
       take({ index, layer, rect, pixels })
       if (performance.now() - t < SLICE_MS) continue
       await nextTick()

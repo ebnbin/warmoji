@@ -9,8 +9,8 @@ import type { Point } from '../../util/vec'
 const DEG = Math.PI / 180
 /** 能走的地面按这么细的格子算距离场，格 */
 const BASIN_CELL_U = 0.25
-/** 崖边、栅栏里侧留出这么宽（格）不能走：脚不悬在崖外，身子不贴进栅栏 */
-const LIP_CLEAR_U = 0.15
+/** 山脚、栅栏里侧留出这么宽（格）不能走：身子不贴进碎石坡与栅栏 */
+const FOOT_CLEAR_U = 0.15
 const FENCE_CLEAR_U = 0.2
 /** 几条林缘交汇的内角按这么大（格）磨圆 */
 const CORNER_U = 2.5
@@ -20,11 +20,8 @@ const NOTCH_BACK_U = 3
 const TRAIL_U = 7
 /** 生成不出合格的草甸就换一组随机数重来，最多这么多次 */
 const TRIES = 40
-/** 崖下谷底的贴图从崖边往外铺多远、顺着崖边往两头多铺多远，格：镜头在草地上任何地方都看不出谷底的边，更远处是雾 */
-export const VALLEY_OUT_U = 120
-export const VALLEY_SIDE_U = 130
-/** 崖边外那圈岩壁从上往下看有多宽（格）：地面贴图画到这里，再往外透出谷底 */
-export const FACE_U = 1.8
+/** 山脚那级岩壁从下到上占多宽（格）：从上往下看是一道窄窄的岩面 */
+export const WALL_U = 1.1
 
 const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t)
 /** 多项式平滑取小：两者相差 k 以内时圆滑过渡 */
@@ -51,7 +48,7 @@ function between(rng: Rng, r: readonly [number, number]): number {
   return r[0] + (r[1] - r[0]) * rng.next()
 }
 
-/** 本地坐标：a 从断崖那条地图边往地图里量，b 顺着那条边量，都以格计、在 [0, size] 里。地图坐标 = o + a·n + b·t */
+/** 本地坐标：a 从山那条地图边往地图里量，b 顺着那条边量，都以格计、在 [0, size] 里。地图坐标 = o + a·n + b·t */
 export interface Frame {
   readonly ox: number
   readonly oy: number
@@ -66,7 +63,7 @@ export interface Local {
   b: number
 }
 
-/** 断崖在地图的哪条边（上、右、下、左）：朝地图里的法线与那条边的中点（占边长的比例） */
+/** 山在地图的哪条边（上、右、下、左）：朝地图里的法线与那条边的中点（占边长的比例） */
 const NORMALS: readonly Point[] = [
   { x: 0, y: 1 },
   { x: -1, y: 0 },
@@ -106,7 +103,7 @@ function dirToMap(f: Frame, da: number, db: number): Point {
 
 export type Side = 'forest' | 'fence'
 
-/** 边上的一处鼓包：第 k 条边（0 崖边、1 low、2 far、3 high 的林缘）在 at 处探出 amp 格（负的是凹进去），宽约 width 格 */
+/** 边上的一处鼓包：第 k 条边（0 山脚、1 low、2 far、3 high 的林缘）在 at 处探出 amp 格（负的是凹进去），宽约 width 格 */
 export interface Bump {
   readonly k: number
   readonly at: number
@@ -115,8 +112,8 @@ export interface Bump {
 }
 
 /**
- * 草甸的边，本地坐标，格。断崖在 a 小的一边；对边（far）与 b 大的侧边（high）里恰好一条是栅栏、另一条是林子，b 小的侧边（low）总是林子。
- * 崖边与林缘按噪声弯，再叠上崖头、崖湾与林舌、草湾；栅栏几乎是直的：整条斜 skew（斜率）、过了 kinkAt 再拐 kink（斜率）。
+ * 草甸的边，本地坐标，格。山在 a 小的一边；对边（far）与 b 大的侧边（high）里恰好一条是栅栏、另一条是林子，b 小的侧边（low）总是林子。
+ * 山脚与林缘按噪声弯，再叠上山嘴、山坳与林舌、草湾；栅栏几乎是直的：整条斜 skew（斜率）、过了 kinkAt 再拐 kink（斜率）。
  * 林间小路在林缘上凹进去一块，notch 是路口、进林子的方向与凹槽的深与半宽
  */
 export interface Edges {
@@ -138,8 +135,8 @@ function bulge(e: Edges, k: number, u: number): number {
   return s
 }
 
-/** 崖边在 b 处离断崖那条地图边多远，格 */
-export function lipAt(e: Edges, b: number): number {
+/** 山脚在 b 处离山那条地图边多远，格 */
+export function footAt(e: Edges, b: number): number {
   const c = e.cliff
   return c.inset + c.bend * swing(b / c.wave + 3.7, 1.9, e.seed + 51, 3) + c.jag * swing(b / 1.2 + 0.4, 8.2, e.seed + 53, 2) - bulge(e, 0, b)
 }
@@ -165,7 +162,7 @@ export function forestDepth(e: Edges, a: number, b: number): number {
   return Math.min(d, Math.max(across - n.half, along - n.depth, -along - NOTCH_BACK_U))
 }
 
-/** 栅栏顺着它的坐标 u 处，它离断崖那条边或 low 那条边多远（与 u 垂直的坐标 v），格 */
+/** 栅栏顺着它的坐标 u 处，它离山那条边或 low 那条边多远（与 u 垂直的坐标 v），格 */
 export function fenceV(e: Edges, u: number): number {
   const f = e.fence
   return e.size - f.inset + f.skew * (u - e.size / 2) + f.kink * Math.max(0, u - f.kinkAt)
@@ -186,9 +183,9 @@ export function beyondFence(e: Edges, a: number, b: number): number {
   return UV.b - fenceV(e, UV.a)
 }
 
-/** 本地 (a, b) 能不能走：崖边以里、林缘以外、栅栏以里 */
+/** 本地 (a, b) 能不能走：山脚以里、林缘以外、栅栏以里 */
 export function openAt(e: Edges, a: number, b: number): boolean {
-  return a > lipAt(e, b) + LIP_CLEAR_U && beyondFence(e, a, b) < -FENCE_CLEAR_U && forestDepth(e, a, b) < 0
+  return a > footAt(e, b) + FOOT_CLEAR_U && beyondFence(e, a, b) < -FENCE_CLEAR_U && forestDepth(e, a, b) < 0
 }
 
 /** 一棵树：树冠中心、半径（格）与树高（米）；云杉是尖顶的深色针叶树，白桦与灌木是圆冠的阔叶 */
@@ -232,8 +229,8 @@ export interface Gate {
   readonly index: number
 }
 
-/** 塌了的下山木台阶：顶在崖边的哪一点、朝崖外的单位方向、顺着崖边的单位方向 */
-export interface Stairs {
+/** 被落石埋掉的上山小路：路口在山脚的哪一点、朝山里的单位方向、顺着山脚的单位方向 */
+export interface Trailhead {
   readonly x: number
   readonly y: number
   readonly ox: number
@@ -261,7 +258,7 @@ export interface Sheep {
 
 /**
  * 按种子生成的草甸，地图坐标以格计：地图是 size 见方的方形；边界、能走的地面（像素）、开局站位；
- * 林子里的树、倒木与那段小路，草地上踩出来的路，栅栏的桩与门，崖边塌了的台阶，栅栏外的饮水槽与羊；
+ * 林子里的树、倒木与那段小路，草地上踩出来的路，栅栏的桩与门，山脚那条被落石埋掉的上山小路，栅栏外的饮水槽与羊；
  * 各种野花的多少，风从哪吹来（朝下风的单位方向），画画用的种子
  */
 export interface MeadowPlan {
@@ -276,7 +273,7 @@ export interface MeadowPlan {
   readonly paths: readonly (readonly Point[])[]
   readonly posts: readonly Post[]
   readonly gate: Gate
-  readonly stairs: Stairs
+  readonly trailhead: Trailhead
   readonly trough: Trough | null
   readonly sheep: readonly Sheep[]
   readonly flowers: readonly number[]
@@ -408,7 +405,7 @@ interface Sketch {
   readonly into: Local
 }
 
-/** 按种子定边：断崖在哪条边、哪条边是栅栏，各条边怎么弯，林间小路开在哪；能走的面积不在范围里就是 null */
+/** 按种子定边：山在哪条边、哪条边是栅栏，各条边怎么弯，林间小路开在哪；能走的面积不在范围里就是 null */
 function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
   const S = cfg.sizeU
   const seed = Math.floor(rng.next() * 0x7fffffff)
@@ -418,7 +415,7 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
   const fo = cfg.forest
   const fe = cfg.fence
   const sign = (): number => (rng.next() < 0.5 ? -1 : 1)
-  // 崖头崖湾与林舌草湾落在边的中段，鼓包之间隔开；只有林子的边才长林舌
+  // 山嘴山坳与林舌草湾落在边的中段，鼓包之间隔开；只有林子的边才长林舌
   const bumps: Bump[] = []
   const addBumps = (k: number, count: readonly [number, number], amp: readonly [number, number], width: readonly [number, number]): void => {
     const n = Math.round(between(rng, count))
@@ -430,7 +427,7 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
       i++
     }
   }
-  addBumps(0, c.capes, c.capeU, c.capeWidthU)
+  addBumps(0, c.spurs, c.spurU, c.spurWidthU)
   for (const k of [1, fenceFar ? 3 : 2]) addBumps(k, fo.lobes, fo.lobeU, fo.lobeWidthU)
   const base: Edges = {
     size: S,
@@ -452,7 +449,7 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
   const onFar = !fenceFar && rng.next() < 0.7
   const onHigh = fenceFar && rng.next() < 0.5
   const along = 0.32 + rng.next() * 0.36
-  const from: Local = onFar ? { a: S * 0.5, b: S * along } : { a: lipAt(base, S / 2) + (S - lipAt(base, S / 2)) * (0.25 + along * 0.6), b: S / 2 }
+  const from: Local = onFar ? { a: S * 0.5, b: S * along } : { a: footAt(base, S / 2) + (S - footAt(base, S / 2)) * (0.25 + along * 0.6), b: S / 2 }
   const dir: Local = onFar ? { a: 1, b: 0 } : onHigh ? { a: 0, b: 1 } : { a: 0, b: -1 }
   const hit = marchToForest(base, from.a, from.b, dir.a, dir.b)
   if (!hit) return null
@@ -466,7 +463,7 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
   let keepRoom = -Infinity
   for (let a = 1; a < S; a += 1) {
     for (let b = 1; b < S; b += 1) {
-      const room = Math.min(a - lipAt(edges, b), -forestDepth(edges, a, b), -beyondFence(edges, a, b))
+      const room = Math.min(a - footAt(edges, b), -forestDepth(edges, a, b), -beyondFence(edges, a, b))
       if (room > keepRoom) {
         keepRoom = room
         keep = { a, b }
@@ -532,7 +529,7 @@ function onCurve(c: { pts: Local[]; s: number[] }, at: number): { p: Local; t: L
 }
 
 /**
- * 定好边以后的布置：栅栏的桩与门（门开在挨着草地的那段中间），崖边塌了的台阶，草地上从门到林间小路、再岔到台阶的踩出来的路，
+ * 定好边以后的布置：栅栏的桩与门（门开在挨着草地的那段中间），山脚上山小路的路口，草地上从门到林间小路、再岔到路口的踩出来的路，
  * 林子里的那段小路与横在路上的倒木，林子里的树与林缘的灌木小树，栅栏外的饮水槽和羊；布置不下就是 null
  */
 function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
@@ -543,15 +540,15 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
     const p = toMap(frame, a, b)
     return roomAt(k.basin, p.x * UNIT, p.y * UNIT) >= room * UNIT
   }
-  // 栅栏：栅栏在侧边时从崖边立起，一直伸进对边的林子；在对边时两头都伸进林子
+  // 栅栏：栅栏在侧边时从山脚立起，一直伸进对边的林子；在对边时两头都伸进林子
   let u0 = -(pad - 1)
   if (e.far !== 'fence') {
     let a = e.cliff.inset
-    for (let i = 0; i < 8; i++) a = lipAt(e, fenceV(e, a)) + 0.25
+    for (let i = 0; i < 8; i++) a = footAt(e, fenceV(e, a)) + 0.25
     u0 = a
   }
   const curve = fenceCurve(e, u0, S + pad - 1)
-  const pasture = (p: Local): boolean => forestDepth(e, p.a, p.b) < -0.3 && p.a > lipAt(e, p.b) + 0.3
+  const pasture = (p: Local): boolean => forestDepth(e, p.a, p.b) < -0.3 && p.a > footAt(e, p.b) + 0.3
   const ok = curve.pts.map((p) => {
     const inA = e.far === 'fence' ? p.a - 0.7 : p.a
     const inB = e.far === 'fence' ? p.b : p.b - 0.7
@@ -596,29 +593,29 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
   const outLocal: Local = e.far === 'fence' ? { a: 1, b: 0 } : { a: 0, b: 1 }
   const go = dirToMap(frame, outLocal.a, outLocal.b)
   const gate: Gate = { x: gm.x, y: gm.y, ux: gu.x, uy: gu.y, ox: go.x, oy: go.y, half, index: gateIndex }
-  // 崖边塌了的台阶：开在挨着草地、离栅栏与林子都有一段的那截崖边的中段
+  // 上山小路的路口：开在挨着草地、离栅栏与林子都有一段的那截山脚的中段
   const bs: number[] = []
-  const lipOk: boolean[] = []
+  const footOk: boolean[] = []
   for (let b = 0; b <= S; b += 0.1) {
-    const a = lipAt(e, b) + 0.9
+    const a = footAt(e, b) + 0.9
     bs.push(b)
-    lipOk.push(inside(a, b, 0.3) && forestDepth(e, a, b) < -1.5 && beyondFence(e, a, b) < -3)
+    footOk.push(inside(a, b, 0.3) && forestDepth(e, a, b) < -1.5 && beyondFence(e, a, b) < -3)
   }
-  const lipRun = longestRun(lipOk)
-  if (!lipRun || bs[lipRun.to]! - bs[lipRun.from]! < 4) return null
-  const sb = bs[lipRun.from]! + (bs[lipRun.to]! - bs[lipRun.from]!) * (0.25 + rng.next() * 0.5)
-  const slope = (lipAt(e, sb + 0.2) - lipAt(e, sb - 0.2)) / 0.4
+  const footRun = longestRun(footOk)
+  if (!footRun || bs[footRun.to]! - bs[footRun.from]! < 4) return null
+  const sb = bs[footRun.from]! + (bs[footRun.to]! - bs[footRun.from]!) * (0.25 + rng.next() * 0.5)
+  const slope = (footAt(e, sb + 0.2) - footAt(e, sb - 0.2)) / 0.4
   const ol = Math.hypot(1, slope)
-  const sOut = dirToMap(frame, -1 / ol, slope / ol)
-  const sAlong = dirToMap(frame, slope / ol, 1 / ol)
-  const sAt = toMap(frame, lipAt(e, sb), sb)
-  const stairs: Stairs = { x: sAt.x, y: sAt.y, ox: sOut.x, oy: sOut.y, ux: sAlong.x, uy: sAlong.y }
-  // 踩出来的路：从门口到林间小路的路口，半路岔到台阶
+  const hOut = dirToMap(frame, -1 / ol, slope / ol)
+  const hAlong = dirToMap(frame, slope / ol, 1 / ol)
+  const hAt = toMap(frame, footAt(e, sb), sb)
+  const trailhead: Trailhead = { x: hAt.x, y: hAt.y, ox: hOut.x, oy: hOut.y, ux: hAlong.x, uy: hAlong.y }
+  // 踩出来的路：从门口到林间小路的路口，半路岔到上山的路口
   const inward: Local = { a: -outLocal.a, b: -outLocal.b }
   const gateIn: Local = { a: g.p.a + inward.a * 0.8, b: g.p.b + inward.b * 0.8 }
   const n = e.notch
   const mouthIn: Local = { a: n.a + n.ua * (n.depth - 0.25), b: n.b + n.ub * (n.depth - 0.25) }
-  const stairsIn: Local = { a: lipAt(e, sb) + 0.55, b: sb }
+  const headIn: Local = { a: footAt(e, sb) + 0.55, b: sb }
   const pathSeed = e.seed + 401
   const fits = (pts: readonly Local[], skip: number): boolean => pts.every((p, i) => i < skip || i > pts.length - 1 - skip || inside(p.a, p.b, 0.35))
   let main: Local[] = []
@@ -631,13 +628,13 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
   const before = main[Math.max(0, fi - 1)]!
   const after = main[Math.min(main.length - 1, fi + 1)]!
   const fl = Math.hypot(after.a - before.a, after.b - before.b) || 1
-  const toStairs: Local = { a: stairsIn.a - forkAt.a, b: stairsIn.b - forkAt.b }
-  const tl = Math.hypot(toStairs.a, toStairs.b) || 1
-  const forkDir: Local = { a: ((after.a - before.a) / fl + toStairs.a / tl) / 2, b: ((after.b - before.b) / fl + toStairs.b / tl) / 2 }
+  const toHead: Local = { a: headIn.a - forkAt.a, b: headIn.b - forkAt.b }
+  const tl = Math.hypot(toHead.a, toHead.b) || 1
+  const forkDir: Local = { a: ((after.a - before.a) / fl + toHead.a / tl) / 2, b: ((after.b - before.b) / fl + toHead.b / tl) / 2 }
   const fdl = Math.hypot(forkDir.a, forkDir.b) || 1
   let branch: Local[] = []
   for (const m of [1, 0.6, 0.3, 0]) {
-    branch = route(rng, forkAt, { a: forkDir.a / fdl, b: forkDir.b / fdl }, stairsIn, { a: -1, b: 0 }, 0.8 * m, pathSeed + 7)
+    branch = route(rng, forkAt, { a: forkDir.a / fdl, b: forkDir.b / fdl }, headIn, { a: -1, b: 0 }, 0.8 * m, pathSeed + 7)
     if (fits(branch, 3)) break
   }
   const paths = [main, branch].map((pts) => pts.map((p) => toMap(frame, p.a, p.b)))
@@ -681,7 +678,7 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
     toLocal(frame, x, y, tmp)
     const depth = forestDepth(e, tmp.a, tmp.b)
     if (depth < r - fo.overhangU) return false
-    if (tmp.a < lipAt(e, tmp.b) + 0.4) return false
+    if (tmp.a < footAt(e, tmp.b) + 0.4) return false
     if (Math.abs(beyondFence(e, tmp.a, tmp.b)) < 0.7) return false
     if (!clearOf(x, y, r) || crowd.crowded(x, y, r, overlap)) return false
     const t: Tree = { x, y, r, h, kind }
@@ -733,9 +730,9 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
   const flowers = Array.from({ length: FLOWER_KINDS }, () => 0.15 + rng.next() ** 1.5)
   flowers[Math.floor(rng.next() * FLOWER_KINDS)]! += 1.2
   const sum = flowers.reduce((s, w) => s + w, 0)
-  // 白天的山风从山谷吹上坡：从崖边往林子那边，偏一点
+  // 白天的山风顺着坡往山上吹：从草地往山那边，偏一点
   const wa = (rng.next() * 2 - 1) * 25 * DEG
-  const wind = dirToMap(frame, Math.cos(wa), Math.sin(wa))
+  const wind = dirToMap(frame, -Math.cos(wa), Math.sin(wa))
   return {
     size: S,
     frame,
@@ -748,7 +745,7 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
     paths,
     posts,
     gate,
-    stairs,
+    trailhead,
     trough,
     sheep,
     flowers: flowers.map((w) => w / sum),
@@ -759,7 +756,7 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
 
 let last: { cfg: MeadowConfig; seed: number; plan: MeadowPlan } | null = null
 
-/** 按种子生成草甸：先定边、量能走的面积，再布置林子、栅栏、台阶与路；哪一步不合格就换一组随机数。同一张图视图与规则各要一次，记住最近一张 */
+/** 按种子生成草甸：先定边、量能走的面积，再布置林子、栅栏、上山的路口与路；哪一步不合格就换一组随机数。同一张图视图与规则各要一次，记住最近一张 */
 export function meadowPlan(cfg: MeadowConfig, seed: number): MeadowPlan {
   if (last && last.cfg === cfg && last.seed === seed) return last.plan
   const rng = new Rng(scramble(seed))
