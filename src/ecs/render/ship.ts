@@ -236,10 +236,10 @@ const MARGIN_U = 0.62
 const SEAM_U = 0.035
 
 type Rgb = [number, number, number]
-const DECK_LIGHT: Rgb = [0.66, 0.5, 0.34]
-const DECK_DARK: Rgb = [0.38, 0.26, 0.17]
+const DECK_LIGHT: Rgb = [0.91, 0.8, 0.67]
+const DECK_DARK: Rgb = [0.55, 0.47, 0.39]
 const CAULK: Rgb = [0.09, 0.065, 0.05]
-const RAIL_WOOD: Rgb = [0.3, 0.17, 0.1]
+const RAIL_WOOD: Rgb = [0.44, 0.35, 0.29]
 
 function lerp3(a: Rgb, b: Rgb, t: number, out: Rgb): Rgb {
   out[0] = a[0] + (b[0] - a[0]) * t
@@ -254,7 +254,7 @@ function onDeck(cfg: ShipConfig, s: number, t: number): boolean {
 }
 
 /**
- * 甲板贴图：船长方向沿贴图的 x（船头朝右），右舷朝下。旧船的橡木甲板沿船长铺板，板缝嵌着黑色的填缝，
+ * 甲板贴图：船长方向沿贴图的 x（船头朝右），右舷朝下。刷洗得泛白的柚木甲板沿船长铺板，板缝嵌着黑色的填缝，
  * 板头错开接缝、按横梁钉木钉；沿着舷墙有一圈顺着船形弯的边板，舷墙顶是圆润的桃花心木扶手。
  * 中线一带被踩白、洗白，靠舷墙的地方潮湿发暗。light 是朝太阳的水平方向在船上的分量
  */
@@ -420,9 +420,9 @@ function knots(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number): vo
     if (Math.abs(t) > halfBeamAt(h, s) - MARGIN_U - 0.2) continue
     const r = 0.05 + rng.next() * 0.07
     const g = ctx.createRadialGradient(s, t, 0, s, t, r * 2.2)
-    g.addColorStop(0, 'rgba(40,24,14,0.85)')
-    g.addColorStop(0.45, 'rgba(60,38,22,0.45)')
-    g.addColorStop(1, 'rgba(60,38,22,0)')
+    g.addColorStop(0, 'rgba(59,51,46,0.85)')
+    g.addColorStop(0.45, 'rgba(94,79,68,0.45)')
+    g.addColorStop(1, 'rgba(94,79,68,0)')
     ctx.fillStyle = g
     ctx.beginPath()
     ctx.ellipse(s, t, r * 2.6, r * 1.3, 0, 0, Math.PI * 2)
@@ -432,11 +432,11 @@ function knots(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number): vo
 
 const IRON = '#1c1b1f'
 const IRON_LIT = '#4b4a52'
-const TIMBER = '#5a3b25'
-const TIMBER_LIT = '#86603d'
-const TIMBER_DARK = '#2e1d12'
-const ROPE = '#b59a6c'
-const ROPE_DARK = '#6e5a3c'
+const TIMBER = '#846d5b'
+const TIMBER_LIT = '#bca184'
+const TIMBER_DARK = '#473c36'
+const ROPE = '#e6d7b4'
+const ROPE_DARK = '#a2957e'
 const TAR_ROPE = '#2a2019'
 
 /** 投影：往背光的方向偏一点的半透明黑 */
@@ -478,7 +478,7 @@ function grating(ctx: CanvasRenderingContext2D, s: number, len: number, wid: num
   const inset = 0.24
   ctx.fillStyle = '#140e0a'
   ctx.fillRect(x + inset, y + inset, len - inset * 2, wid - inset * 2)
-  ctx.strokeStyle = '#6d4b2f'
+  ctx.strokeStyle = '#9c836c'
   ctx.lineWidth = 0.09
   for (let u = x + inset + 0.2; u < x + len - inset; u += 0.28) {
     ctx.beginPath()
@@ -541,7 +541,7 @@ function cable(ctx: CanvasRenderingContext2D, pts: readonly Point[], width: numb
   ctx.lineWidth = width
   path()
   ctx.stroke()
-  ctx.strokeStyle = '#4c3a2a'
+  ctx.strokeStyle = '#76695c'
   ctx.lineWidth = width * 0.55
   ctx.setLineDash([width * 0.5, width * 0.45])
   path()
@@ -551,7 +551,7 @@ function cable(ctx: CanvasRenderingContext2D, pts: readonly Point[], width: numb
 
 /**
  * 甲板上的陈设，按格画（x 沿船长、y 往右舷）：主舱口与前舱口的格栅、桅杆脚的楔圈与带缆桩架、盘绳、
- * 船尾的舵轮、罗经柜与透着舱里灯光的天窗、船头的缆桩与锚链、舷墙内侧的系缆栓；舷外是链板与复滑车、炮口、吊着的锚和船尾灯架
+ * 船尾的舵轮、罗经柜与天窗、船头的缆桩与锚链、舷墙内侧的系缆栓；舷外是链板与复滑车、炮口、吊着的锚和船尾灯架
  */
 function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number, light: { s: number; t: number }): void {
   const h = cfg.hull
@@ -615,7 +615,7 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
       if (rng.next() < 0.7) coil(ctx, m.s + (rng.next() * 2 - 1) * 1.2, side * (edge - 0.62), 0.3, ROPE, ROPE_DARK)
     }
   }
-  // 船尾：舵轮、罗经柜、透光的天窗
+  // 船尾：舵轮、罗经柜、天窗
   const helm = Math.max(1.6, h.stern * L * 0.3)
   dropShadow(ctx, light, 0.12, () => ctx.fillRect(helm - 0.3, -0.35, 0.6, 0.7))
   ctx.fillStyle = TIMBER
@@ -650,8 +650,8 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
   ctx.fillStyle = TIMBER
   ctx.fillRect(sky - 0.8, -0.6, 1.6, 1.2)
   const glass = ctx.createRadialGradient(sky, 0, 0.05, sky, 0, 0.8)
-  glass.addColorStop(0, '#ffe3a1')
-  glass.addColorStop(1, '#d98a3a')
+  glass.addColorStop(0, '#e4eef0')
+  glass.addColorStop(1, '#93a9ae')
   ctx.fillStyle = glass
   ctx.fillRect(sky - 0.66, -0.46, 1.32, 0.92)
   ctx.strokeStyle = TIMBER_DARK
@@ -703,7 +703,7 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
         ctx.beginPath()
         ctx.arc(x, side * (r + 0.2), 0.15, 0, Math.PI * 2)
         ctx.fill()
-        ctx.strokeStyle = '#5b412a'
+        ctx.strokeStyle = '#877461'
         ctx.lineWidth = 0.05
         ctx.stroke()
       }
@@ -777,8 +777,8 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
     const t = (rng.next() * 2 - 1) * h.beamU * 0.28
     if (masts.some((m) => Math.hypot(m.s - s, t) < 2.2) || !onDeck(cfg, s, t)) continue
     const g = ctx.createRadialGradient(s, t, 0.01, s, t, 0.12)
-    g.addColorStop(0, 'rgba(255,236,190,0.95)')
-    g.addColorStop(1, 'rgba(210,150,80,0.4)')
+    g.addColorStop(0, 'rgba(236,246,246,0.95)')
+    g.addColorStop(1, 'rgba(150,185,190,0.4)')
     ctx.fillStyle = g
     ctx.beginPath()
     for (let e = 0; e < 6; e++) {
@@ -854,9 +854,9 @@ export interface Pen {
   strokePath(): unknown
 }
 
-const MAST_WOOD = 0x563a25
-const MAST_LIT = 0x8f6a44
-const SPAR_WOOD = 0x3f2a1b
+const MAST_WOOD = 0x7d6957
+const MAST_LIT = 0xc5ab8d
+const SPAR_WOOD = 0x605146
 const SAIL = 0xc9bc9f
 const SAIL_SHADE = 0x8f8470
 const RIGGING = 0x17110c
@@ -982,9 +982,9 @@ export function drawRig(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose, time: n
       top.push(P(m.s + 0.15 + Math.cos(a) * 0.7, Math.sin(a) * 0.8, m.top))
     }
     top.push(P(m.s - 0.4, 0.8, m.top), P(m.s - 0.4, -0.8, m.top))
-    g.fillStyle(0x3b2718, 0.85)
+    g.fillStyle(0x5b4d42, 0.85)
     g.fillPoints(top, true)
-    g.lineStyle(0.06 * UNIT, 0x8a6440, 0.9)
+    g.lineStyle(0.06 * UNIT, 0xbea386, 0.9)
     g.beginPath()
     g.moveTo(top[0]!.x, top[0]!.y)
     for (let k = 1; k < 11; k++) g.lineTo(top[k]!.x, top[k]!.y)
@@ -1001,7 +1001,7 @@ export function drawRig(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose, time: n
       line(fa, fb)
       g.lineStyle(0.16 * UNIT, SAIL, FURL_ALPHA)
       g.lineBetween(fa.x + SUN.x * 0.05 * UNIT, fa.y + SUN.y * 0.05 * UNIT, fb.x + SUN.x * 0.05 * UNIT, fb.y + SUN.y * 0.05 * UNIT)
-      g.lineStyle(0.05 * UNIT, 0x4a3b2a, 0.8)
+      g.lineStyle(0.05 * UNIT, 0x72685a, 0.8)
       const n = Math.max(2, Math.round(y.half / 1.3))
       for (let k = 1; k < n * 2; k++) {
         const u = -0.9 + (k / (n * 2)) * 1.8
@@ -1084,7 +1084,7 @@ export function drawRigShadow(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose): 
 // ————————————————————————————— 海面 —————————————————————————————
 
 /**
- * 海面：两层平铺的风浪贴图交错漂移，按夕照打光，浪尖偶尔碎成白浪；海水相对船往船尾流。
+ * 海面：浅海的松石绿，两层平铺的风浪贴图交错漂移，按正午的阳光打光，浪尖偶尔碎成白浪；海水相对船往船尾流。
  * 船壳：舷墙外露出的一圈船舷，抬高的一侧露得多、压低的一侧贴着水；水线上一道细白沫，船头推出的浪沿开尔文角往两边散开，
  * 船尾拖着翻白的尾流，船身在背着太阳的一侧投下影子。离船多远查甲板的距离场贴图
  */
@@ -1163,19 +1163,19 @@ void main ()
   vec3 sun = uSun;
   float diff = max(dot(n, sun), 0.0);
   float gust = vnoise(wu * 0.04 + vec2(uTime * 0.02, -uTime * 0.013));
-  vec3 col = mix(vec3(0.02, 0.075, 0.105), vec3(0.042, 0.16, 0.19), clamp(hgt * 0.7 + (diff - sun.z) * 2.2 - 0.12, 0.0, 1.0));
+  vec3 col = mix(vec3(0.02, 0.42, 0.42), vec3(0.15, 0.53, 0.53), clamp(hgt * 0.7 + (diff - sun.z) * 2.2 - 0.12, 0.0, 1.0));
   float tilt = length(slope);
   vec2 rdir = -slope / max(tilt, 0.0001);
   float toward = dot(rdir, normalize(sun.xy)) * 0.5 + 0.5;
-  vec3 sky = mix(vec3(0.16, 0.22, 0.3), vec3(0.95, 0.6, 0.36), pow(toward, 5.0));
+  vec3 sky = mix(vec3(0.52, 0.72, 0.86), vec3(1.0, 0.97, 0.88), pow(toward, 5.0));
   col = mix(col, sky, clamp(tilt * (0.9 + 0.6 * gust), 0.0, 0.28));
   vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);
-  col += vec3(1.0, 0.82, 0.58) * pow(max(dot(r, sun), 0.0), 140.0) * 0.8;
+  col += vec3(1.0, 0.97, 0.9) * pow(max(dot(r, sun), 0.0), 140.0) * 0.8;
   col *= 0.88 + 0.22 * gust;
   float cap = smoothstep(0.9, 1.0, hgt + (vnoise(q * 0.18 + vec2(0.0, uTime * 0.05)) - 0.5) * 0.28) * (0.25 + 0.3 * gust);
   vec2 across = vec2(-wind.y, wind.x);
   float lane = smoothstep(0.62, 0.95, vnoise(vec2(dot(q, wind) * 0.035, dot(q, across) * 0.55))) * smoothstep(0.35, 0.8, vnoise(q * 0.09 + 7.0));
-  col = mix(col, vec3(0.38, 0.46, 0.47), lane * 0.12);
+  col = mix(col, vec3(0.55, 0.78, 0.78), lane * 0.12);
 
   vec2 nw = normalize(rel);
   if (d < 2.5) {
@@ -1205,13 +1205,13 @@ void main ()
   float inWake = (1.0 - smoothstep(wakeW * 0.3, wakeW, abs(p.y))) * smoothstep(-0.5, 0.5, behind);
   float wakeN = vnoise(vec2(flowS * 0.5, p.y * 1.8)) * 0.55 + vnoise(vec2(flowS * 1.5, p.y * 4.5)) * 0.45;
   float wake = inWake * exp(-max(behind, 0.0) / 12.0) * smoothstep(0.6, 0.9, wakeN + 0.25 * exp(-max(behind, 0.0) / 3.0)) * 0.6;
-  col = mix(col, vec3(0.045, 0.17, 0.19), inWake * exp(-max(behind, 0.0) / 18.0) * 0.4);
+  col = mix(col, vec3(0.17, 0.55, 0.54), inWake * exp(-max(behind, 0.0) / 18.0) * 0.4);
 
   float sd = edgeAt(world - uWind.zw);
   float shade = 1.0 - smoothstep(-0.3, 1.2, sd);
   col *= 1.0 - 0.4 * shade;
   float foam = clamp(max(max(hullFoam, arm), max(wake, cap)), 0.0, 1.0);
-  vec3 foamCol = vec3(0.74, 0.81, 0.8) * (0.7 + 0.35 * diff) * (1.0 - 0.35 * shade);
+  vec3 foamCol = vec3(0.92, 0.96, 0.95) * (0.7 + 0.35 * diff) * (1.0 - 0.35 * shade);
   col = mix(col, foamCol, foam);
 
   if (d < band + 0.05) {

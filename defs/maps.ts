@@ -165,9 +165,9 @@ export const MAPS = {
     kind: 'meadow',
     stamina: { exertion: 0.4, regen: 1.2 },
     palette: {
-      bgFrom: 'hsl(96 30% 30%)',
-      bgTo: 'hsl(150 32% 12%)',
-      map: hslToInt(92, 0.34, 0.4),
+      bgFrom: 'hsl(112 23% 42%)',
+      bgTo: 'hsl(158 28% 17%)',
+      map: hslToInt(107, 0.33, 0.56),
       shadow: 0x000000,
     },
     decor: {
@@ -562,9 +562,9 @@ export const MAPS = {
     size: { w: 32, h: 32 },
     stamina: { exertion: 0.5, regen: 0.9 },
     palette: {
-      bgFrom: 'hsl(14 45% 18%)',
-      bgTo: 'hsl(5 40% 6%)',
-      map: hslToInt(18, 0.14, 0.26),
+      bgFrom: 'hsl(210 6% 19%)',
+      bgTo: 'hsl(210 20% 6%)',
+      map: hslToInt(209, 0.05, 0.3),
       shadow: 0x000000,
     },
     decor: {
@@ -618,9 +618,9 @@ export const MAPS = {
     kind: 'ship',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
-      bgFrom: 'hsl(205 38% 22%)',
-      bgTo: 'hsl(222 45% 7%)',
-      map: hslToInt(28, 0.32, 0.34),
+      bgFrom: 'hsl(180 58% 29%)',
+      bgTo: 'hsl(182 80% 12%)',
+      map: hslToInt(32, 0.27, 0.63),
       shadow: 0x000000,
     },
     decor: {
@@ -839,9 +839,9 @@ export const MAPS = {
     size: { w: 32, h: 32 },
     stamina: { exertion: 0.75, regen: 0.55 },
     palette: {
-      bgFrom: 'hsl(34 46% 36%)',
-      bgTo: 'hsl(18 38% 12%)',
-      map: hslToInt(36, 0.5, 0.62),
+      bgFrom: 'hsl(35 43% 54%)',
+      bgTo: 'hsl(22 32% 20%)',
+      map: hslToInt(42, 0.84, 0.69),
       shadow: 0x000000,
     },
     decor: {
