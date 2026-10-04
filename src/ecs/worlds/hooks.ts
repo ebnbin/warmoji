@@ -1,4 +1,4 @@
-import { DEG2RAD, UNIT } from '../../util/units'
+import { DEG2RAD, FRAME_U, SAFE_U, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
@@ -10,7 +10,7 @@ import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, Ne
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
-import { accrete, aroundCircle, endMeteor, feed, flyMeteor, fromCenterU, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
+import { accrete, aroundCircle, endMeteor, feed, flyMeteor, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
 import type { NebulaMeteor, NebulaState } from '../worlds/nebula'
 import { around, fumaroles, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava, VENT_COUNT, volcanoMarks } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
@@ -987,7 +987,7 @@ function nebulaCfg(sim: Sim): NebulaConfig {
 function nebulaOf(sim: Sim): NebulaState {
   let s = sim.worldState.nebula
   if (!s) {
-    s = makeNebula(nebulaCfg(sim), sim.run.decorSeed, sim.mapW / 2)
+    s = makeNebula(nebulaCfg(sim), sim.run.decorSeed, FRAME_MID)
     sim.worldState.nebula = s
   }
   return s
@@ -1136,8 +1136,10 @@ const nebula: WorldHooks = {
   sink(sim, x, y) {
     return inNebulaHorizon(nebulaOf(sim), x, y)
   },
-  constrainBody(_sim, _eid, _from, next) {
-    return next
+  /** 壳层平时就把人拉回来；被击退、冲刺或瞬移甩出去的也停在安全区的内切圆里 */
+  constrainBody(sim, eid, _from, next) {
+    const L = nebulaOf(sim).layout
+    return clampToDisc(next.x, next.y, L.cx, L.cy, (FRAME_U / 2 - SAFE_U) * UNIT - Radius.v[eid]!)
   },
   chaseDir(sim, eid, tx, ty) {
     if (Boss.v[eid] !== 1) return bounded.chaseDir(sim, eid, tx, ty)
@@ -1151,16 +1153,13 @@ const nebula: WorldHooks = {
   fleeDir(sim, eid, awayX, awayY) {
     return keepInCavity(nebulaOf(sim), nebulaCfg(sim), Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
   },
-  outside(sim, x, y) {
-    return fromCenterU(nebulaOf(sim), x, y) > nebulaCfg(sim).shell.outerU
-  },
   spawnPoint(sim, boss) {
     const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
     return spawnSpot(nebulaOf(sim), nebulaCfg(sim), () => sim.rng.next(), nebulaClearPx(sim), (boss ? 2 : SPAWN.edgeInset) * UNIT, leaderX(sim), leaderY(sim), near)
   },
   center(sim) {
     const L = nebulaOf(sim).layout
-    return { x: L.sx, y: L.sy }
+    return { x: L.cx, y: L.cy }
   },
   settle(sim, p) {
     return settleSpot(nebulaOf(sim), nebulaCfg(sim), p.x, p.y, nebulaClearPx(sim), SPAWN.edgeInset * UNIT)
@@ -1191,7 +1190,7 @@ const nebula: WorldHooks = {
     }
     const lx = leaderX(sim) - L.hx
     const ly = leaderY(sim) - L.hy
-    const away = Math.hypot(lx, ly) > 1e-6 ? norm(lx, ly) : norm(L.sx - L.hx, L.sy - L.hy)
+    const away = Math.hypot(lx, ly) > 1e-6 ? norm(lx, ly) : norm(L.cx - L.hx, L.cy - L.hy)
     const clear = nebulaClearPx(sim)
     return {
       hole: [{ x: L.hx, y: L.hy, r: 0, nx: 0, ny: 0 }],

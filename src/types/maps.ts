@@ -131,9 +131,8 @@ export interface NebulaConfig {
     readonly maxGm: number
     /** 这片星域里的光速，格/秒：定出视界 r_s = 2GM/c²、透镜的偏折与光传过来要多久 */
     readonly lightU: number
-    /** 黑洞离星云中心多远，方向随机；队伍从中心另一侧离中心 startU 格处出发 */
+    /** 黑洞离星云中心多远，方向随机；队伍从中心出发 */
     readonly fromCenterU: readonly [number, number]
-    readonly startU: number
   }
   /**
    * 吞下的东西折成多少 GM：身体按 bodyGm·质量·(半径/bodyRadiusU)³，掉落物、弹体各算一份。

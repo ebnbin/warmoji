@@ -538,7 +538,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 星云：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来；
+ * 星云：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点（球心）够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来，
+ * 走得最深也落在方框安全区的内切圆里；
  * 爱因斯坦环落在一般角色走不出来的半径上；最慢的敌人也有刷怪的地方
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -552,7 +553,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(shell.rise >= 0 && shell.tau > 1, `${at}.shell 的密度只能往外涨、整层光深须大于 1：被照亮的内壁才落在壳层里`)
   need(contain.speedMul >= 1 && contain.depthU > 0 && contain.leapU >= 0, `${at}.contain 的速度余量不小于 1、深度为正、瞬移余量不为负`)
   need(hole.gm > 0 && hole.maxGm >= hole.gm && hole.lightU > 0, `${at}.hole 的引力须为正、上限不小于开局、光速为正`)
-  need(near >= 0 && near <= far && hole.startU > 0 && hole.startU < shell.innerU, `${at}.hole 的位置范围与出发点须落在空腔里`)
+  need(near >= 0 && near <= far && far < shell.innerU, `${at}.hole 的位置范围须落在空腔里`)
+  need(shell.innerU + contain.depthU <= FRAME_U / 2 - SAFE_U, `${at}.shell 空腔半径加上走进壳层的深度须落在方框安全区的内切圆里`)
   need(disk.outerRs > ISCO_RS && disk.innerK > 0, `${at}.disk 须铺到最内稳定圆轨道以外、色温为正`)
   need(swallow.bodyGm >= 0 && swallow.bodyRadiusU > 0 && swallow.pickupGm >= 0 && swallow.shotGm >= 0, `${at}.swallow 的质量不为负、身体的参考半径为正`)
   need(swallow.lightEta > 0 && swallow.lightEta < ACCRETION_ETA, `${at}.swallow.lightEta 须在 0 与薄盘的 1/16 之间：径直掉进去的东西放的光不会比绕到最内稳定圆轨道的还多`)
@@ -579,7 +581,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   }
   for (const b of characters) {
     const reach = captureU(hole.maxGm, rsMax, b.fall / b.speedU)
-    need(reach < near + hole.startU - 1, `${at}.hole 长到最大时 ${b.path} 在出发点就走不出来：离黑洞 ${near + hole.startU} 格，走不出来的半径 ${+reach.toFixed(2)}`)
+    need(reach < near - 1, `${at}.hole 长到最大时 ${b.path} 在出发点就走不出来：离黑洞 ${near} 格，走不出来的半径 ${+reach.toFixed(2)}`)
   }
   const ratios = characters.map((b) => b.fall / b.speedU).sort((x, y) => x - y)
   const median = ratios[Math.floor(ratios.length / 2)]!

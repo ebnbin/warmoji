@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { hasComponent, removeEntity } from 'bitecs'
-import { UNIT } from '../util/units'
+import { FRAME_U, UNIT } from '../util/units'
 import { MAP, MAPS, rollDecor } from '../data/maps'
 import { viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
@@ -40,7 +40,7 @@ import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { drawCloud, drawGlint, drawHalo, NEBULA_FRAG, NEBULA_PPU, sheetPx } from './render/nebula'
 import type { NebulaSheet, SheetBand } from './render/nebula'
 import { NebulaPainter } from './render/nebulaPainter'
-import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES, nebulaHalfU, nebulaLayout } from './worlds/nebula'
+import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES } from './worlds/nebula'
 import type { NebulaState } from './worlds/nebula'
 import { SHADOW_RS, wallU } from '../data/nebula'
 import { edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING, windAt } from './worlds/floe'
@@ -1851,7 +1851,6 @@ interface Stream {
  * 身后拖着冷却变红的热迹与背向黑洞的尾巴，照亮它经过的星云，扎进对面的壳层就碎掉
  */
 class NebulaView extends BoundedView {
-  private size?: { w: number; h: number; origin: Point }
   private painter?: NebulaPainter
   private readonly u = {
     time: 0,
@@ -1878,14 +1877,12 @@ class NebulaView extends BoundedView {
   private phase: 'none' | 'warn' | 'fly' = 'none'
   private shake = true
 
-  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    if (!this.size) {
-      const cfg = v.def.nebula!
-      const half = nebulaHalfU(cfg, MAP.cameraMargin) * UNIT
-      const L = nebulaLayout(cfg, v.run.decorSeed, half)
-      this.size = { w: half * 2, h: half * 2, origin: { x: L.sx, y: L.sy } }
-    }
-    return this.size
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
+  }
+
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   build(v: ViewCtx): void {
@@ -1906,7 +1903,7 @@ class NebulaView extends BoundedView {
     const cfg = v.def.nebula!
     const scene = v.scene
     const L = s.layout
-    const reach = v.w / 2 / UNIT + MAP.cameraMargin + 1
+    const reach = FRAME_U / 2
     const sheet: NebulaSheet = {
       x0: -reach,
       y0: -reach,
