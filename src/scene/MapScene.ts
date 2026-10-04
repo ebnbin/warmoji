@@ -31,7 +31,7 @@ const JOURNEYS: readonly RunId[] = RUN_IDS.filter((id) => RUNS[id].map === undef
 const TAB_RUNS: readonly RunId[] = RUN_IDS.filter((id) => !LABS.includes(id))
 const LAB_TAB = { key: 'labs', emoji: '1f9ea', name: '实验关' } as const
 /** 沙盒排在最前，按这个顺序列新画风的地图，开局同试炼场；其余要选地图的页签只列剩下的旧地图 */
-const BOX_TAB = { key: 'box', emoji: '1f3d6', name: '沙盒', run: 'sandbox' } as const satisfies { readonly run: RunId }
+const BOX_TAB = { key: 'box', emoji: '1f3d6', name: '沙盒', run: 'sandbox' } as const
 const BOX_MAPS: readonly MapId[] = ['meadow', 'desert', 'sakura', 'floe', 'volcano', 'ship', 'cave', 'ruins', 'circuit', 'nebula']
 const OLD_MAPS: readonly MapId[] = MAP_IDS.filter((id) => !BOX_MAPS.includes(id))
 type Mode = RunId | typeof LAB_TAB.key | typeof BOX_TAB.key
