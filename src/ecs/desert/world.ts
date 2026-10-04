@@ -9,6 +9,7 @@ import { approach } from '../systems/shared/body'
 import { phases } from '../utils/pass'
 import { leaderX, leaderY } from '../utils/team'
 import { desertPlanFor, gridAt, slopeAt, solidAt, sunAt, wrapU } from './terrain'
+import { desertMarks } from './marks'
 import { paceOf } from './gait'
 import { newTracks, packAt, stepTracks } from './tracks'
 import type { DesertPlan } from './terrain'
@@ -22,7 +23,6 @@ import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
-const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 /** 弹体飞到离队长这么近（格）的对面那一半就消失：再往前就该从背后绕回来了 */
 const FAR_EDGE_U = 0.5
 /** 追人的离标志物这么近（格，在身体半径之外）就开始贴着边绕；游荡与逃跑的看得远一些 */
@@ -32,9 +32,10 @@ const DRIFT_GLIDE_U = 0.6
 const SETTLE_U = 0.7
 const BOSS_SETTLE_U = 1.3
 
-/** 沙漠此刻的状态：按种子生成的地形，沙上的印子与踩实 */
+/** 沙漠此刻的状态：按种子生成的地形与它上面的地标（基准的那一份），沙上的印子与踩实 */
 export interface DesertState {
   readonly plan: DesertPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly tracks: Tracks
 }
 
@@ -52,7 +53,7 @@ export function desertOf(sim: Sim): DesertState {
   if (!s) {
     const cfg = cfgOf(sim)
     const plan = desertPlanOf(cfg, sim.mapW / UNIT, sim.run.decorSeed)
-    s = { plan, tracks: newTracks(plan.sizeU) }
+    s = { plan, marks: desertMarks(plan), tracks: newTracks(plan.sizeU) }
     sim.worldState.desert = s
   }
   return s
@@ -278,11 +279,15 @@ export const desert: WorldHooks = {
   ground(sim) {
     return sim.hooks.basin(sim)
   },
-  canSpawn() {
-    return true
+  /** 不压着标志物 */
+  canSpawn(sim, x, y, radius) {
+    return solidAt(desertOf(sim).plan, x / UNIT, y / UNIT, SOLID).d * UNIT >= radius
   },
-  landmarks() {
-    return NO_MARKS
+  /** 每处都给离队长最近的那一份：吸附按直线距离量 */
+  landmarks(sim) {
+    const out: Record<string, Landmark[]> = {}
+    for (const [k, list] of Object.entries(desertOf(sim).marks)) out[k] = list.map((m) => ({ ...m, ...nearLeader(sim, m.x, m.y) }))
+    return out
   },
   lean() {
     return ZERO

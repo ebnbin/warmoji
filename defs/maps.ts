@@ -948,6 +948,17 @@ export const MAPS = {
       density: [0.002, 0.0035],
     },
     mix: DESERT_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'sand',
+      boss: 'burrow',
+      kinds: {
+        crest: { name: '丘顶', at: { kind: 'mark' }, enter: 'climb', look: 'sand', weight: 2, perSec: 1 },
+        marker: { name: '标志物', at: { kind: 'mark' }, enter: 'walk', look: 'sand', snapU: 4, weight: 3, perSec: 1, only: ['snake', 'rat', 'turtle', 'skeleton'] },
+        burrow: { name: '沙下', at: { kind: 'ground' }, enter: 'rise', look: 'sand', weight: 1 },
+      },
+    },
     finalWaveSub: '蝎王在沙下穿行——别在沙丘上耗光体力！',
     desert: {
       meterPerU: 0.5,
