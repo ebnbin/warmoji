@@ -8,19 +8,11 @@ import type { Point } from '../../util/vec'
 import type { EnemyKind } from '../../types/enemies'
 import type { Entrance, EntranceLook, GateAway, GateKind, GatesConfig } from '../../types/maps'
 import type { SpawnAt } from '../../types/runs'
-import { awayFromWall, roomAt, wallLoops } from './basin'
-import type { Basin } from './basin'
+import { awayFromWall, roomAt, wallLoops } from '../../maps/basin'
+import type { Basin } from '../../maps/basin'
+import type { Landmark } from '../../maps/landmark'
 import { leaderX, leaderY } from '../utils/team'
 import type { Sim } from '../sim'
-
-/** 地图给的一处地标，像素：位置、口子的半径，与朝场地里的单位方向（场地中间的地标为零） */
-export interface Landmark {
-  readonly x: number
-  readonly y: number
-  readonly r: number
-  readonly nx: number
-  readonly ny: number
-}
 
 /**
  * 一处出怪口，像素：point 是在 a 的半径 r 的口子，segment 是 a 到 b 的一段边，area 是整片能走的地面，reach 是从 a 抛得到 r 以内；
@@ -102,14 +94,6 @@ const LANDING_TRIES = 3
 const SLIDE_U = 0.6
 /** 翻进、走出的落点横着散开多远，格 */
 const SIDE_U = 0.5
-/** 落点离壁至少这么远，格；大的身体按它自己的半径 */
-const LANDING_ROOM_U = 0.5
-
-/** 半径 radius 像素的身体落在这片地面上的这一点站得下 */
-export function roomFor(b: Basin, x: number, y: number, radius: number): boolean {
-  return roomAt(b, x, y) >= Math.max(LANDING_ROOM_U * UNIT, radius)
-}
-
 function hashOf(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
