@@ -39,6 +39,8 @@ export interface Screen {
   shake(ms: number, intensity: number): void
   /** 主镜头此刻拍到的世界范围 */
   view(): Rect
+  /** 主镜头此刻的缩放：世界里一像素在屏幕上占几个设备像素 */
+  zoom(): number
   /** 屏幕上此刻看得到的世界范围：镜像镜头拍到的那几圈也算 */
   visible(): Rect
   /** 世界里 (x, y) 往外 pad 像素以内有没有落进主镜头 */
@@ -110,6 +112,7 @@ export class Lens {
         if (!this.quake) this.quake = { elapsed: 0, ms, intensity }
       },
       view: () => this.view(),
+      zoom: () => this.zoom,
       visible: () => this.visible(),
       sees: (x, y, pad = 0) => {
         const v = this.view()

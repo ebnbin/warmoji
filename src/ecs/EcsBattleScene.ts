@@ -379,7 +379,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
-  /** 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，沙盒地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下 */
+  /**
+   * 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，沙盒地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下。
+   * 线宽按屏幕上的粗细定：标准缩放时照原样，拉远看整张图时不跟着变细
+   */
   private drawDevGrid(): void {
     if (!showGrid()) {
       this.gridGfx?.setVisible(false)
@@ -389,17 +392,18 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.clear()
     g.setVisible(true)
     const r = this.lens.screen.view()
+    const k = viewport.renderScale / this.lens.screen.zoom()
     const right = r.x + r.w
     const bottom = r.y + r.h
-    g.lineStyle(0.03 * UNIT, 0xffffff, 0.45)
+    g.lineStyle(0.03 * UNIT * k, 0xffffff, 0.45)
     for (let x = Math.floor(r.x / UNIT) * UNIT; x <= right; x += UNIT) g.lineBetween(x, r.y, x, bottom)
     for (let y = Math.floor(r.y / UNIT) * UNIT; y <= bottom; y += UNIT) g.lineBetween(r.x, y, right, y)
-    g.lineStyle(0.05 * UNIT, 0xff1744, 1)
+    g.lineStyle(0.05 * UNIT * k, 0xff1744, 1)
     g.lineBetween(r.x, 0, right, 0)
-    g.lineStyle(0.05 * UNIT, 0x00e676, 1)
+    g.lineStyle(0.05 * UNIT * k, 0x00e676, 1)
     g.lineBetween(0, r.y, 0, bottom)
     if (this.framing.edge !== 'frame') return
-    g.lineStyle(0.05 * UNIT, 0xffd600, 1)
+    g.lineStyle(0.05 * UNIT * k, 0xffd600, 1)
     g.strokeRect(SAFE.x, SAFE.y, SAFE.w, SAFE.h)
   }
 
