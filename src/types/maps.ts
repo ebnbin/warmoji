@@ -685,6 +685,124 @@ export interface SakuraConfig {
   readonly body: WadeConfig
 }
 /**
+ * 红叶林：寺院外溪边的一片枫林空地，正是红叶最盛的时候。一面是寺院的瓦顶土墙，另外三面是枫林，林缘上的枫树一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
+ * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流是浅水方程在溪床上的稳态解，溪上架着一座木桥；
+ * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface MapleConfig {
+  readonly meterPerU: number
+  /** 地形格子的边长，格；地形铺满方框 */
+  readonly cellU: number
+  /** 地图是 sizeU 见方的方形，摆在方框正中 */
+  readonly sizeU: number
+  /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /**
+   * 寺墙：墙身中线离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；
+   * 院门宽（格）
+   */
+  readonly wall: {
+    readonly insetU: readonly [number, number]
+    readonly skewDeg: number
+    readonly kinkDeg: number
+    readonly thickU: number
+    readonly heightM: number
+    readonly eaveU: number
+    readonly gateU: number
+  }
+  /**
+   * 枫林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进空地的林舌或凹进林子的草湾，
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格
+   */
+  readonly forest: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly scallopU: number
+    readonly lobes: readonly [number, number]
+    readonly lobeU: readonly [number, number]
+    readonly lobeWidthU: readonly [number, number]
+  }
+  /**
+   * 溪：从进林缘到出林缘的走向离横竖方向至少 slantDeg 度，两头进出林子时再各偏最多 turnDeg 度；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍；
+   * 溪岸离寺墙至少 wallGapU 格
+   */
+  readonly stream: {
+    readonly slantDeg: number
+    readonly turnDeg: number
+    readonly meanderU: number
+    readonly minBend: number
+    readonly wallGapU: number
+  }
+  /**
+   * 溪的流量 discharge（米³/秒），河道按流量定：水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米），坡降由曼宁糙率 manning 反算；
+   * 横断面的水深按 1 − |ξ|^bedShape 从深泓往两岸收；弯顶的深潭、过渡段的浅滩相对平均的水深倍率 pool、riffle，深泓往凹岸偏到半宽的 thalwegShift 倍；
+   * 河岸高出水面 bankM 米、岸坡宽 bankU 格，岸顶以外的滩地每格升 floodSlope 米；空地上地面的起伏 reliefM 米
+   */
+  readonly flow: {
+    readonly discharge: number
+    readonly widthCoef: number
+    readonly depthCoef: number
+    readonly manning: number
+    readonly bedShape: number
+    readonly pool: number
+    readonly riffle: number
+    readonly thalwegShift: number
+    readonly bankM: number
+    readonly bankU: number
+    readonly floodSlope: number
+    readonly reliefM: number
+  }
+  /** 上游的石组：石头的半径（格）、石缝多宽（格）、石顶比水面高多少米 */
+  readonly rocks: {
+    readonly radiusU: readonly [number, number]
+    readonly gapU: readonly [number, number]
+    readonly heightM: number
+  }
+  /** 下游的石槛：槛前从河床升上槛顶的坡多长（格）、槛下的溪比槛顶低多少米；槛上的竹栅：竹桩隔多远（格）、多高（米） */
+  readonly sill: {
+    readonly rampU: number
+    readonly dropM: number
+    readonly postU: number
+    readonly heightM: number
+  }
+  /** 木桥：桥面宽（格）、两头落地的坡道多长（格）、桥面正中拱起多高（米）；架在溪的哪一段（弧长的比例） */
+  readonly bridge: {
+    readonly widthU: number
+    readonly rampU: number
+    readonly riseM: number
+    readonly at: readonly [number, number]
+  }
+  /** 枫树：空地上几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；寺墙外（寺里）的枫树隔多远一棵（格） */
+  readonly trees: {
+    readonly inside: readonly [number, number]
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly overhangU: number
+    readonly templeGapU: number
+  }
+  /**
+   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克，别的身体质量按半径的三次方与质量倍率缩放（半径不算队长倍率），身高按占的层数；
+   * 身体的密度 density（千克/米³）与水里的阻力系数 drag。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
+   * 或者干脆浮起来，就站不住、随水漂。站着时胯以下迎水的是两条腿：腿宽占身宽 legs、胯高占身高 hip；站着时重心到脚掌下游边的水平距离占身高 lever；
+   * 脚底踩在湿河床上的静摩擦系数 mu；随水漂着时自己划水的速度（相对水）占想走的速度的 swim；水深不到 wetM 米算干地
+   */
+  readonly body: {
+    readonly kg: number
+    readonly radiusU: number
+    readonly density: number
+    readonly drag: number
+    readonly legs: number
+    readonly hip: number
+    readonly lever: number
+    readonly mu: number
+    readonly swim: number
+    readonly wetM: number
+  }
+}
+/**
  * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
  * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
  */
@@ -993,8 +1111,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1059,7 +1177,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1087,6 +1205,7 @@ export interface MapDef {
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
   readonly sakura?: SakuraConfig
+  readonly maple?: MapleConfig
   readonly circuit?: CircuitConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
