@@ -2297,8 +2297,6 @@ const FROST_KEY = 'floe-frost'
 const FROST_PX = 960
 /** 开局最多几个线程分着画冰面 */
 const FLOE_THREADS = 4
-/** 海面四边形往浮冰外铺多远，格：游再远也冻死在这以内了 */
-const SEA_PAD_U = 40
 /** 风速过了 DRIFT_FROM_MS（米/秒）雪才扬得起来，扬起的雪按超出的部分的三次方变多，超出 DRIFT_SPAN_MS 时每格每秒撒 1.1 粒 */
 const DRIFT_FROM_MS = 4.5
 const DRIFT_SPAN_MS = 8.5
@@ -2408,7 +2406,7 @@ function drawFrost(ctx: CanvasRenderingContext2D, w: number, h: number): void {
 }
 
 /**
- * 浮冰：冰面是开局在后台线程画好的一张贴图，压在着色器画的南大洋上；海面延伸到镜头能去的任何地方，镜头只跟着队长、不设边。
+ * 浮冰：冰面是开局在后台线程画好的一张贴图，压在着色器画的南大洋上；海面铺满方框。
  * 风吹着雪贴地跑，阵风来时雪流变密、飞得更快；有人落水就溅起水花，浮着的人只露出上半身，一圈圈波纹往外扩；
  * 队长泡在冰水里，屏幕四边就结起霜，上了冰慢慢化掉
  */
@@ -2432,10 +2430,8 @@ class FloeView extends BoundedView {
   private frostAspect = 0
   private readonly rippleAt = new Map<number, number>()
 
-  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const side = v.def.floe!.frameU * UNIT
-    const f = floeField(v)
-    return { w: side, h: side, origin: { x: f.heart.x, y: f.heart.y } }
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
   }
 
   build(v: ViewCtx): void {
@@ -2445,9 +2441,8 @@ class FloeView extends BoundedView {
     this.visuals.push(this.frost)
   }
 
-  /** 四面是海，游得出去，镜头不设边 */
-  framing(v: ViewCtx): Framing {
-    return { ...super.framing(v), edge: 'open' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   /** 装饰只撒在冰上，离冰缘留出它自己的大小 */
@@ -2476,8 +2471,7 @@ class FloeView extends BoundedView {
     const tex = canvasTexture(scene, FLOE_KEY, frame.w, frame.h)
     const painting = painter.paint((p) => tex.getContext().putImageData(new ImageData(p.pixels, frame.w, p.r1 - p.r0), 0, p.r0))
     // 后台线程画冰面的时候，主线程把海面要用的几张图算好
-    const pad = SEA_PAD_U * UNIT
-    const rect = [-pad, -pad, v.w + pad * 2, v.h + pad * 2]
+    const rect = [FRAME.x, FRAME.y, FRAME.w, FRAME.h]
     // 冰缘一圈留不住雪，投影按光冰高出海面的高度算
     const shadeU = (f.freeboard / cfg.meterPerU) * (Math.hypot(LIGHT.x, LIGHT.y) / LIGHT.z)
     canvasTexture(scene, SHORE_KEY, f.cols, f.rows, (ctx) => drawShore(ctx, f, shadeU))

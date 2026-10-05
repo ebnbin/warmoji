@@ -761,10 +761,9 @@ export const MAPS = {
     },
     floe: {
       meterPerU: 0.4,
-      frameU: 52,
       cellU: 0.125,
       shape: {
-        areaU: 1024,
+        spanU: 32,
         turnDeg: 8,
         sideDeg: 6,
         sideU: 1.5,

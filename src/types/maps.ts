@@ -359,13 +359,12 @@ export interface ShipConfig {
  */
 export interface FloeConfig {
   readonly meterPerU: number
-  /** 地图是边长 frameU 的方形，浮冰居中；冰面的距离场、积雪与新冰的格子边长 cellU */
-  readonly frameU: number
+  /** 冰面的距离场、积雪与新冰的格子边长 cellU，格子铺满方框 */
   readonly cellU: number
   /** 平面形状，格 */
   readonly shape: {
-    /** 冰面的面积，格² */
-    readonly areaU: number
+    /** 冰心对准方框正中，冰面从冰心往四边最远伸出 spanU / 2 格 */
+    readonly spanU: number
     /** 四条主断裂边：整块最多转 turnDeg 度，每条边再各自最多偏 sideDeg 度、离中心的距离最多差 sideU 格 */
     readonly turnDeg: number
     readonly sideDeg: number

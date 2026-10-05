@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { SAFE_U, UNIT } from '../util/units'
+import { UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
@@ -39,6 +39,7 @@ import { remapSim } from './systems/shared/remap'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
+import { SAFE } from './frame'
 import { Lens, LENS_MODES } from './lens'
 import type { Framing, LensMode } from './lens'
 import { makeSim } from './sim'
@@ -398,10 +399,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.lineStyle(0.05 * UNIT, 0x00e676, 1)
     g.lineBetween(0, r.y, 0, bottom)
     if (this.framing.edge !== 'frame') return
-    const m = this.framing.map
-    const safe = SAFE_U * UNIT
     g.lineStyle(0.05 * UNIT, 0xffd600, 1)
-    g.strokeRect(m.x + safe, m.y + safe, m.w - safe * 2, m.h - safe * 2)
+    g.strokeRect(SAFE.x, SAFE.y, SAFE.w, SAFE.h)
   }
 
   create(): void {

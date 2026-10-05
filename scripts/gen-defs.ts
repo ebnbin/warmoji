@@ -30,7 +30,7 @@ import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
-import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
+import { depth, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
 import { bodyField } from '../src/ecs/ruins/masonry.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
@@ -215,8 +215,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 浮冰：参数合理，冰比海水轻、压满雪也还浮在海面上；摩擦是雪最大、新冰最小。按标准身体：平时的风吹不动站在新冰上的，
- * 阵风吹得动站在新冰上的、吹不动站在雪上的（雪是避风的地方）；每个角色都游得过海流。抽一批种子生成轮廓：面积对、不自交，冰面离地图边留出海面
+ * 浮冰：参数合理，冰面在安全区里四周还留着海，冰比海水轻、压满雪也还浮在海面上；摩擦是雪最大、新冰最小。按标准身体：平时的风吹不动站在新冰上的，
+ * 阵风吹得动站在新冰上的、吹不动站在雪上的（雪是避风的地方）；每个角色都游得过海流。抽一批种子生成轮廓：不自交，出生的冰心四周空得开
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'floe') === (m.floe !== undefined), `maps.${id} 是浮冰当且仅当写了 floe`)
@@ -225,8 +225,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const s = f.shape
   const span = (r: readonly [number, number]): boolean => r[0] > 0 && r[0] <= r[1]
   const at = `maps.${id}.floe`
-  need(f.meterPerU > 0 && f.cellU > 0 && f.frameU > Math.sqrt(s.areaU), `${at} 的尺度、格子须为正，地图比冰面大`)
-  need(s.areaU > 0 && s.turnDeg >= 0 && s.sideDeg >= 0 && s.sideU >= 0 && s.bendU >= 0 && s.jagU >= 0, `${at}.shape 的面积须为正，偏转、拐折与锯齿不为负`)
+  need(f.meterPerU > 0 && f.cellU > 0, `${at} 的尺度、格子须为正`)
+  need(s.spanU > 0 && s.spanU < FRAME_U - SAFE_U * 2, `${at}.shape.spanU 须为正，冰面在安全区里四周还留着海`)
+  need(s.turnDeg >= 0 && s.sideDeg >= 0 && s.sideU >= 0 && s.bendU >= 0 && s.jagU >= 0, `${at}.shape 的偏转、拐折与锯齿不为负`)
   need(s.cutChance >= 0 && s.cutChance <= 1 && s.leadChance >= 0 && s.leadChance <= 1, `${at}.shape 的概率须在 [0, 1] 内`)
   need(Number.isInteger(s.bites[0]) && Number.isInteger(s.bites[1]) && s.bites[0] >= 0 && s.bites[0] <= s.bites[1], `${at}.shape.bites 须为非负整数范围`)
   need([s.cutU, s.biteDepthU, s.biteWidthU, s.leadU, s.leadWidthU, s.seamWidthU, s.roundU].every(span), `${at}.shape 的范围须为正且下限不大于上限`)
@@ -255,10 +256,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (const [cid, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) need(c.stats.moveSpeed * b.swimRatio > current * 1.2, `${at} 的海流（${current.toFixed(2)} 格/秒）快得让 characters.${cid} 游不回来`)
   for (let k = 0; k < 16; k++) {
     const { outline } = floeOutline(k * 7919 + 13, f)
-    const reach = Math.max(...outline.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y))))
     need(simple(outline), `${at} 第 ${k} 个样本的轮廓自交`)
-    need(Math.abs(area(outline) - s.areaU) < 1, `${at} 第 ${k} 个样本的面积不对`)
-    need(reach + 6 <= f.frameU / 2, `${at} 第 ${k} 个样本的冰面离地图边不到 6 格`)
+    need(depth(outline, 0, 0) >= SPAWN_CLEAR_U, `${at} 第 ${k} 个样本的冰心离冰缘不到 ${SPAWN_CLEAR_U} 格`)
   }
 }
 

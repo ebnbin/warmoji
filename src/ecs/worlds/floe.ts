@@ -1,5 +1,6 @@
-import { UNIT } from '../../util/units.ts'
+import { FRAME_U, SPAWN_CLEAR_U, UNIT } from '../../util/units.ts'
 import { fbm } from '../../util/noise.ts'
+import { FRAME_MID } from '../frame.ts'
 import { Rng } from '../../util/rng.ts'
 import type { FloeConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -18,7 +19,7 @@ export interface Seam {
 }
 
 /**
- * 一块浮冰：轮廓（像素，首尾不重复，形心在地图正中）、新冰缝，以及格子上的场——到冰缘的有符号距离（格，冰上为正）、
+ * 一块浮冰：轮廓（像素，首尾不重复，冰心在方框正中）、新冰缝，以及铺满方框的格子上的场——到冰缘的有符号距离（格，冰上为正）、
  * 积雪深（米）、新冰的覆盖（0 到 1）。格子 (i, j) 的格心在 ((i + 0.5)·cell, (j + 0.5)·cell) 像素
  */
 export interface FloeField {
@@ -30,8 +31,6 @@ export interface FloeField {
   readonly edge: Float32Array
   readonly snow: Float32Array
   readonly young: Float32Array
-  /** 冰面上离冰缘最远的一点，像素：队伍从这里出发 */
-  readonly heart: Point
   /** 冰面的形心，像素 */
   readonly cx: number
   readonly cy: number
@@ -75,17 +74,6 @@ function clip(poly: Vertex[], nx: number, ny: number, d: number): Vertex[] {
     }
   }
   return out
-}
-
-/** 有向面积：按地图坐标（y 朝下）顺时针走为正 */
-export function area(p: readonly Point[]): number {
-  let s = 0
-  for (let i = 0; i < p.length; i++) {
-    const a = p[i]!
-    const b = p[(i + 1) % p.length]!
-    s += a.x * b.y - b.x * a.y
-  }
-  return s / 2
 }
 
 function centroid(p: readonly Point[]): Point {
@@ -214,6 +202,21 @@ function inside(poly: readonly Point[], x: number, y: number): boolean {
   return c
 }
 
+/** (x, y) 到线段 ab 的距离，及最近处在 ab 上的比例 */
+function toSegment(x: number, y: number, a: Point, b: Point): { d: number; t: number } {
+  const ex = b.x - a.x
+  const ey = b.y - a.y
+  const t = Math.min(1, Math.max(0, ((x - a.x) * ex + (y - a.y) * ey) / (ex * ex + ey * ey || 1)))
+  return { d: Math.hypot(x - a.x - ex * t, y - a.y - ey * t), t }
+}
+
+/** 到轮廓的有符号距离：在冰上为正 */
+export function depth(poly: readonly Point[], x: number, y: number): number {
+  let d = Infinity
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) d = Math.min(d, toSegment(x, y, poly[j]!, poly[i]!).d)
+  return inside(poly, x, y) ? d : -d
+}
+
 /** 裂缝中线上相邻两点的间距，格 */
 const CRACK_STEP = 0.5
 
@@ -234,7 +237,7 @@ function crack(r: Rng, poly: Vertex[], s: FloeConfig['shape'], used: Set<number>
   const start = { x: a.x + ux * t0, y: a.y + uy * t0 }
   const base = Math.atan2(-n.y, -n.x) + (r.next() * 2 - 1) * 25 * DEG
   const line: Point[] = [start]
-  const reach = Math.sqrt(s.areaU) * (r.next() < 0.35 ? 0.45 + r.next() * 0.35 : 3)
+  const reach = s.spanU * (r.next() < 0.35 ? 0.45 + r.next() * 0.35 : 3)
   let heading = base
   let run = 0
   for (let seg = 0; seg < 40 && run < reach; seg++) {
@@ -397,14 +400,67 @@ export function simple(p: readonly Point[]): boolean {
   return true
 }
 
+/** 新冰缝的边缘软过渡的半宽，格 */
+const YOUNG_SOFT_U = 0.2
+
+/** 新冰缝在 (x, y) 处的覆盖，0 到 1：到中线的距离比半宽近就是新冰，边缘留 soft 的过渡 */
+function youngAt(line: readonly Point[], half: readonly number[], soft: number, x: number, y: number): number {
+  let v = 0
+  for (let i = 0; i + 1 < line.length; i++) {
+    const { d, t } = toSegment(x, y, line[i]!, line[i + 1]!)
+    const h = half[i]! + (half[i + 1]! - half[i]!) * t
+    v = Math.max(v, 1 - smooth(h - soft, h + soft, d))
+  }
+  return v
+}
+
+/** 找冰心时一圈圈往外的步子，格 */
+const HEART_STEP_U = 0.5
+
 /**
- * 按断裂的成因生成一块浮冰的轮廓，格，形心在原点：四条主断裂边围出近似的方形，斜裂缝切掉几个角，长边中途拐折，
- * 边上掰掉一两块留下豁口，可能有一道伸进冰里的水道；大的凸角被撞圆，断口按两层折线噪声起锯齿；最后整体缩放到给定面积。
- * 偶尔锯齿让轮廓自交，就换一组随机数重来
+ * 冰心，格：队伍从这里出发。冰心对准方框正中后，冰面要缩放到从冰心往四边最远伸出 reach 格，所以冰心离冰面外框的正中越近，冰面缩得越少：
+ * 从外框正中一圈圈往外找，脚下不是新冰、缩放后离冰缘至少 room 格的点，最先找到的一圈里挑缩放后离冰缘最远的
+ */
+function heartOf(poly: readonly Point[], line: readonly Point[], half: readonly number[], reach: number, room: number): Point {
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const p of poly) {
+    x0 = Math.min(x0, p.x)
+    y0 = Math.min(y0, p.y)
+    x1 = Math.max(x1, p.x)
+    y1 = Math.max(y1, p.y)
+  }
+  const cx = (x0 + x1) / 2
+  const cy = (y0 + y1) / 2
+  let best = { x: cx, y: cy }
+  let top = -Infinity
+  for (let n = 0; top < room && n * HEART_STEP_U <= Math.max(x1 - x0, y1 - y0) / 2; n++) {
+    for (let j = -n; j <= n; j++) {
+      for (let i = -n; i <= n; i++) {
+        if (Math.max(Math.abs(i), Math.abs(j)) !== n) continue
+        const x = cx + i * HEART_STEP_U
+        const y = cy + j * HEART_STEP_U
+        if (youngAt(line, half, YOUNG_SOFT_U, x, y) > 0) continue
+        const v = (depth(poly, x, y) * reach) / Math.max(x - x0, x1 - x, y - y0, y1 - y)
+        if (v <= top) continue
+        top = v
+        best = { x, y }
+      }
+    }
+  }
+  return best
+}
+
+/**
+ * 按断裂的成因生成一块浮冰的轮廓，格：四条主断裂边围出近似的方形，斜裂缝切掉几个角，长边中途拐折，
+ * 边上掰掉一两块留下豁口，可能有一道伸进冰里的水道；大的凸角被撞圆，断口按两层折线噪声起锯齿。
+ * 最后把冰心挪到原点，整体缩放到从冰心往四边最远伸出 spanU / 2 格。偶尔锯齿让轮廓自交，就换一组随机数重来
  */
 export function floeOutline(seed: number, cfg: FloeConfig): { outline: Point[]; seams: { line: Point[]; half: number[] }[] } {
   const s = cfg.shape
-  const half = Math.sqrt(s.areaU) / 2
+  const half = s.spanU / 2
   for (let attempt = 0; ; attempt++) {
     const r = new Rng((seed ^ Math.imul(attempt + 1, 0x9e3779b1)) >>> 0)
     let poly = bend(r, fractured(r, s, half), s.bendU)
@@ -414,8 +470,10 @@ export function floeOutline(seed: number, cfg: FloeConfig): { outline: Point[]; 
     const c = crack(r, poly, s, used)
     poly = c.poly
     const out = jagged(r, rounded(r, poly, s), s.jagU)
-    const k = Math.sqrt(s.areaU / Math.abs(area(out)))
-    const o = centroid(out)
+    const o = heartOf(out, c.seam, c.half, half, SPAWN_CLEAR_U)
+    let reach = 0
+    for (const p of out) reach = Math.max(reach, Math.abs(p.x - o.x), Math.abs(p.y - o.y))
+    const k = half / reach
     const scale = (p: Point): Point => ({ x: (p.x - o.x) * k, y: (p.y - o.y) * k })
     const outline = out.map(scale)
     if (!simple(outline) && attempt < 40) continue
@@ -542,7 +600,7 @@ const spread = (n: number): number => Math.min(1, Math.max(0, (n - 0.5) * 2.4 + 
 /** 新冰的覆盖：逐段在中线附近一圈里算到线段的距离，半宽沿线段插值，边缘留一点过渡 */
 function youngField(seams: readonly Seam[], cols: number, rows: number, cell: number): Float32Array {
   const out = new Float32Array(cols * rows)
-  const soft = 0.2 * UNIT
+  const soft = YOUNG_SOFT_U * UNIT
   for (const s of seams) {
     for (let i = 0; i + 1 < s.line.length; i++) {
       const a = s.line[i]!
@@ -577,16 +635,15 @@ function youngField(seams: readonly Seam[], cols: number, rows: number, cell: nu
 }
 
 /**
- * 按种子生成一块浮冰：先定轮廓与新冰缝，摆到边长 frameU 的地图正中，再在格子上铺到冰缘的距离、新冰与积雪。
+ * 按种子生成一块浮冰：先定轮廓与新冰缝，冰心摆到方框正中，再在铺满方框的格子上铺到冰缘的距离、新冰与积雪。
  * 积雪沿盛行风拉长成一条条雪堆，冰缘一圈被浪花打湿留不住雪，新冰上也没有雪；冰面高出海面多少按阿基米德由冰厚与平均雪载定
  */
 export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   const { outline: shapeU, seams: seamsU } = floeOutline(seed, cfg)
-  const frame = cfg.frameU * UNIT
   const cell = cfg.cellU * UNIT
-  const cols = Math.ceil(cfg.frameU / cfg.cellU)
+  const cols = Math.ceil(FRAME_U / cfg.cellU)
   const rows = cols
-  const toPx = (p: Point): Point => ({ x: frame / 2 + p.x * UNIT, y: frame / 2 + p.y * UNIT })
+  const toPx = (p: Point): Point => ({ x: FRAME_MID.x + p.x * UNIT, y: FRAME_MID.y + p.y * UNIT })
   const outline = shapeU.map(toPx)
   const seams = seamsU.map((s) => ({ line: s.line.map(toPx), half: s.half.map((h) => h * UNIT) }))
   const edge = edgeField(outline, cols, rows, cell)
@@ -601,8 +658,6 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   const noiseSeed = Math.floor(r.next() * 0x7fffffff)
   let snowSum = 0
   let iceCells = 0
-  let heart = { x: frame / 2, y: frame / 2 }
-  let deepest = -Infinity
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       const k = j * cols + i
@@ -614,10 +669,6 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
       const x = (i + 0.5) * cell
       const y = (j + 0.5) * cell
       const yg = young[k]!
-      if (e - yg * 4 > deepest) {
-        deepest = e - yg * 4
-        heart = { x, y }
-      }
       const xu = x / UNIT
       const yu = y / UNIT
       const along = (xu * wc + yu * ws) / (sn.waveU * 1.6)
@@ -634,7 +685,7 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   const ice = cfg.ice
   const sink = 1 - ice.density / ice.seaDensity
   const freeboard = ice.thicknessM * sink - ((iceCells > 0 ? snowSum / iceCells : 0) * sn.density) / ice.seaDensity
-  return { outline, seams, cols, rows, cell, edge, snow, young, heart, cx: c.x, cy: c.y, windAngle, freeboard, youngFreeboard: ice.youngM * sink, seed: noiseSeed }
+  return { outline, seams, cols, rows, cell, edge, snow, young, cx: c.x, cy: c.y, windAngle, freeboard, youngFreeboard: ice.youngM * sink, seed: noiseSeed }
 }
 
 const fieldCache = new WeakMap<FloeConfig, { readonly seed: number; readonly field: FloeField }>()
@@ -1023,12 +1074,12 @@ export function ashore(f: FloeField, x: number, y: number, margin: number): Poin
     const d = edgeAt(f, px, py)
     if (d >= margin) break
     const n = seaward(f, px, py)
-    if (n.x === 0 && n.y === 0) return { x: f.heart.x, y: f.heart.y }
+    if (n.x === 0 && n.y === 0) return { x: FRAME_MID.x, y: FRAME_MID.y }
     const step = (margin - d) * UNIT + f.cell * 0.5
     px -= n.x * step
     py -= n.y * step
   }
-  return edgeAt(f, px, py) >= margin * 0.5 ? { x: px, y: py } : { x: f.heart.x, y: f.heart.y }
+  return edgeAt(f, px, py) >= margin * 0.5 ? { x: px, y: py } : { x: FRAME_MID.x, y: FRAME_MID.y }
 }
 
 /**

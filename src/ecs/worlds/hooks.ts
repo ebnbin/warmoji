@@ -5,7 +5,7 @@ import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAPS } from '../../data/maps'
-import { centered, FRAME_MID } from '../frame'
+import { centered, FRAME_MID, SAFE } from '../frame'
 import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
@@ -1328,7 +1328,8 @@ function landed(s: FloeState, cfg: FloeConfig): void {
 
 /**
  * 浮冰：南极海上一块没有边的浮冰。冰上一切按库仑摩擦走、滑、停，摩擦随积雪、老冰、新冰变，阵风按风压推着身体；
- * 重心探出冰缘就掉进海里，水里按二次阻力与推力游、随海流漂，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底
+ * 重心探出冰缘就掉进海里，水里按二次阻力与推力游、随海流漂，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底。
+ * 海上游到安全区的边就被一堵看不见的墙挡住，敌我都一样
  */
 const floe: WorldHooks = {
   ...bounded,
@@ -1406,8 +1407,12 @@ const floe: WorldHooks = {
     foot.vy = out.vy
     return true
   },
-  constrainBody(_sim, _eid, _from, next) {
-    return next
+  constrainBody(_sim, eid, _from, next) {
+    const r = Radius.v[eid]!
+    return {
+      x: Math.min(Math.max(next.x, SAFE.x + r), SAFE.x + SAFE.w - r),
+      y: Math.min(Math.max(next.y, SAFE.y + r), SAFE.y + SAFE.h - r),
+    }
   },
   chaseDir(sim, eid, tx, ty) {
     const s = floeOf(sim)
@@ -1435,17 +1440,13 @@ const floe: WorldHooks = {
   fleeDir(sim, eid, awayX, awayY) {
     return alongEdge(floeOf(sim).field, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! / UNIT + 1.5)
   },
-  outside(sim, x, y) {
-    const m = 4 * UNIT
-    return x < -m || x > sim.mapW + m || y < -m || y > sim.mapH + m
-  },
   spawnPoint(sim, boss) {
     const f = floeOf(sim).field
     const min = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
     const inset = boss ? 3 : 1.5
     const lx = leaderX(sim)
     const ly = leaderY(sim)
-    let p: Point = f.heart
+    let p: Point = FRAME_MID
     for (let i = 0; i < 48; i++) {
       const q = { x: sim.rng.next() * sim.mapW, y: sim.rng.next() * sim.mapH }
       if (edgeAt(f, q.x, q.y) < inset) continue
@@ -1454,8 +1455,8 @@ const floe: WorldHooks = {
     }
     return p
   },
-  center(sim) {
-    return floeOf(sim).field.heart
+  center() {
+    return FRAME_MID
   },
   settle(sim, p) {
     return ashore(floeOf(sim).field, p.x, p.y, SPAWN.edgeInset)
