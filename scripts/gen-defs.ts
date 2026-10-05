@@ -468,8 +468,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 天枢：大厅放得进方框的安全区，开局空地空得出出生点要的格数；门线是整格长、落在格线上，两头门柱之间宽得过这张图最大的身体（头目与队长也算）；
- * 门柱比平射的子弹高、挡得住子弹，全息台挡得住标准身体、又比平射的子弹矮；门的对数不超过颜色的种数，挪门的间隔比预警长。
+ * 天枢：大厅放得进方框的安全区，开局空地空得出出生点要的格数；门线是整格长、落在格线上；
+ * 全息台挡得住标准身体、又比平射的子弹矮；门的对数不超过颜色的种数，挪门的间隔比预警长。
  * 抽一批种子真的生成一遍：每个都生成得出来，开局站位四周空着，门的对数在范围里，同一对朝向相同、隔得够远，横竖两种门各有足够的地方挪
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -491,10 +491,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(layersOf(c.pedestals.heightM) > Math.floor(B.layers * B.step) && layersOf(c.pedestals.heightM) * layerM < chestM, `${at}.pedestals.heightM 须挡得住标准身体、又比平射的子弹矮`)
   need(c.cores.widthU > c.cores.doorU * 2 && c.cores.depthU > 0 && range(c.cores.count, true) && c.cores.count[1] <= 2, `${at}.cores 须放得下两扇门，最多两座`)
   need(range(c.hatches, true), `${at}.hatches 须是整数范围`)
-  const widest = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ENEMIES[m.boss].radius, ...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0)) * 2
   need(Number.isInteger(w.lenU) && w.lenU > 0, `${at}.warps.lenU 须是整格：门线落在格线上`)
-  need(w.lenU - w.postU * 2 > widest, `${at}.warps 两头门柱之间须宽得过这张图最大的身体（${widest} 格）`)
-  need(w.postU > 0 && layersOf(w.heightM) * layerM > chestM, `${at}.warps 的门柱须比平射的子弹高`)
   need(w.pairs[0] >= 1 && range(w.pairs, true) && w.pairs[1] <= 3, `${at}.warps.pairs 须在 1 到 3 对之间：门的颜色只有三种`)
   need(w.apronU >= 1 && w.apartU > w.lenU && w.pairU > w.apartU, `${at}.warps 门线两侧至少空一格，同一对隔得比任两扇门远，任两扇门的中点隔得比门长`)
   need(w.warnMs > 0 && range(w.everyMs, false) && w.everyMs[0] > w.warnMs, `${at}.warps 挪门的间隔须比预警长`)

@@ -166,7 +166,7 @@ export interface WorldHooks {
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
   /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（船是倾角的度数，浮冰是风速）；不偏为零 */
   lean(sim: Sim): Point
-  /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
+  /** 队员在队长 from 身后的坑位 at 落在不该站的地方（会伤人、贴着或隔着传送门）时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
   /** 沿直线从 a 走到 b（像素）先穿过的那扇传送门；eid 不为 −1 时是这个实体此刻真的穿了过去。没有传送门的地图不写 */
   portal?(sim: Sim, eid: number, ax: number, ay: number, bx: number, by: number): PortalHop | null

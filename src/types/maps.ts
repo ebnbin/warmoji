@@ -816,8 +816,8 @@ export interface CircuitConfig {
 /**
  * 天枢：未来城市一座高楼顶上的空中大厅，切了角的方形，四周是落地的玻璃幕墙，贴着幕墙一圈玻璃地面，往下看是夜里城市的灯海。
  * 厅里的地面是一格一块的瓷砖，谁踩上去就亮起谁的颜色、慢慢暗下去；立柱与电梯井顶到天花板，全息台齐腰。
- * 厅里有几对传送门：门线是格线上的一段，两头立着发光的门柱，同一对门朝向相同、颜色相同；任何东西的中心越过一扇门的门线，
- * 就平移到另一扇门同一侧接着走，速度不变。每隔一阵有一扇门挪到别处：旧处闪烁、新处投出全息的轮廓，预警过后一下换过去
+ * 厅里有几对传送门：每扇门是格线上一段发光的粗线，同一对门朝向相同、颜色相同；任何东西的中心越过一扇门的门线，
+ * 就平移到另一扇门同一侧接着走，速度不变。每隔一阵有一扇门挪到别处：旧处闪烁、错位，新处先出一条虚线、被一个光点沿线画实，预警过后一下换过去
  */
 export interface NexusConfig {
   /** 大厅外接的方形边长（格），摆在方框正中；四个角斜切 chamferU 格 */
@@ -838,14 +838,12 @@ export interface NexusConfig {
   /** 地上的检修口：几处 */
   readonly hatches: readonly [number, number]
   /**
-   * 传送门：几对；门线多长（格），两头门柱的半径（格）与高（米）；门线两侧各要空出 apronU 格；同一对的两扇门至少隔 pairU 格，任两扇门至少隔 apartU 格；
+   * 传送门：几对；门线多长（格）；门线两侧各要空出 apronU 格；同一对的两扇门至少隔 pairU 格，任两扇门至少隔 apartU 格；
    * 每隔 everyMs 有一扇门挪到别处，旧处与新处一起预警 warnMs 后换过去
    */
   readonly warps: {
     readonly pairs: readonly [number, number]
     readonly lenU: number
-    readonly postU: number
-    readonly heightM: number
     readonly apronU: number
     readonly pairU: number
     readonly apartU: number

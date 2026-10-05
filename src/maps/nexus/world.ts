@@ -3,22 +3,21 @@ import { FRAME_U, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Alive, Enemy, ENEMY_SET, Phys, Radius, Transform } from '../../ecs/components'
+import { Alive, Enemy, ENEMY_SET, Radius, Transform } from '../../ecs/components'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { leaderPoint } from '../../ecs/utils/team'
-import { grounded, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
+import { grounded, phases, topOf } from '../../ecs/utils/pass'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { alongWall, awayFromWall, keepOut, makeBasin, roomAt } from '../basin'
 import { roomFor } from '../landmark'
 import { hallRoom, nexusPlan, warpApart, warpDist } from './layout'
 import { nexusMarks } from './marks'
 import { flowNav, makeNav, navCell, navCenter, navDist, navNear, relink } from './nav'
-import { warpCross, warpPosts } from './warps'
+import { warpCross } from './warps'
 import type { NexusPlan, WarpSpot } from './layout'
 import type { NavGrid } from './nav'
 import type { Basin } from '../basin'
 import type { Solid, Solids } from '../../ecs/worlds/solids'
-import type { Crossing, Probe } from '../../ecs/utils/pass'
 import type { Landmark } from '../landmark'
 import type { MapId, NexusConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -40,8 +39,11 @@ const PROBE_U = 0.25
 /** 门挪去的新位置离队伍里每个人至少这么远、离自己原来的位置至少这么远，格 */
 const WARP_SQUAD_U = 2.5
 const WARP_MOVE_U = 4
-/** 新门柱打出来的地方离任何身体的边至少再空出这么多格 */
-const POST_CLEAR_U = 0.25
+/** 寻路到队长的路最多隔这么久（毫秒）重算一次；队长一下挪得比这（格）远（穿门）就马上重算 */
+const NAV_MS = 150
+const NAV_JUMP_U = 2
+/** 队员的坑位离门线至少这么多格、和队长在门线同一侧：队员刹不住也冲不过门线 */
+const SEAT_GAP_U = 0.6
 /** 新位置一时挑不出来，过这么久再挑，毫秒 */
 const WARP_RETRY_MS = 2000
 /** 地砖：身体半径的这么多倍以内的瓷砖算踩着；离开这么久（毫秒）再踩上来算新踩的一脚 */
@@ -81,16 +83,16 @@ export interface NexusState {
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly solids: Solids
   readonly warps: WarpState[]
-  /** 此刻立着的门两头门柱的圆心，像素：挡弹体；门开始挪、换过位置都重算 */
-  readonly posts: Point[]
-  /** 挡身体的门柱：立着的，加上正在新位置打出来的 */
-  readonly blocks: Point[]
   moveAt: number
   /** 门换过位置就加一：寻路按它重铺 */
   version: number
   readonly nav: NavGrid
   navVersion: number
+  /** 上一次算到队长的路时队长在哪一格、在哪（格），什么时刻 */
   navCell: number
+  navX: number
+  navY: number
+  navAt: number
   readonly tiles: Tiles
   readonly hops: Hop[]
   hopCount: number
@@ -138,19 +140,19 @@ export function nexusOf(sim: Sim): NexusState {
       marks: nexusMarks(cfg, plan),
       solids: solidsOf(cfg, plan),
       warps: plan.warps.map((spot) => ({ spot, next: null, since: 0 })),
-      posts: [],
-      blocks: [],
       moveAt: sim.elapsedMs + between(sim, cfg.warps.everyMs),
       version: 0,
       nav,
       navVersion: -1,
       navCell: -1,
+      navX: 0,
+      navY: 0,
+      navAt: 0,
       tiles: { team: never(), foe: never(), teamFrom: never(), foeFrom: never() },
       hops: [],
       hopCount: 0,
     }
     sim.worldState.nexus = s
-    placePosts(s, cfg)
     stepNav(sim, s, cfg)
   }
   return s
@@ -160,35 +162,29 @@ function between(sim: Sim, r: readonly [number, number]): number {
   return r[0] + (r[1] - r[0]) * sim.rng.next()
 }
 
-/** 按此刻的门重算门柱的圆心：正在打出来的门柱一开始就挡身体，到换过去时那里不会站着人 */
-function placePosts(s: NexusState, cfg: NexusConfig): void {
-  const len = cfg.warps.lenU
-  s.posts.length = 0
-  s.blocks.length = 0
-  for (const w of s.warps) {
-    for (const q of warpPosts(w.spot, len)) s.posts.push({ x: q.x * UNIT, y: q.y * UNIT })
-    if (w.next) for (const q of warpPosts(w.next, len)) s.blocks.push({ x: q.x * UNIT, y: q.y * UNIT })
-  }
-  s.blocks.push(...s.posts)
-}
-
 /** 此刻的门在哪：按对排，第 k 扇的另一扇是 k ^ 1 */
 export function warpSpots(s: NexusState): WarpSpot[] {
   return s.warps.map((w) => w.spot)
 }
 
-/** 门挪过就重铺寻路，队长换了一格就重算到队长的路 */
+/** 门挪过就重铺寻路；队长换了一格就重算到队长的路，最多隔 NAV_MS 算一次，队长一下挪远了（穿门）就马上算 */
 function stepNav(sim: Sim, s: NexusState, cfg: NexusConfig): void {
   if (s.navVersion !== s.version) {
-    relink(s.nav, warpSpots(s), s.blocks.map((q) => ({ x: q.x / UNIT, y: q.y / UNIT })), cfg.warps.lenU, cfg.warps.postU)
+    relink(s.nav, warpSpots(s), cfg.warps.lenU)
     s.navVersion = s.version
     s.navCell = -2
   }
   const lead = leaderPoint(sim)
-  const c = navCell(s.nav, lead.x / UNIT, lead.y / UNIT)
+  const x = lead.x / UNIT
+  const y = lead.y / UNIT
+  const c = navCell(s.nav, x, y)
   if (c === s.navCell) return
-  flowNav(s.nav, lead.x / UNIT, lead.y / UNIT)
+  if (s.navCell !== -2 && sim.elapsedMs - s.navAt < NAV_MS && Math.hypot(x - s.navX, y - s.navY) < NAV_JUMP_U) return
+  flowNav(s.nav, x, y)
   s.navCell = c
+  s.navX = x
+  s.navY = y
+  s.navAt = sim.elapsedMs
 }
 
 /** 门到时候挪：没在挪的门到点挑一扇、挑个新位置开始预警；预警满了就换过去 */
@@ -200,7 +196,6 @@ function stepWarps(sim: Sim, s: NexusState, cfg: NexusConfig): void {
     moving.spot = moving.next!
     moving.next = null
     s.version++
-    placePosts(s, cfg)
     s.moveAt = now + between(sim, cfg.warps.everyMs)
     return
   }
@@ -213,27 +208,21 @@ function stepWarps(sim: Sim, s: NexusState, cfg: NexusConfig): void {
   }
   s.warps[k]!.next = spot
   s.warps[k]!.since = now
-  s.version++
-  placePosts(s, cfg)
 }
 
-/** 第 k 扇门挪去哪：朝向不变，离另一扇门够远，离别的门、队伍里的人和它原来的位置都够远，门柱打出来的地方没站着任何身体 */
+/** 第 k 扇门挪去哪：朝向不变，离另一扇门够远，离别的门、队伍里的人和它原来的位置都够远 */
 function newSpot(sim: Sim, s: NexusState, cfg: NexusConfig, k: number): WarpSpot | null {
   const w = cfg.warps
   const cur = s.warps[k]!.spot
   const other = s.warps[k ^ 1]!.spot
   const squad = sim.characters.filter((m) => Alive.v[m] === 1).map((m) => ({ x: Transform.x[m]! / UNIT, y: Transform.y[m]! / UNIT }))
-  const bodies = [...query(sim.world, [Phys, Transform, Radius])].filter((e) => Alive.v[e] !== 0)
-  const free = (sp: WarpSpot): boolean =>
-    warpPosts(sp, w.lenU).every((q) => bodies.every((e) => Math.hypot(Transform.x[e]! / UNIT - q.x, Transform.y[e]! / UNIT - q.y) >= w.postU + Radius.v[e]! / UNIT + POST_CLEAR_U))
   const list = s.plan.spots.filter(
     (sp) =>
       sp.axis === cur.axis &&
       warpApart(sp, cur, w.lenU) >= WARP_MOVE_U &&
       warpApart(sp, other, w.lenU) >= w.pairU &&
       s.warps.every((o, j) => j === k || j === (k ^ 1) || warpApart(sp, o.spot, w.lenU) >= w.apartU) &&
-      squad.every((p) => warpDist(sp, w.lenU, p.x, p.y) >= WARP_SQUAD_U) &&
-      free(sp),
+      squad.every((p) => warpDist(sp, w.lenU, p.x, p.y) >= WARP_SQUAD_U),
   )
   return list[Math.floor(sim.rng.next() * list.length)] ?? null
 }
@@ -259,100 +248,29 @@ function stepTiles(sim: Sim, s: NexusState): void {
   for (const e of query(sim.world, ENEMY_SET)) if (Alive.v[e] === 1 && grounded(sim.world, e)) mark(e, t.foe, t.foeFrom)
 }
 
-/** 线段 a→b（像素）最先在两头门柱之间越过的那扇门，与走到那里的比例；一扇都没越过为 null */
+/** 线段 a→b（像素）最先越过的那扇门，与走到那里的比例；一扇都没越过为 null */
 function firstCross(s: NexusState, cfg: NexusConfig, ax: number, ay: number, bx: number, by: number): { readonly warp: number; readonly t: number } | null {
-  const w = cfg.warps
+  const len = cfg.warps.lenU
   let best: { warp: number; t: number } | null = null
   for (let i = 0; i < s.warps.length; i++) {
-    const t = warpCross(s.warps[i]!.spot, w.lenU, w.postU, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
+    const t = warpCross(s.warps[i]!.spot, len, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
     if (t >= 0 && (!best || t < best.t)) best = { warp: i, t }
   }
   return best
 }
 
-/** 半径 rad 的身体走不进此刻挡身体的门柱：陷进去多深就沿连心线退回去 */
-function offPosts(s: NexusState, cfg: NexusConfig, p: Point, rad: number): Point {
-  const min = rad + cfg.warps.postU * UNIT
-  let x = p.x
-  let y = p.y
-  for (const q of s.blocks) {
-    const dx = x - q.x
-    const dy = y - q.y
-    if (Math.abs(dx) >= min || Math.abs(dy) >= min) continue
-    const d = Math.hypot(dx, dy)
-    if (d >= min) continue
-    const nx = d > 1e-6 ? dx / d : 1
-    const ny = d > 1e-6 ? dy / d : 0
-    x = q.x + nx * min
-    y = q.y + ny * min
-  }
-  return x === p.x && y === p.y ? p : { x, y }
-}
-
-/** (x, y) 离此刻最近的挡身体的门柱的表面多远，像素 */
-function postRoom(s: NexusState, cfg: NexusConfig, x: number, y: number): number {
-  let best = Infinity
-  for (const q of s.blocks) best = Math.min(best, Math.hypot(x - q.x, y - q.y))
-  return best - cfg.warps.postU * UNIT
-}
-
-/** 线段 a→b（像素）先碰上的门柱：探测在那里比柱顶低、又要贯穿才过得去 */
-function postTrace(s: NexusState, cfg: NexusConfig, probe: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null {
-  if (passCost(probe, 'structure') <= 0) return null
-  const w = cfg.warps
-  const top = topOf(w.heightM)
-  const R = w.postU * UNIT
-  const dx = bx - ax
-  const dy = by - ay
-  const a = dx * dx + dy * dy
-  let best: Crossing | null = null
-  if (a === 0) return null
-  for (const q of s.posts) {
-    const fx = ax - q.x
-    const fy = ay - q.y
-    const c = fx * fx + fy * fy - R * R
-    const b = 2 * (fx * dx + fy * dy)
-    const disc = b * b - 4 * a * c
-    if (disc < 0) continue
-    const sq = Math.sqrt(disc)
-    const t0 = Math.max(0, (-b - sq) / (2 * a))
-    const t1 = Math.min(1, (-b + sq) / (2 * a))
-    if (t0 > t1 || t1 < 0 || t0 > 1) continue
-    if (probeZ(probe, t0) >= top) continue
-    if (!best || t0 < best.t0) best = { t0, t1, material: 'structure' }
-  }
-  return best
-}
-
-/**
- * 走直线从 a 到 b（像素）通不通：中途离障碍与门柱够远，不越过任何门线；allow 不为 −1 时这一段正是要穿过那扇门，必须在两头门柱之间越过它
- */
+/** 走直线从 a 到 b（像素）通不通：中途离障碍够远，不越过任何门线；allow 不为 −1 时这一段正是要穿过那扇门，必须越过它的门线 */
 function clearLine(s: NexusState, cfg: NexusConfig, ax: number, ay: number, bx: number, by: number, r: number, allow: number): boolean {
-  const w = cfg.warps
+  const len = cfg.warps.lenU
   for (let i = 0; i < s.warps.length; i++) {
-    const t = warpCross(s.warps[i]!.spot, w.lenU, w.postU, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
+    const t = warpCross(s.warps[i]!.spot, len, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
     if (i === allow ? t < 0 : t >= 0) return false
   }
   const need = Math.min(r, 0.45 * UNIT) * 0.85
   const dx = bx - ax
   const dy = by - ay
-  const len = Math.hypot(dx, dy)
-  // 只有离这段路近的门柱才逐点看
-  const near: Point[] = []
-  for (const q of s.blocks) {
-    const px = q.x - ax
-    const py = q.y - ay
-    const t = len > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy) / (len * len))) : 0
-    if (Math.hypot(px - dx * t, py - dy * t) < need + w.postU * UNIT) near.push(q)
-  }
-  const n = Math.max(1, Math.ceil(len / (PROBE_U * UNIT)))
-  const basin = s.plan.basin
-  for (let k = 1; k <= n; k++) {
-    const x = ax + (dx * k) / n
-    const y = ay + (dy * k) / n
-    if (roomAt(basin, x, y) < need) return false
-    for (const q of near) if (Math.hypot(x - q.x, y - q.y) < need + w.postU * UNIT) return false
-  }
+  const n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (PROBE_U * UNIT)))
+  for (let k = 1; k <= n; k++) if (roomAt(s.plan.basin, ax + (dx * k) / n, ay + (dy * k) / n) < need) return false
   return true
 }
 
@@ -407,7 +325,7 @@ function openNear(s: NexusState, cfg: NexusConfig, p: Point, room: number): Poin
   return { x: s.plan.start.x * UNIT, y: s.plan.start.y * UNIT }
 }
 
-/** 半径 rad 像素的身体在 (x, y) 不挨着任何一扇门（连正要挪去的地方）：离门线与门柱都再空出半格 */
+/** 半径 rad 像素的身体在 (x, y) 不挨着任何一扇门（连正要挪去的地方）：离门线再空出半格 */
 function clearOfWarps(s: NexusState, cfg: NexusConfig, x: number, y: number, rad: number): boolean {
   const min = rad / UNIT + 0.5
   return s.warps.every((w) => warpDist(w.spot, cfg.warps.lenU, x / UNIT, y / UNIT) >= min && (!w.next || warpDist(w.next, cfg.warps.lenU, x / UNIT, y / UNIT) >= min))
@@ -434,8 +352,8 @@ function groundOf(sim: Sim): Surface {
 }
 
 /**
- * 天枢：能走的是幕墙围着的大厅，幕墙、立柱、电梯井与门柱是硬边界，走到跟前就停住（穿墙的身体只被幕墙挡住）；全息台齐腰，挡人，子弹从上面飞过去。
- * 传送门：任何东西的中心在两头门柱之间越过门线，就平移到另一扇门同一侧接着走，速度不变；寻路认得门，穿门近就穿。
+ * 天枢：能走的是幕墙围着的大厅，幕墙、立柱与电梯井是硬边界，走到跟前就停住（穿墙的身体只被幕墙挡住）；全息台齐腰，挡人，子弹从上面飞过去。
+ * 传送门：任何东西的中心越过门线，就平移到另一扇门同一侧接着走，速度不变；寻路认得门，穿门近就穿。
  * 门隔一阵挪一扇，预警过后一下换过去；地砖记着谁什么时候踩过
  */
 export const nexus: WorldHooks = {
@@ -470,12 +388,10 @@ export const nexus: WorldHooks = {
   contact() {
     return false
   },
-  /** 穿墙的身体穿得过厅里的建筑与门柱，出不了幕墙 */
+  /** 穿墙的身体穿得过厅里的建筑，出不了幕墙 */
   constrainBody(sim, eid, _from, next) {
     const s = nexusOf(sim)
-    const r = Radius.v[eid]!
-    if (phases(sim.world, eid, 'structure')) return keepOut(s.floor, next.x, next.y, r)
-    return offPosts(s, cfgOf(sim), keepOut(s.plan.basin, next.x, next.y, r), r)
+    return keepOut(phases(sim.world, eid, 'structure') ? s.floor : s.plan.basin, next.x, next.y, Radius.v[eid]!)
   },
   basin(sim) {
     return nexusOf(sim).plan.basin
@@ -494,15 +410,10 @@ export const nexus: WorldHooks = {
     return alongWall(s.plan.basin, x, y, d.x, d.y, r + 0.3 * UNIT)
   },
   trace(sim, probe, ax, ay, bx, by) {
-    const s = nexusOf(sim)
-    const hit = solidsTrace(s.solids, probe, ax, ay, bx, by)
-    const post = postTrace(s, cfgOf(sim), probe, ax, ay, bx, by)
-    return post && (!hit || post.t0 < hit.t0) ? post : hit
+    return solidsTrace(nexusOf(sim).solids, probe, ax, ay, bx, by)
   },
   solidAt(sim, x, y) {
-    const s = nexusOf(sim)
-    const cfg = cfgOf(sim)
-    return postRoom(s, cfg, x, y) < 0 ? { topM: topOf(cfg.warps.heightM), material: 'structure' } : solidOf(s.solids, x, y)
+    return solidOf(nexusOf(sim).solids, x, y)
   },
   smashWall() {},
   wanderDir(sim, eid, dx, dy) {
@@ -550,13 +461,30 @@ export const nexus: WorldHooks = {
   canSpawn(sim, x, y, radius) {
     const s = nexusOf(sim)
     const cfg = cfgOf(sim)
-    return roomFor(s.plan.basin, x, y, radius) && postRoom(s, cfg, x, y) >= radius && clearOfWarps(s, cfg, x, y, radius)
+    return roomFor(s.plan.basin, x, y, radius) && clearOfWarps(s, cfg, x, y, radius)
   },
   landmarks(sim) {
     return nexusOf(sim).marks
   },
   lean() {
     return ZERO
+  },
+  /** 坑位贴着或隔着门线（连两头外 SEAT_GAP_U 格）就横着挪回队长那一侧、离门线 SEAT_GAP_U 格 */
+  seat(sim, from, at) {
+    const len = cfgOf(sim).warps.lenU
+    let x = at.x / UNIT
+    let y = at.y / UNIT
+    for (const w of nexusOf(sim).warps) {
+      const sp = w.spot
+      const v = sp.axis === 0
+      const along = v ? y - sp.y : x - sp.x
+      if (along <= -SEAT_GAP_U || along >= len + SEAT_GAP_U) continue
+      const side = (v ? from.x / UNIT - sp.x : from.y / UNIT - sp.y) < 0 ? -1 : 1
+      if ((v ? x - sp.x : y - sp.y) * side >= SEAT_GAP_U) continue
+      if (v) x = sp.x + side * SEAT_GAP_U
+      else y = sp.y + side * SEAT_GAP_U
+    }
+    return { x: x * UNIT, y: y * UNIT }
   },
   portal(sim, eid, ax, ay, bx, by) {
     const s = nexusOf(sim)
@@ -568,10 +496,10 @@ export const nexus: WorldHooks = {
     if (eid >= 0) record(sim, s, eid, c.warp, bx + hop.dx, by + hop.dy)
     return hop
   },
-  /** 穿过第 i 扇门就平移到另一扇门那边：b 在门这边的像离 a 更近、直线又正好从这扇门的两头门柱之间过，就朝它飞 */
+  /** 穿过第 i 扇门就平移到另一扇门那边：b 在门这边的像离 a 更近、直线又正好越过这扇门的门线，就朝它飞 */
   towards(sim, ax, ay, bx, by) {
     const s = nexusOf(sim)
-    const w = cfgOf(sim).warps
+    const len = cfgOf(sim).warps.lenU
     let dx = bx - ax
     let dy = by - ay
     let best = Math.hypot(dx, dy)
@@ -581,7 +509,7 @@ export const nexus: WorldHooks = {
       const ix = bx + (a.x - o.x) * UNIT
       const iy = by + (a.y - o.y) * UNIT
       const d = Math.hypot(ix - ax, iy - ay)
-      if (d >= best || warpCross(a, w.lenU, w.postU, ax / UNIT, ay / UNIT, ix / UNIT, iy / UNIT) < 0) continue
+      if (d >= best || warpCross(a, len, ax / UNIT, ay / UNIT, ix / UNIT, iy / UNIT) < 0) continue
       best = d
       dx = ix - ax
       dy = iy - ay

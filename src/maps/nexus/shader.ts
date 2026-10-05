@@ -365,38 +365,20 @@ void main ()
 
 /**
  * 地砖：每块瓷砖按数据图亮起谁的颜色——四边的光最亮、往里淡，刚踩上的那一下从中心往外扩一圈方框；亮着的瓷砖把光渗到相邻那一边。
- * 传送门两侧的瓷砖铺着那一对的颜色，箭头一步步朝门线走；挪走前闪烁、挪来前一格格搭起来。一道扫描线隔一阵扫过地面，扫到的瓷砖闪一下。
- * 只画瓷砖地面；输出按预乘透明度：亮起的颜色盖在瓷砖上，最亮的那一点往上加
+ * 一道扫描线隔一阵扫过地面，扫到的瓷砖闪一下。只画瓷砖地面；输出按预乘透明度：亮起的颜色盖在瓷砖上，最亮的那一点往上加
  */
 export const TILES_FRAG = `${HEADER}
 uniform sampler2D uData;
-uniform sampler2D uWarp;
 uniform sampler2D uMask;
 uniform float uTime;
 uniform vec4 uScan;
 uniform vec3 uTeam;
 uniform vec3 uFoe;
-uniform vec3 uPair0;
-uniform vec3 uPair1;
-uniform vec3 uPair2;
 ${NOISE}
 const float N = ${FRAME_U.toFixed(1)};
 
 vec2 texel(vec2 cell) {
   return vec2((cell.x + 0.5) / N, 1.0 - (cell.y + 0.5) / N);
-}
-
-vec3 pairColor(float k) {
-  return k < 1.5 ? uPair0 : k < 2.5 ? uPair1 : uPair2;
-}
-
-/** 朝 dir 的箭头：一格里两道人字纹，随时间往前走 */
-float chevron(vec2 f, vec2 dir, float t) {
-  vec2 c = f - 0.5;
-  float a = dot(c, dir);
-  float b = abs(dot(c, vec2(-dir.y, dir.x)));
-  float s = fract((a - b * 0.9) * 2.2 - t);
-  return smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.18, 0.28, s)) * step(b, 0.34);
 }
 
 void main ()
@@ -409,20 +391,31 @@ void main ()
     gl_FragColor = vec4(0.0);
     return;
   }
+  vec3 d = texture2D(uData, texel(cell)).rgb;
+  vec2 side = f.x < 0.5 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
+  vec2 side2 = f.y < 0.5 ? vec2(0.0, -1.0) : vec2(0.0, 1.0);
+  vec3 nx = texture2D(uData, texel(cell + side)).rgb;
+  vec3 ny = texture2D(uData, texel(cell + side2)).rgb;
+  float h = hash1(cell);
+  float wake = pow(max(0.0, sin(uTime * 0.45 + h * 6.2832)), 60.0);
+  // 扫描线：x 是位置（格），y 是横扫（0）还是竖扫（1），z 是亮度
+  float scanAt = uScan.y < 0.5 ? p.y : p.x;
+  float scanCell = uScan.y < 0.5 ? cell.y + 0.5 : cell.x + 0.5;
+  float scanNear = uScan.z * step(abs(scanCell - uScan.x), 4.0);
+  // 这一块与挨着的两块都没亮、没在闪、扫描线也不在附近：什么都不画
+  if (max(max(d.r, d.g), max(max(nx.r, nx.g), max(ny.r, ny.g))) + d.b + wake + scanNear < 0.004) {
+    gl_FragColor = vec4(0.0);
+    return;
+  }
   float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
   float rim = exp(-edge / 0.05);
   // 亮起的瓷砖：四边一道亮线，往里一点再一道细线，中间只淡淡地染一层
   float seam = exp(-edge / 0.022);
   float inset = exp(-abs(edge - 0.11) / 0.012);
   float lit = 0.07 + 0.6 * seam + 0.4 * inset;
-  vec3 d = texture2D(uData, texel(cell)).rgb;
   float glow = max(d.r, d.g);
   vec3 tint = (uTeam * d.r + uFoe * d.g) / max(d.r + d.g, 0.001);
   // 隔壁亮着的瓷砖把光渗过缝来
-  vec2 side = f.x < 0.5 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
-  vec2 side2 = f.y < 0.5 ? vec2(0.0, -1.0) : vec2(0.0, 1.0);
-  vec3 nx = texture2D(uData, texel(cell + side)).rgb;
-  vec3 ny = texture2D(uData, texel(cell + side2)).rgb;
   float fx = exp(-min(f.x, 1.0 - f.x) / 0.06) * texture2D(uMask, texel(cell + side)).r;
   float fy = exp(-min(f.y, 1.0 - f.y) / 0.06) * texture2D(uMask, texel(cell + side2)).r;
   float a = glow * lit + 0.22 * (max(nx.r, nx.g) * fx + max(ny.r, ny.g) * fy);
@@ -434,43 +427,9 @@ void main ()
   add += mix(tint, vec3(1.0), 0.35) * ring * 0.9;
   a += ring * 0.25;
   // 闲着的地面：零星几块瓷砖的四边微微亮一下
-  float h = hash1(cell);
-  float idle = pow(max(0.0, sin(uTime * 0.45 + h * 6.2832)), 60.0) * 0.12 * rim;
+  float idle = wake * 0.12 * rim;
   col += uTeam * idle;
   a += idle;
-  // 传送门两侧：那一对的颜色铺开，箭头朝门线走；挪走前一闪一闪，挪来前从门线往外一格格亮起来
-  vec3 w = texture2D(uWarp, texel(cell)).rgb;
-  float pair = floor(w.r * 255.0 + 0.5);
-  if (pair > 0.5) {
-    vec3 pc = pairColor(pair);
-    float k = w.g;
-    float code = floor(w.b * 255.0 + 0.5);
-    float style = floor(code / 8.0);
-    float dirc = code - style * 8.0;
-    vec2 dir = dirc < 1.5 ? vec2(1.0, 0.0) : dirc < 2.5 ? vec2(-1.0, 0.0) : dirc < 3.5 ? vec2(0.0, 1.0) : vec2(0.0, -1.0);
-    float arrow = chevron(f, dir, uTime * 1.4);
-    float lay = 0.12 + 0.5 * rim;
-    if (style > 1.5) {
-      // 正在搭：虚线的框，一道亮线一遍遍朝门线扫过去
-      float dash = step(0.5, fract((f.x + f.y) * 6.0 - uTime * 3.0));
-      float along = dot(f - 0.5, dir) + 0.5;
-      float sweep = exp(-abs(along - fract(uTime * 1.3)) / 0.04);
-      lay = rim * dash * 0.8 + sweep * 0.6;
-      arrow = 0.0;
-    } else if (style > 0.5) {
-      // 要挪走：铺上斜的警示条纹，箭头暗下去
-      float stripe = step(0.5, fract((f.x - f.y) * 4.0 + uTime * 2.0));
-      lay = lay * 0.6 + stripe * 0.3;
-      arrow *= 0.5;
-    }
-    float on = k * (lay + arrow * 0.55);
-    col += pc * on;
-    a += on;
-    add += pc * arrow * k * 0.35;
-  }
-  // 扫描线：x 是位置（格），y 是横扫（0）还是竖扫（1），z 是亮度
-  float scanAt = uScan.y < 0.5 ? p.y : p.x;
-  float scanCell = uScan.y < 0.5 ? cell.y + 0.5 : cell.x + 0.5;
   float line = exp(-abs(scanAt - uScan.x) / 0.03) * uScan.z;
   float swept = exp(-abs(scanCell - uScan.x) / 0.6) * uScan.z * (0.1 + 0.5 * rim);
   add += vec3(0.75, 0.95, 1.0) * line;

@@ -13,16 +13,10 @@ const EAST = 1
 const WEST = 2
 const SOUTH = 4
 const NORTH = 8
-const DIRS = [
-  [1, 0, 1],
-  [-1, 0, 1],
-  [0, 1, 1],
-  [0, -1, 1],
-  [1, 1, Math.SQRT2],
-  [1, -1, Math.SQRT2],
-  [-1, 1, Math.SQRT2],
-  [-1, -1, Math.SQRT2],
-] as const
+/** 往八个方向迈一步：前四个横竖，后四个斜着；迈一步走多远，格 */
+const DX = [1, -1, 0, 0, 1, 1, -1, -1] as const
+const DY = [0, 0, 1, -1, 1, -1, 1, -1] as const
+const STEP = [1, 1, 1, 1, Math.SQRT2, Math.SQRT2, Math.SQRT2, Math.SQRT2].map((k) => k * NAV_CELL_U)
 
 /**
  * 认得传送门的寻路：大厅外接方形上 NAV_CELL_U 格一格，从队长那一格往外按 Dijkstra 算到每一格要走多远、下一步往哪一格走。
@@ -33,15 +27,12 @@ export interface NavGrid {
   readonly y0: number
   readonly cols: number
   readonly rows: number
-  /** 只看地面走不走得通 */
-  readonly base: Uint8Array
-  /** 再扣掉此刻门柱占着的格 */
   readonly open: Uint8Array
   readonly sides: Uint8Array
   readonly link: Int32Array
   readonly linkWarp: Int16Array
-  /** 到队长那一格的路长，格（不是寻路格）；走不到为 Infinity */
-  readonly dist: Float32Array
+  /** 到队长那一格的路长，格（不是寻路格）；走不到为 Infinity。与堆里的路长同精度，比较时才不会把刚算好的格当成旧的 */
+  readonly dist: Float64Array
   readonly next: Int32Array
   readonly hop: Int16Array
   src: number
@@ -94,12 +85,12 @@ export function makeNav(hall: Hall, basin: Basin): NavGrid {
   const cols = Math.ceil((hall.x1 - x0) / NAV_CELL_U)
   const rows = Math.ceil((hall.y1 - y0) / NAV_CELL_U)
   const n = cols * rows
-  const base = new Uint8Array(n)
+  const open = new Uint8Array(n)
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const x = x0 + (c + 0.5) * NAV_CELL_U
       const y = y0 + (r + 0.5) * NAV_CELL_U
-      base[r * cols + c] = roomAt(basin, x * UNIT, y * UNIT) >= NAV_ROOM_U * UNIT ? 1 : 0
+      open[r * cols + c] = roomAt(basin, x * UNIT, y * UNIT) >= NAV_ROOM_U * UNIT ? 1 : 0
     }
   }
   return {
@@ -107,16 +98,15 @@ export function makeNav(hall: Hall, basin: Basin): NavGrid {
     y0,
     cols,
     rows,
-    base,
-    open: new Uint8Array(n),
+    open,
     sides: new Uint8Array(n),
     link: new Int32Array(n).fill(-1),
     linkWarp: new Int16Array(n).fill(-1),
-    dist: new Float32Array(n).fill(Infinity),
+    dist: new Float64Array(n).fill(Infinity),
     next: new Int32Array(n).fill(-1),
     hop: new Int16Array(n).fill(-1),
     src: -1,
-    heap: { key: new Float64Array(n * DIRS.length + n + 1), val: new Int32Array(n * DIRS.length + n + 1), size: 0 },
+    heap: { key: new Float64Array(n * DX.length + n + 1), val: new Int32Array(n * DX.length + n + 1), size: 0 },
   }
 }
 
@@ -134,34 +124,23 @@ export function navCenter(nav: NavGrid, i: number): { x: number; y: number } {
 }
 
 /**
- * 按此刻的门重铺：posts（格）是挡身体的门柱，占着的格不通；门线两侧的格互不相通，改通到另一扇门另一侧的对应格。
+ * 按此刻的门重铺：门线两侧的格互不相通，改通到另一扇门另一侧的对应格。
  * warps 按对排，第 k 扇的另一扇是 k ^ 1（正挪着的门照旧通，到时候才换）
  */
-export function relink(nav: NavGrid, warps: readonly WarpSpot[], posts: readonly { x: number; y: number }[], len: number, post: number): void {
+export function relink(nav: NavGrid, warps: readonly WarpSpot[], len: number): void {
   const { cols, rows, open, sides, link, linkWarp } = nav
-  const reach = post + NAV_ROOM_U
-  open.set(nav.base)
   sides.fill(0)
   link.fill(-1)
   linkWarp.fill(-1)
-  for (const p of posts) {
-    for (let r = Math.max(0, Math.floor((p.y - reach - nav.y0) / NAV_CELL_U)); r < rows && nav.y0 + r * NAV_CELL_U < p.y + reach; r++) {
-      for (let c = Math.max(0, Math.floor((p.x - reach - nav.x0) / NAV_CELL_U)); c < cols && nav.x0 + c * NAV_CELL_U < p.x + reach; c++) {
-        const x = nav.x0 + (c + 0.5) * NAV_CELL_U
-        const y = nav.y0 + (r + 0.5) * NAV_CELL_U
-        if (Math.hypot(x - p.x, y - p.y) < reach) open[r * cols + c] = 0
-      }
-    }
-  }
   const steps = Math.round(len / NAV_CELL_U)
   warps.forEach((w, i) => {
     const o = warps[i ^ 1]
     if (!o) return
     // 门线左上侧的那一排（列）与右下侧的那一排（列），以及另一扇门的
-    const line = Math.round(((w.axis === 0 ? w.x - nav.x0 : w.y - nav.y0) / NAV_CELL_U))
-    const from = Math.round(((w.axis === 0 ? w.y - nav.y0 : w.x - nav.x0) / NAV_CELL_U))
-    const oline = Math.round(((o.axis === 0 ? o.x - nav.x0 : o.y - nav.y0) / NAV_CELL_U))
-    const ofrom = Math.round(((o.axis === 0 ? o.y - nav.y0 : o.x - nav.x0) / NAV_CELL_U))
+    const line = Math.round((w.axis === 0 ? w.x - nav.x0 : w.y - nav.y0) / NAV_CELL_U)
+    const from = Math.round((w.axis === 0 ? w.y - nav.y0 : w.x - nav.x0) / NAV_CELL_U)
+    const oline = Math.round((o.axis === 0 ? o.x - nav.x0 : o.y - nav.y0) / NAV_CELL_U)
+    const ofrom = Math.round((o.axis === 0 ? o.y - nav.y0 : o.x - nav.x0) / NAV_CELL_U)
     const at = (ln: number, k: number): number => {
       const c = w.axis === 0 ? ln : k
       const r = w.axis === 0 ? k : ln
@@ -188,20 +167,12 @@ export function relink(nav: NavGrid, warps: readonly WarpSpot[], posts: readonly
   nav.src = -1
 }
 
-/** 从 a 格往 (dx, dy) 迈一步过不过得去：门线挡着的那一边不通，斜着走要两条折线都通 */
-function passable(nav: NavGrid, a: number, dx: number, dy: number): boolean {
-  const { cols, open, sides } = nav
-  const ax = a % cols
-  const ay = (a - ax) / cols
+/** 从 a 格（第 ax 列、第 ay 行）横或竖迈一格过不过得去：那一格走得通，门线不挡在这一边 */
+function go(nav: NavGrid, a: number, ax: number, ay: number, dx: number, dy: number): boolean {
   const bx = ax + dx
   const by = ay + dy
-  if (bx < 0 || by < 0 || bx >= cols || by >= nav.rows || !open[by * cols + bx]) return false
-  if (dx !== 0 && dy !== 0) return passable(nav, a, dx, 0) && passable(nav, ay * cols + bx, 0, dy) && passable(nav, a, 0, dy) && passable(nav, by * cols + ax, dx, 0)
-  const s = sides[a]!
-  if (dx > 0) return (s & EAST) === 0
-  if (dx < 0) return (s & WEST) === 0
-  if (dy > 0) return (s & SOUTH) === 0
-  return (s & NORTH) === 0
+  if (bx < 0 || by < 0 || bx >= nav.cols || by >= nav.rows || nav.open[by * nav.cols + bx] === 0) return false
+  return (nav.sides[a]! & (dx > 0 ? EAST : dx < 0 ? WEST : dy > 0 ? SOUTH : NORTH)) === 0
 }
 
 /** 走得通、最近的一格：(x, y) 所在的格不通就看四周一圈，格 */
@@ -228,11 +199,11 @@ export function navNear(nav: NavGrid, x: number, y: number): number {
   return best
 }
 
-/** 从 (x, y)（格）那一格往外算：每格到它要走多远、下一步往哪走 */
+/** 从 (x, y)（格）那一格往外算：每格到它要走多远、下一步往哪走；斜着走要两条折线都走得通 */
 export function flowNav(nav: NavGrid, x: number, y: number): void {
   const src = navNear(nav, x, y)
   nav.src = src
-  const { dist, next, hop, link, linkWarp, heap } = nav
+  const { dist, next, hop, link, linkWarp, heap, cols } = nav
   dist.fill(Infinity)
   next.fill(-1)
   hop.fill(-1)
@@ -240,17 +211,25 @@ export function flowNav(nav: NavGrid, x: number, y: number): void {
   heap.size = 0
   dist[src] = 0
   push(heap, 0, src)
-  const cols = nav.cols
   while (heap.size > 0) {
     const d0 = heap.key[0]!
     const a = pop(heap)
     if (d0 > dist[a]!) continue
     const ax = a % cols
     const ay = (a - ax) / cols
-    for (const [dx, dy, cost] of DIRS) {
-      if (!passable(nav, a, dx, dy)) continue
-      const b = (ay + dy) * cols + ax + dx
-      const nd = d0 + cost * NAV_CELL_U
+    const e = go(nav, a, ax, ay, 1, 0)
+    const w = go(nav, a, ax, ay, -1, 0)
+    const s = go(nav, a, ax, ay, 0, 1)
+    const n = go(nav, a, ax, ay, 0, -1)
+    for (let k = 0; k < DX.length; k++) {
+      const dx = DX[k]!
+      const dy = DY[k]!
+      const across = dx > 0 ? e : dx < 0 ? w : true
+      const along = dy > 0 ? s : dy < 0 ? n : true
+      if (!across || !along) continue
+      if (dx !== 0 && dy !== 0 && !(go(nav, a + dx, ax + dx, ay, 0, dy) && go(nav, a + dy * cols, ax, ay + dy, dx, 0))) continue
+      const b = a + dy * cols + dx
+      const nd = d0 + STEP[k]!
       if (nd >= dist[b]!) continue
       dist[b] = nd
       next[b] = a

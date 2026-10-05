@@ -28,7 +28,7 @@ export const OBSTACLES = {
     barrier: { name: '技能墙', phase: true, opaque: false, pierce: null, strength: null },
     // 天枢的落地玻璃幕墙：看得穿，挡身体也挡弹体，穿墙的身体也出不去
     glass: { name: '玻璃', phase: false, opaque: false, pierce: null, strength: null },
-    // 天枢的立柱、电梯井、全息台与传送门的门柱
+    // 天枢的立柱、电梯井与全息台
     structure: { name: '建筑', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning

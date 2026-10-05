@@ -18,8 +18,7 @@ const HATCH_APART_U = 7
 const HATCH_CLEAR_U = 1.5
 /** 全息台两两至少隔这么多格 */
 const PEDESTAL_APART_U = 6
-/** 门柱四周要空出这么多格让身体绕过去；门线两侧的空地每一点离障碍至少这么多格 */
-const POST_WALK_U = 0.7
+/** 门线两侧的空地与门线两头每一点离障碍至少这么多格 */
 const APRON_ROOM_U = 0.45
 /** 门的中点离开局空地、检修口、电梯门至少多远，格 */
 const WARP_PLAZA_U = 1.5
@@ -108,7 +107,7 @@ export interface WarpSpot {
 export interface NexusPlan {
   readonly seed: number
   readonly hall: Hall
-  /** 能走的地面，不含传送门的门柱（门柱会挪，另算） */
+  /** 能走的地面 */
   readonly basin: Basin
   readonly start: Point
   readonly pillars: readonly Pillar[]
@@ -139,7 +138,7 @@ export function warpEnd(w: WarpSpot, len: number): Point {
   return w.axis === 0 ? { x: w.x, y: w.y + len } : { x: w.x + len, y: w.y }
 }
 
-/** 点到门线（连两头门柱）的距离，格 */
+/** 点到门线的距离，格 */
 export function warpDist(w: WarpSpot, len: number, x: number, y: number): number {
   return w.axis === 0 ? Math.hypot(x - w.x, Math.max(w.y - y, 0, y - w.y - len)) : Math.hypot(Math.max(w.x - x, 0, x - w.x - len), y - w.y)
 }
@@ -230,7 +229,7 @@ function placeHatches(cfg: NexusConfig, rng: Rng, hall: Hall, mid: Point, pillar
   return out
 }
 
-/** 摆得下门的位置：门线落在格线上，两头门柱四周走得过去，门线两侧 apronU 格都是空着的瓷砖地面 */
+/** 摆得下门的位置：门线落在格线上，门线两侧 apronU 格与门线两头都是空着的瓷砖地面 */
 function warpSpots(cfg: NexusConfig, hall: Hall, basin: Basin, mid: Point, hatches: readonly Point[], cores: readonly Core[]): WarpSpot[] {
   const w = cfg.warps
   const len = w.lenU
@@ -242,7 +241,7 @@ function warpSpots(cfg: NexusConfig, hall: Hall, basin: Basin, mid: Point, hatch
       for (let b = Math.ceil(hall.y0); b <= Math.floor(hall.y1); b++) {
         const spot: WarpSpot = { x: a, y: b, axis }
         const end = warpEnd(spot, len)
-        if (room(a, b) < w.postU + POST_WALK_U || room(end.x, end.y) < w.postU + POST_WALK_U) continue
+        if (room(a, b) < APRON_ROOM_U || room(end.x, end.y) < APRON_ROOM_U) continue
         let clear = true
         for (let t = 0.25; clear && t < len; t += 0.5) {
           for (let s = 0.25; clear && s <= w.apronU; s += 0.5) {

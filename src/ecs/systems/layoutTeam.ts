@@ -12,23 +12,19 @@ import { fanDistance, fanSpreadDeg, recallDist, reverseGain, seatHysteresis, tur
 const HEADING_MIN = 0.5
 /** 队员离坑位比这（格）远时按地图的寻路走 */
 const NAVIGATE_U = 2
-/** 坑位隔着传送门时收到门线跟前，只走到门线的这么多 */
-const SEAT_SHORT = 0.85
 
 /** 活着的队员，不含队长：倒下的人不跟队，也不占坑位 */
 export function followersOf(sim: Sim): number[] {
   return sim.characters.filter((e) => e !== sim.leader && Alive.v[e] === 1)
 }
 
-/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上；隔着传送门的门线就收到门线跟前，坑位总在队长这一侧；落在会伤人的地方由地图挪开 */
+/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上；落在不该站的地方（会伤人、贴着或隔着传送门）由地图挪开 */
 export function seatPoints(sim: Sim, n: number): Point[] {
   const cx = leaderX(sim)
   const cy = leaderY(sim)
   const from = { x: cx, y: cy }
   return fanSlots(n, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) => {
-    const hop = sim.hooks.portal?.(sim, -1, cx, cy, cx + o.x, cy + o.y)
-    const k = hop ? hop.t * SEAT_SHORT : 1
-    const at = sim.hooks.constrainBody(sim, sim.leader, from, { x: cx + o.x * k, y: cy + o.y * k })
+    const at = sim.hooks.constrainBody(sim, sim.leader, from, { x: cx + o.x, y: cy + o.y })
     return sim.hooks.seat ? sim.hooks.seat(sim, from, at) : at
   })
 }
