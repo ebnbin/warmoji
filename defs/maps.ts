@@ -167,6 +167,16 @@ const CIRCUIT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const PETRI_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'blob', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'slime', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'rat', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'mushroom', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'crab', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1032,5 +1042,49 @@ export const MAPS = {
       button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], holdMs: 3200, rearmMs: 4800 },
     },
     boss: 'mecha',
+  },
+  petri: {
+    emoji: '1f9eb',
+    name: '培养皿',
+    desc: '实验室灯箱上的一只血琼脂培养皿：队伍和敌人缩得比菌落还小，在樱桃红的琼脂上作战，圆形的玻璃皿壁谁也翻不出去。皿底用记号笔分了四区，按四区划线接种过：菌落一刻不停地往外长，长厚的地方黏脚，敌我走得都慢、更费体力。子弹和攻击都伤不了菌落，只有怪物死在哪里，那里的菌落才被溶掉一圈，留下一圈金黄的抑菌圈；抑菌圈慢慢缩小，菌落又从边上长回来。菌落长过的金币被盖住，捡不到，把那块清干净才露出来',
+    kind: 'petri',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(204 16% 80%)',
+      bgTo: 'hsl(212 14% 38%)',
+      map: hslToInt(352, 0.62, 0.32),
+      shadow: 0x000000,
+    },
+    // 光从头顶的灯照下来，脚下的灯箱又从下面透上来，背光面不暗、影子淡
+    light: { sun: 0xfffaf4, shade: 0xcac2c6, shadow: { color: 0x2a0710, alpha: 0.3, length: 0.6 } },
+    decor: {
+      emojis: ['1f9eb'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: PETRI_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'drop',
+      look: 'splash',
+      boss: 'wall',
+      kinds: {
+        wall: { name: '皿壁', at: { kind: 'rim', segU: 3 }, enter: 'climb', weight: 3, perSec: 1.5 },
+        drip: { name: '滴落', at: { kind: 'ground' }, enter: 'drop', look: 'splash', weight: 1 },
+      },
+    },
+    finalWaveSub: '蛛后翻过皿壁爬了进来——把它引进菌落里打，倒下时能溶出一大片！',
+    petri: {
+      mmPerU: 2.7,
+      dish: { radiusU: 16, wallU: 0.45 },
+      plazaU: 5,
+      streak: { quadrants: [3, 4], strokes: [4, 6], band: [0.5, 0.92], spacingU: [0.3, 0.8, 1.8, 3.6], colonyU: [0.3, 0.55], strays: [1, 3] },
+      colony: { cellU: 0.2, stepMs: 100, growth: 0.16, frontU: 0.08, waveU: 4, patchy: 0.3, preS: 12, mature: 0.6, matureS: 30 },
+      stick: { film: 0.1, full: 0.9, viscosity: 2, exertion: 0.6 },
+      cover: 0.6,
+      lysis: { radiusU: 2, holdS: 12, halfLifeS: 4, lysePerS: 4 },
+    },
+    boss: 'treant',
   },
 } as const satisfies Record<string, MapDef>

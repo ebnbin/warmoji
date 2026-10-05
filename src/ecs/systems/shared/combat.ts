@@ -122,6 +122,7 @@ function down(sim: Sim, eid: number): void {
 
 /** 死亡移除：战利品、击杀计数与 Boss 倒下只算敌方阵营的身体；亡语、巢穴、携带物、碎片敌我同一条 */
 function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, flingVy: number): void {
+  sim.hooks.died?.(sim, eid)
   const hostile = Faction.v[eid] === FACTION.enemy
   const st = sim.run.stats
   if (hostile) {

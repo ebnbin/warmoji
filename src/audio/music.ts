@@ -964,6 +964,53 @@ function buildCircuit(): BgmScore {
   )
 }
 
+/** 培养皿：利底亚调式的正弦与三角波，琶音像气泡一颗颗往上冒，低音按拍子轻轻涨落，隔一小节高处一声玻璃的叮 */
+function buildPetri(): BgmScore {
+  const chords = [0, 0, 4, 4, 1, 1, 5, 4, 0, 0, 4, 4, 1, 5, 3, 4]
+  return track(
+    {
+      bpm: 92,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 57,
+      scale: LYDIAN,
+      echo: { delaySec: (60 / 92) * 0.75, feedback: 0.35, level: 0.28 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.02, release: 0.25, octave: -1 }
+      const bubble: Voice = { wave: 'sine', vol: 0.05, attack: 0.002, release: 0.08, octave: 1, echo: true }
+      const pad: Voice = { wave: 'triangle', vol: 0.025, attack: 0.4, release: 0.6, octave: 0 }
+      const lead: Voice = { wave: 'triangle', vol: 0.1, attack: 0.03, release: 0.2, octave: 1 }
+      const glass: Voice = { wave: 'sine', vol: 0.03, attack: 0.002, release: 0.4, octave: 3, echo: true }
+      b.bass(bass, chords, 'r...o...')
+      b.arp(bubble, chords, [0, 2, 4, 1, 3, 5, 2, 4])
+      b.pad(pad, chords, [0, 1, 2])
+      b.line(lead, [
+        [0, 0, 4, 3], [0, 3, 5, 1], [0, 4, 6, 4],
+        [1, 0, 7, 6], [1, 6, 6, 2],
+        [2, 0, 4, 3], [2, 3, 3, 1], [2, 4, 4, 4],
+        [3, 0, 2, 8],
+        [4, 0, 4, 3], [4, 3, 5, 1], [4, 4, 6, 2], [4, 6, 7, 2],
+        [5, 0, 8, 6], [5, 6, 7, 2],
+        [6, 0, 6, 4], [6, 4, 5, 4],
+        [7, 0, 4, 8],
+        [8, 0, 7, 3], [8, 3, 8, 1], [8, 4, 9, 4],
+        [9, 0, 10, 6], [9, 6, 9, 2],
+        [10, 0, 8, 3], [10, 3, 7, 1], [10, 4, 6, 4],
+        [11, 0, 5, 8],
+        [12, 0, 3, 4], [12, 4, 4, 4],
+        [13, 0, 5, 4], [13, 4, 6, 4],
+        [14, 0, 4, 3], [14, 3, 3, 1], [14, 4, 2, 4],
+        [15, 0, 0, 8],
+      ])
+      for (let bar = 1; bar < chords.length; bar += 2) b.note(glass, bar, 5, chords[bar]! + 9, 1)
+      b.drums('hat', '..o...o.', 0, 16, 0.018)
+      b.drums('tom', 'x.......', 4, 16, 0.05)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -985,6 +1032,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   sakura: buildSakura,
   desert: buildDunes,
   circuit: buildCircuit,
+  petri: buildPetri,
 }
 
 const cache = new Map<BgmId, BgmScore>()

@@ -14,6 +14,8 @@ export const OBSTACLES = {
     fence: { name: '栅栏', phase: true, opaque: false, pierce: 0, strength: null },
     // 电路板的元件与屏蔽罩
     device: { name: '元件', phase: true, opaque: true, pierce: null, strength: null },
+    // 培养皿的玻璃壁：看得穿，挡身体也挡弹体
+    glass: { name: '玻璃', phase: true, opaque: false, pierce: null, strength: null },
     // 旧残垣的断墙：一格一格的，破坏力碰上就碎
     wall: { name: '断墙', phase: true, opaque: true, pierce: null, strength: 1 },
     // 残垣的石墙与石柱

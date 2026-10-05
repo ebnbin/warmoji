@@ -44,6 +44,7 @@ import type { ObstacleId } from '../../types/obstacles'
 import type { MeadowState } from '../../maps/meadow/world'
 import type { SakuraState } from '../../maps/sakura/world'
 import type { CircuitState } from '../../maps/circuit/world'
+import type { PetriState } from '../../maps/petri/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
 
@@ -98,11 +99,12 @@ export interface WorldState {
   meadow: MeadowState | null
   sakura: SakuraState | null
   circuit: CircuitState | null
+  petri: PetriState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, petri: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -159,6 +161,10 @@ export interface WorldHooks {
   lean(sim: Sim): Point
   /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
+  /** 一具身体死了（倒下等复活的不算），这时它的位置与半径还在；不写就什么也不做 */
+  died?(sim: Sim, eid: number): void
+  /** 地面此刻盖住了 (x, y) 处躺着的掉落物：捡不到、吸不走，露出来以后照常；不写就从不盖住 */
+  covers?(sim: Sim, x: number, y: number): boolean
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
