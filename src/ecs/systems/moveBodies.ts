@@ -9,6 +9,7 @@ import type { BodyStep } from './shared/body'
 import { endMotion, transitFlash } from './shared/displace'
 import { isSameEntity } from '../utils/identity'
 import { sineEaseInOut } from '../utils/ease'
+import { slideCam } from './shared/leader'
 import type { Sim } from '../sim'
 
 const STILL = { x: 0, y: 0 }
@@ -90,7 +91,7 @@ function seek(sim: Sim, eid: number): boolean {
   return false
 }
 
-/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，悬空的身体不受地面与介质影响、照样受引力；地面自己有接触力学的由它接管；位置经场地修正后速度按实际位移回推 */
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，悬空的身体不受地面与介质影响、照样受引力；地面自己有接触力学的由它接管；位置经场地修正后速度按实际位移回推；走着越过传送门的门线就平移到另一扇门那边 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (Alive.v[eid] === 0) continue
@@ -155,12 +156,18 @@ export function moveBodies(sim: Sim): void {
       const r = Radius.v[eid]!
       Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, next.x + (vx / sp) * r * 0.6, next.y + (vy / sp) * r * 0.6, ((Span.lo[eid]! + Span.hi[eid]! + 1) / 2) * LAYER_M, r, Motion.breach[eid]!)
     }
-    const to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
+    let to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
     const d = sim.hooks.worldDelta(sim, x, y, to.x, to.y)
     // 被场地修正过的位移才回推速度：撞墙的分量归零；环面回绕不算修正
     if (Math.abs(d.x - (next.x - x)) > 1e-6 || Math.abs(d.y - (next.y - y)) > 1e-6) {
       vx = d.x / dt
       vy = d.y / dt
+    }
+    // 越过传送门的门线：落点连同速度原样平移到另一扇门那边，再按那边的场地修正
+    const hop = sim.hooks.portal?.(sim, eid, x, y, to.x, to.y)
+    if (hop) {
+      to = sim.hooks.constrainBody(sim, eid, { x: x + d.x * hop.t + hop.dx, y: y + d.y * hop.t + hop.dy }, { x: to.x + hop.dx, y: to.y + hop.dy })
+      if (eid === sim.leader) slideCam(sim, hop.dx, hop.dy)
     }
     Phys.vx[eid] = vx
     Phys.vy[eid] = vy

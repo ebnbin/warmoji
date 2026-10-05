@@ -46,6 +46,7 @@ import type { SakuraState } from '../../maps/sakura/world'
 import type { CircuitState } from '../../maps/circuit/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
+import type { NexusState } from '../../maps/nexus/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -98,14 +99,22 @@ export interface WorldState {
   meadow: MeadowState | null
   sakura: SakuraState | null
   circuit: CircuitState | null
+  nexus: NexusState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, nexus: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
+
+/** 穿过一扇传送门：在这一段路上走到 t（0 到 1）时越过门线，剩下的路连同终点平移 (dx, dy) 像素到另一扇门那边，速度不变 */
+export interface PortalHop {
+  readonly t: number
+  readonly dx: number
+  readonly dy: number
+}
 
 export interface WorldHooks {
   readonly torus: boolean
@@ -159,6 +168,10 @@ export interface WorldHooks {
   lean(sim: Sim): Point
   /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
+  /** 沿直线从 a 走到 b（像素）先穿过的那扇传送门；eid 不为 −1 时是这个实体此刻真的穿了过去。没有传送门的地图不写 */
+  portal?(sim: Sim, eid: number, ax: number, ay: number, bx: number, by: number): PortalHop | null
+  /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */
+  toLeader?(sim: Sim, x: number, y: number): number
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }

@@ -964,6 +964,53 @@ function buildCircuit(): BgmScore {
   )
 }
 
+/** 天枢：自然小调的合成器流行，四拍底鼓推着走；i–VI–III–VII 的和声，方波琶音带着回声在高处闪，锯齿波的低音与铺底，三角波唱主旋律，像夜里飞过灯海 */
+function buildNexus(): BgmScore {
+  const chords = [0, 0, 5, 5, 2, 2, 6, 6, 0, 0, 5, 5, 2, 6, 0, 0]
+  return track(
+    {
+      bpm: 104,
+      stepsPerBeat: 4,
+      stepsPerBar: 16,
+      bars: 16,
+      rootMidi: 45,
+      scale: AEOLIAN,
+      echo: { delaySec: (60 / 104) * 0.75, feedback: 0.34, level: 0.24 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sawtooth', vol: 0.08, attack: 0.004, release: 0.08, octave: -1 }
+      const pad: Voice = { wave: 'sawtooth', vol: 0.016, attack: 0.6, release: 1.2, octave: 0 }
+      const arp: Voice = { wave: 'square', vol: 0.035, attack: 0.002, release: 0.05, octave: 1, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.11, attack: 0.02, release: 0.14, octave: 1, echo: true }
+      b.bass(bass, chords, 'r.r.r.o.r.r.r.o.')
+      b.pad(pad, chords, [0, 1, 2], 0.006)
+      b.arp(arp, chords, [0, 1, 2, 3, 2, 1, 3, 2])
+      b.line(lead, [
+        [0, 0, 4, 4], [0, 4, 7, 4], [0, 8, 6, 4], [0, 12, 4, 4],
+        [1, 0, 2, 8], [1, 8, 4, 8],
+        [2, 0, 5, 4], [2, 4, 7, 4], [2, 8, 9, 4], [2, 12, 7, 4],
+        [3, 0, 5, 12], [3, 12, 4, 4],
+        [4, 0, 2, 4], [4, 4, 4, 4], [4, 8, 6, 4], [4, 12, 7, 4],
+        [5, 0, 9, 8], [5, 8, 7, 8],
+        [6, 0, 6, 4], [6, 4, 8, 4], [6, 8, 10, 4], [6, 12, 8, 4],
+        [7, 0, 6, 12], [7, 12, 7, 4],
+        [8, 0, 7, 4], [8, 4, 11, 4], [8, 8, 9, 4], [8, 12, 7, 4],
+        [9, 0, 6, 8], [9, 8, 4, 8],
+        [10, 0, 5, 4], [10, 4, 9, 4], [10, 8, 12, 4], [10, 12, 9, 4],
+        [11, 0, 7, 12], [11, 12, 6, 4],
+        [12, 0, 4, 4], [12, 4, 6, 4], [12, 8, 9, 4], [12, 12, 11, 4],
+        [13, 0, 10, 8], [13, 8, 8, 8],
+        [14, 0, 7, 6], [14, 6, 6, 2], [14, 8, 4, 4], [14, 12, 2, 4],
+        [15, 0, 0, 16],
+      ])
+      b.drums('kick', 'x...x...x...x...', 0, 16, 0.15)
+      b.drums('snare', '....x.......x...', 2, 16, 0.07)
+      b.drums('hat', '..o...o...o...o.', 0, 16, 0.04)
+      b.drums('hat', 'o.o.o.o.o.o.o.o.', 8, 16, 0.02)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -985,6 +1032,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   sakura: buildSakura,
   desert: buildDunes,
   circuit: buildCircuit,
+  nexus: buildNexus,
 }
 
 const cache = new Map<BgmId, BgmScore>()

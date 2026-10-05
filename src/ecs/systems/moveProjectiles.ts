@@ -14,6 +14,8 @@ import type { BodyStep } from './shared/body'
 import type { Sim } from '../sim'
 
 const REFLECT_LIFE_MS = 1400
+/** 弹体停在门线跟前多远，像素：离门线不到两倍这么远就直接穿过去 */
+const WARP_EDGE_PX = 1
 const FLIGHT: BodyStep = { x: 0, y: 0, vx: 0, vy: 0 }
 
 /** 追踪弹转向最近的敌人，每秒最多转 Homing.turn */
@@ -70,7 +72,7 @@ function reflect(sim: Sim, eid: number, b: number, x0: number, y0: number, x1: n
 }
 
 /**
- * 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速；这一步的轨迹先截在第一个挡住它的障碍上（地图的按高度与贯穿，敌方的技能墙一律挡），
+ * 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速；越过传送门的门线就从另一扇门那边接着飞，速度不变；这一步的轨迹先截在第一个挡住它的障碍上（地图的按高度与贯穿，敌方的技能墙一律挡），
  * 截下的这一段照常判命中，判完就消失（会落地的落在那里），撞上时带着的破坏力打在障碍上；会反弹的技能墙把它弹回去。抛射的按飞了多远抬高，抛到地方落地
  */
 export function moveProjectiles(sim: Sim): void {
@@ -84,8 +86,8 @@ export function moveProjectiles(sim: Sim): void {
       if (!Linger.back[eid] && Linger.until[eid]! > 0) continue
     }
     if (hasComponent(sim.world, eid, Homing)) steer(sim, eid, dt)
-    const ax = Transform.x[eid]!
-    const ay = Transform.y[eid]!
+    let ax = Transform.x[eid]!
+    let ay = Transform.y[eid]!
     const g = sim.hooks.pull(sim, ax, ay)
     let stepX = Vel.x[eid]! * dt
     let stepY = Vel.y[eid]! * dt
@@ -98,6 +100,25 @@ export function moveProjectiles(sim: Sim): void {
       if (Proj.spin[eid] === 0 && (FLIGHT.vx !== 0 || FLIGHT.vy !== 0)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
     }
     let len = Math.hypot(stepX, stepY)
+    // 传送门：离门线还远就先停在门线跟前，下一帧再穿；贴着门线就穿过去，剩下的路从另一扇门那边接着飞，命中从那边算起
+    const gate = len > 0 ? sim.hooks.portal?.(sim, -1, ax, ay, ax + stepX, ay + stepY) : null
+    if (gate) {
+      const at = gate.t * len
+      if (at > WARP_EDGE_PX * 2) {
+        const k = (at - WARP_EDGE_PX) / len
+        stepX *= k
+        stepY *= k
+        len *= k
+      } else {
+        sim.hooks.portal!(sim, eid, ax, ay, ax + stepX, ay + stepY)
+        ax += stepX * gate.t + gate.dx
+        ay += stepY * gate.t + gate.dy
+        const k = 1 - gate.t
+        stepX *= k
+        stepY *= k
+        len *= k
+      }
+    }
     if (!Proj.through[eid] && len > 0) {
       const p = shotPass(sim, Faction.v[eid]!, boltProbe(eid, len), ax, ay, ax + stepX, ay + stepY)
       const b = p.block

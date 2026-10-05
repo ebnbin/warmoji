@@ -42,4 +42,7 @@ export const SFX = {
   surge: { wave: 'sawtooth', freq: 120, freqEnd: 360, duration: 0.3, volume: 0.1, attack: 0.02, decayPow: 1, throttleMs: 300, jitter: 0.08 },
   relay: { wave: 'square', freq: 1800, freqEnd: 900, duration: 0.035, volume: 0.1, steps: [1, 0.55], throttleMs: 150 },
   shock: { wave: 'sawtooth', freq: 2600, freqEnd: 900, duration: 0.09, volume: 0.09, steps: [1, 0.6, 1.15, 0.5], throttleMs: 200, jitter: 0.15 },
+  warp: { wave: 'sine', freq: 520, freqEnd: 1650, duration: 0.16, volume: 0.16, attack: 0.005, decayPow: 1.3, throttleMs: 90, jitter: 0.1 },
+  glitch: { wave: 'noise', freq: 4200, freqEnd: 1200, duration: 0.5, volume: 0.13, attack: 0.005, decayPow: 0.9, steps: [1, 0.3, 1.2, 0.2, 0.9, 0.4, 1.1, 0.25], throttleMs: 600, jitter: 0.2 },
+  print: { wave: 'square', freq: 660, duration: 0.3, volume: 0.1, steps: [1, 1.5, 2], throttleMs: 300 },
 } as const satisfies Record<string, SfxDef>

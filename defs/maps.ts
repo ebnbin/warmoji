@@ -167,6 +167,17 @@ const CIRCUIT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const NEXUS_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
+  { kind: 'invader', sinceWave: 1, base: 15, perWave: 0.6, min: 10, max: 28 },
+  { kind: 'alien', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 22 },
+  { kind: 'chameleon', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'ufo', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'siren', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1032,5 +1043,53 @@ export const MAPS = {
       button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], holdMs: 3200, rearmMs: 4800 },
     },
     boss: 'mecha',
+  },
+  nexus: {
+    emoji: '1f3d9',
+    name: '天枢',
+    desc: '未来城市一座高楼顶上的空中大厅，四周是落地的玻璃幕墙，贴墙一圈玻璃地面，往下看是夜里城市的灯海。厅里的地面一格一块，谁踩上去就亮起谁的颜色：队伍是蓝的，敌人是红的。厅里立着几对传送门，同一对颜色相同：任何东西从一扇门的门线穿过去，就从另一扇门同一侧出来，速度不变——人、怪、子弹都一样，敌人会算穿门的近路，挨击退也会被推进门里。每隔一阵有一扇门挪到别处：旧处闪烁、新处先投出全息的轮廓',
+    kind: 'nexus',
+    stamina: { exertion: 0.4, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(222 52% 18%)',
+      bgTo: 'hsl(228 60% 5%)',
+      map: hslToInt(214, 0.2, 0.86),
+      shadow: 0x000000,
+    },
+    light: { sun: 0xffffff, shade: 0xc4cedb, shadow: { color: 0x1a2438, alpha: 0.26, length: 0.45 } },
+    decor: {
+      emojis: ['1f4a0'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: NEXUS_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'lift',
+      kinds: {
+        lift: { name: '电梯', at: { kind: 'mark' }, enter: 'walk', look: 'glow', snapU: 6, weight: 4, perSec: 1.2 },
+        glass: { name: '幕墙', at: { kind: 'rim', segU: 3, away: { mark: 'lift', minU: 3 } }, enter: 'climb', look: 'glow', snapU: 5, weight: 3, perSec: 1.5, only: ['zombie', 'invader', 'alien', 'chameleon', 'creeper', 'ghost'] },
+        hatch: { name: '检修口', at: { kind: 'mark' }, enter: 'rise', look: 'sparks', snapU: 4, weight: 2, perSec: 1, only: ['zombie', 'invader', 'alien', 'chameleon', 'creeper'] },
+        beam: { name: '全息投送', at: { kind: 'ground' }, enter: 'rise', look: 'glow', weight: 1 },
+      },
+    },
+    finalWaveSub: '奇点乘电梯上来了——它的引力换位能把你拽到门的另一头！',
+    nexus: {
+      sizeU: 34,
+      chamferU: [5, 8],
+      glassU: 1.5,
+      neckU: 0.35,
+      plazaU: 5,
+      pillars: { count: [4, 8], radiusU: 0.7, ringU: [8, 10] },
+      pedestals: { count: [2, 4], radiusU: 0.75, heightM: 1 },
+      cores: { count: [1, 2], widthU: 5, depthU: 3, doorU: 1.6 },
+      hatches: [3, 5],
+      warps: { pairs: [2, 3], lenU: 3, postU: 0.22, heightM: 2.4, apronU: 2, pairU: 12, apartU: 5, everyMs: [24000, 36000], warnMs: 3500 },
+      tiles: { fadeMs: 1400 },
+    },
+    boss: 'blackhole',
   },
 } as const satisfies Record<string, MapDef>
