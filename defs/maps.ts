@@ -904,7 +904,7 @@ export const MAPS = {
       hall: { insetU: [2.5, 5.5], waveU: 8, cornerU: 6, neckU: 0.8, ceilingM: 10, wallU: 2.2 },
       skylights: { mainCount: [2, 2], mainU: [3.6, 4.4], mainOffsetU: [1, 3.5], minorCount: [2, 3], minorU: [1.4, 2.2], jitter: 0.22, gapU: 3, rubbleM: 1.4, rubbleSpread: 1.25 },
       alcoves: { count: [4, 4], widthU: 2.6, outU: 2.6, alongU: [3.5, 5.5], pocketU: 1.5 },
-      formations: { columns: [7, 11], columnU: [0.55, 0.95], stalagmites: [48, 66], clusters: [7, 8], stalagmiteU: [0.16, 0.6], stalagmiteM: [0.6, 2.8], blockU: 0.32, clearU: 4 },
+      formations: { columns: [7, 11], columnU: [0.55, 0.95], stalagmites: [48, 66], clusters: [7, 8], stalagmiteU: [0.16, 0.6], stalagmiteM: [0.6, 2.8], blockU: 0.32, clearU: 4.8 },
       pools: { count: [5, 8], sizeU: [1.6, 3.2], viscosity: 1.35, exertion: 1.2 },
       sky: { latitudeDeg: 24, declinationDeg: 6, dayS: 108, startHour: 9.5, extinction: 0.21, dwell: 10, dwellCenterDeg: -2.5, dwellWidthDeg: 4 },
       light: { albedo: 0.42, bounceU: 5, glowCount: [8, 15], glowLux: 0.4 },
