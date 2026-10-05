@@ -13,8 +13,9 @@ const LEAF_GAP_U = 0.125
 const TO_SUN = { x: SUN.x / Math.hypot(SUN.x, SUN.y), y: SUN.y / Math.hypot(SUN.x, SUN.y) }
 /** 整棵树冠是一个扁扁的圆顶：外圈的叶子跟着往外倒这么多（法线的水平分量），朝着太阳那半边亮、背着的那半边暗 */
 const DOME_TILT = 0.5
-/** 树冠的高度图每格多少格：画叶子时拿它找挡着太阳的叶子 */
+/** 树冠的高度图每格多少格：画叶子时拿它找挡着太阳的叶子；高度按每米多少档存 */
 const HEIGHT_CELL_U = 0.05
+const HEIGHT_STEPS_PER_M = 32
 
 type Rgb = readonly [number, number, number]
 
@@ -88,9 +89,9 @@ export interface Crowns {
   readonly squash: Float32Array
   readonly nx: Float32Array
   readonly ny: Float32Array
-  readonly r: Float32Array
-  readonly g: Float32Array
-  readonly b: Float32Array
+  readonly r: Uint8ClampedArray
+  readonly g: Uint8ClampedArray
+  readonly b: Uint8ClampedArray
   readonly lobes: Uint8Array
   readonly palette: Int32Array
   readonly x0: number
@@ -102,8 +103,8 @@ export interface Crowns {
   readonly twigs: readonly Twig[]
   readonly twigStart: Int32Array
   readonly twigItems: Int32Array
-  /** 树冠的高度图：每个格点上最高那片叶子离地多高（米），没有叶子是 0；格点 (i, j) 在 (x0 + i·HEIGHT_CELL_U, y0 + j·HEIGHT_CELL_U) */
-  readonly heights: Float32Array
+  /** 树冠的高度图：每个格点上最高那片叶子离地多高（按 1/HEIGHT_STEPS_PER_M 米一档），没有叶子是 0；格点 (i, j) 在 (x0 + i·HEIGHT_CELL_U, y0 + j·HEIGHT_CELL_U) */
+  readonly heights: Uint8ClampedArray
   readonly hCols: number
   readonly hRows: number
 }
@@ -130,17 +131,69 @@ function sprayHalf(sp: Spray, s: number): number {
   return sp.half * grow * tip
 }
 
-/** 按列攒叶子 */
+/** 按列攒叶子：满了就把每一列翻倍 */
 class LeafList {
   n = 0
-  readonly cols: number[][] = Array.from({ length: 12 }, () => [])
-  readonly lobes: number[] = []
+  private cap = 1 << 14
+  x: Float32Array = new Float32Array(this.cap)
+  y: Float32Array = new Float32Array(this.cap)
+  z: Float32Array = new Float32Array(this.cap)
+  cos: Float32Array = new Float32Array(this.cap)
+  sin: Float32Array = new Float32Array(this.cap)
+  size: Float32Array = new Float32Array(this.cap)
+  squash: Float32Array = new Float32Array(this.cap)
+  nx: Float32Array = new Float32Array(this.cap)
+  ny: Float32Array = new Float32Array(this.cap)
+  r: Uint8ClampedArray = new Uint8ClampedArray(this.cap)
+  g: Uint8ClampedArray = new Uint8ClampedArray(this.cap)
+  b: Uint8ClampedArray = new Uint8ClampedArray(this.cap)
+  lobes: Uint8Array = new Uint8Array(this.cap)
 
   push(x: number, y: number, z: number, ang: number, size: number, squash: number, nx: number, ny: number, c: readonly number[], lobes: number): void {
-    const v = [x, y, z, Math.cos(ang), Math.sin(ang), size, squash, nx, ny, c[0]!, c[1]!, c[2]!]
-    for (let i = 0; i < v.length; i++) this.cols[i]!.push(v[i]!)
-    this.lobes.push(lobes)
-    this.n++
+    if (this.n === this.cap) this.grow()
+    const i = this.n++
+    this.x[i] = x
+    this.y[i] = y
+    this.z[i] = z
+    this.cos[i] = Math.cos(ang)
+    this.sin[i] = Math.sin(ang)
+    this.size[i] = size
+    this.squash[i] = squash
+    this.nx[i] = nx
+    this.ny[i] = ny
+    this.r[i] = c[0]!
+    this.g[i] = c[1]!
+    this.b[i] = c[2]!
+    this.lobes[i] = lobes
+  }
+
+  private grow(): void {
+    this.cap *= 2
+    const f = (a: Float32Array): Float32Array => {
+      const b = new Float32Array(this.cap)
+      b.set(a)
+      return b
+    }
+    const u = (a: Uint8ClampedArray): Uint8ClampedArray => {
+      const b = new Uint8ClampedArray(this.cap)
+      b.set(a)
+      return b
+    }
+    this.x = f(this.x)
+    this.y = f(this.y)
+    this.z = f(this.z)
+    this.cos = f(this.cos)
+    this.sin = f(this.sin)
+    this.size = f(this.size)
+    this.squash = f(this.squash)
+    this.nx = f(this.nx)
+    this.ny = f(this.ny)
+    this.r = u(this.r)
+    this.g = u(this.g)
+    this.b = u(this.b)
+    const lobes = new Uint8Array(this.cap)
+    lobes.set(this.lobes)
+    this.lobes = lobes
   }
 }
 
@@ -292,11 +345,11 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
     palette[k] = paletteOf(seed, k)
     grow(t, k, palette[k]!, seed, mpu, leaves, twigs)
   })
-  const f = (i: number): Float32Array => Float32Array.from(leaves.cols[i]!)
-  const x = f(0)
-  const y = f(1)
-  const z = f(2)
-  const size = f(5)
+  const n = leaves.n
+  const x = leaves.x.slice(0, n)
+  const y = leaves.y.slice(0, n)
+  const z = leaves.z.slice(0, n)
+  const size = leaves.size.slice(0, n)
   const x0 = area.x0 - 1
   const y0 = area.y0 - 1
   const cols = Math.ceil((area.w + 2) / CROWN_BUCKET_U)
@@ -308,7 +361,7 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
     out[2] = x[i]! + r
     out[3] = y[i]! + r
   }
-  const lb = bucketize(leaves.n, leafBox, x0, y0, cols, rows, (a, b) => z[b]! - z[a]!)
+  const lb = bucketize(n, leafBox, x0, y0, cols, rows, (a, b) => z[b]! - z[a]!)
   const twigBox = (i: number, out: number[]): void => {
     const tw = twigs[i]!
     out[0] = Math.min(tw.ax, tw.bx) - tw.w0
@@ -320,8 +373,8 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
   // 高度图：每片叶子按叶心那一圈（大半是实的）记进去
   const hCols = Math.ceil((area.w + 2) / HEIGHT_CELL_U)
   const hRows = Math.ceil((area.h + 2) / HEIGHT_CELL_U)
-  const heights = new Float32Array(hCols * hRows)
-  for (let i = 0; i < leaves.n; i++) {
+  const heights = new Uint8ClampedArray(hCols * hRows)
+  for (let i = 0; i < n; i++) {
     const r = size[i]! * 0.5
     const i0 = Math.max(0, Math.floor((x[i]! - r - x0) / HEIGHT_CELL_U))
     const i1 = Math.min(hCols - 1, Math.ceil((x[i]! + r - x0) / HEIGHT_CELL_U))
@@ -333,7 +386,8 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
         const dy = y0 + j * HEIGHT_CELL_U - y[i]!
         if (dx * dx + dy * dy > r * r) continue
         const o = j * hCols + q
-        if (z[i]! > heights[o]!) heights[o] = z[i]!
+        const h = Math.max(1, Math.round(z[i]! * HEIGHT_STEPS_PER_M))
+        if (h > heights[o]!) heights[o] = h
       }
     }
   }
@@ -341,16 +395,16 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
     x,
     y,
     z,
-    cos: f(3),
-    sin: f(4),
+    cos: leaves.cos.slice(0, n),
+    sin: leaves.sin.slice(0, n),
     size,
-    squash: f(6),
-    nx: f(7),
-    ny: f(8),
-    r: f(9),
-    g: f(10),
-    b: f(11),
-    lobes: Uint8Array.from(leaves.lobes),
+    squash: leaves.squash.slice(0, n),
+    nx: leaves.nx.slice(0, n),
+    ny: leaves.ny.slice(0, n),
+    r: leaves.r.slice(0, n),
+    g: leaves.g.slice(0, n),
+    b: leaves.b.slice(0, n),
+    lobes: leaves.lobes.slice(0, n),
     palette,
     x0,
     y0,
@@ -389,7 +443,7 @@ export function crownCover(c: Crowns, x: number, y: number): number {
 export function crownHeight(c: Crowns, x: number, y: number): number {
   const i = Math.round((x - c.x0) / HEIGHT_CELL_U)
   const j = Math.round((y - c.y0) / HEIGHT_CELL_U)
-  return i < 0 || j < 0 || i >= c.hCols || j >= c.hRows ? 0 : c.heights[j * c.hCols + i]!
+  return i < 0 || j < 0 || i >= c.hCols || j >= c.hRows ? 0 : c.heights[j * c.hCols + i]! / HEIGHT_STEPS_PER_M
 }
 
 /** (x, y) 格落在哪一桶，桶外是 −1 */
