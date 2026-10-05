@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { Alive, LeapShape, Motion, MOTION, MotionHit, Payload, SprintShape, Transform } from '../components'
-import { sourceOf } from '../utils/source'
+import { sourceOf, sweep } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
 import { hit } from './shared/damage'
 import { applyAbilityEffects, applyBlast, applyOnHit, struckOf } from './shared/effects'
@@ -10,14 +10,14 @@ import { BLAST_M, breachAt, covered } from '../utils/pass'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
-/** 冲刺途中撞到的敌人各吃一下，同一段冲刺不重复 */
+/** 冲刺途中撞到的敌人各吃一下，同一段冲刺不重复；只撞得到与冲刺的身体层重叠的 */
 function dashHits(sim: Sim, m: number, e: number): void {
   const src = sourceOf(sim, e)
   const x = Transform.x[m]!
   const y = Transform.y[m]!
   const stamp = Motion.stamp[m]!
   const damage = Motion.dmg[m]!
-  for (const t of covered(sim, src, x, y, targetsWithin(sim, src, x, y, SprintShape.radius[e]!))) {
+  for (const t of covered(sim, src, x, y, targetsWithin(sim, sweep(sim, e, src), x, y, SprintShape.radius[e]!))) {
     if (MotionHit.stamp[t.eid] === stamp) continue
     MotionHit.stamp[t.eid] = stamp
     const s = struckOf(t.eid)

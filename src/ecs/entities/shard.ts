@@ -2,7 +2,7 @@ import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { norm } from '../../util/vec'
 import { KNOCKBACK, SHARD_BODY } from '../../data/abilities'
-import { Alive, Clock, Depth, Drive, Phys, Quad, Radius, Shard, Sprite, Tint, Transform, VisOff } from '../components'
+import { Alive, Clock, Depth, Drive, Phys, Quad, Radius, Shard, Span, Sprite, Tint, Transform, VisOff } from '../components'
 import type { Sim } from '../sim'
 
 export function spawnShards(
@@ -26,7 +26,7 @@ export function spawnShards(
     const dir = norm(ox, oy)
     const scatter = 45 + sim.rng.next() * 65
     const eid = newEntity(sim.world)
-    addComponents(sim.world, eid, Shard, Transform, Sprite, Tint, Depth, VisOff, Phys, Drive, Clock, Alive, Radius)
+    addComponents(sim.world, eid, Shard, Transform, Sprite, Tint, Depth, VisOff, Phys, Drive, Clock, Alive, Radius, Span)
     Transform.x[eid] = x + ox
     Transform.y[eid] = y + oy
     Transform.rot[eid] = 0

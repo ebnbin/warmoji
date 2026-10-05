@@ -6,7 +6,7 @@ import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { Rng } from '../../util/rng'
 import { spawnDecor } from '../entities/decor'
-import { Airborne, Alive, Depth, Phys, Pickup, Radius, Transform, Uid } from '../components'
+import { Alive, Depth, Phys, Pickup, Radius, Span, Transform, Uid } from '../components'
 import { roomAt } from '../worlds/basin'
 import { flowAt } from './water'
 import { Wakes } from './wakes'
@@ -395,7 +395,7 @@ export class SakuraView implements MapView {
     const b = plan.bridge
     const seen = new Set<number>()
     for (const eid of query(sim.world, [Phys, Transform, Radius, Depth])) {
-      if (hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Pickup)) continue
+      if (Span.lo[eid]! > 0 || hasComponent(sim.world, eid, Pickup)) continue
       if (s.aboard.get(eid) === Uid.v[eid] || !Alive.v[eid]) continue
       const q = bridgeLocal(b, Transform.x[eid]! / UNIT, Transform.y[eid]! / UNIT)
       if (Math.abs(q.a) >= b.span || Math.abs(q.t) > b.width + Radius.v[eid]! / UNIT) continue

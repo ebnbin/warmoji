@@ -32,7 +32,7 @@ import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/oldRiver'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Airborne, Alive, Boss, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
+import { Alive, Boss, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Span, Stats, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/oldRuins'
@@ -50,7 +50,7 @@ import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { ruins } from '../ruins/world'
-import { phases } from '../utils/pass'
+import { grounded, phases } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
 import { meadow } from '../meadow/world'
@@ -315,11 +315,11 @@ const ice: WorldHooks = {
     const dmg = Math.round(cfg.waterTeamDps * frac)
     const src = hazardSource('coldWater', 0x4fc3f7)
     for (const m of sim.characters) {
-      if (Alive.v[m] && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hit(sim, src, m, dmg, { tick: true })
+      if (Alive.v[m] && grounded(sim.world, m) && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hit(sim, src, m, dmg, { tick: true })
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
-      if (!onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) hit(sim, src, eid, edmg, { tick: true })
+      if (grounded(sim.world, eid) && !onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) hit(sim, src, eid, edmg, { tick: true })
     }
   },
 }
@@ -774,15 +774,14 @@ function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   }
 }
 
-/** 脚下的熔岩没凝固就挨烫：穿行、腾空的身体不沾地 */
+/** 脚下的熔岩没凝固就挨烫：脚不沾地的不烫 */
 function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   const now = sim.elapsedMs
   if (now < s.hurtAt) return
   s.hurtAt = now + cfg.lava.tickMs
   const frac = cfg.lava.tickMs / 1000
   const src = hazardSource('lava', LAVA_TINT)
-  const onLava = (eid: number): boolean =>
-    Motion.kind[eid] !== MOTION.transit && Motion.kind[eid] !== MOTION.arc && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
+  const onLava = (eid: number): boolean => grounded(sim.world, eid) && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
   const dmg = Math.round(cfg.lava.teamDps * frac)
   for (const m of sim.characters) if (Alive.v[m] && onLava(m)) hit(sim, src, m, dmg, { tick: true })
   const edmg = Math.round(cfg.lava.enemyDps * frac)
@@ -871,11 +870,9 @@ function shipOf(sim: Sim): ShipState {
   return s
 }
 
-/** 压在甲板上的重量，千克：身体按半径的三次方与身体的质量折算；腾空、被抛着、穿行中、死了的与碎片不压甲板 */
+/** 压在甲板上的重量，千克：身体按半径的三次方与身体的质量折算；脚不沾地的、死了的与碎片不压甲板 */
 function deckKg(sim: Sim, cfg: ShipConfig, eid: number): number {
-  if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Shard)) return 0
-  const k = Motion.kind[eid]
-  if (k === MOTION.arc || k === MOTION.transit) return 0
+  if (!Alive.v[eid] || !grounded(sim.world, eid) || hasComponent(sim.world, eid, Shard)) return 0
   if (hasComponent(sim.world, eid, Pickup)) return cfg.weight.pickupKg
   return cfg.weight.bodyKg * Phys.mass[eid]! * (Radius.v[eid]! / (cfg.weight.bodyRadiusU * UNIT)) ** 3
 }
@@ -1343,7 +1340,6 @@ const floe: WorldHooks = {
    * 自己发动的冲刺、跳跃由能力推着走、也由能力刹住，收尾时还回冲之前的速度；被打飞、被扔出去的照样带着速度滑
    */
   contact(sim, eid, dt, x, y, vx, vy, out) {
-    if (hasComponent(sim.world, eid, Phasing)) return false
     const cfg = floeCfg(sim)
     const s = floeOf(sim)
     const f = s.field
@@ -1418,7 +1414,7 @@ const floe: WorldHooks = {
     const s = floeOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    if (inWater(s, eid, Uid.v[eid]!) || hasComponent(sim.world, eid, Phasing)) return norm(tx - x, ty - y)
+    if (inWater(s, eid, Uid.v[eid]!) || Span.lo[eid]! > 0) return norm(tx - x, ty - y)
     const reach = Radius.v[eid]! / UNIT + 0.6
     if (edgeAt(s.field, tx, ty) >= 0) return walkTo(s, x, y, tx, ty, reach)
     // 目标在水里：不跟着跳下去，走到离它最近的冰上守着

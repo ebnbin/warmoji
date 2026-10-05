@@ -1,10 +1,10 @@
-import { passCost, probeZ } from '../utils/pass'
+import { LAYER_M, layersOf, passCost, probeZ } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
 import type { Dust, Masonry } from './masonry'
 
 /**
- * 局部线段 a→b（格，全长 lenM 米）上第一处探测在它里面、又要贯穿才过得去的实心：砌体与木板按探测在那一格的最低处比各自的顶，
+ * 局部线段 a→b（格，全长 lenM 米）上第一处探测在它里面、又要贯穿才过得去的实心：砌体与木板按探测在那一格的最低处比各自占到的那一层的顶，
  * 视线还按一路攒下的尘雾光学厚度，攒过 opaqueTau 就看不穿
  */
 export function traceLocal(m: Masonry, dust: Dust | null, opaqueTau: number, p: Probe, ua: number, va: number, ub: number, vb: number, lenM: number): Crossing | null {
@@ -15,6 +15,7 @@ export function traceLocal(m: Masonry, dust: Dust | null, opaqueTau: number, p: 
   const dy = (vb - g.v0) / g.cell - y0
   if (Math.max(x0, x0 + dx) < 0 || Math.max(y0, y0 + dy) < 0 || Math.min(x0, x0 + dx) >= g.cols || Math.min(y0, y0 + dy) >= g.rows) return null
   const hc = m.courseM
+  const top = (n: number): number => layersOf(n * hc) * LAYER_M
   const sight = p.via === 'sight' && dust !== null
   let ix = Math.floor(x0)
   let iy = Math.floor(y0)
@@ -34,8 +35,8 @@ export function traceLocal(m: Masonry, dust: Dust | null, opaqueTau: number, p: 
     if (ix >= 0 && iy >= 0 && ix < g.cols && iy < g.rows) {
       const idx = iy * g.cols + ix
       const z = Math.min(probeZ(p, t), probeZ(p, t1))
-      if (m.n[idx]! * hc > z) here = 'masonry'
-      else if (m.timber[idx]! * hc > z) here = 'timber'
+      if (top(m.n[idx]!) > z) here = 'masonry'
+      else if (top(m.timber[idx]!) > z) here = 'timber'
       else if (sight) {
         tau += dust.sigma[(iy >> 1) * dust.cols + (ix >> 1)]! * (t1 - t) * lenM
         if (tau >= opaqueTau) here = 'dust'

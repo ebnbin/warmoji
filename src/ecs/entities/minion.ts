@@ -1,13 +1,12 @@
 import { addComponent, addComponents, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
-import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS } from '../../data/abilities'
+import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS, SWARM_SPAN } from '../../data/abilities'
 import { EMPLACE } from '../../data/feel'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import { holderOutline } from './weapon'
 import {
-  Airborne,
   Alive,
   Anim,
   Built,
@@ -27,6 +26,7 @@ import {
   Phys,
   Radius,
   Retiring,
+  Span,
   Sprite,
   Ctl,
   SummonShape,
@@ -39,6 +39,7 @@ import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../sto
 import { anchorX, anchorY } from '../utils/ability'
 import { equipAbility } from '../entities/ability'
 import { attachStats } from '../utils/stats'
+import { hoverPx } from '../utils/ground'
 import { liveOnes } from '../utils/turret'
 
 interface MinionSpec {
@@ -97,7 +98,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
     lifeMs: SummonShape.lifeMs[e]!,
     animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
-  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, Ctl, Nest, Orbit, Contact, Phasing, Airborne)
+  addComponents(world, m, Phys, Drive, Clock, Radius, Span, Faction, Alive, Ctl, Nest, Orbit, Contact, Phasing)
   Phys.vx[m] = 0
   Phys.vy[m] = 0
   Phys.drag[m] = MINION_BODY.drag
@@ -107,6 +108,8 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Drive.y[m] = 0
   Clock.v[m] = 0
   Radius.v[m] = size * 0.35
+  Span.lo[m] = SWARM_SPAN[0]
+  Span.hi[m] = SWARM_SPAN[1]
   Faction.v[m] = Faction.v[e]!
   Alive.v[m] = 1
   attachStats(world, m, { moveSpeed: SummonShape.speed[e]! / UNIT })
@@ -123,7 +126,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Contact.knockback[m] = Payload.knockback[e]!
   Contact.vanish[m] = 1
   bodyRules[m] = { onTouch: abilityOnHit[e] }
-  VisOff.y[m] = -8
+  VisOff.y[m] = -hoverPx(m)
 }
 
 /** 装置退场：先撤它的能力，再缩小淡出 */

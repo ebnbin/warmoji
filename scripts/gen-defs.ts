@@ -49,6 +49,7 @@ import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
+import type { Span } from '../src/types/obstacles'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef, NebulaOldConfig } from '../src/types/maps'
 import type { MutatorDef, RunDef } from '../src/types/runs'
@@ -399,7 +400,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(sl.rampU > 0 && sl.dropM + 0.3 > SINK_M && sl.postU > 0 && sl.heightM > 0, `${at}.sill 的槛前有坡，槛下的溪比槛顶低过 ${SINK_M} 米（水流到那里才算落下去），竹栅有桩距有高`)
   need(bg.widthU > s.neckU * 2 && bg.rampU > 0 && bg.riseM > 0 && bg.at[0] > 0 && range(bg.at, false) && bg.at[1] < 1, `${at}.bridge 的桥面须比窄缝宽、坡道与拱有长有高，架在溪的 (0, 1) 段`)
   need(tr.crownU[0] > tr.overhangU && range(tr.crownU, false) && tr.heightM[0] > 0 && range(tr.heightM, false) && range(tr.inside, true) && tr.templeGapU > 0, `${at}.trees 的树冠须比能走进去的那截大，树高为正，空地上的棵数为非负整数范围，寺里的间距为正`)
-  need(b.kg > 0 && b.radiusU > 0 && b.heightM > 0 && b.density > 0 && b.drag > 0, `${at}.body 的体重、半径、身高、密度与阻力系数须为正`)
+  need(b.kg > 0 && b.radiusU > 0 && b.density > 0 && b.drag > 0, `${at}.body 的体重、半径、密度与阻力系数须为正`)
   need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.mu > 0, `${at}.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂与脚底摩擦系数为正`)
   need(b.swim >= 0 && b.wetM > 0, `${at}.body 的划水不为负，湿地水深为正`)
   for (let k = 0; k < 8; k++) {
@@ -526,6 +527,16 @@ for (const e of Object.values(ENEMIES).flatMap(withNested)) {
     const range = 'range' in a ? a.range : undefined
     need(range === undefined || range > lm.standoffDist, `enemies.${e.kind} 的能力射程须大于 standoffDist`)
   }
+}
+
+/** 身段：层号是 0 ≤ lo ≤ hi 的整数；头目高过标准身体；蜂群悬空 */
+{
+  const ok = (sp: Span | undefined): boolean => sp === undefined || (Number.isInteger(sp[0]) && Number.isInteger(sp[1]) && sp[0] >= 0 && sp[0] <= sp[1])
+  for (const e of Object.values(ENEMIES).flatMap(withNested)) {
+    need(ok(e.span) && (e.forms ?? []).every((f) => ok(f.span)), `enemies.${e.kind} 的身段须是 0 ≤ lo ≤ hi 的整数层`)
+    need(e.role !== 'boss' || (e.span !== undefined && e.span[1] >= OBSTACLES.body.layers), `enemies.${e.kind} 是头目，须高过标准身体`)
+  }
+  need(ok(COMBAT.swarmSpan) && COMBAT.swarmSpan[0] > 0, 'combat.swarmSpan 须悬空')
 }
 
 /** 走进壳层停下的半径：终端漂移 g·fall 追上速度的地方，壳层里引力随半径单调增大；外缘都追不上就停不下 */
@@ -695,11 +706,12 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
 }
 
-/** 障碍：跨得过的比眼睛低，平射飞在膝盖与眼睛之间；贯穿次数是非负整数，强度为正 */
+/** 障碍：标准身体至少两层、跨得过贴地的一层，跨不过平射飞的那一层；贯穿次数是非负整数，强度为正 */
 {
-  const { body, shot, materials } = OBSTACLES
-  need(body.refRadiusU > 0 && body.heightM > 0 && body.step > 0 && body.step < body.eye && body.eye < 1, 'obstacles.body 的半径、身高须为正，跨得过的高度低于眼睛，眼睛低于头顶')
-  need(shot.flatM > body.step * body.heightM && shot.flatM < body.eye * body.heightM && shot.launchM > 0 && shot.blastM > 0, 'obstacles.shot 的平射高度须在标准身体的膝盖与眼睛之间，抛射的出手高度与爆炸的高度为正')
+  const { body, blastM, materials } = OBSTACLES
+  const over = Math.floor(body.layers * body.step)
+  need(body.refRadiusU > 0 && body.heightM > 0 && blastM > 0, 'obstacles 的半径、身高与爆炸的高度须为正')
+  need(Number.isInteger(body.layers) && body.layers >= 2 && over >= 1 && over < body.layers - 1, 'obstacles.body.layers 须是不小于 2 的整数，标准身体跨得过贴地的一层、跨不过平射飞的顶层')
   for (const [id, m] of Object.entries(materials)) {
     need(m.pierce === null || (Number.isInteger(m.pierce) && m.pierce >= 0), `obstacles.materials.${id}.pierce 须是非负整数或 null`)
     need(m.strength === null || m.strength > 0, `obstacles.materials.${id}.strength 须为正或 null`)
@@ -707,8 +719,8 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
 }
 
 /**
- * 残垣：参数说得通；砌体的层高把挡人、挡弹、挡视线分开——总有几层高的墙只挡标准身体、几层只挡身体和平射；原本的墙与石柱高过眼睛，
- * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：
+ * 残垣：参数说得通；石块的厚度分得出挡人与挡弹——总有几层石块高的墙只挡标准身体、平射与视线从上面过去；原本的墙与石柱挡得住平射与视线，
+ * 柱廊的矮墙挡人不挡平射，封门的木板挡得住平射与视线；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：
  * 从回廊院走得到台地上几乎所有能走的地方，标准身体走得过的通道大个子也都走得过
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -722,9 +734,11 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const ints = (v: readonly [number, number]): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && span(v)
   const { site, plan: p, masonry: ms, arcade: a, decay: d, timber: t, rubble: rb, fall, dust, trees } = r
   const B = OBSTACLES.body
-  const stepM = B.heightM * B.step
-  const eyeM = B.heightM * B.eye
-  const flatM = OBSTACLES.shot.flatM
+  const layerM = B.heightM / B.layers
+  const layersOf = (h: number): number => Math.ceil(h / layerM - 1e-9)
+  // 标准身体跨得过的、平射与视线从上面过得去的最高的墙，层数
+  const over = Math.floor(B.layers * B.step)
+  const flat = B.layers - 1
   const hc = ms.courseM
   const W = p.wallU
   need(r.meterPerU > 0 && r.cellU > 0 && r.cellU <= 0.5, `${at} 的米每格须为正，砌体格子在 (0, 0.5] 格内`)
@@ -738,15 +752,15 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(p.roomU[0] - W.inner - 1 >= p.doorU[1], `${at}.plan.roomU 最短的开间也放得下最宽的门洞`)
   need(r.bodyCapU > 0 && r.gapU >= 2 * r.bodyCapU && p.doorU[0] >= r.gapU, `${at}.gapU 须放得下按 bodyCapU 算的大个子，最窄的门洞也不窄于 gapU`)
   need(pos(ms.heightM.outer) && pos(ms.heightM.inner) && pos(ms.heightM.tower) && ms.density > 0 && Number.isInteger(ms.bond) && ms.bond >= 1, `${at}.masonry 的高度与密度须为正，bond 是正整数`)
-  need(hc > 0 && Math.floor(flatM / hc) > Math.floor(stepM / hc) && Math.floor(eyeM / hc) > Math.floor(flatM / hc), `${at}.masonry.courseM 须让标准身体跨得过的、平射飞得过的与眼睛看得过的墙各差至少一层`)
-  need(Math.min(ms.heightM.outer[0], ms.heightM.inner[0], ms.heightM.tower[0], ms.heightM.column) > eyeM, `${at}.masonry 原本的墙与石柱须高过标准身体的眼睛`)
-  const parapet = Math.round(ms.heightM.parapet / hc) * hc
-  need(parapet > stepM && parapet <= flatM, `${at}.masonry.heightM.parapet 砌成 ${parapet.toFixed(2)} 米，须挡得住标准身体、挡不住平射`)
+  need(hc > 0 && Math.floor((flat * layerM) / hc + 1e-9) > Math.floor((over * layerM) / hc + 1e-9), `${at}.masonry.courseM 须让标准身体跨得过的与平射飞得过的墙差至少一层石块`)
+  need(layersOf(Math.min(ms.heightM.outer[0], ms.heightM.inner[0], ms.heightM.tower[0], ms.heightM.column)) > flat, `${at}.masonry 原本的墙与石柱须挡得住平射与视线`)
+  const parapet = layersOf(Math.round(ms.heightM.parapet / hc) * hc)
+  need(parapet > over && parapet <= flat, `${at}.masonry.heightM.parapet 砌成 ${parapet} 层高，须挡得住标准身体、挡不住平射`)
   need(a.radiusU > 0 && a.spacingU - 2 * a.radiusU >= r.gapU && ints(a.entries) && a.entries[0] >= 1, `${at}.arcade 的柱间须不窄于 gapU，每边至少一个入口：队伍从回廊院出发`)
   need(p.garthU[0] >= 2 * a.spacingU, `${at}.plan.garthU 须放得下每边至少两个柱间`)
   need(d.waveU > 0 && d.keep[0] >= 0 && d.keep[1] <= 1 && span(d.keep) && ints(d.razed) && pos(d.razeU) && ints(d.breaches) && pos(d.breachM3), `${at}.decay 的波长、保留比例、拆毁与破坏须合理`)
   need(d.broken >= 0 && d.fallen >= 0 && d.broken + d.fallen <= 1 && d.rubble >= 0 && d.rubble <= 1, `${at}.decay 的石柱折断与倒下的比例加起来不超过 1，留下的碎石比例在 [0, 1] 内`)
-  need(ints(t.doors) && t.heightM > eyeM && t.thickU >= r.cellU, `${at}.timber 的门洞数须是非负整数，木板高过标准身体的眼睛、至少一格砌体格子厚`)
+  need(ints(t.doors) && layersOf(t.heightM) > flat && t.thickU >= r.cellU, `${at}.timber 的门洞数须是非负整数，木板挡得住平射与视线、至少一格砌体格子厚`)
   need(rb.reposeDeg > 0 && rb.reposeDeg < 90 && rb.fullM > 0 && rb.viscosity >= 1 && rb.exertion >= 0, `${at}.rubble 的休止角在 0 到 90 度之间，碎石不比平地好走`)
   need(fall.damagePerKJ >= 0 && fall.radiusU >= 0, `${at}.fall 的伤害与范围不为负`)
   need(dust.perM3 >= 0 && dust.spreadU > 0 && dust.halfLifeS > 0 && dust.opaqueTau > 0, `${at}.dust 的参数须为正`)
@@ -754,7 +768,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(r.reflowMs > 0, `${at}.reflowMs 须为正`)
   if (errors.length > 0) continue
   const strength = { masonry: OBSTACLES.materials.masonry.strength, timber: OBSTACLES.materials.timber.strength }
-  const level = Math.floor(stepM / hc)
+  const level = Math.floor((over * layerM) / hc + 1e-9)
   for (let k = 0; k < 6; k++) {
     const seed = k * 7919 + 17
     const plan = ruinsPlan(r, { strength, walk: level, bodyU: B.refRadiusU }, seed)

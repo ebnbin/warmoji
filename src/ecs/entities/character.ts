@@ -16,6 +16,7 @@ import type { StatMods } from '../../types/stats'
 import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
 import { bodyRules } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
+import { STANDARD } from '../utils/pass'
 import { attachResource } from './resource'
 import { memberGear, memberGearMods } from './loadout'
 
@@ -48,6 +49,7 @@ export function spawnCharacter(
     x,
     y,
     radius: MEMBER.radius * UNIT * place.sizeMul,
+    span: STANDARD,
     stats: run.invincible ? { ...base, maxHp: INVINCIBLE_HP } : base,
     drag: def.body.drag,
     mass: def.body.mass,

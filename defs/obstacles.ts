@@ -1,8 +1,8 @@
 import type { ObstacleTuning } from '../src/types/obstacles'
 
 export const OBSTACLES = {
-  body: { refRadiusU: 0.45, heightM: 1.7, step: 0.35, eye: 0.93 },
-  shot: { flatM: 1.2, launchM: 1.4, blastM: 0.6 },
+  body: { refRadiusU: 0.45, heightM: 1.7, layers: 3, step: 0.35 },
+  blastM: 0.6,
   materials: {
     // 溶洞的洞壁、石柱与大石笋
     rock: { name: '岩体', phase: true, opaque: true, pierce: null, strength: null },

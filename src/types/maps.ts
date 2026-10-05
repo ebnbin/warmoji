@@ -574,14 +574,13 @@ export interface ChannelConfig {
   readonly floodSlope: number
 }
 /**
- * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
+ * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克，别的身体质量按半径的三次方与质量倍率缩放（半径不算队长倍率），身高按占的层数；
  * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
  * 或者干脆浮起来，就站不住、随水漂
  */
 export interface WadeConfig {
   readonly kg: number
   readonly radiusU: number
-  readonly heightM: number
   readonly density: number
   readonly drag: number
   /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */

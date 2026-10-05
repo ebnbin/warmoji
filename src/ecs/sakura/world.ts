@@ -4,7 +4,7 @@ import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
-import { Airborne, Alive, Phys, Pickup, Radius, Transform, Uid } from '../components'
+import { Alive, Phys, Pickup, Radius, Span, Transform, Uid } from '../components'
 import { fleeSteer } from '../systems/shared/steer'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
@@ -198,7 +198,7 @@ function board(sim: Sim, s: SakuraState): void {
     const pickup = hasComponent(sim.world, eid, Pickup)
     const fresh = pickup && s.seen.get(eid) !== uid
     if (pickup) s.seen.set(eid, uid)
-    if (!overSpan(b, x, y) || hasComponent(sim.world, eid, Airborne)) {
+    if (!overSpan(b, x, y) || Span.lo[eid]! > 0) {
       s.aboard.delete(eid)
       continue
     }

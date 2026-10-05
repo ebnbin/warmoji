@@ -268,7 +268,7 @@ export const MAPS = {
       sill: { rampU: 1.5, dropM: 0.8, postU: 0.42, heightM: 1.1 },
       bridge: { widthU: 2.6, rampU: 1.4, riseM: 0.6, at: [0.3, 0.7] },
       trees: { inside: [3, 6], crownU: [1.3, 2.2], heightM: [4, 6], overhangU: 0.5, templeGapU: 4.5 },
-      body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, mu: 0.5, swim: 0.4, wetM: 0.02 },
+      body: { kg: 60, radiusU: 0.45, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, mu: 0.5, swim: 0.4, wetM: 0.02 },
     },
     boss: 'croc',
   },

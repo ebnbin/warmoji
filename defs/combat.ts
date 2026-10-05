@@ -6,6 +6,7 @@ export const COMBAT = {
   minionBody: { mass: 1, drag: 5, grip: 8 },
   pickupBody: { mass: 1, drag: 5, grip: 8 },
   shardBody: { mass: 1, drag: 5, grip: 0.2 },
+  swarmSpan: [1, 2],
   knockback: { maxSpeed: 1300, deathSlideMs: 300 },
   // 须略大于屏幕中心到角落的距离（≈11.5 格）
   acquire: { range: 12 },

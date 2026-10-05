@@ -6,7 +6,8 @@ import { cullProjectile } from './shared/projectile'
 import { isSameEntity } from '../utils/identity'
 import { nearestTarget } from '../utils/targets'
 import { flying, WORLD_SOURCE } from '../utils/source'
-import { boltProbe, breachAt, FLAT_SHOT_M, impactAt, lobZ, shotPass } from '../utils/pass'
+import { boltProbe, boltZ, breachAt, CHEST_M, impactAt, lobZ, shotPass } from '../utils/pass'
+import { flatSource } from '../entities/projectile'
 import { ballistic } from './shared/body'
 import { LIFT_PER_M } from '../../util/units'
 import type { BodyStep } from './shared/body'
@@ -62,7 +63,7 @@ function reflect(sim: Sim, eid: number, b: number, x0: number, y0: number, x1: n
   Transform.y[eid] = y0
   Faction.v[eid] = Faction.v[b]!
   const src = barrierSrc[b]
-  if (src) projSrc[eid] = flying(src)
+  if (src) projSrc[eid] = Proj.arc[eid]! > 0 ? flying(src) : flatSource(flying(src), Proj.z[eid]!)
   projHitUids[eid] = new Set()
   Proj.dieAt[eid] = sim.elapsedMs + REFLECT_LIFE_MS
   Tint.color[eid] = Barrier.color[b]!
@@ -113,7 +114,7 @@ export function moveProjectiles(sim: Sim): void {
         len *= b.t
         Proj.dieAt[eid] = sim.elapsedMs
         impactAt(sim, b)
-        breachAt(sim, b.x, b.y, Proj.arc[eid]! > 0 ? lobZ(Proj.arc[eid]!, Math.min(1, (Proj.flown[eid]! + len) / Proj.reach[eid]!)) : FLAT_SHOT_M, Proj.radius[eid]!, Proj.breach[eid]!)
+        breachAt(sim, b.x, b.y, Proj.arc[eid]! > 0 ? lobZ(Proj.z[eid]!, Proj.arc[eid]!, Math.min(1, (Proj.flown[eid]! + len) / Proj.reach[eid]!)) : Proj.z[eid]!, Proj.radius[eid]!, Proj.breach[eid]!)
       }
     }
     const moved = sim.hooks.wrap(sim, ax + stepX, ay + stepY)
@@ -122,7 +123,7 @@ export function moveProjectiles(sim: Sim): void {
     PrevPos.x[eid] = moved.x - stepX
     PrevPos.y[eid] = moved.y - stepY
     Proj.flown[eid] = Proj.flown[eid]! + len
-    if (Proj.arc[eid]! > 0) VisOff.y[eid] = -Math.max(0, lobZ(Proj.arc[eid]!, Math.min(1, Proj.flown[eid]! / Proj.reach[eid]!)) - FLAT_SHOT_M) * LIFT_PER_M
+    if (Proj.arc[eid]! > 0) VisOff.y[eid] = -Math.max(0, boltZ(eid) - CHEST_M) * LIFT_PER_M
     if (Proj.spin[eid] !== 0) Transform.rot[eid] = Transform.rot[eid]! + Proj.spin[eid]! * dt
     else if (hasComponent(sim.world, eid, Homing) || hasComponent(sim.world, eid, Linger)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
   }

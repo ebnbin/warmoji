@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
-import { Airborne, Alive, Phys, Pickup, Radius, Shard, Transform } from '../components'
+import { Alive, Phys, Pickup, Radius, Shard, Span, Transform } from '../components'
 import { flowAt } from './water'
 import type Phaser from 'phaser'
 import type { Flow, Water } from './water'
@@ -24,7 +24,7 @@ export class Wakes {
     for (const eid of swimming.keys()) if (!this.afloat.has(eid)) playSfx('wash')
     this.afloat = new Set(swimming.keys())
     for (const eid of query(sim.world, [Phys, Transform, Radius])) {
-      if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard) || skip(eid)) continue
+      if (!Alive.v[eid] || Span.lo[eid]! > 0 || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard) || skip(eid)) continue
       const x = Transform.x[eid]!
       const y = Transform.y[eid]!
       flowAt(water, x / UNIT, y / UNIT, f)

@@ -1,4 +1,5 @@
 import type { AbilityDef, Effect } from './abilityDefs'
+import type { Span } from './obstacles'
 import type { StatBase, StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
 
@@ -92,10 +93,11 @@ export type EnemyKind =
   | 'tree'
   | 'pylon'
   | 'swan'
-/** 一种形态：换外观、换能力、换走法、改属性；不写的沿用本体 */
+/** 一种形态：换外观、换能力、换走法、改属性、换身段；不写的沿用本体 */
 export interface FormDef {
   readonly emoji?: string
   readonly name?: string
+  readonly span?: Span
   readonly abilities?: readonly AbilityDef[]
   readonly drive?: DriveDef
   readonly stats?: StatMods
@@ -109,6 +111,8 @@ export interface NpcDef extends BodyRules {
   readonly name: string
   readonly size: number
   readonly radius: number
+  /** 竖直方向占哪几层，不写是标准身体 */
+  readonly span?: Span
   readonly hp: number
   readonly speed: number
   readonly damage: number

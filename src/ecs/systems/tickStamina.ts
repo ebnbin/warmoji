@@ -1,14 +1,14 @@
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { STAMINA } from '../../data/stamina'
-import { Airborne, Alive, Drive, Motion, MOTION, Slot, Stamina, Stats, Transform } from '../components'
+import { Alive, Drive, Motion, MOTION, Slot, Span, Stamina, Stats, Transform } from '../components'
 import { bodyDt } from './shared/body'
 import { draftShare, exertionScale, regenScale } from './shared/stamina'
 import type { Sim } from '../sim'
 
 /** 这一帧自己赶路的距离：闲逛、脚不沾地、被脚本带着走的都不算 */
-function walked(sim: Sim, eid: number, dt: number): number {
-  if (Drive.idle[eid] || Motion.kind[eid] !== MOTION.none || hasComponent(sim.world, eid, Airborne)) return 0
+function walked(eid: number, dt: number): number {
+  if (Drive.idle[eid] || Motion.kind[eid] !== MOTION.none || Span.lo[eid]! > 0) return 0
   return Math.hypot(Drive.x[eid]!, Drive.y[eid]!) * dt
 }
 
@@ -19,7 +19,7 @@ function walked(sim: Sim, eid: number, dt: number): number {
  */
 export function tickStamina(sim: Sim): void {
   const leader = sim.leader
-  const squad = Alive.v[leader] ? walked(sim, leader, bodyDt(sim, leader)) : 0
+  const squad = Alive.v[leader] ? walked(leader, bodyDt(sim, leader)) : 0
   const scale = exertionScale()
   const draft = draftShare()
   const regenMul = regenScale()
@@ -28,7 +28,7 @@ export function tickStamina(sim: Sim): void {
     const dt = bodyDt(sim, eid)
     if (dt <= 0) continue
     const member = hasComponent(sim.world, eid, Slot)
-    const dist = member ? squad : walked(sim, eid, dt)
+    const dist = member ? squad : walked(eid, dt)
     const by = member ? leader : eid
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!

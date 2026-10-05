@@ -7,7 +7,7 @@ import { GROUND_PPU } from '../../data/texel'
 import { Rng } from '../../util/rng'
 import { playSfx } from '../../audio/sfx'
 import { spawnDecor } from '../entities/decor'
-import { Airborne, Alive, Pickup, Radius, Transform } from '../components'
+import { Alive, Pickup, Radius, Span, Transform } from '../components'
 import { roomAt } from '../worlds/basin'
 import { CANOPY_PPU, grassMask, GROUND_AREA, MASK_PPU, textureSize } from './ground'
 import { MeadowPainter } from './painter'
@@ -384,7 +384,7 @@ export class MeadowView implements MapView {
     for (const b of this.butterflies) {
       let scared = false
       for (const eid of query(sim.world, [Transform, Radius])) {
-        if (!Alive.v[eid] || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Airborne)) continue
+        if (!Alive.v[eid] || hasComponent(sim.world, eid, Pickup) || Span.lo[eid]! > 0) continue
         const dx = b.x - Transform.x[eid]! / UNIT
         const dy = b.y - Transform.y[eid]! / UNIT
         const d = Math.hypot(dx, dy)

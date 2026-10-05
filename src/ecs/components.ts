@@ -170,6 +170,9 @@ export const Boss = { v: u8() }
 
 export const Radius = { v: f32() }
 
+/** 身段：竖直方向从第 lo 层占到第 hi 层，第 0 层贴着地；所有身体都有 */
+export const Span = { lo: u8(), hi: u8() }
+
 /** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
 export const Phys = { vx: f32(), vy: f32(), drag: f32(), mass: f32(), grip: f32() }
 
@@ -223,8 +226,9 @@ export const Projectile = {}
 
 export const Vel = { x: f32(), y: f32() }
 
-/** 弹体：pierce 是还能贯穿的次数（身体与障碍共用）；arc 是抛射拱起的高度（米，平射为 0），reach 是抛射的全程、flown 是已经飞了多远（像素）；breach 是撞上障碍时的破坏力，through 为 1 的不受障碍阻挡 */
+/** 弹体：pierce 是还能贯穿的次数（身体与障碍共用）；z 是平射飞的、抛射出手的离地高度，arc 是抛射拱起的高度（米，平射为 0），reach 是抛射的全程、flown 是已经飞了多远（像素）；breach 是撞上障碍时的破坏力，through 为 1 的不受障碍阻挡 */
 export const Proj = {
+  z: f32(),
   damage: f32(),
   radius: f32(),
   kb: f32(),
@@ -637,9 +641,6 @@ export const LOCK_AT = { start: 0, end: 1 } as const
 export const Windup = { ms: f32(), lockAt: u8(), telegraph: u8() }
 
 export const WindupState = { until: f32(), angle: f32() }
-
-/** 飞在空中的身体：不受地面与介质影响 */
-export const Airborne = {}
 
 /** 这一帧身体能做什么：move 自己走、act 普通出手、cast 施放技能、dash 自己位移；forced 非零时被迫朝 f 点走（1 逃离、2 靠近） */
 export const Ctl = { move: u8(), act: u8(), cast: u8(), dash: u8(), forced: u8(), fx: f32(), fy: f32() }

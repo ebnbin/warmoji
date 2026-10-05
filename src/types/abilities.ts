@@ -1,4 +1,5 @@
 import type abilitiesJson from '../assets/abilities.json'
+import type { Span } from './obstacles'
 
 interface BodyTuning {
   readonly mass: number
@@ -10,6 +11,8 @@ export interface CombatTuning {
   readonly minionBody: BodyTuning
   readonly pickupBody: BodyTuning
   readonly shardBody: BodyTuning
+  /** 蜂群悬在半空占的层 */
+  readonly swarmSpan: Span
   readonly knockback: {
     readonly maxSpeed: number
     readonly deathSlideMs: number

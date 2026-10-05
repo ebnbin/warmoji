@@ -3,12 +3,13 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Alive, ENEMY_SET, Motion, MOTION, Radius, Transform } from '../components'
+import { Alive, ENEMY_SET, Radius, Transform } from '../components'
 import { hit } from '../systems/shared/damage'
 import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
 import { HIT } from '../utils/hitTags'
 import { leaderPoint } from '../utils/team'
+import { grounded } from '../utils/pass'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { roomFor } from '../worlds/gates'
 import { circuitPlan, copperAt, segDist } from './layout'
@@ -122,16 +123,11 @@ export function gapPhase(cfg: CircuitConfig, now: number, phaseMs: number): { ph
   return { phase: 'arc', charge: 1, cycle }
 }
 
-/** 脚沾着板面的身体：腾空的、穿行中的不算 */
-function grounded(eid: number): boolean {
-  return Alive.v[eid] !== 0 && Motion.kind[eid] !== MOTION.transit && Motion.kind[eid] !== MOTION.arc
-}
-
-/** 队伍与敌人里脚沾着板面的身体 */
+/** 队伍与敌人里活着、脚沾着板面的身体 */
 function bodies(sim: Sim): number[] {
   const out: number[] = []
-  for (const m of sim.characters) if (grounded(m)) out.push(m)
-  for (const e of query(sim.world, ENEMY_SET)) if (grounded(e)) out.push(e)
+  for (const m of sim.characters) if (Alive.v[m] !== 0 && grounded(sim.world, m)) out.push(m)
+  for (const e of query(sim.world, ENEMY_SET)) if (Alive.v[e] !== 0 && grounded(sim.world, e)) out.push(e)
   return out
 }
 
