@@ -1143,6 +1143,80 @@ export interface RuinsConfig {
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
 }
+/**
+ * 深海：大陆坡上一道海底峡谷的谷底，两侧是陡峭的岩壁，上游一头是从岩壁上塌下来的岩堆，下游一头是往下没进黑暗的陡坎；谷底铺着软泥，散着大石头，躺着一副鲸骨，有一两处冒泡的冷泉。
+ * 队伍从一艘潜艇里出来：潜艇停在谷底上，只有一舷开着门，门口罩着一团空气。队员离开门口只能憋着气，回到门口那一片才喘得上气；潜艇隔一阵自己开走，换个地方停下。
+ * 海里的东西不用换气。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface DeepConfig {
+  readonly meterPerU: number
+  /** 地图是 sizeU 见方的方形，摆在方框正中 */
+  readonly sizeU: number
+  /** 能走的谷底有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /** 谷底的起伏（米）与波长（格）；顺着峡谷往陡坎那头每格降多少米 */
+  readonly floor: { readonly reliefM: number; readonly waveU: number; readonly tiltM: number }
+  /** 两侧岩壁：壁脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU）；壁高（米），从壁脚到壁顶横着多宽（格） */
+  readonly walls: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly heightM: readonly [number, number]
+    readonly slopeU: readonly [number, number]
+  }
+  /** 上游的岩堆：堆脚离地图边 insetU 格之间，弯出最多 bendU（波长 waveU）；石块多大（格），堆多高（米），从堆脚到堆顶多宽（格） */
+  readonly rubble: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly blockU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly slopeU: number
+  }
+  /** 下游的陡坎：坎沿离地图边 insetU 格之间，弯出最多 bendU（波长 waveU）；坎下的坡起头每格降多少米，越往下越陡 */
+  readonly lip: { readonly insetU: readonly [number, number]; readonly bendU: number; readonly waveU: number; readonly dropM: number }
+  /** 谷底的大石头：几块、底半径（格）、多高（米）；离开局站位至少 clearU 格，彼此至少隔 gapU 格，靠壁脚的占多少 */
+  readonly boulders: {
+    readonly count: readonly [number, number]
+    readonly radiusU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly clearU: number
+    readonly gapU: number
+    readonly wallShare: number
+  }
+  /** 鲸骨：鲸多长（米），离开局站位至少多远（格）；只有头骨挡路，高 skullM 米，脊椎与肋骨矮得跨得过去 */
+  readonly whale: { readonly lengthM: readonly [number, number]; readonly clearU: number; readonly skullM: number }
+  /** 冷泉：几处、多大（格），离开局站位至少多远（格） */
+  readonly seeps: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly clearU: number }
+  /**
+   * 潜艇：艇长、艇宽（格），艇身从艇底往上多高（米，挡子弹按它）；门口那一片喘得上气的半圆的半径（格）；开走时浮到离谷底多高（米）。
+   * 门口每秒补多少点体力，憋着气每秒掉多少点；气见底后满血的标准身体几秒呛死，每 tickMs 结算一次。
+   * 开局 firstMs 后第一次开走，之后隔 intervalMs 上下 jitterMs；先预兆 warnMs（门口还喘得上气），再用 riseMs 浮起、按 speedMs（米/秒）开过去、用 settleMs 落下；
+   * 新落点离旧的 moveU 格之间，艇身离边与石头至少 roomU 格
+   */
+  readonly sub: {
+    readonly lengthU: number
+    readonly beamU: number
+    readonly heightM: number
+    readonly doorU: number
+    readonly cruiseM: number
+    readonly breath: number
+    readonly hold: number
+    readonly drownSec: number
+    readonly tickMs: number
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly warnMs: number
+    readonly riseMs: number
+    readonly settleMs: number
+    readonly speedMs: number
+    readonly moveU: readonly [number, number]
+    readonly roomU: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1151,8 +1225,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1217,7 +1291,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1248,13 +1322,14 @@ export interface MapDef {
   readonly maple?: MapleConfig
   readonly circuit?: CircuitConfig
   readonly nexus?: NexusConfig
+  readonly deep?: DeepConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
 
 export interface DecorInstance {
   emoji: string

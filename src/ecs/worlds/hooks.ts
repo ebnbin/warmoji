@@ -48,6 +48,7 @@ import type { CircuitState } from '../../maps/circuit/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
 import type { NexusState } from '../../maps/nexus/world'
+import type { DeepState } from '../../maps/deep/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -102,11 +103,12 @@ export interface WorldState {
   maple: MapleState | null
   circuit: CircuitState | null
   nexus: NexusState | null
+  deep: DeepState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -176,6 +178,10 @@ export interface WorldHooks {
   towards?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point
   /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */
   toLeader?(sim: Sim, x: number, y: number): number
+  /** 这个身体此刻每秒换多少口气，按体力点数：正的是喘得上气，走着也按它补；负的是憋着气，按它往下掉，歇着也回不来；不写就照常 */
+  breath?(sim: Sim, eid: number): number
+  /** 这张图要队伍盯住的一处：在屏幕外时队长身边画一个指过去的箭头；不写就没有 */
+  beacon?(sim: Sim): Point | null
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }

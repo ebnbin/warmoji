@@ -1026,6 +1026,50 @@ function buildCircuit(): BgmScore {
   )
 }
 
+/** 深海：很慢的小调，低沉的正弦贴着根音一拖一整小节，长长的铺底慢慢起落；声呐似的一声高音隔两小节响一下、回声一圈圈荡开，远处像鲸在叫，偶尔几点冷光似的亮音；心跳一样的轻鼓 */
+function buildDeep(): BgmScore {
+  const chords = [0, 0, 5, 5, 3, 3, 4, 4, 0, 0, 5, 5, 6, 4, 0, 0]
+  return track(
+    {
+      bpm: 52,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 38,
+      scale: AEOLIAN,
+      echo: { delaySec: (60 / 52) * 1.5, feedback: 0.55, level: 0.45 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.16, attack: 0.3, release: 1.2, octave: -1 }
+      const drone: Voice = { wave: 'triangle', vol: 0.028, attack: 1.2, release: 2, octave: 0 }
+      const ping: Voice = { wave: 'sine', vol: 0.05, attack: 0.002, release: 0.6, octave: 2, echo: true }
+      const whale: Voice = { wave: 'triangle', vol: 0.045, attack: 0.45, release: 1.1, octave: 1, echo: true }
+      const glint: Voice = { wave: 'sine', vol: 0.022, attack: 0.003, release: 0.3, octave: 3, echo: true }
+      b.bass(bass, chords, 'r-------')
+      b.pad(drone, chords, [0, 2], 0.004)
+      for (let bar = 0; bar < chords.length; bar += 2) b.note(ping, bar, 0, chords[bar]! + 4, 1)
+      b.line(whale, [
+        [1, 2, 4, 6],
+        [3, 0, 3, 4], [3, 4, 2, 4],
+        [5, 2, 5, 6],
+        [6, 4, 4, 4],
+        [7, 0, 2, 8],
+        [9, 2, 7, 6],
+        [11, 0, 6, 4], [11, 4, 4, 4],
+        [12, 2, 5, 6],
+        [13, 0, 4, 8],
+        [15, 0, 0, 8],
+      ])
+      b.line(glint, [
+        [2, 5, 11, 1], [4, 3, 9, 1], [6, 6, 12, 1], [8, 2, 11, 1],
+        [10, 7, 9, 1], [12, 4, 13, 1], [14, 1, 10, 1], [15, 6, 9, 1],
+      ])
+      b.drums('kick', 'x...o...', 0, 16, 0.07)
+      b.drums('tom', '......o.', 4, 16, 0.04)
+    },
+  )
+}
+
 /** 天枢：自然小调的合成器流行，四拍底鼓推着走；i–VI–III–VII 的和声，方波琶音带着回声在高处闪，锯齿波的低音与铺底，三角波唱主旋律，像夜里飞过灯海 */
 function buildNexus(): BgmScore {
   const chords = [0, 0, 5, 5, 2, 2, 6, 6, 0, 0, 5, 5, 2, 6, 0, 0]
@@ -1096,6 +1140,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   desert: buildDunes,
   circuit: buildCircuit,
   nexus: buildNexus,
+  deep: buildDeep,
 }
 
 const cache = new Map<BgmId, BgmScore>()

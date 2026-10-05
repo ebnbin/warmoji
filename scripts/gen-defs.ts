@@ -42,6 +42,8 @@ import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
 import { bridgeLocal as mapleBridgeLocal, CREST_U as MAPLE_CREST_U, maplePlan, SINK_M as MAPLE_SINK_M, weirLocal as mapleWeirLocal } from '../src/maps/maple/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
+import { deepPlan } from '../src/maps/deep/layout.ts'
+import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
@@ -380,6 +382,77 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
+  }
+}
+
+/**
+ * 深海：参数说得通；头骨挡得住标准身体、大石头比标准身体矮的子弹飞得过去；艇身收得出艇尾、门开在一样粗的那一段、比标准身体高，门口那一片装得下队长和跟在身后的队员，
+ * 喘上气补得比憋气掉得快，满满一口气撑得过潜艇开走一次的两倍时间，开走一次走完才到下一次；
+ * 抽一批种子真的生成一遍：每张都生成得出来，开局站位离边够远，陡坎沿、岩堆脚、鲸骨与冷泉都有出怪的地标，潜艇在开局站位旁停得下、也开得出去
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'deep') === (m.deep !== undefined), `maps.${id} 是深海当且仅当写了 deep`)
+  const d = m.deep
+  if (!d) continue
+  const at = `maps.${id}.deep`
+  const span = (v: readonly [number, number]): boolean => v[0] <= v[1]
+  const pos = (v: readonly [number, number]): boolean => v[0] > 0 && span(v)
+  const ints = (v: readonly [number, number]): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && span(v)
+  const { floor, walls, rubble, lip, boulders, whale, seeps, sub } = d
+  const half = d.sizeU / 2 - SPAWN_CLEAR_U - 1
+  need(d.meterPerU > 0 && d.sizeU > 0 && d.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
+  need(d.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(pos(d.areaU2) && d.areaU2[1] < d.sizeU * d.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
+  need(floor.reliefM >= 0 && floor.waveU > 0 && floor.tiltM >= 0, `${at}.floor 的起伏与坡度不为负、波长为正`)
+  for (const [name, e] of [['walls', walls], ['rubble', rubble], ['lip', lip]] as const) {
+    need(pos(e.insetU) && e.bendU >= 0 && e.waveU > 0 && e.insetU[1] + e.bendU < half, `${at}.${name} 的边距、弯与波长须为正，边落在地图边与出生点四周的空地之间`)
+  }
+  need(pos(walls.heightM) && pos(walls.slopeU), `${at}.walls 的壁高与壁宽须为正的范围`)
+  need(pos(rubble.blockU) && pos(rubble.heightM) && rubble.slopeU > 0, `${at}.rubble 的石块、堆高与堆宽须为正`)
+  need(lip.dropM > 0, `${at}.lip.dropM 须为正：坎外是往下的坡`)
+  const B = OBSTACLES.body
+  const clearM = (B.heightM / B.layers) * Math.floor(B.layers * B.step)
+  need(ints(boulders.count) && pos(boulders.radiusU) && pos(boulders.heightM) && boulders.heightM[0] > clearM, `${at}.boulders 的个数须为非负整数、尺寸为正，最矮的也挡得住标准身体`)
+  need(boulders.clearU >= SPAWN_CLEAR_U && boulders.gapU > 2 * d.neckU && boulders.wallShare >= 0 && boulders.wallShare <= 1, `${at}.boulders 离出生点至少 ${SPAWN_CLEAR_U} 格、彼此隔得开窄缝，靠壁的占比在 [0, 1] 内`)
+  need(pos(whale.lengthM) && whale.clearU >= SPAWN_CLEAR_U && whale.skullM > clearM, `${at}.whale 的鲸长须为正，头骨离出生点至少 ${SPAWN_CLEAR_U} 格、高得挡住标准身体`)
+  need(ints(seeps.count) && seeps.count[0] >= 1 && pos(seeps.radiusU) && seeps.clearU >= SPAWN_CLEAR_U, `${at}.seeps 至少一处、半径为正，离出生点至少 ${SPAWN_CLEAR_U} 格`)
+  const hull = hullOf(sub)
+  need(sub.beamU > 0 && sub.lengthU > sub.beamU && hull.tail < hull.neck && hull.neck <= hull.door && hull.door <= hull.bow && hull.r - hull.tailR < hull.neck - hull.tail, `${at}.sub 的艇身太短：收不出艇尾，门也要开在一样粗的那一段`)
+  need(sub.heightM > B.heightM && sub.cruiseM > B.heightM, `${at}.sub 的艇身须比标准身体高，开走时浮得过身体的头顶`)
+  need(sub.hold > 0 && sub.breath > sub.hold && sub.drownSec > 0 && sub.tickMs > 0, `${at}.sub 憋气要掉气、换气补得比掉得快，呛水的时长与节拍为正`)
+  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(sub.doorU >= squad + 0.5, `${at}.sub 门口那一片只有 ${sub.doorU} 格，装不下跟在队长身后 ${squad.toFixed(2)} 格的队员`)
+  need(sub.roomU > 0 && pos(sub.moveU) && sub.moveU[1] < d.sizeU, `${at}.sub 的艇壁离边要留空，开走的距离须为正、比地图小`)
+  need(sub.firstMs > 0 && sub.jitterMs >= 0 && sub.warnMs > 0 && sub.riseMs > 0 && sub.settleMs > 0 && sub.speedMs > 0, `${at}.sub 开走的各段时长与速度须为正`)
+  const transitMs = sub.riseMs + sub.settleMs + ((sub.moveU[1] * d.meterPerU) / sub.speedMs) * 1000
+  need(sub.intervalMs - sub.jitterMs > sub.warnMs + transitMs, `${at}.sub 潜艇开走一次走完前不该到下一次`)
+  need((STATS.maxStamina.base / sub.hold) * 1000 >= transitMs * 2, `${at}.sub 满满一口气撑 ${(STATS.maxStamina.base / sub.hold).toFixed(1)} 秒，撑不过潜艇开走一次的两倍时间`)
+  for (let s = 0; s < 24; s++) {
+    const where = `${at} 第 ${s} 个样本`
+    let plan: ReturnType<typeof deepPlan>
+    try {
+      plan = deepPlan(d, s * 7919 + 13)
+    } catch (e) {
+      need(false, `${where} 生成不出来：${(e as Error).message}`)
+      continue
+    }
+    const sx = plan.start.x * UNIT
+    const sy = plan.start.y * UNIT
+    need(roomAt(plan.basin, sx, sy) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
+    const mk = plan.marks
+    need(mk.abyss.length >= 3 && mk.rubble.length >= 2 && mk.bones.length >= 2 && mk.seep.length >= seeps.count[0], `${where} 的陡坎沿、岩堆脚、鲸骨或冷泉缺出怪的地标`)
+    const berth = { plan, hull, rim: rimOf(hull, 48), inner: innerOf(hull, 0.5) }
+    const home = homePose(berth, sub)
+    need(fits(berth, sub, home, sub.roomU * UNIT), `${where} 的潜艇在开局站位旁停不下：艇壁离边与石头不到 ${sub.roomU} 格`)
+    let moves = 0
+    for (let k = 0; k < 64; k++) {
+      const a = (k / 64) * Math.PI * 2
+      const r = ((sub.moveU[0] + sub.moveU[1]) / 2) * UNIT
+      const x = home.x + Math.cos(a) * r
+      const y = home.y + Math.sin(a) * r
+      if ([0, 1, 2, 3, 4, 5, 6, 7].some((j) => fits(berth, sub, { x, y, a: (j / 8) * Math.PI * 2 }, sub.roomU * UNIT))) moves++
+    }
+    need(moves >= 4, `${where} 的潜艇从开局停的地方开不出去：开走的距离上几乎找不到停得下的地方`)
   }
 }
 

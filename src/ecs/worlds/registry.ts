@@ -15,6 +15,7 @@ import { sakura } from '../../maps/sakura/world'
 import { maple } from '../../maps/maple/world'
 import { ship } from '../../maps/ship/world'
 import { volcano } from '../../maps/volcano/world'
+import { deep } from '../../maps/deep/world'
 
 const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   bounded,
@@ -36,6 +37,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   maple,
   desert,
   circuit,
+  deep,
   nexus,
 }
 

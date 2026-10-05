@@ -51,6 +51,7 @@ const MARK_WIDTH = 4
 const INSIDE_COLOR = 0x66bb6a
 const OUTSIDE_COLOR = 0xffdc5d
 const GOAL_COLOR = 0xffdc5d
+const BEACON_COLOR = 0x4dd0e1
 
 /** 地上的一圈：据点或救援的范围 */
 interface Mark {
@@ -84,6 +85,7 @@ export class Presentation {
     bars(sim, this.bars)
     pointer(sim, this.pointer, goalSpot(sim), GOAL_COLOR)
     pointer(sim, this.pointer, nearestTo(sim, levelUpsOnField(sim)), LEVEL_UP_COLOR)
+    pointer(sim, this.pointer, sim.hooks.beacon?.(sim) ?? null, BEACON_COLOR)
     const r = sim.fight.rules.rescue
     if (!r) this.rescue = []
     else if (!sim.over) this.rescue = rescueMarks(sim, r.radius * UNIT)
@@ -149,7 +151,7 @@ function bars(sim: Sim, o: Scratch): void {
   }
 }
 
-/** 目标或最近的升级道具在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
+/** 目标、最近的升级道具或地图要盯住的那一处在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
 function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
