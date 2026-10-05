@@ -32,6 +32,7 @@ import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, 
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
+import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
 import { place } from './render/tri'
 import { Presentation } from './presentation'
@@ -477,7 +478,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     resetEntityStorage()
     const paint = new Presentation()
     this.paint = paint
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites)
+    const light = MAPS[run.mapId].light
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light)
+    if (light) new EcsShadowBatch(this, this.world, atlas, light)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))

@@ -3,9 +3,23 @@ import { query } from 'bitecs'
 import { Depth, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
+import type { UnitLight } from '../../types/maps'
+import { SUN } from '../../data/light'
+import { paintedEmojiOn } from '../../emoji/style'
 import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 export { SPRITE_BANDS } from './bands'
+
+/** 背着太阳的方向，画面上的单位向量 */
+const AWAY = { x: -SUN.x / Math.hypot(SUN.x, SUN.y), y: -SUN.y / Math.hypot(SUN.x, SUN.y) }
+
+/** 状态色乘上一个角受的光：t 从迎光的 0 到背光的 1，在 sun 与 shade 之间插 */
+function litTint(color: number, sun: number, shade: number, t: number, alpha: number): number {
+  const r = (((sun >> 16) & 0xff) * (1 - t) + ((shade >> 16) & 0xff) * t) * ((color >> 16) & 0xff)
+  const g = (((sun >> 8) & 0xff) * (1 - t) + ((shade >> 8) & 0xff) * t) * ((color >> 8) & 0xff)
+  const b = ((sun & 0xff) * (1 - t) + (shade & 0xff) * t) * (color & 0xff)
+  return packTint((Math.round(r / 255) << 16) | (Math.round(g / 255) << 8) | Math.round(b / 255), alpha)
+}
 
 /** 不属于实体的一张图：和实体的精灵按 z 排在一起画，z 相同时画在实体之后 */
 export interface PaintSprite {
@@ -35,14 +49,18 @@ export class EcsSpriteBatch extends EcsLayer {
   private readonly zMax: number
   /** 按 z 从小到大排好 */
   private readonly paint: readonly PaintSprite[]
+  private readonly light: UnitLight | undefined
+  /** 这一帧打不打光：新画风随时能在设置里关掉 */
+  private lit = false
 
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[]) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight | undefined) {
     super(scene, LayerType.Sprite, depth)
     this.world = world
     this.atlas = atlas
     this.zMin = zMin
     this.zMax = zMax
     this.paint = paint
+    this.light = light
     scene.add.existing(this)
   }
 
@@ -72,6 +90,7 @@ export class EcsSpriteBatch extends EcsLayer {
     order.sort((a, b) => Depth.z[a]! - Depth.z[b]! || a - b)
 
     self.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
+    self.lit = self.light !== undefined && paintedEmojiOn()
 
     for (let i = 0; i < order.length; i++) {
       const eid = order[i]!
@@ -105,16 +124,8 @@ export class EcsSpriteBatch extends EcsLayer {
     spriteMatrix.applyITRS(x, y, rot, 1, 1)
     this.camMatrix.multiply(spriteMatrix, calc)
 
-    const hw = (flipX ? -1 : 1) * w * 0.5
+    let hw = (flipX ? -1 : 1) * w * 0.5
     const hh = h * 0.5
-    const x0 = calc.getX(-hw, -hh)
-    const y0 = calc.getY(-hw, -hh)
-    const x1 = calc.getX(-hw, hh)
-    const y1 = calc.getY(-hw, hh)
-    const x2 = calc.getX(hw, -hh)
-    const y2 = calc.getY(hw, -hh)
-    const x3 = calc.getX(hw, hh)
-    const y3 = calc.getY(hw, hh)
 
     this.atlas.uvInto(frame, this.uv)
     let u0 = this.uv[0]!
@@ -130,15 +141,51 @@ export class EcsSpriteBatch extends EcsLayer {
       else v0 = vm
     }
 
-    const tint = packTint(color, alpha)
+    const light = this.lit && effect === 0 ? this.light : undefined
+    // 背着太阳的方向转进精灵自己的坐标，按对角线的一半归一
+    let ax = 0
+    let ay = 0
+    if (light) {
+      const c = Math.cos(rot)
+      const s = Math.sin(rot)
+      const r = Math.hypot(hw, hh) || 1
+      ax = (c * AWAY.x + s * AWAY.y) / r
+      ay = (c * AWAY.y - s * AWAY.x) / r
+      // 四边形沿 TL–BR 剖成两个三角形：这条对角线顺着光时，几何与贴图一起左右镜像，换成横着光的那条，暗面才压得进背光的一角
+      if (Math.abs(hw * ax + hh * ay) > Math.abs(hw * ax - hh * ay)) {
+        hw = -hw
+        const u = u0
+        u0 = u1
+        u1 = u
+      }
+    }
+
+    const x0 = calc.getX(-hw, -hh)
+    const y0 = calc.getY(-hw, -hh)
+    const x1 = calc.getX(-hw, hh)
+    const y1 = calc.getY(-hw, hh)
+    const x2 = calc.getX(hw, -hh)
+    const y2 = calc.getY(hw, -hh)
+    const x3 = calc.getX(hw, hh)
+    const y3 = calc.getY(hw, hh)
     const tex = this.atlas.pageGlTexture(this.atlas.page(frame))
+    if (!light) {
+      const tint = packTint(color, alpha)
+      node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, effect, tint, tint, tint, tint, this.renderOptions)
+      return
+    }
+    // 每个角偏离中心的那段投到背光方向上：迎光的一半保持 sun，过了中心才往背光的一角渐渐乘到 shade
+    const { sun, shade } = light
     node.batch(
       drawingContext,
       tex,
       x0, y0, x1, y1, x2, y2, x3, y3,
       u0, v0, u1 - u0, v1 - v0,
       effect,
-      tint, tint, tint, tint,
+      litTint(color, sun, shade, Math.max(0, -hw * ax - hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, -hw * ax + hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, hw * ax - hh * ay), alpha),
+      litTint(color, sun, shade, Math.max(0, hw * ax + hh * ay), alpha),
       this.renderOptions,
     )
   }
