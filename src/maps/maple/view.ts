@@ -56,8 +56,8 @@ const LANDED_S = 6
 const LEAF_U = [0.26, 0.36] as const
 const LEAF_PX = 64
 /** 飘落的叶子离地每高一米，画面上往上抬多少格、影子往背光的方向挪开多少格 */
-const FALL_LIFT_U = 0.16
-const FALL_SHADOW_U = 0.7
+const FALL_LIFT_U = 0.32
+const FALL_SHADOW_U = 0.35
 /** 飘着的叶子离镜头近，离地每高一米画大这么多 */
 const NEARER_PER_M = 0.07
 
@@ -391,7 +391,6 @@ export class MapleView implements MapView {
       this.fallAt = FALL_EVERY_S
       this.shed(v, plan)
     }
-    const mpu = cfg.meterPerU
     this.falling = this.falling.filter((p) => {
       if (p.landed < 0) {
         p.phase += dt
@@ -426,8 +425,8 @@ export class MapleView implements MapView {
         const tex = leafKey(p.color, face < 0)
         if (p.img.texture.key !== tex) p.img.setTexture(tex)
         const near = p.size * (1 + NEARER_PER_M * p.z)
-        p.img.setPosition(p.x * UNIT, (p.y - (p.z / mpu) * FALL_LIFT_U) * UNIT).setRotation(p.rot).setDisplaySize(near * UNIT, near * UNIT * wide)
-        const off = (p.z / mpu) * FALL_SHADOW_U * 0.25
+        p.img.setPosition(p.x * UNIT, (p.y - p.z * FALL_LIFT_U) * UNIT).setRotation(p.rot).setDisplaySize(near * UNIT, near * UNIT * wide)
+        const off = p.z * FALL_SHADOW_U
         p.shadow
           .setPosition((p.x + AWAY.x * off) * UNIT, (p.y + AWAY.y * off) * UNIT)
           .setRotation(p.rot)

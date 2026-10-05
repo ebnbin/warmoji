@@ -158,6 +158,10 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
   const limbs = 5 + Math.floor(rng.next() * 3)
   const base = rng.next() * Math.PI * 2
   const step = (Math.PI * 2) / limbs
+  // 树冠不是正圆：往哪边伸得远按方位起伏，一棵一个样
+  const p2 = rng.next() * Math.PI * 2
+  const p3 = rng.next() * Math.PI * 2
+  const spread = (a: number): number => 1 + 0.12 * Math.cos(2 * (a - p2)) + 0.07 * Math.cos(3 * (a - p3))
   for (let i = 0; i < limbs; i++) {
     const ang = base + (i + (rng.next() - 0.5) * 0.5) * step
     const fork = R * (0.32 + 0.14 * rng.next())
@@ -168,7 +172,7 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
     const subs = rng.next() < 0.3 ? 3 : 2
     for (let j = 0; j < subs; j++) {
       const a2 = ang + (j - (subs - 1) / 2) * step * (subs === 3 ? 0.36 : 0.5) + (rng.next() - 0.5) * 0.18
-      const reach = R * (rng.next() < 0.2 ? 0.62 + 0.14 * rng.next() : 0.8 + 0.26 * rng.next())
+      const reach = R * spread(a2) * (rng.next() < 0.2 ? 0.62 + 0.14 * rng.next() : 0.8 + 0.26 * rng.next())
       const ex = t.x + Math.cos(a2) * reach
       const ey = t.y + Math.sin(a2) * reach
       twigs.push({ ax: fx, ay: fy, bx: ex, by: ey, w0: 0.05, w1: 0.022, z: H * 0.55 })
@@ -215,7 +219,7 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
         const x = sp.x + sp.ux * js + vx * jl
         const y = sp.y + sp.uy * js + vy * jl
         const rho = Math.hypot(x - t.x, y - t.y)
-        if (rho > R * 1.08) continue
+        if (rho > R * 1.2) continue
         // 叶簇是一团拱起的扇面：当中最高，根部、梢头与两边往下垂；叶子的高低与朝向都顺着这个面，再各自偏一点
         const fs = js / sp.len
         const side = jl / Math.max(1e-3, hw)
