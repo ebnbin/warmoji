@@ -41,13 +41,15 @@ const PAINT_THREADS = 4
 const CAM_M = 20
 /** 钟从钟口到顶有多高，米：画在一半高处 */
 const BELL_TALL_M = 2.4
+/** 钟画多大，占钟口底下喘得上气那一圈的比例：那一圈比钟口宽一点，气泡从钟口漫出来 */
+const BELL_SIZE = 0.62
 /** 探照灯与头灯的亮度（给着色器的量，与照到的距离平方相除）；头灯举多高（米） */
-const BELL_LAMP = 26
-const HEAD_LAMP = 3.2
+const BELL_LAMP = 30
+const HEAD_LAMP = 1.6
 const HEAD_LAMP_M = 1.3
 /** 头顶照下来的那一丝蓝，三色 */
-const SKY = [0.032, 0.1, 0.26] as const
-const EXPOSURE = 1.6
+const SKY = [0.02, 0.066, 0.25] as const
+const EXPOSURE = 1.5
 /** 冷光：每格几个格子，衰减的时间常数（秒），身体游多快（格/秒）才搅亮水，搅亮多少；弹体一路拖出多亮的尾巴 */
 const GLOW_PPU = 4
 const GLOW_TAU = 0.75
@@ -56,11 +58,11 @@ const GLOW_BODY = 2.4
 const GLOW_SHOT = 0.22
 const GLOW_GAIN = 1.1
 /** 气泡：最多同时几个，往上升多快（米/秒），升到多高就散了（米） */
-const BUBBLE_MAX = 220
-const BUBBLE_RISE_MS = 0.9
-const BUBBLE_TOP_M = CAM_M * 0.8
+const BUBBLE_MAX = 160
+const BUBBLE_RISE_MS = 1.4
+const BUBBLE_TOP_M = 9
 /** 海雪：几片，往下沉多快（米/秒），离谷底多高的范围（米） */
-const SNOW = 170
+const SNOW = 190
 const SNOW_SINK_MS = 0.12
 const SNOW_LO_M = 0.4
 const SNOW_HI_M = CAM_M * 0.72
@@ -347,9 +349,9 @@ export class DeepView extends BoundedView {
     const high = smooth(cfg.bell.hangM + 3, cfg.bell.hangM + 9, b.h)
     img
       .setPosition(mid.x, mid.y)
-      .setDisplaySize(R * 2 * mid.k, R * 2 * mid.k)
+      .setDisplaySize(R * 2 * BELL_SIZE * mid.k, R * 2 * BELL_SIZE * mid.k)
       .setRotation(Math.sin(now / 3100) * 0.03)
-      .setAlpha((0.3 + 0.7 * smooth(R * 0.7, R * 1.5, near)) * (1 - high))
+      .setAlpha((0.3 + 0.62 * smooth(R * 0.5, R * 1.3, near)) * (1 - high))
       .setVisible(high < 1)
     const rim = at(b.h)
     halo
@@ -398,13 +400,13 @@ export class DeepView extends BoundedView {
     const R = airRadius(cfg)
     const screen = v.lens.screen
     const floorAt = (x: number, y: number): number => seabedM(s.plan, x / UNIT, y / UNIT)
-    const rate = b.phase === 'down' ? 3 : b.phase === 'warn' ? 26 : b.phase === 'hoist' ? 14 : 0
+    const rate = b.phase === 'down' ? 2 : b.phase === 'warn' ? 18 : b.phase === 'hoist' ? 10 : 0
     this.bubbleDebt += rate * dt
     if (screen.sees(b.x, b.y, 6 * UNIT)) {
       while (this.bubbleDebt >= 1) {
         this.bubbleDebt -= 1
         const a = Math.random() * Math.PI * 2
-        this.spawnBubble(v, b.x + Math.cos(a) * R * 0.95, b.y + Math.sin(a) * R * 0.95, floorAt(b.x, b.y) + b.h, 0.05 + Math.random() * 0.12)
+        this.spawnBubble(v, b.x + Math.cos(a) * R * 0.95, b.y + Math.sin(a) * R * 0.95, floorAt(b.x, b.y) + b.h, 0.03 + Math.random() * 0.05)
       }
     } else this.bubbleDebt = 0
     for (const m of sim.characters) {
@@ -416,16 +418,16 @@ export class DeepView extends BoundedView {
         const at = this.exhaleAt.get(Uid.v[m]!) ?? 0
         if (now < at) continue
         this.exhaleAt.set(Uid.v[m]!, now + 1800 + Math.random() * 1200)
-        for (let i = 0; i < 3; i++) this.spawnBubble(v, x + (Math.random() - 0.5) * 8, y - 0.2 * UNIT, h, 0.04 + Math.random() * 0.05)
+        for (let i = 0; i < 3; i++) this.spawnBubble(v, x + (Math.random() - 0.5) * 8, y - 0.2 * UNIT, h, 0.02 + Math.random() * 0.03)
       } else if (staminaLeft(m) <= 0) {
-        if (Math.random() < dt * 9) this.spawnBubble(v, x + (Math.random() - 0.5) * 10, y - 0.2 * UNIT, h, 0.05 + Math.random() * 0.08)
+        if (Math.random() < dt * 9) this.spawnBubble(v, x + (Math.random() - 0.5) * 10, y - 0.2 * UNIT, h, 0.03 + Math.random() * 0.05)
         if (now >= this.gurgleAt && screen.sees(x, y)) {
           this.gurgleAt = now + GURGLE_MS
           playSfx('gurgle')
         }
       }
     }
-    this.seepDebt += s.plan.seeps.length * 6 * dt
+    this.seepDebt += s.plan.seeps.length * 3 * dt
     while (this.seepDebt >= 1) {
       this.seepDebt -= 1
       const q = s.plan.seeps[Math.floor(Math.random() * s.plan.seeps.length)]!
@@ -433,7 +435,7 @@ export class DeepView extends BoundedView {
       const r = Math.sqrt(Math.random()) * q.r * 0.45 * UNIT
       const x = q.x * UNIT + Math.cos(a) * r
       const y = q.y * UNIT + Math.sin(a) * r
-      if (screen.sees(x, y, 3 * UNIT)) this.spawnBubble(v, x, y, floorAt(x, y), 0.03 + Math.random() * 0.06)
+      if (screen.sees(x, y, 3 * UNIT)) this.spawnBubble(v, x, y, floorAt(x, y), 0.015 + Math.random() * 0.03)
     }
   }
 
@@ -441,7 +443,7 @@ export class DeepView extends BoundedView {
     if (this.bubbles.length >= BUBBLE_MAX) return
     const img = this.spare.pop() ?? v.scene.add.image(0, 0, BUBBLE_KEY).setDepth(32)
     img.setVisible(true)
-    this.bubbles.push({ x, y, h, vh: BUBBLE_RISE_MS * (0.75 + Math.random() * 0.5) * (0.6 + r * 4), r, phase: Math.random() * 6.28, age: 0, img })
+    this.bubbles.push({ x, y, h, vh: BUBBLE_RISE_MS * (0.75 + Math.random() * 0.5) * (0.7 + r * 6), r, phase: Math.random() * 6.28, age: 0, img })
   }
 
   /** 气泡一边往上升一边左右晃，按透视画：越高越大、越往画面外偏，升高了就散了 */
@@ -462,7 +464,7 @@ export class DeepView extends BoundedView {
       q.img
         .setPosition(eye.x + (q.x - eye.x) * k, eye.y + (q.y - eye.y) * k)
         .setDisplaySize(size * (1 + 0.08 * Math.sin(q.phase * 1.7)), size * (1 - 0.08 * Math.sin(q.phase * 1.7)))
-        .setAlpha(smooth(0, 0.15, q.age) * (1 - smooth(BUBBLE_TOP_M * 0.55, BUBBLE_TOP_M, q.h)) * 0.85)
+        .setAlpha(smooth(0, 0.15, q.age) * (1 - smooth(BUBBLE_TOP_M * 0.45, BUBBLE_TOP_M, q.h)) * 0.8)
         .setTint(this.lightTint(q.x, q.y))
       kept.push(q)
     }
@@ -488,7 +490,7 @@ export class DeepView extends BoundedView {
     for (let i = 0; i < SNOW; i++) {
       const img = scene.add.image(0, 0, FLAKE_KEY).setDepth(33)
       this.visuals.push(img)
-      const f: Flake = { x: 0, y: 0, h: 0, vx: 0, vy: 0, r: 0.03 + Math.random() * 0.05, phase: Math.random() * 6.28, img }
+      const f: Flake = { x: 0, y: 0, h: 0, vx: 0, vy: 0, r: 0.04 + Math.random() * 0.06, phase: Math.random() * 6.28, img }
       this.respawnFlake(f, eye, view, Math.random())
       this.snow.push(f)
     }
@@ -526,7 +528,7 @@ export class DeepView extends BoundedView {
         .setPosition(sx, sy)
         .setDisplaySize(size, size)
         .setRotation(f.phase)
-        .setAlpha((0.18 + 0.4 * smooth(SNOW_HI_M, SNOW_LO_M, f.h)) * (0.4 + 0.6 * smooth(0, 1, f.h)))
+        .setAlpha((0.3 + 0.45 * smooth(SNOW_HI_M, SNOW_LO_M, f.h)) * (0.4 + 0.6 * smooth(0, 1, f.h)))
         .setTint(this.lightTint(f.x, f.y))
     }
   }

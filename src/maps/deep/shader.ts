@@ -21,11 +21,11 @@ export const MAX_LAMPS = 6
  * 海水对红、绿、蓝三色光的衰减系数，每米：红光一两米就被吃掉，蓝光走得最远，灯光照远了只剩青蓝。
  * 清澈的深海水大致是这个量级
  */
-export const ATTENUATION = [0.42, 0.075, 0.035] as const
+export const ATTENUATION = [0.45, 0.16, 0.05] as const
 
 /**
  * 谷底的光：地面的固有色乘上照到它的光，再加上水里散射回来的光与被搅亮的浮游生物。
- * 头顶的天光只剩一丝深蓝，朝上的地方吃得多、越往陡坎下越暗；钟上的探照灯朝下照，按 I·cosθ/r² 落在地面上，光走过的每一米按三色的衰减系数吃掉，远处只剩青蓝；
+ * 头顶的天光只剩一丝深蓝，朝上的地方吃得多，越高越亮（离海面近一点）、越往陡坎下越暗；钟上的探照灯朝下照，按 I·cosθ/r² 落在地面上，光走过的每一米按三色的衰减系数吃掉，远处只剩青蓝；
  * 队员的头灯朝着各自面朝的方向亮，身后也漏一点。灯光在水里被悬浮的颗粒散射回镜头，灯四周罩着一团泛青的光晕。
  * 被搅动的浮游生物发出蓝绿的冷光，叠在最上面。最后按曝光压成画面的颜色，加一点抖动免得暗处出色带
  */
@@ -64,18 +64,18 @@ void main ()
   vec3 nm = texture2D(uNorm, uv).rgb;
   vec3 n = normalize(vec3(nm.xy * 2.0 - 1.0, max(nm.z, 0.05)));
   vec3 p = vec3(world * uMpp, z);
-  float sky = (0.4 + 0.6 * max(n.z, 0.0)) * exp(0.075 * min(z, 0.0)) * (1.0 + 0.035 * max(z, 0.0));
+  float sky = (0.55 + 0.45 * max(n.z, 0.0)) * exp(0.05 * min(z, 16.0) + 0.03 * min(z, 0.0));
   vec3 light = uSky * sky;
   vec3 haze = vec3(0.0);
   if (uBell.w > 0.0) {
     vec3 l = vec3(uBell.xy * uMpp, uBell.z) - p;
     float r = length(l);
     vec3 ld = l / max(r, 0.001);
-    float spot = smoothstep(0.3, 0.85, ld.z);
+    float spot = smoothstep(0.22, 0.8, ld.z);
     vec3 fall = exp(-ATT * r);
     light += uBell.w * spot * max(dot(n, ld), 0.0) / (r * r + 0.4) * fall;
     float dh = length(l.xy);
-    haze += uBell.w * 0.0065 * exp(-ATT * (dh * 0.8 + 1.5)) / (dh * dh * 0.18 + 1.0);
+    haze += uBell.w * 0.0042 * exp(-ATT * (dh * 0.8 + 1.5)) / (dh * dh * 0.2 + 1.0);
   }
   for (int k = 0; k < ${MAX_LAMPS}; k++) {
     if (float(k) >= uLampCount) break;
@@ -85,12 +85,12 @@ void main ()
     vec3 ld = l / max(r, 0.001);
     vec2 away = -l.xy / max(length(l.xy), 0.001);
     float ahead = dot(away, uLampDir[k].xy);
-    float spot = mix(0.22, 1.0, smoothstep(-0.2, 0.75, ahead));
+    float spot = mix(0.12, 1.0, smoothstep(0.0, 0.85, ahead));
     spot = mix(1.0, spot, smoothstep(0.4, 1.4, length(l.xy)));
     vec3 fall = exp(-ATT * r);
     light += lamp.w * spot * max(dot(n, ld), 0.0) / (r * r + 0.3) * fall;
     float dh = length(l.xy);
-    haze += lamp.w * 0.006 * exp(-ATT * (dh * 0.8 + 1.0)) / (dh * dh * 0.6 + 1.0) * mix(0.5, 1.0, smoothstep(-0.3, 0.6, ahead));
+    haze += lamp.w * 0.003 * exp(-ATT * (dh * 0.8 + 1.0)) / (dh * dh * 0.8 + 1.0) * mix(0.5, 1.0, smoothstep(-0.3, 0.6, ahead));
   }
   vec3 glow = vec3(0.12, 0.78, 1.0) * texture2D(uGlow, uv).r * uGlowGain;
   vec3 col = albedo * light + haze + glow;

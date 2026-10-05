@@ -161,8 +161,10 @@ export function boulderRadius(s: Boulder, x: number, y: number): number {
 
 /** (x, y) 在大石头里多深，占它那个方位半径的比例，石头外为负 */
 export function inBoulder(s: Boulder, x: number, y: number): number {
+  const far = s.r * 1.3
+  if (Math.abs(x - s.x) > far || Math.abs(y - s.y) > far) return -1
   const d = Math.hypot(x - s.x, y - s.y)
-  if (d > s.r * 1.3) return -1
+  if (d > far) return -1
   return 1 - d / boulderRadius(s, x, y)
 }
 

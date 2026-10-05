@@ -35,18 +35,21 @@ function scale(c: Rgb, k: number): void {
   c[2] *= k
 }
 
-/** 线段 a→b 上离 (x, y) 最近的点有多远，与那一点在线段上的比例 */
-function segDist(x: number, y: number, ax: number, ay: number, bx: number, by: number): { d: number; t: number } {
+/** 线段 a→b 上离 (x, y) 最近的点：距离与在线段上的比例写进 SEG */
+const SEG = { d: 0, t: 0 }
+function segDist(x: number, y: number, ax: number, ay: number, bx: number, by: number): void {
   const dx = bx - ax
   const dy = by - ay
   const l2 = dx * dx + dy * dy
   const t = l2 > 0 ? clamp01(((x - ax) * dx + (y - ay) * dy) / l2) : 0
-  return { d: Math.hypot(x - ax - dx * t, y - ay - dy * t), t }
+  SEG.d = Math.hypot(x - ax - dx * t, y - ay - dy * t)
+  SEG.t = t
 }
 
-/** 一根骨头：鲸骨坐标（u、v，格）下的折线、粗细（格，起止）、多高（米） */
+/** 一根骨头：鲸骨坐标（u、v，格）下的折线、粗细（格，起止）、多高（米）；box 是折线连同粗细的外框 u0、v0、u1、v1 */
 interface Bone {
   readonly pts: Float32Array
+  readonly box: readonly [number, number, number, number]
   readonly w0: number
   readonly w1: number
   readonly h: number
@@ -70,6 +73,8 @@ export interface Skeleton {
   readonly bones: readonly Bone[]
   readonly verts: readonly Vert[]
   readonly reach: number
+  /** 鲸骨连同四周染黑的泥的外框，地图坐标 x0、y0、x1、y1 */
+  readonly box: readonly [number, number, number, number]
 }
 
 function polyline(n: number, at: (s: number) => [number, number]): Float32Array {
@@ -88,10 +93,25 @@ export function skeletonOf(w: Whale): Skeleton {
   const ws = SKULL_HALF * L
   const r = (k: number): number => hash(k, 17, w.seed)
   const bones: Bone[] = []
+  const add = (b: Omit<Bone, 'box'>): void => {
+    const p = b.pts
+    const w = Math.max(b.w0, b.w1) * 1.6
+    let u0 = Infinity
+    let v0 = Infinity
+    let u1 = -Infinity
+    let v1 = -Infinity
+    for (let i = 0; i < p.length; i += 2) {
+      u0 = Math.min(u0, p[i]!)
+      u1 = Math.max(u1, p[i]!)
+      v0 = Math.min(v0, p[i + 1]!)
+      v1 = Math.max(v1, p[i + 1]!)
+    }
+    bones.push({ ...b, box: [u0 - w, v0 - w, u1 + w, v1 + w] })
+  }
   // 下颌：从脑颅后两角往前，向外弓出去，比吻部还长一点
   for (const side of [-1, 1]) {
     const splay = 0.15 + 0.35 * r(side + 3)
-    bones.push({ pts: polyline(14, (s) => [0.9 * sk - s * 1.02 * sk, side * (0.95 * ws + (0.32 + splay) * ws * Math.sin(Math.PI * s * 0.9) + 0.25 * ws * s)]), w0: 0.16 * ws, w1: 0.07 * ws, h: 0.28, belly: false })
+    add({ pts: polyline(14, (s) => [0.9 * sk - s * 1.02 * sk, side * (0.95 * ws + (0.32 + splay) * ws * Math.sin(Math.PI * s * 0.9) + 0.25 * ws * s)]), w0: 0.16 * ws, w1: 0.07 * ws, h: 0.28, belly: false })
   }
   // 肋骨：十二对，从胸椎往外、往尾巴那边弯；有的倒向一边、有的散开
   for (let k = 0; k < 12; k++) {
@@ -103,7 +123,7 @@ export function skeletonOf(w: Whale): Skeleton {
       const bend = 0.16 + 0.12 * r(j + 160)
       const du = Math.cos(ang)
       const dv = Math.sin(ang) * side
-      bones.push({
+      add({
         pts: polyline(10, (s) => {
           const a = s * len
           return [u0 + du * a + bend * s * s * len * 0.9, side * 0.018 * L + dv * a - side * bend * s * s * len * 0.15]
@@ -123,13 +143,13 @@ export function skeletonOf(w: Whale): Skeleton {
     const du = Math.cos(a)
     const dv = Math.sin(a + Math.PI / 2) * side
     const hu = 0.045 * L
-    bones.push({ pts: polyline(4, (s) => [u0 + du * hu * s * 0.3, v0 + dv * hu * s]), w0: 0.014 * L, w1: 0.012 * L, h: 0.24, belly: false })
-    for (const off of [-0.006, 0.006]) bones.push({ pts: polyline(4, (s) => [u0 + du * hu * 0.3 + du * 0.02 * L * s + off * L, v0 + dv * (hu + 0.05 * L * s)]), w0: 0.006 * L, w1: 0.005 * L, h: 0.18, belly: false })
+    add({ pts: polyline(4, (s) => [u0 + du * hu * s * 0.3, v0 + dv * hu * s]), w0: 0.014 * L, w1: 0.012 * L, h: 0.24, belly: false })
+    for (const off of [-0.006, 0.006]) add({ pts: polyline(4, (s) => [u0 + du * hu * 0.3 + du * 0.02 * L * s + off * L, v0 + dv * (hu + 0.05 * L * s)]), w0: 0.006 * L, w1: 0.005 * L, h: 0.18, belly: false })
     for (let f = 0; f < 4; f++) {
       const fa = a + (f - 1.5) * 0.16
       const fu = Math.cos(fa)
       const fv = Math.sin(fa + Math.PI / 2) * side
-      bones.push({ pts: polyline(5, (s) => [u0 + du * hu * 0.3 + du * 0.02 * L + fu * 0.012 * L * f * 0.3 + fu * 0.07 * L * s * 0.4, v0 + dv * (hu + 0.05 * L) + fv * 0.08 * L * s]), w0: 0.0035 * L, w1: 0.002 * L, h: 0.12, belly: false })
+      add({ pts: polyline(5, (s) => [u0 + du * hu * 0.3 + du * 0.02 * L + fu * 0.012 * L * f * 0.3 + fu * 0.07 * L * s * 0.4, v0 + dv * (hu + 0.05 * L) + fv * 0.08 * L * s]), w0: 0.0035 * L, w1: 0.002 * L, h: 0.12, belly: false })
     }
   }
   // 脊椎：三十来节，从颈椎排到尾尖，越往后越小；腰那一段的横突最长；有几节被拱散了
@@ -149,7 +169,10 @@ export function skeletonOf(w: Whale): Skeleton {
       rot: (r(i + 420) - 0.5) * (loose ? 0.9 : 0.12),
     })
   }
-  return { whale: w, bones, verts, reach: WHALE_HALF * L + 0.8 }
+  const pad = WHALE_HALF * L * 1.3 + 0.8
+  const tx = w.x + w.dx * L
+  const ty = w.y + w.dy * L
+  return { whale: w, bones, verts, reach: WHALE_HALF * L + 0.8, box: [Math.min(w.x, tx) - pad, Math.min(w.y, ty) - pad, Math.max(w.x, tx) + pad, Math.max(w.y, ty) + pad] }
 }
 
 /** 鲸骨上 (x, y) 处是哪种骨头、多高（米）、骨面的明暗；没有骨头 kind 为 0：1 头骨、2 下颌与肋骨鳍骨、3 脊椎 */
@@ -166,7 +189,8 @@ function boneAt(s: Skeleton, x: number, y: number, out: BoneHit): BoneHit {
   out.h = 0
   out.shade = 1
   const w = s.whale
-  if (fromWhale(w, x, y) > s.reach) return out
+  const bx = s.box
+  if (x < bx[0] || x > bx[2] || y < bx[1] || y > bx[3] || fromWhale(w, x, y) > s.reach) return out
   whaleUV(w, x, y, UV)
   const u = UV.a
   const v = UV.b
@@ -188,6 +212,7 @@ function boneAt(s: Skeleton, x: number, y: number, out: BoneHit): BoneHit {
     return out
   }
   for (const vt of s.verts) {
+    if (Math.abs(u - vt.u) > vt.hl * 1.6 + 0.1) continue
     const du = u - vt.u
     const dv = v - vt.v
     if (Math.abs(du) > vt.hl + 0.1 || Math.abs(dv) > vt.hw + vt.wing + 0.1) continue
@@ -211,14 +236,16 @@ function boneAt(s: Skeleton, x: number, y: number, out: BoneHit): BoneHit {
     }
   }
   for (const bn of s.bones) {
+    const bx = bn.box
+    if (u < bx[0] || u > bx[2] || v < bx[1] || v > bx[3]) continue
     const p = bn.pts
     const n = p.length / 2 - 1
     for (let i = 0; i < n; i++) {
-      const g = segDist(u, v, p[i * 2]!, p[i * 2 + 1]!, p[i * 2 + 2]!, p[i * 2 + 3]!)
-      const s0 = (i + g.t) / n
+      segDist(u, v, p[i * 2]!, p[i * 2 + 1]!, p[i * 2 + 2]!, p[i * 2 + 3]!)
+      const s0 = (i + SEG.t) / n
       const wdt = (bn.w0 + (bn.w1 - bn.w0) * s0) * (bn.belly ? 0.7 + 0.6 * Math.sin(Math.PI * s0) : 1)
-      if (g.d > wdt) continue
-      const q = g.d / wdt
+      if (SEG.d > wdt) continue
+      const q = SEG.d / wdt
       out.kind = 2
       out.h = bn.h * Math.sqrt(1 - q * q)
       out.shade = 0.78 + 0.22 * Math.sqrt(1 - q * q)
@@ -238,8 +265,19 @@ function seepAt(plan: DeepPlan, x: number, y: number): { k: number; seed: number
   return null
 }
 
-/** 落在第几个 cell 格里、格心的随机偏移与这个格子掷的签：撒小东西用 */
-function scatter(x: number, y: number, cell: number, seed: number, chance: number, fn: (dx: number, dy: number, r: number) => void): void {
+/** 撒小东西：每个 cell 见方的格子掷一次签，中了就在格子里放一个，离格边至少 reach（它最远伸到多远），所以只看自己这一格 */
+function scatter(x: number, y: number, cell: number, reach: number, seed: number, chance: number, fn: (dx: number, dy: number, r: number) => void): void {
+  const cx = Math.floor(x / cell)
+  const cy = Math.floor(y / cell)
+  if (hash(cx, cy, seed) >= chance) return
+  const room = cell - 2 * reach
+  const px = cx * cell + reach + room * hash(cx, cy, seed + 1)
+  const py = cy * cell + reach + room * hash(cx, cy, seed + 2)
+  fn(x - px, y - py, hash(cx, cy, seed + 3))
+}
+
+/** 撒密密的小东西：放在格子里任何地方，可能伸进邻格，所以连邻近的八格一起看 */
+function sprinkle(x: number, y: number, cell: number, seed: number, chance: number, fn: (dx: number, dy: number, r: number) => void): void {
   const gx = Math.floor(x / cell)
   const gy = Math.floor(y / cell)
   for (let j = -1; j <= 1; j++) {
@@ -247,9 +285,7 @@ function scatter(x: number, y: number, cell: number, seed: number, chance: numbe
       const cx = gx + i
       const cy = gy + j
       if (hash(cx, cy, seed) >= chance) continue
-      const px = (cx + 0.15 + 0.7 * hash(cx, cy, seed + 1)) * cell
-      const py = (cy + 0.15 + 0.7 * hash(cx, cy, seed + 2)) * cell
-      fn(x - px, y - py, hash(cx, cy, seed + 3))
+      fn(x - (cx + hash(cx, cy, seed + 1)) * cell, y - (cy + hash(cx, cy, seed + 2)) * cell, hash(cx, cy, seed + 3))
     }
   }
 }
@@ -263,9 +299,9 @@ function ooze(c: Rgb, x: number, y: number, seed: number): void {
   const big = fbm(x / 7, y / 7, seed + 1, 3)
   const mid = fbm(x / 1.7, y / 1.7, seed + 2, 3)
   const grain = valueNoise(x * 9, y * 9, seed + 3)
-  c[0] = 0.6 + 0.08 * big
-  c[1] = 0.57 + 0.07 * big
-  c[2] = 0.5 + 0.05 * big
+  c[0] = 0.55 + 0.08 * big
+  c[1] = 0.52 + 0.07 * big
+  c[2] = 0.46 + 0.05 * big
   scale(c, 0.9 + 0.12 * mid + 0.06 * grain)
   mixTo(c, 0.55, 0.53, 0.42, smooth(0.55, 0.75, fbm(x / 3.3 + 7, y / 3.3, seed + 4, 2)) * 0.5)
 }
@@ -280,13 +316,13 @@ function traces(c: Rgb, x: number, y: number, seed: number): void {
     const rim = smooth(1.2, 1.6, band) * (1 - smooth(1.8, 2.2, band))
     scale(c, 1 - 0.22 * groove + 0.07 * rim)
   }
-  scatter(x, y, 0.55, seed + 13, 0.55, (dx, dy, r) => {
+  sprinkle(x, y, 0.5, seed + 13, 0.22, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const hole = 0.035 + 0.04 * r
-    if (d < hole) scale(c, 0.45 + 0.3 * (d / hole))
+    if (d < hole) scale(c, 0.62 + 0.25 * (d / hole))
     else if (d < hole * 2.2) scale(c, 1.06)
   })
-  scatter(x, y, 2.4, seed + 14, 0.18, (dx, dy, r) => {
+  scatter(x, y, 2.4, 0.72, seed + 14, 0.18, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const reach = 0.35 + 0.35 * r
     if (d > reach) return
@@ -301,16 +337,16 @@ function traces(c: Rgb, x: number, y: number, seed: number): void {
 /** 谷底的活物与小东西：蛇尾、玻璃海绵、海鳃、海葵、海猪、锰结核、粗粒的有孔虫球；颜色是本色，灯照上去才看得出来 */
 function life(c: Rgb, x: number, y: number, seed: number): void {
   // 锰结核：成片的黑褐色小疙瘩
-  if (fbm(x / 5, y / 5, seed + 20, 2) > 0.58) {
-    scatter(x, y, 0.32, seed + 21, 0.6, (dx, dy, r) => {
+  if (fbm(x / 5, y / 5, seed + 20, 2) > 0.62) {
+    sprinkle(x, y, 0.3, seed + 21, 0.45, (dx, dy, r) => {
       const d = Math.hypot(dx * (1 + r * 0.4), dy)
-      const s = 0.05 + 0.07 * r
-      if (d < s) mixTo(c, 0.12, 0.1, 0.09, 0.9 - 0.3 * (d / s))
+      const s = 0.04 + 0.06 * r
+      if (d < s) mixTo(c, 0.2, 0.17, 0.15, 0.85 - 0.3 * (d / s))
       else if (d < s * 1.4) scale(c, 0.85)
     })
   }
   // 蛇尾：五条细腕，盘在泥上
-  scatter(x, y, 1.6, seed + 22, 0.28, (dx, dy, r) => {
+  scatter(x, y, 1.6, 0.4, seed + 22, 0.28, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const arm = 0.22 + 0.16 * r
     if (d > arm) return
@@ -321,7 +357,7 @@ function life(c: Rgb, x: number, y: number, seed: number): void {
     else if (k > 0.94 - 0.04 * (1 - d / arm)) mixTo(c, tone[0], tone[1], tone[2], 0.85 * (1 - d / arm) + 0.15)
   })
   // 玻璃海绵：从上往下看是一圈象牙白的瓶口，里面黑
-  scatter(x, y, 3.2, seed + 23, 0.32, (dx, dy, r) => {
+  scatter(x, y, 3.2, 0.42, seed + 23, 0.32, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const R0 = 0.16 + 0.18 * r
     if (d > R0 * 1.15) return
@@ -332,7 +368,7 @@ function life(c: Rgb, x: number, y: number, seed: number): void {
     } else scale(c, 0.82)
   })
   // 海鳃：一根羽毛似的橙红色
-  scatter(x, y, 2.9, seed + 24, 0.22, (dx, dy, r) => {
+  scatter(x, y, 2.9, 0.38, seed + 24, 0.22, (dx, dy, r) => {
     const a = r * 6.28
     const u = dx * Math.cos(a) + dy * Math.sin(a)
     const v = -dx * Math.sin(a) + dy * Math.cos(a)
@@ -343,7 +379,7 @@ function life(c: Rgb, x: number, y: number, seed: number): void {
     else if (Math.abs(v) < width && Math.sin(u * 120) > -0.2) mixTo(c, 0.95, 0.45, 0.3, 0.75)
   })
   // 海葵：一圈触手围着嘴，粉、紫、白
-  scatter(x, y, 2.3, seed + 25, 0.26, (dx, dy, r) => {
+  scatter(x, y, 2.3, 0.32, seed + 25, 0.26, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const R0 = 0.1 + 0.08 * r
     if (d > R0 * 1.7) return
@@ -353,7 +389,7 @@ function life(c: Rgb, x: number, y: number, seed: number): void {
     else if (Math.abs(Math.sin(Math.atan2(dy, dx) * 9)) > 0.6) mixTo(c, hue[0], hue[1], hue[2], 0.7 * (1 - (d - R0) / (0.7 * R0)))
   })
   // 海猪：几只一群，半透明的粉
-  scatter(x, y, 4.5, seed + 26, 0.16, (dx, dy, r) => {
+  scatter(x, y, 4.5, 0.62, seed + 26, 0.16, (dx, dy, r) => {
     for (let i = 0; i < 3; i++) {
       const ox = (hash(i, 1, Math.floor(r * 1e6)) - 0.5) * 0.9
       const oy = (hash(i, 2, Math.floor(r * 1e6)) - 0.5) * 0.9
@@ -365,7 +401,7 @@ function life(c: Rgb, x: number, y: number, seed: number): void {
     }
   })
   // 有孔虫球：灰色、碎碎的，偶尔一个
-  scatter(x, y, 3.6, seed + 27, 0.14, (dx, dy, r) => {
+  scatter(x, y, 3.6, 0.17, seed + 27, 0.14, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const R0 = 0.09 + 0.07 * r
     if (d < R0) mixTo(c, 0.66, 0.66, 0.62, 0.7 + 0.25 * valueNoise(dx * 60, dy * 60, seed))
@@ -375,15 +411,15 @@ function life(c: Rgb, x: number, y: number, seed: number): void {
 /** 岩面：深灰的玄武岩，有裂隙、有亮一点的剥落面，朝上的地方积着一层泥，石缝里长着小珊瑚与海绵 */
 function rock(c: Rgb, x: number, y: number, seed: number, drape: number): void {
   const n = fbm(x / 1.4, y / 1.4, seed + 31, 3)
-  c[0] = 0.27 + 0.1 * n
-  c[1] = 0.26 + 0.09 * n
-  c[2] = 0.25 + 0.08 * n
+  c[0] = 0.33 + 0.14 * n
+  c[1] = 0.32 + 0.13 * n
+  c[2] = 0.31 + 0.11 * n
   const crack = cellEdge(x * 1.6, y * 1.6, seed + 32)
   if (crack < 0.05) scale(c, 0.55 + 8 * crack)
   const facet = valueNoise(Math.floor(x * 2.2), Math.floor(y * 2.2), seed + 33)
   scale(c, 0.88 + 0.22 * facet)
   mixTo(c, 0.57, 0.54, 0.47, drape * (0.75 + 0.25 * fbm(x * 2, y * 2, seed + 34, 2)))
-  scatter(x, y, 0.9, seed + 35, 0.2 * (1 - drape * 0.5), (dx, dy, r) => {
+  scatter(x, y, 0.9, 0.12, seed + 35, 0.2 * (1 - drape * 0.5), (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
     const R0 = 0.05 + 0.06 * r
     if (d > R0) return
@@ -395,6 +431,8 @@ function rock(c: Rgb, x: number, y: number, seed: number, drape: number): void {
 
 /** 鲸骨四周：骨头被硫化物染黑的泥，泥上一块块白的、黄的细菌席，骨头上一簇簇红的食骨虫 */
 function whaleSurrounds(c: Rgb, s: Skeleton, x: number, y: number): void {
+  const bx = s.box
+  if (x < bx[0] || x > bx[2] || y < bx[1] || y > bx[3]) return
   const w = s.whale
   const d = fromWhale(w, x, y)
   const halo = 1 - smooth(WHALE_HALF * w.length * 0.6, WHALE_HALF * w.length * 1.25, d)
@@ -413,7 +451,7 @@ function boneColor(c: Rgb, hit: BoneHit, x: number, y: number, seed: number): vo
   scale(c, hit.shade)
   const fuzz = fbm(x * 3, y * 3, seed + 8, 2)
   if (fuzz > 0.62) mixTo(c, 0.97, 0.97, 0.94, smooth(0.62, 0.72, fuzz) * 0.7)
-  scatter(x, y, 0.35, seed + 9, 0.3, (dx, dy) => {
+  scatter(x, y, 0.35, 0.05, seed + 9, 0.3, (dx, dy) => {
     if (Math.hypot(dx, dy) < 0.04) mixTo(c, 0.85, 0.12, 0.12, 0.9)
   })
 }
@@ -428,7 +466,7 @@ function seepColor(c: Rgb, q: { k: number; seed: number; sx: number; sy: number 
   if (mat > 0.5) mixTo(c, 0.95, 0.95, 0.9, edge * smooth(0.5, 0.6, mat))
   else if (mat < 0.36) mixTo(c, 0.97, 0.66, 0.2, edge * smooth(0.36, 0.28, mat) * 0.9)
   if (k > 0.45 && k < 1.05) {
-    scatter(x, y, 0.28, q.seed + 2, 0.5, (dx, dy, r) => {
+    scatter(x, y, 0.28, 0.09, q.seed + 2, 0.5, (dx, dy, r) => {
       const a = r * 6.28
       const u = dx * Math.cos(a) + dy * Math.sin(a)
       const v = -dx * Math.sin(a) + dy * Math.cos(a)
@@ -437,13 +475,13 @@ function seepColor(c: Rgb, q: { k: number; seed: number; sx: number; sy: number 
     })
   }
   if (k < 0.4) {
-    scatter(x, y, 0.16, q.seed + 3, 0.7, (dx, dy, r) => {
+    scatter(x, y, 0.16, 0.075, q.seed + 3, 0.7, (dx, dy, r) => {
       const d = Math.hypot(dx, dy)
       if (d < 0.035) mixTo(c, 0.9, 0.15, 0.12, 0.95)
       else if (d < 0.05 + 0.02 * r) mixTo(c, 0.95, 0.95, 0.92, 0.8)
     })
   }
-  scatter(x, y, 0.7, q.seed + 4, 0.35, (dx, dy) => {
+  scatter(x, y, 0.7, 0.07, q.seed + 4, 0.35, (dx, dy) => {
     const d = Math.hypot(dx, dy)
     if (k < 0.9 && d < 0.06) scale(c, 0.4 + 6 * d)
   })
@@ -499,7 +537,7 @@ function albedoAt(sc: PaintScene, x: number, y: number, c: Rgb): void {
     // 壁脚、堆脚下一溜碎石
     const talus = Math.min(RE.low, RE.high, RE.rubble)
     if (talus < 1.1) {
-      scatter(x, y, 0.4, seed + 51, 0.7 * (1 - talus / 1.1), (dx, dy, r) => {
+      scatter(x, y, 0.4, 0.17, seed + 51, 0.7 * (1 - talus / 1.1), (dx, dy, r) => {
         const d = Math.hypot(dx * (1 + r), dy)
         const s = 0.06 + 0.1 * r
         if (d < s) {

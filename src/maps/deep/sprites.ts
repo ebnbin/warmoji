@@ -1,7 +1,5 @@
 import { SUN } from '../../data/light'
 
-const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
-
 /**
  * 从正上方看的潜水钟，边长 size 的方图，钟口的圈正好顶着图边：黄漆的钢壳，钟口一圈加厚的裙边，壳上一道接缝的箍与一圈螺栓；
  * 顶上吊缆的吊耳、一扇圆舱盖、两只绑在侧面的气瓶、两盏朝下照的灯的灯罩；漆面有磕碰与锈迹。高光按画面的太阳放
@@ -101,23 +99,32 @@ export function drawBell(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.beginPath()
   ctx.arc(c, c, size * 0.03, 0, Math.PI * 2)
   ctx.stroke()
-  // 磕碰与锈迹
-  const img = ctx.getImageData(0, 0, size, size)
-  const d = img.data
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const o = (y * size + x) * 4
-      if (d[o + 3]! === 0) continue
-      const n = Math.sin(x * 0.37 + y * 0.11) * Math.sin(y * 0.29 - x * 0.07) * 0.5 + 0.5
-      const streak = Math.max(0, Math.sin(x * 0.9 + Math.sin(y * 0.05) * 4) - 0.94) * 12
-      const rust = clamp01((n - 0.82) * 4) * 0.5 + streak * 0.25
-      if (rust <= 0) continue
-      d[o] = d[o]! * (1 - rust) + 120 * rust
-      d[o + 1] = d[o + 1]! * (1 - rust) + 62 * rust
-      d[o + 2] = d[o + 2]! * (1 - rust) + 20 * rust
-    }
+  // 漆面的磕碰与几道顺着往下流的锈迹
+  for (let i = 0; i < 14; i++) {
+    const a = i * 2.39996
+    const r = shell * (0.35 + 0.6 * ((i * 0.618) % 1))
+    const x = c + Math.cos(a) * r
+    const y = c + Math.sin(a) * r
+    const len = size * (0.04 + 0.08 * ((i * 0.37) % 1))
+    const g2 = ctx.createLinearGradient(x, y, x + Math.cos(a) * len, y + Math.sin(a) * len)
+    g2.addColorStop(0, 'rgba(120, 62, 18, 0.55)')
+    g2.addColorStop(1, 'rgba(120, 62, 18, 0)')
+    ctx.strokeStyle = g2
+    ctx.lineWidth = size * (0.008 + 0.01 * ((i * 0.71) % 1))
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len)
+    ctx.stroke()
   }
-  ctx.putImageData(img, 0, 0)
+  // 背光的一侧压暗：钟是个穹顶
+  const dark = ctx.createRadialGradient(c - lx * R * 0.35, c - ly * R * 0.35, R * 0.2, c - lx * R * 0.2, c - ly * R * 0.2, R * 1.05)
+  dark.addColorStop(0, 'rgba(0, 0, 0, 0)')
+  dark.addColorStop(0.7, 'rgba(10, 20, 40, 0.1)')
+  dark.addColorStop(1, 'rgba(10, 20, 40, 0.45)')
+  ctx.fillStyle = dark
+  ctx.beginPath()
+  ctx.arc(c, c, R, 0, Math.PI * 2)
+  ctx.fill()
 }
 
 /** 一个气泡：透明的球，边上一圈亮、靠太阳那边一个高光点，靠着色得到颜色 */

@@ -1096,11 +1096,11 @@ export const MAPS = {
       whale: { lengthM: [7, 9], clearU: 6.5, skullM: 0.85 },
       seeps: { count: [1, 2], radiusU: [1.1, 1.8], clearU: 5 },
       bell: {
-        radiusM: 1.3,
+        radiusM: 1,
         hangM: 2,
         liftM: 16,
         breath: 48,
-        hold: 1.25,
+        hold: 1.6,
         drownSec: 12,
         tickMs: 250,
         firstMs: 60000,
