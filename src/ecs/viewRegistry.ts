@@ -8,11 +8,14 @@ import { DesertView } from '../maps/desert/view'
 import { FloeView } from '../maps/floe/view'
 import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
+import { NexusView } from '../maps/nexus/view'
 import { PetriView } from '../maps/petri/view'
 import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
+import { MapleView } from '../maps/maple/view'
 import { ShipView } from '../maps/ship/view'
 import { VolcanoView } from '../maps/volcano/view'
+import { DeepView } from '../maps/deep/view'
 
 export function viewFor(mapId: MapId): MapView {
   return MAKE[MAPS[mapId].kind]()
@@ -35,7 +38,10 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   cave: () => new CaveView(),
   meadow: () => new MeadowView(),
   sakura: () => new SakuraView(),
+  maple: () => new MapleView(),
   desert: () => new DesertView(),
   circuit: () => new CircuitView(),
+  deep: () => new DeepView(),
+  nexus: () => new NexusView(),
   petri: () => new PetriView(),
 }

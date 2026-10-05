@@ -14,8 +14,6 @@ export const OBSTACLES = {
     fence: { name: '栅栏', phase: true, opaque: false, pierce: 0, strength: null },
     // 电路板的元件与屏蔽罩
     device: { name: '元件', phase: true, opaque: true, pierce: null, strength: null },
-    // 培养皿的玻璃壁：看得穿，挡身体也挡弹体
-    glass: { name: '玻璃', phase: true, opaque: false, pierce: null, strength: null },
     // 旧残垣的断墙：一格一格的，破坏力碰上就碎
     wall: { name: '断墙', phase: true, opaque: true, pierce: null, strength: 1 },
     // 残垣的石墙与石柱
@@ -26,7 +24,13 @@ export const OBSTACLES = {
     dust: { name: '尘雾', phase: true, opaque: true, pierce: 0, strength: null },
     // 沙漠的标志物：只挡身体，弹体与视线从上面过去
     landmark: { name: '标志物', phase: true, opaque: false, pierce: 0, strength: null },
+    // 钢壳：深海潜艇的艇身
+    steel: { name: '钢壳', phase: true, opaque: true, pierce: null, strength: null },
     // 技能立的墙：看得穿，挡身体与弹体按它自己的规则
     barrier: { name: '技能墙', phase: true, opaque: false, pierce: null, strength: null },
+    // 天枢的落地玻璃幕墙与培养皿的玻璃壁：看得穿，挡身体也挡弹体，穿墙的身体也出不去
+    glass: { name: '玻璃', phase: false, opaque: false, pierce: null, strength: null },
+    // 天枢的立柱、电梯井与全息台
+    structure: { name: '建筑', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning

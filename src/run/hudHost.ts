@@ -26,6 +26,8 @@ export interface HudSnapshot {
   tilt: TiltSnapshot | null
   /** 在溶洞里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
   clock: ClockSnapshot | null
+  /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
+  submarine: SubmarineSnapshot | null
 }
 
 /** 甲板的倾斜：往下的方向与船头的朝向是屏幕上的单位向量，倾角与站着会滑的门槛是度 */
@@ -42,6 +44,13 @@ export interface ClockSnapshot {
   readonly moon: number
   readonly phase: number
   readonly night: boolean
+  readonly inSec: number
+}
+
+/** 潜艇的倒计时：phase 是停着（down）、快开走（warn）还是开走了（away），ratio 是这一段还剩的比例，inSec 是还有几秒 */
+export interface SubmarineSnapshot {
+  readonly phase: 'down' | 'warn' | 'away'
+  readonly ratio: number
   readonly inSec: number
 }
 

@@ -18,7 +18,7 @@ export function followersOf(sim: Sim): number[] {
   return sim.characters.filter((e) => e !== sim.leader && Alive.v[e] === 1)
 }
 
-/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上；落在会伤人的地方由地图挪开 */
+/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上；落在不该站的地方（会伤人、贴着或隔着传送门）由地图挪开 */
 export function seatPoints(sim: Sim, n: number): Point[] {
   const cx = leaderX(sim)
   const cy = leaderY(sim)
@@ -62,7 +62,7 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位（远了按地图的寻路绕过障碍），扇形只给活着的队员留坑；进占位半径即占位、同位取最近；这一帧不能自己走时不动 */
+/** 队员的驱动指向队长身后扇形上的目标位（远了按地图的寻路绕过障碍），扇形只给活着的队员留坑；进占位半径即占位、同位取最近；这一帧不能自己走时不动；离队长的路（地图认得传送门就按穿门的路）太远直接拉回目标位 */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -103,7 +103,7 @@ export function layoutTeam(sim: Sim): void {
     const x = Transform.x[f]!
     const y = Transform.y[f]!
     const away = sim.hooks.worldDelta(sim, x, y, cx, cy)
-    if (Math.hypot(away.x, away.y) > recall) {
+    if ((sim.hooks.toLeader ? sim.hooks.toLeader(sim, x, y) : Math.hypot(away.x, away.y)) > recall) {
       Transform.x[f] = seat.x
       Transform.y[f] = seat.y
       Phys.vx[f] = 0
@@ -113,8 +113,8 @@ export function layoutTeam(sim: Sim): void {
     const d = sim.hooks.worldDelta(sim, x, y, seat.x, seat.y)
     const dist = Math.hypot(d.x, d.y)
     if (dist <= seatR) continue
-    // 离坑位远了就按地图的寻路绕过障碍，近了直奔坑位
-    const way = dist > NAVIGATE_U * UNIT ? sim.hooks.chaseDir(sim, f, seat.x, seat.y) : { x: d.x / dist, y: d.y / dist }
+    // 离坑位远了或隔着传送门的门线就按地图的寻路走，近了直奔坑位
+    const way = dist > NAVIGATE_U * UNIT || sim.hooks.portal?.(sim, -1, x, y, seat.x, seat.y) ? sim.hooks.chaseDir(sim, f, seat.x, seat.y) : { x: d.x / dist, y: d.y / dist }
     const nx = way.x
     const ny = way.y
     const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1

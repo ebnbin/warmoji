@@ -51,6 +51,7 @@ const MARK_WIDTH = 4
 const INSIDE_COLOR = 0x66bb6a
 const OUTSIDE_COLOR = 0xffdc5d
 const GOAL_COLOR = 0xffdc5d
+const BEACON_COLOR = 0x4dd0e1
 
 /** 地上的一圈：据点或救援的范围 */
 interface Mark {
@@ -84,6 +85,7 @@ export class Presentation {
     bars(sim, this.bars)
     pointer(sim, this.pointer, goalSpot(sim), GOAL_COLOR)
     pointer(sim, this.pointer, nearestTo(sim, levelUpsOnField(sim)), LEVEL_UP_COLOR)
+    pointer(sim, this.pointer, sim.hooks.beacon?.(sim) ?? null, BEACON_COLOR)
     const r = sim.fight.rules.rescue
     if (!r) this.rescue = []
     else if (!sim.over) this.rescue = rescueMarks(sim, r.radius * UNIT)
@@ -149,7 +151,7 @@ function bars(sim: Sim, o: Scratch): void {
   }
 }
 
-/** 目标或最近的升级道具在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
+/** 目标、最近的升级道具或地图要盯住的那一处在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
 function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
@@ -167,7 +169,7 @@ function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void 
   tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(color, 0.95 * a))
 }
 
-/** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚；冷却中一起淡下去，也随队长显隐 */
+/** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚，穿过传送门的地方断开；冷却中一起淡下去，也随队长显隐 */
 function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const lead = sim.leader
   const root = sim.skills[sim.characters.indexOf(lead)]
@@ -190,6 +192,7 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   if (!pts) return
   const n = pts.length / 2
   for (let i = 1; i < n; i++) {
+    if (Number.isNaN(pts[i * 2 - 2]!) || Number.isNaN(pts[i * 2]!)) continue
     const a = (TRAIL_ALPHA_OLD + ((TRAIL_ALPHA_NEW - TRAIL_ALPHA_OLD) * i) / (n - 1)) * dim
     segment(trail, WORLD, pts[i * 2 - 2]!, pts[i * 2 - 1]!, pts[i * 2]!, pts[i * 2 + 1]!, TRAIL_WIDTH, packTint(ECHO_COLOR, a))
   }
