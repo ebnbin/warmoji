@@ -24,8 +24,8 @@ const MAX_SAMPLES = 40_000
 const PAD_U = 2
 const REFRESH_MS = 300
 /** 身体旁的标尺一层一格：格子多大、隔多宽（格） */
-const BOX_U = 0.13
-const GAP_U = 0.03
+const BOX_U = 0.17
+const GAP_U = 0.035
 
 function colorOf(layer: number): number {
   return LAYER_COLORS[Math.min(layer, LAYER_COLORS.length - 1)]!
@@ -143,8 +143,10 @@ export class HeightOverlay {
         g.strokeRect(x, top, box, box)
       }
       const over = foot - overOf(Span.lo[eid]!, Span.hi[eid]!) * pitch + (GAP_U * UNIT) / 2
+      g.lineStyle(line * 4, 0x000000, 0.8)
+      g.lineBetween(x - 0.07 * UNIT, over, x + box + 0.07 * UNIT, over)
       g.lineStyle(line * 2, 0xffffff, 1)
-      g.lineBetween(x - 0.04 * UNIT, over, x + box + 0.04 * UNIT, over)
+      g.lineBetween(x - 0.06 * UNIT, over, x + box + 0.06 * UNIT, over)
     }
     for (const eid of query(world, [Projectile, Proj, Transform, VisOff])) {
       g.lineStyle(0.035 * UNIT, colorOf(layerAt(boltZ(eid))), 1)
