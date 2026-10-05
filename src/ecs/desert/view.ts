@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { removeEntity } from 'bitecs'
 import { FRAME_U, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { GROUND_PPU } from '../../data/texel'
@@ -7,7 +6,8 @@ import { viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
 import { fbm } from '../../util/noise'
 import { devFlag } from '../../devtools'
-import { spawnDecor } from '../entities/decor'
+import { decorSprite } from '../decor'
+import type { Decor } from '../decor'
 import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
 import { DesertPainter } from './painter'
 import { encodeInfo, GROUND_FRAG } from './shader'
@@ -126,7 +126,8 @@ function drawDust(ctx: CanvasRenderingContext2D, size: number): void {
  */
 export class DesertView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
-  private decorEids: number[] = []
+  /** 布景与它在一圈里的原位：画的是离镜头最近的那一份 */
+  private spots: { readonly s: Decor; readonly x: number; readonly y: number }[] = []
   private painter?: DesertPainter
   private ground?: Phaser.GameObjects.Shader
   private tracks?: { tex: Phaser.Textures.CanvasTexture; data: TrackTex; at: number }
@@ -170,7 +171,9 @@ export class DesertView implements MapView {
     const n = FRAME_U
     for (const d of rollDecor(v.def.decor, () => rng.next(), n, n)) {
       for (const k of [0, n / 2]) {
-        this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: ((d.xU + k) % n) * UNIT, y: ((d.yU + k) % n) * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+        const s = decorSprite(atlas, d.emoji, ((d.xU + k) % n) * UNIT, ((d.yU + k) % n) * UNIT, d.sizeU * UNIT, d.rotation, d.alpha)
+        v.decor.push(s)
+        this.spots.push({ s, x: s.x, y: s.y })
       }
     }
   }
@@ -296,7 +299,12 @@ export class DesertView implements MapView {
     u.rect[3] = h
     u.track[3] = s.tracks.now
     this.stampTracks(v, s, dt)
-    this.placeLandmarks(s, { x: view.x + view.w / 2, y: view.y + view.h / 2 }, now)
+    const mid = { x: view.x + view.w / 2, y: view.y + view.h / 2 }
+    for (const p of this.spots) {
+      p.s.x = mid.x + wrapU(p.x - mid.x, v.w)
+      p.s.y = mid.y + wrapU(p.y - mid.y, v.h)
+    }
+    this.placeLandmarks(s, mid, now)
   }
 
   /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；松沙上的脚步扬起一小团沙 */
@@ -387,9 +395,9 @@ export class DesertView implements MapView {
     this.painter?.close()
     this.painter = undefined
     for (const o of this.visuals) o.destroy()
-    for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
-    this.decorEids = []
+    this.spots = []
+    v.decor.length = 0
     this.marks = []
     this.ground = undefined
     this.tracks = undefined

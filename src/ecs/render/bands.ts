@@ -4,7 +4,7 @@ interface Band {
   readonly zMax: number
 }
 
-/** z 低于它的精灵平躺在地上（布景），往上的都立着 */
+/** z 低于它的精灵平躺在地上，往上的都立着 */
 export const LYING_Z = 2
 
 export const SPRITE_BANDS: readonly Band[] = [

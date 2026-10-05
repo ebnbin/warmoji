@@ -213,10 +213,6 @@ export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
 
 export const Quad = { v: u8() }
 
-export const Spin = { rate: f32() }
-
-export const Drift = { u: f32(), cross: f32(), speedMul: f32(), swayPhase: f32(), swayAmp: f32() }
-
 export const Shard = { startMs: f32(), until: f32(), rot: f32(), size: f32() }
 export const SHARD_SET: QueryTerm[] = [Shard, Transform, Sprite, Tint, Depth]
 

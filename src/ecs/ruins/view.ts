@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { removeEntity } from 'bitecs'
 import { LIFT_PER_M, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { AWAY, SUN } from '../../data/light'
@@ -8,7 +7,7 @@ import { Rng } from '../../util/rng'
 import { playSfx } from '../../audio/sfx'
 import { loadSettings } from '../../save/settings'
 import { browserStorage } from '../../util/storage'
-import { spawnDecor } from '../entities/decor'
+import { decorSprite } from '../decor'
 import { Alive, Transform } from '../components'
 import { devFlag } from '../../devtools'
 import { roomAt } from '../worlds/basin'
@@ -120,7 +119,6 @@ function snapshot(s: RuinsState): PaintState {
  */
 export class RuinsView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
-  private decorEids: number[] = []
   private plan?: RuinsPlan
   private painter?: RuinsPainter
   private ground?: { tex: Phaser.Textures.CanvasTexture; seen: Uint8Array; seenT: Uint8Array; dirty: Uint8Array; cols: number; rows: number; busy: boolean }
@@ -174,7 +172,7 @@ export class RuinsView implements MapView {
       const l = toLocal(plan.frame, d.xU, d.yU)
       const i = cellAt(plan.grid, l.u, l.v)
       if (i >= 0 && (plan.n[i]! > 0 || plan.timber[i]! > 0 || plan.rubble[i]! > 0.05 || plan.sid[i]! > 0)) continue
-      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x, y, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+      v.decor.push(decorSprite(atlas, d.emoji, x, y, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 
@@ -562,9 +560,8 @@ export class RuinsView implements MapView {
     this.devWalls?.destroy()
     this.devWalls = undefined
     this.devVersion = -1
-    for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
-    this.decorEids = []
+    v.decor.length = 0
     this.stones = []
     this.pigeons = []
     this.perches = []
