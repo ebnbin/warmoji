@@ -469,7 +469,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 
 /**
  * 培养皿：皿放得进安全区，开局空地空得出出生点、落在划线区以内；四区划线的区数、道数是范围，每区落菌的间距一区比一区稀；
- * 菌落的前沿在格子上长得圆（过渡带宽过一格），显式积分不出负数也不发散；黏脚、盖住、溶菌的参数说得通，标准身体溶出的圈盖得过它掉的金币；
+ * 菌落的前沿在格子上长得圆（过渡带宽过一格），显式积分不出负数也不发散，皿边常驻的一圈宽过一格、碰不到开局空地；
+ * 算作菌落的密度线、黏脚、溶菌的参数说得通，标准身体溶出的圈盖得过它掉的金币；
  * 抽一批种子真的生成一遍：每只皿都接种上了菌落，皿心的空地上没有，开局站位四周空着
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -492,8 +493,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(frontWidthU(p) >= colony.cellU, `${at}.colony 增长率最高处前沿的过渡带只有 ${frontWidthU(p).toFixed(3)} 格，须宽过一格格子：太窄的前沿在格子上长不圆`)
   const dt = colony.stepMs / 1000
   need((diffusionU(p) / colony.cellU ** 2) * dt <= 0.3 && colony.growth * (1 + colony.patchy) * dt <= 0.5, `${at}.colony.stepMs 太长：显式积分会出负数或发散`)
-  need(stick.film >= 0 && stick.film < stick.full && stick.full <= 1 && stick.viscosity >= 1 && stick.exertion >= 0, `${at}.stick 须薄膜比长满薄、都在 [0, 1] 内，黏度不小于 1，多耗的体力不为负`)
-  need(p.cover > 0 && p.cover < 1, `${at}.cover 须在 (0, 1) 内`)
+  need(colony.rimU >= colony.cellU && colony.rimU < dish.radiusU - p.plazaU, `${at}.colony.rimU 须宽过一格格子，且碰不到开局的空地`)
+  need(p.edge > 0 && p.edge < 1, `${at}.edge 须在 (0, 1) 内`)
+  need(stick.viscosity >= 1 && stick.exertion >= 0, `${at}.stick 的黏度须不小于 1，多耗的体力不为负`)
   need(lysis.holdS > 0 && lysis.halfLifeS > 0 && lysis.lysePerS > 0, `${at}.lysis 的留存、半衰期与溶菌速度须为正`)
   need(lysis.radiusU >= 1, `${at}.lysis.radiusU 须不小于 1 格：标准身体溶出的圈盖得过它掉的金币散开的范围`)
   for (let s = 0; s < 16; s++) {

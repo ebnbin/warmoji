@@ -32,7 +32,7 @@ export function tickStamina(sim: Sim): void {
     const by = member ? leader : eid
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    const ground = sim.hooks.surface(sim, x, y)
+    const ground = sim.hooks.surface(sim, x, y, eid)
     const share = member && eid !== leader ? draft : 1
     const cost = dist > 0 ? (dist / UNIT) * ground.exertion * scale * sim.hooks.effort(sim, x, y, Drive.x[by]!, Drive.y[by]!) * Stats.exertion[eid]! * share : 0
     const max = Stats.maxStamina[eid]!

@@ -1011,7 +1011,8 @@ export interface PetriConfig {
   }
   /**
    * 菌落：格子边长 cellU 格、每 stepMs 积分一步；局部按逻辑斯谛增长率 growth（每秒）长满，前沿每秒推进 frontU 格；
-   * 增长率按波长 waveU 格的噪声在 1 ± patchy 倍之间起伏，前沿长得高低不齐；开局先长 preS 秒；密度过 mature 起算长熟，matureS 秒长到最厚
+   * 增长率按波长 waveU 格的噪声在 1 ± patchy 倍之间起伏，前沿长得高低不齐；开局先长 preS 秒；密度过 mature 起算长熟，matureS 秒长到最厚；
+   * 贴着皿壁 rimU 格宽的一圈永远长满、溶不掉，菌落从那里一直往里长
    */
   readonly colony: {
     readonly cellU: number
@@ -1023,16 +1024,15 @@ export interface PetriConfig {
     readonly preS: number
     readonly mature: number
     readonly matureS: number
+    readonly rimU: number
   }
-  /** 黏脚：密度从 film 到 full 之间平滑地变黏，长满时黏度 viscosity、每走一格多耗 exertion 点体力（敌我通吃） */
+  /** 密度过 edge 的地方就是菌落：画成菌落，粘住我方角色，盖住躺在那里的掉落物；不到的地方就是干净的琼脂 */
+  readonly edge: number
+  /** 我方角色踩进菌落：黏度 viscosity、每走一格多耗 exertion 点体力；敌人不受影响 */
   readonly stick: {
-    readonly film: number
-    readonly full: number
     readonly viscosity: number
     readonly exertion: number
   }
-  /** 密度到 cover 以上盖住躺在那里的掉落物 */
-  readonly cover: number
   /**
    * 溶菌：标准身体死后当场溶掉半径 radiusU 格的一圈，holdS 秒后那圈才缩没；个头大的按半径等比例铺得更开。
    * 溶菌物质按 halfLifeS 秒的半衰期衰减；高过最低抑菌浓度的地方菌落长不出来，每秒按 lysePerS 乘超出的倍数溶掉，低于它时增长按浓度打折

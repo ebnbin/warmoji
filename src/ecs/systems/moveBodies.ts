@@ -137,7 +137,7 @@ export function moveBodies(sim: Sim): void {
       const air = Span.lo[eid]! > 0
       if (air || !sim.hooks.contact(sim, eid, dt, x, y, vx, vy, STEP)) {
         // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度 + 引力的终端漂移 g·质量/阻力）
-        const s = air ? GROUND : sim.hooks.surface(sim, x, y)
+        const s = air ? GROUND : sim.hooks.surface(sim, x, y, eid)
         const medium = air ? STILL : sim.hooks.mediumVelocity(sim, x, y)
         const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
         const bx = medium.x + Drive.x[eid]! / s.viscosity

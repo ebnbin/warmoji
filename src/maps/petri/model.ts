@@ -63,7 +63,7 @@ export interface PetriPlan {
 }
 
 /**
- * 菌落场：格子 (0, 0) 的左上角在 (x0, y0) 像素，cell 是格子边长（像素）；inside 是琼脂面上的格。
+ * 菌落场：格子 (0, 0) 的左上角在 (x0, y0) 像素，cell 是格子边长（像素）；inside 是琼脂面上的格，rim 是其中贴着皿壁、永远长满的那一圈。
  * u 是菌落的密度（0 到 1，也就是有多厚），m 是溶菌物质的浓度（以最低抑菌浓度计），age 是长熟了多久（秒），rate 是这格的增长率倍数
  */
 export interface ColonyField {
@@ -73,6 +73,7 @@ export interface ColonyField {
   readonly x0: number
   readonly y0: number
   readonly inside: Uint8Array
+  readonly rim: Uint8Array
   readonly rate: Float32Array
   readonly u: Float32Array
   readonly m: Float32Array
@@ -203,7 +204,7 @@ export function lysinPeak(cfg: PetriConfig): number {
 }
 
 /**
- * 开局的菌落场：琼脂面上的格，每格的增长率按噪声起伏；按接种落下的菌落一开始就长满、长熟了一阵，再先长 preS 秒，
+ * 开局的菌落场：琼脂面上的格，每格的增长率按噪声起伏；皿边那一圈与按接种落下的菌落一开始就长满、长熟了一阵，再先长 preS 秒，
  * 菌落的边自然长出前沿的过渡带
  */
 export function makeColony(plan: PetriPlan, cfg: PetriConfig, seed: number): ColonyField {
@@ -221,6 +222,7 @@ export function makeColony(plan: PetriPlan, cfg: PetriConfig, seed: number): Col
     x0,
     y0,
     inside: new Uint8Array(n),
+    rim: new Uint8Array(n),
     rate: new Float32Array(n),
     u: new Float32Array(n),
     m: new Float32Array(n),
@@ -236,8 +238,14 @@ export function makeColony(plan: PetriPlan, cfg: PetriConfig, seed: number): Col
       const uy = (y0 + (y + 0.5) * cell) / UNIT
       // 边上一圈格子永远不在琼脂面上：拉普拉斯算子不用判越界
       if (x === 0 || y === 0 || x === cols - 1 || y === rows - 1) continue
-      if (Math.hypot(ux - plan.cx, uy - plan.cy) > plan.radius - c.cellU / 2) continue
+      const r = Math.hypot(ux - plan.cx, uy - plan.cy)
+      if (r > plan.radius - c.cellU / 2) continue
       f.inside[i] = 1
+      if (r > plan.radius - c.rimU) {
+        f.rim[i] = 1
+        f.u[i] = 1
+        f.age[i] = c.matureS
+      }
       const wobble = (fbm(ux / c.waveU, uy / c.waveU, noiseSeed, 3) - 0.5) * 4
       f.rate[i] = 1 + c.patchy * Math.max(-1, Math.min(1, wobble))
     }
@@ -266,11 +274,11 @@ export function makeColony(plan: PetriPlan, cfg: PetriConfig, seed: number): Col
 
 /**
  * 积分一步：菌落按费希尔方程扩散、按逻辑斯谛增长，增长按溶菌物质的浓度打折（到最低抑菌浓度长不出来），高过它的按超出的倍数溶掉；
- * 溶菌物质按半衰期衰减；长熟的格记着长熟了多久，被溶得不熟了从头算
+ * 皿边那一圈溶完又长满；溶菌物质按半衰期衰减；长熟的格记着长熟了多久，被溶得不熟了从头算
  */
 export function stepColony(f: ColonyField, cfg: PetriConfig, dt: number): void {
   const c = cfg.colony
-  const { cols, rows, inside, u, m, age, lap, rate } = f
+  const { cols, rows, inside, rim, u, m, age, lap, rate } = f
   const d = diffusionU(cfg) / (c.cellU * c.cellU)
   for (let y = 1; y < rows - 1; y++) {
     for (let x = 1; x < cols - 1; x++) {
@@ -297,7 +305,7 @@ export function stepColony(f: ColonyField, cfg: PetriConfig, dt: number): void {
     let v = u[i]!
     v += dt * (d * lap[i]! + c.growth * rate[i]! * Math.max(0, 1 - k) * v * (1 - v))
     if (k > 1) v *= Math.exp(-dt * lyse * (k - 1))
-    v = v < TRACE ? 0 : v > 1 ? 1 : v
+    v = rim[i] || v > 1 ? 1 : v < TRACE ? 0 : v
     u[i] = v
     m[i] = k * decay
     age[i] = v >= c.mature ? age[i]! + dt : 0

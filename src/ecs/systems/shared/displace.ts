@@ -83,7 +83,7 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
   }
   if (d.kind === 'drift') {
     if (hasMark(sim, eid, MARK.unstoppable) || !hasComponent(sim.world, eid, Phys) || Motion.kind[eid] !== MOTION.none) return false
-    const s = sim.hooks.surface(sim, Transform.x[eid]!, Transform.y[eid]!)
+    const s = sim.hooks.surface(sim, Transform.x[eid]!, Transform.y[eid]!, eid)
     const k = Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity * d.dt
     impulse(sim, eid, d.vx * k, d.vy * k)
     return true

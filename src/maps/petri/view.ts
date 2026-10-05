@@ -2,11 +2,11 @@ import Phaser from 'phaser'
 import { UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
 import { SUN } from '../../data/light'
-import { canvasTexture, drawSpark } from '../textures'
+import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
 import { GROUND_AREA, textureSize } from './ground'
 import { PetriPainter } from './painter'
-import { COLONY_FRAG, encodeColony, LYSIN_SCALE } from './shader'
+import { COLONY_FRAG, encodeColony } from './shader'
 import { petriPlanFor } from './world'
 import type { PetriState } from './world'
 import type { PaintScene, PixelRect } from './ground'
@@ -21,25 +21,11 @@ import type { Point } from '../../util/vec'
 const BG = 0xc9d2d8
 const GROUND_KEY = 'petri-ground'
 const COLONY_KEY = 'petri-colony'
-const SPARK_KEY = 'petri-spark'
 /** 开局最多几个线程分着画；贴图按这么多像素高的条分块交给线程 */
 const PAINT_THREADS = 4
 const STRIP_PX = 64
-/** 溶出抑菌圈时那一圈光往外扩多久（毫秒）、什么颜色，溅出几滴 */
-const POP_MS = 520
-const POP_COLOR = 0xffd27a
-const POP_DROPS = 10
 /** 菌落层画在躺着的布景之上、身体的影子之下 */
 const COLONY_DEPTH = 1.6
-const RING_DEPTH = 1.7
-
-/** 正在画的一圈溶菌的光：在哪、最大多大（像素），什么时候溶出的 */
-interface Pop {
-  readonly x: number
-  readonly y: number
-  readonly r: number
-  readonly at: number
-}
 
 /** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，所以上传完要重新设 */
 function upload(tex: Phaser.Textures.CanvasTexture): void {
@@ -49,17 +35,13 @@ function upload(tex: Phaser.Textures.CanvasTexture): void {
 
 /**
  * 培养皿：灯箱、玻璃皿壁、琼脂和皿底的记号笔是开局在后台线程画好的贴图；菌落按菌落场编成的数据图由着色器画在琼脂上，
- * 菌落场一变就重传。身体死在哪里，那里先亮起一圈金色的光往外扩、溅出几滴，之后由着色器画出慢慢缩小的抑菌圈
+ * 菌落场一变就重传。溶掉的菌落直接不画，露出底下干净的琼脂
  */
 export class PetriView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
   private plan?: PetriPlan
   private painter?: PetriPainter
   private colony?: { readonly tex: Phaser.Textures.CanvasTexture; readonly img: ImageData; readonly field: ColonyField; version: number }
-  private rings?: Phaser.GameObjects.Graphics
-  private drops?: Phaser.GameObjects.Particles.ParticleEmitter
-  private pops: Pop[] = []
-  private plaqueSeen = 0
 
   private planOf(v: ViewCtx): PetriPlan {
     if (!this.plan) this.plan = petriPlanFor(v.def.petri!, v.run.decorSeed)
@@ -73,7 +55,6 @@ export class PetriView implements MapView {
 
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
-    if (!v.scene.textures.exists(SPARK_KEY)) canvasTexture(v.scene, SPARK_KEY, 32, 32, (ctx) => drawSpark(ctx, 32))
   }
 
   framing(): Framing {
@@ -104,19 +85,6 @@ export class PetriView implements MapView {
     const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.colonyLayer(v, st)
-    this.rings = scene.add.graphics().setDepth(RING_DEPTH)
-    this.drops = scene.add
-      .particles(0, 0, SPARK_KEY, {
-        lifespan: { min: 280, max: 620 },
-        speed: { min: 40, max: 150 },
-        scale: { start: 0.26, end: 0 },
-        alpha: { start: 0.95, end: 0 },
-        tint: [0xfff4dc, 0xffe6a8, 0xffcf6a],
-        emitting: false,
-      })
-      .setDepth(9)
-    this.visuals.push(this.rings, this.drops)
-    this.plaqueSeen = st.plaqueCount
     v.lens.screen.vignette(0.78, 0.15, 0x1c252c)
   }
 
@@ -142,7 +110,7 @@ export class PetriView implements MapView {
               set('uGrid', [f.cols, f.rows])
               set('uDish', dish)
               set('uLight', light)
-              set('uLysin', LYSIN_SCALE)
+              set('uEdge', v.def.petri!.edge)
             },
           },
           f.x0,
@@ -168,27 +136,7 @@ export class PetriView implements MapView {
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const st = sim.worldState.petri
-    if (!st || !this.rings) return
-    this.encode(v, st)
-    const fresh = Math.min(st.plaqueCount - this.plaqueSeen, st.plaques.length)
-    this.plaqueSeen = st.plaqueCount
-    for (let k = st.plaques.length - fresh; k < st.plaques.length; k++) {
-      const p = st.plaques[k]!
-      this.pops.push(p)
-      this.drops?.explode(POP_DROPS, p.x, p.y)
-    }
-    const now = sim.elapsedMs
-    const g = this.rings
-    g.clear()
-    this.pops = this.pops.filter((p) => now - p.at < POP_MS)
-    for (const p of this.pops) {
-      const t = Math.max(0, (now - p.at) / POP_MS)
-      const ease = 1 - (1 - t) ** 3
-      g.lineStyle(0.1 * UNIT * (1 - t * 0.6), POP_COLOR, 0.85 * (1 - t))
-      g.strokeCircle(p.x, p.y, p.r * (0.3 + 0.7 * ease))
-      g.fillStyle(POP_COLOR, 0.18 * (1 - t))
-      g.fillCircle(p.x, p.y, p.r * (0.3 + 0.7 * ease))
-    }
+    if (st) this.encode(v, st)
   }
 
   resize(): void {}
@@ -199,9 +147,6 @@ export class PetriView implements MapView {
     for (const o of this.visuals) o.destroy()
     this.visuals = []
     this.colony = undefined
-    this.rings = undefined
-    this.drops = undefined
-    this.pops = []
     for (const key of [GROUND_KEY, COLONY_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }

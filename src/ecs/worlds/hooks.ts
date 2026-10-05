@@ -120,7 +120,8 @@ export interface WorldHooks {
   pull(sim: Sim, x: number, y: number): Point
   /** 这里是不是汇（黑洞的视界）：进了这里的身体、弹体就停下，由地图吞掉 */
   sink(sim: Sim, x: number, y: number): boolean
-  surface(sim: Sim, x: number, y: number): Surface
+  /** 这里的地面；body 是踩在上面的身体，有的地面只对一部分身体起作用，不给就只算对谁都一样的那部分 */
+  surface(sim: Sim, x: number, y: number, body?: number): Surface
   /** 在这里朝 (dx, dy) 赶路的费力倍率：逆着介质更累，顺着更省力 */
   effort(sim: Sim, x: number, y: number, dx: number, dy: number): number
   /** 地面自己的接触力学：接管这一步就把位置与速度写进 out 并返回 true，否则按常规积分 */
