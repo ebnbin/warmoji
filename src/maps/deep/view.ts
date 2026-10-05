@@ -14,7 +14,7 @@ import { groundM, HEIGHT_RANGE, paintScene, RELIEF_PPU } from './ground'
 import { seabedM } from './layout'
 import { DeepPainter } from './painter'
 import { MAX_LAMPS, SEABED_FRAG } from './shader'
-import { drawBell, drawBubble, drawFlake, drawHalo } from './sprites'
+import { BELL_ART, drawBell, drawBubble, drawFlake, drawHalo } from './sprites'
 import { underBell } from './world'
 import type { Bell, BellPhase } from './bell'
 import type { PaintScene } from './ground'
@@ -37,12 +37,16 @@ const HALO_KEY = 'deep-halo'
 const FLAKE_KEY = 'deep-flake'
 /** 开局最多几个线程分着画地面 */
 const PAINT_THREADS = 4
-/** 透视镜头离开局站位那片谷底多高，米：比谷底高的东西在画面上更大、从画面中间往外偏 */
+/** 透视镜头离开局站位那片谷底多高，米：海雪离谷底越高在画面上越大、越往画面外偏 */
 const CAM_M = 20
-/** 钟从钟口到顶有多高，米：画在一半高处 */
-const BELL_TALL_M = 2.4
-/** 钟画多大，占钟口底下喘得上气那一圈的比例：那一圈比钟口宽一点，气泡从钟口漫出来 */
-const BELL_SIZE = 0.62
+/** 钟与气泡像身体一样立着画，离地越高画得越往上：钟吊着时钟口画在离地这么高（格），刚好高过队员的头 */
+const MOUTH_U = 1.35
+/** 钟口画多宽，占钟口底下喘得上气那一圈的比例：那一圈比钟口宽，气泡从钟口两边漫出来 */
+const BELL_LIP = 0.56
+/** 钟的贴图多宽，像素 */
+const BELL_PX = 512
+/** 队员的头离脚多高（格）：呼出的气泡从这里冒 */
+const HEAD_U = 0.9
 /** 探照灯与头灯的亮度（给着色器的量，与照到的距离平方相除）；头灯举多高（米） */
 const BELL_LAMP = 24
 const HEAD_LAMP = 1.6
@@ -57,10 +61,10 @@ const GLOW_SPEED_U = 1.4
 const GLOW_BODY = 2.4
 const GLOW_SHOT = 0.22
 const GLOW_GAIN = 1.1
-/** 气泡：最多同时几个，往上升多快（米/秒），升到多高就散了（米） */
+/** 气泡：最多同时几个，往上升多快（格/秒），最多升多高就散了（格） */
 const BUBBLE_MAX = 160
-const BUBBLE_RISE_MS = 1.4
-const BUBBLE_TOP_M = 9
+const BUBBLE_RISE_U = 1.2
+const BUBBLE_TOP_U = 5
 /** 海雪：几片，往下沉多快（米/秒），离谷底多高的范围（米） */
 const SNOW = 190
 const SNOW_SINK_MS = 0.12
@@ -75,11 +79,19 @@ function smooth(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
+/** 离地 hM 米的东西画得比它在地上的位置高多少像素：吊着的钟口正好在 MOUTH_U 格 */
+function liftPx(hM: number, cfg: DeepConfig): number {
+  return (hM / cfg.bell.hangM) * MOUTH_U * UNIT
+}
+
+/** 一个气泡：x、y 是它底下地上的位置，up 是它画得比地上高多少格，从 from 升到 end 就散了；r 是半径（格） */
 interface Bubble {
   x: number
   y: number
-  h: number
-  vh: number
+  up: number
+  vup: number
+  readonly from: number
+  readonly end: number
   r: number
   phase: number
   age: number
@@ -106,8 +118,8 @@ function refreshLinear(tex: Phaser.Textures.CanvasTexture): void {
 /**
  * 深海：谷底是开局在后台线程画好的固有色与高度，光照由着色器逐点算——头顶只剩一丝深蓝，钟上的探照灯与队员的头灯照出一圈圈暖白，
  * 光在水里走得越远越只剩青蓝，灯四周罩着一团泛青的光晕；被搅动的浮游生物发出蓝绿的冷光，游过的身体与飞过的子弹身后拖着一道道光痕。
- * 潜水钟、缆绳、气泡与海雪按透视画：越高的东西越大、越往画面外偏；钟口底下那一圈喘得上气的地方画一道圈，钟吊走时圈画在它要落下去的地方。
- * 呛水的队员一串串冒泡
+ * 潜水钟、缆绳与气泡像身体一样立着画，离地越高画得越往上；海雪按透视画，越高越大、越往画面外偏。钟口底下那一圈喘得上气的地方画一道圈，
+ * 钟吊走时圈画在它要落下去的地方。呛水的队员一串串冒泡
  */
 export class DeepView extends BoundedView {
   private painter?: DeepPainter
@@ -147,7 +159,8 @@ export class DeepView extends BoundedView {
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     const scene = v.scene
-    if (!scene.textures.exists(BELL_KEY)) canvasTexture(scene, BELL_KEY, 256, 256, (ctx) => drawBell(ctx, 256))
+    const bellH = Math.round(BELL_PX * BELL_ART.aspect)
+    if (!scene.textures.exists(BELL_KEY)) canvasTexture(scene, BELL_KEY, BELL_PX, bellH, (ctx) => drawBell(ctx, BELL_PX, bellH))
     if (!scene.textures.exists(BUBBLE_KEY)) canvasTexture(scene, BUBBLE_KEY, 32, 32, (ctx) => drawBubble(ctx, 32))
     if (!scene.textures.exists(HALO_KEY)) canvasTexture(scene, HALO_KEY, 64, 64, (ctx) => drawHalo(ctx, 64))
     if (!scene.textures.exists(FLAKE_KEY)) canvasTexture(scene, FLAKE_KEY, 16, 16, (ctx) => drawFlake(ctx, 16))
@@ -221,10 +234,11 @@ export class DeepView extends BoundedView {
       .setDepth(-1)
     this.visuals.push(this.ground)
     this.ring = scene.add.graphics().setDepth(-0.5)
-    this.lampHalo = scene.add.image(0, 0, HALO_KEY).setDepth(30.5).setBlendMode(Phaser.BlendModes.ADD).setTint(0xbfe8ff)
-    this.bell = scene.add.image(0, 0, BELL_KEY).setDepth(31)
-    this.cable = scene.add.graphics().setDepth(31.5)
-    this.visuals.push(this.ring, this.lampHalo, this.bell, this.cable)
+    // 钟、缆绳与钟口的光晕画在所有身体后面：站在钟底下的队员、钟后面的敌人都不会被挡住
+    this.cable = scene.add.graphics().setDepth(0.85)
+    this.bell = scene.add.image(0, 0, BELL_KEY).setOrigin(0.5, BELL_ART.ringY).setDepth(0.9)
+    this.lampHalo = scene.add.image(0, 0, HALO_KEY).setDepth(0.95).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffe2b0)
+    this.visuals.push(this.ring, this.cable, this.bell, this.lampHalo)
     this.phase = s.bell.phase
     this.seedSnow(v)
     v.lens.screen.vignette(0.72, 0.3, 0x010510)
@@ -245,10 +259,10 @@ export class DeepView extends BoundedView {
     const eye = this.eye(v)
     this.lamps(sim, s, cfg, now)
     this.stepGlow(sim, dt)
-    this.drawBell(sim, s, cfg, eye, now)
+    this.drawBell(v, s, cfg, now)
     this.sounds(s.bell)
     this.emit(v, sim, s, cfg, dt, now)
-    this.stepBubbles(dt, eye)
+    this.stepBubbles(dt)
     this.stepSnow(v, dt, eye)
   }
 
@@ -333,44 +347,40 @@ export class DeepView extends BoundedView {
     refreshLinear(g.tex)
   }
 
-  /** 钟按透视画在钟口往上一半高处，靠近画面中间的盖住队员时淡下去；缆绳从顶上一直往上没进黑暗；地上那一圈是喘得上气的地方，吊走时圈在新落点 */
-  private drawBell(sim: Sim, s: DeepState, cfg: DeepConfig, eye: Point, now: number): void {
+  /**
+   * 钟立着画，钟口离地 MOUTH_U 格，吊起来时往画面上方升、暗下去，隐进黑暗；绕着吊环轻轻晃，预兆时缆绳一紧晃得厉害。
+   * 缆绳从吊环一直往上伸出画面；地上那一圈是喘得上气的地方，吊走时圈在新落点
+   */
+  private drawBell(v: ViewCtx, s: DeepState, cfg: DeepConfig, now: number): void {
     const b = s.bell
     const img = this.bell!
     const halo = this.lampHalo!
     const cable = this.cable!
     const ring = this.ring!
     const R = airRadius(cfg)
-    const floor = seabedM(s.plan, b.x / UNIT, b.y / UNIT)
-    const sway = b.phase === 'warn' ? Math.sin(now / 70) * 0.06 * UNIT : Math.sin(now / 2300) * 0.04 * UNIT
-    const at = (h: number): { x: number; y: number; k: number } => {
-      const k = CAM_M / Math.max(0.5, CAM_M - (floor + h))
-      return { x: eye.x + (b.x + sway - eye.x) * k, y: eye.y + (b.y - eye.y) * k, k }
-    }
-    const mid = at(b.h + BELL_TALL_M * 0.5)
-    const lead = sim.leader
-    const near = Math.hypot(Transform.x[lead]! - b.x, Transform.y[lead]! - b.y)
+    const w = (R * BELL_LIP) / BELL_ART.lipHalf
+    const h = w * BELL_ART.aspect
+    const drop = (BELL_ART.lipY - BELL_ART.ringY) * h
+    const lug = b.y - liftPx(b.h, cfg) - drop
+    const tilt = b.phase === 'warn' ? Math.sin(now / 70) * 0.05 : Math.sin(now / 2300) * 0.025
     const high = smooth(cfg.bell.hangM + 3, cfg.bell.hangM + 9, b.h)
+    const dark = Math.round(255 * (1 - 0.7 * high))
     img
-      .setPosition(mid.x, mid.y)
-      .setDisplaySize(R * 2 * BELL_SIZE * mid.k, R * 2 * BELL_SIZE * mid.k)
-      .setRotation(Math.sin(now / 3100) * 0.03)
-      .setAlpha((0.3 + 0.62 * smooth(R * 0.5, R * 1.3, near)) * (1 - high))
+      .setPosition(b.x, lug)
+      .setDisplaySize(w, h)
+      .setRotation(tilt)
+      .setAlpha(1 - high)
+      .setTint((dark << 16) | (dark << 8) | Math.round(255 * (1 - 0.45 * high)))
       .setVisible(high < 1)
-    const rim = at(b.h)
     halo
-      .setPosition(rim.x, rim.y)
-      .setScale((R * 3.2 * rim.k) / 64)
-      .setAlpha(0.22 * this.lit.power * (1 - high))
+      .setPosition(b.x - Math.sin(tilt) * drop, lug + Math.cos(tilt) * drop)
+      .setScale((w * 1.3) / 64)
+      .setAlpha(0.3 * this.lit.power * (1 - high))
     cable.clear()
-    const top = b.h + BELL_TALL_M
-    let prev = at(top)
-    for (let i = 1; i <= 12; i++) {
-      const h = top + ((CAM_M * 0.82 - floor - top) * i) / 12
-      const p = at(h)
-      cable.lineStyle(Math.max(1.5, 0.05 * UNIT * p.k), 0x2a2f36, 0.85 * (1 - i / 13) * (1 - high * 0.6))
-      cable.lineBetween(prev.x, prev.y, p.x, p.y)
-      prev = p
+    const top = v.lens.screen.view().y - UNIT
+    if (high < 1 && lug > top) {
+      cable.lineStyle(0.06 * UNIT, 0x14181e, 0.95 * (1 - high)).lineBetween(b.x, lug, b.x, top)
+      cable.lineStyle(0.02 * UNIT, 0x5d6975, 0.5 * (1 - high)).lineBetween(b.x - 0.015 * UNIT, lug, b.x - 0.015 * UNIT, top)
     }
     ring.clear()
     const breath = breathable(b)
@@ -398,33 +408,33 @@ export class DeepView extends BoundedView {
     else if (b.phase === 'down') playSfx('clank')
   }
 
-  /** 冒气泡：钟口一圈平时慢慢冒、预兆时猛冒、吊起那一下涌出一大团；钟底下换气的队员呼出一串；呛水的一串串往上冒；冷泉冒甲烷 */
+  /** 冒气泡：钟口两边平时慢慢冒、预兆时猛冒、吊起那一下涌出一大团；钟口底下换气的队员呼出一串、冒进钟里；呛水的一串串往上冒；冷泉冒甲烷 */
   private emit(v: ViewCtx, sim: Sim, s: DeepState, cfg: DeepConfig, dt: number, now: number): void {
     const b = s.bell
-    const R = airRadius(cfg)
+    const lip = airRadius(cfg) * BELL_LIP
+    const mouth = liftPx(b.h, cfg) / UNIT
     const screen = v.lens.screen
-    const floorAt = (x: number, y: number): number => seabedM(s.plan, x / UNIT, y / UNIT)
     const rate = b.phase === 'down' ? 2 : b.phase === 'warn' ? 18 : b.phase === 'hoist' ? 10 : 0
     this.bubbleDebt += rate * dt
-    if (screen.sees(b.x, b.y, 6 * UNIT)) {
+    if (screen.sees(b.x, b.y - mouth * UNIT, 6 * UNIT)) {
       while (this.bubbleDebt >= 1) {
         this.bubbleDebt -= 1
-        const a = Math.random() * Math.PI * 2
-        this.spawnBubble(v, b.x + Math.cos(a) * R * 0.95, b.y + Math.sin(a) * R * 0.95, floorAt(b.x, b.y) + b.h, 0.03 + Math.random() * 0.05)
+        const side = Math.random() < 0.5 ? -1 : 1
+        this.spawnBubble(v, b.x + side * lip * (0.85 + Math.random() * 0.25), b.y, mouth - 0.1, 0.06 + Math.random() * 0.1)
       }
     } else this.bubbleDebt = 0
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
       const x = Transform.x[m]!
       const y = Transform.y[m]!
-      const h = floorAt(x, y) + 1.5
       if (underBell(cfg, b, x, y)) {
         const at = this.exhaleAt.get(Uid.v[m]!) ?? 0
         if (now < at) continue
         this.exhaleAt.set(Uid.v[m]!, now + 1800 + Math.random() * 1200)
-        for (let i = 0; i < 3; i++) this.spawnBubble(v, x + (Math.random() - 0.5) * 8, y - 0.2 * UNIT, h, 0.02 + Math.random() * 0.03)
+        const into = Math.abs(x - b.x) < lip ? mouth : undefined
+        for (let i = 0; i < 3; i++) this.spawnBubble(v, x + (Math.random() - 0.5) * 8, y, HEAD_U, 0.04 + Math.random() * 0.06, into)
       } else if (staminaLeft(m) <= 0) {
-        if (Math.random() < dt * 9) this.spawnBubble(v, x + (Math.random() - 0.5) * 10, y - 0.2 * UNIT, h, 0.03 + Math.random() * 0.05)
+        if (Math.random() < dt * 9) this.spawnBubble(v, x + (Math.random() - 0.5) * 10, y, HEAD_U, 0.06 + Math.random() * 0.1)
         if (now >= this.gurgleAt && screen.sees(x, y)) {
           this.gurgleAt = now + GURGLE_MS
           playSfx('gurgle')
@@ -439,36 +449,38 @@ export class DeepView extends BoundedView {
       const r = Math.sqrt(Math.random()) * q.r * 0.45 * UNIT
       const x = q.x * UNIT + Math.cos(a) * r
       const y = q.y * UNIT + Math.sin(a) * r
-      if (screen.sees(x, y, 3 * UNIT)) this.spawnBubble(v, x, y, floorAt(x, y), 0.015 + Math.random() * 0.03)
+      if (screen.sees(x, y, 3 * UNIT)) this.spawnBubble(v, x, y, 0, 0.03 + Math.random() * 0.06)
     }
   }
 
-  private spawnBubble(v: ViewCtx, x: number, y: number, h: number, r: number): void {
+  /** 在地上 (x, y) 的上方 up 格放一个半径 r 格的气泡；写了 end 就升到那么高散掉，不写就升几格 */
+  private spawnBubble(v: ViewCtx, x: number, y: number, up: number, r: number, end?: number): void {
     if (this.bubbles.length >= BUBBLE_MAX) return
     const img = this.spare.pop() ?? v.scene.add.image(0, 0, BUBBLE_KEY).setDepth(32)
     img.setVisible(true)
-    this.bubbles.push({ x, y, h, vh: BUBBLE_RISE_MS * (0.75 + Math.random() * 0.5) * (0.7 + r * 6), r, phase: Math.random() * 6.28, age: 0, img })
+    const vup = BUBBLE_RISE_U * (0.75 + Math.random() * 0.5) * (0.7 + r * 3)
+    this.bubbles.push({ x, y, up, vup, from: up, end: end ?? up + BUBBLE_TOP_U * (0.6 + Math.random() * 0.4), r, phase: Math.random() * 6.28, age: 0, img })
   }
 
-  /** 气泡一边往上升一边左右晃，按透视画：越高越大、越往画面外偏，升高了就散了 */
-  private stepBubbles(dt: number, eye: Point): void {
+  /** 气泡一边往上升一边左右晃，立着画：升得越高画得越往上、胀大一点，升到头就散了 */
+  private stepBubbles(dt: number): void {
     const kept: Bubble[] = []
     for (const q of this.bubbles) {
       q.age += dt
-      q.h += q.vh * dt
+      q.up += q.vup * dt
       q.phase += dt * 7
       q.x += Math.sin(q.phase) * 6 * dt
-      if (q.h >= BUBBLE_TOP_M) {
+      if (q.up >= q.end) {
         q.img.setVisible(false)
         this.spare.push(q.img)
         continue
       }
-      const k = CAM_M / Math.max(0.5, CAM_M - q.h)
-      const size = (q.r / 0.5) * UNIT * 2 * k
+      const size = q.r * 2 * UNIT * (1 + 0.05 * q.up)
+      const fade = Math.min(1.2, (q.end - q.from) * 0.5)
       q.img
-        .setPosition(eye.x + (q.x - eye.x) * k, eye.y + (q.y - eye.y) * k)
+        .setPosition(q.x, q.y - q.up * UNIT)
         .setDisplaySize(size * (1 + 0.08 * Math.sin(q.phase * 1.7)), size * (1 - 0.08 * Math.sin(q.phase * 1.7)))
-        .setAlpha(smooth(0, 0.15, q.age) * (1 - smooth(BUBBLE_TOP_M * 0.45, BUBBLE_TOP_M, q.h)) * 0.8)
+        .setAlpha(smooth(0, 0.15, q.age) * (1 - smooth(q.end - fade, q.end, q.up)) * 0.8)
         .setTint(this.lightTint(q.x, q.y))
       kept.push(q)
     }
