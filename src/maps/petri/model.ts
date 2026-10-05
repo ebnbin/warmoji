@@ -38,17 +38,16 @@ export interface Disc {
   readonly r: number
 }
 
-/** 皿底记号笔分的一区：从 a0 转到 a1（弧度，顺着划线的方向），区号 1–4，划没划过 */
+/** 皿底记号笔分的一区：从 a0 转到 a1（弧度，顺着划线的方向），区号 1–4 */
 export interface Quadrant {
   readonly a0: number
   readonly a1: number
   readonly label: number
-  readonly streaked: boolean
 }
 
 /**
- * 一只培养皿，格：皿心、琼脂面的半径与玻璃壁厚，能走的琼脂面；接种时记号笔分的四区、划过的线与落下的菌落；
- * 琼脂里的气泡，灯箱网格的偏移，皿底标签写在哪
+ * 一只培养皿，格：皿心、琼脂面的半径与玻璃壁厚，能走的琼脂面；接种时记号笔分的四区与落下的菌落；
+ * 琼脂里的气泡，灯箱网格的偏移（占一格网格的比例），皿底标签写在哪
  */
 export interface PetriPlan {
   readonly cx: number
@@ -57,7 +56,6 @@ export interface PetriPlan {
   readonly wall: number
   readonly basin: Basin
   readonly quadrants: readonly Quadrant[]
-  readonly strokes: readonly (readonly Point[])[]
   readonly seeds: readonly Disc[]
   readonly bubbles: readonly Disc[]
   readonly grid: Point
@@ -126,12 +124,11 @@ export function petriPlan(cfg: PetriConfig, seed: number): PetriPlan {
   const dir = rng.next() < 0.5 ? 1 : -1
   const streaked = rng.int(s.quadrants[0], s.quadrants[1])
   const quarter = Math.PI / 2
-  const quadrants: Quadrant[] = [0, 1, 2, 3].map((k) => ({ a0: start + dir * k * quarter, a1: start + dir * (k + 1) * quarter, label: k + 1, streaked: k < streaked }))
+  const quadrants: Quadrant[] = [0, 1, 2, 3].map((k) => ({ a0: start + dir * k * quarter, a1: start + dir * (k + 1) * quarter, label: k + 1 }))
   const fits = (d: Disc): boolean => {
     const r = Math.hypot(d.x - cx, d.y - cy)
     return r - d.r >= cfg.plazaU && r + d.r <= R - WALL_KEEP_U
   }
-  const strokes: Point[][] = []
   const seeds: Disc[] = []
   for (let k = 0; k < streaked; k++) {
     const q = quadrants[k]!
@@ -146,7 +143,6 @@ export function petriPlan(cfg: PetriConfig, seed: number): PetriPlan {
       const r = R * (band + (rng.next() * 2 - 1) * 0.03)
       pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r })
     }
-    strokes.push(pts)
     const spacing = s.spacingU[Math.min(k, s.spacingU.length - 1)]!
     const found: Disc[] = []
     seedAlong(rng, pts, spacing, spacing < 1 ? SCATTER_U.dense : SCATTER_U.sparse, s.colonyU, found)
@@ -181,7 +177,6 @@ export function petriPlan(cfg: PetriConfig, seed: number): PetriPlan {
     wall: cfg.dish.wallU,
     basin,
     quadrants,
-    strokes,
     seeds,
     bubbles,
     grid: { x: rng.next(), y: rng.next() },
