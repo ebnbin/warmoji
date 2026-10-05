@@ -43,6 +43,7 @@ import type { Solid } from './solids'
 import type { ObstacleId } from '../../types/obstacles'
 import type { MeadowState } from '../../maps/meadow/world'
 import type { SakuraState } from '../../maps/sakura/world'
+import type { MapleState } from '../../maps/maple/world'
 import type { CircuitState } from '../../maps/circuit/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
@@ -98,13 +99,14 @@ export interface WorldState {
   desert: DesertState | null
   meadow: MeadowState | null
   sakura: SakuraState | null
+  maple: MapleState | null
   circuit: CircuitState | null
   nexus: NexusState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, nexus: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}

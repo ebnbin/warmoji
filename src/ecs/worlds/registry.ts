@@ -12,6 +12,7 @@ import { nexus } from '../../maps/nexus/world'
 import { nebula } from '../../maps/nebula/world'
 import { ruins } from '../../maps/ruins/world'
 import { sakura } from '../../maps/sakura/world'
+import { maple } from '../../maps/maple/world'
 import { ship } from '../../maps/ship/world'
 import { volcano } from '../../maps/volcano/world'
 
@@ -32,6 +33,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   cave,
   meadow,
   sakura,
+  maple,
   desert,
   circuit,
   nexus,
