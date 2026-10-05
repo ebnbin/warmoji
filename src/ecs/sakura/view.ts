@@ -1,11 +1,11 @@
 import Phaser from 'phaser'
-import { hasComponent, query, removeEntity } from 'bitecs'
+import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { Rng } from '../../util/rng'
-import { spawnDecor } from '../entities/decor'
+import { decorSprite, keepDecor } from '../decor'
 import { Alive, Depth, Phys, Pickup, Radius, Span, Transform, Uid } from '../components'
 import { roomAt } from '../worlds/basin'
 import { flowAt } from './water'
@@ -104,7 +104,6 @@ function ensurePetal(scene: Phaser.Scene): void {
  */
 export class SakuraView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
-  private decorEids: number[] = []
   private plan?: SakuraPlan
   private painter?: SakuraPainter
   private readonly u = { time: 0 }
@@ -146,7 +145,7 @@ export class SakuraView implements MapView {
       if (roomAt(plan.basin, d.xU * UNIT, d.yU * UNIT) < keep) continue
       const bl = bridgeLocal(plan.bridge, d.xU, d.yU)
       if (Math.abs(bl.a) < plan.bridge.half + 0.3 && Math.abs(bl.t) < plan.bridge.width + 0.3) continue
-      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: d.xU * UNIT, y: d.yU * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+      v.decor.push(decorSprite(atlas, d.emoji, d.xU * UNIT, d.yU * UNIT, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 
@@ -186,13 +185,7 @@ export class SakuraView implements MapView {
     this.bridge(v, plan)
     this.fence(v, plan)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, KEYS.canopy).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(20))
-    this.decorEids = this.decorEids.filter((eid) => {
-      const x = Transform.x[eid]!
-      const y = Transform.y[eid]!
-      const keep = roomAt(plan.basin, x, y) >= 0.4 * UNIT && flowAt(water, x / UNIT, y / UNIT, this.flow).h <= 0
-      if (!keep) removeEntity(v.world, eid)
-      return keep
-    })
+    keepDecor(v.decor, (s) => roomAt(plan.basin, s.x, s.y) >= 0.4 * UNIT && flowAt(water, s.x / UNIT, s.y / UNIT, this.flow).h <= 0)
     const wr = plan.weir
     for (let i = 0; i < water.h.length; i++) {
       if (water.h[i]! <= 0.08 || water.sink[i]! >= 0) continue
@@ -416,9 +409,8 @@ export class SakuraView implements MapView {
     this.painter?.close()
     this.painter = undefined
     for (const o of this.visuals) o.destroy()
-    for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
-    this.decorEids = []
+    v.decor.length = 0
     this.afloat = []
     this.falling = []
     this.spots = []

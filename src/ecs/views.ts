@@ -1,16 +1,17 @@
 import Phaser from 'phaser'
-import { hasComponent, removeEntity } from 'bitecs'
+import { hasComponent } from 'bitecs'
 import { FRAME_U, LIFT_PER_M, UNIT } from '../util/units'
 import { MAP, MAPS, rollDecor } from '../data/maps'
 import { viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
 import { Rng } from '../util/rng'
-import { spawnDecor } from './entities/decor'
+import { decorSprite, keepDecor } from './decor'
+import type { Decor } from './decor'
 import type { EcsAtlas } from './atlas'
 import type { EcsWorld } from './world'
 import type { MapDef, MapId } from '../types/maps'
 import type { Point } from '../util/vec'
-import type { LocalLight } from './render/spriteBatch'
+import type { LocalLight, PaintSprite } from './render/sprites'
 import type { RunState } from '../run/state'
 import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
@@ -21,7 +22,6 @@ import { meteorPath, telegraphDef, telegraphEntry } from './store'
 import { captureRadiusU } from './worlds/nebulaOld'
 import { ringPoint } from './worlds/space'
 import { leaderX, leaderY } from './utils/team'
-import { spawnDriftDecor } from './entities/decor'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/oldRiver'
@@ -93,6 +93,8 @@ export interface ViewCtx {
   readonly lens: Lens
   /** 开战时屏幕是竖的：按屏幕摆向的地图据此定朝向，之后不随屏幕转 */
   readonly portrait: boolean
+  /** 地上的布景：不是实体，地图往里放、删、挪；场景的布景层按列表的次序、按地图的光画在躺着的精灵那一层 */
+  readonly decor: PaintSprite[]
   w: number
   h: number
   atlas?: EcsAtlas
@@ -118,7 +120,6 @@ export interface MapView {
 
 class BoundedView implements MapView {
   protected visuals: Phaser.GameObjects.GameObject[] = []
-  protected decorEids: number[] = []
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const w = (v.def.size?.w ?? MAP.width) * UNIT
@@ -151,18 +152,7 @@ class BoundedView implements MapView {
     const cols = Math.round(v.w / UNIT)
     const rows = Math.round(v.h / UNIT)
     for (const d of rollDecor(v.def.decor, () => rng.next(), cols, rows)) {
-      this.decorEids.push(
-        spawnDecor(v.world, atlas, {
-          id: d.emoji,
-          outline: 'player',
-          x: d.xU * UNIT,
-          y: d.yU * UNIT,
-          size: d.sizeU * UNIT,
-          rot: d.rotation,
-          alpha: d.alpha,
-          z: 1,
-        }),
-      )
+      v.decor.push(decorSprite(atlas, d.emoji, d.xU * UNIT, d.yU * UNIT, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 
@@ -174,9 +164,8 @@ class BoundedView implements MapView {
 
   destroy(v: ViewCtx): void {
     for (const o of this.visuals) o.destroy()
-    for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
-    this.decorEids = []
+    v.decor.length = 0
   }
 }
 
@@ -321,18 +310,7 @@ class SpaceView extends BoundedView {
       const xU = d.xU - rU
       const yU = d.yU - rU
       if (Math.hypot(xU, yU) > rU - d.sizeU / 2) continue
-      this.decorEids.push(
-        spawnDecor(v.world, atlas, {
-          id: d.emoji,
-          outline: 'player',
-          x: xU * UNIT,
-          y: yU * UNIT,
-          size: d.sizeU * UNIT,
-          rot: d.rotation,
-          alpha: d.alpha,
-          z: 1,
-        }),
-      )
+      v.decor.push(decorSprite(atlas, d.emoji, xU * UNIT, yU * UNIT, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 
@@ -435,18 +413,7 @@ class NebulaOldView extends BoundedView {
       const xU = d.xU - rU
       const yU = d.yU - rU
       if (Math.hypot(xU, yU) > rU - d.sizeU / 2) continue
-      this.decorEids.push(
-        spawnDecor(v.world, atlas, {
-          id: d.emoji,
-          outline: 'player',
-          x: xU * UNIT,
-          y: yU * UNIT,
-          size: d.sizeU * UNIT,
-          rot: d.rotation,
-          alpha: d.alpha,
-          z: 1,
-        }),
-      )
+      v.decor.push(decorSprite(atlas, d.emoji, xU * UNIT, yU * UNIT, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 
@@ -585,8 +552,20 @@ class OldRuinsView extends BoundedView {
   }
 }
 
+/** 河上漂着的一片叶子：沿河漂到 u，离河心 cross，按 speedMul 倍的流速漂，左右摆着、自己转着 */
+interface Drifter {
+  readonly s: Decor
+  u: number
+  cross: number
+  speedMul: number
+  readonly swayPhase: number
+  readonly swayAmp: number
+  readonly spin: number
+}
+
 class OldRiverView extends SingleScreenView {
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
+  private drifters: Drifter[] = []
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const s = v.def.oldRiver!.viewScale
@@ -689,18 +668,8 @@ class OldRiverView extends SingleScreenView {
         const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
         const size = Math.min(sizeU * UNIT, bandW * 0.9)
         const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
-        this.decorEids.push(
-          spawnDecor(v.world, atlas, {
-            id: def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!,
-            outline: 'player',
-            x: horizontal ? along : cross,
-            y: horizontal ? cross : along,
-            size,
-            rot: (decorRng.next() * 2 - 1) * 0.6,
-            alpha: def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]),
-            z: 0.8,
-          }),
-        )
+        const id = def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!
+        v.decor.push(decorSprite(atlas, id, horizontal ? along : cross, horizontal ? cross : along, size, (decorRng.next() * 2 - 1) * 0.6, def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0])))
       }
     }
 
@@ -710,33 +679,22 @@ class OldRiverView extends SingleScreenView {
     for (let i = 0; i < cfg.driftCount; i++) {
       const cross = (Math.random() * 2 - 1) * halfCross * 0.92
       const u = Math.random() * alongLen
-      this.decorEids.push(
-        spawnDriftDecor(
-          v.world,
-          atlas,
-          {
-            id: pool[Math.floor(Math.random() * pool.length)]!,
-            outline: 'player',
-            x: horizontal ? v.w - u : mid + cross,
-            y: horizontal ? mid + cross : u,
-            size: (0.35 + Math.random() * 0.25) * UNIT,
-            alpha: 0.5,
-            z: 1.5,
-            spin: (Math.random() * 2 - 1) * 0.5,
-          },
-          {
-            u,
-            cross,
-            speedMul: driftSpeed(cross / halfCross, cfg, Math.random),
-            swayPhase: Math.random() * Math.PI * 2,
-            swayAmp: (0.06 + Math.random() * 0.12) * UNIT,
-          },
-        ),
-      )
+      const id = pool[Math.floor(Math.random() * pool.length)]!
+      const s = decorSprite(atlas, id, horizontal ? v.w - u : mid + cross, horizontal ? mid + cross : u, (0.35 + Math.random() * 0.25) * UNIT, 0, 0.5)
+      v.decor.push(s)
+      this.drifters.push({
+        s,
+        u,
+        cross,
+        speedMul: driftSpeed(cross / halfCross, cfg, Math.random),
+        swayPhase: Math.random() * Math.PI * 2,
+        swayAmp: (0.06 + Math.random() * 0.12) * UNIT,
+        spin: (Math.random() * 2 - 1) * 0.5,
+      })
     }
   }
 
-  step(v: ViewCtx, _sim: Sim, delta: number): void {
+  step(v: ViewCtx, sim: Sim, delta: number): void {
     const cfg = v.def.oldRiver!
     const dt = delta / 1000
     const r = riverRect(v.w, v.h, cfg.width * UNIT)
@@ -744,10 +702,27 @@ class OldRiverView extends SingleScreenView {
       if (r.horizontal) w.tile.tilePositionX += w.speed * dt
       else w.tile.tilePositionY -= w.speed * dt
     }
+    // 叶子顺水漂，漂出下游就换到上游、换一道漂
+    const alongLen = r.horizontal ? v.w : v.h
+    const halfCross = (r.horizontal ? r.h : r.w) / 2
+    const mid = r.horizontal ? r.y + r.h / 2 : r.x + r.w / 2
+    for (const d of this.drifters) {
+      d.u += cfg.flow * UNIT * d.speedMul * dt
+      if (d.u > alongLen + UNIT) {
+        d.u = -UNIT
+        d.cross = (Math.random() * 2 - 1) * halfCross * 0.92
+        d.speedMul = driftSpeed(d.cross / halfCross, cfg, Math.random)
+      }
+      const cross = mid + d.cross + Math.sin(sim.elapsedMs / 1250 + d.swayPhase) * d.swayAmp
+      d.s.x = r.horizontal ? v.w - d.u : cross
+      d.s.y = r.horizontal ? cross : d.u
+      d.s.rot += d.spin * dt
+    }
   }
 
   destroy(v: ViewCtx): void {
     this.waveTiles = []
+    this.drifters = []
     super.destroy(v)
   }
 }
@@ -818,18 +793,8 @@ class TorusView extends SingleScreenView {
     const density = def.density[0] + rng.next() * (def.density[1] - def.density[0])
     for (let i = 0; i < Math.round(cells * density); i++) {
       const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
-      this.decorEids.push(
-        spawnDecor(v.world, atlas, {
-          id: def.emojis[Math.floor(rng.next() * def.emojis.length)]!,
-          outline: 'player',
-          x: rng.next() * v.w,
-          y: rng.next() * v.h,
-          size: sizeU * UNIT,
-          rot: (rng.next() * 2 - 1) * Math.PI,
-          alpha: def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]),
-          z: 0.5,
-        }),
-      )
+      const id = def.emojis[Math.floor(rng.next() * def.emojis.length)]!
+      v.decor.push(decorSprite(atlas, id, rng.next() * v.w, rng.next() * v.h, sizeU * UNIT, (rng.next() * 2 - 1) * Math.PI, def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0])))
     }
   }
 
@@ -1092,11 +1057,7 @@ class VolcanoView extends BoundedView {
       .setOrigin(0, 0)
       .setDepth(1.5)
     this.visuals.push(shader)
-    this.decorEids = this.decorEids.filter((eid) => {
-      const keep = roomAt(f.basin, Transform.x[eid]!, Transform.y[eid]!) >= 0.5 * UNIT
-      if (!keep) removeEntity(v.world, eid)
-      return keep
-    })
+    keepDecor(v.decor, (s) => roomAt(f.basin, s.x, s.y) >= 0.5 * UNIT)
     this.plume = scene.add
       .particles(f.craterX, f.craterY, PUFF_KEY, {
         lifespan: { min: 3000, max: 4800 },
@@ -1664,13 +1625,7 @@ class ShipView extends BoundedView {
     this.ballShade = scene.add.graphics().setDepth(-0.6)
     this.rig = scene.add.graphics().setDepth(31)
     this.visuals.push(this.deckImg, this.shade, this.ballShade, this.rig)
-    this.decorEids = this.decorEids.filter((eid) => {
-      const x = Transform.x[eid]!
-      const y = Transform.y[eid]!
-      const keep = roomAt(deck.basin, x, y) >= 0.7 * UNIT && roomAt(deck.basin, x, y) < 2.5 * UNIT
-      if (!keep) removeEntity(v.world, eid)
-      return keep
-    })
+    keepDecor(v.decor, (s) => roomAt(deck.basin, s.x, s.y) >= 0.7 * UNIT && roomAt(deck.basin, s.x, s.y) < 2.5 * UNIT)
     this.balls = s.balls.map(() => scene.add.image(0, 0, BALL_KEY).setDepth(0.9).setDisplaySize(cfg.balls.radiusU * 2 * UNIT, cfg.balls.radiusU * 2 * UNIT))
     this.visuals.push(...this.balls)
     const masts = rigOf(cfg)
@@ -2508,7 +2463,7 @@ class FloeView extends BoundedView {
     const cells = Math.round(v.w / UNIT)
     for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
       if (edgeAt(f, d.xU * UNIT, d.yU * UNIT) < d.sizeU / 2 + 0.3) continue
-      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: d.xU * UNIT, y: d.yU * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+      v.decor.push(decorSprite(atlas, d.emoji, d.xU * UNIT, d.yU * UNIT, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 
@@ -2944,7 +2899,7 @@ class CaveView extends BoundedView {
       const x = d.xU * UNIT
       const y = d.yU * UNIT
       if (roomOf(L.rock, x, y) < (d.sizeU / 2 + 0.15) * UNIT || inPool(L, x, y) || L.mounds.some((m) => Math.hypot(x - m.x, y - m.y) < m.r)) continue
-      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x, y, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+      v.decor.push(decorSprite(atlas, d.emoji, x, y, d.sizeU * UNIT, d.rotation, d.alpha))
     }
   }
 

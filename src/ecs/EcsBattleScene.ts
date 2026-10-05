@@ -33,6 +33,7 @@ import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, 
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
+import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
 import { place } from './render/tri'
@@ -440,7 +441,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
     this.lens = new Lens(this)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, portrait: viewport.logicalWidth < viewport.logicalHeight, w: 0, h: 0 }
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, portrait: viewport.logicalWidth < viewport.logicalHeight, decor: [], w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
@@ -501,6 +502,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.paint = paint
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
+    // 布景躺在地上，和最底下那一段 z 的精灵画在同一层
+    new SpriteBatch(this, LayerType.Decor, SPRITE_BANDS[0]!.depth, atlas, this.ctx.decor, light, lightAt)
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
     if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))

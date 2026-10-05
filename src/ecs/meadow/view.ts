@@ -1,12 +1,12 @@
 import Phaser from 'phaser'
-import { hasComponent, query, removeEntity } from 'bitecs'
+import { hasComponent, query } from 'bitecs'
 import { FRAME_U, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { Rng } from '../../util/rng'
 import { playSfx } from '../../audio/sfx'
-import { spawnDecor } from '../entities/decor'
+import { decorSprite } from '../decor'
 import { Alive, Pickup, Radius, Span, Transform } from '../components'
 import { roomAt } from '../worlds/basin'
 import { CANOPY_PPU, grassMask, GROUND_AREA, MASK_PPU, textureSize } from './ground'
@@ -122,7 +122,6 @@ function ensureCritters(scene: Phaser.Scene): void {
  */
 export class MeadowView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
-  private decorEids: number[] = []
   private plan?: MeadowPlan
   private painter?: MeadowPainter
   private readonly u = { time: 0 }
@@ -164,7 +163,7 @@ export class MeadowView implements MapView {
       const y = (o + d.yU) * UNIT
       if (roomAt(plan.basin, x, y) < (d.sizeU / 2 + 0.3) * UNIT) continue
       if (plan.paths.some((p) => polylineDist(p, o + d.xU, o + d.yU) < 0.6)) continue
-      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x, y, size: d.sizeU * UNIT, rot: d.rotation * 0.3, alpha: d.alpha, z: 1 }))
+      v.decor.push(decorSprite(atlas, d.emoji, x, y, d.sizeU * UNIT, d.rotation * 0.3, d.alpha))
     }
   }
 
@@ -483,9 +482,8 @@ export class MeadowView implements MapView {
     this.painter?.close()
     this.painter = undefined
     for (const o of this.visuals) o.destroy()
-    for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
-    this.decorEids = []
+    v.decor.length = 0
     this.sheep = []
     this.butterflies = []
     this.birds = []

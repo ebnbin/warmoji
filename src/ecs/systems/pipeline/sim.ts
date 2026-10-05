@@ -1,8 +1,6 @@
 import { animateEnemies } from '../animateEnemies'
 import { blinkTelegraphs } from '../blinkTelegraphs'
 import { animateBooms } from '../animateBooms'
-import { driftDecor } from '../driftDecor'
-import { spinDecor } from '../spinDecor'
 import { expireFx } from '../expireFx'
 import { animateCharacters } from '../animateCharacters'
 import { despawnExpired } from '../despawnExpired'
@@ -90,8 +88,6 @@ export const SIM_PIPELINE = pipeline([
   blinkTelegraphs,
   updateShards,
   animateBooms,
-  driftDecor,
-  { run: spinDecor, after: [driftDecor] },
   { run: expireFx, after: [animateBooms] },
   { run: worldTick, after: [moveBodies, touchBodies] },
 ])

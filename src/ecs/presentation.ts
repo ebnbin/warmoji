@@ -23,7 +23,7 @@ import { leaderX, leaderY } from './utils/team'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
 import { packTint } from './render/tint'
-import type { PaintSprite } from './render/spriteBatch'
+import type { PaintSprite } from './render/sprites'
 import type { Sim } from './sim'
 
 /** 按世界坐标画：顶点原样记下，渲染时再乘镜头 */
