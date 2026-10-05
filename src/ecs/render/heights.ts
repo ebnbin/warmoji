@@ -4,7 +4,7 @@ import { MATERIALS } from '../../data/obstacles'
 import { UNIT } from '../../util/units'
 import { Alive, Pickup, Proj, Projectile, Radius, Shard, Span, Transform, VisOff } from '../components'
 import { boltZ, hiOf, layerAt, layersOf, loOf, overOf } from '../utils/pass'
-import { roomAt } from '../worlds/basin'
+import { roomAt } from '../../maps/basin'
 import type { Lens, Rect } from '../lens'
 import type { Sim } from '../sim'
 

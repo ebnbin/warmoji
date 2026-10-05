@@ -1,6 +1,6 @@
 import { passCost, probeZ } from '../utils/pass'
-import { roomAt } from './basin'
-import type { Basin } from './basin'
+import { roomAt } from '../../maps/basin'
+import type { Basin } from '../../maps/basin'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
 

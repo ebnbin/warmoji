@@ -3,12 +3,12 @@ import { MAP } from '../data/maps'
 import { safeInsets, viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
 import { UNIT } from '../util/units'
-import { FRAME } from './frame'
+import { FRAME } from '../maps/frame'
 import { fitAspectRect } from './worlds/torus'
-import type { Rect } from './frame'
+import type { Rect } from '../maps/frame'
 import type { Point } from '../util/vec'
 
-export type { Rect } from './frame'
+export type { Rect } from '../maps/frame'
 
 /**
  * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；

@@ -2,8 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
 // 战斗镜头只由镜头层摆，跟着屏幕走的东西只经它的屏幕层 lens.screen：战斗代码别处不许碰主镜头、加减镜头、改镜头的缩放边界视口、跟随与效果，也不许自己读镜头拍到哪里
-const root = resolve('src/ecs')
-const lens = join(root, 'lens.ts')
+const lens = resolve('src/ecs/lens.ts')
 
 const RULES: readonly { readonly re: RegExp; readonly what: string }[] = [
   { re: /\bcameras\.(add|remove)\s*\(/, what: '加减镜头' },
@@ -21,7 +20,8 @@ const walk = (dir: string): void => {
     else if (p.endsWith('.ts') && p !== lens) files.push(p)
   }
 }
-walk(root)
+walk(resolve('src/ecs'))
+walk(resolve('src/maps'))
 
 const errors: string[] = []
 for (const file of files) {
