@@ -29,13 +29,16 @@ varying vec2 outTexCoord;
 
 /**
  * 玻璃外往下看的夜城：从远到近四层——地面的街区与车流、楼顶、楼间穿梭的飞行器、隔壁几栋高楼的楼顶，层越深越暗、越蓝。
- * 镜头在地板上方 uCam.z 格：深 D 格的一层，地板上 p 处看到的是它上面 c + (p − c)·(H + D) / H 处，c 是镜头的正下方，越深的层跟着镜头移得越慢
+ * 镜头在地板上方 uCam.z 格：深 D 格的一层，地板上 p 处看到的是它上面 c + (p − c)·(H + D) / H 处，c 是镜头的正下方，越深的层跟着镜头移得越慢。
+ * 离幕墙内侧超过 uCut.y 格的地方是不透光的瓷砖地面，不画
  */
 export const CITY_FRAG = `${HEADER}
 uniform vec4 uRect;
 uniform vec3 uCam;
 uniform float uTime;
 uniform float uSeed;
+uniform vec4 uHall;
+uniform vec2 uCut;
 ${NOISE}
 const vec3 NIGHT = vec3(0.01, 0.018, 0.05);
 const vec3 HAZE = vec3(0.06, 0.08, 0.2);
@@ -175,10 +178,27 @@ vec3 traffic(vec2 q) {
   return col;
 }
 
+/** p 离幕墙内侧多远，厅里为正：uHall 是外接方形，uCut.x 是切角 */
+float hallRoom(vec2 p) {
+  float w = p.x - uHall.x;
+  float e = uHall.z - p.x;
+  float n = p.y - uHall.y;
+  float s = uHall.w - p.y;
+  float c = uCut.x;
+  float side = min(min(w, e), min(n, s));
+  float corner = min(min(w + n, e + n), min(w + s, e + s)) - c;
+  return min(side, corner * 0.70710678);
+}
+
 void main ()
 {
   vec2 tc = outTexCoord;
   vec2 p = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
+  // 瓷砖地面不透光，底下的城市不用画
+  if (hallRoom(p) > uCut.y) {
+    gl_FragColor = vec4(0.0);
+    return;
+  }
   vec3 col = ground(deep(p, 110.0), (uCam.z + 110.0) / uCam.z);
   col = mix(col, HAZE, 0.22);
   vec4 mid = roofs(deep(p, 62.0), 8.0, 0.45, 0.4);

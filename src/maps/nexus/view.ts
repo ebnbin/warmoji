@@ -60,6 +60,11 @@ const BEAM_U = 5
 /** 穿门时门那头冒出的错位横条：几条、留多久 */
 const GLITCH_SLICES = 6
 const GLITCH_MS = [120, 260] as const
+/** 队长穿门：整屏闪一下青光、横着蹿过几道错位的条纹，多久、多亮、几条 */
+const SIGNAL_MS = 220
+const SIGNAL_ALPHA = 0.16
+const SIGNAL_SLICES = 9
+const SIGNAL_COLORS = [0xffffff, 0x37f6ff, 0xff3df0] as const
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 
@@ -181,6 +186,9 @@ export class NexusView implements MapView {
   private airFx?: Phaser.GameObjects.Graphics
   private sparks?: Phaser.GameObjects.Particles.ParticleEmitter
   private slices: Slice[] = []
+  private signal?: Phaser.GameObjects.Rectangle
+  private signalUntil = 0
+  private slideSeen: object | null = null
   private hopSeen = 0
   private moving: (WarpSpot | null)[] = []
 
@@ -196,6 +204,8 @@ export class NexusView implements MapView {
 
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
+    this.signal = v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, 0x37f6ff).setDepth(86).setAlpha(0))
+    this.visuals.push(this.signal)
     if (!v.scene.textures.exists(SPARK_KEY)) {
       const tex = canvasTexture(v.scene, SPARK_KEY, 32, 32)
       drawSpark(tex.getContext(), 32)
@@ -229,7 +239,7 @@ export class NexusView implements MapView {
     if (this.painter !== painter) return
     this.painter = undefined
     upload(tex, Phaser.Textures.FilterMode.LINEAR)
-    this.city(v)
+    this.city(v, cfg, plan)
     this.visuals.push(scene.add.image(0, 0, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.floor(v, cfg, plan)
     this.dynamics(v)
@@ -239,10 +249,11 @@ export class NexusView implements MapView {
     v.lens.screen.vignette(0.86, 0.14, 0x061028)
   }
 
-  /** 玻璃外的夜城：铺满方框，着色器按镜头的位置算每一层看到哪里 */
-  private city(v: ViewCtx): void {
+  /** 玻璃外的夜城：铺满方框，着色器按镜头的位置算每一层看到哪里；瓷砖地面底下不画 */
+  private city(v: ViewCtx, cfg: NexusConfig, plan: NexusPlan): void {
     const u = this.u
     const seed = (v.run.decorSeed % 997) + 0.5
+    const h = plan.hall
     this.visuals.push(
       v.scene.add
         .shader(
@@ -254,6 +265,8 @@ export class NexusView implements MapView {
               set('uCam', [u.camX, u.camY, CAM_U])
               set('uTime', u.time)
               set('uSeed', seed)
+              set('uHall', [h.x0, h.y0, h.x1, h.y1])
+              set('uCut', [h.cut, cfg.glassU + 0.1])
             },
           },
           0,
@@ -358,7 +371,30 @@ export class NexusView implements MapView {
       if (w.next) this.preview(cfg, w.next, i, color, p, t)
     })
     this.holograms(st.plan, cfg, sim.fxMs, t)
+    const slide = sim.camSlide
+    if (slide && slide.msLeft === slide.ms && slide !== this.slideSeen) {
+      this.slideSeen = slide
+      this.interfere(v, sim.fxMs)
+    }
+    this.signal?.setAlpha(SIGNAL_ALPHA * clamp01((this.signalUntil - sim.fxMs) / SIGNAL_MS))
     this.glitches(sim.fxMs)
+  }
+
+  /** 队长穿门的那一下：整屏闪一下青光，镜头里横着蹿过几道错位的条纹，像信号被打断了一下 */
+  private interfere(v: ViewCtx, fx: number): void {
+    this.signalUntil = fx + SIGNAL_MS
+    const view = v.lens.screen.view()
+    for (let k = 0; k < SIGNAL_SLICES; k++) {
+      const w = view.w * (0.15 + Math.random() * 0.5)
+      this.slices.push({
+        x: view.x + w / 2 + Math.random() * (view.w - w),
+        y: view.y + Math.random() * view.h,
+        w,
+        h: (2 + Math.random() * 5) / v.lens.screen.zoom(),
+        color: SIGNAL_COLORS[k % SIGNAL_COLORS.length]!,
+        until: fx + GLITCH_MS[0] + Math.random() * (GLITCH_MS[1] - GLITCH_MS[0]),
+      })
+    }
   }
 
   /** 门两侧的瓷砖：立着的门铺满，要挪走的一闪一闪，要挪来的随预警一点点亮起来 */
@@ -710,6 +746,7 @@ export class NexusView implements MapView {
     for (const o of this.visuals) o.destroy()
     this.visuals = []
     this.slices = []
+    this.signal = undefined
     this.tiles = undefined
     this.warps = undefined
     this.floorFx = undefined
