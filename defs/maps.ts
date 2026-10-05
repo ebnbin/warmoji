@@ -1080,7 +1080,7 @@ export const MAPS = {
       dish: { radiusU: 16, wallU: 0.45 },
       plazaU: 5,
       streak: { quadrants: [3, 4], strokes: [4, 6], band: [0.5, 0.92], spacingU: [0.3, 0.8, 1.8, 3.6], colonyU: [0.3, 0.55], strays: [1, 3] },
-      colony: { cellU: 0.15, stepMs: 100, growth: 0.056, frontU: 0.02, waveU: 4, patchy: 0.3, preS: 12, mature: 0.6, matureS: 30, rimU: 0.5 },
+      colony: { cellU: 0.15, stepMs: 100, growth: 0.14, frontU: 0.05, waveU: 4, patchy: 0.3, preS: 12, mature: 0.6, matureS: 30, rimU: 0.5 },
       edge: 0.43,
       stick: { viscosity: 10, exertion: 0.6 },
       lysis: { radiusU: 2, holdS: 12, halfLifeS: 4, lysePerS: 4 },
