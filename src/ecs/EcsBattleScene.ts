@@ -527,6 +527,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       glow: burstEmitter(this, [0xd1c4e9, 0x80deea, 0xffffff, 0xb388ff], 150, 800, { blendMode: Phaser.BlendModes.ADD }),
       petals: burstEmitter(this, [0xffc1d9, 0xffe4ee, 0xf8bbd0, 0xffffff], 100, 1200, { gravityY: 55, rotate: { min: 0, max: 360 } }),
       sand: burstEmitter(this, [0xe8c27a, 0xd9a85b, 0xf3dca5, 0xc8954a], 120, 700, { gravityY: 160 }),
+      silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
+      bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)

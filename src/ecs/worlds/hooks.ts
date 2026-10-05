@@ -159,6 +159,10 @@ export interface WorldHooks {
   lean(sim: Sim): Point
   /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
+  /** 这个身体此刻每秒换多少口气，按体力点数：正的是喘得上气，走着也按它补；负的是憋着气，按它往下掉，歇着也回不来；不写就照常 */
+  breath?(sim: Sim, eid: number): number
+  /** 这张图要队伍盯住的一处：在屏幕外时队长身边画一个指过去的箭头；不写就没有 */
+  beacon?(sim: Sim): Point | null
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
