@@ -24,7 +24,7 @@ import type { ShipState } from '../worlds/ship'
 import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, gustSpan, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING, windAt, windPush } from '../worlds/floe'
 import type { FloeField, FloeState } from '../worlds/floe'
 import { clearPath, diffuseLux, directLux, flowDir, flowFrom, inPool, makeCaveState, outward, pushOut, rockHit, roomOf, skyAt, stepLight, stepTorch, torchesLux, torchSpot } from '../worlds/cave'
-import type { CaveState, Rock } from '../worlds/cave'
+import type { CaveState, Rock, Stalagmite } from '../worlds/cave'
 import { clockSec } from '../fight/clock'
 import { charSize } from '../systems/shared/scale'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/oldRiver'
@@ -50,8 +50,9 @@ import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { ruins } from '../ruins/world'
-import { grounded, phases } from '../utils/pass'
+import { clearM, grounded, passCost, phases, probeZ, topOf } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
+import { solidsTrace, wallsOf } from './solids'
 import type { ObstacleId } from '../../types/obstacles'
 import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
@@ -722,7 +723,7 @@ function volcanoOf(sim: Sim): VolcanoState {
     const size = MAPS[sim.mapId].size!
     const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, centered(size.w, size.h), FRAME_MID)
     const vents = fumaroles(field, cfg, VENT_COUNT)
-    s = { field, vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    s = { field, solids: wallsOf(field.basin, 'rock'), vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s
   }
   return s
@@ -802,6 +803,9 @@ const volcano: WorldHooks = {
   ...bounded,
   constrainBody(sim, eid, _from, next) {
     return keepOut(volcanoOf(sim).field.basin, next.x, next.y, Radius.v[eid]!)
+  },
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(volcanoOf(sim).solids, probe, ax, ay, bx, by)
   },
   basin(sim) {
     return volcanoOf(sim).field.basin
@@ -888,6 +892,9 @@ function resistPx(cfg: ShipConfig): number {
  */
 const ship: WorldHooks = {
   ...bounded,
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(shipOf(sim).deck.solids, probe, ax, ay, bx, by)
+  },
   /** 恒定功率下每秒花的体力不变，每格的费力是功率之比：上坡照常花、走得慢，下坡快到顶就刹着走、花得少 */
   effort(sim, _x, _y, dx, dy) {
     const len = Math.hypot(dx, dy)
@@ -1499,6 +1506,48 @@ function caveCfg(sim: Sim): CaveConfig {
 }
 
 /** 溶洞的地形与这一局的月龄由布景种子定下，视图从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
+/** 半径 rad 的身体陷进高过 clear 米的矮石笋多深就沿外法线退回多远：只有矮个子跨不过它们 */
+function lowOut(list: readonly Stalagmite[], x: number, y: number, rad: number, clear: number): Point {
+  let px = x
+  let py = y
+  for (const st of list) {
+    if (st.block || topOf(st.h) <= clear) continue
+    const dx = px - st.x
+    const dy = py - st.y
+    const d = Math.hypot(dx, dy)
+    const r = st.r + rad
+    if (d >= r) continue
+    const nx = d > 1e-6 ? dx / d : 1
+    const ny = d > 1e-6 ? dy / d : 0
+    px = st.x + nx * r
+    py = st.y + ny * r
+  }
+  return { x: px, y: py }
+}
+
+/** 线段 a→b（像素）上第一根探测在它里面的矮石笋：按探测穿过它那一段的最低处比它占到的那一层的顶 */
+function lowTrace(list: readonly Stalagmite[], p: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null {
+  const dx = bx - ax
+  const dy = by - ay
+  const l2 = dx * dx + dy * dy
+  if (l2 <= 0 || passCost(p, 'rock') <= 0) return null
+  let best: Crossing | null = null
+  for (const st of list) {
+    if (st.block) continue
+    const fx = ax - st.x
+    const fy = ay - st.y
+    const b = fx * dx + fy * dy
+    const disc = b * b - l2 * (fx * fx + fy * fy - st.r * st.r)
+    if (disc < 0) continue
+    const sq = Math.sqrt(disc)
+    const t0 = Math.max(0, (-b - sq) / l2)
+    const t1 = Math.min(1, (-b + sq) / l2)
+    if (t0 > t1 || (best && t0 >= best.t0) || Math.min(probeZ(p, t0), probeZ(p, t1)) >= topOf(st.h)) continue
+    best = { t0, t1, material: 'rock' }
+  }
+  return best
+}
+
 function caveOf(sim: Sim): CaveState {
   let s = sim.worldState.cave
   if (!s) {
@@ -1589,7 +1638,9 @@ const cave: WorldHooks = {
   },
   constrainBody(sim, eid, from, next) {
     if (phases(sim.world, eid, 'rock')) return bounded.constrainBody(sim, eid, from, next)
-    return pushOut(caveOf(sim).layout.rock, next.x, next.y, Radius.v[eid]!)
+    const L = caveOf(sim).layout
+    const p = pushOut(L.rock, next.x, next.y, Radius.v[eid]!)
+    return lowOut(L.stalagmites, p.x, p.y, Radius.v[eid]!, clearM(eid))
   },
   basin(sim) {
     return caveOf(sim).layout.rock
@@ -1606,12 +1657,15 @@ const cave: WorldHooks = {
     const f = flowDir(s.flow, x, y) ?? d
     return glide(rock, x, y, f.x, f.y, rad + 0.3 * UNIT)
   },
-  trace(sim, _probe, ax, ay, bx, by) {
-    const hit = rockHit(caveOf(sim).layout.rock, ax, ay, bx, by)
-    if (!hit) return null
+  /** 洞壁、石柱与挡路的石笋高过一切；矮石笋只挡贴地的 */
+  trace(sim, probe, ax, ay, bx, by) {
+    const L = caveOf(sim).layout
+    const low = lowTrace(L.stalagmites, probe, ax, ay, bx, by)
+    const hit = rockHit(L.rock, ax, ay, bx, by)
     const len = Math.hypot(bx - ax, by - ay)
-    const t = len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
-    return { t0: t, t1: t, material: 'rock' }
+    const t = !hit ? Infinity : len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
+    if (low && low.t0 <= t) return low
+    return hit ? { t0: t, t1: t, material: 'rock' } : null
   },
   wanderDir(sim, eid, dx, dy) {
     const rock = caveOf(sim).layout.rock

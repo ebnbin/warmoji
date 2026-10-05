@@ -296,8 +296,9 @@ export interface ShipConfig {
     readonly sternPow: number
     readonly transom: number
     readonly transomBulge: number
-    /** 舷墙的厚度 */
+    /** 舷墙的厚度（格）与高（米） */
     readonly bulwarkU: number
+    readonly bulwarkM: number
     /** 窄过两倍 neckU 的尖角填掉 */
     readonly neckU: number
     /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路，队伍从船长正中出发，前后各有桅杆 */
@@ -483,7 +484,10 @@ export interface CaveConfig {
     readonly alongU: readonly [number, number]
     readonly pocketU: number
   }
-  /** 石柱（顶到洞顶）与石笋：个数、底半径（格）；石笋多半长成 clusters 丛，高多少米；底半径不到 blockU 的石笋矮小，人跨得过、子弹飞得过；出生点 clearU 格内不长 */
+  /**
+   * 石柱（顶到洞顶）与石笋：个数、底半径（格）；石笋多半长成 clusters 丛。底半径不到 blockU 的石笋矮小，高 lowM 米，人跨得过；
+   * 粗的高 stalagmiteM 米，挡路；出生点 clearU 格内不长
+   */
   readonly formations: {
     readonly columns: readonly [number, number]
     readonly columnU: readonly [number, number]
@@ -491,6 +495,7 @@ export interface CaveConfig {
     readonly clusters: readonly [number, number]
     readonly stalagmiteU: readonly [number, number]
     readonly stalagmiteM: readonly [number, number]
+    readonly lowM: readonly [number, number]
     readonly blockU: number
     readonly clearU: number
   }
@@ -753,6 +758,8 @@ export interface MeadowConfig {
  */
 export interface CircuitConfig {
   readonly mmPerU: number
+  /** 标准身体在板上高多少毫米：比芯片矮得多，元件与罩壁多高、挡不挡子弹按它换算成层 */
+  readonly bodyMM: number
   /** 地图是 sizeU 见方的方形，摆在方框正中；地面画满方框 */
   readonly sizeU: number
   /** 能走的板面有多大，格²：生成出来不在这个范围里就换一组随机数 */

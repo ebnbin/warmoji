@@ -12,11 +12,14 @@ import { project } from './channel'
 import { holds, wade } from './bodies'
 import { roomFor } from '../worlds/gates'
 import { sakuraMarks } from './marks'
-import { bridgeLocal, sakuraPlan } from './layout'
+import { bridgeLocal, forestDepth, sakuraPlan, toLocal, wallSide } from './layout'
+import { makeSolids, solidsTrace } from '../worlds/solids'
+import { topOf } from '../utils/pass'
+import type { Solid, Solids } from '../worlds/solids'
 import { flowAt, solveSakura } from './water'
 import type { Along } from './channel'
 import type { Flow, Water } from './water'
-import type { Bridge, SakuraPlan } from './layout'
+import type { Bridge, Local, SakuraPlan } from './layout'
 import type { MapId, SakuraConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
@@ -29,12 +32,13 @@ const NO_GHOSTS: Point[] = []
 const PLAN_SEED = 0x5a4c1e
 
 /**
- * 樱庭此刻的状态：按种子生成的地图与它上面的地标，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
+ * 樱庭此刻的状态：按种子生成的地图与它上面的地标、挡弹体与视线的寺墙林子与樱树，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
  * 哪些身体正在水里站不住、随水漂着，哪些正走在桥上（按实体记，uid 对不上就是换了实体）；见过的掉落物
  */
 export interface SakuraState {
   readonly plan: SakuraPlan
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
+  readonly solids: Solids
   water: Water | null
   ready: Promise<void>
   readonly swimming: Map<number, number>
@@ -44,6 +48,26 @@ export interface SakuraState {
 
 function cfgOf(sim: Sim): SakuraConfig {
   return MAPS[sim.mapId].sakura!
+}
+
+const GROVE: Solid = { topM: Infinity, material: 'wood' }
+
+/** 寺墙按墙高、林子与樱花的树干高过一切；石组与竹栅那两条线外是林子 */
+function solidsOf(cfg: SakuraConfig, plan: SakuraPlan): Solids {
+  const e = plan.edges
+  const b = plan.basin
+  const th = cfg.wall.thickU / 2
+  const wall: Solid = { topM: topOf(cfg.wall.heightM), material: 'earth' }
+  const l: Local = { a: 0, b: 0 }
+  const at = (px: number, py: number): Solid | null => {
+    const x = px / UNIT
+    const y = py / UNIT
+    for (const t of plan.trees) if (Math.hypot(t.x - x, t.y - y) < t.r - cfg.trees.overhangU) return GROVE
+    toLocal(plan.frame, x, y, l)
+    if (Math.abs(wallSide(e, l.a, l.b)) <= th) return wall
+    return forestDepth(e, l.a, l.b) >= 0 ? GROVE : null
+  }
+  return makeSolids(at, b.x0, b.y0, b.cols, b.rows, b.cell)
 }
 
 /** 这一局的樱庭：视图要它定地图的大小，规则要它定一切，两边按同一个种子各要一次 */
@@ -87,7 +111,7 @@ export function sakuraOf(sim: Sim): SakuraState {
   if (!s) {
     const cfg = cfgOf(sim)
     const plan = sakuraPlanFor(cfg, sim.run.decorSeed)
-    const state: SakuraState = { plan, marks: sakuraMarks(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map(), aboard: new Map(), seen: new Map() }
+    const state: SakuraState = { plan, marks: sakuraMarks(cfg, plan), solids: solidsOf(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map(), aboard: new Map(), seen: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -209,7 +233,8 @@ function board(sim: Sim, s: SakuraState): void {
 }
 
 /**
- * 樱庭：能走的是寺墙与三面林缘围着的空地，溪面也能走；寺墙、林缘、空地上樱花的树干、上游的石组与下游的竹栅是硬边界，身体走到跟前就停住、顺着壁面滑。
+ * 樱庭：能走的是寺墙与三面林缘围着的空地，溪面也能走；寺墙、林缘、空地上樱花的树干、上游的石组与下游的竹栅是硬边界，身体走到跟前就停住、顺着壁面滑；
+ * 寺墙齐头高、林子与树干高过一切，都挡子弹与视线。
  * 水里站不住的身体随水漂、自己划水，站得住的跟在岸上一样，掉落物顺水漂（见 wade）；漂到下游的被水压在竹栅前，贴着竹栅挪到岸边才上得来。
  * 桥上的身体不沾水、出不了栏杆，桥下的照样漂
  */
@@ -266,8 +291,8 @@ export const sakura: WorldHooks = {
     const d = norm(g.x - x, g.y - y)
     return alongWall(s, x, y, d.x, d.y, Radius.v[eid]! + 0.3 * UNIT)
   },
-  wallHit() {
-    return null
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(sakuraOf(sim).solids, probe, ax, ay, bx, by)
   },
   smashWall() {},
   wanderDir(sim, eid, dx, dy) {

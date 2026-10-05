@@ -218,13 +218,15 @@ export function sunAt(p: DesertPlan, x: number, y: number): number {
 }
 
 /**
- * (x, y) 格处离最近的标志物实心部分多远（格，陷进去为负），连同从它往外的单位方向；离哪样都远时 d 是无穷大
+ * (x, y) 格处离最近的标志物实心部分多远（格，陷进去为负），连同从它往外的单位方向；离哪样都远时 d 是无穷大。
+ * 不高过 clear 米的标志物不算：身体跨得过去
  */
-export function solidAt(p: DesertPlan, x: number, y: number, out: { d: number; nx: number; ny: number }): { d: number; nx: number; ny: number } {
+export function solidAt(p: DesertPlan, x: number, y: number, out: { d: number; nx: number; ny: number }, clear = 0): { d: number; nx: number; ny: number } {
   out.d = Infinity
   out.nx = 0
   out.ny = 0
   for (const l of p.landmarks) {
+    if (l.shape.top <= clear) continue
     const qx = wrapU(x - l.x, p.sizeU)
     const qy = wrapU(y - l.y, p.sizeU)
     const far = l.shape.reach + 1

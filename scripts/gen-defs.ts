@@ -170,7 +170,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(h.beamU > 0 && h.lengthU > h.beamU, `maps.${id}.ship.hull 的船宽须为正、船长大于船宽`)
   need(h.bow > 0 && h.stern > 0 && h.bow + h.stern < 1 && h.bowPow > 0 && h.sternPow >= 1, `maps.${id}.ship.hull 船头与船尾收拢的两段不重叠，收拢的指数为正、船尾的不小于 1`)
   need(h.transom > 0 && h.transom < 1 && h.transomBulge >= 0, `maps.${id}.ship.hull.transom 须在 0 到 1 之间、横板不往里凹`)
-  need(h.bulwarkU > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、窄缝与桅杆须为正`)
+  need(h.bulwarkU > 0 && h.bulwarkM > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、窄缝与桅杆须为正`)
   const outU = h.lengthU + bulgeU(h) + h.bulwarkU * 2
   need(outU <= FRAME_U - SAFE_U * 2 && h.beamU + h.bulwarkU * 2 <= FRAME_U - SAFE_U * 2, `maps.${id}.ship.hull 连舷墙 ${+outU.toFixed(2)}×${h.beamU + h.bulwarkU * 2} 格，放不进安全区`)
   need(outU / 2 - h.bulwarkU + (spritOf(h).boom.s - h.lengthU) + 1 <= FRAME_U / 2, `maps.${id}.ship 的第一斜桅伸出船头后离方框边不到一格：船一纵摇端头就甩出方框`)
@@ -308,7 +308,13 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(ints(a.count) && a.count[0] >= 1, `maps.${id}.cave.alcoves 至少一条：白天怪物要有暗处出来`)
   need(a.widthU > 2 * hall.neckU && a.outU > a.widthU / 2 && a.alongU[0] > 0 && span(a.alongU) && a.pocketU * 2 >= a.widthU, `maps.${id}.cave.alcoves 须宽过窄缝、拐进岩体、尽头的暗室不比通道窄`)
   need(ints(f.columns) && ints(f.stalagmites) && ints(f.clusters) && f.columnU[0] > f.blockU && span(f.columnU), `maps.${id}.cave.formations 的个数须为非负整数，石柱挡路`)
-  need(f.stalagmiteU[0] > 0 && span(f.stalagmiteU) && f.stalagmiteM[0] > 0 && span(f.stalagmiteM), `maps.${id}.cave.formations 的石笋尺寸须为正`)
+  need(f.stalagmiteU[0] > 0 && span(f.stalagmiteU) && f.stalagmiteM[0] > 0 && span(f.stalagmiteM) && f.lowM[0] > 0 && span(f.lowM), `maps.${id}.cave.formations 的石笋尺寸须为正`)
+  {
+    const B = OBSTACLES.body
+    const layerM = B.heightM / B.layers
+    const over = Math.floor(B.layers * B.step)
+    need(f.lowM[1] <= over * layerM && f.stalagmiteM[0] > B.heightM, `maps.${id}.cave.formations 的矮石笋须矮得让标准身体跨过去，挡路的石笋须高过标准身体`)
+  }
   need(f.clearU >= SPAWN_CLEAR_U + hall.neckU, `maps.${id}.cave.formations.clearU 须比出生点要空出的 ${SPAWN_CLEAR_U} 格再宽一道窄缝：石头之间的窄缝填平后，出生点四周也空得开`)
   need(ints(p.count) && p.sizeU[0] > 0 && span(p.sizeU) && p.viscosity >= 1 && p.exertion >= 0, `maps.${id}.cave.pools 的个数须为非负整数、尺寸为正，水里不比平地快`)
   need(Math.abs(Math.tan(sky.latitudeDeg * DEG) * Math.tan(sky.declinationDeg * DEG)) < 1, `maps.${id}.cave.sky 须让太阳每天升起又落下`)
@@ -435,7 +441,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const body = TEAM_BASELINE.member.radius * 2
   const { frame, shock, rail, clock, arc, button } = c
-  need(c.mmPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at} 的毫米每格、地图边长与窄缝须为正，开局空地空得出出生点要的格数`)
+  need(c.mmPerU > 0 && c.bodyMM > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at} 的毫米每格、身高、地图边长与窄缝须为正，开局空地空得出出生点要的格数`)
   need(c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(c.areaU2[0] > 0 && range(c.areaU2, false) && c.areaU2[1] < c.sizeU * c.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
   need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正`)

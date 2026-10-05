@@ -71,6 +71,16 @@ export function halfBeamAt(h: Hull, s: number): number {
   return s <= -bulge ? 0 : tb * Math.sqrt(1 + s / bulge)
 }
 
+/** 船上一点离舷墙外沿多远，格，舷墙以内为负；船首柱与横板中线外按到端点的距离算 */
+export function bulwarkDistance(h: Hull, s: number, t: number): number {
+  const end = -bulgeU(h)
+  if (s >= h.lengthU) return Math.hypot(s - h.lengthU, t) - h.bulwarkU
+  if (s <= end) return Math.hypot(s - end, t) - h.bulwarkU
+  const e = 0.02
+  const db = (halfBeamAt(h, s + e) - halfBeamAt(h, s - e)) / (2 * e)
+  return (Math.abs(t) - halfBeamAt(h, s) - h.bulwarkU) / Math.sqrt(1 + db * db)
+}
+
 /** 空船正浮时的水线面与排水：面积（米²）、漂心离横板中线多远（米）、横向与纵向的面积惯性矩（米⁴）、排水体积（米³）、排水量（千克）、浮心高（米） */
 export interface Hydrostatics {
   readonly area: number

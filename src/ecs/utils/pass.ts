@@ -65,6 +65,11 @@ export function layersOf(h: number): number {
   return Math.ceil(h / LAYER_M - 1e-9)
 }
 
+/** 高 h 米的障碍按占满的整层算，顶离地多高 */
+export function topOf(h: number): number {
+  return h === Infinity ? h : layersOf(h) * LAYER_M
+}
+
 /** 弧线里腾空的身体整段往上挪一层 */
 function lift(world: EcsWorld, eid: number): number {
   return hasComponent(world, eid, Motion) && Motion.kind[eid] === MOTION.arc ? 1 : 0

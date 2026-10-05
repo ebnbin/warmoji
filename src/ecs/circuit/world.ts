@@ -9,10 +9,12 @@ import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
 import { HIT } from '../utils/hitTags'
 import { leaderPoint } from '../utils/team'
-import { grounded } from '../utils/pass'
+import { grounded, LAYER_M, STANDARD, topOf } from '../utils/pass'
+import { makeSolids, solidsTrace } from '../worlds/solids'
+import type { Solid, Solids } from '../worlds/solids'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { roomFor } from '../worlds/gates'
-import { circuitPlan, copperAt, segDist } from './layout'
+import { arenaRoom, circuitPlan, copperAt, segDist } from './layout'
 import { circuitMarks } from './marks'
 import type { CircuitPlan } from './layout'
 import type { Basin } from '../worlds/basin'
@@ -66,6 +68,8 @@ export interface ButtonState {
 export interface CircuitState {
   readonly plan: CircuitPlan
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
+  /** 罩壁与元件：按高度挡弹体与视线 */
+  readonly solids: Solids
   readonly nets: NetState[]
   readonly gaps: GapState[]
   readonly buttons: ButtonState[]
@@ -83,13 +87,34 @@ export function circuitPlanFor(cfg: CircuitConfig, decorSeed: number): CircuitPl
   return circuitPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
+/** 罩壁与罩里元件的本体按毫米高换算成层：焊盘贴着板面不算；罩壁以外都按罩壁算 */
+function solidsOf(cfg: CircuitConfig, plan: CircuitPlan): Solids {
+  const toM = (u: number): number => topOf(((u * cfg.mmPerU) / cfg.bodyMM) * (STANDARD[1] + 1) * LAYER_M)
+  const frame: Solid = { topM: toM(cfg.frame.heightMM / cfg.mmPerU), material: 'device' }
+  const parts = plan.parts.filter((p) => p.inside).map((p) => ({ p, solid: { topM: toM(p.z), material: 'device' } as Solid }))
+  const at = (px: number, py: number): Solid | null => {
+    const x = px / UNIT
+    const y = py / UNIT
+    if (arenaRoom(plan.arena, x, y) < 0) return frame
+    for (const { p, solid } of parts) {
+      const inBody = p.kind === 'can' ? Math.hypot(x - p.x, y - p.y) < p.hw : Math.abs(x - p.x) < p.hw && Math.abs(y - p.y) < p.hh
+      if (inBody) return solid
+    }
+    return null
+  }
+  const b = plan.basin
+  return makeSolids(at, b.x0, b.y0, b.cols, b.rows, b.cell)
+}
+
 export function circuitOf(sim: Sim): CircuitState {
   let s = sim.worldState.circuit
   if (!s) {
-    const plan = circuitPlanFor(cfgOf(sim), sim.run.decorSeed)
+    const cfg = cfgOf(sim)
+    const plan = circuitPlanFor(cfg, sim.run.decorSeed)
     s = {
       plan,
       marks: circuitMarks(plan),
+      solids: solidsOf(cfg, plan),
       nets: plan.nets.map(() => ({ level: 0, warn: 0 })),
       gaps: plan.gaps.map(() => ({ phase: 'rest' as GapPhase, charge: 0, count: 0, struck: new Set<number>() })),
       buttons: plan.buttons.map(() => ({ phase: 'ready' as ButtonPhase, since: 0, presses: 0 })),
@@ -285,7 +310,7 @@ function clearOfCopper(plan: CircuitPlan, p: Point): boolean {
 }
 
 /**
- * 电路板：能走的是屏蔽罩围着的板面，罩壁、芯片和别的元件是硬边界，身体走到跟前就停住、顺着边滑，子弹照样飞过去。
+ * 电路板：能走的是屏蔽罩围着的板面，罩壁、芯片和别的元件是硬边界，身体走到跟前就停住、顺着边滑；它们比队伍高得多，挡子弹也挡视线。
  * 镀金的裸铜线带电：电源线一直通，时钟线按节拍通断，开关线有人踩了开关才连着铜板整条一齐通；脚碰着通电的铜就触电，
  * 一对电极隔一阵在两尖之间打出电弧，都是敌我通吃
  */
@@ -333,8 +358,8 @@ export const circuit: WorldHooks = {
     const d = norm(tx - x, ty - y)
     return alongWall(circuitOf(sim).plan.basin, x, y, d.x, d.y, Radius.v[eid]! + 0.3 * UNIT)
   },
-  wallHit() {
-    return null
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(circuitOf(sim).solids, probe, ax, ay, bx, by)
   },
   smashWall() {},
   wanderDir(sim, eid, dx, dy) {

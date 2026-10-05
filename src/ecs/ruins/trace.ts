@@ -1,4 +1,4 @@
-import { LAYER_M, layersOf, passCost, probeZ } from '../utils/pass'
+import { passCost, probeZ, topOf } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
 import type { ObstacleId } from '../../types/obstacles'
 import type { Dust, Masonry } from './masonry'
@@ -15,7 +15,7 @@ export function traceLocal(m: Masonry, dust: Dust | null, opaqueTau: number, p: 
   const dy = (vb - g.v0) / g.cell - y0
   if (Math.max(x0, x0 + dx) < 0 || Math.max(y0, y0 + dy) < 0 || Math.min(x0, x0 + dx) >= g.cols || Math.min(y0, y0 + dy) >= g.rows) return null
   const hc = m.courseM
-  const top = (n: number): number => layersOf(n * hc) * LAYER_M
+  const top = (n: number): number => topOf(n * hc)
   const sight = p.via === 'sight' && dust !== null
   let ix = Math.floor(x0)
   let iy = Math.floor(y0)

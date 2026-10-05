@@ -6,7 +6,10 @@ import { SPAWN } from '../../data/enemies'
 import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phys, Pickup, PrevPos, Radius, Shadow, Shard, Transform } from '../components'
 import { traces } from '../store'
 import { approach } from '../systems/shared/body'
-import { phases } from '../utils/pass'
+import { clearM, passCost, phases, probeZ, topOf } from '../utils/pass'
+import type { Crossing, Probe } from '../utils/pass'
+import type { LandmarkKind } from './landmarks'
+import type { ObstacleId } from '../../types/obstacles'
 import { leaderX, leaderY } from '../utils/team'
 import { gridAt, makePlan, slopeAt, solidAt, sunAt, wrapU } from './terrain'
 import { desertMarks } from './marks'
@@ -133,12 +136,12 @@ const SLOPE = { x: 0, y: 0 }
 const PACE: Pace = { demand: 1, speed: 1 }
 const SOLID = { d: 0, nx: 0, ny: 0 }
 
-/** 半径 rad（像素）的身体陷进标志物多深就沿外法线退回多远，夹在两块之间时最多退三次 */
-function pushOut(plan: DesertPlan, x: number, y: number, rad: number): Point {
+/** 半径 rad（像素）的身体陷进高过 clear 米的标志物多深就沿外法线退回多远，夹在两块之间时最多退三次 */
+function pushOut(plan: DesertPlan, x: number, y: number, rad: number, clear = 0): Point {
   let px = x
   let py = y
   for (let k = 0; k < 3; k++) {
-    solidAt(plan, px / UNIT, py / UNIT, SOLID)
+    solidAt(plan, px / UNIT, py / UNIT, SOLID, clear)
     const gap = SOLID.d * UNIT - rad
     if (gap >= 0) break
     px -= SOLID.nx * gap
@@ -147,9 +150,9 @@ function pushOut(plan: DesertPlan, x: number, y: number, rad: number): Point {
   return { x: px, y: py }
 }
 
-/** 贴着标志物走：离它不到 reach（像素）又正朝它去时，削掉朝里的那一份，顺着边绕过去 */
-function glide(plan: DesertPlan, x: number, y: number, dx: number, dy: number, reach: number): Point {
-  solidAt(plan, x / UNIT, y / UNIT, SOLID)
+/** 贴着高过 clear 米的标志物走：离它不到 reach（像素）又正朝它去时，削掉朝里的那一份，顺着边绕过去 */
+function glide(plan: DesertPlan, x: number, y: number, dx: number, dy: number, reach: number, clear: number): Point {
+  solidAt(plan, x / UNIT, y / UNIT, SOLID, clear)
   if (SOLID.d * UNIT > reach) return { x: dx, y: dy }
   const dot = dx * SOLID.nx + dy * SOLID.ny
   if (dot >= -0.2) return { x: dx, y: dy }
@@ -157,6 +160,57 @@ function glide(plan: DesertPlan, x: number, y: number, dx: number, dy: number, r
   const ty = dy - dot * SOLID.ny
   const len = Math.hypot(tx, ty)
   return len > 1e-6 ? { x: tx / len, y: ty / len } : { x: -SOLID.ny, y: SOLID.nx }
+}
+
+/** 标志物的材质：枯树、路标杆与驼骨是细的、有缝的，弹体与视线从旁边过去；石堆与岩盘是实的 */
+const MATERIAL: Record<LandmarkKind, ObstacleId> = { tree: 'landmark', post: 'landmark', bones: 'landmark', cairn: 'rock', rock: 'rock' }
+/** 沿线段找进出标志物实心部分的地方，按这么长一步取样，格 */
+const TRACE_STEP_U = 0.05
+
+/** 相对标志物中心 (qx, qy) 格处在不在它的实心部分里 */
+function insideSolids(l: DesertPlan['landmarks'][number], qx: number, qy: number): boolean {
+  for (const s of l.shape.solids) {
+    const ex = s.x1 - s.x0
+    const ey = s.y1 - s.y0
+    const l2 = ex * ex + ey * ey
+    const t = l2 > 1e-12 ? Math.max(0, Math.min(1, ((qx - s.x0) * ex + (qy - s.y0) * ey) / l2)) : 0
+    if (Math.hypot(qx - s.x0 - ex * t, qy - s.y0 - ey * t) < s.r) return true
+  }
+  return false
+}
+
+/** 线段 a→b（格）上第一处探测在它里面、又要贯穿才过得去的标志物：按探测在那一点的高度比标志物占到的那一层的顶；环面上按离线段中点最近的那一份算 */
+function landmarkTrace(plan: DesertPlan, p: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null {
+  const ex = bx - ax
+  const ey = by - ay
+  const len = Math.hypot(ex, ey)
+  const mx = (ax + bx) / 2
+  const my = (ay + by) / 2
+  const n = Math.max(1, Math.ceil(len / TRACE_STEP_U))
+  let best: Crossing | null = null
+  for (const l of plan.landmarks) {
+    const material = MATERIAL[l.kind]
+    if (passCost(p, material) <= 0) continue
+    const cx = mx + wrapU(l.x - mx, plan.sizeU) - ax
+    const cy = my + wrapU(l.y - my, plan.sizeU) - ay
+    const along = len > 1e-9 ? Math.max(0, Math.min(1, (cx * ex + cy * ey) / (len * len))) : 0
+    if (Math.hypot(cx - ex * along, cy - ey * along) > l.shape.reach + TRACE_STEP_U) continue
+    const top = topOf(l.shape.top)
+    let t0 = -1
+    for (let k = 0; k <= n; k++) {
+      const s = k / n
+      if (t0 < 0 && best && s >= best.t0) break
+      const inside = probeZ(p, s) < top && insideSolids(l, ex * s - cx, ey * s - cy)
+      if (inside && t0 < 0) t0 = s
+      else if (!inside && t0 >= 0) {
+        best = { t0, t1: s, material }
+        t0 = -1
+        break
+      }
+    }
+    if (t0 >= 0) best = { t0, t1: 1, material }
+  }
+  return best
 }
 
 /** 在 (x, y) 像素处朝 (dx, dy) 走：坡度沿前进方向取，沙的松实按格子取，再算上被踩实的程度 */
@@ -222,29 +276,32 @@ export const desert: WorldHooks = {
     approach(out, x, y, vx, vy, dx * f, dy * f, k, dt)
     return true
   },
-  /** 标志物挡人：会穿墙的照旧穿过去 */
+  /** 标志物挡人：跨得过的矮标志物不挡，会穿墙的照旧穿过去 */
   constrainBody(sim, eid, _from, next) {
     const p = nearLeader(sim, next.x, next.y)
     if (phases(sim.world, eid, 'landmark')) return p
-    return pushOut(desertOf(sim).plan, p.x, p.y, Radius.v[eid]!)
+    return pushOut(desertOf(sim).plan, p.x, p.y, Radius.v[eid]!, clearM(eid))
   },
   basin() {
     return null
+  },
+  trace(sim, probe, ax, ay, bx, by) {
+    return landmarkTrace(desertOf(sim).plan, probe, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
   },
   chaseDir(sim, eid, tx, ty) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = norm(tx - x, ty - y)
     if (phases(sim.world, eid, 'landmark')) return d
-    return glide(desertOf(sim).plan, x, y, d.x, d.y, Radius.v[eid]! + GLIDE_U * UNIT)
+    return glide(desertOf(sim).plan, x, y, d.x, d.y, Radius.v[eid]! + GLIDE_U * UNIT, clearM(eid))
   },
   wanderDir(sim, eid, dx, dy) {
     if (phases(sim.world, eid, 'landmark')) return { x: dx, y: dy }
-    return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, dx, dy, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT)
+    return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, dx, dy, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT, clearM(eid))
   },
   fleeDir(sim, eid, awayX, awayY) {
     if (phases(sim.world, eid, 'landmark')) return { x: awayX, y: awayY }
-    return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT)
+    return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT, clearM(eid))
   },
   outside(sim, x, y) {
     const m = FAR_EDGE_U * UNIT
