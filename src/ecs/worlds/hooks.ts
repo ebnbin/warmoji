@@ -1,15 +1,16 @@
-import { DEG2RAD, UNIT } from '../../util/units'
+import { DEG2RAD, FRAME_U, SAFE_U, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
-import { MAP, MAPS } from '../../data/maps'
+import { MAPS } from '../../data/maps'
+import { centered, FRAME_MID, SAFE } from '../frame'
 import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
-import { accrete, aroundCircle, endMeteor, feed, flyMeteor, fromCenterU, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
+import { accrete, aroundCircle, endMeteor, feed, flyMeteor, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
 import type { NebulaMeteor, NebulaState } from '../worlds/nebula'
 import { around, fumaroles, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava, VENT_COUNT, volcanoMarks } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
@@ -718,7 +719,8 @@ function volcanoOf(sim: Sim): VolcanoState {
   let s = sim.worldState.volcano
   if (!s) {
     const cfg = volcanoCfg(sim)
-    const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
+    const size = MAPS[sim.mapId].size!
+    const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, centered(size.w, size.h), FRAME_MID)
     const vents = fumaroles(field, cfg, VENT_COUNT)
     s = { field, vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s
@@ -863,7 +865,7 @@ function shipCfg(sim: Sim): ShipConfig {
 function shipOf(sim: Sim): ShipState {
   let s = sim.worldState.ship
   if (!s) {
-    s = makeShip(shipCfg(sim), sim.mapW, sim.mapH, new Rng(sim.run.decorSeed ^ 0x5b1d))
+    s = makeShip(shipCfg(sim), !sim.portrait, new Rng(sim.run.decorSeed ^ 0x5b1d))
     sim.worldState.ship = s
   }
   return s
@@ -985,7 +987,7 @@ function nebulaCfg(sim: Sim): NebulaConfig {
 function nebulaOf(sim: Sim): NebulaState {
   let s = sim.worldState.nebula
   if (!s) {
-    s = makeNebula(nebulaCfg(sim), sim.run.decorSeed, sim.mapW / 2)
+    s = makeNebula(nebulaCfg(sim), sim.run.decorSeed, FRAME_MID)
     sim.worldState.nebula = s
   }
   return s
@@ -1134,8 +1136,10 @@ const nebula: WorldHooks = {
   sink(sim, x, y) {
     return inNebulaHorizon(nebulaOf(sim), x, y)
   },
-  constrainBody(_sim, _eid, _from, next) {
-    return next
+  /** 壳层平时就把人拉回来；被击退、冲刺或瞬移甩出去的也停在安全区的内切圆里 */
+  constrainBody(sim, eid, _from, next) {
+    const L = nebulaOf(sim).layout
+    return clampToDisc(next.x, next.y, L.cx, L.cy, (FRAME_U / 2 - SAFE_U) * UNIT - Radius.v[eid]!)
   },
   chaseDir(sim, eid, tx, ty) {
     if (Boss.v[eid] !== 1) return bounded.chaseDir(sim, eid, tx, ty)
@@ -1149,16 +1153,13 @@ const nebula: WorldHooks = {
   fleeDir(sim, eid, awayX, awayY) {
     return keepInCavity(nebulaOf(sim), nebulaCfg(sim), Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
   },
-  outside(sim, x, y) {
-    return fromCenterU(nebulaOf(sim), x, y) > nebulaCfg(sim).shell.outerU
-  },
   spawnPoint(sim, boss) {
     const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
     return spawnSpot(nebulaOf(sim), nebulaCfg(sim), () => sim.rng.next(), nebulaClearPx(sim), (boss ? 2 : SPAWN.edgeInset) * UNIT, leaderX(sim), leaderY(sim), near)
   },
   center(sim) {
     const L = nebulaOf(sim).layout
-    return { x: L.sx, y: L.sy }
+    return { x: L.cx, y: L.cy }
   },
   settle(sim, p) {
     return settleSpot(nebulaOf(sim), nebulaCfg(sim), p.x, p.y, nebulaClearPx(sim), SPAWN.edgeInset * UNIT)
@@ -1189,7 +1190,7 @@ const nebula: WorldHooks = {
     }
     const lx = leaderX(sim) - L.hx
     const ly = leaderY(sim) - L.hy
-    const away = Math.hypot(lx, ly) > 1e-6 ? norm(lx, ly) : norm(L.sx - L.hx, L.sy - L.hy)
+    const away = Math.hypot(lx, ly) > 1e-6 ? norm(lx, ly) : norm(L.cx - L.hx, L.cy - L.hy)
     const clear = nebulaClearPx(sim)
     return {
       hole: [{ x: L.hx, y: L.hy, r: 0, nx: 0, ny: 0 }],
@@ -1327,7 +1328,8 @@ function landed(s: FloeState, cfg: FloeConfig): void {
 
 /**
  * 浮冰：南极海上一块没有边的浮冰。冰上一切按库仑摩擦走、滑、停，摩擦随积雪、老冰、新冰变，阵风按风压推着身体；
- * 重心探出冰缘就掉进海里，水里按二次阻力与推力游、随海流漂，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底
+ * 重心探出冰缘就掉进海里，水里按二次阻力与推力游、随海流漂，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底。
+ * 海上游到安全区的边就被一堵看不见的墙挡住，敌我都一样
  */
 const floe: WorldHooks = {
   ...bounded,
@@ -1405,8 +1407,12 @@ const floe: WorldHooks = {
     foot.vy = out.vy
     return true
   },
-  constrainBody(_sim, _eid, _from, next) {
-    return next
+  constrainBody(_sim, eid, _from, next) {
+    const r = Radius.v[eid]!
+    return {
+      x: Math.min(Math.max(next.x, SAFE.x + r), SAFE.x + SAFE.w - r),
+      y: Math.min(Math.max(next.y, SAFE.y + r), SAFE.y + SAFE.h - r),
+    }
   },
   chaseDir(sim, eid, tx, ty) {
     const s = floeOf(sim)
@@ -1434,17 +1440,13 @@ const floe: WorldHooks = {
   fleeDir(sim, eid, awayX, awayY) {
     return alongEdge(floeOf(sim).field, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! / UNIT + 1.5)
   },
-  outside(sim, x, y) {
-    const m = 4 * UNIT
-    return x < -m || x > sim.mapW + m || y < -m || y > sim.mapH + m
-  },
   spawnPoint(sim, boss) {
     const f = floeOf(sim).field
     const min = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
     const inset = boss ? 3 : 1.5
     const lx = leaderX(sim)
     const ly = leaderY(sim)
-    let p: Point = f.heart
+    let p: Point = FRAME_MID
     for (let i = 0; i < 48; i++) {
       const q = { x: sim.rng.next() * sim.mapW, y: sim.rng.next() * sim.mapH }
       if (edgeAt(f, q.x, q.y) < inset) continue
@@ -1453,8 +1455,8 @@ const floe: WorldHooks = {
     }
     return p
   },
-  center(sim) {
-    return floeOf(sim).field.heart
+  center() {
+    return FRAME_MID
   },
   settle(sim, p) {
     return ashore(floeOf(sim).field, p.x, p.y, SPAWN.edgeInset)
@@ -1504,7 +1506,8 @@ function caveCfg(sim: Sim): CaveConfig {
 function caveOf(sim: Sim): CaveState {
   let s = sim.worldState.cave
   if (!s) {
-    s = makeCaveState(caveCfg(sim), sim.mapW, sim.mapH, MAP.cameraMargin * UNIT, new Rng(sim.run.decorSeed ^ 0x3c4e), clockSec(sim))
+    const size = MAPS[sim.mapId].size!
+    s = makeCaveState(caveCfg(sim), centered(size.w, size.h), new Rng(sim.run.decorSeed ^ 0x3c4e), clockSec(sim))
     sim.worldState.cave = s
   }
   return s

@@ -29,12 +29,12 @@ import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
-import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
-import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
+import { bulgeU, deckEdgeAngle, halfBeamAt, hydrostatics, spawnS, spritOf, stability, staticHeel } from '../src/data/ship.ts'
+import { depth, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
 import { bodyField } from '../src/ecs/ruins/masonry.ts'
 import { roomAt } from '../src/ecs/worlds/basin.ts'
-import { UNIT, VIEW } from '../src/util/units.ts'
+import { FRAME_U, SAFE_U, SPAWN_CLEAR_U, UNIT, VIEW } from '../src/util/units.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
@@ -154,8 +154,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 船：甲板收得拢、桅杆两边走得过去；空船正浮稳定。身体之间不互相挤开，最坏是最多的怪全叠在最宽处的舷墙边：
- * 那时也不翻、甲板边不入水（直舷公式还成立），倾角还得超过身体脚下的摩擦角，闲着的身体才滑得起来
+ * 船：连舷墙放得进安全区，首斜桅伸出船头也还在方框里；甲板收得拢、桅杆两边走得过去，出发的地方前后都有桅杆、四周空得开；空船正浮稳定。
+ * 身体之间不互相挤开，最坏是最多的怪全叠在最宽处的舷墙边：那时也不翻、甲板边不入水（直舷公式还成立），倾角还得超过身体脚下的摩擦角，闲着的身体才滑得起来
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'ship') === (m.ship !== undefined), `maps.${id} 是船当且仅当写了 ship`)
@@ -169,9 +169,17 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(h.beamU > 0 && h.lengthU > h.beamU, `maps.${id}.ship.hull 的船宽须为正、船长大于船宽`)
   need(h.bow > 0 && h.stern > 0 && h.bow + h.stern < 1 && h.bowPow > 0 && h.sternPow >= 1, `maps.${id}.ship.hull 船头与船尾收拢的两段不重叠，收拢的指数为正、船尾的不小于 1`)
   need(h.transom > 0 && h.transom < 1 && h.transomBulge >= 0, `maps.${id}.ship.hull.transom 须在 0 到 1 之间、横板不往里凹`)
-  need(h.bulwarkU > 0 && h.seaU > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、海面、窄缝与桅杆须为正`)
-  need(h.masts.length >= 2, `maps.${id}.ship.hull.masts 至少两根：队伍从最前面两根桅杆之间出发`)
-  for (const at of h.masts) need(at > 0 && at < 1 && halfBeamAt(h, at * h.lengthU) >= h.mastU + 2, `maps.${id}.ship.hull.masts 的 ${at} 须立在甲板上、两边各留得出两格的路`)
+  need(h.bulwarkU > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、窄缝与桅杆须为正`)
+  const outU = h.lengthU + bulgeU(h) + h.bulwarkU * 2
+  need(outU <= FRAME_U - SAFE_U * 2 && h.beamU + h.bulwarkU * 2 <= FRAME_U - SAFE_U * 2, `maps.${id}.ship.hull 连舷墙 ${+outU.toFixed(2)}×${h.beamU + h.bulwarkU * 2} 格，放不进安全区`)
+  need(outU / 2 - h.bulwarkU + (spritOf(h).boom.s - h.lengthU) + 1 <= FRAME_U / 2, `maps.${id}.ship 的第一斜桅伸出船头后离方框边不到一格：船一纵摇端头就甩出方框`)
+  const start = spawnS(h)
+  need(h.masts.some((at) => at * h.lengthU < start) && h.masts.some((at) => at * h.lengthU > start), `maps.${id}.ship.hull.masts 须在出发的地方前后都有：队伍从两根桅杆之间出发`)
+  need(halfBeamAt(h, start) >= SPAWN_CLEAR_U, `maps.${id}.ship 出发的地方离舷墙不到 ${SPAWN_CLEAR_U} 格`)
+  for (const at of h.masts) {
+    need(at > 0 && at < 1 && halfBeamAt(h, at * h.lengthU) >= h.mastU + 2, `maps.${id}.ship.hull.masts 的 ${at} 须立在甲板上、两边各留得出两格的路`)
+    need(Math.abs(at * h.lengthU - start) >= SPAWN_CLEAR_U + h.mastU, `maps.${id}.ship.hull.masts 的 ${at} 离出发的地方不到 ${SPAWN_CLEAR_U} 格`)
+  }
   need(d.draftM > 0 && d.depthM > d.draftM && d.midship > 0 && d.midship <= 1 && d.kgM > 0 && d.rho > 0, `maps.${id}.ship.hydro 的吃水、型深、舯剖面系数、重心与密度须合理：型深大于吃水，系数在 (0, 1] 内`)
   need(d.rollGyration > 0 && d.pitchGyration > 0 && d.rollAdded >= 0 && d.pitchAdded >= 0, `maps.${id}.ship.hydro 的惯性半径须为正、附加质量不为负`)
   need(d.rollDamping > 0 && d.rollDamping < 1 && d.pitchDamping > 0 && d.pitchDamping < 1, `maps.${id}.ship.hydro 的阻尼比须在 0 到 1 之间`)
@@ -227,8 +235,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 浮冰：参数合理，冰比海水轻、压满雪也还浮在海面上；摩擦是雪最大、新冰最小。按标准身体：平时的风吹不动站在新冰上的，
- * 阵风吹得动站在新冰上的、吹不动站在雪上的（雪是避风的地方）；每个角色都游得过海流。抽一批种子生成轮廓：面积对、不自交，冰面离地图边留出海面
+ * 浮冰：参数合理，冰面在安全区里四周还留着海，冰比海水轻、压满雪也还浮在海面上；摩擦是雪最大、新冰最小。按标准身体：平时的风吹不动站在新冰上的，
+ * 阵风吹得动站在新冰上的、吹不动站在雪上的（雪是避风的地方）；每个角色都游得过海流。抽一批种子生成轮廓：不自交，出生的冰心四周空得开
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'floe') === (m.floe !== undefined), `maps.${id} 是浮冰当且仅当写了 floe`)
@@ -237,8 +245,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const s = f.shape
   const span = (r: readonly [number, number]): boolean => r[0] > 0 && r[0] <= r[1]
   const at = `maps.${id}.floe`
-  need(f.meterPerU > 0 && f.cellU > 0 && f.frameU > Math.sqrt(s.areaU), `${at} 的尺度、格子须为正，地图比冰面大`)
-  need(s.areaU > 0 && s.turnDeg >= 0 && s.sideDeg >= 0 && s.sideU >= 0 && s.bendU >= 0 && s.jagU >= 0, `${at}.shape 的面积须为正，偏转、拐折与锯齿不为负`)
+  need(f.meterPerU > 0 && f.cellU > 0, `${at} 的尺度、格子须为正`)
+  need(s.spanU > 0 && s.spanU < FRAME_U - SAFE_U * 2, `${at}.shape.spanU 须为正，冰面在安全区里四周还留着海`)
+  need(s.turnDeg >= 0 && s.sideDeg >= 0 && s.sideU >= 0 && s.bendU >= 0 && s.jagU >= 0, `${at}.shape 的偏转、拐折与锯齿不为负`)
   need(s.cutChance >= 0 && s.cutChance <= 1 && s.leadChance >= 0 && s.leadChance <= 1, `${at}.shape 的概率须在 [0, 1] 内`)
   need(Number.isInteger(s.bites[0]) && Number.isInteger(s.bites[1]) && s.bites[0] >= 0 && s.bites[0] <= s.bites[1], `${at}.shape.bites 须为非负整数范围`)
   need([s.cutU, s.biteDepthU, s.biteWidthU, s.leadU, s.leadWidthU, s.seamWidthU, s.roundU].every(span), `${at}.shape 的范围须为正且下限不大于上限`)
@@ -267,20 +276,16 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (const [cid, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) need(c.stats.moveSpeed * b.swimRatio > current * 1.2, `${at} 的海流（${current.toFixed(2)} 格/秒）快得让 characters.${cid} 游不回来`)
   for (let k = 0; k < 16; k++) {
     const { outline } = floeOutline(k * 7919 + 13, f)
-    const reach = Math.max(...outline.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y))))
     need(simple(outline), `${at} 第 ${k} 个样本的轮廓自交`)
-    need(Math.abs(area(outline) - s.areaU) < 1, `${at} 第 ${k} 个样本的面积不对`)
-    need(reach + 6 <= f.frameU / 2, `${at} 第 ${k} 个样本的冰面离地图边不到 6 格`)
+    need(depth(outline, 0, 0) >= SPAWN_CLEAR_U, `${at} 第 ${k} 个样本的冰心离冰缘不到 ${SPAWN_CLEAR_U} 格`)
   }
 }
 
 /**
- * 溶洞：洞厅能走的地方约有标准的 32×32 那么大；洞厅、支洞与天窗都落得进地图；太阳每天升起又落下，时间放慢的窗口罩住天黑那段；正午天窗下的天光亮过熄火把的门槛，
+ * 溶洞：地图放得进方框的安全区；洞厅、支洞与天窗都落得进地图；太阳每天升起又落下，时间放慢的窗口罩住天黑那段；正午天窗下的天光亮过熄火把的门槛，
  * 星光暗过刷怪的门槛；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍
  */
 const DEG = Math.PI / 180
-/** 新地图有效场地的标准边长，格 */
-const STANDARD_SIDE_U = 32
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'cave') === (m.cave !== undefined), `maps.${id} 是溶洞当且仅当写了 cave`)
   const c = m.cave
@@ -293,9 +298,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const { hall, skylights: s, alcoves: a, formations: f, pools: p, sky, light, torch, view } = c
   need(hall.insetU[0] > 0 && span(hall.insetU) && hall.waveU > 0 && hall.cornerU >= 0 && hall.neckU > 0 && hall.wallU > 0, `maps.${id}.cave.hall 的边距、波长、窄缝与洞壁宽须为正，磨角不为负`)
   need(hall.ceilingM > f.stalagmiteM[1] && hall.ceilingM > s.rubbleM, `maps.${id}.cave.hall.ceilingM 须高过最高的石笋与碎石坡`)
-  const inset = hall.insetU[0] + hall.insetU[1]
-  const floor = (mapW - inset) * (mapH - inset)
-  need(floor >= 0.9 * STANDARD_SIDE_U ** 2 && floor <= 1.15 * STANDARD_SIDE_U ** 2, `maps.${id}.cave 洞厅按平均边距算约 ${Math.round(floor)} 格²，须在 ${STANDARD_SIDE_U}×${STANDARD_SIDE_U} 上下`)
+  need(Math.max(mapW, mapH) <= FRAME_U - SAFE_U * 2, `maps.${id}.cave 的地图须放得进方框的安全区`)
   need(a.outU + a.pocketU + 1.2 < side / 2 - 4, `maps.${id}.cave.alcoves 往外走的深度须让洞厅中间留得出地方`)
   need(s.mainU[0] > 0 && span(s.mainU) && s.mainOffsetU[0] >= 0 && span(s.mainOffsetU) && s.jitter >= 0 && s.jitter < 0.5 && s.gapU >= 0, `maps.${id}.cave.skylights 的半径与偏移须为正、起伏在 0 到 0.5 之间`)
   need(s.mainOffsetU[1] + s.mainU[1] * (1 + s.jitter) < side / 2 - Math.max(hall.insetU[1], a.outU + a.pocketU + 1.2) - 1, `maps.${id}.cave.skylights 的主天窗须整个开在洞厅上方`)
@@ -304,7 +307,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(ints(a.count) && a.count[0] >= 1, `maps.${id}.cave.alcoves 至少一条：白天怪物要有暗处出来`)
   need(a.widthU > 2 * hall.neckU && a.outU > a.widthU / 2 && a.alongU[0] > 0 && span(a.alongU) && a.pocketU * 2 >= a.widthU, `maps.${id}.cave.alcoves 须宽过窄缝、拐进岩体、尽头的暗室不比通道窄`)
   need(ints(f.columns) && ints(f.stalagmites) && ints(f.clusters) && f.columnU[0] > f.blockU && span(f.columnU), `maps.${id}.cave.formations 的个数须为非负整数，石柱挡路`)
-  need(f.stalagmiteU[0] > 0 && span(f.stalagmiteU) && f.stalagmiteM[0] > 0 && span(f.stalagmiteM) && f.clearU > 0, `maps.${id}.cave.formations 的石笋尺寸与出生点的空地须为正`)
+  need(f.stalagmiteU[0] > 0 && span(f.stalagmiteU) && f.stalagmiteM[0] > 0 && span(f.stalagmiteM), `maps.${id}.cave.formations 的石笋尺寸须为正`)
+  need(f.clearU >= SPAWN_CLEAR_U + hall.neckU, `maps.${id}.cave.formations.clearU 须比出生点要空出的 ${SPAWN_CLEAR_U} 格再宽一道窄缝：石头之间的窄缝填平后，出生点四周也空得开`)
   need(ints(p.count) && p.sizeU[0] > 0 && span(p.sizeU) && p.viscosity >= 1 && p.exertion >= 0, `maps.${id}.cave.pools 的个数须为非负整数、尺寸为正，水里不比平地快`)
   need(Math.abs(Math.tan(sky.latitudeDeg * DEG) * Math.tan(sky.declinationDeg * DEG)) < 1, `maps.${id}.cave.sky 须让太阳每天升起又落下`)
   need(sky.dayS > 0 && sky.startHour >= 0 && sky.startHour < 24 && sky.extinction > 0 && sky.dwell >= 0 && sky.dwellWidthDeg > 0, `maps.${id}.cave.sky 的一天须为正、开局的钟点在一天里`)
@@ -321,7 +325,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(reach >= view.nightU / 2, `maps.${id}.cave 火把只照得清 ${reach.toFixed(1)} 格，盖不住夜里镜头短边的一半 ${view.nightU / 2} 格`)
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
-  need(view.dayU / 2 <= side / 2 + MAP_DEFAULTS.cameraMargin, `maps.${id}.cave.view.dayU 须让白天的镜头落在地图与边距以内`)
+  need(view.dayU <= FRAME_U, `maps.${id}.cave.view.dayU 须让白天的镜头落在方框以内`)
 }
 
 /**
@@ -336,7 +340,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const { bank, forest, trail, fence, flowers, turf } = g
   need(g.meterPerU > 0 && g.sizeU > 0 && g.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
-  need(g.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(g.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(g.areaU2[0] > 0 && range(g.areaU2, false) && g.areaU2[1] < g.sizeU * g.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
   need(turf.reliefM >= 0 && turf.waveU > 0 && turf.riseM >= 0, `${at}.turf 的起伏、坡度不为负，波长为正`)
   need(bank.insetU[0] > 0 && range(bank.insetU, false) && bank.insetU[1] < g.sizeU / 4, `${at}.bank.insetU 须让坡脚落在地图边与中线之间`)
@@ -364,7 +368,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (let s = 0; s < 24; s++) {
     const plan = meadowPlan(g, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 4 * UNIT, `${where} 的开局站位离边不到四格`)
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
   }
@@ -382,6 +386,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const { wall, forest: fo, stream: st, flow: f, rocks: rk, sill: sl, bridge: bg, trees: tr, body: b } = s
   need(s.meterPerU > 0 && s.cellU > 0 && s.sizeU > 0 && s.neckU > 0, `${at} 的米每格、地形格子、地图边长与窄缝须为正`)
+  need(s.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(s.areaU2[0] > 0 && range(s.areaU2, false) && s.areaU2[1] < s.sizeU * s.sizeU, `${at}.areaU2 须是比整张地图小的正的范围`)
   need(wall.insetU[0] > wall.thickU / 2 && range(wall.insetU, false) && wall.skewDeg >= 0 && wall.skewDeg < 30 && wall.kinkDeg >= 0 && wall.kinkDeg < 30, `${at}.wall 的墙身离地图边至少半个墙厚，整条斜与中途拐都不到 30 度`)
   need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
@@ -400,7 +405,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (let k = 0; k < 8; k++) {
     const plan = sakuraPlan(s, k * 7919 + 13)
     const where = `${at} 第 ${k} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= 3 * UNIT, `${where} 的开局站位离边不到三格`)
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     const br = plan.bridge
     for (const sgn of [-1, 1]) {
       const x = br.x + br.ax * sgn * (br.half - 0.3)
@@ -429,10 +434,10 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
   const body = TEAM_BASELINE.member.radius * 2
   const { frame, shock, rail, clock, arc, button } = c
-  need(c.mmPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU > 0, `${at} 的毫米每格、地图边长、窄缝与开局空地须为正`)
-  need(c.padU >= MAP_DEFAULTS.cameraMargin + 2, `${at}.padU 须比镜头边距多出两格：镜头看得到的地方都画上`)
+  need(c.mmPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at} 的毫米每格、地图边长与窄缝须为正，开局空地空得出出生点要的格数`)
+  need(c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
   need(c.areaU2[0] > 0 && range(c.areaU2, false) && c.areaU2[1] < c.sizeU * c.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
-  need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.insetU[1] < c.padU && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正，罩壁落在画了的地方里`)
+  need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正`)
   need(range(c.aisleU, false) && c.aisleU[0] > body + c.neckU * 2 && range(c.chipU, false), `${at}.aisleU 须走得过标准身体，chipU 须为非负的范围`)
   need(shock.teamDps > 0 && shock.enemyDps > 0 && shock.tickMs > 0 && shock.footFrac > 0 && shock.footFrac <= 1, `${at}.shock 的伤害与结算间隔须为正，脚的范围在 (0, 1] 内`)
   need(rail.widthU[0] > 0 && range(rail.widthU, false), `${at}.rail.widthU 须为正的范围`)
@@ -455,7 +460,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 沙漠：地图是边长为 2 的幂的正方形，地面、印子与地形的贴图才按一圈平铺得上；镜头看到的长边比一圈小，平常的屏幕不用拉近；
+ * 沙漠：一圈就是方框，地面与印子的贴图每格的像素数是整数、沙地横竖挪半圈落在整像素上；镜头看到的长边比一圈小，平常的屏幕不用拉近；
  * 最大的沙丘从脊线中点往哪边伸都不到半圈（按离它最近的那一份算高才对）；坡度、休止角、走路的代谢说得通；平时的风吹不起沙、沙暴吹得起，
  * 一场沙暴在下一场之前刮完；标准身体的印子平时留得住一阵，沙暴最猛时累到见底的印子也在一阵里填平；印子贴图记得下一小时落下的沙
  */
@@ -464,13 +469,13 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const d = m.desert
   if (!d) continue
   const at = `maps.${id}.desert`
-  const w = m.size?.w ?? MAP_DEFAULTS.width
-  const h = m.size?.h ?? MAP_DEFAULTS.height
-  const pow2 = (n: number): boolean => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0
+  need(m.size === undefined, `maps.${id} 是沙漠，一圈就是方框，不写 size`)
+  const w = FRAME_U
+  const h = FRAME_U
   const span = (r: readonly [number, number]): boolean => r[0] > 0 && r[0] <= r[1]
   const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 1 && r[0] <= r[1]
-  need(w === h && pow2(w), `${at} 的地图须是边长为 2 的幂的正方形：环面按一圈平铺，贴图要能重复`)
-  need(pow2(d.tracks.perU), `${at}.tracks.perU 须是 2 的幂：印子贴图按一圈平铺`)
+  need(Number.isInteger(GROUND_PPU) && (w * GROUND_PPU) % 2 === 0, `${at} 的沙地贴图须每格整数个像素、一圈的像素数是偶数：横竖挪半圈落在整像素上`)
+  need(Number.isInteger(d.tracks.perU) && d.tracks.perU > 0, `${at}.tracks.perU 须是正整数：印子贴图每格整数个格子`)
   need(d.meterPerU > 0 && d.sunDeg > 5 && d.sunDeg < 85, `${at} 的米每格须为正、太阳的仰角在 5 到 85 度之间`)
   need(d.viewMaxU >= VIEW.minLong / UNIT && d.viewMaxU <= w - 4, `${at}.viewMaxU 须不小于平常屏幕的长边 ${VIEW.minLong / UNIT} 格、比一圈小 4 格以上：每样东西只画一份`)
   const dc = d.dunes
@@ -553,7 +558,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 星云：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来；
+ * 星云：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点（球心）够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来，
+ * 走得最深也落在方框安全区的内切圆里；
  * 爱因斯坦环落在一般角色走不出来的半径上；最慢的敌人也有刷怪的地方
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -567,7 +573,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(shell.rise >= 0 && shell.tau > 1, `${at}.shell 的密度只能往外涨、整层光深须大于 1：被照亮的内壁才落在壳层里`)
   need(contain.speedMul >= 1 && contain.depthU > 0 && contain.leapU >= 0, `${at}.contain 的速度余量不小于 1、深度为正、瞬移余量不为负`)
   need(hole.gm > 0 && hole.maxGm >= hole.gm && hole.lightU > 0, `${at}.hole 的引力须为正、上限不小于开局、光速为正`)
-  need(near >= 0 && near <= far && hole.startU > 0 && hole.startU < shell.innerU, `${at}.hole 的位置范围与出发点须落在空腔里`)
+  need(near >= 0 && near <= far && far < shell.innerU, `${at}.hole 的位置范围须落在空腔里`)
+  need(shell.innerU + contain.depthU <= FRAME_U / 2 - SAFE_U, `${at}.shell 空腔半径加上走进壳层的深度须落在方框安全区的内切圆里`)
   need(disk.outerRs > ISCO_RS && disk.innerK > 0, `${at}.disk 须铺到最内稳定圆轨道以外、色温为正`)
   need(swallow.bodyGm >= 0 && swallow.bodyRadiusU > 0 && swallow.pickupGm >= 0 && swallow.shotGm >= 0, `${at}.swallow 的质量不为负、身体的参考半径为正`)
   need(swallow.lightEta > 0 && swallow.lightEta < ACCRETION_ETA, `${at}.swallow.lightEta 须在 0 与薄盘的 1/16 之间：径直掉进去的东西放的光不会比绕到最内稳定圆轨道的还多`)
@@ -594,7 +601,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   }
   for (const b of characters) {
     const reach = captureU(hole.maxGm, rsMax, b.fall / b.speedU)
-    need(reach < near + hole.startU - 1, `${at}.hole 长到最大时 ${b.path} 在出发点就走不出来：离黑洞 ${near + hole.startU} 格，走不出来的半径 ${+reach.toFixed(2)}`)
+    need(reach < near - 1, `${at}.hole 长到最大时 ${b.path} 在出发点就走不出来：离黑洞 ${near} 格，走不出来的半径 ${+reach.toFixed(2)}`)
   }
   const ratios = characters.map((b) => b.fall / b.speedU).sort((x, y) => x - y)
   const median = ratios[Math.floor(ratios.length / 2)]!
@@ -701,7 +708,7 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
 
 /**
  * 残垣：参数说得通；砌体的层高把挡人、挡弹、挡视线分开——总有几层高的墙只挡标准身体、几层只挡身体和平射；原本的墙与石柱高过眼睛，
- * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：能走的地方约有标准的 32×32 那么大，
+ * 柱廊的矮墙挡人不挡平射，封门的木板高过眼睛；门洞、柱间、回廊与台地边放得下压过半径的大个子。抽一批种子生成：
  * 从回廊院走得到台地上几乎所有能走的地方，标准身体走得过的通道大个子也都走得过
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -721,7 +728,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const hc = ms.courseM
   const W = p.wallU
   need(r.meterPerU > 0 && r.cellU > 0 && r.cellU <= 0.5, `${at} 的米每格须为正，砌体格子在 (0, 0.5] 格内`)
-  need(pos(site.marginU) && site.waveU > 0 && site.padU > 0 && site.neckU > 0, `${at}.site 的边距、波长、山坡与窄缝须为正`)
+  need(pos(site.marginU) && site.waveU > 0 && site.neckU > 0, `${at}.site 的边距、波长与窄缝须为正`)
   need(site.marginU[0] >= 2 * r.bodyCapU && site.neckU >= r.bodyCapU, `${at}.site 台地边离院落外框须放得下按 bodyCapU 算的大个子，填掉的窄缝也不窄于他`)
   need(span(p.tiltDeg) && p.tiltDeg[0] >= 0 && p.tiltDeg[1] <= 45, `${at}.plan.tiltDeg 须在 0 到 45 度之间`)
   need(pos(p.garthU) && pos(p.depthU) && pos(p.roomU) && pos(p.doorU) && ints(p.gates) && p.loops >= 0 && p.loops <= 1, `${at}.plan 的尺寸须为正，门的道数是非负整数，多开门的概率在 [0, 1] 内`)
@@ -752,8 +759,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     const seed = k * 7919 + 17
     const plan = ruinsPlan(r, { strength, walk: level, bodyU: B.refRadiusU }, seed)
     const b = plan.basin
-    let open = 0
-    for (let i = 0; i < b.room.length; i++) if (b.room[i]! > 0) open++
     const g = plan.grid
     const onSite = (i: number): boolean => {
       const ci = i % g.cols
@@ -761,14 +766,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       return roomAt(b, w.x * UNIT, w.y * UNIT) > 0
     }
     const walk = new Uint8Array(g.cols * g.rows)
-    let blocked = 0
-    for (let i = 0; i < walk.length; i++) {
-      if (!onSite(i)) continue
-      if (plan.n[i]! > level || plan.timber[i]! > 0) blocked++
-      else walk[i] = 1
-    }
-    const floor = open * (b.cell / UNIT) ** 2 - blocked * g.cell ** 2
-    need(floor >= 0.85 * STANDARD_SIDE_U ** 2 && floor <= 1.2 * STANDARD_SIDE_U ** 2, `${at} 种子 ${seed} 能走的地方约 ${Math.round(floor)} 格²，须在 ${STANDARD_SIDE_U}×${STANDARD_SIDE_U} 上下`)
+    for (let i = 0; i < walk.length; i++) if (onSite(i) && plan.n[i]! <= level && plan.timber[i]! <= 0) walk[i] = 1
     const fu = (plan.start.x - plan.frame.cx) * plan.frame.cos + (plan.start.y - plan.frame.cy) * plan.frame.sin + plan.frame.w / 2
     const fv = -(plan.start.x - plan.frame.cx) * plan.frame.sin + (plan.start.y - plan.frame.cy) * plan.frame.cos + plan.frame.h / 2
     const start = Math.floor((fv - g.v0) / g.cell) * g.cols + Math.floor((fu - g.u0) / g.cell)

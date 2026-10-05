@@ -40,8 +40,9 @@ import { remapSim } from './systems/shared/remap'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
+import { SAFE } from './frame'
 import { Lens, LENS_MODES } from './lens'
-import type { LensMode } from './lens'
+import type { Framing, LensMode } from './lens'
 import { makeSim } from './sim'
 import { abilityRequires, bodyLook, modDef, statBase } from './store'
 import { foldBody, lastingStats, setStatLayer, statsOf } from './utils/stats'
@@ -99,13 +100,13 @@ import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
 const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
-const showGrid = defineDevFlag({ id: 'battle.grid', group: '战斗', label: '显示坐标网格', desc: '每格一条白线；红线是 y = 0，绿线是 x = 0，两条相交处就是原点' })
-const LENS_LABELS: Record<LensMode, string> = { follow: '跟随', map: '完整地图', reach: '可见范围' }
+const showGrid = defineDevFlag({ id: 'battle.grid', group: '战斗', label: '显示坐标网格', desc: '每格一条白线；红线是 y = 0，绿线是 x = 0，两条相交处就是原点；黄框是能走的地方与地图的边不能越出的安全区' })
+const LENS_LABELS: Record<LensMode, string> = { follow: '跟随', map: '完整地图' }
 const lensChoice = defineDevChoice({
   id: 'battle.lens',
   group: '战斗',
   label: '镜头',
-  desc: '后两档不跟随队长，整张图放进一屏',
+  desc: '完整地图不跟随队长，整张图放进一屏',
   options: LENS_MODES.map((id) => ({ id, label: LENS_LABELS[id] })),
   default: 'follow',
 })
@@ -183,6 +184,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   /** 跟随时镜头对准的地方：队长，换人时从上一任那里滑过来 */
   private anchor: Point = { x: 0, y: 0 }
   private lens!: Lens
+  private framing!: Framing
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
   private mapW = 0
@@ -378,7 +380,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
-  /** 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色；盖在战斗画面之上、碰撞边界与出怪口之下 */
+  /**
+   * 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，沙盒地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下。
+   * 线宽按屏幕上的粗细定：标准缩放时照原样，拉远看整张图时不跟着变细
+   */
   private drawDevGrid(): void {
     if (!showGrid()) {
       this.gridGfx?.setVisible(false)
@@ -387,16 +392,20 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const g = (this.gridGfx ??= this.lens.mainOnly(this.add.graphics().setDepth(1000)))
     g.clear()
     g.setVisible(true)
-    const r = this.lens.view()
+    const r = this.lens.screen.view()
+    const k = viewport.renderScale / this.lens.screen.zoom()
     const right = r.x + r.w
     const bottom = r.y + r.h
-    g.lineStyle(0.03 * UNIT, 0xffffff, 0.45)
+    g.lineStyle(0.03 * UNIT * k, 0xffffff, 0.45)
     for (let x = Math.floor(r.x / UNIT) * UNIT; x <= right; x += UNIT) g.lineBetween(x, r.y, x, bottom)
     for (let y = Math.floor(r.y / UNIT) * UNIT; y <= bottom; y += UNIT) g.lineBetween(r.x, y, right, y)
-    g.lineStyle(0.05 * UNIT, 0xff1744, 1)
+    g.lineStyle(0.05 * UNIT * k, 0xff1744, 1)
     g.lineBetween(r.x, 0, right, 0)
-    g.lineStyle(0.05 * UNIT, 0x00e676, 1)
+    g.lineStyle(0.05 * UNIT * k, 0x00e676, 1)
     g.lineBetween(0, r.y, 0, bottom)
+    if (this.framing.edge !== 'frame') return
+    g.lineStyle(0.05 * UNIT * k, 0xffd600, 1)
+    g.strokeRect(SAFE.x, SAFE.y, SAFE.w, SAFE.h)
   }
 
   create(): void {
@@ -410,16 +419,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
     this.lens = new Lens(this)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, w: 0, h: 0 }
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, portrait: viewport.logicalWidth < viewport.logicalHeight, w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.build(this.ctx)
 
     this.anchor = { x: origin.x, y: origin.y }
-    this.lens.frame(this.map.framing(this.ctx))
+    this.framing = this.map.framing(this.ctx)
+    this.lens.frame(this.framing)
 
-    this.timeStopFx = this.lens.cover(this.add.rectangle(0, 0, 1, 1, TIMESTOP.chillColor, 0).setDepth(88))
+    this.timeStopFx = this.lens.screen.cover(this.add.rectangle(0, 0, 1, 1, TIMESTOP.chillColor, 0).setDepth(88))
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     const kb = this.input.keyboard
@@ -472,7 +482,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const lightAt = this.map.lightAt?.bind(this.map)
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
     if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
-    this.cues = new CueLayer(this, this.world, (r) => this.lens.cover(r))
+    this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
     new TriBatch(this, LayerType.Paint, 40, (o, m) => place(o, m, paint.pointer))
@@ -494,7 +504,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       sand: burstEmitter(this, [0xe8c27a, 0xd9a85b, 0xf3dca5, 0xc8954a], 120, 700, { gravityY: 160 }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
-    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
+    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
@@ -506,7 +516,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run)
     this.armedLevels = run.roster.map((_, slot) => memberLevel(run, slot))
-    if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this)
+    if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this, this.lens.screen)
     startPhase(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
@@ -769,7 +779,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.resize(this.ctx)
-    this.lens.frame(this.map.framing(this.ctx))
+    this.framing = this.map.framing(this.ctx)
+    this.lens.frame(this.framing)
     if (w === fromW && h === fromH) return
     if (sim) {
       sim.mapW = w
@@ -910,7 +921,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.teamDir = keyed ? norm(kx, ky) : stick
     sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
 
-    const seen = this.lens.visible()
+    const seen = this.lens.screen.visible()
     sim.view.x = seen.x
     sim.view.y = seen.y
     sim.view.right = seen.x + seen.w
@@ -928,7 +939,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.drainOutbox()
     if (sim.characterHitCount > this.seenHitCount) {
       this.seenHitCount = sim.characterHitCount
-      if (this.hitShakeOn) this.lens.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
+      if (this.hitShakeOn) this.lens.screen.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.paint?.step(sim)
     this.drawDevTargets(sim)

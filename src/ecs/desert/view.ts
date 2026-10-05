@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { removeEntity } from 'bitecs'
-import { UNIT } from '../../util/units'
+import { FRAME_U, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { GROUND_PPU } from '../../data/texel'
 import { viewport } from '../../util/apply'
@@ -12,7 +12,7 @@ import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
 import { DesertPainter } from './painter'
 import { encodeInfo, GROUND_FRAG } from './shader'
 import { HEIGHT_SPAN, newTrackTex, stampPrint, TIME_QUANT, TRACK_TILE } from './stamp'
-import { desertOf, desertPlanOf } from './world'
+import { desertOf } from './world'
 import { wrapU } from './terrain'
 import type { PixelRect } from './ground'
 import type { DesertPlan, Landmark } from './terrain'
@@ -21,8 +21,8 @@ import type { TrackTex } from './stamp'
 import type { DesertState } from './world'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
-import { inRect } from '../lens'
-import type { Framing, Rect } from '../lens'
+import { FRAME, FRAME_MID } from '../frame'
+import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { DesertConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -48,8 +48,8 @@ const RAG_SHADOW_DEPTH = -0.5
 /** 开发工具里"显示碰撞边界"的开关：打开时标志物挡人的轮廓和别的地图的岩壁一样勾在一切之上 */
 const WALLS_FLAG = 'battle.walls'
 const WALLS_DEPTH = 1001
-/** 脚下扬起的沙最多每秒这么多团：人多的时候不糊成一片 */
-const PUFFS_PER_S = 40
+/** 脚下扬起的沙每格²每秒最多这么多团：人多的时候不糊成一片，一圈里各处一样 */
+const PUFFS_PER_U2_S = 0.18
 
 /** 一样标志物在画面上的东西：树冠或杆头的图，杆子顶上的破布条 */
 interface LandmarkFx {
@@ -127,7 +127,6 @@ function drawDust(ctx: CanvasRenderingContext2D, size: number): void {
 export class DesertView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
   private decorEids: number[] = []
-  private plan?: DesertPlan
   private painter?: DesertPainter
   private ground?: Phaser.GameObjects.Shader
   private tracks?: { tex: Phaser.Textures.CanvasTexture; data: TrackTex; at: number }
@@ -143,29 +142,20 @@ export class DesertView implements MapView {
     return v.def.desert!
   }
 
-  private sizeU(v: ViewCtx): number {
-    return v.def.size!.w
-  }
-
-  private planOf(v: ViewCtx): DesertPlan {
-    if (!this.plan) this.plan = desertPlanOf(this.cfgOf(v), this.sizeU(v), v.run.decorSeed)
-    return this.plan
-  }
-
-  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const p = this.planOf(v)
-    return { w: p.sizeU * UNIT, h: p.sizeU * UNIT, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
+  /** 一圈就是方框，出发点在一圈的正中 */
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
   }
 
   build(v: ViewCtx): void {
     const scene = v.scene
-    this.visuals.push(v.lens.cover(scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-3)))
+    this.visuals.push(v.lens.screen.cover(scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-3)))
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
   }
 
   /** 四边首尾相接：跟随时连续地跟着队长、不设边，固定取景时正好拍一圈 */
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'wrap' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'wrap' }
   }
 
   /** 屏幕太宽时拉近：看到的长边不超过 viewMaxU 格 */
@@ -177,7 +167,7 @@ export class DesertView implements MapView {
   /** 布景也成对：横竖各隔半圈再摆一份，和沙丘、标志物一样分不出是哪一处 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const rng = new Rng(v.run.decorSeed)
-    const n = this.sizeU(v)
+    const n = FRAME_U
     for (const d of rollDecor(v.def.decor, () => rng.next(), n, n)) {
       for (const k of [0, n / 2]) {
         this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: ((d.xU + k) % n) * UNIT, y: ((d.yU + k) % n) * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
@@ -228,6 +218,7 @@ export class DesertView implements MapView {
             set('uInfo', 2)
             set('uRect', u.rect)
             set('uPeriod', [plan.sizeU * UNIT, plan.sizeU * UNIT])
+            set('uInfoN', plan.cols)
             set('uTrack', u.track)
             set('uScale', [plan.sizeU, plan.meterPerU, cfg.tracks.lifeS])
             set('uSun', [plan.light.x / sunLen, plan.light.y / sunLen, plan.light.z / sunLen])
@@ -257,7 +248,7 @@ export class DesertView implements MapView {
       .setDepth(1.5)
     this.solidGfx = scene.add.graphics().setDepth(WALLS_DEPTH).setVisible(false)
     this.visuals.push(this.ragShadow, this.ragGfx, this.puffs, this.solidGfx)
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.12, 0x140a04)
+    v.lens.screen.vignette(0.75, 0.12, 0x140a04)
     this.step(v, sim, 0)
   }
 
@@ -291,7 +282,7 @@ export class DesertView implements MapView {
     if (!s || !g || !this.tracks) return
     const now = sim.elapsedMs
     const dt = Math.min(delta, 50) / 1000
-    const view = v.lens.view()
+    const view = v.lens.screen.view()
     const pad = GROUND_PAD_U * UNIT
     const x0 = view.x - pad / 2
     const y0 = view.y - pad / 2
@@ -304,18 +295,19 @@ export class DesertView implements MapView {
     u.rect[2] = w
     u.rect[3] = h
     u.track[3] = s.tracks.now
-    this.stampTracks(v, s, v.lens.visible(), dt)
+    this.stampTracks(v, s, dt)
     this.placeLandmarks(s, { x: view.x + view.w / 2, y: view.y + view.h / 2 }, now)
   }
 
-  /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；镜头里松沙上的脚步扬起一小团沙 */
-  private stampTracks(v: ViewCtx, s: DesertState, view: Rect, dt: number): void {
+  /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；松沙上的脚步扬起一小团沙 */
+  private stampTracks(v: ViewCtx, s: DesertState, dt: number): void {
     const t = this.tracks!
     const at = s.tracks.now
-    this.puffBudget = Math.min(PUFFS_PER_S, this.puffBudget + dt * PUFFS_PER_S)
+    const cap = PUFFS_PER_U2_S * s.plan.sizeU * s.plan.sizeU
+    this.puffBudget = Math.min(cap, this.puffBudget + dt * cap)
     for (const p of s.tracks.prints) {
       stampPrint(t.data, p, UNIT, at)
-      if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither' && inRect(view, p.x, p.y)) {
+      if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither') {
         this.puffBudget--
         this.puffs?.emitParticleAt(p.x, p.y, p.drag > 0.3 || p.gait === 'burrow' ? 2 : 1)
       }

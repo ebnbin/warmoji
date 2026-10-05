@@ -5,7 +5,7 @@ import { playSfx } from '../../audio/sfx'
 import { loadSettings } from '../../save/settings'
 import { browserStorage } from '../../util/storage'
 import { drawSpark } from '../render/volcano'
-import { groundArea, textureSize } from './ground'
+import { GROUND_AREA, textureSize } from './ground'
 import { CircuitPainter } from './painter'
 import { CURRENT_FRAG, encodeCopper, encodeNets } from './shader'
 import { COPPER_REACH_U, NET_SLOTS } from './layout'
@@ -15,6 +15,7 @@ import type { PaintScene, PixelRect } from './ground'
 import type { CircuitPlan, Gap, NetKind, Plate } from './layout'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { FRAME } from '../frame'
 import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -289,17 +290,17 @@ export class CircuitView implements MapView {
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const p = this.planOf(v)
-    return { w: p.size * UNIT, h: p.size * UNIT, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
+    return { w: FRAME.w, h: FRAME.h, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
   }
 
   build(v: ViewCtx): void {
-    this.visuals.push(v.lens.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
+    this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
     if (!v.scene.textures.exists(SPARK_KEY)) upload(canvasTexture(v.scene, SPARK_KEY, 32, 32, (ctx) => drawSpark(ctx, 32)), Phaser.Textures.FilterMode.LINEAR)
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'clamp' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   /** 板面上不撒 emoji */
@@ -310,7 +311,7 @@ export class CircuitView implements MapView {
     const cfg = v.def.circuit!
     const scene = v.scene
     const sc: PaintScene = { cfg, plan }
-    const size = textureSize(sc)
+    const size = textureSize()
     const tex = canvasTexture(scene, GROUND_KEY, size.w, size.h)
     const painter = new CircuitPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
@@ -323,7 +324,7 @@ export class CircuitView implements MapView {
     if (this.painter !== painter) return
     this.painter = undefined
     upload(tex, Phaser.Textures.FilterMode.LINEAR)
-    const ga = groundArea(sc)
+    const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.copper(v, plan)
     this.dynamics(v, plan)
@@ -332,7 +333,7 @@ export class CircuitView implements MapView {
     this.presses = st ? st.buttons.map((b) => b.presses) : []
     this.clockWas = plan.clocks.map(() => -1)
     this.lastNow = sim.elapsedMs
-    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.24, 0x000000)
+    v.lens.screen.vignette(0.72, 0.24, 0x000000)
   }
 
   /** 带电的铜：编成数据图，着色器在铜边上画光 */
@@ -430,10 +431,9 @@ export class CircuitView implements MapView {
     this.visuals.push(this.sparks)
   }
 
-  /** (x, y)（格）在不在镜头里，边上再放宽 pad 格 */
+  /** (x, y)（格）在不在镜头里，边上再放宽 pad 格：只用来决定响不响、震不震，画面照常画 */
   private seen(v: ViewCtx, x: number, y: number, pad: number): boolean {
-    const r = v.scene.cameras.main.worldView
-    return x * UNIT > r.x - pad * UNIT && x * UNIT < r.right + pad * UNIT && y * UNIT > r.y - pad * UNIT && y * UNIT < r.bottom + pad * UNIT
+    return v.lens.screen.sees(x * UNIT, y * UNIT, pad * UNIT)
   }
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {
@@ -447,7 +447,7 @@ export class CircuitView implements MapView {
     this.fx.clear()
     this.rings.clear()
     this.copperFx.clear()
-    const flash = this.currents(v, st, now, dt)
+    const flash = this.currents(st, now, dt)
     encodeNets(this.nets.img.data, st.nets, flash)
     this.nets.tex.getContext().putImageData(this.nets.img, 0, 0)
     upload(this.nets.tex, Phaser.Textures.FilterMode.NEAREST)
@@ -469,7 +469,7 @@ export class CircuitView implements MapView {
    * 带电的铜：每道电弧到时候就换个地方、换个形状，落在镜头外的不画；刚通电时整片闪白、溅一把火花；
    * 时钟线快通电时零星冒小电火花，越临近越密。返回每条网络此刻闪白还剩多少，交给着色器
    */
-  private currents(v: ViewCtx, st: CircuitState, now: number, dt: number): number[] {
+  private currents(st: CircuitState, now: number, dt: number): number[] {
     const g = this.copperFx!
     const flash = this.netFx.map((fx, k) => {
       const net = st.nets[k]
@@ -479,7 +479,7 @@ export class CircuitView implements MapView {
         for (const b of fx.bolts) b.until = 0
         for (let i = 0; i < 6; i++) {
           const p = this.somewhere(fx)
-          if (this.seen(v, p.x, p.y, 1)) this.sparks?.explode(4, p.x * UNIT, p.y * UNIT)
+          this.sparks?.explode(4, p.x * UNIT, p.y * UNIT)
         }
       }
       fx.was = net.level
@@ -493,13 +493,11 @@ export class CircuitView implements MapView {
           b.width = 0.045 * UNIT * thin
           if (i < plateSlots) {
             const { plate: p, rim } = fx.plates[Math.floor(i / PLATE_BOLTS)]!
-            const seen = this.seen(v, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.x1 - p.x0) / 2 + 1)
-            b.lines = !seen ? [] : i % PLATE_BOLTS < PLATE_ACROSS ? acrossBolt(p) : rimBolt(rim)
+            b.lines = i % PLATE_BOLTS < PLATE_ACROSS ? acrossBolt(p) : rimBolt(rim)
             return
           }
           const { w, s } = pickWire(fx.wires, fx.length)
-          const at = wireAt(w, s)
-          b.lines = this.seen(v, at.x, at.y, 3) ? wireBolt(w, s, (fx.kind === 'rail' ? 1 : 1.4) + Math.random() * 1.6) : []
+          b.lines = wireBolt(w, s, (fx.kind === 'rail' ? 1 : 1.4) + Math.random() * 1.6)
         })
         for (const b of fx.bolts) b.lines.forEach((pts, i) => strokeBolt(g, pts, i === 0 ? b.width : b.width * 0.6, b.alpha * (0.7 + 0.3 * Math.random())))
       } else if (net.warn > 0) {
@@ -508,10 +506,8 @@ export class CircuitView implements MapView {
           if (Math.random() < n) {
             const { w, s } = pickWire(fx.wires, fx.length)
             const at = wireAt(w, s)
-            if (this.seen(v, at.x, at.y, 1)) {
-              this.crackles.push({ lines: wireBolt(w, s, 0.35 + Math.random() * 0.45), until: now + 40 + Math.random() * 40, alpha: 0.8, width: 0.032 * UNIT })
-              this.sparks?.explode(2, at.x * UNIT, at.y * UNIT)
-            }
+            this.crackles.push({ lines: wireBolt(w, s, 0.35 + Math.random() * 0.45), until: now + 40 + Math.random() * 40, alpha: 0.8, width: 0.032 * UNIT })
+            this.sparks?.explode(2, at.x * UNIT, at.y * UNIT)
           }
           n -= 1
         }
@@ -623,7 +619,7 @@ export class CircuitView implements MapView {
           fx.shapedAt = 0
           if (this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 3)) {
             playSfx('arc')
-            if (this.shake && this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 0)) v.lens.shake(120, 0.0015)
+            if (this.shake && this.seen(v, (a.x + b.x) / 2, (a.y + b.y) / 2, 0)) v.lens.screen.shake(120, 0.0015)
           }
           this.sparks?.explode(10, ax, ay)
           this.sparks?.explode(10, bx, by)
@@ -654,9 +650,8 @@ export class CircuitView implements MapView {
     this.zapSeen = st.zapCount
     let heard = false
     for (const z of st.zaps) {
-      if (!this.seen(v, z.x, z.y, 1)) continue
       this.sparks?.explode(5, z.x * UNIT + (Math.random() * 2 - 1) * 0.2 * UNIT, z.y * UNIT + (Math.random() * 2 - 1) * 0.2 * UNIT)
-      heard = true
+      heard ||= this.seen(v, z.x, z.y, 1)
     }
     if (heard) playSfx('shock')
   }

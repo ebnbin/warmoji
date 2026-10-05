@@ -131,9 +131,8 @@ export interface NebulaConfig {
     readonly maxGm: number
     /** 这片星域里的光速，格/秒：定出视界 r_s = 2GM/c²、透镜的偏折与光传过来要多久 */
     readonly lightU: number
-    /** 黑洞离星云中心多远，方向随机；队伍从中心另一侧离中心 startU 格处出发 */
+    /** 黑洞离星云中心多远，方向随机；队伍从中心出发 */
     readonly fromCenterU: readonly [number, number]
-    readonly startU: number
   }
   /**
    * 吞下的东西折成多少 GM：身体按 bodyGm·质量·(半径/bodyRadiusU)³，掉落物、弹体各算一份。
@@ -192,7 +191,7 @@ export interface NebulaConfig {
  * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
  */
 export interface VolcanoConfig {
-  /** 地形格子的边长，高度与厚度也以格计；地形铺满镜头能看到的地图外一圈 */
+  /** 地形格子的边长，高度与厚度也以格计；地形铺满方框 */
   readonly cellU: number
   readonly rim: {
     /** 盆地的边离方形地图的边多远：按噪声在两者之间起伏，起伏的波长 waveU；方形的角按 cornerU 的半径磨圆 */
@@ -284,7 +283,7 @@ export interface Friction {
  */
 export interface ShipConfig {
   readonly meterPerU: number
-  /** 甲板的平面形状，格：船长沿地图的长边，船头朝右（竖屏朝上） */
+  /** 甲板的平面形状，格：船摆在方框正中，横屏船头朝右、竖屏朝上 */
   readonly hull: {
     /** 甲板从船尾横板到船首柱的长、最宽处的宽 */
     readonly lengthU: number
@@ -297,12 +296,11 @@ export interface ShipConfig {
     readonly sternPow: number
     readonly transom: number
     readonly transomBulge: number
-    /** 舷墙的厚度；船壳外至少留多宽的海面 */
+    /** 舷墙的厚度 */
     readonly bulwarkU: number
-    readonly seaU: number
     /** 窄过两倍 neckU 的尖角填掉 */
     readonly neckU: number
-    /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路 */
+    /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路，队伍从船长正中出发，前后各有桅杆 */
     readonly masts: readonly number[]
     readonly mastU: number
   }
@@ -360,13 +358,12 @@ export interface ShipConfig {
  */
 export interface FloeConfig {
   readonly meterPerU: number
-  /** 地图是边长 frameU 的方形，浮冰居中；冰面的距离场、积雪与新冰的格子边长 cellU */
-  readonly frameU: number
+  /** 冰面的距离场、积雪与新冰的格子边长 cellU，格子铺满方框 */
   readonly cellU: number
   /** 平面形状，格 */
   readonly shape: {
-    /** 冰面的面积，格² */
-    readonly areaU: number
+    /** 冰心对准方框正中，冰面从冰心往四边最远伸出 spanU / 2 格 */
+    readonly spanU: number
     /** 四条主断裂边：整块最多转 turnDeg 度，每条边再各自最多偏 sideDeg 度、离中心的距离最多差 sideU 格 */
     readonly turnDeg: number
     readonly sideDeg: number
@@ -606,9 +603,9 @@ export interface WadeConfig {
  */
 export interface SakuraConfig {
   readonly meterPerU: number
-  /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
+  /** 地形格子的边长，格；地形铺满方框 */
   readonly cellU: number
-  /** 地图是 sizeU 见方的方形 */
+  /** 地图是 sizeU 见方的方形，摆在方框正中 */
   readonly sizeU: number
   /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
   readonly areaU2: readonly [number, number]
@@ -689,9 +686,8 @@ export interface SakuraConfig {
  */
 export interface MeadowConfig {
   readonly meterPerU: number
-  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  /** 地图是 sizeU 见方的方形，摆在方框正中；地面画满方框 */
   readonly sizeU: number
-  readonly padU: number
   /** 能走的草地有多大，格²：生成出来不在这个范围里就换一组随机数 */
   readonly areaU2: readonly [number, number]
   /** 窄过两倍 neckU 的缝与尖角不能走 */
@@ -758,9 +754,8 @@ export interface MeadowConfig {
  */
 export interface CircuitConfig {
   readonly mmPerU: number
-  /** 地图是 sizeU 见方的方形；地面画到地图外 padU 格，镜头看得到的地方都画上 */
+  /** 地图是 sizeU 见方的方形，摆在方框正中；地面画满方框 */
   readonly sizeU: number
-  readonly padU: number
   /** 能走的板面有多大，格²：生成出来不在这个范围里就换一组随机数 */
   readonly areaU2: readonly [number, number]
   /** 窄过两倍 neckU 的缝不能走 */
@@ -816,7 +811,7 @@ export interface CircuitConfig {
 export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
 
 /**
- * 沙漠：一片四边首尾相接的沙海，地图的四边是回绕的接缝，镜头跟着队长走、看不到边。沙丘与标志物都是一对一对的：
+ * 沙漠：一片四边首尾相接的沙海，一圈就是方框，方框的四边是回绕的接缝，镜头跟着队长走、看不到边。沙丘与标志物都是一对一对的：
  * 同一个摆在横竖各隔半圈的两处，再加上整圈的回绕，怎么走都分不清是回到了原地还是到了另一处。
  * 赶路按坡度与沙的松实算代谢，背阴处歇着回得快；标志物挡人不挡子弹；身体走过的地方留下脚印，越累越深，见底时拖着脚走，过一会儿被风吹平。
  * 物理量按米、千克、秒算，一格 meterPerU 米
@@ -886,11 +881,10 @@ export interface RuinsConfig {
   readonly meterPerU: number
   /** 砌体格子的边长，格：每格记剩几层石块、封着的木板与地上的碎石 */
   readonly cellU: number
-  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地边到地图边留 padU 格的山坡；窄过两倍 neckU 的缝填掉 */
+  /** 台地：院落外框往外 marginU 格之间按噪声起伏（波长 waveU）就是台地的边，台地外是山坡；窄过两倍 neckU 的缝填掉 */
   readonly site: {
     readonly marginU: readonly [number, number]
     readonly waveU: number
-    readonly padU: number
     readonly neckU: number
   }
   /**
@@ -1108,6 +1102,4 @@ export interface MapDefaults {
   readonly width: number
   readonly height: number
   readonly cameraMargin: number
-  /** 镜头不设边的图固定拍可见范围时，拍到地图外几格 */
-  readonly openMargin: number
 }

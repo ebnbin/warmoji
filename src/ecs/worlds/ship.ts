@@ -1,21 +1,15 @@
-import { UNIT } from '../../util/units'
+import { SPAWN_CLEAR_U, UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { Rng } from '../../util/rng'
 import type { Friction, ShipConfig } from '../../types/maps'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
-import { bulgeU, GRAVITY, halfBeamAt, hatchesOf, hydrostatics, skylightOf, stability, stepAxis, waveSlope, waveTerms } from '../../data/ship'
+import { GRAVITY, halfBeamAt, hatchesOf, hydrostatics, skylightOf, spawnS, stability, stepAxis, waveSlope, waveTerms } from '../../data/ship'
 import type { Axis, Hydrostatics, WaveTerm } from '../../data/ship'
+import { FRAME, FRAME_MID } from '../frame'
 import { awayFromWall, keepOut, makeBasin, roomAt } from './basin'
 import type { Basin } from './basin'
 import type { Landmark } from './gates'
-
-/** 地图的长边与短边，格：船壳外四周都留 seaU 格海面 */
-export function shipSizeU(cfg: ShipConfig): { long: number; short: number } {
-  const h = cfg.hull
-  const rim = 2 * (h.bulwarkU + h.seaU)
-  return { long: Math.ceil(h.lengthU + bulgeU(h) + rim), short: Math.ceil(h.beamU + rim) }
-}
 
 /** 船在地图上的摆法，像素：船尾横板中线（s = 0）的位置，船头与右舷的单位方向；能走的甲板与桅杆 */
 export interface Deck {
@@ -45,17 +39,16 @@ export function deckPoint(d: Deck, s: number, t: number): Point {
 
 const CELL_U = 0.25
 
-/** 船长沿地图的长边摆在正中，横屏船头朝右、竖屏船头朝上；右舷是船头方向顺时针转 90° */
-export function makeDeck(cfg: ShipConfig, mapW: number, mapH: number): Deck {
+/** 船长的正中摆在方框正中，横屏（across）船头朝右、竖屏船头朝上；右舷是船头方向顺时针转 90° */
+export function makeDeck(cfg: ShipConfig, across: boolean): Deck {
   const h = cfg.hull
-  const across = mapW >= mapH
   const bx = across ? 1 : 0
   const by = across ? 0 : -1
   const sx = -by
   const sy = bx
-  const mid = ((h.lengthU - bulgeU(h)) / 2) * UNIT
-  const ox = mapW / 2 - bx * mid
-  const oy = mapH / 2 - by * mid
+  const mid = spawnS(h) * UNIT
+  const ox = FRAME_MID.x - bx * mid
+  const oy = FRAME_MID.y - by * mid
   const masts = h.masts.map((f) => ({ x: ox + bx * f * h.lengthU * UNIT, y: oy + by * f * h.lengthU * UNIT }))
   const mastPx = h.mastU * UNIT
   const open = (x: number, y: number): boolean => {
@@ -68,10 +61,9 @@ export function makeDeck(cfg: ShipConfig, mapW: number, mapH: number): Deck {
     return true
   }
   const cell = CELL_U * UNIT
-  const cols = Math.ceil(mapW / cell)
-  const rows = Math.ceil(mapH / cell)
-  const keep = { x: ox + bx * ((h.masts[0]! + h.masts[1]!) / 2) * h.lengthU * UNIT, y: oy + by * ((h.masts[0]! + h.masts[1]!) / 2) * h.lengthU * UNIT }
-  const basin = makeBasin(open, 0, 0, cols, rows, cell, keep, h.neckU * UNIT)
+  const cols = Math.ceil(FRAME.w / cell)
+  const rows = Math.ceil(FRAME.h / cell)
+  const basin = makeBasin(open, FRAME.x, FRAME.y, cols, rows, cell, FRAME_MID, h.neckU * UNIT)
   const hatch = (g: { s: number; len: number; wid: number }): Landmark => ({ x: ox + bx * g.s * UNIT, y: oy + by * g.s * UNIT, r: (Math.min(g.len, g.wid) / 2) * UNIT, nx: 0, ny: 0 })
   return { ox, oy, bx, by, sx, sy, basin, masts, marks: { hatch: hatchesOf(h).map(hatch), skylight: [hatch(skylightOf(h))] } }
 }
@@ -118,9 +110,9 @@ export interface ShipState {
 /** 开战前船已经在海上漂了这么久，秒：一开场就在随浪摇 */
 const WARM_S = 40
 
-/** 空船在涌浪里漂着，炮弹散在甲板上离舷墙与桅杆至少一格的地方 */
-export function makeShip(cfg: ShipConfig, mapW: number, mapH: number, rng: Rng): ShipState {
-  const deck = makeDeck(cfg, mapW, mapH)
+/** 空船在涌浪里漂着，炮弹散在甲板上离舷墙与桅杆至少一格、离出发的地方至少 SPAWN_CLEAR_U 格的地方 */
+export function makeShip(cfg: ShipConfig, across: boolean, rng: Rng): ShipState {
+  const deck = makeDeck(cfg, across)
   const hs = hydrostatics(cfg)
   const waves = waveTerms(
     cfg,
@@ -128,11 +120,12 @@ export function makeShip(cfg: ShipConfig, mapW: number, mapH: number, rng: Rng):
   )
   const balls: Ball[] = []
   const r = cfg.balls.radiusU * UNIT
+  const h = cfg.hull
   for (let i = 0; i < cfg.balls.count; i++) {
-    let p = { x: 0, y: 0 }
+    let p = FRAME_MID
     for (let k = 0; k < 64; k++) {
-      p = { x: rng.next() * mapW, y: rng.next() * mapH }
-      if (roomAt(deck.basin, p.x, p.y) > r + UNIT) break
+      p = deckPoint(deck, rng.next() * h.lengthU, (rng.next() - 0.5) * h.beamU)
+      if (roomAt(deck.basin, p.x, p.y) > r + UNIT && Math.hypot(p.x - FRAME_MID.x, p.y - FRAME_MID.y) > SPAWN_CLEAR_U * UNIT) break
     }
     balls.push({ x: p.x, y: p.y, vx: 0, vy: 0 })
   }

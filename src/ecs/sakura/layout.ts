@@ -1,4 +1,4 @@
-import { UNIT } from '../../util/units.ts'
+import { FRAME_U, SPAWN_CLEAR_U, UNIT } from '../../util/units.ts'
 import { fbm } from '../../util/noise.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin } from '../worlds/basin.ts'
@@ -9,8 +9,6 @@ import type { SakuraConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
 const DEG = Math.PI / 180
-/** 地形铺到地图外多远，格：镜头边距再加设备安全区 */
-export const TERRAIN_PAD_U = 6
 /** 能走的地面按这么细的格子算距离场，格 */
 const BASIN_CELL_U = 0.25
 /** 身子离墙身、林缘至少这么远（格）：不贴进墙里、林子里 */
@@ -18,8 +16,10 @@ const WALL_CLEAR_U = 0.12
 const EDGE_CLEAR_U = 0.15
 /** 几条林缘交汇的内角按这么大（格）磨圆 */
 const CORNER_U = 2.5
-/** 溪的中线两头伸出地图这么远（格）：伸出镜头看得到的范围 */
-const REACH_OUT_U = TERRAIN_PAD_U + 3
+/** 溪的中线两头伸出方框这么远（格） */
+const REACH_OUT_U = 3
+/** 林缘与寺墙离地图中线至少这么远（格）：出生点四周空出 SPAWN_CLEAR_U 格，再让过贴墙贴林缘不能走的那条与栅格 */
+const MID_CLEAR_U = SPAWN_CLEAR_U + 0.5
 /** 石组以上的溪水比石组下高这么多米：石缝把水憋起一点 */
 const UPSTREAM_HEAD_M = 0.12
 /** 主溪在石槛下游再多画这么长（格）：槛下两岸的坡接得上 */
@@ -50,6 +50,8 @@ const RIM_MARGIN_U = 0.3
 const RIM_OVERLAP = 0.35
 /** 生成不出合格的地图就换一组随机数重来，最多这么多次 */
 const TRIES = 120
+/** 一组边上最多挑这么多对溪穿过林缘的地方 */
+const COURSE_TRIES = 6
 /** 槛下比槛顶低过这么多（米）的格子，水一流进去就落下去了 */
 export const SINK_M = 0.5
 
@@ -59,6 +61,14 @@ function smooth(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 const len = (x: number, y: number): number => Math.sqrt(x * x + y * y)
+
+/** 本地 (a, b) 离线段 pq 多远，格 */
+function segDistLocal(a: number, b: number, p: Local, q: Local): number {
+  const ea = q.a - p.a
+  const eb = q.b - p.b
+  const t = clamp01(((a - p.a) * ea + (b - p.b) * eb) / (ea * ea + eb * eb || 1))
+  return len(a - p.a - ea * t, b - p.b - eb * t)
+}
 /** 多项式平滑取小：两者相差 k 以内时圆滑过渡 */
 function smin(a: number, b: number, k: number): number {
   const h = clamp01(0.5 + (0.5 * (b - a)) / k)
@@ -112,11 +122,13 @@ const MIDS: readonly Point[] = [
   { x: 0, y: 0.5 },
 ]
 
+/** 地图坐标就是方框坐标：本地的 [0, size]² 落在方框正中 */
 function frameOf(side: number, mirror: boolean, size: number): Frame {
   const n = NORMALS[side]!
   const t = mirror ? { x: n.y, y: -n.x } : { x: -n.y, y: n.x }
   const m = MIDS[side]!
-  return { ox: m.x * size - (size / 2) * t.x, oy: m.y * size - (size / 2) * t.y, nx: n.x, ny: n.y, tx: t.x, ty: t.y }
+  const o = (FRAME_U - size) / 2
+  return { ox: o + m.x * size - (size / 2) * t.x, oy: o + m.y * size - (size / 2) * t.y, nx: n.x, ny: n.y, tx: t.x, ty: t.y }
 }
 
 export function toLocal(f: Frame, x: number, y: number, out: Local): Local {
@@ -172,10 +184,10 @@ export interface Edges {
   readonly cuts: readonly Cut[]
 }
 
-/** 墙身中线在 b 处离寺墙那条地图边多远，格 */
+/** 墙身中线在 b 处离寺墙那条地图边多远，格：不逼近地图中线 */
 export function wallA(e: Edges, b: number): number {
   const w = e.wall
-  return w.inset + w.skew * (b - e.size / 2) + w.kink * Math.max(0, b - w.kinkAt)
+  return Math.min(w.inset + w.skew * (b - e.size / 2) + w.kink * Math.max(0, b - w.kinkAt), e.size / 2 - MID_CLEAR_U)
 }
 
 /** 在墙身中线的哪一侧、离它多远（格，空地那边为正，按 a 量）；墙两头以外没有墙 */
@@ -191,7 +203,7 @@ function wiggle(e: Edges, u: number, k: number): number {
   return s
 }
 
-/** 进林子多深，格，林子里为正：几条林缘交汇的内角磨圆；溪穿过的两处按石组与竹栅那条线 */
+/** 进林子多深，格，林子里为正：几条林缘交汇的内角磨圆；溪穿过的两处按石组与竹栅那条线；地图正中出生点四周空着 */
 export function forestDepth(e: Edges, a: number, b: number): number {
   const S = e.size
   const f = e.forest
@@ -204,7 +216,7 @@ export function forestDepth(e: Edges, a: number, b: number): number {
     if (r >= c.half + CUT_BLEND_U) continue
     d += ((da * c.ua + db * c.ub) * c.side - d) * smooth(c.half + CUT_BLEND_U, c.half, r)
   }
-  return d
+  return Math.min(d, len(a - S / 2, b - S / 2) - MID_CLEAR_U)
 }
 
 /** 墙身的一段：中线从 a 到 b（格），朝空地那边的单位法线，长 */
@@ -600,10 +612,11 @@ interface Course {
 }
 
 /**
- * 溪的中线：先在三面林缘里挑两面，各取一处溪穿过林缘的地方（侧边的离寺墙够远，都离林子的拐角够远），两处连线够长、走向离横竖方向至少 slantDeg 度；
+ * 溪的中线：在对边与一条侧边的林缘上各取一处溪穿过林缘的地方（侧边的离寺墙够远，都离林子的拐角够远），溪斜着切过一个角，
+ * 两处连线够长、走向离横竖方向至少 slantDeg 度，离地图正中的出生点留出水面半宽再加该空出的地方；
  * 中线是过这两处的光滑曲线，两头顺着连线（各再偏一点）伸出地图外，中间过两个往旁边偏开最多 meanderU 的点，弯成一道或两道缓弯。
  * 再按真的林缘找出进林缘、出林缘的两处：整条离寺墙够远，两处之间不碰林子、弯得不急，进出林子时不顺着林缘擦过去，整段的走向仍是斜的，
- * 石槛下游在地图里留出落水的地方；不合格就把弯放缓再试，还不行就是 null
+ * 整条离出生点也够远，石槛下游在地图里留出落水的地方；不合格就把弯放缓再试，还不行就换一对，换够了还不行就是 null
  */
 function courseOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges): Course | null {
   const st = cfg.stream
@@ -616,115 +629,118 @@ function courseOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges): Course | nul
     if (k === 2) return { k, a: S - fo.far, b: fo.low + 6 + rng.next() * Math.max(0, S - fo.high - fo.low - 12) }
     return { k, a: aMin + rng.next() * Math.max(0, S - fo.far - 6 - aMin), b: k === 1 ? fo.low : S - fo.high }
   }
-  // 先挑两处：连线够长、走向够斜
-  let pa: (Local & { k: number }) | null = null
-  let pb: Local & { k: number } = { k: 0, a: 0, b: 0 }
-  for (let k = 0; k < 24 && !pa; k++) {
-    const pair = [
-      [1, 2],
-      [2, 3],
-      [1, 3],
-    ][Math.floor(rng.next() * 3)]!
-    const u = onSide(pair[0]!)
-    const v = onSide(pair[1]!)
-    const tilt = Math.atan2(Math.abs(v.b - u.b), Math.abs(v.a - u.a))
-    if (len(v.a - u.a, v.b - u.b) < 0.62 * S || Math.min(tilt, Math.PI / 2 - tilt) < st.slantDeg * DEG) continue
-    ;[pa, pb] = rng.next() < 0.5 ? [u, v] : [v, u]
-  }
-  if (!pa) return null
-  const ca = pb.a - pa.a
-  const cb = pb.b - pa.b
-  const cl = len(ca, cb)
-  const da = ca / cl
-  const db = cb / cl
-  // 两头伸出地图：顺着连线往那条林缘的外面拐一半，各再偏一点
-  const turned = (o: Local & { k: number }, sign: number): Point => {
-    const oa = o.k === 2 ? 1 : 0
-    const ob = o.k === 1 ? -1 : o.k === 3 ? 1 : 0
-    const ma = da * sign + oa
-    const mb = db * sign + ob
-    const ml = len(ma, mb) || 1
-    const t = (rng.next() * 2 - 1) * st.turnDeg * DEG
-    const ua = (ma * Math.cos(t) - mb * Math.sin(t)) / ml
-    const ub = (ma * Math.sin(t) + mb * Math.cos(t)) / ml
-    let k = 0
-    for (;;) {
-      const a = o.a + ua * k
-      const b = o.b + ub * k
-      if (a < -REACH_OUT_U || a > S + REACH_OUT_U || b < -REACH_OUT_U || b > S + REACH_OUT_U) return toMap(f, a, b)
-      k += 0.25
+  const clearOf = half + SPAWN_CLEAR_U
+  for (let tries = 0; tries < COURSE_TRIES; tries++) {
+    // 先挑两处：连线够长、走向够斜、离出生点够远
+    let pa: (Local & { k: number }) | null = null
+    let pb: Local & { k: number } = { k: 0, a: 0, b: 0 }
+    for (let k = 0; k < 24 && !pa; k++) {
+      const pair = rng.next() < 0.5 ? [1, 2] : [2, 3]
+      const u = onSide(pair[0]!)
+      const v = onSide(pair[1]!)
+      const tilt = Math.atan2(Math.abs(v.b - u.b), Math.abs(v.a - u.a))
+      if (len(v.a - u.a, v.b - u.b) < 0.55 * S || Math.min(tilt, Math.PI / 2 - tilt) < st.slantDeg * DEG) continue
+      if (segDistLocal(S / 2, S / 2, u, v) < clearOf) continue
+      ;[pa, pb] = rng.next() < 0.5 ? [u, v] : [v, u]
     }
-  }
-  const p0 = turned(pa, -1)
-  const p1 = turned(pb, 1)
-  const A = toMap(f, pa.a, pa.b)
-  const B = toMap(f, pb.a, pb.b)
-  // 中间两个点往旁边偏开：同向是一道弯，反向是两道
-  const nrm = dirToMap(f, -db, da)
-  const o1 = (rng.next() < 0.5 ? -1 : 1) * (0.5 + 0.5 * rng.next()) * st.meanderU
-  const o2 = (rng.next() < 0.5 ? -1 : 1) * (0.5 + 0.5 * rng.next()) * st.meanderU
-  const f1 = 0.3 + 0.08 * rng.next()
-  const f2 = 0.62 + 0.08 * rng.next()
-  const L: Local = { a: 0, b: 0 }
-  const walls = wallsOf(f, e)
-  const WD = { k: 0, side: 0 }
-  for (const m of [1, 0.6, 0.3, 0]) {
-    const via = (fr: number, o: number): Point => ({ x: A.x + (B.x - A.x) * fr + nrm.x * o * m, y: A.y + (B.y - A.y) * fr + nrm.y * o * m })
-    const line = lineOf(spline([p0, A, via(f1, o1), via(f2, o2), B, p1], 0.1))
-    const n = line.pts.length
-    const depth: number[] = []
-    let near = false
-    for (const p of line.pts) {
-      toLocal(f, p.x, p.y, L)
-      depth.push(forestDepth(e, L.a, L.b))
-      if (wallDist(walls, p.x, p.y, WD) < half + bank + st.wallGapU) near = true
-    }
-    if (near) continue
-    const first = depth.findIndex((d) => d < 0)
-    let last = -1
-    for (let i = n - 1; i >= 0; i--) {
-      if (depth[i]! < 0) {
-        last = i
-        break
+    if (!pa) continue
+    const ca = pb.a - pa.a
+    const cb = pb.b - pa.b
+    const cl = len(ca, cb)
+    const da = ca / cl
+    const db = cb / cl
+    // 两头伸出地图：顺着连线往那条林缘的外面拐一半，各再偏一点
+    const turned = (o: Local & { k: number }, sign: number): Point => {
+      const oa = o.k === 2 ? 1 : 0
+      const ob = o.k === 1 ? -1 : o.k === 3 ? 1 : 0
+      const ma = da * sign + oa
+      const mb = db * sign + ob
+      const ml = len(ma, mb) || 1
+      const t = (rng.next() * 2 - 1) * st.turnDeg * DEG
+      const ua = (ma * Math.cos(t) - mb * Math.sin(t)) / ml
+      const ub = (ma * Math.sin(t) + mb * Math.cos(t)) / ml
+      let k = 0
+      for (;;) {
+        const a = o.a + ua * k
+        const b = o.b + ub * k
+        if (a < -REACH_OUT_U || a > S + REACH_OUT_U || b < -REACH_OUT_U || b > S + REACH_OUT_U) return toMap(f, a, b)
+        k += 0.25
       }
     }
-    if (first <= 0 || last >= n - 1 || last <= first) continue
-    const sIn = line.s[first]!
-    const sOut = line.s[last]!
-    if (sOut - sIn < 0.6 * S) continue
-    // 两处之间不碰林子，离开进出口几格以后离林缘远过岸
-    let clear = true
-    for (let i = first; i <= last && clear; i++) {
-      const s = line.s[i]!
-      if (s > sIn + 1.5 && s < sOut - 1.5 && depth[i]! > -0.3) clear = false
-      if (s > sIn + 8 && s < sOut - 8 && depth[i]! > -(half + bank + 0.5)) clear = false
+    const p0 = turned(pa, -1)
+    const p1 = turned(pb, 1)
+    const A = toMap(f, pa.a, pa.b)
+    const B = toMap(f, pb.a, pb.b)
+    // 中间两个点往旁边偏开：同向是一道弯，反向是两道
+    const nrm = dirToMap(f, -db, da)
+    const o1 = (rng.next() < 0.5 ? -1 : 1) * (0.5 + 0.5 * rng.next()) * st.meanderU
+    const o2 = (rng.next() < 0.5 ? -1 : 1) * (0.5 + 0.5 * rng.next()) * st.meanderU
+    const f1 = 0.3 + 0.08 * rng.next()
+    const f2 = 0.62 + 0.08 * rng.next()
+    const L: Local = { a: 0, b: 0 }
+    const walls = wallsOf(f, e)
+    const WD = { k: 0, side: 0 }
+    const mid = toMap(f, S / 2, S / 2)
+    for (const m of [1, 0.6, 0.3, 0]) {
+      const via = (fr: number, o: number): Point => ({ x: A.x + (B.x - A.x) * fr + nrm.x * o * m, y: A.y + (B.y - A.y) * fr + nrm.y * o * m })
+      const line = lineOf(spline([p0, A, via(f1, o1), via(f2, o2), B, p1], 0.1))
+      const n = line.pts.length
+      const depth: number[] = []
+      let near = false
+      for (const p of line.pts) {
+        toLocal(f, p.x, p.y, L)
+        depth.push(forestDepth(e, L.a, L.b))
+        if (wallDist(walls, p.x, p.y, WD) < half + bank + st.wallGapU) near = true
+      }
+      if (near) continue
+      const first = depth.findIndex((d) => d < 0)
+      let last = -1
+      for (let i = n - 1; i >= 0; i--) {
+        if (depth[i]! < 0) {
+          last = i
+          break
+        }
+      }
+      if (first <= 0 || last >= n - 1 || last <= first) continue
+      const sIn = line.s[first]!
+      const sOut = line.s[last]!
+      if (sOut - sIn < 0.5 * S) continue
+      if (line.pts.some((p) => len(p.x - mid.x, p.y - mid.y) < clearOf)) continue
+      // 两处之间不碰林子，离开进出口几格以后离林缘远过岸
+      let clear = true
+      for (let i = first; i <= last && clear; i++) {
+        const s = line.s[i]!
+        if (s > sIn + 1.5 && s < sOut - 1.5 && depth[i]! > -0.3) clear = false
+        if (s > sIn + 8 && s < sOut - 8 && depth[i]! > -(half + bank + 0.5)) clear = false
+      }
+      if (!clear) continue
+      const g = resample(slice(line, sIn, sOut))
+      if (g.curv.some((c) => Math.abs(c) * half * 2 * st.minBend > 1)) continue
+      // 进出林子时离林缘的法线不超过 55 度
+      const square = (i: number): boolean => {
+        const p = line.pts[i]!
+        const q = line.pts[Math.min(n - 1, i + 1)]!
+        const o = line.pts[Math.max(0, i - 1)]!
+        const d = dirToLocal(f, q.x - o.x, q.y - o.y)
+        toLocal(f, p.x, p.y, L)
+        const h = 0.05
+        const ga = forestDepth(e, L.a + h, L.b) - forestDepth(e, L.a - h, L.b)
+        const gb = forestDepth(e, L.a, L.b + h) - forestDepth(e, L.a, L.b - h)
+        return Math.abs(d.a * ga + d.b * gb) >= Math.cos(55 * DEG) * len(d.a, d.b) * len(ga, gb)
+      }
+      if (!square(first) || !square(last)) continue
+      // 整段的走向仍然斜着
+      const pa = line.pts[first]!
+      const pb = line.pts[last]!
+      const chord = dirToLocal(f, pb.x - pa.x, pb.y - pa.y)
+      const off = Math.atan2(Math.abs(chord.b), Math.abs(chord.a))
+      if (Math.min(off, Math.PI / 2 - off) < st.slantDeg * 0.8 * DEG) continue
+      // 石槛下游在地图里还有几格，水落得下去；石组也在地图里
+      const o = (FRAME_U - S) / 2
+      const inMap = (p: Point, m: number): boolean => p.x > o + m && p.y > o + m && p.x < o + S - m && p.y < o + S - m
+      if (!inMap(pointAt(line, sOut + 2.5), 0.6) || !inMap(pointAt(line, sIn), 0.3)) continue
+      return { line, sIn, sOut }
     }
-    if (!clear) continue
-    const g = resample(slice(line, sIn, sOut))
-    if (g.curv.some((c) => Math.abs(c) * half * 2 * st.minBend > 1)) continue
-    // 进出林子时离林缘的法线不超过 55 度
-    const square = (i: number): boolean => {
-      const p = line.pts[i]!
-      const q = line.pts[Math.min(n - 1, i + 1)]!
-      const o = line.pts[Math.max(0, i - 1)]!
-      const d = dirToLocal(f, q.x - o.x, q.y - o.y)
-      toLocal(f, p.x, p.y, L)
-      const h = 0.05
-      const ga = forestDepth(e, L.a + h, L.b) - forestDepth(e, L.a - h, L.b)
-      const gb = forestDepth(e, L.a, L.b + h) - forestDepth(e, L.a, L.b - h)
-      return Math.abs(d.a * ga + d.b * gb) >= Math.cos(55 * DEG) * len(d.a, d.b) * len(ga, gb)
-    }
-    if (!square(first) || !square(last)) continue
-    // 整段的走向仍然斜着
-    const pa = line.pts[first]!
-    const pb = line.pts[last]!
-    const chord = dirToLocal(f, pb.x - pa.x, pb.y - pa.y)
-    const off = Math.atan2(Math.abs(chord.b), Math.abs(chord.a))
-    if (Math.min(off, Math.PI / 2 - off) < st.slantDeg * 0.8 * DEG) continue
-    // 石槛下游在地图里还有几格，水落得下去；石组也在地图里
-    const inMap = (p: Point, m: number): boolean => p.x > m && p.y > m && p.x < S - m && p.y < S - m
-    if (!inMap(pointAt(line, sOut + 2.5), 0.6) || !inMap(pointAt(line, sIn), 0.3)) continue
-    return { line, sIn, sOut }
   }
   return null
 }
@@ -777,7 +793,7 @@ function openLand(cfg: SakuraConfig, e: Edges, a: number, b: number, room: numbe
   return wallSide(e, a, b) >= cfg.wall.thickU / 2 + room && forestDepth(e, a, b) <= -room
 }
 
-/** 木桥：在溪的中段挑一处弯得缓的地方横跨过去，两头都落在空地上 */
+/** 木桥：在溪的中段挑一处弯得缓的地方横跨过去，两头都落在空地上，离地图正中的出生点留出该空出的地方 */
 function bridgeOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges, r: Reach, weir: Weir): Bridge | null {
   const bc = cfg.bridge
   const n = r.x.length
@@ -802,7 +818,10 @@ function bridgeOf(cfg: SakuraConfig, rng: Rng, f: Frame, e: Edges, r: Reach, wei
       return openLand(cfg, e, tmp.a, tmp.b, 1.5)
     })
     if (!ok) continue
-    return { x, y, ax, ay, span, half: total, width: bc.widthU / 2, rise: bc.riseM, level: r.level[i]! }
+    const bridge: Bridge = { x, y, ax, ay, span, half: total, width: bc.widthU / 2, rise: bc.riseM, level: r.level[i]! }
+    const mid = toMap(f, e.size / 2, e.size / 2)
+    if (bridgeDist(bridge, mid.x, mid.y) < SPAWN_CLEAR_U) continue
+    return bridge
   }
   return null
 }
@@ -914,7 +933,7 @@ function rimOf(f: Frame, e: Edges, lo: number, hi: number): Rim[] {
 }
 
 /**
- * 樱花：空地上几棵，离溪岸、桥、路、院门、寺墙、林缘与彼此都留开地方；林缘上一棵挨一棵，画出来的树冠连成一道，探出林缘 RIM_MARGIN_U 到 overhangU；
+ * 樱花：空地上几棵，离溪岸、桥、路、院门、寺墙、林缘、出生点与彼此都留开地方；林缘上一棵挨一棵，画出来的树冠连成一道，探出林缘 RIM_MARGIN_U 到 overhangU；
  * 林缘后面的林子里密密地种满；寺墙外（寺里）隔几格一棵，树冠探过墙头。树都不种在溪里，让开石组与竹栅
  */
 function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'start'>): Tree[] {
@@ -958,13 +977,14 @@ function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'star
     if (bridgeDist(s.bridge, p.x, p.y) < r + 0.6) continue
     if (polylineDist(s.path, p.x, p.y) < PATH_HALF_U + r - tc.overhangU + 0.2) continue
     if (len(s.gate.x - p.x, s.gate.y - p.y) < s.gate.half + r + 1.2) continue
+    if (len(a - S / 2, b - S / 2) < r - tc.overhangU + MID_CLEAR_U) continue
     if (crowd.crowded(p.x, p.y, r, 1.05)) continue
     add({ x: p.x, y: p.y, r, h: height(r), inside: true })
     made++
   }
   // 林缘上的樱花：林缘上一处往空地那边 RIM_MARGIN_U 还没被树冠盖住，就顺着法线往林子里种一棵，树冠的边盖过那里；种不下就换小一点的
-  const lo = -TERRAIN_PAD_U
-  const hi = S + TERRAIN_PAD_U
+  const lo = 0
+  const hi = FRAME_U
   const rims = rimOf(f, e, lo, hi)
   for (let i = rims.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1))
@@ -1001,29 +1021,6 @@ function plantTrees(cfg: SakuraConfig, rng: Rng, s: Omit<Sketch, 'trees' | 'star
   return trees
 }
 
-/** 开局站位：空地上的干处，离溪、墙、林缘、树、桥都有几格，挑离地图中心最近的一处 */
-function startOf(cfg: SakuraConfig, s: Omit<Sketch, 'start'>): Point | null {
-  const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
-  const L: Local = { a: 0, b: 0 }
-  const c = s.edges.size / 2
-  let best: Point | null = null
-  let bestD = Infinity
-  for (let y = 1; y < s.edges.size; y += 0.5) {
-    for (let x = 1; x < s.edges.size; x += 0.5) {
-      const d = len(x - c, y - c)
-      if (d >= bestD) continue
-      toLocal(s.frame, x, y, L)
-      if (!openLand(cfg, s.edges, L.a, L.b, 4)) continue
-      if (waterEdge(s.stream, x, y, tmp) < cfg.flow.bankU + 2.5) continue
-      if (bridgeDist(s.bridge, x, y) < 2) continue
-      if (s.trees.some((t) => t.inside && len(t.x - x, t.y - y) < t.r - cfg.trees.overhangU + 3)) continue
-      bestD = d
-      best = { x, y }
-    }
-  }
-  return best
-}
-
 /** 能走的地面：寺墙里（离墙身留一点）、林缘外，扣掉空地上樱花的树冠（树冠下 overhangU 能走进去）；溪面能走，石组与竹栅那两条线外不能。只留与开局站位连通的一块 */
 function basinOf(cfg: SakuraConfig, k: Sketch, x0: number, y0: number, cols: number, rows: number, cellU: number): Basin {
   const th = cfg.wall.thickU / 2
@@ -1044,7 +1041,8 @@ function basinOf(cfg: SakuraConfig, k: Sketch, x0: number, y0: number, cols: num
 /** 能走的地面按 cell 格的格子栅格化，量出面积，格² */
 function measured(cfg: SakuraConfig, k: Sketch, cell: number): { basin: Basin; area: number } {
   const S = k.edges.size
-  const basin = basinOf(cfg, k, -cell, -cell, Math.ceil(S / cell) + 2, Math.ceil(S / cell) + 2, cell)
+  const o = (FRAME_U - S) / 2
+  const basin = basinOf(cfg, k, o - cell, o - cell, Math.ceil(S / cell) + 2, Math.ceil(S / cell) + 2, cell)
   let cells = 0
   for (let i = 0; i < basin.room.length; i++) if (basin.room[i]! > 0) cells++
   return { basin, area: cells * cell * cell }
@@ -1083,9 +1081,8 @@ function sketch(cfg: SakuraConfig, rng: Rng, seed: number): Sketch | null {
   const walls = wallsOf(frame, edges)
   const base2 = { frame, edges, walls, stream, upstream, downstream, rocks, weir, fence, bridge, ...gp }
   const trees = plantTrees(cfg, rng, base2)
-  const start = startOf(cfg, { ...base2, trees })
-  if (!start) return null
-  return { ...base2, trees, start }
+  // 出生点在地图正中：林缘、寺墙、溪、桥与空地上的树都给它让出了地方
+  return { ...base2, trees, start: toMap(frame, S / 2, S / 2) }
 }
 
 /**
@@ -1189,10 +1186,10 @@ export function sakuraPlan(cfg: SakuraConfig, seed: number): SakuraPlan {
     if (!k) continue
     const a = measured(cfg, k, BASIN_CELL_U * 2).area
     if (a < cfg.areaU2[0] || a > cfg.areaU2[1]) continue
-    const S = cfg.sizeU
-    const terrain = terrainOf(cfg, k, terrainSeed, -TERRAIN_PAD_U, -TERRAIN_PAD_U, Math.ceil((S + TERRAIN_PAD_U * 2) / cfg.cellU), Math.ceil((S + TERRAIN_PAD_U * 2) / cfg.cellU))
+    const n = Math.ceil(FRAME_U / cfg.cellU)
+    const terrain = terrainOf(cfg, k, terrainSeed, 0, 0, n, n)
     const { basin } = measured(cfg, k, BASIN_CELL_U)
-    const plan: SakuraPlan = { w: S, h: S, seed: terrainSeed, ...k, terrain, basin }
+    const plan: SakuraPlan = { w: FRAME_U, h: FRAME_U, seed: terrainSeed, ...k, terrain, basin }
     last = { cfg, seed, plan }
     return plan
   }
