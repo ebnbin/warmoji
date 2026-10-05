@@ -48,6 +48,7 @@ export const BATTLEFIELD = {
     desert: DESERT_EVENTS,
     oldRiver: RIVER_EVENTS,
     sakura: RIVER_EVENTS,
+    maple: RIVER_EVENTS,
     void: [
       { id: 'factory_grind', emoji: '2699', name: '齿轮咬滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
       { id: 'factory_turbo', emoji: '26a1', name: '涡轮增压', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
