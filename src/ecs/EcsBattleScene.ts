@@ -82,6 +82,7 @@ import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from
 import type { ClockSnapshot, HudSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
+import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
@@ -1007,17 +1008,39 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 }
 
-/** 船上的一局：甲板此刻往哪边倾、倾多少，以及站着会滑的门槛 */
+/** 船上的倾斜仪盘边代表的倾角，度：再倾也压在盘边上 */
+const SHIP_FULL_DEG = 10
+
+/** 船上或梦幻乐园里的一局：甲板或台面此刻往哪边倾、倾多少，站着会滑的门槛；台子还有预警里要倾向的边与开着的入口 */
 function tiltSnapshot(sim: Sim): TiltSnapshot | null {
   const ship = sim.worldState.ship
   const cfg = MAPS[sim.mapId].ship
-  if (!ship || !cfg) return null
-  const t = deckTilt(ship)
+  if (ship && cfg) {
+    const t = deckTilt(ship)
+    return {
+      down: t.down,
+      deg: (t.angle * 180) / Math.PI,
+      slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
+      fullDeg: SHIP_FULL_DEG,
+      outline: { kind: 'hull', bow: { x: ship.deck.bx, y: ship.deck.by } },
+      next: -1,
+      open: -1,
+    }
+  }
+  const land = sim.worldState.dreamland
+  const lcfg = MAPS[sim.mapId].dreamland
+  if (!land || !lcfg) return null
+  const s = land.s
+  const plan = s.plan
+  const len = Math.hypot(s.sx, s.sy)
   return {
-    down: t.down,
-    deg: (t.angle * 180) / Math.PI,
-    bow: { x: ship.deck.bx, y: ship.deck.by },
-    slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
+    down: len > 0 ? { x: s.sx / len, y: s.sy / len } : { x: 0, y: 0 },
+    deg: (tiltOf(plan, s.sx, s.sy) * 180) / Math.PI,
+    slipDeg: (Math.atan(lcfg.friction.body.static) * 180) / Math.PI,
+    fullDeg: (tiltOf(plan, fullSlope(lcfg, plan), 0) * 180) / Math.PI,
+    outline: { kind: 'stage', normals: plan.normals },
+    next: s.op.phase === 'warn' ? s.op.next : -1,
+    open: openSide(s, lcfg),
   }
 }
 

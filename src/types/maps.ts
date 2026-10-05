@@ -353,6 +353,63 @@ export interface ShipConfig {
   }
 }
 /**
+ * 梦幻乐园：童话游乐园正中一座正多边形的摇摆台，四周贴着两圈正多边形的传送带。台面是一整块硬板，正中架在支点上，平着时比传送带高出支点那么高；
+ * 看不见的操作员隔一阵随机挑一条边，先预警，再让台子往那边倾，倾到那条边贴着传送带为止，对边翘到两倍高；贴平了那条边围栏上的入口才打开，离开前先关上。
+ * 入口关着或高度没接平，台上台下谁都过不去。倾斜的台面上赶路按恒定功率上坡慢、下坡快，闲着的身体与金币按库仑摩擦顺坡滑。
+ * 内圈与外圈的传送带方向相反，每圈按边分段，隔一阵一齐换向。物理量按米、秒算，一格 meterPerU 米
+ */
+export interface DreamlandConfig {
+  readonly meterPerU: number
+  /** 台子与两圈传送带的边数：倾斜的方向是各边朝外的法线 */
+  readonly sides: number
+  /** 第一条边朝外的法线朝哪，度：0 朝右，往下转为正 */
+  readonly rotDeg: number
+  /** 台面、内圈外沿、外圈外沿的边心距，格 */
+  readonly stageU: number
+  readonly innerU: number
+  readonly outerU: number
+  /** 支点离地多高，米 */
+  readonly pivotM: number
+  /** 台面一圈的围栏：多高（米），一条边两头立柱占的宽（格），中间是入口 */
+  readonly fence: {
+    readonly heightM: number
+    readonly postU: number
+  }
+  /** 操作员，毫秒：预警多久、倾过去多久、倾到底停多久（最短、最长）、回平多久、平着歇多久（最短、最长）；停完不回平、直接转去下一条边的概率 */
+  readonly operator: {
+    readonly warnMs: number
+    readonly tiltMs: number
+    readonly holdMs: readonly [number, number]
+    readonly levelMs: number
+    readonly restMs: readonly [number, number]
+    readonly direct: number
+  }
+  /** 入口，毫秒：贴平后隔多久开、离开前多久关，开关一次要多久 */
+  readonly gate: {
+    readonly openMs: number
+    readonly closeMs: number
+    readonly swingMs: number
+  }
+  /** 传送带：速度（格/秒）；隔多久换一次向（毫秒，最短、最长），换向前预警多久、换向时停下再反转用多久 */
+  readonly belt: {
+    readonly speedU: number
+    readonly flipMs: readonly [number, number]
+    readonly warnMs: number
+    readonly turnMs: number
+  }
+  /** 台面上身体脚下、金币的静与动摩擦系数 */
+  readonly friction: {
+    readonly body: Friction
+    readonly coin: Friction
+  }
+  /** 台面上赶路按恒定功率 P = m·v·(c − g∥)：c 是平地上的阻力（米/秒²），下坡最多快到 downhillMax 倍；每格的费力按 1 − g∥/c，最少 effortMin */
+  readonly gait: {
+    readonly flatResistance: number
+    readonly downhillMax: number
+    readonly effortMin: number
+  }
+}
+/**
  * 浮冰：南极海上一块近似方形的浮冰，形状按断裂、碰撞的成因每局随机生成；冰面没有边，滑出冰缘就掉进冰点附近的海水里。
  * 冰面上的一切按库仑摩擦走、滑、停，积雪、老冰、新冰的摩擦各不相同；海风一阵阵吹，风压超过脚下的摩擦就被吹着滑。
  * 物理量按米、千克、秒算，一格 meterPerU 米
@@ -1059,7 +1116,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit' | 'dreamland'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1088,6 +1145,7 @@ export interface MapDef {
   readonly meadow?: MeadowConfig
   readonly sakura?: SakuraConfig
   readonly circuit?: CircuitConfig
+  readonly dreamland?: DreamlandConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

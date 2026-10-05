@@ -42,4 +42,9 @@ export const SFX = {
   surge: { wave: 'sawtooth', freq: 120, freqEnd: 360, duration: 0.3, volume: 0.1, attack: 0.02, decayPow: 1, throttleMs: 300, jitter: 0.08 },
   relay: { wave: 'square', freq: 1800, freqEnd: 900, duration: 0.035, volume: 0.1, steps: [1, 0.55], throttleMs: 150 },
   shock: { wave: 'sawtooth', freq: 2600, freqEnd: 900, duration: 0.09, volume: 0.09, steps: [1, 0.6, 1.15, 0.5], throttleMs: 200, jitter: 0.15 },
+  // 梦幻乐园：操作员预警的叮咚铃、台子动起来的电机、入口开关的咔嗒、传送带换向前的蜂鸣
+  chime: { wave: 'sine', freq: 1568, duration: 0.62, volume: 0.17, attack: 0.003, decayPow: 1.5, steps: [1, 1.26, 1, 1.26], throttleMs: 600 },
+  whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
+  clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
+  buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
 } as const satisfies Record<string, SfxDef>

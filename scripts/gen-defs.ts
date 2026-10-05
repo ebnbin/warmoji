@@ -41,6 +41,7 @@ import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
+import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -464,6 +465,40 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.nets.length <= NET_SLOTS, `${where} 的带电网络太多，编不进电流着色器`)
     need(plan.gaps.length >= arc.count[0] && plan.gaps.length <= arc.count[1], `${where} 的电弧处数不在范围里`)
   }
+}
+
+/**
+ * 梦幻乐园：台面、内圈、外圈由里往外，外圈放得进安全区，出发的台面正中四周空得开；两圈传送带与台沿的入口都过得去最大的身体；
+ * 倾到底时闲着的身体滑得起来、又不陡得站不住；入口关严之后台子才动，最短的一次停留也等得到入口开足；传送带慢过最慢的队员，逆着也走得动
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'dreamland') === (m.dreamland !== undefined), `maps.${id} 是梦幻乐园当且仅当写了 dreamland`)
+  const c = m.dreamland
+  if (!c) continue
+  const at = `maps.${id}.dreamland`
+  const { fence, operator: o, gate, belt, friction: f, gait } = c
+  const range = (v: readonly [number, number], min: number): boolean => v[0] >= min && v[0] <= v[1]
+  need(c.meterPerU > 0 && Number.isInteger(c.sides) && c.sides >= 3 && Number.isFinite(c.rotDeg), `${at} 的米每格须为正，边数是不小于 3 的整数`)
+  need(c.stageU > 0 && c.innerU > c.stageU && c.outerU > c.innerU && c.pivotM > 0, `${at} 的台面、内圈、外圈须由里往外，支点高须为正`)
+  need(c.stageU * Math.cos(Math.PI / c.sides) >= SPAWN_CLEAR_U + fence.postU, `${at}.stageU 的台面正中离台沿不到 ${SPAWN_CLEAR_U} 格`)
+  const plan = dreamlandPlan(c)
+  const reach = Math.max(...cornersOf(plan, plan.outer).flatMap((p) => [Math.abs(p.x - plan.cx), Math.abs(p.y - plan.cy)])) / UNIT
+  need(reach <= FRAME_U / 2 - SAFE_U, `${at}.outerU 的外圈伸出中心 ${+reach.toFixed(2)} 格，放不进安全区`)
+  const body = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ENEMIES[m.boss].radius, ...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0))
+  need(c.innerU - c.stageU >= 2 * body && c.outerU - c.innerU >= 2 * body, `${at} 的两圈传送带须走得过最大的身体（半径 ${body} 格）`)
+  need(fence.heightM > 0 && fence.postU > 0 && plan.door / UNIT >= 1.5 * body, `${at}.fence 的高与立柱须为正，入口须过得去最大的身体`)
+  const tilt = Math.atan(c.pivotM / (c.stageU * c.meterPerU))
+  const deg = (r: number): string => `${+((r * 180) / Math.PI).toFixed(1)}°`
+  need(Math.tan(tilt) > f.body.static && Math.tan(tilt) > f.coin.static, `${at} 倾到底只有 ${deg(tilt)}，闲着的身体与金币滑不起来`)
+  need(tilt <= Math.PI / 6, `${at} 倾到底有 ${deg(tilt)}，陡得站不住`)
+  need(o.warnMs > 0 && o.tiltMs > 0 && o.levelMs > 0 && range(o.holdMs, 0) && o.holdMs[0] > 0 && range(o.restMs, 0) && o.direct >= 0 && o.direct <= 1, `${at}.operator 的时长须为正、范围从小到大，直接转向的概率在 [0, 1] 内`)
+  need(gate.openMs >= 0 && gate.swingMs > 0 && gate.closeMs >= gate.swingMs, `${at}.gate 离开前提早关的时间须够关上一次门：台子动之前门已关严`)
+  need(o.holdMs[0] > gate.openMs + gate.swingMs + gate.closeMs, `${at}.operator.holdMs 最短的一次停留须等得到入口开足`)
+  need(belt.speedU > 0 && belt.warnMs >= 0 && belt.turnMs > 0 && range(belt.flipMs, 0) && belt.flipMs[0] > belt.warnMs + belt.turnMs, `${at}.belt 的速度与换向的时长须为正，两次换向之间放得下预警与换向`)
+  const slowest = Math.min(...Object.values<CharacterAuthoring>(CHARACTERS).map((ch) => ch.stats.moveSpeed))
+  need(belt.speedU < slowest, `${at}.belt.speedU 须慢过最慢的队员（${slowest} 格/秒），逆着传送带也走得动`)
+  need(f.body.static >= f.body.kinetic && f.body.kinetic > 0 && f.coin.static >= f.coin.kinetic && f.coin.kinetic > 0, `${at}.friction 的静摩擦须不小于动摩擦、动摩擦为正`)
+  need(gait.flatResistance > 0 && gait.downhillMax >= 1 && gait.effortMin > 0 && gait.effortMin <= 1, `${at}.gait 的平地阻力须为正、下坡倍率不小于 1、最少的费力在 (0, 1] 内`)
 }
 
 /**

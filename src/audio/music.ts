@@ -964,6 +964,51 @@ function buildCircuit(): BgmScore {
   )
 }
 
+/** 梦幻乐园：旋转木马的圆舞曲，大调三拍子；低音只踩每小节头一下，方波的和弦在二三拍上“嚓嚓”，汽笛风琴似的方波领奏，钟琴在乐句开头叮一声，回声短短的 */
+function buildDreamland(): BgmScore {
+  const chords = [0, 0, 4, 4, 3, 3, 0, 4, 0, 0, 4, 4, 3, 4, 0, 0]
+  return track(
+    {
+      bpm: 168,
+      stepsPerBeat: 1,
+      stepsPerBar: 3,
+      bars: 16,
+      rootMidi: 60,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 168) * 1.5, feedback: 0.22, level: 0.16 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.15, attack: 0.008, release: 0.08, octave: -2 }
+      const chord: Voice = { wave: 'square', vol: 0.03, attack: 0.008, release: 0.05, octave: 0 }
+      const organ: Voice = { wave: 'square', vol: 0.062, attack: 0.012, release: 0.09, octave: 1 }
+      const bell: Voice = { wave: 'sine', vol: 0.06, attack: 0.002, release: 0.45, octave: 2, echo: true }
+      b.bass(bass, chords, 'r..')
+      for (let bar = 0; bar < chords.length; bar++) for (const step of [1, 2]) for (const tone of [2, 4]) b.note(chord, bar, step, chords[bar]! + tone, 1)
+      b.line(organ, [
+        [0, 0, 4, 2], [0, 2, 2, 1],
+        [1, 0, 4, 1], [1, 1, 7, 2],
+        [2, 0, 6, 2], [2, 2, 5, 1],
+        [3, 0, 4, 3],
+        [4, 0, 5, 2], [4, 2, 3, 1],
+        [5, 0, 5, 1], [5, 1, 8, 2],
+        [6, 0, 7, 2], [6, 2, 6, 1],
+        [7, 0, 4, 3],
+        [8, 0, 4, 2], [8, 2, 2, 1],
+        [9, 0, 4, 1], [9, 1, 9, 2],
+        [10, 0, 8, 2], [10, 2, 7, 1],
+        [11, 0, 6, 3],
+        [12, 0, 5, 1], [12, 1, 7, 1], [12, 2, 9, 1],
+        [13, 0, 8, 2], [13, 2, 6, 1],
+        [14, 0, 7, 3],
+        [15, 0, 4, 1], [15, 1, 2, 1], [15, 2, 0, 1],
+      ])
+      b.line(bell, [[0, 0, 7, 3], [4, 0, 8, 3], [8, 0, 7, 3], [12, 0, 9, 3]])
+      b.drums('kick', 'x..', 0, 16, 0.12)
+      b.drums('hat', '.oo', 4, 16, 0.024)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -985,6 +1030,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   sakura: buildSakura,
   desert: buildDunes,
   circuit: buildCircuit,
+  dreamland: buildDreamland,
 }
 
 const cache = new Map<BgmId, BgmScore>()

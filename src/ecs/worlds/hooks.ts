@@ -46,6 +46,7 @@ import type { SakuraState } from '../../maps/sakura/world'
 import type { CircuitState } from '../../maps/circuit/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
+import type { DreamlandWorld } from '../../maps/dreamland/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -98,11 +99,12 @@ export interface WorldState {
   meadow: MeadowState | null
   sakura: SakuraState | null
   circuit: CircuitState | null
+  dreamland: DreamlandWorld | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, dreamland: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -125,6 +127,8 @@ export interface WorldHooks {
   contact(sim: Sim, eid: number, dt: number, x: number, y: number, vx: number, vy: number, out: BodyStep): boolean
   /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
+  /** 跟随中的身体从 from 被拉到 next 时的位置修正；不写就照拉，隔着障碍也贴到宿主身上 */
+  follow?(sim: Sim, eid: number, from: Point, next: Point): Point
   /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
   /** 能站的地面：出怪口沿它的外边界摆，翻进从它外面起跳；默认是 basin，冰面外是海、空腔外是软壳层这类没有硬墙的地图另给 */

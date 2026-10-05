@@ -167,6 +167,18 @@ const CIRCUIT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const DREAMLAND_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'ghost', sinceWave: 1, base: 14, perWave: 0.8, min: 10, max: 28 },
+  { kind: 'skeleton', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'raccoon', sinceWave: 2, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'mushroom', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'knight', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1032,5 +1044,57 @@ export const MAPS = {
       button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], holdMs: 3200, rearmMs: 4800 },
     },
     boss: 'mecha',
+  },
+  dreamland: {
+    emoji: '1f3a0',
+    name: '梦幻乐园',
+    desc: '一座糖果色的童话游乐园。正中一座八角形的摇摆台，台面比四周高，四周贴着两圈传送带。看不见的操作员隔一阵随机挑一条边，响铃、亮灯预警后让台子往那边倾，倾到那条边贴着传送带为止，对边翘得更高；贴平了那条边围栏上的入口才打开，其余时候台上台下谁都过不去。台面一倾，往高处走吃力变慢、往低处走更快，站着不动会顺坡滑下去，金币也跟着溜。内圈与外圈的传送带方向相反，隔一阵一齐换向——下了台，可能被带到入口够不着的地方',
+    kind: 'dreamland',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(330 78% 84%)',
+      bgTo: 'hsl(282 52% 58%)',
+      map: hslToInt(335, 0.82, 0.86),
+      shadow: 0x000000,
+    },
+    light: { sun: 0xfffaf6, shade: 0xd8c2dc, shadow: { color: 0x5b2346, alpha: 0.32, length: 0.75 } },
+    decor: {
+      emojis: ['1f36c'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: DREAMLAND_MIX,
+    // 城堡里的从城堡大门走出来、游客打扮的从乐园大门走进来、翻过围栏的、从传送带转角的检修口钻出来的；会飞的抓着气球从天上落下来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'castle',
+      kinds: {
+        castle: { name: '城堡大门', at: { kind: 'mark' }, enter: 'walk', look: 'puff', snapU: 6, weight: 2, perSec: 1, only: ['skeleton', 'gargoyle', 'knight', 'ghost', 'eclipse'] },
+        entry: { name: '乐园大门', at: { kind: 'mark' }, enter: 'walk', look: 'puff', snapU: 6, weight: 3, perSec: 1.5, only: ['zombie', 'raccoon', 'mushroom', 'creeper', 'knight'] },
+        fence: { name: '围栏', at: { kind: 'rim', segU: 3, away: { mark: 'entry', minU: 2.5 } }, enter: 'climb', look: 'petals', weight: 3, perSec: 1.5, only: ['zombie', 'skeleton', 'raccoon', 'creeper', 'mushroom'] },
+        hatch: { name: '检修口', at: { kind: 'mark' }, enter: 'rise', look: 'steam', snapU: 4, weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'raccoon', 'creeper'] },
+        balloon: { name: '气球', at: { kind: 'ground' }, enter: 'drop', look: 'glow', weight: 1, only: ['ghost', 'siren', 'gargoyle'] },
+      },
+    },
+    finalWaveSub: '城堡里的夜伯爵走进了乐园——台子往哪边倒，他就从哪边上来！',
+    dreamland: {
+      meterPerU: 0.45,
+      sides: 8,
+      rotDeg: 0,
+      stageU: 9,
+      innerU: 12,
+      outerU: 15,
+      pivotM: 1.1,
+      fence: { heightM: 1.05, postU: 0.4 },
+      operator: { warnMs: 1800, tiltMs: 1600, holdMs: [5200, 7600], levelMs: 1400, restMs: [0, 2600], direct: 0.5 },
+      gate: { openMs: 250, closeMs: 900, swingMs: 450 },
+      belt: { speedU: 1.5, flipMs: [9000, 15000], warnMs: 1600, turnMs: 1300 },
+      friction: { body: { static: 0.17, kinetic: 0.13 }, coin: { static: 0.1, kinetic: 0.07 } },
+      gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
+    },
+    boss: 'eclipse',
   },
 } as const satisfies Record<string, MapDef>

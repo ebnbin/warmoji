@@ -55,7 +55,7 @@ function stepTransit(sim: Sim, eid: number, dt: number): void {
   transitFlash(sim, eid, to.x, to.y, true)
 }
 
-/** 跟随：先从原处被拉到宿主的偏移处，再贴着走，宿主没了或到时就松开 */
+/** 跟随：先从原处被拉到宿主的偏移处，再贴着走，地图挡着的停在挡住的地方；宿主没了或到时就松开 */
 function stepFollow(sim: Sim, eid: number, dt: number): void {
   Motion.t[eid] = Motion.t[eid]! + dt * 1000
   const host = Motion.ref[eid]!
@@ -67,7 +67,8 @@ function stepFollow(sim: Sim, eid: number, dt: number): void {
   const fy = Motion.fy[eid]!
   const d = sim.hooks.worldDelta(sim, fx, fy, Transform.x[host]! + Motion.tx[eid]!, Transform.y[host]! + Motion.ty[eid]!)
   const p = sineEaseInOut(Math.min(1, Motion.t[eid]! / FOLLOW_IN_MS))
-  const to = sim.hooks.wrap(sim, fx + d.x * p, fy + d.y * p)
+  const next = sim.hooks.wrap(sim, fx + d.x * p, fy + d.y * p)
+  const to = sim.hooks.follow ? sim.hooks.follow(sim, eid, { x: Transform.x[eid]!, y: Transform.y[eid]! }, next) : next
   Transform.x[eid] = to.x
   Transform.y[eid] = to.y
   Phys.vx[eid] = Phys.vx[host]!

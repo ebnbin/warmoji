@@ -26,5 +26,11 @@ export const OBSTACLES = {
     landmark: { name: '标志物', phase: true, opaque: false, pierce: 0, strength: null },
     // 技能立的墙：看得穿，挡身体与弹体按它自己的规则
     barrier: { name: '技能墙', phase: true, opaque: false, pierce: null, strength: null },
+    // 梦幻乐园的摇摆台：台身连着台面，谁也穿不过去
+    stage: { name: '摇摆台', phase: false, opaque: true, pierce: null, strength: null },
+    // 梦幻乐园的传送带：低过它的弹体落在带面上
+    belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
+    // 梦幻乐园四周的布景
+    scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning
