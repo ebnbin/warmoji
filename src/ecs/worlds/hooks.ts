@@ -43,9 +43,11 @@ import type { Solid } from './solids'
 import type { ObstacleId } from '../../types/obstacles'
 import type { MeadowState } from '../../maps/meadow/world'
 import type { SakuraState } from '../../maps/sakura/world'
+import type { MapleState } from '../../maps/maple/world'
 import type { CircuitState } from '../../maps/circuit/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
+import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
@@ -98,16 +100,25 @@ export interface WorldState {
   desert: DesertState | null
   meadow: MeadowState | null
   sakura: SakuraState | null
+  maple: MapleState | null
   circuit: CircuitState | null
+  nexus: NexusState | null
   deep: DeepState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, circuit: null, deep: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
+
+/** 穿过一扇传送门：在这一段路上走到 t（0 到 1）时越过门线，剩下的路连同终点平移 (dx, dy) 像素到另一扇门那边，速度不变 */
+export interface PortalHop {
+  readonly t: number
+  readonly dx: number
+  readonly dy: number
+}
 
 export interface WorldHooks {
   readonly torus: boolean
@@ -159,8 +170,14 @@ export interface WorldHooks {
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
   /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（船是倾角的度数，浮冰是风速）；不偏为零 */
   lean(sim: Sim): Point
-  /** 队员在队长 from 身后的坑位 at 落在会伤人的地方时挪开；不写就不挪 */
+  /** 队员在队长 from 身后的坑位 at 落在不该站的地方（会伤人、贴着或隔着传送门）时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
+  /** 沿直线从 a 走到 b（像素）先穿过的那扇传送门；eid 不为 −1 时是这个实体此刻真的穿了过去。没有传送门的地图不写 */
+  portal?(sim: Sim, eid: number, ax: number, ay: number, bx: number, by: number): PortalHop | null
+  /** 从 a 飞向 b（像素）最近的直路：直着飞，或先穿过一扇传送门再飞；返回这一路起头朝哪、多长的位移。没有传送门的地图不写，按 worldDelta */
+  towards?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point
+  /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */
+  toLeader?(sim: Sim, x: number, y: number): number
   /** 这个身体此刻每秒换多少口气，按体力点数：正的是喘得上气，走着也按它补；负的是憋着气，按它往下掉，歇着也回不来；不写就照常 */
   breath?(sim: Sim, eid: number): number
   /** 这张图要队伍盯住的一处：在屏幕外时队长身边画一个指过去的箭头；不写就没有 */

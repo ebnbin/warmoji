@@ -169,7 +169,7 @@ function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void 
   tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(color, 0.95 * a))
 }
 
-/** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚；冷却中一起淡下去，也随队长显隐 */
+/** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚，穿过传送门的地方断开；冷却中一起淡下去，也随队长显隐 */
 function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const lead = sim.leader
   const root = sim.skills[sim.characters.indexOf(lead)]
@@ -192,6 +192,7 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   if (!pts) return
   const n = pts.length / 2
   for (let i = 1; i < n; i++) {
+    if (Number.isNaN(pts[i * 2 - 2]!) || Number.isNaN(pts[i * 2]!)) continue
     const a = (TRAIL_ALPHA_OLD + ((TRAIL_ALPHA_NEW - TRAIL_ALPHA_OLD) * i) / (n - 1)) * dim
     segment(trail, WORLD, pts[i * 2 - 2]!, pts[i * 2 - 1]!, pts[i * 2]!, pts[i * 2 + 1]!, TRAIL_WIDTH, packTint(ECHO_COLOR, a))
   }

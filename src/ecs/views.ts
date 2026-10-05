@@ -10,7 +10,7 @@ import type { EcsAtlas } from './atlas'
 import type { EcsWorld } from './world'
 import type { MapDef, TorusConfig } from '../types/maps'
 import type { Point } from '../util/vec'
-import type { LocalLight, PaintSprite } from './render/sprites'
+import type { LocalLight, PaintSprite, SpriteCut } from './render/sprites'
 import type { RunState } from '../run/state'
 import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
@@ -68,6 +68,8 @@ export interface MapView {
   step(v: ViewCtx, sim: Sim, delta: number): void
   /** 新画风下 (x, y) 处的单位受的光：out 里先填着太阳，地图可以换掉主光的方向、加一层补光 */
   lightAt?(x: number, y: number, out: LocalLight): void
+  /** 身体在地上的 (x, y)、精灵半宽半高 hw×hh：要切成几份画（正穿过传送门的一份在门这边、一份在门那边），写进 out 返回份数，0 是整张画 */
+  cutAt?(x: number, y: number, hw: number, hh: number, out: SpriteCut[]): number
   resize(v: ViewCtx): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void

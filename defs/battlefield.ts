@@ -24,6 +24,13 @@ const RUINS_EVENTS = [
 
 export const BATTLEFIELD = {
   pools: {
+    nexus: [
+      { id: 'nexus_overclock', emoji: '1f4bb', name: '算力全开', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'nexus_lock', emoji: '1f3af', name: '全息锁定', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'nexus_field', emoji: '1f9f2', name: '力场束缚', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'nexus_lag', emoji: '1f4f6', name: '信号延迟', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'nexus_noise', emoji: '1f4fa', name: '信号干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
     circuit: [
       { id: 'circuit_overclock', emoji: '26a1', name: '超频运行', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
       { id: 'circuit_boost', emoji: '1f50b', name: '升压供电', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
@@ -48,6 +55,7 @@ export const BATTLEFIELD = {
     desert: DESERT_EVENTS,
     oldRiver: RIVER_EVENTS,
     sakura: RIVER_EVENTS,
+    maple: RIVER_EVENTS,
     void: [
       { id: 'factory_grind', emoji: '2699', name: '齿轮咬滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
       { id: 'factory_turbo', emoji: '26a1', name: '涡轮增压', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },

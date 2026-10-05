@@ -46,4 +46,7 @@ export const SFX = {
   bubble: { wave: 'sine', freq: 260, freqEnd: 760, duration: 0.55, volume: 0.22, attack: 0.004, decayPow: 1.1, steps: [1, 0.72, 1.18, 0.8, 1.32, 0.9, 1.5], throttleMs: 300, jitter: 0.15 },
   gurgle: { wave: 'noise', freq: 900, freqEnd: 260, duration: 0.7, volume: 0.32, attack: 0.01, decayPow: 1.2, steps: [1, 0.45, 1.2, 0.5, 1.1, 0.4, 1, 0.5], throttleMs: 900, jitter: 0.2 },
   sonar: { wave: 'sine', freq: 1180, freqEnd: 1150, duration: 1.8, volume: 0.18, attack: 0.003, decayPow: 2.6, throttleMs: 1500 },
+  warp: { wave: 'sine', freq: 520, freqEnd: 1650, duration: 0.16, volume: 0.16, attack: 0.005, decayPow: 1.3, throttleMs: 90, jitter: 0.1 },
+  glitch: { wave: 'noise', freq: 4200, freqEnd: 1200, duration: 0.5, volume: 0.13, attack: 0.005, decayPow: 0.9, steps: [1, 0.3, 1.2, 0.2, 0.9, 0.4, 1.1, 0.25], throttleMs: 600, jitter: 0.2 },
+  print: { wave: 'square', freq: 660, duration: 0.3, volume: 0.1, steps: [1, 1.5, 2], throttleMs: 300 },
 } as const satisfies Record<string, SfxDef>
