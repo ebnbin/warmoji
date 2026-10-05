@@ -408,14 +408,14 @@ function fenceShadow(f: Fence, stakes: readonly number[], base: number, heightM:
 
 /** 落了几天的叶子：锈红、红褐、枯褐 */
 const OLD = [
-  [178, 80, 46],
-  [146, 74, 48],
-  [158, 108, 68],
+  [184, 88, 48],
+  [162, 90, 54],
+  [166, 116, 72],
 ] as const
-/** 落叶铺厚了，底下透出来的那层：半烂的叶子，暗暗的红褐 */
-const MULCH = [146, 70, 46] as const
+/** 落叶铺厚了，底下透出来的那层：半烂的叶子，红褐里带橙 */
+const MULCH = [164, 86, 50] as const
 /** 落在地上的叶子干了、沾了土，比树上的暗这么多 */
-const FALLEN = 0.9
+const FALLEN = 0.94
 /** 地上的一片落叶边缘柔和多宽（格）：半个像素 */
 const LITTER_AA_U = 0.6 / GROUND_PPU
 
@@ -471,7 +471,7 @@ function litterAt(x: number, y: number, scale: number, seed: number, dens: numbe
   if (top < 0) return 0
   const pick = hash2(hx, hy, seed + 7)
   const pal = owner >= 0 && pick < 0.78 ? palettes[owner]! : Math.floor(hash2(hx, hy, seed + 8) * 4)
-  leafColor(pal, 0.25 + 0.75 * hash2(hx, hy, seed + 9), LIT)
+  leafColor(pal, 0.15 + 0.75 * hash2(hx, hy, seed + 9), LIT)
   const age = hash2(hx, hy, seed + 10)
   if (age > 0.5) {
     const o = OLD[Math.floor(hash2(hx, hy, seed + 11) * OLD.length)]!
