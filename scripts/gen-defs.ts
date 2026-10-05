@@ -41,6 +41,7 @@ import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
+import { deepPlan } from '../src/maps/deep/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -378,6 +379,70 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     need(plan.gate.index >= 0 && plan.posts.length >= 4, `${where} 的栅栏没有门或太短`)
     need(plan.trees.length > 0 && plan.sheep.length >= Math.min(1, g.sheep[1]), `${where} 的林子里没有树或栅栏外没有羊`)
+  }
+}
+
+/**
+ * 深海：参数说得通；头骨挡得住标准身体、大石头比标准身体矮的子弹飞得过去；钟口底下那一圈装得下队长和跟在身后的队员，
+ * 喘上气补得比憋气掉得快，满满一口气撑得过钟挪一次窝的两倍时间，钟挪完一次窝才到下一次；
+ * 抽一批种子真的生成一遍：每张都生成得出来，开局站位离边够远，陡坎沿、岩堆脚、鲸骨与冷泉都有出怪的地标，钟从开局站位挪得出去
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'deep') === (m.deep !== undefined), `maps.${id} 是深海当且仅当写了 deep`)
+  const d = m.deep
+  if (!d) continue
+  const at = `maps.${id}.deep`
+  const span = (v: readonly [number, number]): boolean => v[0] <= v[1]
+  const pos = (v: readonly [number, number]): boolean => v[0] > 0 && span(v)
+  const ints = (v: readonly [number, number]): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && span(v)
+  const { floor, walls, rubble, lip, boulders, whale, seeps, bell } = d
+  const half = d.sizeU / 2 - SPAWN_CLEAR_U - 1
+  need(d.meterPerU > 0 && d.sizeU > 0 && d.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
+  need(d.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(pos(d.areaU2) && d.areaU2[1] < d.sizeU * d.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
+  need(floor.reliefM >= 0 && floor.waveU > 0 && floor.tiltM >= 0, `${at}.floor 的起伏与坡度不为负、波长为正`)
+  for (const [name, e] of [['walls', walls], ['rubble', rubble], ['lip', lip]] as const) {
+    need(pos(e.insetU) && e.bendU >= 0 && e.waveU > 0 && e.insetU[1] + e.bendU < half, `${at}.${name} 的边距、弯与波长须为正，边落在地图边与出生点四周的空地之间`)
+  }
+  need(pos(walls.heightM) && pos(walls.slopeU), `${at}.walls 的壁高与壁宽须为正的范围`)
+  need(pos(rubble.blockU) && pos(rubble.heightM) && rubble.slopeU > 0, `${at}.rubble 的石块、堆高与堆宽须为正`)
+  need(lip.dropM > 0, `${at}.lip.dropM 须为正：坎外是往下的坡`)
+  const B = OBSTACLES.body
+  const clearM = (B.heightM / B.layers) * Math.floor(B.layers * B.step)
+  need(ints(boulders.count) && pos(boulders.radiusU) && pos(boulders.heightM) && boulders.heightM[0] > clearM, `${at}.boulders 的个数须为非负整数、尺寸为正，最矮的也挡得住标准身体`)
+  need(boulders.clearU >= SPAWN_CLEAR_U && boulders.gapU > 2 * d.neckU && boulders.wallShare >= 0 && boulders.wallShare <= 1, `${at}.boulders 离出生点至少 ${SPAWN_CLEAR_U} 格、彼此隔得开窄缝，靠壁的占比在 [0, 1] 内`)
+  need(pos(whale.lengthM) && whale.clearU >= SPAWN_CLEAR_U && whale.skullM > clearM, `${at}.whale 的鲸长须为正，头骨离出生点至少 ${SPAWN_CLEAR_U} 格、高得挡住标准身体`)
+  need(ints(seeps.count) && seeps.count[0] >= 1 && pos(seeps.radiusU) && seeps.clearU >= SPAWN_CLEAR_U, `${at}.seeps 至少一处、半径为正，离出生点至少 ${SPAWN_CLEAR_U} 格`)
+  need(bell.radiusM > 0 && bell.hangM > 0 && bell.liftM > bell.hangM, `${at}.bell 的钟口半径、放下的高度须为正，吊起来更高`)
+  need(bell.hold > 0 && bell.breath > bell.hold && bell.drownSec > 0 && bell.tickMs > 0, `${at}.bell 憋气要掉气、换气补得比掉得快，呛水的时长与节拍为正`)
+  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(bell.radiusM / d.meterPerU >= squad, `${at}.bell 钟口那一圈只有 ${(bell.radiusM / d.meterPerU).toFixed(2)} 格，装不下跟在队长身后 ${squad.toFixed(2)} 格的队员`)
+  need(bell.roomU >= bell.radiusM / d.meterPerU && pos(bell.moveU) && bell.moveU[1] < d.sizeU, `${at}.bell 的落点离边须放得下那一圈，挪的距离须为正、比地图小`)
+  need(bell.firstMs > 0 && bell.jitterMs >= 0 && bell.warnMs > 0 && bell.hoistMs > 0 && bell.lowerMs > 0 && bell.speedMs > 0, `${at}.bell 挪窝的各段时长与速度须为正`)
+  const transitMs = bell.hoistMs + bell.lowerMs + ((bell.moveU[1] * d.meterPerU) / bell.speedMs) * 1000
+  need(bell.intervalMs - bell.jitterMs > bell.warnMs + transitMs, `${at}.bell 钟挪完一次窝前不该到下一次`)
+  need((STATS.maxStamina.base / bell.hold) * 1000 >= transitMs * 2, `${at}.bell 满满一口气撑 ${(STATS.maxStamina.base / bell.hold).toFixed(1)} 秒，撑不过钟挪一次窝的两倍时间`)
+  for (let s = 0; s < 24; s++) {
+    const where = `${at} 第 ${s} 个样本`
+    let plan: ReturnType<typeof deepPlan>
+    try {
+      plan = deepPlan(d, s * 7919 + 13)
+    } catch (e) {
+      need(false, `${where} 生成不出来：${(e as Error).message}`)
+      continue
+    }
+    const sx = plan.start.x * UNIT
+    const sy = plan.start.y * UNIT
+    need(roomAt(plan.basin, sx, sy) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
+    const mk = plan.marks
+    need(mk.abyss.length >= 3 && mk.rubble.length >= 2 && mk.bones.length >= 2 && mk.seep.length >= seeps.count[0], `${where} 的陡坎沿、岩堆脚、鲸骨或冷泉缺出怪的地标`)
+    let moves = 0
+    for (let k = 0; k < 64; k++) {
+      const a = (k / 64) * Math.PI * 2
+      const r = ((bell.moveU[0] + bell.moveU[1]) / 2) * UNIT
+      if (roomAt(plan.basin, sx + Math.cos(a) * r, sy + Math.sin(a) * r) >= bell.roomU * UNIT) moves++
+    }
+    need(moves >= 4, `${where} 的钟从开局站位挪不出去：挪窝的距离上几乎找不到放得下的地方`)
   }
 }
 

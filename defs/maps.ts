@@ -167,6 +167,18 @@ const CIRCUIT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const DEEP_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'puffer', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
+  { kind: 'blob', sinceWave: 2, base: 11, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'skeleton', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'crab', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'siren', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 6, perWave: 0.3, min: 0, max: 12 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1032,5 +1044,76 @@ export const MAPS = {
       button: { padU: 1, touchU: 0.55, plateU: [4.4, 5.6], reachU: [2.4, 3.6], holdMs: 3200, rearmMs: 4800 },
     },
     boss: 'mecha',
+  },
+  deep: {
+    emoji: '1fae7',
+    name: '深海',
+    desc: '大陆坡上一道海底峡谷的谷底，两三百米深，阳光照不下来，抬头只剩一丝极暗的蓝。两侧是陡峭的岩壁，上游一头是塌下来的岩堆，下游一头是往下没进黑暗的陡坎，都过不去；谷底铺着软泥，散着大石头，躺着一副鲸骨，还有冒泡的冷泉。队伍从一口潜水钟下来：钟吊在缆绳上悬在谷底上方，里面困着一团空气，钟上的灯照亮周围一圈。离开钟只能憋着气：气不会自己回来，歇着也一点点往下掉，赶路掉得更快；回到钟底下换口气，很快就补满。气见底了就呛水掉血。水面上的船隔一阵把钟吊起来、换个地方放下去：钟口先猛地冒出一大团气泡，钟吊着走的那一阵哪里都换不了气，钟的灯照着它要落下去的地方。海里的东西用不着换气',
+    kind: 'deep',
+    stamina: { exertion: 0.35, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(212 64% 22%)',
+      bgTo: 'hsl(224 72% 6%)',
+      map: hslToInt(214, 0.5, 0.22),
+      shadow: 0x000000,
+    },
+    // 没有太阳：光来自头顶那一丝蓝、钟上的探照灯和队员的头灯，迎着灯的一面泛白、背面沉进深蓝；没有接影子的光
+    light: { sun: 0xdbeaff, shade: 0x35507e },
+    decor: {
+      emojis: ['1fae7'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: DEEP_MIX,
+    // 石缝里游出来、从岩堆上爬下来、从陡坎下面浮上来、从鲸骨底下钻出来、冷泉里冒出来、从头顶的黑暗里沉下来、从软泥里钻出来；巨鳄从陡坎下面上来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'silt',
+      boss: 'abyss',
+      kinds: {
+        crack: { name: '石缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'ends', minU: 3 } }, enter: 'walk', look: 'silt', weight: 3, perSec: 1.5, only: ['zombie', 'skeleton', 'snake', 'crab', 'slime'] },
+        rubble: { name: '岩堆', at: { kind: 'mark' }, enter: 'climb', weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'crab'] },
+        abyss: { name: '陡坎下', at: { kind: 'mark' }, enter: 'climb', look: 'silt', weight: 3, perSec: 1.5, only: ['zombie', 'puffer', 'blob', 'siren', 'snake', 'croc'] },
+        bones: { name: '鲸骨', at: { kind: 'mark' }, enter: 'walk', look: 'silt', weight: 2, perSec: 1, only: ['slime', 'crab', 'blob', 'snake'] },
+        seep: { name: '冷泉', at: { kind: 'mark' }, enter: 'rise', look: 'bubbles', weight: 1.5, perSec: 1, only: ['blob', 'slime', 'puffer'] },
+        above: { name: '头顶', at: { kind: 'ground' }, enter: 'drop', look: 'silt', weight: 1, only: ['ghost', 'puffer', 'zombie'] },
+        ooze: { name: '软泥', at: { kind: 'ground' }, enter: 'rise', look: 'silt', weight: 1 },
+      },
+    },
+    finalWaveSub: '巨鳄从陡坎下面游上来了——别被它堵在离钟远的地方！',
+    deep: {
+      meterPerU: 0.5,
+      sizeU: 36,
+      areaU2: [520, 840],
+      neckU: 0.4,
+      floor: { reliefM: 0.18, waveU: 6, tiltM: 0.035 },
+      walls: { insetU: [3.8, 6.5], bendU: 1.8, waveU: 9, heightM: [9, 14], slopeU: [2.2, 3.4] },
+      rubble: { insetU: [3.2, 5.5], bendU: 1.4, waveU: 7, blockU: [0.5, 1.3], heightM: [3, 4.5], slopeU: 3 },
+      lip: { insetU: [3, 5], bendU: 1.5, waveU: 8, dropM: 1.2 },
+      boulders: { count: [6, 10], radiusU: [0.55, 1.5], heightM: [0.9, 2.6], clearU: 4.8, gapU: 2.2, wallShare: 0.4 },
+      whale: { lengthM: [7, 9], clearU: 6.5, skullM: 0.85 },
+      seeps: { count: [1, 2], radiusU: [1.1, 1.8], clearU: 5 },
+      bell: {
+        radiusM: 1.3,
+        hangM: 2,
+        liftM: 16,
+        breath: 48,
+        hold: 1.25,
+        drownSec: 12,
+        tickMs: 250,
+        firstMs: 60000,
+        intervalMs: 75000,
+        jitterMs: 10000,
+        warnMs: 5000,
+        hoistMs: 3500,
+        lowerMs: 3500,
+        speedMs: 1.6,
+        moveU: [10, 16],
+        roomU: 3,
+      },
+    },
+    boss: 'croc',
   },
 } as const satisfies Record<string, MapDef>

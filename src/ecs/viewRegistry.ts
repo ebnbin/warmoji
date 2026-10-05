@@ -12,6 +12,7 @@ import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
 import { ShipView } from '../maps/ship/view'
 import { VolcanoView } from '../maps/volcano/view'
+import { DeepView } from '../maps/deep/view'
 
 export function viewFor(mapId: MapId): MapView {
   return MAKE[MAPS[mapId].kind]()
@@ -36,4 +37,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   sakura: () => new SakuraView(),
   desert: () => new DesertView(),
   circuit: () => new CircuitView(),
+  deep: () => new DeepView(),
 }
