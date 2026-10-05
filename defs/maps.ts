@@ -826,6 +826,8 @@ export const MAPS = {
       map: hslToInt(330, 0.34, 0.16),
       shadow: 0x000000,
     },
+    // 没有太阳：主光是黑洞的吸积盘，迎着它的一面偏暖，背面偏冷偏暗；没有接影子的地面
+    light: { sun: 0xfff3e6, shade: 0x8f97b8 },
     decor: {
       emojis: ['2728'],
       sizeU: [0.3, 0.5],

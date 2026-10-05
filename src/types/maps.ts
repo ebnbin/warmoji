@@ -1041,7 +1041,8 @@ export interface GatesConfig {
   readonly kinds: Readonly<Record<string, GateKind>>
 }
 /**
- * 战场上的精灵在这张图上受的光与身体投的影，光从 data/light.ts 的太阳来：精灵迎光的一半乘 sun，过了中心往背光的一角渐渐乘到 shade；
+ * 战场上的精灵在这张图上受的光与身体投的影，主光是 data/light.ts 的太阳，地图的画面也可以按位置把它换成别的光源、再补一层局部的光：
+ * 精灵迎着主光的一半乘 sun，过了中心往背光的一角渐渐乘到 shade；
  * 影子是离地的东西的剪影顺着太阳的方位铺在地上，长度是精灵高度的 length 倍，整层按 alpha 叠上去；没有地面接影子的图不写 shadow
  */
 export interface UnitLight {

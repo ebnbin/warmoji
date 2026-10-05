@@ -7,8 +7,27 @@ import type { UnitLight } from '../../types/maps'
 import { AWAY } from '../../data/light'
 import { paintedEmojiOn } from '../../emoji/style'
 import { EcsLayer, LayerType } from './layer'
-import { packTint } from './tint'
+import { packTint, TINT_FILL } from './tint'
 export { SPRITE_BANDS } from './bands'
+
+/** 补光里不论朝向、整个身体都吃到的那一份 */
+const FILL_AMBIENT = 0.15
+
+/**
+ * 一个单位此刻受的光，由地图按它的位置写入：k、f 是画面上指向主光、补光的单位向量；
+ * 补光是在精灵上再叠一层 color 的剪影，朝着它的一角浓度是 fill，0 就是没有补光
+ */
+export interface LocalLight {
+  kx: number
+  ky: number
+  fx: number
+  fy: number
+  color: number
+  fill: number
+}
+
+/** 地图按位置给单位的光：可以把主光换个方向，也可以加一层补光 */
+export type LightAt = (x: number, y: number, out: LocalLight) => void
 
 /** 状态色乘上一个角受的光：t 从迎光的 0 到背光的 1，在 sun 与 shade 之间插 */
 function litTint(color: number, sun: number, shade: number, t: number, alpha: number): number {
@@ -47,10 +66,14 @@ export class EcsSpriteBatch extends EcsLayer {
   /** 按 z 从小到大排好 */
   private readonly paint: readonly PaintSprite[]
   private readonly light: UnitLight | undefined
+  private readonly lightAt: LightAt | undefined
   /** 这一帧打不打光：新画风随时能在设置里关掉 */
   private lit = false
+  private readonly local: LocalLight = { kx: 0, ky: 0, fx: 0, fy: 0, color: 0, fill: 0 }
+  /** 四个角按 TL、BL、TR、BR 的染色 */
+  private readonly tints = new Uint32Array(4)
 
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight | undefined) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight | undefined, lightAt: LightAt | undefined) {
     super(scene, LayerType.Sprite, depth)
     this.world = world
     this.atlas = atlas
@@ -58,6 +81,7 @@ export class EcsSpriteBatch extends EcsLayer {
     this.zMax = zMax
     this.paint = paint
     this.light = light
+    this.lightAt = lightAt
     scene.add.existing(this)
   }
 
@@ -139,15 +163,24 @@ export class EcsSpriteBatch extends EcsLayer {
     }
 
     const light = this.lit && effect === 0 ? this.light : undefined
-    // 背着太阳的方向转进精灵自己的坐标，按对角线的一半归一
+    const l = this.local
+    // 背光与补光的方向转进精灵自己的坐标，按对角线的一半归一
     let ax = 0
     let ay = 0
+    let fx = 0
+    let fy = 0
     if (light) {
+      l.kx = -AWAY.x
+      l.ky = -AWAY.y
+      l.fx = l.fy = l.fill = 0
+      this.lightAt?.(x, y, l)
       const c = Math.cos(rot)
       const s = Math.sin(rot)
       const r = Math.hypot(hw, hh) || 1
-      ax = (c * AWAY.x + s * AWAY.y) / r
-      ay = (c * AWAY.y - s * AWAY.x) / r
+      ax = -(c * l.kx + s * l.ky) / r
+      ay = -(c * l.ky - s * l.kx) / r
+      fx = (c * l.fx + s * l.fy) / r
+      fy = (c * l.fy - s * l.fx) / r
       // 四边形沿 TL–BR 剖成两个三角形：这条对角线顺着光时，几何与贴图一起左右镜像，换成横着光的那条，暗面才压得进背光的一角
       if (Math.abs(hw * ax + hh * ay) > Math.abs(hw * ax - hh * ay)) {
         hw = -hw
@@ -173,17 +206,20 @@ export class EcsSpriteBatch extends EcsLayer {
     }
     // 每个角偏离中心的那段投到背光方向上：迎光的一半保持 sun，过了中心才往背光的一角渐渐乘到 shade
     const { sun, shade } = light
-    node.batch(
-      drawingContext,
-      tex,
-      x0, y0, x1, y1, x2, y2, x3, y3,
-      u0, v0, u1 - u0, v1 - v0,
-      effect,
-      litTint(color, sun, shade, Math.max(0, -hw * ax - hh * ay), alpha),
-      litTint(color, sun, shade, Math.max(0, -hw * ax + hh * ay), alpha),
-      litTint(color, sun, shade, Math.max(0, hw * ax - hh * ay), alpha),
-      litTint(color, sun, shade, Math.max(0, hw * ax + hh * ay), alpha),
-      this.renderOptions,
-    )
+    const tints = this.tints
+    for (let i = 0; i < 4; i++) {
+      const cx = i < 2 ? -hw : hw
+      const cy = i % 2 === 0 ? -hh : hh
+      tints[i] = litTint(color, sun, shade, Math.max(0, cx * ax + cy * ay), alpha)
+    }
+    node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, effect, tints[0]!, tints[1]!, tints[2]!, tints[3]!, this.renderOptions)
+    if (l.fill * alpha * 255 < 1) return
+    // 补光：同一张剪影填成光的颜色叠上去，越朝着光的角越浓
+    for (let i = 0; i < 4; i++) {
+      const cx = i < 2 ? -hw : hw
+      const cy = i % 2 === 0 ? -hh : hh
+      tints[i] = packTint(l.color, alpha * l.fill * (FILL_AMBIENT + (1 - FILL_AMBIENT) * Math.max(0, cx * fx + cy * fy)))
+    }
+    node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, TINT_FILL, tints[0]!, tints[1]!, tints[2]!, tints[3]!, this.renderOptions)
   }
 }

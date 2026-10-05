@@ -9,15 +9,13 @@ import { AWAY } from '../../data/light'
 import { paintedEmojiOn } from '../../emoji/style'
 import { bottomAt, footY } from '../utils/ground'
 import { EcsLayer, LayerType } from './layer'
-import { packTint } from './tint'
+import { packTint, TINT_FILL } from './tint'
 
 /** 压在地面、水面与地上的 emoji 之上，所有身体之下 */
 const SHADOW_DEPTH = 2.5
 /** 影子上的一点每比地面高出一个精灵高，就淡掉这么多；再高也留这么一成 */
 const FADE_PER_H = 0.55
 const FADE_MIN = 0.25
-/** 精灵画在影子层里的样子：整块填成一种颜色 */
-const FILL = 1
 /** 身体：角色、敌人与召出来的东西 */
 const BODIES: QueryTerm[] = [Faction, Radius, Alive, ...RENDERABLE]
 /** 拿在手里的武器：影子接在持有者脚下 */
@@ -119,7 +117,7 @@ export class EcsShadowBatch extends EcsLayer {
       this.atlas.pageGlTexture(this.atlas.page(frame)),
       xy[0]!, xy[1]!, xy[2]!, xy[3]!, xy[4]!, xy[5]!, xy[6]!, xy[7]!,
       u0, v0, this.uv[2]! - u0, this.uv[3]! - v0,
-      FILL,
+      TINT_FILL,
       tints[0]!, tints[1]!, tints[2]!, tints[3]!,
       this.renderOptions,
     )

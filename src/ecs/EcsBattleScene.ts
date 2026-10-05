@@ -469,7 +469,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const paint = new Presentation()
     this.paint = paint
     const light = MAPS[run.mapId].light
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light)
+    const lightAt = this.map.lightAt?.bind(this.map)
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
     if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })

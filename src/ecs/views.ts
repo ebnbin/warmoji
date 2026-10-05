@@ -10,6 +10,7 @@ import type { EcsAtlas } from './atlas'
 import type { EcsWorld } from './world'
 import type { MapDef, MapId } from '../types/maps'
 import type { Point } from '../util/vec'
+import type { LocalLight } from './render/spriteBatch'
 import type { RunState } from '../run/state'
 import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
@@ -43,7 +44,7 @@ import { NebulaPainter } from './render/nebulaPainter'
 import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES, nebulaHalfU, nebulaLayout } from './worlds/nebula'
 import type { NebulaState } from './worlds/nebula'
 import { SHADOW_RS, wallU } from '../data/nebula'
-import { edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING, windAt } from './worlds/floe'
+import { bilinear, edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING, windAt } from './worlds/floe'
 import type { FloeField, FloeState } from './worlds/floe'
 import { FLOE_PPU, floeFrame, floeHeights, LIGHT } from './render/floe'
 import type { FloeCanvas } from './render/floe'
@@ -102,6 +103,8 @@ export interface MapView {
   /** 要画很久的地图可以返回 Promise：画完之前战斗不开始 */
   onSimReady(v: ViewCtx, sim: Sim): void | Promise<void>
   step(v: ViewCtx, sim: Sim, delta: number): void
+  /** 新画风下 (x, y) 处的单位受的光：out 里先填着太阳，地图可以换掉主光的方向、加一层补光 */
+  lightAt?(x: number, y: number, out: LocalLight): void
   resize(v: ViewCtx): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void
@@ -907,6 +910,8 @@ const AUX_KEY = 'volcano-aux'
 const WIND = { x: 22, y: -9 }
 /** 火山弹往下落的重力加速度，米/秒² */
 const VOLCANO_GRAVITY = 9.81
+/** 熔岩映在身体上的补光：光色，最浓叠到多少；辉光场的值（喷发时按两倍算）到 span 时叠到最浓的六成多 */
+const LAVA_ON_BODY = { color: 0xffa45c, max: 0.55, span: 0.2 } as const
 
 interface Bomb {
   x: number
@@ -927,6 +932,11 @@ interface Splat {
   y: number
   r: number
   at: number
+}
+
+/** 熔岩的辉光场在 (x, y) 像素处的值 */
+function glowAt(f: VolcanoState['field'], glow: Float32Array, x: number, y: number): number {
+  return bilinear(glow, f.cols, f.rows, f.cell, f.x0, f.y0, x, y, 0)
 }
 
 /** 画好的一块地面的像素，和它在地面贴图上的左上角 */
@@ -963,7 +973,7 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
 class VolcanoView extends BoundedView {
   private painter?: GroundPainter
   private ground?: { tex: Phaser.Textures.CanvasTexture; ppc: number; seen: Float32Array; dirty: Uint8Array; busy: boolean }
-  private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array; shown: LavaShown }
+  private data?: { field: VolcanoState['field']; lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array; shown: LavaShown }
   private repaintAt = 0
   private readonly u = { time: 0, erupt: 0, warn: 0 }
   private plume?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -1024,6 +1034,7 @@ class VolcanoView extends BoundedView {
     const lava = canvasTexture(scene, LAVA_KEY, f.cols, f.rows)
     const aux = canvasTexture(scene, AUX_KEY, f.cols, f.rows)
     this.data = {
+      field: f,
       lava,
       aux,
       lavaImg: lava.getContext().createImageData(f.cols, f.rows),
@@ -1241,6 +1252,24 @@ class VolcanoView extends BoundedView {
     this.emitEmbers(f, cam, delta)
     this.ash?.setPosition(cam.midPoint.x, cam.midPoint.y)
     this.stepBombs(v, s, delta, now)
+  }
+
+  /** 熔岩把单位朝着它的一侧映亮：按脚下一带的辉光，朝辉光变强的方向打 */
+  lightAt(x: number, y: number, out: LocalLight): void {
+    const d = this.data
+    if (!d) return
+    const f = d.field
+    const k = LAVA_ON_BODY.max * (1 - Math.exp((-glowAt(f, d.glow, x, y) * (1 + this.u.erupt)) / LAVA_ON_BODY.span))
+    if (k <= 0) return
+    const gx = glowAt(f, d.glow, x + f.cell, y) - glowAt(f, d.glow, x - f.cell, y)
+    const gy = glowAt(f, d.glow, x, y + f.cell) - glowAt(f, d.glow, x, y - f.cell)
+    const g = Math.hypot(gx, gy)
+    if (g > 0) {
+      out.fx = gx / g
+      out.fy = gy / g
+    }
+    out.color = LAVA_ON_BODY.color
+    out.fill = k
   }
 
   /** 换阶段时改烟和灰的密度：发射频率一改就从头计时，所以只在这时改 */
@@ -1789,6 +1818,10 @@ const NEBULA_GLINT_KEY = 'nebula-glint'
 const NEBULA_HALO_KEY = 'nebula-halo'
 /** 光晕贴图的半径是阴影半径的几倍 */
 const HALO_EDGE = 4
+/** 吸积盘的光色：光晕与照在身体上的暖光 */
+const DISK_LIGHT = 0xffb27a
+/** 吸积盘照在身体上的暖光比照在星尘上的弱多少 */
+const DISK_ON_BODY = 0.6
 /** 开局最多几个线程分着画星云 */
 const NEBULA_THREADS = 4
 /** 着色器的曝光：光的强度乘它再按 1 − e^(−x) 压进画面 */
@@ -1830,6 +1863,11 @@ interface Stream {
   readonly spin: number
 }
 
+/** 吸积盘照到 dU 格外有多亮，lum 是黑洞此刻的光度；1 算照满 */
+function diskLight(lum: number, dU: number): number {
+  return (lum * 9) / (dU * dU + 4)
+}
+
 /**
  * 星云：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按透视、黑洞的引力透镜、吸积盘的光与光回波画出来；
  * 黑洞是一块阴影，外面一圈光子环和正对着看的吸积盘，周围那圈被弯过来的星云光就是走不出来的地方。
@@ -1838,6 +1876,8 @@ interface Stream {
  */
 class NebulaView extends BoundedView {
   private size?: { w: number; h: number; origin: Point }
+  /** 黑洞在哪、此刻多亮：单位按它受光 */
+  private hole?: { x: number; y: number; lum: number }
   private painter?: NebulaPainter
   private readonly u = {
     time: 0,
@@ -1961,7 +2001,7 @@ class NebulaView extends BoundedView {
     this.dustGfx = scene.add.graphics().setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
     this.streamGfx = scene.add.graphics().setDepth(29.5).setBlendMode(Phaser.BlendModes.ADD)
     this.tailGfx = scene.add.graphics().setDepth(33.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffb27a)
+    this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD).setTint(DISK_LIGHT)
     this.knot = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(33).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa860).setVisible(false)
     this.coma = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a4a).setVisible(false)
     this.core = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34.1).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff1d6).setVisible(false)
@@ -2052,11 +2092,26 @@ class NebulaView extends BoundedView {
     const cam = v.scene.cameras.main
     this.syncUniforms(s, cfg, now)
     const lum = luminosity(s, cfg, now)
+    this.hole = { x: s.layout.hx, y: s.layout.hy, lum }
     const shadow = SHADOW_RS * s.rs * UNIT
     if (this.halo) this.halo.setDisplaySize(shadow * HALO_EDGE * 2, shadow * HALO_EDGE * 2).setAlpha(Math.min(0.5, 0.1 * Math.sqrt(lum)))
     this.stepDust(s, cfg, cam, dt, lum)
     this.stepStreams(s, now)
     this.stepMeteor(v, s, cfg, now, lum)
+  }
+
+  /** 单位朝黑洞的一侧受吸积盘的暖光，背面偏冷：主光换成黑洞的方向，离得越近、黑洞越亮，暖光补得越多 */
+  lightAt(x: number, y: number, out: LocalLight): void {
+    const h = this.hole
+    if (!h) return
+    const dx = h.x - x
+    const dy = h.y - y
+    const d = Math.hypot(dx, dy)
+    if (d <= 0) return
+    out.kx = out.fx = dx / d
+    out.ky = out.fy = dy / d
+    out.color = DISK_LIGHT
+    out.fill = Math.min(1, diskLight(h.lum, d / UNIT)) * DISK_ON_BODY
   }
 
   /** 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。离黑洞或飞过的流星越近被照得越亮 */
@@ -2088,7 +2143,7 @@ class NebulaView extends BoundedView {
       }
       const dU = Math.hypot(p.x - L.hx, p.y - L.hy) / UNIT
       const dm = Math.hypot(p.x - mx, p.y - my) / UNIT
-      const light = Math.min(1, (lum * 9) / (dU * dU + 4) + (mw * 2) / (dm * dm + 1))
+      const light = Math.min(1, diskLight(lum, dU) + (mw * 2) / (dm * dm + 1))
       const sp = Math.hypot(p.vx, p.vy)
       const tail = Math.min(sp * 0.045, 1.6 * UNIT)
       const alpha = Math.min(0.85, 0.12 + 0.75 * light)
@@ -2260,6 +2315,7 @@ class NebulaView extends BoundedView {
     this.streamGfx = undefined
     this.tailGfx = undefined
     this.halo = undefined
+    this.hole = undefined
     this.knot = undefined
     this.core = undefined
     this.coma = undefined
