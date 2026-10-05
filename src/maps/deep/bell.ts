@@ -106,6 +106,17 @@ export function stepBell(b: Bell, d: DeepConfig, now: number, pick: (from: Point
   }
 }
 
+/** 钟的倒计时：放着时离吊走还有多久、快吊走时预兆还剩多久、吊着挪时离放下还有多久，毫秒；ratio 是这一段还剩的比例 */
+export function bellCountdown(b: Bell, d: DeepConfig, now: number): { phase: 'down' | 'warn' | 'away'; ratio: number; leftMs: number } {
+  const cfg = d.bell
+  const end = b.at + b.span
+  if (b.phase === 'down') return { phase: 'down', ratio: (b.next - now) / Math.max(1, b.next - b.at), leftMs: b.next - now }
+  if (b.phase === 'warn') return { phase: 'warn', ratio: (end - now) / b.span, leftMs: end - now }
+  const move = moveMs(d, b.fromX, b.fromY, b.toX, b.toY)
+  const left = end - now + (b.phase === 'hoist' ? move + cfg.lowerMs : b.phase === 'move' ? cfg.lowerMs : 0)
+  return { phase: 'away', ratio: left / (cfg.hoistMs + move + cfg.lowerMs), leftMs: left }
+}
+
 /** 钟此刻要落下去、或已经放着的地方，像素：吊着的时候是新落点 */
 export function bellTarget(b: Bell): Point {
   return breathable(b) ? { x: b.x, y: b.y } : { x: b.toX, y: b.toY }

@@ -44,7 +44,7 @@ const BELL_TALL_M = 2.4
 /** 钟画多大，占钟口底下喘得上气那一圈的比例：那一圈比钟口宽一点，气泡从钟口漫出来 */
 const BELL_SIZE = 0.62
 /** 探照灯与头灯的亮度（给着色器的量，与照到的距离平方相除）；头灯举多高（米） */
-const BELL_LAMP = 30
+const BELL_LAMP = 24
 const HEAD_LAMP = 1.6
 const HEAD_LAMP_M = 1.3
 /** 头顶照下来的那一丝蓝，三色 */

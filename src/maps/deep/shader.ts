@@ -75,7 +75,7 @@ void main ()
     vec3 fall = exp(-ATT * r);
     light += uBell.w * spot * max(dot(n, ld), 0.0) / (r * r + 0.4) * fall;
     float dh = length(l.xy);
-    haze += uBell.w * 0.0042 * exp(-ATT * (dh * 0.8 + 1.5)) / (dh * dh * 0.2 + 1.0);
+    haze += uBell.w * 0.0026 * exp(-ATT * (dh * 0.8 + 1.5)) / (dh * dh * 0.25 + 1.0);
   }
   for (int k = 0; k < ${MAX_LAMPS}; k++) {
     if (float(k) >= uLampCount) break;

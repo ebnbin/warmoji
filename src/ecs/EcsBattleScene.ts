@@ -76,9 +76,10 @@ import { callSquad, streamInterval } from './fight/spawns'
 import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseMs, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
+import { bellCountdown } from '../maps/deep/bell'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { BellSnapshot, ClockSnapshot, HudSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import type { AbilityDef } from '../types/abilityDefs'
@@ -604,6 +605,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       })),
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
+      bell: sim ? bellSnapshot(sim) : null,
     }
   }
 
@@ -1023,6 +1025,15 @@ function tiltSnapshot(sim: Sim): TiltSnapshot | null {
 }
 
 /** 溶洞里的一局：太阳与月亮此刻的时角、月相，以及离天黑（太阳落到时间放慢的那个高度）或天亮还有几秒 */
+/** 在深海打的一局：潜水钟的倒计时 */
+function bellSnapshot(sim: Sim): BellSnapshot | null {
+  const deep = sim.worldState.deep
+  const cfg = MAPS[sim.mapId].deep
+  if (!deep || !cfg) return null
+  const c = bellCountdown(deep.bell, cfg, sim.elapsedMs)
+  return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
 function clockSnapshot(sim: Sim): ClockSnapshot | null {
   const cave = sim.worldState.cave
   const cfg = MAPS[sim.mapId].cave
