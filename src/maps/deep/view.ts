@@ -132,8 +132,9 @@ export class DeepView extends BoundedView {
   private gurgleAt = 0
   private bubbleDebt = 0
   private seepDebt = 0
-  /** 这一帧钟的灯在哪、多亮：单位按它分明暗 */
-  private lit?: { x: number; y: number; power: number }
+  /** 这一帧钟的灯在哪、多亮：单位、气泡与海雪按它分明暗 */
+  private readonly lit = { x: 0, y: 0, power: 0 }
+  private ready = false
 
   layout(): { w: number; h: number; origin: Point } {
     return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
@@ -263,7 +264,10 @@ export class DeepView extends BoundedView {
     u.bell[1] = b.y
     u.bell[2] = floor + b.h - 0.2
     u.bell[3] = power
-    this.lit = { x: b.x, y: b.y, power: (power / BELL_LAMP) * (1 - smooth(cfg.bell.hangM + 2, cfg.bell.liftM, b.h) * 0.85) }
+    this.lit.x = b.x
+    this.lit.y = b.y
+    this.lit.power = (power / BELL_LAMP) * (1 - smooth(cfg.bell.hangM + 2, cfg.bell.liftM, b.h) * 0.85)
+    this.ready = true
     let n = 0
     for (const m of sim.characters) {
       if (!Alive.v[m] || n >= MAX_LAMPS) continue
@@ -357,7 +361,7 @@ export class DeepView extends BoundedView {
     halo
       .setPosition(rim.x, rim.y)
       .setScale((R * 3.2 * rim.k) / 64)
-      .setAlpha(0.22 * (this.lit?.power ?? 1) * (1 - high))
+      .setAlpha(0.22 * this.lit.power * (1 - high))
     cable.clear()
     const top = b.h + BELL_TALL_M
     let prev = at(top)
@@ -474,8 +478,8 @@ export class DeepView extends BoundedView {
   /** 气泡与海雪被灯照到多少：离钟的灯近的偏暖白，远的只剩一点深蓝 */
   private lightTint(x: number, y: number): number {
     const l = this.lit
-    const d = l ? Math.hypot(x - l.x, y - l.y) / UNIT : 99
-    const k = l ? clamp01(l.power * Math.exp(-(d * d) / 40)) : 0
+    const d = Math.hypot(x - l.x, y - l.y) / UNIT
+    const k = clamp01(l.power * Math.exp(-(d * d) / 40))
     const r = Math.round(60 + 195 * k)
     const g = Math.round(110 + 140 * k)
     const b = Math.round(170 + 85 * k)
@@ -536,7 +540,7 @@ export class DeepView extends BoundedView {
   /** 立着的身体迎着钟的灯那一面亮，离得越近明暗越分明，再补一层暖白；离灯远的四面一样，只吃头顶那一丝蓝 */
   lightAt(x: number, y: number, out: LocalLight): void {
     const l = this.lit
-    if (!l) return
+    if (!this.ready) return
     const dx = l.x - x
     const dy = l.y - y
     const d = Math.hypot(dx, dy)
@@ -568,7 +572,7 @@ export class DeepView extends BoundedView {
     this.ring = undefined
     this.glow = undefined
     this.relief = undefined
-    this.lit = undefined
+    this.ready = false
     for (const key of [ALBEDO_KEY, GEO_KEY, NORM_KEY, GLOW_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }

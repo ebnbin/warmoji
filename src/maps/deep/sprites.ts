@@ -1,5 +1,17 @@
 import { SUN } from '../../data/light'
 
+/** 圆角矩形的路径 */
+function rounded(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const k = Math.min(r, w / 2, h / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + k, y)
+  ctx.arcTo(x + w, y, x + w, y + h, k)
+  ctx.arcTo(x + w, y + h, x, y + h, k)
+  ctx.arcTo(x, y + h, x, y, k)
+  ctx.arcTo(x, y, x + w, y, k)
+  ctx.closePath()
+}
+
 /**
  * 从正上方看的潜水钟，边长 size 的方图，钟口的圈正好顶着图边：黄漆的钢壳，钟口一圈加厚的裙边，壳上一道接缝的箍与一圈螺栓；
  * 顶上吊缆的吊耳、一扇圆舱盖、两只绑在侧面的气瓶、两盏朝下照的灯的灯罩；漆面有磕碰与锈迹。高光按画面的太阳放
@@ -57,8 +69,7 @@ export function drawBell(ctx: CanvasRenderingContext2D, size: number): void {
     bg.addColorStop(0.35, '#7d9686')
     bg.addColorStop(1, '#2d3b33')
     ctx.fillStyle = bg
-    ctx.beginPath()
-    ctx.roundRect(bx - w / 2, by - h / 2, w, h, w / 2)
+    rounded(ctx, bx - w / 2, by - h / 2, w, h, w / 2)
     ctx.fill()
     ctx.fillStyle = 'rgba(20, 20, 20, 0.6)'
     ctx.fillRect(bx - w / 2, by - h * 0.18, w, size * 0.012)
@@ -69,12 +80,10 @@ export function drawBell(ctx: CanvasRenderingContext2D, size: number): void {
     const lxp = c + side * shell * 0.3
     const lyp = c - shell * 0.78
     ctx.fillStyle = '#1d1d1f'
-    ctx.beginPath()
-    ctx.roundRect(lxp - size * 0.05, lyp - size * 0.03, size * 0.1, size * 0.06, size * 0.015)
+    rounded(ctx, lxp - size * 0.05, lyp - size * 0.03, size * 0.1, size * 0.06, size * 0.015)
     ctx.fill()
     ctx.fillStyle = '#f4f8ff'
-    ctx.beginPath()
-    ctx.roundRect(lxp - size * 0.038, lyp - size * 0.018, size * 0.076, size * 0.036, size * 0.01)
+    rounded(ctx, lxp - size * 0.038, lyp - size * 0.018, size * 0.076, size * 0.036, size * 0.01)
     ctx.fill()
   }
   // 圆舱盖：偏在一边，带一根铰链
@@ -91,8 +100,7 @@ export function drawBell(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.fillRect(hx - shell * 0.04, hy - shell * 0.3, shell * 0.08, shell * 0.1)
   // 吊耳：正中一块钢板带一个环
   ctx.fillStyle = '#5b5f66'
-  ctx.beginPath()
-  ctx.roundRect(c - size * 0.035, c - size * 0.07, size * 0.07, size * 0.14, size * 0.02)
+  rounded(ctx, c - size * 0.035, c - size * 0.07, size * 0.07, size * 0.14, size * 0.02)
   ctx.fill()
   ctx.strokeStyle = '#2b2d31'
   ctx.lineWidth = size * 0.016
