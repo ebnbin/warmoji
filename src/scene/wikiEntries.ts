@@ -1,6 +1,8 @@
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
 import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
 import type { EnemyDef } from '../types/enemies'
+import type { Span } from '../types/obstacles'
+import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
@@ -44,8 +46,30 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   cave: '溶洞（部分露天；光照随真实的昼夜变化，看得清的范围随之涨落；入夜点起火把；怪物只从暗处出来；洞壁、石柱挡人挡子弹）',
   nebula: '星云（空心星云的空腔，没有太阳；黑洞的万有引力作用于一切，周围那圈弯过来的光大致就是走不出来的地方，掉进视界被吞掉·敌我通吃，吞下的东西让它长大；壳层的引力把一切拉回空腔；流星从壳层甩出横穿空腔，撞上就挨打）',
   nebulaOld: '旧星云（空心的星云；黑洞的万有引力作用于一切，越近越强，掉进视界被吞噬·敌我通吃；壳层的引力越往外越强，谁也出不去）',
-  desert: '沙漠（约 32×32、四边首尾相接的沙海，镜头跟着走看不到边；沙丘与标志物成对，分不清来没来过，标志物挡人不挡子弹；爬坡、松沙耗体力，背阴处回得快；走过留下印子，越累越深·敌我通吃，过一会儿就被风吹平）',
+  desert: '沙漠（约 32×32、四边首尾相接的沙海，镜头跟着走看不到边；沙丘与标志物成对，分不清来没来过，标志物挡人、矮的跨得过，石堆挡低处的子弹；爬坡、松沙耗体力，背阴处回得快；走过留下印子，越累越深·敌我通吃，过一会儿就被风吹平）',
   floe: '浮冰（南极海上一块近似方形的浮冰，每局形状不同；积雪踩得住、光冰与新冰打滑，滑出冰缘落进冰水冻伤·敌我通吃；阵风刮来时新冰上站不住）',
+}
+
+/** 多少层高合多少米 */
+function meters(layers: number): string {
+  return `${+(layers * LAYER_M).toFixed(1)} 米`
+}
+
+/** 身段跟标准身体不一样时的说明 */
+function spanLine([lo, hi]: Span): string | null {
+  const over = overOf(lo, hi)
+  const pass = over === overOf(...STANDARD) ? '' : over > 0 ? `；${meters(over)}以下的障碍${lo > 0 ? '从它底下过去' : '跨得过'}` : '；什么障碍都跨不过'
+  if (lo > 0) return `悬空：离地 ${meters(lo)}，脚不沾地——熔岩、触电、溪水与地上的毒池都碰不到它${pass}`
+  if (hi < STANDARD[1]) return `矮：只有 ${meters(hi + 1)}高，打它的子弹压低了飞、更容易被矮东西挡下，齐胸飞的弹幕从它头上过去${pass}`
+  if (hi > STANDARD[1]) return `高大：有 ${meters(hi + 1)}高，隔着矮墙也露得出上半截${pass}`
+  return null
+}
+
+/** 形态的身段换了时的一个词 */
+function spanTag(s: Span | undefined): string {
+  if (!s) return ''
+  const [lo, hi] = s
+  return lo > 0 ? '悬空' : hi < STANDARD[1] ? '矮' : hi > STANDARD[1] ? '高大' : '标准身高'
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {
@@ -60,6 +84,8 @@ export function enemyStatLines(e: EnemyDef): string[] {
     `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${tireless ? ' · 不知疲倦' : ''}`,
   ]
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
+  const span = e.span ? spanLine(e.span) : null
+  if (span) lines.push(span)
   if (e.phasesWalls) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
   if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
   if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
@@ -69,7 +95,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (e.onIdle) lines.push(`${e.onIdle.ms / 1000} 秒没出手${e.onIdle.still ? '也没动' : ''}：${e.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
-    const traits = [...(f.stats ? modTexts(f.stats) : []), f.anchored ? '原地不动' : ''].filter(Boolean).join(' · ')
+    const traits = [...(f.stats ? modTexts(f.stats) : []), f.anchored ? '原地不动' : '', spanTag(f.span)].filter(Boolean).join(' · ')
     lines.push(`形态「${f.name ?? e.name}」${traits ? `：${traits}` : ''}`)
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
