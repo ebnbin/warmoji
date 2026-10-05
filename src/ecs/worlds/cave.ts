@@ -1118,6 +1118,44 @@ export function torchSpot(x: number, y: number, size: number): Point {
   return { x: x + size * 0.32, y: y - size * 0.18 }
 }
 
+/** 一处立着的身体此刻受的光：x、y 是各路有方向的光按迎着它受的照度（勒克斯）乘地图平面上朝它的单位向量加起来，e 是连天光在内的总照度 */
+export interface Toward {
+  x: number
+  y: number
+  e: number
+}
+
+/** 天体的直射按迎着它算：不乘入射角的正弦 */
+function beamToward(L: CaveLayout, dir: SkyDir, lux: number, x: number, y: number, out: Toward): void {
+  if (dir.elev <= 0 || lux <= 0) return
+  const b = directAt(L, x, y, 0, dir, lux) / Math.sin(dir.elev)
+  out.x += b * dir.x
+  out.y += b * dir.y
+  out.e += b
+}
+
+/** 一处立着的身体此刻从哪边受光：太阳、月亮与火把（不算遮挡）各按迎着它受的照度，写进 out */
+export function lightToward(L: CaveLayout, Lt: CaveLight, sky: CaveSky, torch: CaveConfig['torch'], spots: readonly Point[], lits: readonly number[], x: number, y: number, out: Toward): void {
+  out.x = 0
+  out.y = 0
+  out.e = diffuseLux(Lt, x, y)
+  beamToward(L, sky.sun, sky.sunLux, x, y, out)
+  beamToward(L, sky.moon, sky.moonLux, x, y, out)
+  for (let k = 0; k < spots.length; k++) {
+    const lit = lits[k]!
+    if (lit <= 0) continue
+    const dx = spots[k]!.x - x
+    const dy = spots[k]!.y - y
+    const d = Math.hypot(dx, dy)
+    const b = (lit * torch.candela) / ((d / UNIT) ** 2 + torch.heightM ** 2)
+    if (d > 0) {
+      out.x += (b * dx) / d
+      out.y += (b * dy) / d
+    }
+    out.e += b
+  }
+}
+
 /** 一处被这些火把照到多亮（不算遮挡），勒克斯 */
 export function torchesLux(cfg: CaveConfig['torch'], spots: readonly Point[], lits: readonly number[], x: number, y: number): number {
   let e = 0

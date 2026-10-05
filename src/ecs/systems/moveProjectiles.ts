@@ -8,14 +8,12 @@ import { nearestTarget } from '../utils/targets'
 import { flying, WORLD_SOURCE } from '../utils/source'
 import { boltProbe, breachAt, FLAT_SHOT_M, impactAt, lobZ, shotPass } from '../utils/pass'
 import { ballistic } from './shared/body'
-import { UNIT } from '../../util/units'
+import { LIFT_PER_M } from '../../util/units'
 import type { BodyStep } from './shared/body'
 import type { Sim } from '../sim'
 
 const REFLECT_LIFE_MS = 1400
 const FLIGHT: BodyStep = { x: 0, y: 0, vx: 0, vy: 0 }
-/** 抛射高出平射一米，画面上抬起多少像素 */
-const LIFT_PX_PER_M = UNIT * 0.5
 
 /** 追踪弹转向最近的敌人，每秒最多转 Homing.turn */
 function steer(sim: Sim, eid: number, dt: number): void {
@@ -124,7 +122,7 @@ export function moveProjectiles(sim: Sim): void {
     PrevPos.x[eid] = moved.x - stepX
     PrevPos.y[eid] = moved.y - stepY
     Proj.flown[eid] = Proj.flown[eid]! + len
-    if (Proj.arc[eid]! > 0) VisOff.y[eid] = -Math.max(0, lobZ(Proj.arc[eid]!, Math.min(1, Proj.flown[eid]! / Proj.reach[eid]!)) - FLAT_SHOT_M) * LIFT_PX_PER_M
+    if (Proj.arc[eid]! > 0) VisOff.y[eid] = -Math.max(0, lobZ(Proj.arc[eid]!, Math.min(1, Proj.flown[eid]! / Proj.reach[eid]!)) - FLAT_SHOT_M) * LIFT_PER_M
     if (Proj.spin[eid] !== 0) Transform.rot[eid] = Transform.rot[eid]! + Proj.spin[eid]! * dt
     else if (hasComponent(sim.world, eid, Homing) || hasComponent(sim.world, eid, Linger)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
   }

@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { hasComponent, removeEntity } from 'bitecs'
-import { FRAME_U, UNIT } from '../util/units'
+import { FRAME_U, LIFT_PER_M, UNIT } from '../util/units'
 import { MAP, MAPS, rollDecor } from '../data/maps'
 import { viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
@@ -10,6 +10,7 @@ import type { EcsAtlas } from './atlas'
 import type { EcsWorld } from './world'
 import type { MapDef, MapId } from '../types/maps'
 import type { Point } from '../util/vec'
+import type { LocalLight } from './render/spriteBatch'
 import type { RunState } from '../run/state'
 import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
@@ -31,7 +32,7 @@ import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
 import { gatesNow } from './worlds/gates'
 import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, WAVE_TILE, WET_PPU } from './render/ship'
-import { SUN } from '../data/light'
+import { AWAY, SUN } from '../data/light'
 import { deckPoint } from './worlds/ship'
 import type { ShipState } from './worlds/ship'
 import { GRAVITY, halfBeamAt } from '../data/ship'
@@ -43,7 +44,7 @@ import { NebulaPainter } from './render/nebulaPainter'
 import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES } from './worlds/nebula'
 import type { NebulaState } from './worlds/nebula'
 import { SHADOW_RS, wallU } from '../data/nebula'
-import { edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING, windAt } from './worlds/floe'
+import { bilinear, edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING, windAt } from './worlds/floe'
 import type { FloeField, FloeState } from './worlds/floe'
 import { FLOE_PPU, floeFrame, floeHeights, LIGHT } from './render/floe'
 import type { FloeCanvas } from './render/floe'
@@ -52,8 +53,10 @@ import { FloePainter } from './render/floePainter'
 import type { FloeConfig } from '../types/maps'
 import { castShade, drawBat, drawFlame, drawHalo as drawCaveHalo, drawRim, drawSmoke, encodeField, fieldOf, GLOW_FRAG, heightRange, LIGHT_FRAG, MAX_BLOCKS, MAX_TORCHES, modulateMode, paintSky, RELIEF_PPU, SHADE_BINS, SHADE_ROWS, SKY_PPU } from './render/cave'
 import { CavePainter } from './render/cavePainter'
-import { diffuseLux, directLux, heightM, inPool, roomOf, torchesLux, torchSpot } from './worlds/cave'
-import type { CaveLayout, CaveState } from './worlds/cave'
+import { diffuseLux, directLux, heightM, inPool, lightToward, roomOf, torchesLux, torchSpot } from './worlds/cave'
+import type { CaveLayout, CaveState, Toward } from './worlds/cave'
+import { UprightMask } from './render/upright'
+import { paintedEmojiOn } from '../emoji/style'
 import { skyColor, sunColor, viewU, visibility } from '../data/cave'
 import { GROUND_PPU } from '../data/texel'
 import { charSize } from './systems/shared/scale'
@@ -106,6 +109,8 @@ export interface MapView {
   /** 要画很久的地图可以返回 Promise：画完之前战斗不开始 */
   onSimReady(v: ViewCtx, sim: Sim): void | Promise<void>
   step(v: ViewCtx, sim: Sim, delta: number): void
+  /** 新画风下 (x, y) 处的单位受的光：out 里先填着太阳，地图可以换掉主光的方向、加一层补光 */
+  lightAt?(x: number, y: number, out: LocalLight): void
   resize(v: ViewCtx): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void
@@ -917,13 +922,17 @@ const LAVA_KEY = 'volcano-lava'
 const AUX_KEY = 'volcano-aux'
 /** 风把烟和灰往哪吹，像素/秒 */
 const WIND = { x: 22, y: -9 }
-const GRAVITY_PX = 12 * UNIT
+/** 火山弹往下落的重力加速度，米/秒² */
+const VOLCANO_GRAVITY = 9.81
+/** 熔岩映在身体上的补光：光色，最浓叠到多少；辉光场的值（喷发时按两倍算）到 span 时叠到最浓的六成多 */
+const LAVA_ON_BODY = { color: 0xffa45c, max: 0.55, span: 0.2 } as const
 
 interface Bomb {
   x: number
   y: number
   vx: number
   vy: number
+  /** 离地多高，米；vz 是往上的速度，米/秒 */
   z: number
   vz: number
   r: number
@@ -937,6 +946,11 @@ interface Splat {
   y: number
   r: number
   at: number
+}
+
+/** 熔岩的辉光场在 (x, y) 像素处的值 */
+function glowAt(f: VolcanoState['field'], glow: Float32Array, x: number, y: number): number {
+  return bilinear(glow, f.cols, f.rows, f.cell, f.x0, f.y0, x, y, 0)
 }
 
 /** 画好的一块地面的像素，和它在地面贴图上的左上角 */
@@ -973,7 +987,7 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
 class VolcanoView extends BoundedView {
   private painter?: GroundPainter
   private ground?: { tex: Phaser.Textures.CanvasTexture; ppc: number; seen: Float32Array; dirty: Uint8Array; busy: boolean }
-  private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array; shown: LavaShown }
+  private data?: { field: VolcanoState['field']; lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array; shown: LavaShown }
   private repaintAt = 0
   private readonly u = { time: 0, erupt: 0, warn: 0 }
   private plume?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -1042,6 +1056,7 @@ class VolcanoView extends BoundedView {
     const lava = canvasTexture(scene, LAVA_KEY, f.cols, f.rows)
     const aux = canvasTexture(scene, AUX_KEY, f.cols, f.rows)
     this.data = {
+      field: f,
       lava,
       aux,
       lavaImg: lava.getContext().createImageData(f.cols, f.rows),
@@ -1262,6 +1277,24 @@ class VolcanoView extends BoundedView {
     this.stepBombs(v, s, delta, now)
   }
 
+  /** 熔岩把单位朝着它的一侧映亮：按脚下一带的辉光，朝辉光变强的方向打 */
+  lightAt(x: number, y: number, out: LocalLight): void {
+    const d = this.data
+    if (!d) return
+    const f = d.field
+    const k = LAVA_ON_BODY.max * (1 - Math.exp((-glowAt(f, d.glow, x, y) * (1 + this.u.erupt)) / LAVA_ON_BODY.span))
+    if (k <= 0) return
+    const gx = glowAt(f, d.glow, x + f.cell, y) - glowAt(f, d.glow, x - f.cell, y)
+    const gy = glowAt(f, d.glow, x, y + f.cell) - glowAt(f, d.glow, x, y - f.cell)
+    const g = Math.hypot(gx, gy)
+    if (g > 0) {
+      out.fx = gx / g
+      out.fy = gy / g
+    }
+    out.color = LAVA_ON_BODY.color
+    out.fill = k
+  }
+
   /** 换阶段时改烟和灰的密度：发射频率一改就从头计时，所以只在这时改 */
   private enterPhase(v: ViewCtx, s: VolcanoState): void {
     this.plume?.setFrequency(s.phase === 'dormant' ? 110 : s.phase === 'warn' ? 45 : 30)
@@ -1307,13 +1340,14 @@ class VolcanoView extends BoundedView {
     return { x: 0, y: 0, vx: 0, vy: 0, z: 0, vz: 0, r: 0, spin: 0, rock, glow }
   }
 
-  /** 火山弹：喷发时从火山口抛出，按重力画弧，影子留在地上；落地溅起火星，砸出一小片渐暗的红光 */
+  /** 火山弹：喷发时从火山口抛出，按重力画弧，影子背着太阳落在地上；落地溅起火星，砸出一小片渐暗的红光 */
   private stepBombs(v: ViewCtx, s: VolcanoState, delta: number, now: number): void {
     const g = this.bombGfx
     const sg = this.splatGfx
     if (!g || !sg) return
     const f = s.field
     const dt = delta / 1000
+    const reach = v.def.light?.shadow?.length ?? 0
     if (s.phase === 'erupt') {
       this.bombAcc += dt * 13 * this.u.erupt
       while (this.bombAcc >= 1) {
@@ -1325,8 +1359,8 @@ class VolcanoView extends BoundedView {
         b.y = f.craterY + (Math.random() - 0.5) * UNIT
         b.vx = Math.cos(a) * sp
         b.vy = Math.sin(a) * sp
-        b.z = 0.2 * UNIT
-        b.vz = (7 + Math.random() * 5) * UNIT
+        b.z = 0.4
+        b.vz = 6 + Math.random() * 4
         b.r = 7 + Math.random() * 9
         b.spin = (Math.random() * 2 - 1) * 8
         b.rock.setRotation(Math.random() * Math.PI * 2)
@@ -1338,7 +1372,7 @@ class VolcanoView extends BoundedView {
     for (const b of this.bombs) {
       b.x += b.vx * dt
       b.y += b.vy * dt
-      b.vz -= GRAVITY_PX * dt
+      b.vz -= VOLCANO_GRAVITY * dt
       b.z += b.vz * dt
       if (b.z <= 0) {
         this.sparks?.explode(10, b.x, b.y)
@@ -1350,13 +1384,14 @@ class VolcanoView extends BoundedView {
         continue
       }
       kept.push(b)
-      const lift = Math.min(1, b.z / (4 * UNIT))
-      const scale = (b.r * 2 * (1 + lift * 0.5)) / 32
-      g.fillStyle(0x000000, 0.3 * (1 - lift * 0.55))
-      g.fillEllipse(b.x, b.y, b.r * 2.4 * (1 - lift * 0.3), b.r * 1.2 * (1 - lift * 0.3))
-      b.rock.setPosition(b.x, b.y - b.z).setScale(scale).setRotation(b.rock.rotation + b.spin * dt)
-      b.glow.setPosition(b.x, b.y - b.z).setScale(scale * 2.6).setAlpha(0.55)
-      if (Math.random() < dt * 30) this.trail?.emitParticleAt(b.x, b.y - b.z, 1)
+      const high = Math.min(1, b.z / 4)
+      const lift = b.z * LIFT_PER_M
+      const scale = (b.r * 2 * (1 + high * 0.5)) / 32
+      g.fillStyle(0x000000, 0.3 * (1 - high * 0.55))
+      g.fillEllipse(b.x + AWAY.x * reach * lift, b.y + AWAY.y * reach * lift, b.r * 2.4 * (1 - high * 0.3), b.r * 1.2 * (1 - high * 0.3))
+      b.rock.setPosition(b.x, b.y - lift).setScale(scale).setRotation(b.rock.rotation + b.spin * dt)
+      b.glow.setPosition(b.x, b.y - lift).setScale(scale * 2.6).setAlpha(0.55)
+      if (Math.random() < dt * 30) this.trail?.emitParticleAt(b.x, b.y - lift, 1)
     }
     this.bombs = kept
     sg.clear()
@@ -1796,6 +1831,10 @@ const NEBULA_GLINT_KEY = 'nebula-glint'
 const NEBULA_HALO_KEY = 'nebula-halo'
 /** 光晕贴图的半径是阴影半径的几倍 */
 const HALO_EDGE = 4
+/** 吸积盘的光色：光晕与照在身体上的暖光 */
+const DISK_LIGHT = 0xffb27a
+/** 吸积盘照在身体上的暖光比照在星尘上的弱多少 */
+const DISK_ON_BODY = 0.6
 /** 开局最多几个线程分着画星云 */
 const NEBULA_THREADS = 4
 /** 着色器的曝光：光的强度乘它再按 1 − e^(−x) 压进画面 */
@@ -1837,6 +1876,11 @@ interface Stream {
   readonly spin: number
 }
 
+/** 吸积盘照到 dU 格外有多亮，lum 是黑洞此刻的光度；1 算照满 */
+function diskLight(lum: number, dU: number): number {
+  return (lum * 9) / (dU * dU + 4)
+}
+
 /**
  * 星云：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按透视、黑洞的引力透镜、吸积盘的光与光回波画出来；
  * 黑洞是一块阴影，外面一圈光子环和正对着看的吸积盘，周围那圈被弯过来的星云光就是走不出来的地方。
@@ -1844,6 +1888,8 @@ interface Stream {
  * 身后拖着冷却变红的热迹与背向黑洞的尾巴，照亮它经过的星云，扎进对面的壳层就碎掉
  */
 class NebulaView extends BoundedView {
+  /** 黑洞在哪、此刻多亮：单位按它受光 */
+  private hole?: { x: number; y: number; lum: number }
   private painter?: NebulaPainter
   private readonly u = {
     time: 0,
@@ -1965,7 +2011,7 @@ class NebulaView extends BoundedView {
     this.dustGfx = scene.add.graphics().setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
     this.streamGfx = scene.add.graphics().setDepth(29.5).setBlendMode(Phaser.BlendModes.ADD)
     this.tailGfx = scene.add.graphics().setDepth(33.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffb27a)
+    this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD).setTint(DISK_LIGHT)
     this.knot = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(33).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa860).setVisible(false)
     this.coma = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a4a).setVisible(false)
     this.core = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34.1).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff1d6).setVisible(false)
@@ -2055,11 +2101,26 @@ class NebulaView extends BoundedView {
     const dt = Math.min(delta, 50) / 1000
     this.syncUniforms(s, cfg, now)
     const lum = luminosity(s, cfg, now)
+    this.hole = { x: s.layout.hx, y: s.layout.hy, lum }
     const shadow = SHADOW_RS * s.rs * UNIT
     if (this.halo) this.halo.setDisplaySize(shadow * HALO_EDGE * 2, shadow * HALO_EDGE * 2).setAlpha(Math.min(0.5, 0.1 * Math.sqrt(lum)))
     this.stepDust(s, cfg, v.lens.screen, dt, lum)
     this.stepStreams(s, now)
     this.stepMeteor(v, s, cfg, now, lum)
+  }
+
+  /** 单位朝黑洞的一侧受吸积盘的暖光，背面偏冷：主光换成黑洞的方向，离得越近、黑洞越亮，暖光补得越多 */
+  lightAt(x: number, y: number, out: LocalLight): void {
+    const h = this.hole
+    if (!h) return
+    const dx = h.x - x
+    const dy = h.y - y
+    const d = Math.hypot(dx, dy)
+    if (d <= 0) return
+    out.kx = out.fx = dx / d
+    out.ky = out.fy = dy / d
+    out.color = DISK_LIGHT
+    out.fill = Math.min(1, diskLight(h.lum, d / UNIT)) * DISK_ON_BODY
   }
 
   /** 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。离黑洞或飞过的流星越近被照得越亮 */
@@ -2091,7 +2152,7 @@ class NebulaView extends BoundedView {
       }
       const dU = Math.hypot(p.x - L.hx, p.y - L.hy) / UNIT
       const dm = Math.hypot(p.x - mx, p.y - my) / UNIT
-      const light = Math.min(1, (lum * 9) / (dU * dU + 4) + (mw * 2) / (dm * dm + 1))
+      const light = Math.min(1, diskLight(lum, dU) + (mw * 2) / (dm * dm + 1))
       const sp = Math.hypot(p.vx, p.vy)
       const tail = Math.min(sp * 0.045, 1.6 * UNIT)
       const alpha = Math.min(0.85, 0.12 + 0.75 * light)
@@ -2262,6 +2323,7 @@ class NebulaView extends BoundedView {
     this.streamGfx = undefined
     this.tailGfx = undefined
     this.halo = undefined
+    this.hole = undefined
     this.knot = undefined
     this.core = undefined
     this.coma = undefined
@@ -2328,6 +2390,7 @@ interface Drop {
   y: number
   vx: number
   vy: number
+  /** 离水面多高，米；vz 是往上的速度，米/秒 */
   z: number
   vz: number
   age: number
@@ -2644,7 +2707,7 @@ class FloeView extends BoundedView {
     for (let k = 0; k < 16; k++) {
       const a = Math.random() * Math.PI * 2
       const sp = (1 + Math.random() * 2.5) * UNIT
-      this.drops.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8, z: r * 0.3, vz: (2.5 + Math.random() * 3) * UNIT, age: 0, life: 0.9 })
+      this.drops.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8, z: 0.05, vz: 2.2 + Math.random() * 2.2, age: 0, life: 0.9 })
     }
   }
 
@@ -2701,14 +2764,14 @@ class FloeView extends BoundedView {
     const drops: Drop[] = []
     for (const d of this.drops) {
       d.age += dt
-      d.vz -= 12 * UNIT * dt
+      d.vz -= FLOE_GRAVITY * dt
       d.z += d.vz * dt
       d.x += d.vx * dt
       d.y += d.vy * dt
       if (d.age >= d.life || d.z < 0) continue
       drops.push(d)
       sp.fillStyle(0xe6f6fa, 0.85 * (1 - d.age / d.life))
-      sp.fillCircle(d.x, d.y - d.z, 2.6)
+      sp.fillCircle(d.x, d.y - d.z * LIFT_PER_M, 2.6)
     }
     this.drops = drops
   }
@@ -2764,6 +2827,10 @@ const CAVE_FLOOR = [0.035, 0.026, 0.02] as const
 const CAVE_SCATTER = 0.012
 /** 天窗口那圈植物的贴图每格多少像素 */
 const CAVE_RIM_PPU = 24
+const CAVE_MASK_KEY = 'cave-mask'
+/** 立着的东西的遮罩图边长，像素：盖住镜头拍到的范围，四边再各外扩 CAVE_MASK_PAD 倍 */
+const CAVE_MASK_PX = 512
+const CAVE_MASK_PAD = 0.1
 /** 太阳落到这个高度蝙蝠出洞、黎明升到这个高度回洞，度：洞里还看得清，一群黑影预告天要黑了、天快亮了 */
 const BAT_OUT_DEG = 1
 const BAT_IN_DEG = -1
@@ -2840,6 +2907,10 @@ class CaveView extends BoundedView {
   private dripAt = 0
   private sunDeg = 0
   private vignette?: Phaser.Filters.Vignette
+  private mask?: UprightMask
+  /** 这一帧洞里的光与点着的火把：单位按它分明暗 */
+  private lights?: { s: CaveState; torch: NonNullable<MapDef['cave']>['torch']; spots: Point[]; lits: number[] }
+  private readonly toward: Toward = { x: 0, y: 0, e: 0 }
 
   /** 洞里越亮看得越远：短边看到 viewU 格；洞里的光算出来之前按标准 */
   followZoom(): number {
@@ -2941,6 +3012,9 @@ class CaveView extends BoundedView {
     const u = this.u
     const fieldRect = [f.x0, f.y0, f.w, f.h]
     const heightLo = heightRange(L)
+    const maskTex = scene.textures.addDynamicTexture(CAVE_MASK_KEY, CAVE_MASK_PX, CAVE_MASK_PX)
+    if (maskTex && v.atlas) this.mask = new UprightMask(scene, v.world, v.atlas, maskTex)
+    const mask = this.mask
     this.visuals.push(
       scene.add
         .shader(
@@ -2971,13 +3045,15 @@ class CaveView extends BoundedView {
               set('uBlock[0]', u.block)
               set('uBlockCount', u.blockCount)
               set('uFloor', CAVE_FLOOR)
+              set('uMask', 5)
+              set('uMask0', mask?.rect ?? [0, 0, 1, 1])
             },
           },
           f.x0,
           f.y0,
           f.w,
           f.h,
-          [CAVE_FIELD_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_SHADE_KEY],
+          [CAVE_FIELD_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_SHADE_KEY, CAVE_MASK_KEY],
         )
         .setOrigin(0, 0)
         .setDepth(CAVE_LIGHT_DEPTH)
@@ -3110,7 +3186,11 @@ class CaveView extends BoundedView {
     this.viewU += (want - this.viewU) * (1 - Math.exp(-dt / CAVE_VIEW_TAU))
     const dark = 1 - visibility(cfg.view, s.light.hallLux)
     if (this.vignette) this.vignette.strength = 0.18 + 0.22 * dark
-    this.stepEyes(v.scene, sim, s, adapt)
+    const lights = { s, torch: cfg.torch, ...this.torchLights(sim, s) }
+    this.lights = lights
+    this.stepEyes(v.scene, sim, s, adapt, lights.spots, lights.lits)
+    const view = v.lens.screen.view()
+    this.mask?.paint(view.x - view.w * CAVE_MASK_PAD, view.y - view.h * CAVE_MASK_PAD, view.w * (1 + 2 * CAVE_MASK_PAD), view.h * (1 + 2 * CAVE_MASK_PAD), paintedEmojiOn())
     for (const g of this.glows) {
       const x = (diffuseLux(s.light, g.x, g.y) + directLux(L, sky, g.x, g.y, 0)) / adapt
       g.img.setAlpha((0.5 + 0.12 * Math.sin(now / 900 + g.phase)) * (1 - smoothCave(0.04, 0.5, x)))
@@ -3190,9 +3270,8 @@ class CaveView extends BoundedView {
     }
   }
 
-  /** 黑暗里的敌人与快要出来的敌人（在它进场的起点）：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
-  private stepEyes(scene: Phaser.Scene, sim: Sim, s: CaveState, adapt: number): void {
-    const cfg = MAPS[sim.mapId].cave!
+  /** 点着的火把在哪、多亮 */
+  private torchLights(sim: Sim, s: CaveState): { spots: Point[]; lits: number[] } {
     const spots: Point[] = []
     const lits: number[] = []
     for (const m of sim.characters) {
@@ -3201,6 +3280,22 @@ class CaveView extends BoundedView {
       spots.push(torchSpot(Transform.x[m]!, Transform.y[m]!, charSize(m)))
       lits.push(t.lit)
     }
+    return { spots, lits }
+  }
+
+  /** 立着的身体朝光多的一侧亮：天光不分方向，直射与火把按迎着它受的照度定方向，有方向的光占得越多明暗越分明 */
+  lightAt(x: number, y: number, out: LocalLight): void {
+    const c = this.lights
+    if (!c) return
+    const t = this.toward
+    lightToward(c.s.layout, c.s.light, c.s.sky, c.torch, c.spots, c.lits, x, y, t)
+    out.kx = t.e > 0 ? t.x / t.e : 0
+    out.ky = t.e > 0 ? t.y / t.e : 0
+  }
+
+  /** 黑暗里的敌人与快要出来的敌人（在它进场的起点）：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
+  private stepEyes(scene: Phaser.Scene, sim: Sim, s: CaveState, adapt: number, spots: readonly Point[], lits: readonly number[]): void {
+    const cfg = MAPS[sim.mapId].cave!
     let used = 0
     if (spots.length > 0) {
       const view = sim.view
@@ -3357,6 +3452,9 @@ class CaveView extends BoundedView {
       fx.halo.destroy()
     }
     this.torches.clear()
+    this.mask?.destroy()
+    this.mask = undefined
+    this.lights = undefined
     this.data = undefined
     this.eyes = []
     this.glows = []
@@ -3365,7 +3463,7 @@ class CaveView extends BoundedView {
     this.rippleGfx = undefined
     this.embers = undefined
     this.smoke = undefined
-    for (const key of [CAVE_ALBEDO_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_FIELD_KEY, CAVE_SHADE_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [CAVE_ALBEDO_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_FIELD_KEY, CAVE_SHADE_KEY, CAVE_MASK_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }
 

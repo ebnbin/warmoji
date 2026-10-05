@@ -2,6 +2,9 @@ export const VIEW = { minLong: 1280, minShort: 720 } as const
 
 export const UNIT = VIEW.minLong / 20
 
+/** 离地一米，画面上抬起多少像素：立着画的东西离地多高都按它抬 */
+export const LIFT_PER_M = UNIT * 0.5
+
 /** 沙盒地图都画在边长 FRAME_U 格的方框里：左上角是世界原点，队伍出生在正中，方框外只剩纯色背景 */
 export const FRAME_U = 48
 

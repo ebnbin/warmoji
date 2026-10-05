@@ -460,7 +460,7 @@ const TONE_KNEE = 0.7
  * 洞里的光，按 2 倍调制叠在整个战斗画面上（地面、角色、子弹、特效一起变亮变暗）：
  * 天光与反光从照度场来；直射看这一点朝太阳（月亮）的那条线在洞顶的高度上是不是落在天窗里（按半影取几个点），再看半路有没有石柱、石笋挡着；
  * 火把按点光源 I·cosθ/d² 照（w 是火把的高度，米），沿影子图判断有没有被岩石挡住，坡面上的明暗只取一半，免得近处的火光把小坡照出一圈黑影；
- * 有方向的光按法线图照出起伏。
+ * 有方向的光按法线图照出起伏。立着的东西（遮罩图里盖住的地方）不随地面的起伏：直射与火把都按迎着光照，明暗交给精灵按光从哪边来画。
  * 照度除以眼睛适应的亮度后按色调曲线压成倍数，直射的光斑亮过原色；越暗越偏冷偏灰；最暗也留一点暖褐，不是纯黑；加一点抖动免得暗处出色带
  */
 export const LIGHT_FRAG = `${HEADER}
@@ -487,7 +487,14 @@ uniform float uTorchCount;
 uniform vec4 uBlock[${MAX_BLOCKS}];
 uniform float uBlockCount;
 uniform vec3 uFloor;
+uniform sampler2D uMask;
+uniform vec4 uMask0;
 ${SAMPLE}
+float upright(vec2 world) {
+  vec2 uv = (world - uMask0.xy) / uMask0.zw;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
+  return texture2D(uMask, vec2(uv.x, 1.0 - uv.y)).a;
+}
 float blocked(vec2 p, float z, vec2 dir, float cotE) {
   float lit = 1.0;
   for (int i = 0; i < ${MAX_BLOCKS}; i++) {
@@ -506,7 +513,7 @@ float blocked(vec2 p, float z, vec2 dir, float cotE) {
   }
   return lit;
 }
-float beam(vec2 p, float z, vec3 n, vec4 body) {
+float beam(vec2 p, float z, vec3 n, float up, vec4 body) {
   if (body.w <= 0.0) return 0.0;
   float run = (uCeil - z) * body.z;
   vec2 q = p + body.xy * run * uUnit;
@@ -514,7 +521,7 @@ float beam(vec2 p, float z, vec3 n, vec4 body) {
   float open = (2.0 * skyAt(q) + skyAt(q + vec2(pen, 0.0)) + skyAt(q - vec2(pen, 0.0)) + skyAt(q + vec2(0.0, pen)) + skyAt(q - vec2(0.0, pen))) / 6.0;
   if (open <= 0.0) return 0.0;
   vec3 l = normalize(vec3(body.xy, 1.0 / max(body.z, 0.0001)));
-  return body.w * max(dot(n, l), 0.0) * open * blocked(p, z, body.xy, body.z);
+  return body.w * mix(max(dot(n, l), 0.0), 1.0, up) * open * blocked(p, z, body.xy, body.z);
 }
 void main ()
 {
@@ -527,8 +534,9 @@ void main ()
   float z = height(world);
   vec3 nm = texture2D(uNorm, uv).rgb;
   vec3 n = normalize(vec3(nm.xy * 2.0 - 1.0, max(nm.z, 0.05)));
-  float eSun = beam(world, z, n, uSun);
-  float eMoon = beam(world, z, n, uMoon);
+  float up = upright(world);
+  float eSun = beam(world, z, n, up, uSun);
+  float eMoon = beam(world, z, n, up, uMoon);
   float eTorch = 0.0;
   for (int k = 0; k < ${MAX_TORCHES}; k++) {
     if (float(k) >= uTorchCount) break;
@@ -542,7 +550,7 @@ void main ()
     vec3 l = vec3(d, t.w - z);
     float r2 = dot(l, l);
     vec3 ld = l / sqrt(r2);
-    eTorch += t.z * mix(max(ld.z, 0.0), max(dot(n, ld), 0.0), 0.5) / r2 * see;
+    eTorch += t.z * mix(mix(max(ld.z, 0.0), max(dot(n, ld), 0.0), 0.5), 1.0, up) / r2 * see;
   }
   float e = eDiff + eSun + eMoon + eTorch;
   vec3 col = (eDiff * mix(uSkyCol, uBounceCol, f.b) + eSun * uSunCol + eMoon * uMoonCol + eTorch * uTorchCol) / max(e, 1e-6);
