@@ -10,7 +10,7 @@ import { hazardSource } from '../utils/source'
 import { HIT } from '../utils/hitTags'
 import { leaderPoint } from '../utils/team'
 import { grounded, LAYER_M, STANDARD, topOf } from '../utils/pass'
-import { makeSolids, solidsTrace } from '../worlds/solids'
+import { makeSolids, solidOf, solidsTrace } from '../worlds/solids'
 import type { Solid, Solids } from '../worlds/solids'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { roomFor } from '../worlds/gates'
@@ -360,6 +360,9 @@ export const circuit: WorldHooks = {
   },
   trace(sim, probe, ax, ay, bx, by) {
     return solidsTrace(circuitOf(sim).solids, probe, ax, ay, bx, by)
+  },
+  solidAt(sim, x, y) {
+    return solidOf(circuitOf(sim).solids, x, y)
   },
   smashWall() {},
   wanderDir(sim, eid, dx, dy) {

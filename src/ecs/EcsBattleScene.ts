@@ -8,6 +8,7 @@ import { burstEmitter } from '../ui/fx'
 import { CueLayer } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
+import { HeightOverlay } from './render/heights'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { FONT_FAMILY, TEXT } from '../ui/theme'
@@ -91,6 +92,7 @@ import { gainTeamXp } from './systems/shared/combat'
 import { hit } from './systems/shared/damage'
 import { bodySource, WORLD_SOURCE } from './utils/source'
 import { nearestTarget } from './utils/targets'
+import { LAYER_M } from './utils/pass'
 import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
@@ -100,6 +102,13 @@ import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
 const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
+const meters = (layers: number): string => `${+(layers * LAYER_M).toFixed(1)} 米`
+const showHeights = defineDevFlag({
+  id: 'battle.heights',
+  group: '战斗',
+  label: '显示高度',
+  desc: `地形按挡到第几层上色：绿到离地 ${meters(1)}、黄到 ${meters(2)}、橙到 ${meters(3)}、红更高、紫一直高上去；填满的挡子弹，棋盘格的只挡身体，灰色斜纹是没有高度的硬边界。身体旁的小标尺一格一层，占着的层上色，白线以下的高度跨得过；子弹的圈按它此刻飞在哪一层上色`,
+})
 const showGrid = defineDevFlag({ id: 'battle.grid', group: '战斗', label: '显示坐标网格', desc: '每格一条白线；红线是 y = 0，绿线是 x = 0，两条相交处就是原点；黄框是能走的地方与地图的边不能越出的安全区' })
 const LENS_LABELS: Record<LensMode, string> = { follow: '跟随', map: '完整地图' }
 const lensChoice = defineDevChoice({
@@ -194,6 +203,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private wallGfx?: Phaser.GameObjects.Graphics
   private gateGfx?: Phaser.GameObjects.Graphics
   private gridGfx?: Phaser.GameObjects.Graphics
+  private heights?: HeightOverlay
   /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
   private fog?: Fog
   /** 升级弹窗开着，战斗停着 */
@@ -233,6 +243,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.wallGfx = undefined
     this.gateGfx = undefined
     this.gridGfx = undefined
+    this.heights = undefined
     this.fog = undefined
     this.choosing = false
     this.settling = false
@@ -378,6 +389,16 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         if (gate.nx !== 0 || gate.ny !== 0) g.lineBetween(gate.ax, gate.ay, gate.ax + gate.nx * 0.8 * UNIT, gate.ay + gate.ny * 0.8 * UNIT)
       }
     }
+  }
+
+  /** 墙会塌、身体会跳：开着就每帧画身体与弹体，地形隔一会儿按镜头重新取样 */
+  private drawDevHeights(sim: Sim): void {
+    if (!showHeights()) {
+      this.heights?.hide()
+      return
+    }
+    this.heights ??= new HeightOverlay(this, this.lens)
+    this.heights.draw(sim, this.time.now)
   }
 
   /**
@@ -945,6 +966,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.drawDevTargets(sim)
     this.drawDevWalls(sim)
     this.drawDevGates(sim)
+    this.drawDevHeights(sim)
     this.drawSkillAim(sim)
     if (sim.over) {
       this.lose('全军覆没')

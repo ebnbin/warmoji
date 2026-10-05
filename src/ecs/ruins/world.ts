@@ -621,6 +621,17 @@ export const ruins: WorldHooks = {
     const cfg = cfgOf(sim)
     return traceLocal(s.m, s.dust, cfg.dust.opaqueTau, probe, a.u, a.v, b.u, b.v, (Math.hypot(bx - ax, by - ay) / UNIT) * cfg.meterPerU)
   },
+  /** 砌体与木板谁高取谁 */
+  solidAt(sim, x, y) {
+    const s = ruinsOf(sim)
+    const l = local(s, x, y)
+    const i = cellAt(s.m.grid, l.u, l.v)
+    if (i < 0) return null
+    const n = s.m.n[i]!
+    const t = s.m.timber[i]!
+    if (n === 0 && t === 0) return null
+    return n >= t ? { topM: n * s.m.courseM, material: 'masonry' } : { topM: t * s.m.courseM, material: 'timber' }
+  },
   breach(sim, x, y, z, _r, amount) {
     const s = ruinsOf(sim)
     const l = local(s, x, y)

@@ -52,7 +52,8 @@ import type { BodyStep } from '../systems/shared/body'
 import { ruins } from '../ruins/world'
 import { clearM, grounded, passCost, phases, probeZ, topOf } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
-import { solidsTrace, wallsOf } from './solids'
+import { solidOf, solidsTrace, wallsOf } from './solids'
+import type { Solid } from './solids'
 import type { ObstacleId } from '../../types/obstacles'
 import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
@@ -151,6 +152,8 @@ export interface WorldHooks {
   trace?(sim: Sim, probe: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null
   /** 线段第一次碰上墙的地方：碰上的一律当作岩体挡下；写了 trace 的不看它 */
   wallHit?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
+  /** (x, y) 处立着的实心，挡身体的与挡弹体的都算，取规则用的那份；只给开发面板画高度，不写就当没有 */
+  solidAt?(sim: Sim, x: number, y: number): Solid | null
   /** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里，按材质的强度折算能打掉多少，返回实际用掉的；不写就什么也打不坏 */
   breach?(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number
   /** 弹体或出手撞上了障碍：给画面崩点碎屑 */
@@ -807,6 +810,9 @@ const volcano: WorldHooks = {
   trace(sim, probe, ax, ay, bx, by) {
     return solidsTrace(volcanoOf(sim).solids, probe, ax, ay, bx, by)
   },
+  solidAt(sim, x, y) {
+    return solidOf(volcanoOf(sim).solids, x, y)
+  },
   basin(sim) {
     return volcanoOf(sim).field.basin
   },
@@ -894,6 +900,9 @@ const ship: WorldHooks = {
   ...bounded,
   trace(sim, probe, ax, ay, bx, by) {
     return solidsTrace(shipOf(sim).deck.solids, probe, ax, ay, bx, by)
+  },
+  solidAt(sim, x, y) {
+    return solidOf(shipOf(sim).deck.solids, x, y)
   },
   /** 恒定功率下每秒花的体力不变，每格的费力是功率之比：上坡照常花、走得慢，下坡快到顶就刹着走、花得少 */
   effort(sim, _x, _y, dx, dy) {
@@ -1505,7 +1514,8 @@ function caveCfg(sim: Sim): CaveConfig {
   return MAPS[sim.mapId].cave!
 }
 
-/** 溶洞的地形与这一局的月龄由布景种子定下，视图从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
+const CAVE_ROCK: Solid = { topM: Infinity, material: 'rock' }
+
 /** 半径 rad 的身体陷进高过 clear 米的矮石笋多深就沿外法线退回多远：只有矮个子跨不过它们 */
 function lowOut(list: readonly Stalagmite[], x: number, y: number, rad: number, clear: number): Point {
   let px = x
@@ -1548,6 +1558,7 @@ function lowTrace(list: readonly Stalagmite[], p: Probe, ax: number, ay: number,
   return best
 }
 
+/** 溶洞的地形与这一局的月龄由布景种子定下，视图从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
 function caveOf(sim: Sim): CaveState {
   let s = sim.worldState.cave
   if (!s) {
@@ -1666,6 +1677,12 @@ const cave: WorldHooks = {
     const t = !hit ? Infinity : len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
     if (low && low.t0 <= t) return low
     return hit ? { t0: t, t1: t, material: 'rock' } : null
+  },
+  solidAt(sim, x, y) {
+    const L = caveOf(sim).layout
+    if (roomOf(L.rock, x, y) < 0) return CAVE_ROCK
+    for (const st of L.stalagmites) if (!st.block && Math.hypot(x - st.x, y - st.y) < st.r) return { topM: st.h, material: 'rock' }
+    return null
   },
   wanderDir(sim, eid, dx, dy) {
     const rock = caveOf(sim).layout.rock

@@ -13,7 +13,7 @@ import { holds, wade } from './bodies'
 import { roomFor } from '../worlds/gates'
 import { sakuraMarks } from './marks'
 import { bridgeLocal, forestDepth, sakuraPlan, toLocal, wallSide } from './layout'
-import { makeSolids, solidsTrace } from '../worlds/solids'
+import { makeSolids, solidOf, solidsTrace } from '../worlds/solids'
 import { topOf } from '../utils/pass'
 import type { Solid, Solids } from '../worlds/solids'
 import { flowAt, solveSakura } from './water'
@@ -52,12 +52,16 @@ function cfgOf(sim: Sim): SakuraConfig {
 
 const GROVE: Solid = { topM: Infinity, material: 'wood' }
 
-/** 寺墙按墙高、林子与樱花的树干高过一切；石组与竹栅那两条线外是林子 */
+/** 寺墙按墙高、林子与樱花的树干高过一切；石组的石头按露出水面的高；竹栅按栅高占一格宽的一条线，有缝，弹体与视线照样过去；石组与竹栅那两条线外是林子 */
 function solidsOf(cfg: SakuraConfig, plan: SakuraPlan): Solids {
   const e = plan.edges
   const b = plan.basin
+  const f = plan.fence
   const th = cfg.wall.thickU / 2
+  const half = b.cell / UNIT / 2
   const wall: Solid = { topM: topOf(cfg.wall.heightM), material: 'earth' }
+  const stone: Solid = { topM: cfg.rocks.heightM, material: 'rock' }
+  const bamboo: Solid = { topM: cfg.sill.heightM, material: 'fence' }
   const l: Local = { a: 0, b: 0 }
   const at = (px: number, py: number): Solid | null => {
     const x = px / UNIT
@@ -65,6 +69,8 @@ function solidsOf(cfg: SakuraConfig, plan: SakuraPlan): Solids {
     for (const t of plan.trees) if (Math.hypot(t.x - x, t.y - y) < t.r - cfg.trees.overhangU) return GROVE
     toLocal(plan.frame, x, y, l)
     if (Math.abs(wallSide(e, l.a, l.b)) <= th) return wall
+    for (const st of plan.rocks.stones) if (Math.hypot(st.x - x, st.y - y) < st.r) return stone
+    if (Math.abs((x - f.x) * f.tx + (y - f.y) * f.ty) <= half && Math.abs((y - f.y) * f.tx - (x - f.x) * f.ty) <= f.span) return bamboo
     return forestDepth(e, l.a, l.b) >= 0 ? GROVE : null
   }
   return makeSolids(at, b.x0, b.y0, b.cols, b.rows, b.cell)
@@ -293,6 +299,9 @@ export const sakura: WorldHooks = {
   },
   trace(sim, probe, ax, ay, bx, by) {
     return solidsTrace(sakuraOf(sim).solids, probe, ax, ay, bx, by)
+  },
+  solidAt(sim, x, y) {
+    return solidOf(sakuraOf(sim).solids, x, y)
   },
   smashWall() {},
   wanderDir(sim, eid, dx, dy) {

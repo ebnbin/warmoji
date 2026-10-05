@@ -23,6 +23,7 @@ import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
 import type { Landmark } from '../worlds/gates'
 import type { Surface, WorldHooks } from '../worlds/hooks'
+import type { Solid } from '../worlds/solids'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -179,6 +180,19 @@ function insideSolids(l: DesertPlan['landmarks'][number], qx: number, qy: number
   return false
 }
 
+/** (x, y) 格处立着的标志物，叠着的取高的：环面上按离它最近的那一份算 */
+function landmarkAt(plan: DesertPlan, x: number, y: number): Solid | null {
+  let best: Solid | null = null
+  for (const l of plan.landmarks) {
+    const qx = wrapU(x - l.x, plan.sizeU)
+    const qy = wrapU(y - l.y, plan.sizeU)
+    const far = l.shape.reach + 1
+    if (qx > far || qx < -far || qy > far || qy < -far || (best && best.topM >= l.shape.top) || !insideSolids(l, qx, qy)) continue
+    best = { topM: l.shape.top, material: MATERIAL[l.kind] }
+  }
+  return best
+}
+
 /** 线段 a→b（格）上第一处探测在它里面、又要贯穿才过得去的标志物：按探测在那一点的高度比标志物占到的那一层的顶；环面上按离线段中点最近的那一份算 */
 function landmarkTrace(plan: DesertPlan, p: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null {
   const ex = bx - ax
@@ -287,6 +301,9 @@ export const desert: WorldHooks = {
   },
   trace(sim, probe, ax, ay, bx, by) {
     return landmarkTrace(desertOf(sim).plan, probe, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
+  },
+  solidAt(sim, x, y) {
+    return landmarkAt(desertOf(sim).plan, x / UNIT, y / UNIT)
   },
   chaseDir(sim, eid, tx, ty) {
     const x = Transform.x[eid]!

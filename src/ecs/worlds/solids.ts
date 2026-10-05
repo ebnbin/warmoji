@@ -41,6 +41,16 @@ export function makeSolids(at: (x: number, y: number) => Solid | null, x0: numbe
   return { cols, rows, cell, x0, y0, top, kind, materials }
 }
 
+/** (x, y) 像素处那一格的实心，空地为 null */
+export function solidOf(s: Solids, x: number, y: number): Solid | null {
+  const cx = Math.floor((x - s.x0) / s.cell)
+  const cy = Math.floor((y - s.y0) / s.cell)
+  if (cx < 0 || cy < 0 || cx >= s.cols || cy >= s.rows) return null
+  const i = cy * s.cols + cx
+  const top = s.top[i]!
+  return top > 0 ? { topM: top, material: s.materials[s.kind[i]!]! } : null
+}
+
 /** 能走的地面以外都是一直高上去的这种实心 */
 export function wallsOf(b: Basin, material: ObstacleId): Solids {
   return makeSolids((x, y) => (roomAt(b, x, y) < 0 ? { topM: Infinity, material } : null), b.x0, b.y0, b.cols, b.rows, b.cell)
