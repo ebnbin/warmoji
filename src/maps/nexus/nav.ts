@@ -1,6 +1,5 @@
 import { roomAt } from '../basin.ts'
 import { UNIT } from '../../util/units.ts'
-import { warpPosts } from './warps.ts'
 import type { Basin } from '../basin'
 import type { Hall, WarpSpot } from './layout'
 
@@ -135,32 +134,29 @@ export function navCenter(nav: NavGrid, i: number): { x: number; y: number } {
 }
 
 /**
- * 按此刻的门重铺：门柱占着的格不通，门线两侧的格互不相通，改通到另一扇门另一侧的对应格。
- * warps 按对排，第 k 扇的另一扇是 k ^ 1；为 null 的门不在（正挪着的门照旧通，到时候才换）
+ * 按此刻的门重铺：posts（格）是挡身体的门柱，占着的格不通；门线两侧的格互不相通，改通到另一扇门另一侧的对应格。
+ * warps 按对排，第 k 扇的另一扇是 k ^ 1（正挪着的门照旧通，到时候才换）
  */
-export function relink(nav: NavGrid, warps: readonly (WarpSpot | null)[], len: number, post: number): void {
+export function relink(nav: NavGrid, warps: readonly WarpSpot[], posts: readonly { x: number; y: number }[], len: number, post: number): void {
   const { cols, rows, open, sides, link, linkWarp } = nav
   const reach = post + NAV_ROOM_U
   open.set(nav.base)
   sides.fill(0)
   link.fill(-1)
   linkWarp.fill(-1)
-  for (const w of warps) {
-    if (!w) continue
-    for (const p of warpPosts(w, len)) {
-      for (let r = Math.max(0, Math.floor((p.y - reach - nav.y0) / NAV_CELL_U)); r < rows && nav.y0 + r * NAV_CELL_U < p.y + reach; r++) {
-        for (let c = Math.max(0, Math.floor((p.x - reach - nav.x0) / NAV_CELL_U)); c < cols && nav.x0 + c * NAV_CELL_U < p.x + reach; c++) {
-          const x = nav.x0 + (c + 0.5) * NAV_CELL_U
-          const y = nav.y0 + (r + 0.5) * NAV_CELL_U
-          if (Math.hypot(x - p.x, y - p.y) < reach) open[r * cols + c] = 0
-        }
+  for (const p of posts) {
+    for (let r = Math.max(0, Math.floor((p.y - reach - nav.y0) / NAV_CELL_U)); r < rows && nav.y0 + r * NAV_CELL_U < p.y + reach; r++) {
+      for (let c = Math.max(0, Math.floor((p.x - reach - nav.x0) / NAV_CELL_U)); c < cols && nav.x0 + c * NAV_CELL_U < p.x + reach; c++) {
+        const x = nav.x0 + (c + 0.5) * NAV_CELL_U
+        const y = nav.y0 + (r + 0.5) * NAV_CELL_U
+        if (Math.hypot(x - p.x, y - p.y) < reach) open[r * cols + c] = 0
       }
     }
   }
   const steps = Math.round(len / NAV_CELL_U)
   warps.forEach((w, i) => {
     const o = warps[i ^ 1]
-    if (!w || !o) return
+    if (!o) return
     // 门线左上侧的那一排（列）与右下侧的那一排（列），以及另一扇门的
     const line = Math.round(((w.axis === 0 ? w.x - nav.x0 : w.y - nav.y0) / NAV_CELL_U))
     const from = Math.round(((w.axis === 0 ? w.y - nav.y0 : w.x - nav.x0) / NAV_CELL_U))
