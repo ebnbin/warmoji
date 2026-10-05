@@ -6,7 +6,7 @@ import { SPAWN } from '../../data/enemies'
 import { Alive, Enemy, ENEMY_SET, Phys, Radius, Transform } from '../../ecs/components'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { leaderPoint } from '../../ecs/utils/team'
-import { grounded, passCost, probeZ, topOf } from '../../ecs/utils/pass'
+import { grounded, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { alongWall, awayFromWall, keepOut, makeBasin, roomAt } from '../basin'
 import { roomFor } from '../landmark'
@@ -259,6 +259,17 @@ function stepTiles(sim: Sim, s: NexusState): void {
   for (const e of query(sim.world, ENEMY_SET)) if (Alive.v[e] === 1 && grounded(sim.world, e)) mark(e, t.foe, t.foeFrom)
 }
 
+/** 线段 a→b（像素）最先在两头门柱之间越过的那扇门，与走到那里的比例；一扇都没越过为 null */
+function firstCross(s: NexusState, cfg: NexusConfig, ax: number, ay: number, bx: number, by: number): { readonly warp: number; readonly t: number } | null {
+  const w = cfg.warps
+  let best: { warp: number; t: number } | null = null
+  for (let i = 0; i < s.warps.length; i++) {
+    const t = warpCross(s.warps[i]!.spot, w.lenU, w.postU, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
+    if (t >= 0 && (!best || t < best.t)) best = { warp: i, t }
+  }
+  return best
+}
+
 /** 半径 rad 的身体走不进此刻挡身体的门柱：陷进去多深就沿连心线退回去 */
 function offPosts(s: NexusState, cfg: NexusConfig, p: Point, rad: number): Point {
   const min = rad + cfg.warps.postU * UNIT
@@ -423,7 +434,7 @@ function groundOf(sim: Sim): Surface {
 }
 
 /**
- * 天枢：能走的是幕墙围着的大厅，幕墙、立柱、电梯井与门柱是硬边界，走到跟前就停住；全息台齐腰，挡人，子弹从上面飞过去。
+ * 天枢：能走的是幕墙围着的大厅，幕墙、立柱、电梯井与门柱是硬边界，走到跟前就停住（穿墙的身体只被幕墙挡住）；全息台齐腰，挡人，子弹从上面飞过去。
  * 传送门：任何东西的中心在两头门柱之间越过门线，就平移到另一扇门同一侧接着走，速度不变；寻路认得门，穿门近就穿。
  * 门隔一阵挪一扇，预警过后一下换过去；地砖记着谁什么时候踩过
  */
@@ -459,20 +470,25 @@ export const nexus: WorldHooks = {
   contact() {
     return false
   },
+  /** 穿墙的身体穿得过厅里的建筑与门柱，出不了幕墙 */
   constrainBody(sim, eid, _from, next) {
     const s = nexusOf(sim)
     const r = Radius.v[eid]!
+    if (phases(sim.world, eid, 'structure')) return keepOut(s.floor, next.x, next.y, r)
     return offPosts(s, cfgOf(sim), keepOut(s.plan.basin, next.x, next.y, r), r)
   },
   basin(sim) {
     return nexusOf(sim).plan.basin
   },
+  /** 穿墙的身体直奔目标，直线要越过门线时才按寻路走 */
   chaseDir(sim, eid, tx, ty) {
     const s = nexusOf(sim)
+    const cfg = cfgOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const r = Radius.v[eid]!
-    const way = steer(s, cfgOf(sim), x, y, tx, ty, r)
+    if (phases(sim.world, eid, 'structure') && !firstCross(s, cfg, x, y, tx, ty)) return norm(tx - x, ty - y)
+    const way = steer(s, cfg, x, y, tx, ty, r)
     if (way) return way
     const d = norm(tx - x, ty - y)
     return alongWall(s.plan.basin, x, y, d.x, d.y, r + 0.3 * UNIT)
@@ -544,22 +560,33 @@ export const nexus: WorldHooks = {
   },
   portal(sim, eid, ax, ay, bx, by) {
     const s = nexusOf(sim)
-    const w = cfgOf(sim).warps
-    let best = -1
-    let bestT = Infinity
-    for (let i = 0; i < s.warps.length; i++) {
-      const t = warpCross(s.warps[i]!.spot, w.lenU, w.postU, ax / UNIT, ay / UNIT, bx / UNIT, by / UNIT)
-      if (t >= 0 && t < bestT) {
-        bestT = t
-        best = i
-      }
-    }
-    if (best < 0) return null
-    const a = s.warps[best]!.spot
-    const o = s.warps[best ^ 1]!.spot
-    const hop: PortalHop = { t: bestT, dx: (o.x - a.x) * UNIT, dy: (o.y - a.y) * UNIT }
-    if (eid >= 0) record(sim, s, eid, best, bx + hop.dx, by + hop.dy)
+    const c = firstCross(s, cfgOf(sim), ax, ay, bx, by)
+    if (!c) return null
+    const a = s.warps[c.warp]!.spot
+    const o = s.warps[c.warp ^ 1]!.spot
+    const hop: PortalHop = { t: c.t, dx: (o.x - a.x) * UNIT, dy: (o.y - a.y) * UNIT }
+    if (eid >= 0) record(sim, s, eid, c.warp, bx + hop.dx, by + hop.dy)
     return hop
+  },
+  /** 穿过第 i 扇门就平移到另一扇门那边：b 在门这边的像离 a 更近、直线又正好从这扇门的两头门柱之间过，就朝它飞 */
+  towards(sim, ax, ay, bx, by) {
+    const s = nexusOf(sim)
+    const w = cfgOf(sim).warps
+    let dx = bx - ax
+    let dy = by - ay
+    let best = Math.hypot(dx, dy)
+    for (let i = 0; i < s.warps.length; i++) {
+      const a = s.warps[i]!.spot
+      const o = s.warps[i ^ 1]!.spot
+      const ix = bx + (a.x - o.x) * UNIT
+      const iy = by + (a.y - o.y) * UNIT
+      const d = Math.hypot(ix - ax, iy - ay)
+      if (d >= best || warpCross(a, w.lenU, w.postU, ax / UNIT, ay / UNIT, ix / UNIT, iy / UNIT) < 0) continue
+      best = d
+      dx = ix - ax
+      dy = iy - ay
+    }
+    return { x: dx, y: dy }
   },
   /** 寻路还没铺到队长、或这里接不上寻路时按直线 */
   toLeader(sim, x, y) {

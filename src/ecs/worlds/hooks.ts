@@ -170,6 +170,8 @@ export interface WorldHooks {
   seat?(sim: Sim, from: Point, at: Point): Point
   /** 沿直线从 a 走到 b（像素）先穿过的那扇传送门；eid 不为 −1 时是这个实体此刻真的穿了过去。没有传送门的地图不写 */
   portal?(sim: Sim, eid: number, ax: number, ay: number, bx: number, by: number): PortalHop | null
+  /** 从 a 飞向 b（像素）最近的直路：直着飞，或先穿过一扇传送门再飞；返回这一路起头朝哪、多长的位移。没有传送门的地图不写，按 worldDelta */
+  towards?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point
   /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */
   toLeader?(sim: Sim, x: number, y: number): number
   onStart(sim: Sim): void

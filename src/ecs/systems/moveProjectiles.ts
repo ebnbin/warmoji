@@ -37,13 +37,16 @@ function steer(sim: Sim, eid: number, dt: number): void {
   Vel.y[eid] = Math.sin(a) * speed
 }
 
-/** 召回中的弹体飞向主人，到了就收起；主人没了就消失 */
+/** 召回中的弹体沿最近的直路（穿门近就穿门）飞向主人，到了就收起；主人没了就消失 */
 function home(sim: Sim, eid: number): boolean {
   const to = Linger.to[eid]!
   if (!isSameEntity(sim.world, to, Linger.toUid[eid]!)) return false
-  const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, Transform.x[to]!, Transform.y[to]!)
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  const near = sim.hooks.worldDelta(sim, x, y, Transform.x[to]!, Transform.y[to]!)
+  if (Math.hypot(near.x, near.y) <= Radius.v[to]!) return false
+  const d = sim.hooks.towards?.(sim, x, y, Transform.x[to]!, Transform.y[to]!) ?? near
   const dist = Math.hypot(d.x, d.y)
-  if (dist <= Radius.v[to]!) return false
   const sp = Linger.speed[eid]!
   Vel.x[eid] = (d.x / dist) * sp
   Vel.y[eid] = (d.y / dist) * sp
@@ -72,7 +75,7 @@ function reflect(sim: Sim, eid: number, b: number, x0: number, y0: number, x1: n
 }
 
 /**
- * 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速；越过传送门的门线就从另一扇门那边接着飞，速度不变；这一步的轨迹先截在第一个挡住它的障碍上（地图的按高度与贯穿，敌方的技能墙一律挡），
+ * 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速；越过传送门的门线就从另一扇门那边接着飞，速度不变（召回中的穿过去离主人更近才穿）；这一步的轨迹先截在第一个挡住它的障碍上（地图的按高度与贯穿，敌方的技能墙一律挡），
  * 截下的这一段照常判命中，判完就消失（会落地的落在那里），撞上时带着的破坏力打在障碍上；会反弹的技能墙把它弹回去。抛射的按飞了多远抬高，抛到地方落地
  */
 export function moveProjectiles(sim: Sim): void {
@@ -100,8 +103,14 @@ export function moveProjectiles(sim: Sim): void {
       if (Proj.spin[eid] === 0 && (FLIGHT.vx !== 0 || FLIGHT.vy !== 0)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
     }
     let len = Math.hypot(stepX, stepY)
-    // 传送门：离门线还远就先停在门线跟前，下一帧再穿；贴着门线就穿过去，剩下的路从另一扇门那边接着飞，命中从那边算起
-    const gate = len > 0 ? sim.hooks.portal?.(sim, -1, ax, ay, ax + stepX, ay + stepY) : null
+    // 传送门：离门线还远就先停在门线跟前，下一帧再穿；贴着门线就穿过去，剩下的路从另一扇门那边接着飞，命中从那边算起；召回中的只在穿过去离主人更近时穿
+    let gate = len > 0 ? (sim.hooks.portal?.(sim, -1, ax, ay, ax + stepX, ay + stepY) ?? null) : null
+    if (gate && hasComponent(sim.world, eid, Linger) && Linger.back[eid]) {
+      const to = Linger.to[eid]!
+      const ox = Transform.x[to]! - ax - stepX
+      const oy = Transform.y[to]! - ay - stepY
+      if (Math.hypot(ox - gate.dx, oy - gate.dy) >= Math.hypot(ox, oy)) gate = null
+    }
     if (gate) {
       const at = gate.t * len
       if (at > WARP_EDGE_PX * 2) {
