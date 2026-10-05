@@ -9,8 +9,13 @@ import type { Sim } from '../sim'
 import { leaderX, leaderY } from '../utils/team'
 
 const FADE_MS = 250
+/** 被地面盖住的掉落物透出来多少 */
+const COVERED_ALPHA = 0.3
 
-/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；穿行中的角色没有实体，不捡也不吸；位移由 moveBodies 负责，漂出世界就消失 */
+/**
+ * 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；穿行中的角色没有实体，不捡也不吸；
+ * 被地面盖住的不捡也不吸，只隐约透出来；位移由 moveBodies 负责，漂出世界就消失
+ */
 export function updatePickups(sim: Sim): void {
   const eids = query(sim.world, PICKUP_SET)
   if (eids.length === 0) return
@@ -25,8 +30,9 @@ export function updatePickups(sim: Sim): void {
       removeEntity(sim.world, eid)
       continue
     }
+    const covered = sim.hooks.covers?.(sim, x, y) ?? false
     const magnetic = Pull.on[eid] === 1
-    if (sim.frameAttractors.length > 0 && magnetic) {
+    if (!covered && sim.frameAttractors.length > 0 && magnetic) {
       let taken = false
       for (const a of sim.frameAttractors) {
         const ad = sim.hooks.worldDelta(sim, x, y, a.x, a.y)
@@ -39,21 +45,23 @@ export function updatePickups(sim: Sim): void {
       if (taken) continue
     }
     const grab = Grab.radius[eid]!
-    const grabbed = magnetic ? nearAliveCharacter(sim, x, y, grab) : present(sim.leader) && within(sim, x, y, lx, ly, grab)
+    const grabbed = !covered && (magnetic ? nearAliveCharacter(sim, x, y, grab) : present(sim.leader) && within(sim, x, y, lx, ly, grab))
     if (grabbed) {
       take(sim, eid)
       continue
     }
+    let alpha = covered ? COVERED_ALPHA : 1
     if (Lifetime.until[eid]! > 0) {
       const left = Lifetime.until[eid]! - now
       if (left <= 0) {
         removeEntity(sim.world, eid)
         continue
       }
-      if (left < FADE_MS) Tint.alpha[eid] = left / FADE_MS
+      if (left < FADE_MS) alpha *= left / FADE_MS
     }
+    Tint.alpha[eid] = alpha
     if (!magnetic) continue
-    const pull = magnetPull(sim, x, y)
+    const pull = covered ? null : magnetPull(sim, x, y)
     if (pull) {
       const dir = norm(pull.x, pull.y)
       Drive.x[eid] = dir.x * PICKUP.magnetSpeed * UNIT

@@ -742,6 +742,124 @@ export interface SakuraConfig {
   readonly body: WadeConfig
 }
 /**
+ * 红叶林：寺院外溪边的一片枫林空地，正是红叶最盛的时候。一面是寺院的瓦顶土墙，另外三面是枫林，林缘上的枫树一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
+ * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流是浅水方程在溪床上的稳态解，溪上架着一座木桥；
+ * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface MapleConfig {
+  readonly meterPerU: number
+  /** 地形格子的边长，格；地形铺满方框 */
+  readonly cellU: number
+  /** 地图是 sizeU 见方的方形，摆在方框正中 */
+  readonly sizeU: number
+  /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /**
+   * 寺墙：墙身中线离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；
+   * 院门宽（格）
+   */
+  readonly wall: {
+    readonly insetU: readonly [number, number]
+    readonly skewDeg: number
+    readonly kinkDeg: number
+    readonly thickU: number
+    readonly heightM: number
+    readonly eaveU: number
+    readonly gateU: number
+  }
+  /**
+   * 枫林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进空地的林舌或凹进林子的草湾，
+   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格
+   */
+  readonly forest: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly scallopU: number
+    readonly lobes: readonly [number, number]
+    readonly lobeU: readonly [number, number]
+    readonly lobeWidthU: readonly [number, number]
+  }
+  /**
+   * 溪：从进林缘到出林缘的走向离横竖方向至少 slantDeg 度，两头进出林子时再各偏最多 turnDeg 度；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍；
+   * 溪岸离寺墙至少 wallGapU 格
+   */
+  readonly stream: {
+    readonly slantDeg: number
+    readonly turnDeg: number
+    readonly meanderU: number
+    readonly minBend: number
+    readonly wallGapU: number
+  }
+  /**
+   * 溪的流量 discharge（米³/秒），河道按流量定：水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米），坡降由曼宁糙率 manning 反算；
+   * 横断面的水深按 1 − |ξ|^bedShape 从深泓往两岸收；弯顶的深潭、过渡段的浅滩相对平均的水深倍率 pool、riffle，深泓往凹岸偏到半宽的 thalwegShift 倍；
+   * 河岸高出水面 bankM 米、岸坡宽 bankU 格，岸顶以外的滩地每格升 floodSlope 米；空地上地面的起伏 reliefM 米
+   */
+  readonly flow: {
+    readonly discharge: number
+    readonly widthCoef: number
+    readonly depthCoef: number
+    readonly manning: number
+    readonly bedShape: number
+    readonly pool: number
+    readonly riffle: number
+    readonly thalwegShift: number
+    readonly bankM: number
+    readonly bankU: number
+    readonly floodSlope: number
+    readonly reliefM: number
+  }
+  /** 上游的石组：石头的半径（格）、石缝多宽（格）、石顶比水面高多少米 */
+  readonly rocks: {
+    readonly radiusU: readonly [number, number]
+    readonly gapU: readonly [number, number]
+    readonly heightM: number
+  }
+  /** 下游的石槛：槛前从河床升上槛顶的坡多长（格）、槛下的溪比槛顶低多少米；槛上的竹栅：竹桩隔多远（格）、多高（米） */
+  readonly sill: {
+    readonly rampU: number
+    readonly dropM: number
+    readonly postU: number
+    readonly heightM: number
+  }
+  /** 木桥：桥面宽（格）、两头落地的坡道多长（格）、桥面正中拱起多高（米）；架在溪的哪一段（弧长的比例） */
+  readonly bridge: {
+    readonly widthU: number
+    readonly rampU: number
+    readonly riseM: number
+    readonly at: readonly [number, number]
+  }
+  /** 枫树：空地上几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；寺墙外（寺里）的枫树隔多远一棵（格） */
+  readonly trees: {
+    readonly inside: readonly [number, number]
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly overhangU: number
+    readonly templeGapU: number
+  }
+  /**
+   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克，别的身体质量按半径的三次方与质量倍率缩放（半径不算队长倍率），身高按占的层数；
+   * 身体的密度 density（千克/米³）与水里的阻力系数 drag。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
+   * 或者干脆浮起来，就站不住、随水漂。站着时胯以下迎水的是两条腿：腿宽占身宽 legs、胯高占身高 hip；站着时重心到脚掌下游边的水平距离占身高 lever；
+   * 脚底踩在湿河床上的静摩擦系数 mu；随水漂着时自己划水的速度（相对水）占想走的速度的 swim；水深不到 wetM 米算干地
+   */
+  readonly body: {
+    readonly kg: number
+    readonly radiusU: number
+    readonly density: number
+    readonly drag: number
+    readonly legs: number
+    readonly hip: number
+    readonly lever: number
+    readonly mu: number
+    readonly swim: number
+    readonly wetM: number
+  }
+}
+/**
  * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
  * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
  */
@@ -869,6 +987,46 @@ export interface CircuitConfig {
     readonly holdMs: number
     readonly rearmMs: number
   }
+}
+/**
+ * 天枢：未来城市一座高楼顶上的空中大厅，切了角的方形，四周是落地的玻璃幕墙，贴着幕墙一圈玻璃地面，往下看是夜里城市的灯海。
+ * 厅里的地面是一格一块的瓷砖，谁踩上去就亮起谁的颜色、慢慢暗下去；立柱与电梯井顶到天花板，全息台齐腰。
+ * 厅里有几对传送门：每扇门是格线上一段发光的粗线，同一对门朝向相同、颜色相同；任何东西的中心越过一扇门的门线，
+ * 就平移到另一扇门同一侧接着走，速度不变。每隔一阵有一扇门挪到别处：旧处闪烁、错位，新处先出一条虚线、被一个光点沿线画实，预警过后一下换过去
+ */
+export interface NexusConfig {
+  /** 大厅外接的方形边长（格），摆在方框正中；四个角斜切 chamferU 格 */
+  readonly sizeU: number
+  readonly chamferU: readonly [number, number]
+  /** 贴着幕墙内侧那一圈玻璃地面多宽，格 */
+  readonly glassU: number
+  /** 窄过两倍 neckU 的缝不能走 */
+  readonly neckU: number
+  /** 开局站的那片空地的半径，格 */
+  readonly plazaU: number
+  /** 立柱：几根，半径（格），围着厅心摆在多远的一圈上（格） */
+  readonly pillars: { readonly count: readonly [number, number]; readonly radiusU: number; readonly ringU: readonly [number, number] }
+  /** 全息台：几座，台面半径（格），多高（米） */
+  readonly pedestals: { readonly count: readonly [number, number]; readonly radiusU: number; readonly heightM: number }
+  /** 电梯井：几座，沿墙多宽、往厅里多深（格），每座两扇门，门多宽（格） */
+  readonly cores: { readonly count: readonly [number, number]; readonly widthU: number; readonly depthU: number; readonly doorU: number }
+  /** 地上的检修口：几处 */
+  readonly hatches: readonly [number, number]
+  /**
+   * 传送门：几对；门线多长（格）；门线两侧各要空出 apronU 格；同一对的两扇门至少隔 pairU 格，任两扇门至少隔 apartU 格；
+   * 每隔 everyMs 有一扇门挪到别处，旧处与新处一起预警 warnMs 后换过去
+   */
+  readonly warps: {
+    readonly pairs: readonly [number, number]
+    readonly lenU: number
+    readonly apronU: number
+    readonly pairU: number
+    readonly apartU: number
+    readonly everyMs: readonly [number, number]
+    readonly warnMs: number
+  }
+  /** 地砖被踩亮以后按 fadeMs 的时间常数暗下去 */
+  readonly tiles: { readonly fadeMs: number }
 }
 /** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
 export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
@@ -1042,6 +1200,139 @@ export interface RuinsConfig {
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
 }
+/**
+ * 深海：大陆坡上一道海底峡谷的谷底，两侧是陡峭的岩壁，上游一头是从岩壁上塌下来的岩堆，下游一头是往下没进黑暗的陡坎；谷底铺着软泥，散着大石头，躺着一副鲸骨，有一两处冒泡的冷泉。
+ * 队伍从一艘潜艇里出来：潜艇停在谷底上，只有一舷开着门，门口罩着一团空气。队员离开门口只能憋着气，回到门口那一片才喘得上气；潜艇隔一阵自己开走，换个地方停下。
+ * 海里的东西不用换气。物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface DeepConfig {
+  readonly meterPerU: number
+  /** 地图是 sizeU 见方的方形，摆在方框正中 */
+  readonly sizeU: number
+  /** 能走的谷底有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /** 谷底的起伏（米）与波长（格）；顺着峡谷往陡坎那头每格降多少米 */
+  readonly floor: { readonly reliefM: number; readonly waveU: number; readonly tiltM: number }
+  /** 两侧岩壁：壁脚离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU）；壁高（米），从壁脚到壁顶横着多宽（格） */
+  readonly walls: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly heightM: readonly [number, number]
+    readonly slopeU: readonly [number, number]
+  }
+  /** 上游的岩堆：堆脚离地图边 insetU 格之间，弯出最多 bendU（波长 waveU）；石块多大（格），堆多高（米），从堆脚到堆顶多宽（格） */
+  readonly rubble: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waveU: number
+    readonly blockU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly slopeU: number
+  }
+  /** 下游的陡坎：坎沿离地图边 insetU 格之间，弯出最多 bendU（波长 waveU）；坎下的坡起头每格降多少米，越往下越陡 */
+  readonly lip: { readonly insetU: readonly [number, number]; readonly bendU: number; readonly waveU: number; readonly dropM: number }
+  /** 谷底的大石头：几块、底半径（格）、多高（米）；离开局站位至少 clearU 格，彼此至少隔 gapU 格，靠壁脚的占多少 */
+  readonly boulders: {
+    readonly count: readonly [number, number]
+    readonly radiusU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly clearU: number
+    readonly gapU: number
+    readonly wallShare: number
+  }
+  /** 鲸骨：鲸多长（米），离开局站位至少多远（格）；只有头骨挡路，高 skullM 米，脊椎与肋骨矮得跨得过去 */
+  readonly whale: { readonly lengthM: readonly [number, number]; readonly clearU: number; readonly skullM: number }
+  /** 冷泉：几处、多大（格），离开局站位至少多远（格） */
+  readonly seeps: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly clearU: number }
+  /**
+   * 潜艇：艇长、艇宽（格），艇身从艇底往上多高（米，挡子弹按它）；门口那一片喘得上气的半圆的半径（格）；开走时浮到离谷底多高（米）。
+   * 门口每秒补多少点体力，憋着气每秒掉多少点；气见底后满血的标准身体几秒呛死，每 tickMs 结算一次。
+   * 开局 firstMs 后第一次开走，之后隔 intervalMs 上下 jitterMs；先预兆 warnMs（门口还喘得上气），再用 riseMs 浮起、按 speedMs（米/秒）开过去、用 settleMs 落下；
+   * 新落点离旧的 moveU 格之间，艇身离边与石头至少 roomU 格
+   */
+  readonly sub: {
+    readonly lengthU: number
+    readonly beamU: number
+    readonly heightM: number
+    readonly doorU: number
+    readonly cruiseM: number
+    readonly breath: number
+    readonly hold: number
+    readonly drownSec: number
+    readonly tickMs: number
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly warnMs: number
+    readonly riseMs: number
+    readonly settleMs: number
+    readonly speedMs: number
+    readonly moveU: readonly [number, number]
+    readonly roomU: number
+  }
+}
+/**
+ * 培养皿：实验室灯箱上的一只血琼脂培养皿，队伍和敌人缩到菌落的尺度，在琼脂上作战；一格 mmPerU 毫米。圆形的玻璃皿壁是硬边界，挡身体也挡子弹，看得穿。
+ * 开局按四区划线接种过：菌落按反应扩散（费希尔方程）往外长，前沿匀速推进，越厚越黏脚，敌我走得都慢、更费体力。
+ * 身体死在哪里就放出一团溶菌物质：浓度高过最低抑菌浓度的地方菌落被溶掉、也长不出来；它按半衰期衰减，抑菌圈慢慢缩小，菌落再从边上长回来。
+ * 菌落长过的掉落物被盖住：捡不到也吸不走，那块清干净才露出来
+ */
+export interface PetriConfig {
+  readonly mmPerU: number
+  /** 皿：琼脂面（皿壁内侧）的半径、玻璃壁厚，格；皿心在方框正中 */
+  readonly dish: { readonly radiusU: number; readonly wallU: number }
+  /** 开局站的那片空地的半径（格）：接种不落在里面 */
+  readonly plazaU: number
+  /**
+   * 接种：皿底用记号笔分成四区，从随机一区起顺着一个方向依次划 quadrants 个区，每区在 band 倍半径之间来回划 strokes 道；
+   * 第 k 区沿线每隔 spacingU[k] 格落一个菌落，一区比一区稀：头一区连成菌苔，末一区只剩零星的单菌落；菌落开局半径 colonyU 格；另有 strays 个落在别处的杂菌
+   */
+  readonly streak: {
+    readonly quadrants: readonly [number, number]
+    readonly strokes: readonly [number, number]
+    readonly band: readonly [number, number]
+    readonly spacingU: readonly [number, number, number, number]
+    readonly colonyU: readonly [number, number]
+    readonly strays: readonly [number, number]
+  }
+  /**
+   * 菌落：格子边长 cellU 格、每 stepMs 积分一步；局部按逻辑斯谛增长率 growth（每秒）长满，前沿每秒推进 frontU 格；
+   * 增长率按波长 waveU 格的噪声在 1 ± patchy 倍之间起伏，前沿长得高低不齐；开局先长 preS 秒；密度过 mature 起算长熟，matureS 秒长到最厚；
+   * 贴着皿壁 rimU 格宽的一圈永远长满、溶不掉，菌落从那里一直往里长
+   */
+  readonly colony: {
+    readonly cellU: number
+    readonly stepMs: number
+    readonly growth: number
+    readonly frontU: number
+    readonly waveU: number
+    readonly patchy: number
+    readonly preS: number
+    readonly mature: number
+    readonly matureS: number
+    readonly rimU: number
+  }
+  /** 密度过 edge 的地方就是菌落：画成菌落，粘住我方角色，盖住躺在那里的掉落物；不到的地方就是干净的琼脂 */
+  readonly edge: number
+  /** 我方角色踩进菌落：黏度 viscosity、每走一格多耗 exertion 点体力；敌人不受影响 */
+  readonly stick: {
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /**
+   * 溶菌：标准身体死后当场溶掉半径 radiusU 格的一圈，holdS 秒后那圈才缩没；个头大的按半径等比例铺得更开。
+   * 溶菌物质按 halfLifeS 秒的半衰期衰减；高过最低抑菌浓度的地方菌落长不出来，每秒按 lysePerS 乘超出的倍数溶掉，低于它时增长按浓度打折
+   */
+  readonly lysis: {
+    readonly radiusU: number
+    readonly holdS: number
+    readonly halfLifeS: number
+    readonly lysePerS: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1050,8 +1341,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1116,7 +1407,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'circuit' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1144,7 +1435,11 @@ export interface MapDef {
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
   readonly sakura?: SakuraConfig
+  readonly maple?: MapleConfig
   readonly circuit?: CircuitConfig
+  readonly nexus?: NexusConfig
+  readonly deep?: DeepConfig
+  readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
@@ -1152,7 +1447,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
 
 export interface DecorInstance {
   emoji: string

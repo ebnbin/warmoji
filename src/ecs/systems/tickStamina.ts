@@ -16,6 +16,7 @@ function walked(eid: number, dt: number): number {
  * 赶路按格数扣体力：乘脚下的费力、朝这个方向走的费力倍率与属性表的赶路耗体力。
  * 队员为队长走的路付费，方向按队长走的方向，队长扣全额、其余只扣跟跑的那份；队员自己跟队、找坑的碎步不算。
  * 这一帧没被扣就算在歇，歇满一阵后按体力回复乘脚下的回复倍率先慢后快地回。
+ * 地图让身体换气时：喘得上气的走着也补，憋着气的不论走不走都往下掉、也不算在歇。
  */
 export function tickStamina(sim: Sim): void {
   const leader = sim.leader
@@ -32,11 +33,13 @@ export function tickStamina(sim: Sim): void {
     const by = member ? leader : eid
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    const ground = sim.hooks.surface(sim, x, y)
+    const ground = sim.hooks.surface(sim, x, y, eid)
     const share = member && eid !== leader ? draft : 1
     const cost = dist > 0 ? (dist / UNIT) * ground.exertion * scale * sim.hooks.effort(sim, x, y, Drive.x[by]!, Drive.y[by]!) * Stats.exertion[eid]! * share : 0
     const max = Stats.maxStamina[eid]!
-    if (cost > 0) {
+    const air = sim.hooks.breath?.(sim, eid) ?? 0
+    if (air !== 0) Stamina.used[eid] = Math.max(0, Stamina.used[eid]! - air * dt)
+    if (cost > 0 || air < 0) {
       Stamina.used[eid] = Math.min(max, Stamina.used[eid]! + cost)
       Stamina.restMs[eid] = 0
       continue

@@ -33,8 +33,8 @@ function groundAt(sim: Sim, s: Surface, x: number, y: number): Surface {
 export function withBuilt(base: WorldHooks): WorldHooks {
   return {
     ...base,
-    surface(sim, x, y) {
-      return groundAt(sim, base.surface(sim, x, y), x, y)
+    surface(sim, x, y, body) {
+      return groundAt(sim, base.surface(sim, x, y, body), x, y)
     },
     constrainBody(sim, eid, from, next) {
       return blockBody(sim, eid, from, base.constrainBody(sim, eid, from, next))

@@ -24,12 +24,26 @@ const RUINS_EVENTS = [
 
 export const BATTLEFIELD = {
   pools: {
+    nexus: [
+      { id: 'nexus_overclock', emoji: '1f4bb', name: '算力全开', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'nexus_lock', emoji: '1f3af', name: '全息锁定', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'nexus_field', emoji: '1f9f2', name: '力场束缚', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'nexus_lag', emoji: '1f4f6', name: '信号延迟', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'nexus_noise', emoji: '1f4fa', name: '信号干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
     circuit: [
       { id: 'circuit_overclock', emoji: '26a1', name: '超频运行', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
       { id: 'circuit_boost', emoji: '1f50b', name: '升压供电', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'circuit_static', emoji: '1f9f2', name: '静电吸附', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
       { id: 'circuit_brownout', emoji: '1faab', name: '电压骤降', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'circuit_jam', emoji: '1f4e1', name: '电磁干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
+    petri: [
+      { id: 'petri_nutrient', emoji: '1f9eb', name: '营养充足', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'petri_penicillin', emoji: '1f48a', name: '青霉素', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'petri_chill', emoji: '1f9ca', name: '冷藏抑菌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'petri_biofilm', emoji: '1f9a0', name: '菌膜缠身', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'petri_incubator', emoji: '1f321', name: '培养箱闷热', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
     meadow: [
       { id: 'meadow_breeze', emoji: '1f32c', name: '山风送爽', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
@@ -48,6 +62,7 @@ export const BATTLEFIELD = {
     desert: DESERT_EVENTS,
     oldRiver: RIVER_EVENTS,
     sakura: RIVER_EVENTS,
+    maple: RIVER_EVENTS,
     void: [
       { id: 'factory_grind', emoji: '2699', name: '齿轮咬滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
       { id: 'factory_turbo', emoji: '26a1', name: '涡轮增压', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
@@ -112,6 +127,13 @@ export const BATTLEFIELD = {
       { id: 'nebula_tide', emoji: '1f300', name: '潮汐撕扯', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
       { id: 'nebula_dust', emoji: '1f32b', name: '星尘拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'nebula_redshift', emoji: '1f534', name: '红移', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
+    deep: [
+      { id: 'deep_song', emoji: '1f40b', name: '鲸歌回荡', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'deep_glow', emoji: '1fabc', name: '冷光指路', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'deep_school', emoji: '1f41f', name: '鱼群搅局', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'deep_current', emoji: '1f30a', name: '暗流拖拽', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'deep_pressure', emoji: '1fae7', name: '水压压身', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
     cave: [
       { id: 'cave_echo', emoji: '1f514', name: '钟乳回响', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },

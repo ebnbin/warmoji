@@ -40,7 +40,12 @@ import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
+import { bridgeLocal as mapleBridgeLocal, CREST_U as MAPLE_CREST_U, maplePlan, SINK_M as MAPLE_SINK_M, weirLocal as mapleWeirLocal } from '../src/maps/maple/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
+import { deepPlan } from '../src/maps/deep/layout.ts'
+import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
+import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
+import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
@@ -383,6 +388,77 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
+ * 深海：参数说得通；头骨挡得住标准身体、大石头比标准身体矮的子弹飞得过去；艇身收得出艇尾、门开在一样粗的那一段、比标准身体高，门口那一片装得下队长和跟在身后的队员，
+ * 喘上气补得比憋气掉得快，满满一口气撑得过潜艇开走一次的两倍时间，开走一次走完才到下一次；
+ * 抽一批种子真的生成一遍：每张都生成得出来，开局站位离边够远，陡坎沿、岩堆脚、鲸骨与冷泉都有出怪的地标，潜艇在开局站位旁停得下、也开得出去
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'deep') === (m.deep !== undefined), `maps.${id} 是深海当且仅当写了 deep`)
+  const d = m.deep
+  if (!d) continue
+  const at = `maps.${id}.deep`
+  const span = (v: readonly [number, number]): boolean => v[0] <= v[1]
+  const pos = (v: readonly [number, number]): boolean => v[0] > 0 && span(v)
+  const ints = (v: readonly [number, number]): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && span(v)
+  const { floor, walls, rubble, lip, boulders, whale, seeps, sub } = d
+  const half = d.sizeU / 2 - SPAWN_CLEAR_U - 1
+  need(d.meterPerU > 0 && d.sizeU > 0 && d.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
+  need(d.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(pos(d.areaU2) && d.areaU2[1] < d.sizeU * d.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
+  need(floor.reliefM >= 0 && floor.waveU > 0 && floor.tiltM >= 0, `${at}.floor 的起伏与坡度不为负、波长为正`)
+  for (const [name, e] of [['walls', walls], ['rubble', rubble], ['lip', lip]] as const) {
+    need(pos(e.insetU) && e.bendU >= 0 && e.waveU > 0 && e.insetU[1] + e.bendU < half, `${at}.${name} 的边距、弯与波长须为正，边落在地图边与出生点四周的空地之间`)
+  }
+  need(pos(walls.heightM) && pos(walls.slopeU), `${at}.walls 的壁高与壁宽须为正的范围`)
+  need(pos(rubble.blockU) && pos(rubble.heightM) && rubble.slopeU > 0, `${at}.rubble 的石块、堆高与堆宽须为正`)
+  need(lip.dropM > 0, `${at}.lip.dropM 须为正：坎外是往下的坡`)
+  const B = OBSTACLES.body
+  const clearM = (B.heightM / B.layers) * Math.floor(B.layers * B.step)
+  need(ints(boulders.count) && pos(boulders.radiusU) && pos(boulders.heightM) && boulders.heightM[0] > clearM, `${at}.boulders 的个数须为非负整数、尺寸为正，最矮的也挡得住标准身体`)
+  need(boulders.clearU >= SPAWN_CLEAR_U && boulders.gapU > 2 * d.neckU && boulders.wallShare >= 0 && boulders.wallShare <= 1, `${at}.boulders 离出生点至少 ${SPAWN_CLEAR_U} 格、彼此隔得开窄缝，靠壁的占比在 [0, 1] 内`)
+  need(pos(whale.lengthM) && whale.clearU >= SPAWN_CLEAR_U && whale.skullM > clearM, `${at}.whale 的鲸长须为正，头骨离出生点至少 ${SPAWN_CLEAR_U} 格、高得挡住标准身体`)
+  need(ints(seeps.count) && seeps.count[0] >= 1 && pos(seeps.radiusU) && seeps.clearU >= SPAWN_CLEAR_U, `${at}.seeps 至少一处、半径为正，离出生点至少 ${SPAWN_CLEAR_U} 格`)
+  const hull = hullOf(sub)
+  need(sub.beamU > 0 && sub.lengthU > sub.beamU && hull.tail < hull.neck && hull.neck <= hull.door && hull.door <= hull.bow && hull.r - hull.tailR < hull.neck - hull.tail, `${at}.sub 的艇身太短：收不出艇尾，门也要开在一样粗的那一段`)
+  need(sub.heightM > B.heightM && sub.cruiseM > B.heightM, `${at}.sub 的艇身须比标准身体高，开走时浮得过身体的头顶`)
+  need(sub.hold > 0 && sub.breath > sub.hold && sub.drownSec > 0 && sub.tickMs > 0, `${at}.sub 憋气要掉气、换气补得比掉得快，呛水的时长与节拍为正`)
+  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(sub.doorU >= squad + 0.5, `${at}.sub 门口那一片只有 ${sub.doorU} 格，装不下跟在队长身后 ${squad.toFixed(2)} 格的队员`)
+  need(sub.roomU > 0 && pos(sub.moveU) && sub.moveU[1] < d.sizeU, `${at}.sub 的艇壁离边要留空，开走的距离须为正、比地图小`)
+  need(sub.firstMs > 0 && sub.jitterMs >= 0 && sub.warnMs > 0 && sub.riseMs > 0 && sub.settleMs > 0 && sub.speedMs > 0, `${at}.sub 开走的各段时长与速度须为正`)
+  const transitMs = sub.riseMs + sub.settleMs + ((sub.moveU[1] * d.meterPerU) / sub.speedMs) * 1000
+  need(sub.intervalMs - sub.jitterMs > sub.warnMs + transitMs, `${at}.sub 潜艇开走一次走完前不该到下一次`)
+  need((STATS.maxStamina.base / sub.hold) * 1000 >= transitMs * 2, `${at}.sub 满满一口气撑 ${(STATS.maxStamina.base / sub.hold).toFixed(1)} 秒，撑不过潜艇开走一次的两倍时间`)
+  for (let s = 0; s < 24; s++) {
+    const where = `${at} 第 ${s} 个样本`
+    let plan: ReturnType<typeof deepPlan>
+    try {
+      plan = deepPlan(d, s * 7919 + 13)
+    } catch (e) {
+      need(false, `${where} 生成不出来：${(e as Error).message}`)
+      continue
+    }
+    const sx = plan.start.x * UNIT
+    const sy = plan.start.y * UNIT
+    need(roomAt(plan.basin, sx, sy) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
+    const mk = plan.marks
+    need(mk.abyss.length >= 3 && mk.rubble.length >= 2 && mk.bones.length >= 2 && mk.seep.length >= seeps.count[0], `${where} 的陡坎沿、岩堆脚、鲸骨或冷泉缺出怪的地标`)
+    const berth = { plan, hull, rim: rimOf(hull, 48), inner: innerOf(hull, 0.5) }
+    const home = homePose(berth, sub)
+    need(fits(berth, sub, home, sub.roomU * UNIT), `${where} 的潜艇在开局站位旁停不下：艇壁离边与石头不到 ${sub.roomU} 格`)
+    let moves = 0
+    for (let k = 0; k < 64; k++) {
+      const a = (k / 64) * Math.PI * 2
+      const r = ((sub.moveU[0] + sub.moveU[1]) / 2) * UNIT
+      const x = home.x + Math.cos(a) * r
+      const y = home.y + Math.sin(a) * r
+      if ([0, 1, 2, 3, 4, 5, 6, 7].some((j) => fits(berth, sub, { x, y, a: (j / 8) * Math.PI * 2 }, sub.roomU * UNIT))) moves++
+    }
+    need(moves >= 4, `${where} 的潜艇从开局停的地方开不出去：开走的距离上几乎找不到停得下的地方`)
+  }
+}
+
+/**
  * 樱庭：参数说得通；槛下的溪比槛顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
  * 开局站位离边够远，桥两头落在能走的地方，石槛顶没有塌下去的缺口
  */
@@ -431,6 +507,54 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
+ * 红叶林：参数说得通；槛下的溪比槛顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
+ * 开局站位离边够远，桥两头落在能走的地方，石槛顶没有塌下去的缺口
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'maple') === (m.maple !== undefined), `maps.${id} 是红叶林当且仅当写了 maple`)
+  const s = m.maple
+  if (!s) continue
+  const at = `maps.${id}.maple`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { wall, forest: fo, stream: st, flow: f, rocks: rk, sill: sl, bridge: bg, trees: tr, body: b } = s
+  need(s.meterPerU > 0 && s.cellU > 0 && s.sizeU > 0 && s.neckU > 0, `${at} 的米每格、地形格子、地图边长与窄缝须为正`)
+  need(s.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(s.areaU2[0] > 0 && range(s.areaU2, false) && s.areaU2[1] < s.sizeU * s.sizeU, `${at}.areaU2 须是比整张地图小的正的范围`)
+  need(wall.insetU[0] > wall.thickU / 2 && range(wall.insetU, false) && wall.skewDeg >= 0 && wall.skewDeg < 30 && wall.kinkDeg >= 0 && wall.kinkDeg < 30, `${at}.wall 的墙身离地图边至少半个墙厚，整条斜与中途拐都不到 30 度`)
+  need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
+  need(fo.insetU[0] > 0 && range(fo.insetU, false) && fo.bendU >= 0 && fo.waveU > 0 && fo.scallopU >= 0 && range(fo.lobes, true) && range(fo.lobeU, false) && fo.lobeWidthU[0] > 0 && range(fo.lobeWidthU, false), `${at}.forest 的林缘离地图边、弯的幅度与波长、林舌草湾的大小须说得通`)
+  need(st.slantDeg > 0 && st.slantDeg < 45 && st.turnDeg >= 0 && st.meanderU >= 0 && st.minBend >= 1 && st.wallGapU >= 0, `${at}.stream 的斜角在 (0, 45) 度里，偏角与蜿蜒不为负、弯道半径至少一个水面宽、离寺墙不为负`)
+  need(f.discharge > 0 && f.widthCoef > 0 && f.depthCoef > 0 && f.manning > 0 && f.bedShape >= 1, `${at}.flow 的流量、水力几何系数与糙率须为正，断面形状指数不小于 1`)
+  need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `${at}.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出溪岸`)
+  need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `${at}.flow 的溪岸须有高有宽，滩地不往溪里倾`)
+  need(rk.radiusU[0] > 0 && range(rk.radiusU, false) && range(rk.gapU, false) && rk.gapU[1] < b.radiusU && rk.heightM > 0, `${at}.rocks 的石头有大小，石缝窄过身子的半径，石顶露出水面`)
+  need(sl.rampU > 0 && sl.dropM + 0.3 > MAPLE_SINK_M && sl.postU > 0 && sl.heightM > 0, `${at}.sill 的槛前有坡，槛下的溪比槛顶低过 ${MAPLE_SINK_M} 米（水流到那里才算落下去），竹栅有桩距有高`)
+  need(bg.widthU > s.neckU * 2 && bg.rampU > 0 && bg.riseM > 0 && bg.at[0] > 0 && range(bg.at, false) && bg.at[1] < 1, `${at}.bridge 的桥面须比窄缝宽、坡道与拱有长有高，架在溪的 (0, 1) 段`)
+  need(tr.crownU[0] > tr.overhangU && range(tr.crownU, false) && tr.heightM[0] > 0 && range(tr.heightM, false) && range(tr.inside, true) && tr.templeGapU > 0, `${at}.trees 的树冠须比能走进去的那截大，树高为正，空地上的棵数为非负整数范围，寺里的间距为正`)
+  need(b.kg > 0 && b.radiusU > 0 && b.density > 0 && b.drag > 0, `${at}.body 的体重、半径、密度与阻力系数须为正`)
+  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.mu > 0, `${at}.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂与脚底摩擦系数为正`)
+  need(b.swim >= 0 && b.wetM > 0, `${at}.body 的划水不为负，湿地水深为正`)
+  for (let k = 0; k < 8; k++) {
+    const plan = maplePlan(s, k * 7919 + 13)
+    const where = `${at} 第 ${k} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
+    const br = plan.bridge
+    for (const sgn of [-1, 1]) {
+      const x = br.x + br.ax * sgn * (br.half - 0.3)
+      const y = br.y + br.ay * sgn * (br.half - 0.3)
+      need(roomAt(plan.basin, x * UNIT, y * UNIT) > 0.5 * UNIT && Math.abs(mapleBridgeLocal(br, x, y).a) < br.half, `${where} 的桥头没落在能走的地方`)
+    }
+    const t = plan.terrain
+    let notch = 0
+    for (let i = 0; i < t.z.length; i++) {
+      const wl = mapleWeirLocal(plan.weir, t.x0 + ((i % t.cols) + 0.5) * t.cell, t.y0 + (Math.floor(i / t.cols) + 0.5) * t.cell)
+      if (wl.side < plan.weir.half && wl.along >= 0 && wl.along < MAPLE_CREST_U - 0.05 && t.z[i]! < plan.weir.crest - 0.01) notch++
+    }
+    need(notch === 0, `${where} 的石槛顶有 ${notch} 格塌了下去，水会从缺口漏走`)
+  }
+}
+
+/**
  * 电路板：参数说得通——过道与两尖之间走得过标准身体，时钟线的线距比线宽宽，队长和小怪站在开关的圆金上脚碰不到盘外带电的铜（栅格再差一格也碰不到）；
  * 抽一批种子真的生成一遍：每块都生成得出来，开局站位四周空着，带电网络的条数编得进电流着色器，电弧的处数在范围里
  */
@@ -464,6 +588,90 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
     need(plan.nets.length <= NET_SLOTS, `${where} 的带电网络太多，编不进电流着色器`)
     need(plan.gaps.length >= arc.count[0] && plan.gaps.length <= arc.count[1], `${where} 的电弧处数不在范围里`)
+  }
+}
+
+/**
+ * 天枢：大厅放得进方框的安全区，开局空地空得出出生点要的格数；门线是整格长、落在格线上；
+ * 全息台挡得住标准身体、又比平射的子弹矮；门的对数不超过颜色的种数，挪门的间隔比预警长。
+ * 抽一批种子真的生成一遍：每个都生成得出来，开局站位四周空着，门的对数在范围里，同一对朝向相同、隔得够远，横竖两种门各有足够的地方挪
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'nexus') === (m.nexus !== undefined), `maps.${id} 是天枢当且仅当写了 nexus`)
+  const c = m.nexus
+  if (!c) continue
+  const at = `maps.${id}.nexus`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const w = c.warps
+  const B = OBSTACLES.body
+  const layerM = B.heightM / B.layers
+  const chestM = (B.layers - 0.5) * layerM
+  const layersOf = (h: number): number => Math.ceil(h / layerM - 1e-9)
+  need(c.sizeU > 0 && c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at}.plazaU 须空得出出生点要的格数`)
+  need(c.glassU > 0 && c.neckU > 0 && range(c.chamferU, false) && c.chamferU[1] < c.sizeU / 2, `${at} 的玻璃地面、窄缝与切角须为正，切角小于半边`)
+  need(c.pillars.radiusU > 0 && range(c.pillars.count, true) && range(c.pillars.ringU, false) && c.pillars.ringU[0] > c.plazaU + c.pillars.radiusU, `${at}.pillars 须在开局空地以外`)
+  need(c.pedestals.radiusU > 0 && range(c.pedestals.count, true), `${at}.pedestals 的半径须为正、座数是整数范围`)
+  need(layersOf(c.pedestals.heightM) > Math.floor(B.layers * B.step) && layersOf(c.pedestals.heightM) * layerM < chestM, `${at}.pedestals.heightM 须挡得住标准身体、又比平射的子弹矮`)
+  need(c.cores.widthU > c.cores.doorU * 2 && c.cores.depthU > 0 && range(c.cores.count, true) && c.cores.count[1] <= 2, `${at}.cores 须放得下两扇门，最多两座`)
+  need(range(c.hatches, true), `${at}.hatches 须是整数范围`)
+  need(Number.isInteger(w.lenU) && w.lenU > 0, `${at}.warps.lenU 须是整格：门线落在格线上`)
+  need(w.pairs[0] >= 1 && range(w.pairs, true) && w.pairs[1] <= 3, `${at}.warps.pairs 须在 1 到 3 对之间：门的颜色只有三种`)
+  need(w.apronU >= 1 && w.apartU > w.lenU && w.pairU > w.apartU, `${at}.warps 门线两侧至少空一格，同一对隔得比任两扇门远，任两扇门的中点隔得比门长`)
+  need(w.warnMs > 0 && range(w.everyMs, false) && w.everyMs[0] > w.warnMs, `${at}.warps 挪门的间隔须比预警长`)
+  need(c.tiles.fadeMs > 0, `${at}.tiles.fadeMs 须为正`)
+  for (let s = 0; s < 16; s++) {
+    const plan = nexusPlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+    const pairs = plan.warps.length / 2
+    need(pairs >= w.pairs[0] && pairs <= w.pairs[1], `${where} 的门的对数不在范围里`)
+    for (let k = 0; k < plan.warps.length; k += 2) {
+      const a = plan.warps[k]!
+      const b = plan.warps[k + 1]!
+      need(a.axis === b.axis && warpApart(a, b, w.lenU) >= w.pairU, `${where} 的第 ${k / 2} 对门朝向不同或隔得太近`)
+    }
+    for (const axis of [0, 1]) need(plan.spots.filter((p) => p.axis === axis).length >= 12, `${where} 摆得下${axis === 0 ? '竖' : '横'}门的地方不到 12 处，门挪不开`)
+  }
+}
+
+/**
+ * 培养皿：皿放得进安全区，开局空地空得出出生点、落在划线区以内；四区划线的区数、道数是范围，每区落菌的间距一区比一区稀；
+ * 菌落的前沿在格子上长得圆（过渡带宽过一格），显式积分不出负数也不发散，皿边常驻的一圈宽过一格、碰不到开局空地；
+ * 算作菌落的密度线、黏脚、溶菌的参数说得通，标准身体溶出的圈盖得过它掉的金币；
+ * 抽一批种子真的生成一遍：每只皿都接种上了菌落，皿心的空地上没有，开局站位四周空着
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'petri') === (m.petri !== undefined), `maps.${id} 是培养皿当且仅当写了 petri`)
+  const p = m.petri
+  if (!p) continue
+  const at = `maps.${id}.petri`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { dish, streak, colony, stick, lysis } = p
+  need(p.mmPerU > 0 && dish.radiusU > 0 && dish.wallU > 0, `${at} 的毫米每格、皿的半径与壁厚须为正`)
+  need(dish.radiusU + dish.wallU <= (FRAME_U - SAFE_U * 2) / 2, `${at}.dish 须放得进方框的安全区`)
+  need(p.plazaU - 0.5 >= SPAWN_CLEAR_U && p.plazaU < dish.radiusU * streak.band[0], `${at}.plazaU 须空得出出生点要的格数，且落在划线区以内`)
+  need(range(streak.quadrants, true) && streak.quadrants[0] >= 1 && streak.quadrants[1] <= 4, `${at}.streak.quadrants 须在 1 到 4 区之间`)
+  need(range(streak.strokes, true) && streak.strokes[0] >= 1, `${at}.streak.strokes 须至少划一道`)
+  need(streak.band[0] > 0 && streak.band[0] < streak.band[1] && streak.band[1] < 1, `${at}.streak.band 须在 (0, 1) 倍半径之间、由内到外`)
+  need(streak.spacingU.every((g, i) => g > 0 && (i === 0 || g >= streak.spacingU[i - 1]!)), `${at}.streak.spacingU 须为正、一区比一区稀`)
+  need(streak.colonyU[0] > 0 && range(streak.colonyU, false) && range(streak.strays, true), `${at}.streak 的菌落半径须为正的范围，杂菌个数为非负整数范围`)
+  need(colony.cellU > 0 && colony.stepMs > 0 && colony.growth > 0 && colony.frontU > 0 && colony.waveU > 0 && colony.preS >= 0 && colony.matureS > 0, `${at}.colony 的格子、步长、增长率、前沿速度、波长与长熟的时间须为正，先长的时间不为负`)
+  need(colony.patchy >= 0 && colony.patchy < 1 && colony.mature > 0 && colony.mature < 1, `${at}.colony 的起伏须在 [0, 1) 内，长熟的密度在 (0, 1) 内`)
+  need(frontWidthU(p) >= colony.cellU, `${at}.colony 增长率最高处前沿的过渡带只有 ${frontWidthU(p).toFixed(3)} 格，须宽过一格格子：太窄的前沿在格子上长不圆`)
+  const dt = colony.stepMs / 1000
+  need((diffusionU(p) / colony.cellU ** 2) * dt <= 0.3 && colony.growth * (1 + colony.patchy) * dt <= 0.5, `${at}.colony.stepMs 太长：显式积分会出负数或发散`)
+  need(colony.rimU >= colony.cellU && colony.rimU < dish.radiusU - p.plazaU, `${at}.colony.rimU 须宽过一格格子，且碰不到开局的空地`)
+  need(p.edge > 0 && p.edge < 1, `${at}.edge 须在 (0, 1) 内`)
+  need(stick.viscosity >= 1 && stick.exertion >= 0, `${at}.stick 的黏度须不小于 1，多耗的体力不为负`)
+  need(lysis.holdS > 0 && lysis.halfLifeS > 0 && lysis.lysePerS > 0, `${at}.lysis 的留存、半衰期与溶菌速度须为正`)
+  need(lysis.radiusU >= 1, `${at}.lysis.radiusU 须不小于 1 格：标准身体溶出的圈盖得过它掉的金币散开的范围`)
+  for (let s = 0; s < 16; s++) {
+    const plan = petriPlan(p, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
+    need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
+    need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
   }
 }
 

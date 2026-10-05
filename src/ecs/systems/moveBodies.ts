@@ -9,19 +9,34 @@ import type { BodyStep } from './shared/body'
 import { endMotion, transitFlash } from './shared/displace'
 import { isSameEntity } from '../utils/identity'
 import { sineEaseInOut } from '../utils/ease'
+import { slideCam } from './shared/leader'
+import { breakTrace } from './shared/trace'
 import type { Sim } from '../sim'
 
 const STILL = { x: 0, y: 0 }
 const STEP: BodyStep = { x: 0, y: 0, vx: 0, vy: 0 }
 
-/** 弧线：沿起止点插值、画面上抬起，到点落地并记下 landed */
+/** 身体一下平移了 (dx, dy) 穿过传送门：队长的镜头滑过去，记的路在这里断开 */
+function hopped(sim: Sim, eid: number, dx: number, dy: number): void {
+  if (eid === sim.leader) slideCam(sim, dx, dy)
+  breakTrace(eid)
+}
+
+/** 弧线：沿起止点插值、画面上抬起，到点落地并记下 landed；越过传送门的门线时整条弧线平移到另一扇门那边 */
 function stepArc(sim: Sim, eid: number, dt: number): void {
   const t = Math.min(Motion.ms[eid]!, Motion.t[eid]! + dt * 1000)
   Motion.t[eid] = t
   const p = t / Motion.ms[eid]!
-  const fx = Motion.fx[eid]!
-  const fy = Motion.fy[eid]!
-  const to = sim.hooks.wrap(sim, fx + (Motion.tx[eid]! - fx) * p, fy + (Motion.ty[eid]! - fy) * p)
+  let to = sim.hooks.wrap(sim, Motion.fx[eid]! + (Motion.tx[eid]! - Motion.fx[eid]!) * p, Motion.fy[eid]! + (Motion.ty[eid]! - Motion.fy[eid]!) * p)
+  const hop = sim.hooks.portal?.(sim, eid, Transform.x[eid]!, Transform.y[eid]!, to.x, to.y)
+  if (hop) {
+    Motion.fx[eid] = Motion.fx[eid]! + hop.dx
+    Motion.fy[eid] = Motion.fy[eid]! + hop.dy
+    Motion.tx[eid] = Motion.tx[eid]! + hop.dx
+    Motion.ty[eid] = Motion.ty[eid]! + hop.dy
+    to = { x: to.x + hop.dx, y: to.y + hop.dy }
+    hopped(sim, eid, hop.dx, hop.dy)
+  }
   Transform.x[eid] = to.x
   Transform.y[eid] = to.y
   Phys.vx[eid] = Motion.vx[eid]!
@@ -91,7 +106,7 @@ function seek(sim: Sim, eid: number): boolean {
   return false
 }
 
-/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，悬空的身体不受地面与介质影响、照样受引力；地面自己有接触力学的由它接管；位置经场地修正后速度按实际位移回推 */
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，悬空的身体不受地面与介质影响、照样受引力；地面自己有接触力学的由它接管；位置经场地修正后速度按实际位移回推；走着越过传送门的门线就平移到另一扇门那边 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (Alive.v[eid] === 0) continue
@@ -138,7 +153,7 @@ export function moveBodies(sim: Sim): void {
       const air = Span.lo[eid]! > 0
       if (air || !sim.hooks.contact(sim, eid, dt, x, y, vx, vy, STEP)) {
         // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度 + 引力的终端漂移 g·质量/阻力）
-        const s = air ? GROUND : sim.hooks.surface(sim, x, y)
+        const s = air ? GROUND : sim.hooks.surface(sim, x, y, eid)
         const medium = air ? STILL : sim.hooks.mediumVelocity(sim, x, y)
         const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
         const bx = medium.x + Drive.x[eid]! / s.viscosity
@@ -158,12 +173,18 @@ export function moveBodies(sim: Sim): void {
       const hy = next.y + (vy / sp) * r * 0.6
       Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, hx, hy, floorAt(sim, hx, hy) + ((Span.lo[eid]! + Span.hi[eid]! + 1) / 2) * LAYER_M, r, Motion.breach[eid]!)
     }
-    const to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
+    let to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
     const d = sim.hooks.worldDelta(sim, x, y, to.x, to.y)
     // 被场地修正过的位移才回推速度：撞墙的分量归零；环面回绕不算修正
     if (Math.abs(d.x - (next.x - x)) > 1e-6 || Math.abs(d.y - (next.y - y)) > 1e-6) {
       vx = d.x / dt
       vy = d.y / dt
+    }
+    // 越过传送门的门线：落点连同速度原样平移到另一扇门那边，再按那边的场地修正
+    const hop = sim.hooks.portal?.(sim, eid, x, y, to.x, to.y)
+    if (hop) {
+      to = sim.hooks.constrainBody(sim, eid, { x: x + d.x * hop.t + hop.dx, y: y + d.y * hop.t + hop.dy }, { x: to.x + hop.dx, y: to.y + hop.dy })
+      hopped(sim, eid, hop.dx, hop.dy)
     }
     Phys.vx[eid] = vx
     Phys.vy[eid] = vy
