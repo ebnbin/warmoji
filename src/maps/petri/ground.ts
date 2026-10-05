@@ -14,7 +14,7 @@ const GRID_LINE_U = 0.06
 /** 笔画按这么大（格）的格子分桶，画一个像素只看附近一桶 */
 const BUCKET_U = 2
 /** 记号笔的笔画宽，格 */
-const PEN_U = 0.17
+const PEN_U = 0.12
 /** 区号与标签的字高（格），区号写在几倍半径处，分区线从皿心往外画到几倍半径 */
 const QUAD_TEXT_U = 1.3
 const LABEL_TEXT_U = 0.9
@@ -27,8 +27,8 @@ const MENISCUS_U = 0.4
 const MENISCUS_RISE = 0.9
 const MENISCUS_LENS = 0.06
 /** 血琼脂每单位厚度透过多少光（红、绿、蓝）：灯箱的光透过它就是看到的颜色；另加琼脂表面漫反射回来的室内光 */
-const AGAR_T = [0.72, 0.13, 0.18] as const
-const AGAR_BACK = [38, 7, 11] as const
+const AGAR_T = [0.64, 0.11, 0.16] as const
+const AGAR_BACK = [32, 6, 10] as const
 /** 透过钠钙玻璃看灯箱的颜色倍率：玻璃边带一点青 */
 const GLASS_TINT = [0.8, 0.88, 0.88] as const
 /** 灯箱：中心的颜色，到方框四角暗下去多少；网格线的颜色 */
@@ -270,11 +270,11 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const thick = 1 + MENISCUS_RISE * climb
         const mag = 1 + MENISCUS_LENS * climb
         const line = gridLine(plan.cx + dx * mag - gx, plan.cy + dy * mag - gy, pitch, aa)
-        const light = lit * (1 - 0.55 * line)
+        const light = lit * (1 - 0.45 * line)
         const mottle = 1 + 0.14 * (fbm(x * 1.1, y * 1.1, 77, 3) - 0.5)
         for (let c = 0; c < 3; c++) tmp[c] = LIGHTBOX[c]! * light * Math.pow(AGAR_T[c]!, thick) * mottle + AGAR_BACK[c]!
         const ink = inkAt(prep, x, y, aa)
-        if (ink > 0) for (let c = 0; c < 3; c++) tmp[c] = tmp[c]! * (1 - 0.8 * ink)
+        if (ink > 0) for (let c = 0; c < 3; c++) tmp[c] = tmp[c]! * (1 - 0.55 * ink)
         for (const b of plan.bubbles) {
           const d = Math.hypot(x - b.x, y - b.y)
           if (d > b.r + aa) continue

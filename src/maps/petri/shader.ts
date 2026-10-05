@@ -56,8 +56,8 @@ float vnoise(vec2 p) {
 
 float height(vec2 at, vec2 cell) {
   vec4 d = texture2D(uData, at);
-  float wrinkle = vnoise(cell * 1.7) * 0.6 + vnoise(cell * 3.9 + 7.0) * 0.4;
-  return d.r * (0.55 + 0.45 * d.b) + (wrinkle - 0.5) * 0.16 * d.b * d.r;
+  float swell = vnoise(cell * 0.45) * 0.7 + vnoise(cell * 1.1 + 7.0) * 0.3;
+  return d.r * (0.5 + 0.5 * d.b) + (swell - 0.5) * 0.08 * d.b * d.r;
 }
 
 void main ()
@@ -65,33 +65,33 @@ void main ()
   vec2 tc = outTexCoord;
   vec2 cell = vec2(tc.x, 1.0 - tc.y) * uGrid;
   vec2 px = 1.0 / uGrid;
-  vec2 wob = vec2(vnoise(cell * 0.7 + 3.0), vnoise(cell * 0.7 + 19.0)) - 0.5;
-  vec2 at = tc + vec2(wob.x, -wob.y) * 0.8 * px;
+  vec2 wob = vec2(vnoise(cell * 0.5 + 3.0), vnoise(cell * 0.5 + 19.0)) - 0.5;
+  vec2 at = tc + vec2(wob.x, -wob.y) * 1.2 * px;
   vec4 d = texture2D(uData, at);
   float u = d.r;
   float m = d.g * uLysin;
   float mature = d.b;
-  float ragged = (vnoise(cell * 2.3) - 0.5) * 0.14 + (vnoise(cell * 6.1 + 5.0) - 0.5) * 0.07;
-  float body = smoothstep(0.38, 0.47, u + ragged);
-  float film = smoothstep(0.05, 0.12, u + ragged * 0.5) * 0.32;
+  float ragged = (vnoise(cell * 1.3) - 0.5) * 0.12 + (vnoise(cell * 3.1 + 5.0) - 0.5) * 0.03;
+  float body = smoothstep(0.4, 0.46, u + ragged);
+  float film = smoothstep(0.06, 0.14, u + ragged * 0.5) * 0.24;
   float a = max(body, film) * (1.0 - 0.6 * smoothstep(0.55, 1.0, m));
 
   float hR = height(at + vec2(px.x, 0.0), cell + vec2(1.0, 0.0));
   float hL = height(at - vec2(px.x, 0.0), cell - vec2(1.0, 0.0));
   float hD = height(at - vec2(0.0, px.y), cell + vec2(0.0, 1.0));
   float hU = height(at + vec2(0.0, px.y), cell - vec2(0.0, 1.0));
-  vec3 n = normalize(vec3(-(hR - hL) * 2.4, -(hD - hU) * 2.4, 1.0));
+  vec3 n = normalize(vec3(-(hR - hL) * 1.3, -(hD - hU) * 1.3, 1.0));
   vec3 l = normalize(uLight);
   vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
   float dif = max(dot(n, l), 0.0);
-  float spec = pow(max(dot(n, h), 0.0), 40.0);
-  vec3 cream = mix(vec3(0.95, 0.91, 0.82), vec3(0.89, 0.84, 0.70), mature * 0.6);
-  vec3 shade = vec3(0.66, 0.58, 0.47);
-  vec3 col = mix(shade, cream, clamp(0.72 + (dif - 0.52) * 1.5, 0.0, 1.0)) + vec3(1.0, 0.98, 0.94) * spec * 0.55;
+  float spec = pow(max(dot(n, h), 0.0), 24.0);
+  vec3 cream = mix(vec3(0.97, 0.94, 0.86), vec3(0.94, 0.89, 0.75), mature);
+  vec3 shade = vec3(0.84, 0.76, 0.62);
+  vec3 col = mix(shade, cream, clamp(0.8 + (dif - 0.52) * 1.2, 0.0, 1.0)) + vec3(1.0, 0.99, 0.95) * spec * 0.45;
   float thin = film * (1.0 - body);
-  col = mix(col, vec3(1.0, 0.86, 0.78), thin * 0.6);
+  col = mix(col, vec3(0.98, 0.84, 0.8), thin * 0.5);
 
-  float zone = smoothstep(0.9, 1.5, m) * (0.16 + 0.14 * smoothstep(1.5, 4.0, m));
+  float zone = smoothstep(0.9, 1.5, m) * (0.14 + 0.1 * smoothstep(1.5, 4.0, m));
   float ring = exp(-pow((m - 1.0) / 0.1, 2.0)) * step(0.3, m) * 0.5;
   float ha = clamp(zone + ring, 0.0, 0.8);
   float lead = smoothstep(0.004, 0.03, u) * (1.0 - smoothstep(0.06, 0.16, u + ragged * 0.5)) * 0.18;
