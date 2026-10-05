@@ -164,6 +164,12 @@ function segDist(ax: number, ay: number, bx: number, by: number, x: number, y: n
 const TREE_SHADOW_U = 1.2
 const PENUMBRA_U = 0.04
 const TREE_SHADE = 0.46
+const PENUMBRA = [
+  [-PENUMBRA_U, -PENUMBRA_U],
+  [PENUMBRA_U, -PENUMBRA_U],
+  [-PENUMBRA_U, PENUMBRA_U],
+  [PENUMBRA_U, PENUMBRA_U],
+] as const
 
 /** 一张按格子铺的场：格点 (i, j) 在 (x0 + i·cell, y0 + j·cell) */
 interface Field {
@@ -349,12 +355,6 @@ function dappleAt(prep: Prepared, x: number, y: number): number {
   for (const [ox, oy] of PENUMBRA) cover += crownCover(c, qx + ox, qy + oy)
   return (cover / PENUMBRA.length) * TREE_SHADE
 }
-const PENUMBRA = [
-  [-PENUMBRA_U, -PENUMBRA_U],
-  [PENUMBRA_U, -PENUMBRA_U],
-  [-PENUMBRA_U, PENUMBRA_U],
-  [PENUMBRA_U, PENUMBRA_U],
-] as const
 
 /** 树冠边上的地面被伸出来的枝叶挡掉一圈天光：离树冠的边多远（格）以内、最多暗多少 */
 const CROWN_AO_U = 0.45

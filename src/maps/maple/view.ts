@@ -58,6 +58,8 @@ const LEAF_PX = 64
 /** 飘落的叶子离地每高一米，画面上往上抬多少格、影子往背光的方向挪开多少格 */
 const FALL_LIFT_U = 0.16
 const FALL_SHADOW_U = 0.7
+/** 飘着的叶子离镜头近，离地每高一米画大这么多 */
+const NEARER_PER_M = 0.07
 
 /** 按各叶色占的几成挑一种 */
 function pickColor(r: number): number {
@@ -423,7 +425,8 @@ export class MapleView implements MapView {
         const wide = 0.18 + 0.82 * Math.abs(face)
         const tex = leafKey(p.color, face < 0)
         if (p.img.texture.key !== tex) p.img.setTexture(tex)
-        p.img.setPosition(p.x * UNIT, (p.y - (p.z / mpu) * FALL_LIFT_U) * UNIT).setRotation(p.rot).setDisplaySize(p.size * UNIT, p.size * UNIT * wide)
+        const near = p.size * (1 + NEARER_PER_M * p.z)
+        p.img.setPosition(p.x * UNIT, (p.y - (p.z / mpu) * FALL_LIFT_U) * UNIT).setRotation(p.rot).setDisplaySize(near * UNIT, near * UNIT * wide)
         const off = (p.z / mpu) * FALL_SHADOW_U * 0.25
         p.shadow
           .setPosition((p.x + AWAY.x * off) * UNIT, (p.y + AWAY.y * off) * UNIT)

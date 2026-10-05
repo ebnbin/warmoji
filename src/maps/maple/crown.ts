@@ -4,7 +4,7 @@ import { BLADE_REACH } from './blade'
 import type { Tree } from './layout'
 
 /** 叶子与枝条按这么大（格）的格子分桶，画一个像素只看它那一桶 */
-export const CROWN_BUCKET_U = 0.25
+const CROWN_BUCKET_U = 0.25
 /** 一片叶子正中那片裂片多长（格）：叶子画得比真的大两倍上下，镜头里才认得出一片片的掌状叶 */
 const LEAF_U = 0.15
 /** 叶簇里的叶子大约隔多远（格）一片：叶子挨着叶子，彼此压住一截，叶簇里才密 */
@@ -14,7 +14,7 @@ const TO_SUN = { x: SUN.x / Math.hypot(SUN.x, SUN.y), y: SUN.y / Math.hypot(SUN.
 /** 整棵树冠是一个扁扁的圆顶：外圈的叶子跟着往外倒这么多（法线的水平分量），朝着太阳那半边亮、背着的那半边暗 */
 const DOME_TILT = 0.5
 /** 树冠的高度图每格多少格：画叶子时拿它找挡着太阳的叶子 */
-export const HEIGHT_CELL_U = 0.05
+const HEIGHT_CELL_U = 0.05
 
 type Rgb = readonly [number, number, number]
 
@@ -42,7 +42,7 @@ const PALETTES: readonly { readonly weight: number; readonly pal: Palette }[] = 
 ]
 
 /** 第 k 棵树用哪种叶色 */
-export function paletteOf(seed: number, k: number): number {
+function paletteOf(seed: number, k: number): number {
   const h = new Rng(Math.imul(seed ^ 0x51ed27, 0x9e3779b1) ^ Math.imul(k + 1, 0x85ebca6b)).next()
   let acc = 0
   for (let i = 0; i < PALETTES.length; i++) {
@@ -62,7 +62,7 @@ export function leafColor(p: number, e: number, out: number[]): number[] {
   return out
 }
 
-/** 一段枝条：两头（格）、两头的粗细（格）、离地多高（米），属于第几棵树 */
+/** 一段枝条：两头（格）、两头的粗细（格）、离地多高（米） */
 export interface Twig {
   readonly ax: number
   readonly ay: number
@@ -71,16 +71,14 @@ export interface Twig {
   readonly w0: number
   readonly w1: number
   readonly z: number
-  readonly tree: number
 }
 
 /**
  * 所有树上的叶子，按列存：叶心（格）、离地多高（米）、正中那片裂片朝哪（cos、sin）、多长（格）、顺着中脉被斜着看短了几成、
- * 叶面法线的水平分量（法线是 (nx, ny, 1) 归一）、本色、属于第几棵树、几片裂片。
+ * 叶面法线的水平分量（法线是 (nx, ny, 1) 归一）、本色、几片裂片；每棵树用的是哪种叶色。
  * 叶子与枝条按 CROWN_BUCKET_U 的格子分桶，桶里的叶子从高到低排好：start[i]..start[i+1] 是第 i 桶在 items 里的那一段
  */
 export interface Crowns {
-  readonly count: number
   readonly x: Float32Array
   readonly y: Float32Array
   readonly z: Float32Array
@@ -93,7 +91,6 @@ export interface Crowns {
   readonly r: Float32Array
   readonly g: Float32Array
   readonly b: Float32Array
-  readonly tree: Int32Array
   readonly lobes: Uint8Array
   readonly palette: Int32Array
   readonly x0: number
@@ -136,11 +133,11 @@ function sprayHalf(sp: Spray, s: number): number {
 /** 按列攒叶子 */
 class LeafList {
   n = 0
-  readonly cols: number[][] = Array.from({ length: 14 }, () => [])
+  readonly cols: number[][] = Array.from({ length: 12 }, () => [])
   readonly lobes: number[] = []
 
-  push(x: number, y: number, z: number, ang: number, size: number, squash: number, nx: number, ny: number, c: readonly number[], tree: number, lobes: number): void {
-    const v = [x, y, z, Math.cos(ang), Math.sin(ang), size, squash, nx, ny, c[0]!, c[1]!, c[2]!, tree]
+  push(x: number, y: number, z: number, ang: number, size: number, squash: number, nx: number, ny: number, c: readonly number[], lobes: number): void {
+    const v = [x, y, z, Math.cos(ang), Math.sin(ang), size, squash, nx, ny, c[0]!, c[1]!, c[2]!]
     for (let i = 0; i < v.length; i++) this.cols[i]!.push(v[i]!)
     this.lobes.push(lobes)
     this.n++
@@ -166,7 +163,7 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
     const fork = R * (0.32 + 0.14 * rng.next())
     const fx = t.x + Math.cos(ang) * fork
     const fy = t.y + Math.sin(ang) * fork
-    twigs.push({ ax: t.x, ay: t.y, bx: fx, by: fy, w0: 0.085, w1: 0.06, z: H * 0.5, tree: k })
+    twigs.push({ ax: t.x, ay: t.y, bx: fx, by: fy, w0: 0.085, w1: 0.06, z: H * 0.5 })
     sprays.push({ x: t.x + Math.cos(ang) * R * 0.12, y: t.y + Math.sin(ang) * R * 0.12, ux: Math.cos(ang), uy: Math.sin(ang), len: R * 0.42, half: R * 0.17, z: dome(R * 0.3) + 0.1, tone: (rng.next() - 0.5) * 0.24, bright: 1 + (rng.next() - 0.5) * 0.1 })
     const subs = rng.next() < 0.3 ? 3 : 2
     for (let j = 0; j < subs; j++) {
@@ -174,7 +171,7 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
       const reach = R * (rng.next() < 0.2 ? 0.62 + 0.14 * rng.next() : 0.8 + 0.26 * rng.next())
       const ex = t.x + Math.cos(a2) * reach
       const ey = t.y + Math.sin(a2) * reach
-      twigs.push({ ax: fx, ay: fy, bx: ex, by: ey, w0: 0.05, w1: 0.022, z: H * 0.55, tree: k })
+      twigs.push({ ax: fx, ay: fy, bx: ex, by: ey, w0: 0.05, w1: 0.022, z: H * 0.55 })
       const tier = (j % 2 === 0 ? 1 : -1) * 0.15
       // 侧枝上两簇：里面一簇从半路伸到七成，外面一簇伸到梢头
       for (const [from, to] of [
@@ -247,7 +244,7 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
         col[0] = col[0]! * vary
         col[1] = col[1]! * (vary + (rng.next() - 0.5) * 0.1)
         col[2] = col[2]! * vary
-        leaves.push(x, y, z, ang, size, squash, nx, ny, col, k, rng.next() < 0.85 ? 7 : 5)
+        leaves.push(x, y, z, ang, size, squash, nx, ny, col, rng.next() < 0.85 ? 7 : 5)
       }
     }
   }
@@ -337,7 +334,6 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
     }
   }
   return {
-    count: leaves.n,
     x,
     y,
     z,
@@ -350,7 +346,6 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
     r: f(9),
     g: f(10),
     b: f(11),
-    tree: Int32Array.from(leaves.cols[12]!),
     lobes: Uint8Array.from(leaves.lobes),
     palette,
     x0,
