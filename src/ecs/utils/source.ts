@@ -1,5 +1,5 @@
 import { hasComponent } from 'bitecs'
-import { Anchor, FACTION, Faction, MARK, Minion, Owner, Slot, SummonShape, Summoned, Uid, WallBlocked } from '../components'
+import { Anchor, FACTION, Faction, FlyerShape, MARK, Minion, Owner, Sector, Segment, Slot, SprintShape, SummonShape, Summoned, Uid, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { abilityDef, enemyDef } from '../store'
 import { attributionSlot, creditSlot } from './ability'
@@ -7,7 +7,8 @@ import { deliveryOf, HIT } from './hitTags'
 import { hasMark, realmOf } from './marks'
 import { isSameEntity } from './identity'
 import { NEUTRAL, offenseOf } from './stats'
-import { eyeM } from './pass'
+import { eyeM, hiOf, loOf } from './pass'
+import type { Span } from '../../types/obstacles'
 import type { Offense } from './stats'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
@@ -39,6 +40,8 @@ export interface Source {
   readonly sight?: { readonly x: number; readonly y: number; readonly eye: number }
   /** 这一下被障碍挡：近战、爆炸与场只打得到从出手处够得着的身体 */
   readonly blocked?: boolean
+  /** 这一下打在哪几层：只打得到占着其中一层的身体，不写的不论高低 */
+  readonly band?: Span
   /** 出手的位置：迷雾里的身体只能被同在迷雾里出手的打到 */
   readonly from?: { readonly x: number; readonly y: number }
   /** 伤害标签（见 hitTags）：出手方式与是否来自召唤物；范围与持续由出手处补上 */
@@ -72,6 +75,14 @@ export function sourceOf(sim: Sim, e: number): Source {
     blocked: WallBlocked.v[e] === 1,
     tags: deliveryOf(abilityDef[e]) | (summon ? HIT.summon : 0),
   }
+}
+
+/** 近战、冲刺与飞返体只扫得到出手者自己占的那几层 */
+export function sweep(sim: Sim, e: number, src: Source): Source {
+  const w = sim.world
+  if (!hasComponent(w, e, Segment) && !hasComponent(w, e, Sector) && !hasComponent(w, e, SprintShape) && !hasComponent(w, e, FlyerShape)) return src
+  const o = Owner.eid[e]!
+  return { ...src, band: [loOf(w, o), hiOf(w, o)] }
 }
 
 /** 身体自己在看：转向用 */

@@ -1,7 +1,8 @@
-import { hasComponent, query } from 'bitecs'
+import { query } from 'bitecs'
 import { FOLLOW_IN_MS } from '../../data/abilities'
-import { Airborne, Alive, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
-import { bodyHeightM, breachAt } from '../utils/pass'
+import { Alive, Drive, Motion, MOTION, Phys, Radius, Span, Transform, VisOff } from '../components'
+import { breachAt, LAYER_M } from '../utils/pass'
+import { hoverPx } from '../utils/ground'
 import { GROUND } from '../worlds/hooks'
 import { approach, ballistic, bodyDt, drift } from './shared/body'
 import type { BodyStep } from './shared/body'
@@ -25,9 +26,9 @@ function stepArc(sim: Sim, eid: number, dt: number): void {
   Transform.y[eid] = to.y
   Phys.vx[eid] = Motion.vx[eid]!
   Phys.vy[eid] = Motion.vy[eid]!
-  VisOff.y[eid] = -Math.sin(Math.PI * p) * Motion.h[eid]!
+  VisOff.y[eid] = -hoverPx(eid) - Math.sin(Math.PI * p) * Motion.h[eid]!
   if (p < 1) return
-  VisOff.y[eid] = 0
+  VisOff.y[eid] = -hoverPx(eid)
   Motion.kind[eid] = MOTION.none
   Motion.landed[eid] = 1
 }
@@ -89,7 +90,7 @@ function seek(sim: Sim, eid: number): boolean {
   return false
 }
 
-/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，空中的身体不受地面与介质影响、照样受引力；地面自己有接触力学的由它接管；位置经场地修正后速度按实际位移回推 */
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，悬空的身体不受地面与介质影响、照样受引力；地面自己有接触力学的由它接管；位置经场地修正后速度按实际位移回推 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (Alive.v[eid] === 0) continue
@@ -133,7 +134,7 @@ export function moveBodies(sim: Sim): void {
       vx = Motion.vx[eid]!
       vy = Motion.vy[eid]!
     } else {
-      const air = hasComponent(sim.world, eid, Airborne)
+      const air = Span.lo[eid]! > 0
       if (air || !sim.hooks.contact(sim, eid, dt, x, y, vx, vy, STEP)) {
         // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度 + 引力的终端漂移 g·质量/阻力）
         const s = air ? GROUND : sim.hooks.surface(sim, x, y)
@@ -152,7 +153,7 @@ export function moveBodies(sim: Sim): void {
     if (dashing && Motion.breach[eid]! > 0) {
       const sp = Math.hypot(vx, vy) || 1
       const r = Radius.v[eid]!
-      Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, next.x + (vx / sp) * r * 0.6, next.y + (vy / sp) * r * 0.6, bodyHeightM(sim.world, eid) * 0.5, r, Motion.breach[eid]!)
+      Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, next.x + (vx / sp) * r * 0.6, next.y + (vy / sp) * r * 0.6, ((Span.lo[eid]! + Span.hi[eid]! + 1) / 2) * LAYER_M, r, Motion.breach[eid]!)
     }
     const to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
     const d = sim.hooks.worldDelta(sim, x, y, to.x, to.y)

@@ -1,6 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { CharScale, Drive, Phys, Pickup, Radius, Shard, Uid } from '../components'
+import { CharScale, Drive, Phys, Pickup, Radius, Shard, Span, Uid } from '../components'
+import { LAYER_M, STANDARD } from '../utils/pass'
 import { approach } from '../systems/shared/body'
 import { GRAVITY } from './channel'
 import { flowAt } from './water'
@@ -21,16 +22,15 @@ export interface Wading {
 }
 
 /**
- * 水深 depth 米、水速 (wx, wy) 米/秒 的地方，半径 radius 像素、质量倍率 massMul 的身体站不站得住：质量按半径的三次方与质量倍率缩放，身高按半径缩放，体积按密度；
+ * 水深 depth 米、水速 (wx, wy) 米/秒 的地方，半径 radius 像素、高 height 米、质量倍率 massMul 的身体站不站得住：质量按半径的三次方与质量倍率缩放，体积按密度；
  * 浮力按没进水里的那截身高占的比例托起身体，脚下的压力 N = mg − 浮力；水的推力 ½ρ·Cd·迎水面积·w²，胯以下迎水的是两条腿，胯以上是整个身宽。
  * 浮起来了，推力绕脚掌的力矩大过 N 乘扶正力臂（推倒），或者推力大过 N 乘脚底的摩擦系数（滑走），就站不住；正在游的 swimming 要两样都降到 STEADY 倍以内才重新站得住
  */
-function swept(cfg: Wading, radius: number, massMul: number, depth: number, wx: number, wy: number, swimming: boolean): boolean {
+function swept(cfg: Wading, radius: number, height: number, massMul: number, depth: number, wx: number, wy: number, swimming: boolean): boolean {
   const b = cfg.body
   const k = radius / UNIT / b.radiusU
   const mass = b.kg * massMul * k ** 3
   const width = (2 * radius * cfg.meterPerU) / UNIT
-  const height = b.heightM * k
   const stand = Math.min(depth, height)
   const upright = mass * GRAVITY * (1 - (RHO / b.density) * (stand / height))
   if (upright <= 0) return true
@@ -53,10 +53,10 @@ function drift(cfg: Wading, out: BodyStep, x: number, y: number, vx: number, vy:
 
 const FLOW: Flow = { h: 0, u: 0, v: 0 }
 
-/** 半径 radius 像素、质量倍率 massMul 的身体刚落在 (x, y) 像素处站得住：干地，或者水里推不倒、冲不走 */
+/** 半径 radius 像素、质量倍率 massMul 的标准身体刚落在 (x, y) 像素处站得住：干地，或者水里推不倒、冲不走 */
 export function holds(cfg: Wading, w: Water, x: number, y: number, radius: number, massMul: number): boolean {
   flowAt(w, x / UNIT, y / UNIT, FLOW)
-  return FLOW.h < cfg.body.wetM || !swept(cfg, radius, massMul, FLOW.h, FLOW.u, FLOW.v, false)
+  return FLOW.h < cfg.body.wetM || !swept(cfg, radius, (STANDARD[1] + 1) * LAYER_M, massMul, FLOW.h, FLOW.u, FLOW.v, false)
 }
 
 /** 身体本来的大小：角色的判定半径里乘了队长倍率，那只是画面上突出队长，受力不算它 */
@@ -80,7 +80,7 @@ export function wade(sim: Sim, cfg: Wading, w: Water, swimming: Map<number, numb
   }
   const uid = Uid.v[eid]!
   const was = swimming.get(eid) === uid
-  if (FLOW.h < cfg.body.wetM || !swept(cfg, bodyRadius(sim, eid), Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
+  if (FLOW.h < cfg.body.wetM || !swept(cfg, bodyRadius(sim, eid), (Span.hi[eid]! + 1) * LAYER_M, Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
     swimming.delete(eid)
     return false
   }

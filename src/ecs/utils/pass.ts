@@ -1,9 +1,8 @@
 import { hasComponent, query } from 'bitecs'
 import { MATERIALS, OBSTACLES } from '../../data/obstacles'
-import { UNIT } from '../../util/units'
-import { Barrier, CharScale, Phasing, Proj, Radius } from '../components'
+import { Barrier, Motion, MOTION, Phasing, Proj, Span } from '../components'
 import { barrierHit, hostileTo } from '../entities/barrier'
-import type { ObstacleId } from '../../types/obstacles'
+import type { ObstacleId, Span as Layers } from '../../types/obstacles'
 import type { Source } from './source'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
@@ -40,11 +39,94 @@ export interface Passage {
 }
 
 const B = OBSTACLES.body
-const FLAT_M = OBSTACLES.shot.flatM
-const LAUNCH_M = OBSTACLES.shot.launchM
+/** 一层多高，米 */
+export const LAYER_M = B.heightM / B.layers
+/** 标准身体占的层：英雄与没写身段的非玩家身体都是它 */
+export const STANDARD: Layers = [0, B.layers - 1]
+/** 贴着地的一层：掉落物、地上的场 */
+export const FLOOR: Layers = [0, 0]
+/** 平射在标准身体的顶层飞 */
+const CHEST = B.layers - 1
 /** 爆炸与落地的冲击从离地多高打出去，米 */
-export const BLAST_M = OBSTACLES.shot.blastM
-export const FLAT_SHOT_M = FLAT_M
+export const BLAST_M = OBSTACLES.blastM
+
+/** 第 k 层正中离地多高，米 */
+export function layerZ(k: number): number {
+  return (k + 0.5) * LAYER_M
+}
+
+/** 离地 z 米落在第几层 */
+export function layerAt(z: number): number {
+  return Math.floor(z / LAYER_M)
+}
+
+/** 高 h 米的障碍从地面往上占几层 */
+export function layersOf(h: number): number {
+  return Math.ceil(h / LAYER_M - 1e-9)
+}
+
+/** 高 h 米的障碍按占满的整层算，顶离地多高 */
+export function topOf(h: number): number {
+  return h === Infinity ? h : layersOf(h) * LAYER_M
+}
+
+/** 弧线里腾空的身体整段往上挪一层 */
+function lift(world: EcsWorld, eid: number): number {
+  return hasComponent(world, eid, Motion) && Motion.kind[eid] === MOTION.arc ? 1 : 0
+}
+
+/** 身体此刻占的最低一层 */
+export function loOf(world: EcsWorld, eid: number): number {
+  return Span.lo[eid]! + lift(world, eid)
+}
+
+/** 身体此刻占的最高一层 */
+export function hiOf(world: EcsWorld, eid: number): number {
+  return Span.hi[eid]! + lift(world, eid)
+}
+
+/** 身体此刻占的层 */
+export function spanOf(world: EcsWorld, eid: number): Layers {
+  return [loOf(world, eid), hiOf(world, eid)]
+}
+
+/** 脚沾着地：占着贴地的一层，没在弧线里腾空，也没在穿行 */
+export function grounded(world: EcsWorld, eid: number): boolean {
+  if (Span.lo[eid] !== 0) return false
+  if (!hasComponent(world, eid, Motion)) return true
+  const k = Motion.kind[eid]
+  return k !== MOTION.arc && k !== MOTION.transit
+}
+
+/** 占 lo 到 hi 层的身体从哪一层出手：标准身体的顶层，矮的取自己的顶层，悬在它上面的取自己的底层 */
+export function muzzleOf(lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, CHEST))
+}
+
+/** 从 lo..hi 层出手打占 tlo..thi 层的身体，弹体在哪一层飞：出手的那一层，打不着它就取它离那一层最近的一层 */
+export function aimLayer(lo: number, hi: number, tlo: number, thi: number): number {
+  return Math.min(thi, Math.max(tlo, muzzleOf(lo, hi)))
+}
+
+/** 身体过得去多少层高的障碍：从脚下往上 ⌊层数·step⌋ 层以内的 */
+export function overOf(lo: number, hi: number): number {
+  return lo + Math.floor((hi - lo + 1) * B.step)
+}
+
+/** 身体过得去多高的障碍，米 */
+export function clearM(eid: number): number {
+  return overOf(Span.lo[eid]!, Span.hi[eid]!) * LAYER_M
+}
+
+/** 眼睛在顶层正中；装置、宠物这些不是身体的出手处按标准身体看 */
+export function eyeM(world: EcsWorld, eid: number): number {
+  return layerZ(hasComponent(world, eid, Span) ? hiOf(world, eid) : STANDARD[1])
+}
+
+/** 占 lo..hi 层的身体挨不挨得到离地 z 米处的东西 */
+export function inSpan(lo: number, hi: number, z: number): boolean {
+  return z >= lo * LAYER_M && z < (hi + 1) * LAYER_M
+}
 
 /** 探测在线段 t 处离地多高，米 */
 export function probeZ(p: Probe, t: number): number {
@@ -96,7 +178,10 @@ export function canSee(sim: Sim, ax: number, ay: number, eyeA: number, bx: numbe
   return terrainPass(sim, { via: 'sight', h0: eyeA, h1: eyeB, arc: 0, pierce: 0 }, ax, ay, bx, by).block === null
 }
 
-const REACH: Probe = { via: 'shot', h0: FLAT_M, h1: FLAT_M, arc: 0, pierce: 0 }
+/** 标准身体平射飞的高度，米：近战、爆炸与场按它看够不够得着，画面上抛射按高出它多少抬起 */
+export const CHEST_M = layerZ(CHEST)
+
+const REACH: Probe = { via: 'shot', h0: CHEST_M, h1: CHEST_M, arc: 0, pierce: 0 }
 
 /** 齐胸高从出手处往目标够，第一处挡住的地方：近战、爆炸与场都按它，贯穿不了 */
 export function reachBlock(sim: Sim, ax: number, ay: number, bx: number, by: number): Block | null {
@@ -125,41 +210,32 @@ export function shotPass(sim: Sim, faction: number, p: Probe, ax: number, ay: nu
   return { block: best, spent: best && best.barrier >= 0 ? 0 : r.spent }
 }
 
-/** 抛射飞到全程 s（0 到 1）处离地多高：从出手的高度落到地上，中间拱起 arc 米 */
-export function lobZ(arc: number, s: number): number {
-  return LAUNCH_M * (1 - s) + 4 * arc * s * (1 - s)
+/** 抛射从离地 z0 米出手，飞到全程 s（0 到 1）处离地多高：落到地上，中间拱起 arc 米 */
+export function lobZ(z0: number, arc: number, s: number): number {
+  return z0 * (1 - s) + 4 * arc * s * (1 - s)
 }
 
-/** 弹体从出手飞完全程 reach 像素的探测：平射一路齐胸，抛射落到 reach 处的地上 */
-export function flightProbe(arc: number, pierce: number): Probe {
-  return arc > 0 ? { via: 'shot', h0: LAUNCH_M, h1: 0, arc, pierce } : { via: 'shot', h0: FLAT_M, h1: FLAT_M, arc: 0, pierce }
+/** 弹体从离地 z0 米出手、飞完全程的探测：平射一路在这个高度，抛射落到全程尽头的地上 */
+export function flightProbe(z0: number, arc: number, pierce: number): Probe {
+  return { via: 'shot', h0: z0, h1: arc > 0 ? 0 : z0, arc, pierce }
+}
+
+/** 弹体此刻离地多高，米 */
+export function boltZ(eid: number): number {
+  const arc = Proj.arc[eid]!
+  return arc > 0 ? lobZ(Proj.z[eid]!, arc, Math.min(1, Proj.flown[eid]! / Proj.reach[eid]!)) : Proj.z[eid]!
 }
 
 /** 弹体这一步（飞出 step 像素）的探测 */
 export function boltProbe(eid: number, step: number): Probe {
   const pierce = Math.max(0, Proj.pierce[eid]!)
   const arc = Proj.arc[eid]!
-  if (arc <= 0) return flightProbe(0, pierce)
+  const z0 = Proj.z[eid]!
+  if (arc <= 0) return flightProbe(z0, 0, pierce)
   const reach = Proj.reach[eid]!
   const s0 = Math.min(1, Proj.flown[eid]! / reach)
   const s1 = Math.min(1, (Proj.flown[eid]! + step) / reach)
-  return { via: 'shot', h0: lobZ(arc, s0), h1: lobZ(arc, s1), arc: arc * (s1 - s0) ** 2, pierce }
-}
-
-/** 身体的身高，米：按不算队长倍率的半径缩放；不是身体的按标准身高 */
-export function bodyHeightM(world: EcsWorld, eid: number): number {
-  if (!hasComponent(world, eid, Radius)) return B.heightM
-  const r = hasComponent(world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!
-  return (B.heightM * r) / (B.refRadiusU * UNIT)
-}
-
-export function eyeM(world: EcsWorld, eid: number): number {
-  return bodyHeightM(world, eid) * B.eye
-}
-
-/** 身体跨得过多高的东西，米 */
-export function stepM(world: EcsWorld, eid: number): number {
-  return bodyHeightM(world, eid) * B.step
+  return { via: 'shot', h0: lobZ(z0, arc, s0), h1: lobZ(z0, arc, s1), arc: arc * (s1 - s0) ** 2, pierce }
 }
 
 /** 穿墙的身体穿得过这种材质 */

@@ -1,6 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { Alive, Faction, Hp, MARK, Mark, Radius, Revive, Transform, Uid } from '../components'
 import { inTransit, isHidden, isUntargetable, markSlot, realmOf } from '../utils/marks'
+import { hiOf, loOf } from '../utils/pass'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
@@ -19,6 +20,8 @@ export function refreshTargets(sim: Sim): void {
       x: Transform.x[eid]!,
       y: Transform.y[eid]!,
       radius: Radius.v[eid]!,
+      lo: loOf(sim.world, eid),
+      hi: hiOf(sim.world, eid),
       hidden: isHidden(sim, eid),
       untargetable: isUntargetable(sim, eid),
       realm: realmOf(sim, eid),

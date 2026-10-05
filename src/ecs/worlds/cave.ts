@@ -18,7 +18,7 @@ export interface Circle {
   readonly r: number
 }
 
-/** 一根石笋：底半径（像素）与高（米）；矮小的人跨得过、子弹飞得过 */
+/** 一根石笋：底半径（像素）与高（米）；不挡路的矮小，标准身体跨得过 */
 export interface Stalagmite extends Circle {
   readonly h: number
   readonly block: boolean
@@ -598,7 +598,6 @@ function makeCave(cfg: CaveConfig, map: Rect, rng: Rng): CaveLayout {
   }
   const stalagmiteCount = pickInt(rng, f.stalagmites)
   const [r0, r1] = f.stalagmiteU
-  const [m0, m1] = f.stalagmiteM
   for (let tries = 0; tries < stalagmiteCount * PLACE_TRIES && stalagmites.length < stalagmiteCount; tries++) {
     const k = rng.next() * rng.next()
     const r = (r0 + (r1 - r0) * k) * UNIT
@@ -619,7 +618,10 @@ function makeCave(cfg: CaveConfig, map: Rect, rng: Rng): CaveLayout {
     if (!hallHolds(x, y, r, 0.25 * UNIT) || underSky(x, y, r) || wet(x, y, r)) continue
     if (columns.some((c) => Math.hypot(c.x - x, c.y - y) < c.r + r + 0.3 * UNIT)) continue
     if (stalagmites.some((s) => Math.hypot(s.x - x, s.y - y) < s.r + r + (block && s.block ? 0.9 * UNIT : 0.12 * UNIT))) continue
-    const tall = m0 + (m1 - m0) * Math.min(1, ((r / UNIT - r0) / (r1 - r0)) ** 0.7 * (0.75 + 0.5 * rng.next()))
+    // 粗细各按自己那一段越粗越高：矮的跨得过，挡路的高过人
+    const [lo, hi] = block ? f.stalagmiteM : f.lowM
+    const thick = block ? (r / UNIT - f.blockU) / (r1 - f.blockU) : (r / UNIT - r0) / (f.blockU - r0)
+    const tall = lo + (hi - lo) * Math.min(1, Math.max(0, thick) ** 0.7 * (0.75 + 0.5 * rng.next()))
     stalagmites.push({ x, y, r, h: tall, block })
   }
   const blockers: Circle[] = [...columns, ...stalagmites.filter((s) => s.block)]

@@ -4,14 +4,17 @@ import type { Rng } from '../../util/rng'
 import type { Friction, ShipConfig } from '../../types/maps'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
-import { GRAVITY, halfBeamAt, hatchesOf, hydrostatics, skylightOf, spawnS, stability, stepAxis, waveSlope, waveTerms } from '../../data/ship'
+import { bulwarkDistance, GRAVITY, halfBeamAt, hatchesOf, hydrostatics, skylightOf, spawnS, stability, stepAxis, waveSlope, waveTerms } from '../../data/ship'
 import type { Axis, Hydrostatics, WaveTerm } from '../../data/ship'
 import { FRAME, FRAME_MID } from '../frame'
 import { awayFromWall, keepOut, makeBasin, roomAt } from './basin'
 import type { Basin } from './basin'
+import { makeSolids } from './solids'
+import type { Solid, Solids } from './solids'
+import { topOf } from '../utils/pass'
 import type { Landmark } from './gates'
 
-/** 船在地图上的摆法，像素：船尾横板中线（s = 0）的位置，船头与右舷的单位方向；能走的甲板与桅杆 */
+/** 船在地图上的摆法，像素：船尾横板中线（s = 0）的位置，船头与右舷的单位方向；能走的甲板与桅杆；挡弹体与视线的桅杆与齐腰的舷墙 */
 export interface Deck {
   readonly ox: number
   readonly oy: number
@@ -21,6 +24,7 @@ export interface Deck {
   readonly sy: number
   readonly basin: Basin
   readonly masts: readonly Point[]
+  readonly solids: Solids
   /** 给出怪口的地标：格栅舱口与船尾天窗 */
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
 }
@@ -64,8 +68,19 @@ export function makeDeck(cfg: ShipConfig, across: boolean): Deck {
   const cols = Math.ceil(FRAME.w / cell)
   const rows = Math.ceil(FRAME.h / cell)
   const basin = makeBasin(open, FRAME.x, FRAME.y, cols, rows, cell, FRAME_MID, h.neckU * UNIT)
+  const mast: Solid = { topM: Infinity, material: 'wood' }
+  const bulwark: Solid = { topM: topOf(h.bulwarkM), material: 'wood' }
+  const solid = (x: number, y: number): Solid | null => {
+    for (const m of masts) if ((x - m.x) ** 2 + (y - m.y) ** 2 < mastPx * mastPx) return mast
+    const dx = x - ox
+    const dy = y - oy
+    const s = (dx * bx + dy * by) / UNIT
+    const t = (dx * sx + dy * sy) / UNIT
+    return Math.abs(t) >= halfBeamAt(h, s) && bulwarkDistance(h, s, t) <= 0 ? bulwark : null
+  }
+  const solids = makeSolids(solid, FRAME.x, FRAME.y, cols, rows, cell)
   const hatch = (g: { s: number; len: number; wid: number }): Landmark => ({ x: ox + bx * g.s * UNIT, y: oy + by * g.s * UNIT, r: (Math.min(g.len, g.wid) / 2) * UNIT, nx: 0, ny: 0 })
-  return { ox, oy, bx, by, sx, sy, basin, masts, marks: { hatch: hatchesOf(h).map(hatch), skylight: [hatch(skylightOf(h))] } }
+  return { ox, oy, bx, by, sx, sy, basin, masts, solids, marks: { hatch: hatchesOf(h).map(hatch), skylight: [hatch(skylightOf(h))] } }
 }
 
 /** 甲板上散着的一颗炮弹，像素 */

@@ -14,6 +14,7 @@ export const KNOCKBACK_TAU_MS = (ENEMY_BODY.mass / (ENEMY_BODY.drag * ENEMY_BODY
 export const ACQUIRE = CT.acquire
 export const PICKUP_BODY = CT.pickupBody
 export const SHARD_BODY = CT.shardBody
+export const SWARM_SPAN = CT.swarmSpan
 export const MORPH = CT.morph
 export const BLINK_IFRAME_PAD_MS = CT.blinkIframePadMs
 export const TRANSIT_MS = CT.transitMs

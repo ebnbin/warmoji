@@ -8,6 +8,7 @@ import { applyAbilityEffects, applyOnHit, struckOf } from './shared/effects'
 import { selfSource, sourceOf } from '../utils/source'
 import type { Source } from '../utils/source'
 import { eachFoeBody } from '../utils/targets'
+import { spanOf } from '../utils/pass'
 import type { Sim } from '../sim'
 
 /** 谁在碰：造物算它的能力，其余算身体自己 */
@@ -16,7 +17,7 @@ function contactSource(sim: Sim, eid: number): Source {
   return selfSource(sim, eid)
 }
 
-/** 接触：带接触载荷的身体碰到能打的身体就打一下，每帧最多一下；这一帧不能出手的不打；打中后被碰者先按属性表反伤、再施加它的被碰规则，最后施加碰者的接触效果；接触不看隐匿与视线 */
+/** 接触：带接触载荷的身体碰到能打的身体就打一下，每帧最多一下；这一帧不能出手的不打；只碰得到层与它重叠的；打中后被碰者先按属性表反伤、再施加它的被碰规则，最后施加碰者的接触效果；接触不看隐匿与视线 */
 export function touchBodies(sim: Sim): void {
   if (sim.over) return
   for (const eid of [...query(sim.world, [Contact, Transform, Radius, Alive, Faction])]) {
@@ -29,7 +30,7 @@ export function touchBodies(sim: Sim): void {
     const y = Transform.y[eid]!
     const touch = bodyRules[eid]?.onTouch
     let landed = false
-    eachFoeBody(sim, src, x, y, Radius.v[eid]!, (t, tx, ty) => {
+    eachFoeBody(sim, { ...src, band: spanOf(sim.world, eid) }, x, y, Radius.v[eid]!, (t, tx, ty) => {
       const s = struckOf(t)
       if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y }, tags: HIT.melee })) return
       landed = true

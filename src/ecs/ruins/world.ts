@@ -4,12 +4,12 @@ import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { MATERIALS, OBSTACLES } from '../../data/obstacles'
-import { Airborne, Alive, Phys, Pickup, Radius, Shard, Transform } from '../components'
+import { Alive, Phys, Pickup, Radius, Shard, Transform } from '../components'
 import { hit } from '../systems/shared/damage'
 import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
 import { leaderPoint } from '../utils/team'
-import { canSee, eyeM, phases, stepM } from '../utils/pass'
+import { canSee, clearM, eyeM, LAYER_M, layerZ, overOf, phases, STANDARD } from '../utils/pass'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { makeMasonry, ruinsPlan, toLocal, toWorld } from './layout'
 import { awayOf, bodyField, carve, cellAt, GRAVITY, newDust, pushOut, roomOf, spill, walkStop } from './masonry'
@@ -28,7 +28,7 @@ const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
 /** 残垣按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a1e
-/** 跨步高度分这么多档（层），各按一张距离场与一张寻路走 */
+/** 身体过得去的砌体分这么多档（石块层数），各按一张距离场与一张寻路走 */
 const LEVELS = 6
 /** 寻路的粗格子里离挡路处至少这么远（格）才算走得过 */
 const FLOW_CLEAR_U = 0.32
@@ -133,19 +133,19 @@ export function ruinsOf(sim: Sim): RuinsState {
   return s
 }
 
-/** 跨得过 m 米的身体跨得过几层石块 */
+/** 过得去 m 米高的障碍的身体过得去几层石块 */
 function levelFor(cfg: RuinsConfig, m: number): number {
   return Math.max(0, Math.min(LEVELS - 1, Math.floor(m / cfg.masonry.courseM + 1e-6)))
 }
 
-/** 标准身高的身体跨得过几层石块 */
+/** 标准身体跨得过几层石块 */
 export function walkLevel(cfg: RuinsConfig): number {
-  return levelFor(cfg, OBSTACLES.body.heightM * OBSTACLES.body.step)
+  return levelFor(cfg, overOf(STANDARD[0], STANDARD[1]) * LAYER_M)
 }
 
-/** 这具身体跨得过几层石块 */
+/** 这具身体过得去几层石块 */
 function levelOf(sim: Sim, eid: number): number {
-  return levelFor(cfgOf(sim), stepM(sim.world, eid))
+  return levelFor(cfgOf(sim), clearM(eid))
 }
 
 /** 跨得过 level 层的身体按的距离场（格）：砌体变了就重算 */
@@ -521,7 +521,7 @@ function landFalls(sim: Sim, s: RuinsState): void {
   const src = hazardSource('collapse', FALL_TINT)
   const reach = cfg.fall.radiusU * UNIT
   for (const eid of [...query(sim.world, [Phys, Transform, Radius])]) {
-    if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) continue
+    if (!Alive.v[eid] || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) continue
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const r = Radius.v[eid]! + reach
@@ -532,11 +532,10 @@ function landFalls(sim: Sim, s: RuinsState): void {
   }
 }
 
-/** 从队长的眼睛看不看得见 (x, y) 处标准身高的身体 */
+/** 从队长的眼睛看不看得见 (x, y) 处标准身体的眼睛 */
 function seenFromLeader(sim: Sim, x: number, y: number): boolean {
   const lead = leaderPoint(sim)
-  const B = OBSTACLES.body
-  return canSee(sim, lead.x, lead.y, eyeM(sim.world, sim.leader), x, y, B.heightM * B.eye)
+  return canSee(sim, lead.x, lead.y, eyeM(sim.world, sim.leader), x, y, layerZ(STANDARD[1]))
 }
 
 /**
@@ -621,6 +620,17 @@ export const ruins: WorldHooks = {
     const b = local(s, bx, by)
     const cfg = cfgOf(sim)
     return traceLocal(s.m, s.dust, cfg.dust.opaqueTau, probe, a.u, a.v, b.u, b.v, (Math.hypot(bx - ax, by - ay) / UNIT) * cfg.meterPerU)
+  },
+  /** 砌体与木板谁高取谁 */
+  solidAt(sim, x, y) {
+    const s = ruinsOf(sim)
+    const l = local(s, x, y)
+    const i = cellAt(s.m.grid, l.u, l.v)
+    if (i < 0) return null
+    const n = s.m.n[i]!
+    const t = s.m.timber[i]!
+    if (n === 0 && t === 0) return null
+    return n >= t ? { topM: n * s.m.courseM, material: 'masonry' } : { topM: t * s.m.courseM, material: 'timber' }
   },
   breach(sim, x, y, z, _r, amount) {
     const s = ruinsOf(sim)

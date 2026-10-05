@@ -21,6 +21,7 @@ import {
   Pull,
   Radius,
   Ring,
+  Span,
   Transform,
   VisOff,
 } from '../components'
@@ -62,7 +63,7 @@ interface PickupSpec {
 
 function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   const eid = newEntity(sim.world)
-  addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Phys, Drive, Clock, Alive, Radius, Pop, Bob)
+  addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Phys, Drive, Clock, Alive, Radius, Span, Pop, Bob)
   Radius.v[eid] = spec.radius
   const p = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   attachDrawable(sim.world, eid, sim.frames, {

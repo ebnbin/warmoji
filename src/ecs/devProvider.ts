@@ -106,6 +106,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
     },
     devFlagItem('battle.targets'),
     devFlagItem('battle.walls'),
+    devFlagItem('battle.heights'),
     devFlagItem('battle.grid'),
     devFlagItem('battle.gates'),
     devFlagItem('ecs.profile'),

@@ -1,12 +1,14 @@
 import { addComponent, hasComponent, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
-import { Anchored, Anim, Borrowed, Contact, EnemyArm, Faction, Form, Manual, MARK, Phys, Slot, Sprite, Transform } from '../components'
+import { Anchored, Anim, Borrowed, Contact, EnemyArm, Faction, Form, Manual, MARK, Motion, MOTION, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
 import { bodyLook, enemyDef, formEnd } from '../store'
 import { hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { armIdle } from '../systems/shared/anim'
 import { interrupt } from '../systems/shared/ability'
 import { attachDrive, detachDrive, npcOutline } from './enemy'
+import { STANDARD } from '../utils/pass'
+import { hoverPx } from '../utils/ground'
 import { equipAbility, unequipAbilities } from './ability'
 import { armCarriers } from './loadout'
 import type { Effect } from '../../types/abilityDefs'
@@ -98,9 +100,13 @@ export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
 }
 
-/** 非玩家身体的走法、锚定与接触伤害 */
+/** 非玩家身体的走法、锚定、身段与接触伤害 */
 function npcBody(sim: Sim, eid: number, f: FormDef | undefined): void {
   const def = enemyDef[eid]!
+  const span = f?.span ?? def.span ?? STANDARD
+  Span.lo[eid] = span[0]
+  Span.hi[eid] = span[1]
+  if (Motion.kind[eid] !== MOTION.arc) VisOff.y[eid] = -hoverPx(eid)
   detachDrive(sim, eid)
   attachDrive(sim, eid, f?.drive ?? def.drive)
   const anchored = f?.anchored ?? def.kbImmune === true

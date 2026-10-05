@@ -6,12 +6,12 @@ import { abilityOnHit, flyerHits } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
 import { hit } from './shared/damage'
 import { applyOnHit, struckOf } from './shared/effects'
-import { sourceOf } from '../utils/source'
+import { sourceOf, sweep } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
 import { impactAt, reachBlock } from '../utils/pass'
 import type { Sim } from '../sim'
 
-/** 飞返体：去程沿直线缓动到射程尽头（撞上障碍就提早折回），回程追着持有者；去程回程各打每个身体一次 */
+/** 飞返体：去程沿直线缓动到射程尽头（撞上障碍就提早折回），回程追着持有者；去程回程各打每个身体一次，只打得到占着持有者那几层的 */
 export function updateFlyers(sim: Sim): void {
   const dt = sim.wdtMs
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
@@ -56,7 +56,7 @@ export function updateFlyers(sim: Sim): void {
     if (magnet > 0) sim.frameAttractors.push({ x: Transform.x[f]!, y: Transform.y[f]!, r2: magnet * magnet })
     const struck = flyerHits[f]!
     const radius = FlyerShape.radius[e]!
-    for (const t of targetsWithin(sim, src, Transform.x[f]!, Transform.y[f]!, radius)) {
+    for (const t of targetsWithin(sim, sweep(sim, e, src), Transform.x[f]!, Transform.y[f]!, radius)) {
       if (struck.has(Uid.v[t.eid]!)) continue
       const dx = t.x - Transform.x[f]!
       const dy = t.y - Transform.y[f]!

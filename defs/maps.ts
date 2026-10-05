@@ -268,7 +268,7 @@ export const MAPS = {
       sill: { rampU: 1.5, dropM: 0.8, postU: 0.42, heightM: 1.1 },
       bridge: { widthU: 2.6, rampU: 1.4, riseM: 0.6, at: [0.3, 0.7] },
       trees: { inside: [3, 6], crownU: [1.3, 2.2], heightM: [4, 6], overhangU: 0.5, templeGapU: 4.5 },
-      body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, mu: 0.5, swim: 0.4, wetM: 0.02 },
+      body: { kg: 60, radiusU: 0.45, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, mu: 0.5, swim: 0.4, wetM: 0.02 },
     },
     boss: 'croc',
   },
@@ -405,7 +405,7 @@ export const MAPS = {
   ruins: {
     emoji: '1f3da',
     name: '残垣',
-    desc: '山顶台地上一座塌了大半的石砌院落：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少——高过膝盖挡人，高过胸口挡子弹，高过眼睛挡视线，看不见的敌人不会被自动瞄准，只剩一道淡影；跨得过的残基贴着地面，挡路的墙露出一截立面，越高露得越多。矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
+    desc: '山顶台地上一座塌了大半的石砌院落：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少，高度按层算——膝盖以下的残基跨得过，齐腰的矮墙挡人、子弹从上面飞过，齐头的墙挡人也挡子弹和视线，看不见的敌人不会被自动瞄准，只剩一道淡影；跨得过的残基贴着地面，挡路的墙露出一截立面，越高露得越多。矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
     kind: 'ruins',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
@@ -714,7 +714,7 @@ export const MAPS = {
     finalWaveSub: '巨鳄爬上了甲板——它有一吨重，它往哪边走，船就往哪边倾！',
     ship: {
       meterPerU: 0.45,
-      hull: { lengthU: 34.2, beamU: 18, bow: 0.42, bowPow: 0.85, stern: 0.2, sternPow: 2.5, transom: 0.62, transomBulge: 0.05, bulwarkU: 0.45, neckU: 0.6, masts: [0.34, 0.65], mastU: 0.45 },
+      hull: { lengthU: 34.2, beamU: 18, bow: 0.42, bowPow: 0.85, stern: 0.2, sternPow: 2.5, transom: 0.62, transomBulge: 0.05, bulwarkU: 0.45, bulwarkM: 1, neckU: 0.6, masts: [0.34, 0.65], mastU: 0.45 },
       hydro: { draftM: 2, midship: 0.78, kgM: 2.5, depthM: 4.2, rho: 1025, rollGyration: 0.38, pitchGyration: 0.26, rollAdded: 0.2, pitchAdded: 0.8, rollDamping: 0.15, pitchDamping: 0.35 },
       weight: { bodyKg: 75, bodyRadiusU: 0.45, bodyHeightM: 0.9, pickupKg: 0.05, ballKg: 14.5 },
       sea: {
@@ -914,7 +914,7 @@ export const MAPS = {
       hall: { insetU: [2.5, 5.5], waveU: 8, cornerU: 6, neckU: 0.8, ceilingM: 10, wallU: 2.2 },
       skylights: { mainCount: [2, 2], mainU: [3.6, 4.4], mainOffsetU: [1, 3.5], minorCount: [2, 3], minorU: [1.4, 2.2], jitter: 0.22, gapU: 3, rubbleM: 1.4, rubbleSpread: 1.25 },
       alcoves: { count: [4, 4], widthU: 2.6, outU: 2.6, alongU: [3.5, 5.5], pocketU: 1.5 },
-      formations: { columns: [7, 11], columnU: [0.55, 0.95], stalagmites: [48, 66], clusters: [7, 8], stalagmiteU: [0.16, 0.6], stalagmiteM: [0.6, 2.8], blockU: 0.32, clearU: 4.8 },
+      formations: { columns: [7, 11], columnU: [0.55, 0.95], stalagmites: [48, 66], clusters: [7, 8], stalagmiteU: [0.16, 0.6], stalagmiteM: [1.8, 2.8], lowM: [0.2, 0.55], blockU: 0.32, clearU: 4.8 },
       pools: { count: [5, 8], sizeU: [1.6, 3.2], viscosity: 1.35, exertion: 1.2 },
       sky: { latitudeDeg: 24, declinationDeg: 6, dayS: 108, startHour: 9.5, extinction: 0.21, dwell: 10, dwellCenterDeg: -2.5, dwellWidthDeg: 4 },
       light: { albedo: 0.42, bounceU: 5, glowCount: [8, 15], glowLux: 0.4 },
@@ -1017,6 +1017,7 @@ export const MAPS = {
     finalWaveSub: '失控核心翻过屏蔽罩闯了进来——把它引到通电的铜线上！',
     circuit: {
       mmPerU: 1.4,
+      bodyMM: 0.8,
       sizeU: 36,
       areaU2: [800, 1000],
       neckU: 0.35,

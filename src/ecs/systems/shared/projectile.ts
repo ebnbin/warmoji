@@ -7,8 +7,8 @@ import { spawnBolt } from '../../entities/projectile'
 import { flying, sourceOf } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 能力朝某个方向射出自己的弹体；抛射的抛到 reach 像素远（瞄准的目标那里） */
-export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, damage: number, onHit: readonly Effect[] | undefined, reach?: number): void {
+/** 能力朝某个方向射出自己的弹体：平射的在离地 z 米飞，抛射的从那里出手、抛到 reach 像素远（瞄准的目标那里） */
+export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, z: number, damage: number, onHit: readonly Effect[] | undefined, reach?: number): void {
   const def = abilityDef[e]
   spawnBolt(sim, x, y, angle, {
     faction: Faction.v[e]!,
@@ -25,6 +25,7 @@ export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, 
     onHit,
     homingDeg: Bolt.homingDeg[e]!,
     linger: Bolt.linger[e]!,
+    z,
     arc: Bolt.arc[e]!,
     reach,
     breach: def?.breach,

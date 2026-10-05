@@ -1,17 +1,19 @@
 import { FACTION, Radius, Transform, Uid, Zone } from '../components'
 import { isSameEntity } from './identity'
 import { tauntedBy } from './marks'
-import { canSee, eyeM } from './pass'
+import { canSee, eyeM, hiOf, loOf } from './pass'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
-/** 帧首快照里的一个身体；uid 用来识别快照后已死亡或被复用的编号；hidden 看不见，untargetable 碰不到，realm 是所在的界 */
+/** 帧首快照里的一个身体；uid 用来识别快照后已死亡或被复用的编号；lo、hi 是此刻占的层；hidden 看不见，untargetable 碰不到，realm 是所在的界 */
 export interface Target {
   readonly eid: number
   readonly uid: number
   readonly x: number
   readonly y: number
   readonly radius: number
+  readonly lo: number
+  readonly hi: number
   readonly hidden: boolean
   readonly untargetable: boolean
   readonly realm: number
@@ -38,12 +40,18 @@ function shrouded(sim: Sim, t: Target, from: Source['from']): boolean {
   return d.x * d.x + d.y * d.y > r * r
 }
 
+/** 来源打在哪几层：不写的不论高低 */
+function outOfBand(src: Source, t: Target): boolean {
+  const b = src.band
+  return b !== undefined && (t.hi < b[0] || t.lo > b[1])
+}
+
 function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, seeing: boolean, visit: Visit): void {
   const sight = src.sight
   const realm = src.realm ?? 0
   for (const f of foeFactions(src)) {
     for (const t of sim.targets[f]!) {
-      if (!t.alive || t.untargetable || t.realm !== realm || Uid.v[t.eid] !== t.uid || (seeing && t.hidden) || t.eid === src.body || shrouded(sim, t, src.from)) continue
+      if (!t.alive || t.untargetable || t.realm !== realm || Uid.v[t.eid] !== t.uid || (seeing && t.hidden) || t.eid === src.body || outOfBand(src, t) || shrouded(sim, t, src.from)) continue
       const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
       const rr = reach + t.radius
       if (d.x * d.x + d.y * d.y > rr * rr) continue
@@ -55,10 +63,12 @@ function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, s
   }
 }
 
-/** 看：来源能打的身体里瞄得到的。世界打所有人；倒戈的打自己人；被嘲讽的观察者只看得见嘲讽者；隐匿的谁也看不见；碰不到的、不在同一个界的、躲在迷雾里而出手者在雾外的不算；有视线要求时看不见的不算 */
+/** 看：来源能打的身体里瞄得到的。世界打所有人；倒戈的打自己人；被嘲讽的观察者只看得见嘲讽者；隐匿的谁也看不见；碰不到的、不在同一个界的、不占来源打的那几层的、躲在迷雾里而出手者在雾外的不算；有视线要求时看不见的不算 */
 export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
   if (by >= 0) {
+    const band = src.band
+    if (band && (hiOf(sim.world, by) < band[0] || loOf(sim.world, by) > band[1])) return
     const d = sim.hooks.worldDelta(sim, cx, cy, Transform.x[by]!, Transform.y[by]!)
     const r = Radius.v[by]!
     const rr = reach + r
@@ -68,12 +78,12 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   eachFoe(sim, src, cx, cy, reach, true, visit)
 }
 
-/** 碰：来源能打的身体里被覆盖到的，隐匿、嘲讽与视线不算数，碰不到的与界外的仍不算；够不够得着由出手处另查（见 pass.covered） */
+/** 碰：来源能打的身体里被覆盖到的，隐匿、嘲讽与视线不算数，碰不到的、界外的与不在那几层的仍不算；够不够得着由出手处另查（见 pass.covered） */
 export function eachTargetBody(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   eachFoe(sim, src, cx, cy, reach, false, visit)
 }
 
-/** 身体的实体接触：不看隐匿、嘲讽与视线，倒地的、碰不到的、界外的不算 */
+/** 身体的实体接触：不看隐匿、嘲讽与视线，倒地的、碰不到的、界外的与层不重叠的不算 */
 export function eachFoeBody(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   eachFoe(sim, src, cx, cy, reach, false, visit)
 }
@@ -140,9 +150,4 @@ export function nearestTarget(
     }
   })
   return bestEid < 0 ? null : { eid: bestEid, x: bestX, y: bestY, radius: bestR }
-}
-
-export function nearestAngle(sim: Sim, src: Source, ox: number, oy: number, maxRange: number): number | null {
-  const t = nearestTarget(sim, src, ox, oy, maxRange)
-  return t ? Math.atan2(t.y - oy, t.x - ox) : null
 }

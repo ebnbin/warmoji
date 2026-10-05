@@ -25,9 +25,9 @@ import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { healAllies } from './heal'
-import { eachAlly, nearestAngle, nearestTarget, targetsWithin } from '../../utils/targets'
+import { eachAlly, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
-import { BLAST_M, breachAt, covered } from '../../utils/pass'
+import { aimLayer, BLAST_M, breachAt, covered, FLOOR, hiOf, layerZ, loOf, STANDARD } from '../../utils/pass'
 import { HIT } from '../../utils/hitTags'
 import { layerMul, setStatLayer } from '../../utils/stats'
 import { isSameEntity } from '../../utils/identity'
@@ -223,7 +223,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       x: at.x,
       y: at.y,
       radius: fx.def.radius,
-      src: { ...flying(src), tint: 0xa5d86a },
+      src: { ...flying(src), tint: 0xa5d86a, band: FLOOR },
       durationMs: fx.def.durationMs,
       enterMs: fx.def.enterMs,
       color: fx.def.color,
@@ -256,9 +256,9 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   spawnProjectile: (sim, src, fx, at) => {
-    const angle = nearestAngle(sim, src, at.x, at.y, Infinity)
-    if (angle === null) return
-    spawnBolt(sim, at.x, at.y, angle, {
+    const t = nearestTarget(sim, src, at.x, at.y, Infinity)
+    if (!t) return
+    spawnBolt(sim, at.x, at.y, Math.atan2(t.y - at.y, t.x - at.x), {
       faction: src.faction,
       frame: sim.frames.index(fx.projectile.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
       size: fx.projectile.size,
@@ -273,6 +273,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       onHit: fx.onHit,
       homingDeg: fx.projectile.homingDeg,
       linger: fx.projectile.linger,
+      z: layerZ(aimLayer(STANDARD[0], STANDARD[1], loOf(sim.world, t.eid), hiOf(sim.world, t.eid))),
     })
   },
 

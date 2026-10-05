@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { STAMINA } from '../../data/stamina'
-import { Airborne, Alive, CharScale, MARK, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Stamina, Stats, Transform, Uid } from '../components'
+import { Alive, CharScale, MARK, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Span, Stamina, Stats, Transform, Uid } from '../components'
 import { enemyOf } from '../store'
 import { hasMark } from '../utils/marks'
 import { staminaLeft } from '../systems/shared/stamina'
@@ -94,9 +94,9 @@ function bodyRadius(sim: Sim, eid: number): number {
   return hasComponent(sim.world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!
 }
 
-/** 这个身体在沙上留什么样的印子：队员穿着靴子，敌人按种类，钻进沙里的蝎王顶出一道隆起，飞着的不留 */
+/** 这个身体在沙上留什么样的印子：队员穿着靴子，敌人按种类，钻进沙里的蝎王顶出一道隆起，悬空的不留 */
 function gaitOf(sim: Sim, cfg: DesertConfig, eid: number): PrintGait | null {
-  if (hasComponent(sim.world, eid, Airborne)) return null
+  if (Span.lo[eid]! > 0) return null
   if (hasComponent(sim.world, eid, Slot)) return 'boot'
   const kind = enemyOf[eid]?.kind
   const g = kind ? (cfg.tracks.gaits[kind] ?? 'foot') : 'foot'

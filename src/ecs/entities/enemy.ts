@@ -50,6 +50,7 @@ import {
   Telegraph,
   Tint,
   Transform,
+  VisOff,
 } from '../components'
 import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook } from '../store'
 import { attachResource } from './resource'
@@ -61,6 +62,8 @@ import { gateEntry } from '../worlds/gates'
 import type { Entry } from '../worlds/gates'
 import type { SpawnTraits } from './telegraph'
 import { armIdle } from '../systems/shared/anim'
+import { STANDARD } from '../utils/pass'
+import { hoverPx } from '../utils/ground'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
@@ -181,6 +184,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     x,
     y,
     radius: def.radius,
+    span: def.span ?? STANDARD,
     stats: { ...def.stats, maxHp: hp, moveSpeed: def.speed / UNIT },
     drag: ENEMY_BODY.drag,
     mass: ENEMY_BODY.mass,
@@ -195,6 +199,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
+  VisOff.y[eid] = -hoverPx(eid)
   Transform.w[eid] = size * (boss ? 0.2 : 0.3)
   Transform.h[eid] = Transform.w[eid]!
   attachDrive(sim, eid, def.drive)

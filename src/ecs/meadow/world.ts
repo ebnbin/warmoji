@@ -7,9 +7,11 @@ import { fleeSteer } from '../systems/shared/steer'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { roomFor } from '../worlds/gates'
-import { meadowPlan } from './layout'
+import { beyondFence, footAt, forestDepth, meadowPlan, toLocal } from './layout'
+import { makeSolids, solidOf, solidsTrace } from '../worlds/solids'
+import type { Solid, Solids } from '../worlds/solids'
 import { meadowMarks } from './marks'
-import type { MeadowPlan } from './layout'
+import type { Local, MeadowPlan } from './layout'
 import type { Basin } from '../worlds/basin'
 import type { MapId, MeadowConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -22,10 +24,30 @@ const NO_GHOSTS: Point[] = []
 /** 草甸按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x6d3ad0
 
-/** 草甸此刻的状态：只有按种子生成的地图与它上面的地标，没有会变的东西 */
+/** 草甸此刻的状态：只有按种子生成的地图、它上面的地标与林子、陡坡和栅栏的实心，没有会变的东西 */
 export interface MeadowState {
   readonly plan: MeadowPlan
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
+  readonly solids: Solids
+}
+
+const FOREST: Solid = { topM: Infinity, material: 'wood' }
+const BANK: Solid = { topM: Infinity, material: 'earth' }
+
+/** 林子与陡坡（连同坡上那层草甸）高过一切；栅栏按栅高占一格宽的一条线，有缝，弹体与视线照样过去 */
+function solidsOf(cfg: MeadowConfig, plan: MeadowPlan): Solids {
+  const e = plan.edges
+  const b = plan.basin
+  const fence: Solid = { topM: cfg.fence.heightM, material: 'fence' }
+  const half = b.cell / UNIT / 2
+  const l: Local = { a: 0, b: 0 }
+  const at = (x: number, y: number): Solid | null => {
+    toLocal(plan.frame, x / UNIT, y / UNIT, l)
+    if (l.a <= footAt(e, l.b)) return BANK
+    if (forestDepth(e, l.a, l.b) >= 0) return FOREST
+    return Math.abs(beyondFence(e, l.a, l.b)) <= half ? fence : null
+  }
+  return makeSolids(at, b.x0, b.y0, b.cols, b.rows, b.cell)
 }
 
 function cfgOf(sim: Sim): MeadowConfig {
@@ -40,8 +62,9 @@ export function meadowPlanFor(cfg: MeadowConfig, decorSeed: number): MeadowPlan 
 export function meadowOf(sim: Sim): MeadowState {
   let s = sim.worldState.meadow
   if (!s) {
-    const plan = meadowPlanFor(cfgOf(sim), sim.run.decorSeed)
-    s = { plan, marks: meadowMarks(plan) }
+    const cfg = cfgOf(sim)
+    const plan = meadowPlanFor(cfg, sim.run.decorSeed)
+    s = { plan, marks: meadowMarks(plan), solids: solidsOf(cfg, plan) }
     sim.worldState.meadow = s
   }
   return s
@@ -85,7 +108,7 @@ function openNear(plan: MeadowPlan, p: Point, room: number): Point {
 
 /**
  * 草甸：能走的是林子、栅栏和陡坡围着的一片草地，场里没有障碍，也没有任何特殊规则。
- * 林缘、栅栏与坡脚是硬边界，身体走到跟前就停住、顺着边滑，子弹照样飞过去
+ * 林缘、栅栏与坡脚是硬边界，身体走到跟前就停住、顺着边滑；林子与陡坡挡子弹和视线，栅栏有缝，子弹照样穿过去
  */
 export const meadow: WorldHooks = {
   torus: false,
@@ -131,8 +154,11 @@ export const meadow: WorldHooks = {
     const d = norm(tx - x, ty - y)
     return alongWall(meadowOf(sim).plan.basin, x, y, d.x, d.y, Radius.v[eid]! + 0.3 * UNIT)
   },
-  wallHit() {
-    return null
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(meadowOf(sim).solids, probe, ax, ay, bx, by)
+  },
+  solidAt(sim, x, y) {
+    return solidOf(meadowOf(sim).solids, x, y)
   },
   smashWall() {},
   wanderDir(sim, eid, dx, dy) {

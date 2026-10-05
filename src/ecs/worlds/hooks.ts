@@ -24,7 +24,7 @@ import type { ShipState } from '../worlds/ship'
 import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, gustSpan, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING, windAt, windPush } from '../worlds/floe'
 import type { FloeField, FloeState } from '../worlds/floe'
 import { clearPath, diffuseLux, directLux, flowDir, flowFrom, inPool, makeCaveState, outward, pushOut, rockHit, roomOf, skyAt, stepLight, stepTorch, torchesLux, torchSpot } from '../worlds/cave'
-import type { CaveState, Rock } from '../worlds/cave'
+import type { CaveState, Rock, Stalagmite } from '../worlds/cave'
 import { clockSec } from '../fight/clock'
 import { charSize } from '../systems/shared/scale'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/oldRiver'
@@ -32,7 +32,7 @@ import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/oldRiver'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Airborne, Alive, Boss, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
+import { Alive, Boss, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Span, Stats, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/oldRuins'
@@ -50,8 +50,10 @@ import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
 import { ruins } from '../ruins/world'
-import { phases } from '../utils/pass'
+import { clearM, grounded, passCost, phases, probeZ, topOf } from '../utils/pass'
 import type { Crossing, Probe } from '../utils/pass'
+import { solidOf, solidsTrace, wallsOf } from './solids'
+import type { Solid } from './solids'
 import type { ObstacleId } from '../../types/obstacles'
 import { meadow } from '../meadow/world'
 import type { MeadowState } from '../meadow/world'
@@ -150,6 +152,8 @@ export interface WorldHooks {
   trace?(sim: Sim, probe: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null
   /** 线段第一次碰上墙的地方：碰上的一律当作岩体挡下；写了 trace 的不看它 */
   wallHit?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
+  /** (x, y) 处立着的实心，挡身体的与挡弹体的都算，取规则用的那份；只给开发面板画高度，不写就当没有 */
+  solidAt?(sim: Sim, x: number, y: number): Solid | null
   /** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里，按材质的强度折算能打掉多少，返回实际用掉的；不写就什么也打不坏 */
   breach?(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number
   /** 弹体或出手撞上了障碍：给画面崩点碎屑 */
@@ -315,11 +319,11 @@ const ice: WorldHooks = {
     const dmg = Math.round(cfg.waterTeamDps * frac)
     const src = hazardSource('coldWater', 0x4fc3f7)
     for (const m of sim.characters) {
-      if (Alive.v[m] && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hit(sim, src, m, dmg, { tick: true })
+      if (Alive.v[m] && grounded(sim.world, m) && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hit(sim, src, m, dmg, { tick: true })
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
-      if (!onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) hit(sim, src, eid, edmg, { tick: true })
+      if (grounded(sim.world, eid) && !onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) hit(sim, src, eid, edmg, { tick: true })
     }
   },
 }
@@ -722,7 +726,7 @@ function volcanoOf(sim: Sim): VolcanoState {
     const size = MAPS[sim.mapId].size!
     const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, centered(size.w, size.h), FRAME_MID)
     const vents = fumaroles(field, cfg, VENT_COUNT)
-    s = { field, vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    s = { field, solids: wallsOf(field.basin, 'rock'), vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s
   }
   return s
@@ -774,15 +778,14 @@ function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   }
 }
 
-/** 脚下的熔岩没凝固就挨烫：穿行、腾空的身体不沾地 */
+/** 脚下的熔岩没凝固就挨烫：脚不沾地的不烫 */
 function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   const now = sim.elapsedMs
   if (now < s.hurtAt) return
   s.hurtAt = now + cfg.lava.tickMs
   const frac = cfg.lava.tickMs / 1000
   const src = hazardSource('lava', LAVA_TINT)
-  const onLava = (eid: number): boolean =>
-    Motion.kind[eid] !== MOTION.transit && Motion.kind[eid] !== MOTION.arc && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
+  const onLava = (eid: number): boolean => grounded(sim.world, eid) && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
   const dmg = Math.round(cfg.lava.teamDps * frac)
   for (const m of sim.characters) if (Alive.v[m] && onLava(m)) hit(sim, src, m, dmg, { tick: true })
   const edmg = Math.round(cfg.lava.enemyDps * frac)
@@ -803,6 +806,12 @@ const volcano: WorldHooks = {
   ...bounded,
   constrainBody(sim, eid, _from, next) {
     return keepOut(volcanoOf(sim).field.basin, next.x, next.y, Radius.v[eid]!)
+  },
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(volcanoOf(sim).solids, probe, ax, ay, bx, by)
+  },
+  solidAt(sim, x, y) {
+    return solidOf(volcanoOf(sim).solids, x, y)
   },
   basin(sim) {
     return volcanoOf(sim).field.basin
@@ -871,11 +880,9 @@ function shipOf(sim: Sim): ShipState {
   return s
 }
 
-/** 压在甲板上的重量，千克：身体按半径的三次方与身体的质量折算；腾空、被抛着、穿行中、死了的与碎片不压甲板 */
+/** 压在甲板上的重量，千克：身体按半径的三次方与身体的质量折算；脚不沾地的、死了的与碎片不压甲板 */
 function deckKg(sim: Sim, cfg: ShipConfig, eid: number): number {
-  if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Shard)) return 0
-  const k = Motion.kind[eid]
-  if (k === MOTION.arc || k === MOTION.transit) return 0
+  if (!Alive.v[eid] || !grounded(sim.world, eid) || hasComponent(sim.world, eid, Shard)) return 0
   if (hasComponent(sim.world, eid, Pickup)) return cfg.weight.pickupKg
   return cfg.weight.bodyKg * Phys.mass[eid]! * (Radius.v[eid]! / (cfg.weight.bodyRadiusU * UNIT)) ** 3
 }
@@ -891,6 +898,12 @@ function resistPx(cfg: ShipConfig): number {
  */
 const ship: WorldHooks = {
   ...bounded,
+  trace(sim, probe, ax, ay, bx, by) {
+    return solidsTrace(shipOf(sim).deck.solids, probe, ax, ay, bx, by)
+  },
+  solidAt(sim, x, y) {
+    return solidOf(shipOf(sim).deck.solids, x, y)
+  },
   /** 恒定功率下每秒花的体力不变，每格的费力是功率之比：上坡照常花、走得慢，下坡快到顶就刹着走、花得少 */
   effort(sim, _x, _y, dx, dy) {
     const len = Math.hypot(dx, dy)
@@ -1343,7 +1356,6 @@ const floe: WorldHooks = {
    * 自己发动的冲刺、跳跃由能力推着走、也由能力刹住，收尾时还回冲之前的速度；被打飞、被扔出去的照样带着速度滑
    */
   contact(sim, eid, dt, x, y, vx, vy, out) {
-    if (hasComponent(sim.world, eid, Phasing)) return false
     const cfg = floeCfg(sim)
     const s = floeOf(sim)
     const f = s.field
@@ -1418,7 +1430,7 @@ const floe: WorldHooks = {
     const s = floeOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    if (inWater(s, eid, Uid.v[eid]!) || hasComponent(sim.world, eid, Phasing)) return norm(tx - x, ty - y)
+    if (inWater(s, eid, Uid.v[eid]!) || Span.lo[eid]! > 0) return norm(tx - x, ty - y)
     const reach = Radius.v[eid]! / UNIT + 0.6
     if (edgeAt(s.field, tx, ty) >= 0) return walkTo(s, x, y, tx, ty, reach)
     // 目标在水里：不跟着跳下去，走到离它最近的冰上守着
@@ -1500,6 +1512,50 @@ const floe: WorldHooks = {
 
 function caveCfg(sim: Sim): CaveConfig {
   return MAPS[sim.mapId].cave!
+}
+
+const CAVE_ROCK: Solid = { topM: Infinity, material: 'rock' }
+
+/** 半径 rad 的身体陷进高过 clear 米的矮石笋多深就沿外法线退回多远：只有矮个子跨不过它们 */
+function lowOut(list: readonly Stalagmite[], x: number, y: number, rad: number, clear: number): Point {
+  let px = x
+  let py = y
+  for (const st of list) {
+    if (st.block || topOf(st.h) <= clear) continue
+    const dx = px - st.x
+    const dy = py - st.y
+    const d = Math.hypot(dx, dy)
+    const r = st.r + rad
+    if (d >= r) continue
+    const nx = d > 1e-6 ? dx / d : 1
+    const ny = d > 1e-6 ? dy / d : 0
+    px = st.x + nx * r
+    py = st.y + ny * r
+  }
+  return { x: px, y: py }
+}
+
+/** 线段 a→b（像素）上第一根探测在它里面的矮石笋：按探测穿过它那一段的最低处比它占到的那一层的顶 */
+function lowTrace(list: readonly Stalagmite[], p: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null {
+  const dx = bx - ax
+  const dy = by - ay
+  const l2 = dx * dx + dy * dy
+  if (l2 <= 0 || passCost(p, 'rock') <= 0) return null
+  let best: Crossing | null = null
+  for (const st of list) {
+    if (st.block) continue
+    const fx = ax - st.x
+    const fy = ay - st.y
+    const b = fx * dx + fy * dy
+    const disc = b * b - l2 * (fx * fx + fy * fy - st.r * st.r)
+    if (disc < 0) continue
+    const sq = Math.sqrt(disc)
+    const t0 = Math.max(0, (-b - sq) / l2)
+    const t1 = Math.min(1, (-b + sq) / l2)
+    if (t0 > t1 || (best && t0 >= best.t0) || Math.min(probeZ(p, t0), probeZ(p, t1)) >= topOf(st.h)) continue
+    best = { t0, t1, material: 'rock' }
+  }
+  return best
 }
 
 /** 溶洞的地形与这一局的月龄由布景种子定下，视图从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
@@ -1593,7 +1649,9 @@ const cave: WorldHooks = {
   },
   constrainBody(sim, eid, from, next) {
     if (phases(sim.world, eid, 'rock')) return bounded.constrainBody(sim, eid, from, next)
-    return pushOut(caveOf(sim).layout.rock, next.x, next.y, Radius.v[eid]!)
+    const L = caveOf(sim).layout
+    const p = pushOut(L.rock, next.x, next.y, Radius.v[eid]!)
+    return lowOut(L.stalagmites, p.x, p.y, Radius.v[eid]!, clearM(eid))
   },
   basin(sim) {
     return caveOf(sim).layout.rock
@@ -1610,12 +1668,21 @@ const cave: WorldHooks = {
     const f = flowDir(s.flow, x, y) ?? d
     return glide(rock, x, y, f.x, f.y, rad + 0.3 * UNIT)
   },
-  trace(sim, _probe, ax, ay, bx, by) {
-    const hit = rockHit(caveOf(sim).layout.rock, ax, ay, bx, by)
-    if (!hit) return null
+  /** 洞壁、石柱与挡路的石笋高过一切；矮石笋只挡贴地的 */
+  trace(sim, probe, ax, ay, bx, by) {
+    const L = caveOf(sim).layout
+    const low = lowTrace(L.stalagmites, probe, ax, ay, bx, by)
+    const hit = rockHit(L.rock, ax, ay, bx, by)
     const len = Math.hypot(bx - ax, by - ay)
-    const t = len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
-    return { t0: t, t1: t, material: 'rock' }
+    const t = !hit ? Infinity : len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0
+    if (low && low.t0 <= t) return low
+    return hit ? { t0: t, t1: t, material: 'rock' } : null
+  },
+  solidAt(sim, x, y) {
+    const L = caveOf(sim).layout
+    if (roomOf(L.rock, x, y) < 0) return CAVE_ROCK
+    for (const st of L.stalagmites) if (!st.block && Math.hypot(x - st.x, y - st.y) < st.r) return { topM: st.h, material: 'rock' }
+    return null
   },
   wanderDir(sim, eid, dx, dy) {
     const rock = caveOf(sim).layout.rock

@@ -59,11 +59,11 @@ import { abilityPiercesWalls } from '../../../data/abilities'
 import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
 import { anchorX, anchorY } from '../../utils/ability'
-import { flying, sourceOf } from '../../utils/source'
+import { flying, sourceOf, sweep } from '../../utils/source'
 import { HIT } from '../../utils/hitTags'
 import type { Source } from '../../utils/source'
 import { eachAlly, eachTarget, nearestTarget, targetsNear, targetsWithin } from '../../utils/targets'
-import { BLAST_M, breachAt, covered, FLAT_SHOT_M, flightProbe, impactAt, reachBlock, reaches, shotPass } from '../../utils/pass'
+import { aimLayer, BLAST_M, breachAt, covered, flightProbe, hiOf, impactAt, layerZ, loOf, muzzleOf, reachBlock, reaches, shotPass } from '../../utils/pass'
 import type { Found } from '../../utils/targets'
 import { circleHitIndices, sectorHitIndices, thrustHitIndices } from '../../utils/hit'
 import { strongestTarget } from '../../utils/assassinate'
@@ -128,12 +128,26 @@ export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
   }
 }
 
+/** 出手者从哪一层出手 */
+function muzzleLayer(sim: Sim, e: number): number {
+  const o = Owner.eid[e]!
+  return muzzleOf(loOf(sim.world, o), hiOf(sim.world, o))
+}
+
+/** 这一发离地多高：抛射从出手的那一层出手，平射朝着目标那一层飞，没有目标就在出手的那一层 */
+function shotZ(sim: Sim, e: number, target: Found | null): number {
+  if (Bolt.arc[e]! > 0 || !target) return layerZ(muzzleLayer(sim, e))
+  const w = sim.world
+  const o = Owner.eid[e]!
+  return layerZ(aimLayer(loOf(w, o), hiOf(w, o), loOf(w, target.eid), hiOf(w, target.eid)))
+}
+
 /** 这一下打不打得到 f：弹体看飞不飞得过去（抛射的抛到它脚下），近战与连锁看够不够得着，其余的看得见就行 */
 function hittable(sim: Sim, e: number, src: Source, ox: number, oy: number, f: Found): boolean {
   const w = sim.world
   if (hasComponent(w, e, Bolt)) {
     const def = abilityDef[e]
-    return (def !== undefined && abilityPiercesWalls(def)) || shotPass(sim, src.faction, flightProbe(Bolt.arc[e]!, Bolt.pierce[e]!), ox, oy, f.x, f.y).block === null
+    return (def !== undefined && abilityPiercesWalls(def)) || shotPass(sim, src.faction, flightProbe(shotZ(sim, e, f), Bolt.arc[e]!, Bolt.pierce[e]!), ox, oy, f.x, f.y).block === null
   }
   if (hasComponent(w, e, Segment) || hasComponent(w, e, Sector) || hasComponent(w, e, Chain)) return reaches(sim, ox, oy, f.x, f.y)
   return true
@@ -208,7 +222,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, Bolt)) {
     const from = muzzle(sim, e)
-    shoot(sim, e, from.x, from.y, angle, damage, onHit, target ? Math.hypot(target.x - from.x, target.y - from.y) : undefined)
+    shoot(sim, e, from.x, from.y, angle, shotZ(sim, e, target), damage, onHit, target ? Math.hypot(target.x - from.x, target.y - from.y) : undefined)
     return true
   }
 
@@ -218,13 +232,13 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     // 被障碍挡的一刺、一束只伸到撞上的地方
     const wall = src.blocked ? reachBlock(sim, ox, oy, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach) : null
     if (wall) reach *= wall.t
-    const list = covered(sim, src, ox, oy, targetsWithin(sim, src, ox, oy, reach + radius))
+    const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, reach + radius))
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
     applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
     if (wall) {
       impactAt(sim, wall)
-      breachAt(sim, wall.x, wall.y, FLAT_SHOT_M, radius, breachOf(e))
+      breachAt(sim, wall.x, wall.y, layerZ(muzzleLayer(sim, e)), radius, breachOf(e))
     }
     if (Segment.beam[e]) spawnFxBeam(sim, ox, oy, angle, reach, radius, color)
     Swing.startMs[e] = sim.fxMs
@@ -234,11 +248,11 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, Sector)) {
     const radius = Sector.radius[e]!
-    const list = covered(sim, src, ox, oy, targetsWithin(sim, src, ox, oy, radius))
+    const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, radius))
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
     applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
-    breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, FLAT_SHOT_M, radius * 0.5, breachOf(e))
+    breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, layerZ(muzzleLayer(sim, e)), radius * 0.5, breachOf(e))
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = Sector.ms[e]!
     return true
@@ -513,7 +527,7 @@ function empowered(sim: Sim, e: number): readonly Effect[] {
 export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const w = sim.world
   const src = sourceOf(sim, e)
-  const shot = preset ?? aimAt(sim, e, src)
+  const shot = preset ?? aimAt(sim, e, sweep(sim, e, src))
   if (!shot) return false
   Aim.rad[e] = shot.angle
   if (!preset && hasComponent(w, e, Windup)) {
@@ -597,14 +611,14 @@ export function fireRepeat(sim: Sim, e: number): boolean {
   const oy = anchorY(e)
   switch (Repeat.reaim[e]) {
     case REAIM.nearest: {
-      const t = nearestHittable(sim, e, src, ox, oy, Aim.range[e]!)
+      const t = nearestHittable(sim, e, sweep(sim, e, src), ox, oy, Aim.range[e]!)
       if (!t) return false
       target = t
       angle = Math.atan2(t.y - oy, t.x - ox)
       break
     }
     case REAIM.random: {
-      const near = targetsNear(sim, src, ox, oy, Aim.range[e]!)
+      const near = targetsNear(sim, sweep(sim, e, src), ox, oy, Aim.range[e]!)
       if (near.length === 0) return false
       target = near[Math.floor(sim.rng.next() * near.length)]!
       angle = Math.atan2(target.y - oy, target.x - ox)

@@ -2,6 +2,7 @@ import { hasComponent } from 'bitecs'
 import { BODY_MAX_SPEED } from '../../../data/abilities'
 import { Alive, Anchored, Ctl, MARK, Motion, MOTION, Phys, Radius, Transform, TRANSIT, Uid, VisOff } from '../../components'
 import { hasMark, inTransit } from '../../utils/marks'
+import { hoverPx } from '../../utils/ground'
 import { motionFx } from '../../store'
 import { spawnFxCircle } from '../../entities/fx'
 import type { Effect } from '../../../types/abilityDefs'
@@ -58,9 +59,9 @@ export function movable(sim: Sim, eid: number, by: Mover): boolean {
   return by.self ? Ctl.dash[eid] === 1 : !hasComponent(sim.world, eid, Anchored) && !hasMark(sim, eid, MARK.unstoppable)
 }
 
-/** 结束手头的脚本位移：弧线中的身体落回地面 */
+/** 结束手头的脚本位移：弧线中的身体落回原来的高度 */
 export function endMotion(eid: number): void {
-  if (Motion.kind[eid] === MOTION.arc) VisOff.y[eid] = 0
+  if (Motion.kind[eid] === MOTION.arc) VisOff.y[eid] = -hoverPx(eid)
   Motion.kind[eid] = MOTION.none
   Motion.skill[eid] = 0
   Motion.seek[eid] = 0
@@ -123,7 +124,7 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
     Motion.h[eid] = d.height
     Motion.vx[eid] = 0
     Motion.vy[eid] = 0
-    VisOff.y[eid] = -d.height
+    VisOff.y[eid] = -hoverPx(eid) - d.height
     return true
   }
   if (d.kind === 'arc' || d.kind === 'transit') {

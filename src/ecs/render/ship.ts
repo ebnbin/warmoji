@@ -37,17 +37,6 @@ export function deckFrame(cfg: ShipConfig): DeckFrame {
   return { s0: -bulgeU(h) - out, s1: h.lengthU + out, t1: h.beamU / 2 + out }
 }
 
-/** 船上一点离舷墙外沿多远，格，舷墙以内为负；船首柱与横板中线外按到端点的距离算 */
-export function railDistance(cfg: ShipConfig, s: number, t: number): number {
-  const h = cfg.hull
-  const end = -bulgeU(h)
-  if (s >= h.lengthU) return Math.hypot(s - h.lengthU, t) - h.bulwarkU
-  if (s <= end) return Math.hypot(s - end, t) - h.bulwarkU
-  const e = 0.02
-  const db = (halfBeamAt(h, s + e) - halfBeamAt(h, s - e)) / (2 * e)
-  return (Math.abs(t) - halfBeamAt(h, s) - h.bulwarkU) / Math.sqrt(1 + db * db)
-}
-
 /** 一根桅杆：立在船长方向 s 格处，高 height 米，桅楼在 top 米，帆桁的高（米）与半长（格） */
 export interface Mast {
   readonly s: number
