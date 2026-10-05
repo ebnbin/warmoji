@@ -931,6 +931,46 @@ export interface CircuitConfig {
     readonly rearmMs: number
   }
 }
+/**
+ * 天枢：未来城市一座高楼顶上的空中大厅，切了角的方形，四周是落地的玻璃幕墙，贴着幕墙一圈玻璃地面，往下看是夜里城市的灯海。
+ * 厅里的地面是一格一块的瓷砖，谁踩上去就亮起谁的颜色、慢慢暗下去；立柱与电梯井顶到天花板，全息台齐腰。
+ * 厅里有几对传送门：每扇门是格线上一段发光的粗线，同一对门朝向相同、颜色相同；任何东西的中心越过一扇门的门线，
+ * 就平移到另一扇门同一侧接着走，速度不变。每隔一阵有一扇门挪到别处：旧处闪烁、错位，新处先出一条虚线、被一个光点沿线画实，预警过后一下换过去
+ */
+export interface NexusConfig {
+  /** 大厅外接的方形边长（格），摆在方框正中；四个角斜切 chamferU 格 */
+  readonly sizeU: number
+  readonly chamferU: readonly [number, number]
+  /** 贴着幕墙内侧那一圈玻璃地面多宽，格 */
+  readonly glassU: number
+  /** 窄过两倍 neckU 的缝不能走 */
+  readonly neckU: number
+  /** 开局站的那片空地的半径，格 */
+  readonly plazaU: number
+  /** 立柱：几根，半径（格），围着厅心摆在多远的一圈上（格） */
+  readonly pillars: { readonly count: readonly [number, number]; readonly radiusU: number; readonly ringU: readonly [number, number] }
+  /** 全息台：几座，台面半径（格），多高（米） */
+  readonly pedestals: { readonly count: readonly [number, number]; readonly radiusU: number; readonly heightM: number }
+  /** 电梯井：几座，沿墙多宽、往厅里多深（格），每座两扇门，门多宽（格） */
+  readonly cores: { readonly count: readonly [number, number]; readonly widthU: number; readonly depthU: number; readonly doorU: number }
+  /** 地上的检修口：几处 */
+  readonly hatches: readonly [number, number]
+  /**
+   * 传送门：几对；门线多长（格）；门线两侧各要空出 apronU 格；同一对的两扇门至少隔 pairU 格，任两扇门至少隔 apartU 格；
+   * 每隔 everyMs 有一扇门挪到别处，旧处与新处一起预警 warnMs 后换过去
+   */
+  readonly warps: {
+    readonly pairs: readonly [number, number]
+    readonly lenU: number
+    readonly apronU: number
+    readonly pairU: number
+    readonly apartU: number
+    readonly everyMs: readonly [number, number]
+    readonly warnMs: number
+  }
+  /** 地砖被踩亮以后按 fadeMs 的时间常数暗下去 */
+  readonly tiles: { readonly fadeMs: number }
+}
 /** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
 export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
 
@@ -1177,7 +1217,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1207,6 +1247,7 @@ export interface MapDef {
   readonly sakura?: SakuraConfig
   readonly maple?: MapleConfig
   readonly circuit?: CircuitConfig
+  readonly nexus?: NexusConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

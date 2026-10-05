@@ -42,6 +42,7 @@ import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
 import { bridgeLocal as mapleBridgeLocal, CREST_U as MAPLE_CREST_U, maplePlan, SINK_M as MAPLE_SINK_M, weirLocal as mapleWeirLocal } from '../src/maps/maple/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
+import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -512,6 +513,50 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
     need(plan.nets.length <= NET_SLOTS, `${where} 的带电网络太多，编不进电流着色器`)
     need(plan.gaps.length >= arc.count[0] && plan.gaps.length <= arc.count[1], `${where} 的电弧处数不在范围里`)
+  }
+}
+
+/**
+ * 天枢：大厅放得进方框的安全区，开局空地空得出出生点要的格数；门线是整格长、落在格线上；
+ * 全息台挡得住标准身体、又比平射的子弹矮；门的对数不超过颜色的种数，挪门的间隔比预警长。
+ * 抽一批种子真的生成一遍：每个都生成得出来，开局站位四周空着，门的对数在范围里，同一对朝向相同、隔得够远，横竖两种门各有足够的地方挪
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'nexus') === (m.nexus !== undefined), `maps.${id} 是天枢当且仅当写了 nexus`)
+  const c = m.nexus
+  if (!c) continue
+  const at = `maps.${id}.nexus`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const w = c.warps
+  const B = OBSTACLES.body
+  const layerM = B.heightM / B.layers
+  const chestM = (B.layers - 0.5) * layerM
+  const layersOf = (h: number): number => Math.ceil(h / layerM - 1e-9)
+  need(c.sizeU > 0 && c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at}.plazaU 须空得出出生点要的格数`)
+  need(c.glassU > 0 && c.neckU > 0 && range(c.chamferU, false) && c.chamferU[1] < c.sizeU / 2, `${at} 的玻璃地面、窄缝与切角须为正，切角小于半边`)
+  need(c.pillars.radiusU > 0 && range(c.pillars.count, true) && range(c.pillars.ringU, false) && c.pillars.ringU[0] > c.plazaU + c.pillars.radiusU, `${at}.pillars 须在开局空地以外`)
+  need(c.pedestals.radiusU > 0 && range(c.pedestals.count, true), `${at}.pedestals 的半径须为正、座数是整数范围`)
+  need(layersOf(c.pedestals.heightM) > Math.floor(B.layers * B.step) && layersOf(c.pedestals.heightM) * layerM < chestM, `${at}.pedestals.heightM 须挡得住标准身体、又比平射的子弹矮`)
+  need(c.cores.widthU > c.cores.doorU * 2 && c.cores.depthU > 0 && range(c.cores.count, true) && c.cores.count[1] <= 2, `${at}.cores 须放得下两扇门，最多两座`)
+  need(range(c.hatches, true), `${at}.hatches 须是整数范围`)
+  need(Number.isInteger(w.lenU) && w.lenU > 0, `${at}.warps.lenU 须是整格：门线落在格线上`)
+  need(w.pairs[0] >= 1 && range(w.pairs, true) && w.pairs[1] <= 3, `${at}.warps.pairs 须在 1 到 3 对之间：门的颜色只有三种`)
+  need(w.apronU >= 1 && w.apartU > w.lenU && w.pairU > w.apartU, `${at}.warps 门线两侧至少空一格，同一对隔得比任两扇门远，任两扇门的中点隔得比门长`)
+  need(w.warnMs > 0 && range(w.everyMs, false) && w.everyMs[0] > w.warnMs, `${at}.warps 挪门的间隔须比预警长`)
+  need(c.tiles.fadeMs > 0, `${at}.tiles.fadeMs 须为正`)
+  for (let s = 0; s < 16; s++) {
+    const plan = nexusPlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+    const pairs = plan.warps.length / 2
+    need(pairs >= w.pairs[0] && pairs <= w.pairs[1], `${where} 的门的对数不在范围里`)
+    for (let k = 0; k < plan.warps.length; k += 2) {
+      const a = plan.warps[k]!
+      const b = plan.warps[k + 1]!
+      need(a.axis === b.axis && warpApart(a, b, w.lenU) >= w.pairU, `${where} 的第 ${k / 2} 对门朝向不同或隔得太近`)
+    }
+    for (const axis of [0, 1]) need(plan.spots.filter((p) => p.axis === axis).length >= 12, `${where} 摆得下${axis === 0 ? '竖' : '横'}门的地方不到 12 处，门挪不开`)
   }
 }
 

@@ -8,6 +8,7 @@ import { DesertView } from '../maps/desert/view'
 import { FloeView } from '../maps/floe/view'
 import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
+import { NexusView } from '../maps/nexus/view'
 import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
 import { MapleView } from '../maps/maple/view'
@@ -38,4 +39,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   maple: () => new MapleView(),
   desert: () => new DesertView(),
   circuit: () => new CircuitView(),
+  nexus: () => new NexusView(),
 }

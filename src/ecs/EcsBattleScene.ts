@@ -95,7 +95,7 @@ import { hit } from './systems/shared/damage'
 import { bodySource, WORLD_SOURCE } from './utils/source'
 import { nearestTarget } from './utils/targets'
 import { LAYER_M } from './utils/pass'
-import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
+import { camSlideOffset, canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 import { wallLoops } from '../maps/basin'
@@ -503,9 +503,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.paint = paint
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
+    const cutAt = this.map.cutAt?.bind(this.map)
     // 布景躺在地上，和最底下那一段 z 的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, SPRITE_BANDS[0]!.depth, atlas, this.ctx.decor, light, lightAt)
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt)
     if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
@@ -978,8 +979,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return
     }
     const camOff = handoverCamOffset(sim)
-    this.anchor.x = leaderX(sim) + camOff.x
-    this.anchor.y = leaderY(sim) + camOff.y
+    const slide = camSlideOffset(sim)
+    this.anchor.x = leaderX(sim) + camOff.x + slide.x
+    this.anchor.y = leaderY(sim) + camOff.y + slide.y
     this.aimLens(delta)
     this.map.step(this.ctx, sim, delta)
     this.fog?.show(leaderX(sim), leaderY(sim), sim.fight.rules.vision * UNIT, VISION_FOG_ALPHA)
