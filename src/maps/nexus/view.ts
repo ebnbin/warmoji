@@ -134,7 +134,7 @@ function tileMask(cfg: NexusConfig, plan: NexusPlan): Uint8ClampedArray<ArrayBuf
   return out
 }
 
-/** 一扇门两侧的瓷砖铺上那一对的颜色：pair 从 1 起，k 是浓度，style 0 是立着的门、2 是正在搭；箭头朝门线 */
+/** 一扇门两侧的瓷砖铺上那一对的颜色：pair 从 1 起，k 是浓度，style 0 是立着的门、1 是要挪走的、2 是正在搭；箭头朝门线 */
 function layWarp(out: Uint8ClampedArray, w: WarpSpot, len: number, pair: number, k: number, style: number): void {
   for (let t = 0; t < len; t++) {
     for (const s of [1, 2]) {
@@ -374,8 +374,8 @@ export class NexusView implements MapView {
         return
       }
       const p = clamp01((now - w.since) / cfg.warps.warnMs)
-      layWarp(out, w.spot, len, pair, this.flicker(now, i, p), 0)
-      layWarp(out, w.next, len, pair, 0.25 + 0.75 * p, 2)
+      layWarp(out, w.spot, len, pair, this.flicker(now, i, p), 1)
+      layWarp(out, w.next, len, pair, 0.35 + 0.65 * p, 2)
     })
   }
 
@@ -464,55 +464,76 @@ export class NexusView implements MapView {
 
   /**
    * 一扇立着的门：地上一道亮线、两头门柱脚下的光圈，门柱中间立着一片光幕，光一道道往上走；横门的光幕正对镜头，竖门的侧对镜头只剩一道亮线。
-   * closing 不为 −1 时这扇门正要挪走（0 到 1）：一闪一闪、左右错位，越到最后断得越频繁；t 是画面的时钟（秒），now 是对局的时钟（毫秒）
+   * closing 不为 −1 时这扇门正要挪走（0 到 1）：一闪一闪、整扇左右错位，旁边一青一品红两道重影，柱顶一圈倒计时越走越短，门柱时不时迸出火花，
+   * 越到最后越厉害；t 是画面的时钟（秒），now 是对局的时钟（毫秒）
    */
   private gate(cfg: NexusConfig, spot: WarpSpot, i: number, color: number, closing: number, t: number, now: number): void {
     const w = cfg.warps
     const len = w.lenU
     const post = w.postU * UNIT
     const lift = w.heightM * LIFT_PER_M
-    const a = { x: spot.x * UNIT, y: spot.y * UNIT }
-    const e = warpEnd(spot, len)
-    const b = { x: e.x * UNIT, y: e.y * UNIT }
     const on = closing < 0 ? 1 : this.flicker(now, i, closing)
-    const jitter = closing < 0 ? 0 : (noise(Math.floor(now / 40), i * 17 + 3) - 0.5) * 10 * closing
+    const jitter = closing < 0 ? 0 : (noise(Math.floor(now / 40), i * 17 + 3) - 0.5) * 12 * closing
+    const a = { x: spot.x * UNIT + jitter, y: spot.y * UNIT }
+    const e = warpEnd(spot, len)
+    const b = { x: e.x * UNIT + jitter, y: e.y * UNIT }
     const f = this.floorFx!
     const g = this.standFx!
     // 地上：门线一道亮线，门柱脚下的光圈
     f.fillStyle(color, 0.28 * on)
     for (const q of [a, b]) f.fillCircle(q.x, q.y, post * 2)
+    if (closing >= 0) {
+      for (const [dx, tint] of [
+        [4, 0x37f6ff],
+        [-4, 0xff3df0],
+      ] as const) {
+        f.lineStyle(0.07 * UNIT, tint, 0.5 * closing)
+        f.lineBetween(a.x + dx, a.y, b.x + dx, b.y)
+      }
+    }
     f.lineStyle(0.14 * UNIT, color, 0.9 * on)
     f.lineBetween(a.x, a.y, b.x, b.y)
     f.lineStyle(0.045 * UNIT, 0xffffff, 0.95 * on)
     f.lineBetween(a.x, a.y, b.x, b.y)
     // 光幕
-    for (const [dx, tint, alpha] of [
-      [jitter, color, 1],
-      [-jitter, 0x7ff9ff, closing < 0 ? 0 : 0.5],
-    ] as const) {
-      if (alpha <= 0) continue
-      const k = on * alpha
-      if (spot.axis === 1) {
-        const x0 = a.x + post + dx
-        const width = b.x - a.x - post * 2
-        g.fillGradientStyle(tint, tint, tint, tint, 0.06 * k, 0.06 * k, 0.5 * k, 0.5 * k)
-        g.fillRect(x0, a.y - lift, width, lift)
-        for (let n = 0; n < 4; n++) {
-          const h = (t * 0.55 + n / 4) % 1
-          g.lineStyle(2, 0xffffff, (1 - h) * 0.7 * k)
-          g.lineBetween(x0, a.y - h * lift, x0 + width, a.y - h * lift)
-        }
-        g.lineStyle(1.5, tint, 0.7 * k)
-        g.lineBetween(x0, a.y - lift, x0 + width, a.y - lift)
-      } else {
-        const x = a.x + dx
-        g.fillGradientStyle(tint, tint, tint, tint, 0.12 * k, 0.12 * k, 0.6 * k, 0.6 * k)
-        g.fillRect(x - 0.08 * UNIT, a.y - lift + post, 0.16 * UNIT, b.y - a.y + lift - post * 2)
-        g.lineStyle(2, 0xffffff, 0.85 * k)
-        g.lineBetween(x, a.y - lift + post, x, b.y - post)
+    if (spot.axis === 1) {
+      const x0 = a.x + post
+      const width = b.x - a.x - post * 2
+      g.fillGradientStyle(color, color, color, color, 0.06 * on, 0.06 * on, 0.5 * on, 0.5 * on)
+      g.fillRect(x0, a.y - lift, width, lift)
+      for (let n = 0; n < 4; n++) {
+        const h = (t * 0.55 + n / 4) % 1
+        g.lineStyle(2, 0xffffff, (1 - h) * 0.7 * on)
+        g.lineBetween(x0, a.y - h * lift, x0 + width, a.y - h * lift)
       }
+      g.lineStyle(1.5, color, 0.7 * on)
+      g.lineBetween(x0, a.y - lift, x0 + width, a.y - lift)
+    } else {
+      g.fillGradientStyle(color, color, color, color, 0.12 * on, 0.12 * on, 0.6 * on, 0.6 * on)
+      g.fillRect(a.x - 0.08 * UNIT, a.y - lift + post, 0.16 * UNIT, b.y - a.y + lift - post * 2)
+      g.lineStyle(2, 0xffffff, 0.85 * on)
+      g.lineBetween(a.x, a.y - lift + post, a.x, b.y - post)
     }
     for (const q of [a, b]) this.post(g, q.x, q.y, post, lift, color, i >> 1, on, 1)
+    if (closing < 0) return
+    const air = this.airFx!
+    for (const q of [a, b]) this.countdown(air, q.x, q.y - lift, post * 2, 1 - closing, 0xffffff, 0.9)
+    if (Math.random() < 0.06 + 0.3 * closing) {
+      const q = Math.random() < 0.5 ? a : b
+      this.sparks?.setParticleTint(Math.random() < 0.5 ? color : 0xffffff)
+      this.sparks?.explode(2 + Math.floor(closing * 4), q.x, q.y - lift * Math.random())
+    }
+  }
+
+  /** 一圈倒计时：从正上方顺时针走 frac 圈 */
+  private countdown(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, frac: number, color: number, alpha: number): void {
+    g.lineStyle(3, 0x000000, 0.25 * alpha)
+    g.strokeCircle(x, y, r)
+    if (frac <= 0) return
+    g.lineStyle(2.5, color, alpha)
+    g.beginPath()
+    g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false)
+    g.strokePath()
   }
 
   /** 一根门柱：白的柱身、背光一侧发灰，正面一条那一对颜色的灯带，柱顶上是那一对的记号；fill 是从下往上打出来了多少 */
@@ -538,7 +559,10 @@ export class NexusView implements MapView {
     else g.fillRect(x - s * 0.7, y - h - s * 0.7, s * 1.4, s * 1.4)
   }
 
-  /** 要挪来的地方：地上虚线的门线从两头往中间搭，门柱的全息轮廓，上面打下来两道激光，一点点把门柱打出来 */
+  /**
+   * 要挪来的地方：地上虚线的门线从两头往中间一截截搭实，门柱的全息轮廓里一道道扫描线，上面打下来两道激光，
+   * 把门柱从下往上一点点打出来，打着的地方冒火花；门柱脚下一圈进度走满就换过去
+   */
   private preview(cfg: NexusConfig, spot: WarpSpot, i: number, color: number, p: number, t: number): void {
     const w = cfg.warps
     const len = w.lenU
@@ -550,39 +574,60 @@ export class NexusView implements MapView {
     const f = this.floorFx!
     const g = this.standFx!
     const air = this.airFx!
-    const flick = 0.65 + 0.35 * noise(Math.floor(t * 30), i * 13 + 1)
-    // 虚线的门线：两头各搭上 p 的一半
+    const flick = 0.75 + 0.25 * noise(Math.floor(t * 30), i * 13 + 1)
+    // 虚线的门线：两头各搭实 p 的一半
     const dash = 0.18 * UNIT
     const total = Math.hypot(b.x - a.x, b.y - a.y)
     const ux = (b.x - a.x) / total
     const uy = (b.y - a.y) / total
-    f.lineStyle(0.06 * UNIT, color, 0.7 * flick)
-    for (let s = 0; s < total; s += dash * 2) {
+    f.lineStyle(0.07 * UNIT, color, 0.85 * flick)
+    for (let s = (t * 40) % (dash * 2) - dash * 2; s < total; s += dash * 2) {
+      const s0 = Math.max(0, s)
       const s1 = Math.min(total, s + dash)
-      f.lineBetween(a.x + ux * s, a.y + uy * s, a.x + ux * s1, a.y + uy * s1)
+      if (s1 > s0) f.lineBetween(a.x + ux * s0, a.y + uy * s0, a.x + ux * s1, a.y + uy * s1)
     }
     const built = (total / 2) * p
-    f.lineStyle(0.1 * UNIT, color, 0.9)
-    f.lineBetween(a.x, a.y, a.x + ux * built, a.y + uy * built)
-    f.lineBetween(b.x, b.y, b.x - ux * built, b.y - uy * built)
+    for (const [w0, c, k] of [
+      [0.14 * UNIT, color, 0.95],
+      [0.045 * UNIT, 0xffffff, 0.95],
+    ] as const) {
+      f.lineStyle(w0, c, k)
+      f.lineBetween(a.x, a.y, a.x + ux * built, a.y + uy * built)
+      f.lineBetween(b.x, b.y, b.x - ux * built, b.y - uy * built)
+    }
     for (const q of [a, b]) {
-      f.lineStyle(1.5, color, 0.8 * flick)
-      f.strokeCircle(q.x, q.y, post * (2.2 - p))
-      // 门柱的全息轮廓与已经打出来的那一截
-      g.lineStyle(1.2, color, 0.75 * flick)
+      f.lineStyle(2, color, 0.9 * flick)
+      f.strokeCircle(q.x, q.y, post * (2.4 - p))
+      this.countdown(f, q.x, q.y, post * 2.9, p, color, 0.95)
+      // 门柱的全息轮廓：外框、顶圈与一道道往上走的扫描线
+      g.lineStyle(1.6, color, 0.9 * flick)
       g.strokeRect(q.x - post, q.y - lift, post * 2, lift)
       g.strokeCircle(q.x, q.y - lift, post)
-      this.post(g, q.x, q.y, post, lift, color, i >> 1, 0.9, p)
+      for (let n = 0; n < 3; n++) {
+        const h = ((t * 1.2 + n / 3) % 1) * lift
+        g.lineStyle(1, color, 0.6 * flick)
+        g.lineBetween(q.x - post, q.y - h, q.x + post, q.y - h)
+      }
+      this.post(g, q.x, q.y, post, lift, color, i >> 1, 0.95, p)
       // 从上面打下来的激光，打在已经打出来的那一截顶上
       const hit = q.y - lift * p
-      air.lineStyle(3, color, 0.25 * flick)
-      air.lineBetween(q.x, q.y - lift - BEAM_U * UNIT, q.x, hit)
-      air.lineStyle(1.2, 0xffffff, 0.85 * flick)
-      air.lineBetween(q.x, q.y - lift - BEAM_U * UNIT, q.x, hit)
-      air.fillStyle(0xffffff, 0.9 * flick)
-      air.fillCircle(q.x, hit, 2.5 + 1.5 * flick)
-      air.fillStyle(color, 0.35 * flick)
-      air.fillCircle(q.x, hit, 7)
+      const top = q.y - lift - BEAM_U * UNIT
+      for (const [w0, c, k] of [
+        [8, color, 0.16],
+        [3.5, color, 0.5],
+        [1.4, 0xffffff, 1],
+      ] as const) {
+        air.lineStyle(w0, c, k * flick)
+        air.lineBetween(q.x, top, q.x, hit)
+      }
+      air.fillStyle(color, 0.4 * flick)
+      air.fillCircle(q.x, hit, 9)
+      air.fillStyle(0xffffff, 0.95)
+      air.fillCircle(q.x, hit, 3 + 1.5 * flick)
+      if (Math.random() < 0.15) {
+        this.sparks?.setParticleTint(color)
+        this.sparks?.explode(2, q.x, hit)
+      }
     }
   }
 

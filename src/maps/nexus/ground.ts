@@ -188,7 +188,8 @@ function tile(p: Px, sc: PaintScene, x: number, y: number, aa: number): void {
     // 每隔几块的缝里嵌一条冷蓝的灯带，从厅心起算
     const sx = Math.abs(Math.round(x - plan.start.x)) % STRIP_EVERY === 0 && ex < STRIP_U + aa
     const sy = Math.abs(Math.round(y - plan.start.y)) % STRIP_EVERY === 0 && ey < STRIP_U + aa
-    mix(p, sx || sy ? STRIP : GROUT, grout)
+    if (sx || sy) mix(p, STRIP, grout * 0.7)
+    else mix(p, GROUT, grout)
   }
   // 厅心的光环与环上的刻度
   const r = Math.hypot(x - plan.start.x, y - plan.start.y)
