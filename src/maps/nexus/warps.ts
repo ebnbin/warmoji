@@ -15,23 +15,7 @@ export function warpCross(w: WarpSpot, len: number, post: number, ax: number, ay
   return along > post && along < len - post ? t : -1
 }
 
-/** (x, y)（格）在门线的哪一侧：负侧为 −1，正侧（含压在门线上）为 1 */
-export function warpSide(w: WarpSpot, x: number, y: number): -1 | 1 {
-  return (w.axis === 0 ? x - w.x : y - w.y) < 0 ? -1 : 1
-}
-
-/** (x, y)（格）沿门线方向落在两头门柱之间 */
-export function withinWarp(w: WarpSpot, len: number, x: number, y: number): boolean {
-  const along = w.axis === 0 ? y - w.y : x - w.x
-  return along > 0 && along < len
-}
-
 /** 两头门柱的圆心，格 */
 export function warpPosts(w: WarpSpot, len: number): [Point, Point] {
   return [{ x: w.x, y: w.y }, warpEnd(w, len)]
-}
-
-/** 门线的法向：负侧指向正侧的单位向量 */
-export function warpNormal(w: WarpSpot): Point {
-  return w.axis === 0 ? { x: 1, y: 0 } : { x: 0, y: 1 }
 }

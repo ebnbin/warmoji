@@ -58,21 +58,6 @@ export function hallRoom(h: Hall, x: number, y: number): number {
   return Math.min(w, e, n, s, (w + n - h.cut) * SQRT1_2, (e + n - h.cut) * SQRT1_2, (w + s - h.cut) * SQRT1_2, (e + s - h.cut) * SQRT1_2)
 }
 
-/** 幕墙的一圈顶点（格），从左上角斜边的上端起顺时针 */
-export function hallOutline(h: Hall): Point[] {
-  const c = h.cut
-  return [
-    { x: h.x0 + c, y: h.y0 },
-    { x: h.x1 - c, y: h.y0 },
-    { x: h.x1, y: h.y0 + c },
-    { x: h.x1, y: h.y1 - c },
-    { x: h.x1 - c, y: h.y1 },
-    { x: h.x0 + c, y: h.y1 },
-    { x: h.x0, y: h.y1 - c },
-    { x: h.x0, y: h.y0 + c },
-  ]
-}
-
 /** 顶到天花板的圆立柱，格 */
 export interface Pillar {
   readonly x: number

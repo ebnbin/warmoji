@@ -10,7 +10,7 @@ import { grounded, passCost, probeZ, topOf } from '../../ecs/utils/pass'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { alongWall, awayFromWall, keepOut, makeBasin, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { hallRoom, nexusPlan, warpApart, warpDist, warpMid } from './layout'
+import { hallRoom, nexusPlan, warpApart, warpDist } from './layout'
 import { nexusMarks } from './marks'
 import { flowNav, makeNav, navCell, navCenter, navDist, navNear, relink } from './nav'
 import { warpCross, warpPosts } from './warps'
@@ -79,6 +79,8 @@ export interface NexusState {
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly solids: Solids
   readonly warps: WarpState[]
+  /** 此刻每扇门两头门柱的圆心，像素：门换过位置就重算 */
+  readonly posts: Point[]
   moveAt: number
   /** 门换过位置就加一：寻路按它重铺 */
   version: number
@@ -132,6 +134,7 @@ export function nexusOf(sim: Sim): NexusState {
       marks: nexusMarks(cfg, plan),
       solids: solidsOf(cfg, plan),
       warps: plan.warps.map((spot) => ({ spot, next: null, since: 0 })),
+      posts: [],
       moveAt: sim.elapsedMs + between(sim, cfg.warps.everyMs),
       version: 0,
       nav,
@@ -142,6 +145,7 @@ export function nexusOf(sim: Sim): NexusState {
       hopCount: 0,
     }
     sim.worldState.nexus = s
+    placePosts(s, cfg)
     stepNav(sim, s, cfg)
   }
   return s
@@ -149,6 +153,12 @@ export function nexusOf(sim: Sim): NexusState {
 
 function between(sim: Sim, r: readonly [number, number]): number {
   return r[0] + (r[1] - r[0]) * sim.rng.next()
+}
+
+/** 按此刻的门重算门柱的圆心 */
+function placePosts(s: NexusState, cfg: NexusConfig): void {
+  s.posts.length = 0
+  for (const w of s.warps) for (const q of warpPosts(w.spot, cfg.warps.lenU)) s.posts.push({ x: q.x * UNIT, y: q.y * UNIT })
 }
 
 /** 此刻的门在哪：按对排，第 k 扇的另一扇是 k ^ 1 */
@@ -179,6 +189,7 @@ function stepWarps(sim: Sim, s: NexusState, cfg: NexusConfig): void {
     moving.spot = moving.next!
     moving.next = null
     s.version++
+    placePosts(s, cfg)
     s.moveAt = now + between(sim, cfg.warps.everyMs)
     return
   }
@@ -233,30 +244,28 @@ function stepTiles(sim: Sim, s: NexusState): void {
 
 /** 半径 rad 的身体走不进此刻的门柱：陷进去多深就沿连心线退回去 */
 function offPosts(s: NexusState, cfg: NexusConfig, p: Point, rad: number): Point {
-  const w = cfg.warps
+  const min = rad + cfg.warps.postU * UNIT
   let x = p.x
   let y = p.y
-  for (const st of s.warps) {
-    for (const q of warpPosts(st.spot, w.lenU)) {
-      const dx = x - q.x * UNIT
-      const dy = y - q.y * UNIT
-      const d = Math.hypot(dx, dy)
-      const min = rad + w.postU * UNIT
-      if (d >= min) continue
-      const nx = d > 1e-6 ? dx / d : 1
-      const ny = d > 1e-6 ? dy / d : 0
-      x = q.x * UNIT + nx * min
-      y = q.y * UNIT + ny * min
-    }
+  for (const q of s.posts) {
+    const dx = x - q.x
+    const dy = y - q.y
+    if (Math.abs(dx) >= min || Math.abs(dy) >= min) continue
+    const d = Math.hypot(dx, dy)
+    if (d >= min) continue
+    const nx = d > 1e-6 ? dx / d : 1
+    const ny = d > 1e-6 ? dy / d : 0
+    x = q.x + nx * min
+    y = q.y + ny * min
   }
-  return { x, y }
+  return x === p.x && y === p.y ? p : { x, y }
 }
 
 /** (x, y) 离此刻最近的门柱的表面多远，像素 */
 function postRoom(s: NexusState, cfg: NexusConfig, x: number, y: number): number {
   let best = Infinity
-  for (const st of s.warps) for (const q of warpPosts(st.spot, cfg.warps.lenU)) best = Math.min(best, Math.hypot(x - q.x * UNIT, y - q.y * UNIT) - cfg.warps.postU * UNIT)
-  return best
+  for (const q of s.posts) best = Math.min(best, Math.hypot(x - q.x, y - q.y))
+  return best - cfg.warps.postU * UNIT
 }
 
 /** 线段 a→b（像素）先碰上的门柱：探测在那里比柱顶低、又要贯穿才过得去 */
@@ -269,22 +278,20 @@ function postTrace(s: NexusState, cfg: NexusConfig, probe: Probe, ax: number, ay
   const dy = by - ay
   const a = dx * dx + dy * dy
   let best: Crossing | null = null
-  for (const st of s.warps) {
-    for (const q of warpPosts(st.spot, w.lenU)) {
-      const fx = ax - q.x * UNIT
-      const fy = ay - q.y * UNIT
-      const c = fx * fx + fy * fy - R * R
-      const b = 2 * (fx * dx + fy * dy)
-      if (a === 0) continue
-      const disc = b * b - 4 * a * c
-      if (disc < 0) continue
-      const sq = Math.sqrt(disc)
-      const t0 = Math.max(0, (-b - sq) / (2 * a))
-      const t1 = Math.min(1, (-b + sq) / (2 * a))
-      if (t0 > t1 || t1 < 0 || t0 > 1) continue
-      if (probeZ(probe, t0) >= top) continue
-      if (!best || t0 < best.t0) best = { t0, t1, material: 'structure' }
-    }
+  if (a === 0) return null
+  for (const q of s.posts) {
+    const fx = ax - q.x
+    const fy = ay - q.y
+    const c = fx * fx + fy * fy - R * R
+    const b = 2 * (fx * dx + fy * dy)
+    const disc = b * b - 4 * a * c
+    if (disc < 0) continue
+    const sq = Math.sqrt(disc)
+    const t0 = Math.max(0, (-b - sq) / (2 * a))
+    const t1 = Math.min(1, (-b + sq) / (2 * a))
+    if (t0 > t1 || t1 < 0 || t0 > 1) continue
+    if (probeZ(probe, t0) >= top) continue
+    if (!best || t0 < best.t0) best = { t0, t1, material: 'structure' }
   }
   return best
 }
@@ -304,13 +311,11 @@ function clearLine(s: NexusState, cfg: NexusConfig, ax: number, ay: number, bx: 
   const len = Math.hypot(dx, dy)
   // 只有离这段路近的门柱才逐点看
   const near: Point[] = []
-  for (const st of s.warps) {
-    for (const q of warpPosts(st.spot, w.lenU)) {
-      const px = q.x * UNIT - ax
-      const py = q.y * UNIT - ay
-      const t = len > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy) / (len * len))) : 0
-      if (Math.hypot(px - dx * t, py - dy * t) < need + w.postU * UNIT) near.push({ x: q.x * UNIT, y: q.y * UNIT })
-    }
+  for (const q of s.posts) {
+    const px = q.x - ax
+    const py = q.y - ay
+    const t = len > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy) / (len * len))) : 0
+    if (Math.hypot(px - dx * t, py - dy * t) < need + w.postU * UNIT) near.push(q)
   }
   const n = Math.max(1, Math.ceil(len / (PROBE_U * UNIT)))
   const basin = s.plan.basin
@@ -552,10 +557,4 @@ export const nexus: WorldHooks = {
     stepNav(sim, s, cfg)
     stepTiles(sim, s)
   },
-}
-
-/** 门线的中点，像素 */
-export function warpMidPx(spot: WarpSpot, len: number): Point {
-  const m = warpMid(spot, len)
-  return { x: m.x * UNIT, y: m.y * UNIT }
 }
