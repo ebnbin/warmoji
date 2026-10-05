@@ -42,6 +42,7 @@ import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
 import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
 import { deepPlan } from '../src/maps/deep/layout.ts'
+import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -383,9 +384,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 深海：参数说得通；头骨挡得住标准身体、大石头比标准身体矮的子弹飞得过去；钟口底下那一圈装得下队长和跟在身后的队员，
- * 喘上气补得比憋气掉得快，满满一口气撑得过钟挪一次窝的两倍时间，钟挪完一次窝才到下一次；
- * 抽一批种子真的生成一遍：每张都生成得出来，开局站位离边够远，陡坎沿、岩堆脚、鲸骨与冷泉都有出怪的地标，钟从开局站位挪得出去
+ * 深海：参数说得通；头骨挡得住标准身体、大石头比标准身体矮的子弹飞得过去；艇身收得出艇尾、门开在一样粗的那一段、比标准身体高，门口那一片装得下队长和跟在身后的队员，
+ * 喘上气补得比憋气掉得快，满满一口气撑得过潜艇开走一次的两倍时间，开走一次走完才到下一次；
+ * 抽一批种子真的生成一遍：每张都生成得出来，开局站位离边够远，陡坎沿、岩堆脚、鲸骨与冷泉都有出怪的地标，潜艇在开局站位旁停得下、也开得出去
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'deep') === (m.deep !== undefined), `maps.${id} 是深海当且仅当写了 deep`)
@@ -395,7 +396,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const span = (v: readonly [number, number]): boolean => v[0] <= v[1]
   const pos = (v: readonly [number, number]): boolean => v[0] > 0 && span(v)
   const ints = (v: readonly [number, number]): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && span(v)
-  const { floor, walls, rubble, lip, boulders, whale, seeps, bell } = d
+  const { floor, walls, rubble, lip, boulders, whale, seeps, sub } = d
   const half = d.sizeU / 2 - SPAWN_CLEAR_U - 1
   need(d.meterPerU > 0 && d.sizeU > 0 && d.neckU > 0, `${at} 的米每格、地图边长与窄缝须为正`)
   need(d.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
@@ -413,15 +414,17 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(boulders.clearU >= SPAWN_CLEAR_U && boulders.gapU > 2 * d.neckU && boulders.wallShare >= 0 && boulders.wallShare <= 1, `${at}.boulders 离出生点至少 ${SPAWN_CLEAR_U} 格、彼此隔得开窄缝，靠壁的占比在 [0, 1] 内`)
   need(pos(whale.lengthM) && whale.clearU >= SPAWN_CLEAR_U && whale.skullM > clearM, `${at}.whale 的鲸长须为正，头骨离出生点至少 ${SPAWN_CLEAR_U} 格、高得挡住标准身体`)
   need(ints(seeps.count) && seeps.count[0] >= 1 && pos(seeps.radiusU) && seeps.clearU >= SPAWN_CLEAR_U, `${at}.seeps 至少一处、半径为正，离出生点至少 ${SPAWN_CLEAR_U} 格`)
-  need(bell.radiusM > 0 && bell.hangM > 0 && bell.liftM > bell.hangM, `${at}.bell 的钟口半径、放下的高度须为正，吊起来更高`)
-  need(bell.hold > 0 && bell.breath > bell.hold && bell.drownSec > 0 && bell.tickMs > 0, `${at}.bell 憋气要掉气、换气补得比掉得快，呛水的时长与节拍为正`)
+  const hull = hullOf(sub)
+  need(sub.beamU > 0 && sub.lengthU > sub.beamU && hull.tail < hull.neck && hull.neck <= hull.door && hull.door <= hull.bow && hull.r - hull.tailR < hull.neck - hull.tail, `${at}.sub 的艇身太短：收不出艇尾，门也要开在一样粗的那一段`)
+  need(sub.heightM > B.heightM && sub.cruiseM > B.heightM, `${at}.sub 的艇身须比标准身体高，开走时浮得过身体的头顶`)
+  need(sub.hold > 0 && sub.breath > sub.hold && sub.drownSec > 0 && sub.tickMs > 0, `${at}.sub 憋气要掉气、换气补得比掉得快，呛水的时长与节拍为正`)
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
-  need(bell.radiusM / d.meterPerU >= squad, `${at}.bell 钟口那一圈只有 ${(bell.radiusM / d.meterPerU).toFixed(2)} 格，装不下跟在队长身后 ${squad.toFixed(2)} 格的队员`)
-  need(bell.roomU >= bell.radiusM / d.meterPerU && pos(bell.moveU) && bell.moveU[1] < d.sizeU, `${at}.bell 的落点离边须放得下那一圈，挪的距离须为正、比地图小`)
-  need(bell.firstMs > 0 && bell.jitterMs >= 0 && bell.warnMs > 0 && bell.hoistMs > 0 && bell.lowerMs > 0 && bell.speedMs > 0, `${at}.bell 挪窝的各段时长与速度须为正`)
-  const transitMs = bell.hoistMs + bell.lowerMs + ((bell.moveU[1] * d.meterPerU) / bell.speedMs) * 1000
-  need(bell.intervalMs - bell.jitterMs > bell.warnMs + transitMs, `${at}.bell 钟挪完一次窝前不该到下一次`)
-  need((STATS.maxStamina.base / bell.hold) * 1000 >= transitMs * 2, `${at}.bell 满满一口气撑 ${(STATS.maxStamina.base / bell.hold).toFixed(1)} 秒，撑不过钟挪一次窝的两倍时间`)
+  need(sub.doorU >= squad + 0.5, `${at}.sub 门口那一片只有 ${sub.doorU} 格，装不下跟在队长身后 ${squad.toFixed(2)} 格的队员`)
+  need(sub.roomU > 0 && pos(sub.moveU) && sub.moveU[1] < d.sizeU, `${at}.sub 的艇壁离边要留空，开走的距离须为正、比地图小`)
+  need(sub.firstMs > 0 && sub.jitterMs >= 0 && sub.warnMs > 0 && sub.riseMs > 0 && sub.settleMs > 0 && sub.speedMs > 0, `${at}.sub 开走的各段时长与速度须为正`)
+  const transitMs = sub.riseMs + sub.settleMs + ((sub.moveU[1] * d.meterPerU) / sub.speedMs) * 1000
+  need(sub.intervalMs - sub.jitterMs > sub.warnMs + transitMs, `${at}.sub 潜艇开走一次走完前不该到下一次`)
+  need((STATS.maxStamina.base / sub.hold) * 1000 >= transitMs * 2, `${at}.sub 满满一口气撑 ${(STATS.maxStamina.base / sub.hold).toFixed(1)} 秒，撑不过潜艇开走一次的两倍时间`)
   for (let s = 0; s < 24; s++) {
     const where = `${at} 第 ${s} 个样本`
     let plan: ReturnType<typeof deepPlan>
@@ -436,13 +439,18 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(roomAt(plan.basin, sx, sy) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     const mk = plan.marks
     need(mk.abyss.length >= 3 && mk.rubble.length >= 2 && mk.bones.length >= 2 && mk.seep.length >= seeps.count[0], `${where} 的陡坎沿、岩堆脚、鲸骨或冷泉缺出怪的地标`)
+    const berth = { plan, hull, rim: rimOf(hull, 48), inner: innerOf(hull, 0.5) }
+    const home = homePose(berth, sub)
+    need(fits(berth, sub, home, sub.roomU * UNIT), `${where} 的潜艇在开局站位旁停不下：艇壁离边与石头不到 ${sub.roomU} 格`)
     let moves = 0
     for (let k = 0; k < 64; k++) {
       const a = (k / 64) * Math.PI * 2
-      const r = ((bell.moveU[0] + bell.moveU[1]) / 2) * UNIT
-      if (roomAt(plan.basin, sx + Math.cos(a) * r, sy + Math.sin(a) * r) >= bell.roomU * UNIT) moves++
+      const r = ((sub.moveU[0] + sub.moveU[1]) / 2) * UNIT
+      const x = home.x + Math.cos(a) * r
+      const y = home.y + Math.sin(a) * r
+      if ([0, 1, 2, 3, 4, 5, 6, 7].some((j) => fits(berth, sub, { x, y, a: (j / 8) * Math.PI * 2 }, sub.roomU * UNIT))) moves++
     }
-    need(moves >= 4, `${where} 的钟从开局站位挪不出去：挪窝的距离上几乎找不到放得下的地方`)
+    need(moves >= 4, `${where} 的潜艇从开局停的地方开不出去：开走的距离上几乎找不到停得下的地方`)
   }
 }
 

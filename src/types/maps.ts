@@ -987,7 +987,7 @@ export interface RuinsConfig {
 }
 /**
  * 深海：大陆坡上一道海底峡谷的谷底，两侧是陡峭的岩壁，上游一头是从岩壁上塌下来的岩堆，下游一头是往下没进黑暗的陡坎；谷底铺着软泥，散着大石头，躺着一副鲸骨，有一两处冒泡的冷泉。
- * 队伍从一口潜水钟下来：钟吊在缆绳上悬在谷底上方，里面困着一团空气。队员离开钟只能憋着气，回到钟口底下才喘得上气；水面上的船隔一阵把钟吊起来，换个地方放下去。
+ * 队伍从一艘潜艇里出来：潜艇停在谷底上，只有一舷开着门，门口罩着一团空气。队员离开门口只能憋着气，回到门口那一片才喘得上气；潜艇隔一阵自己开走，换个地方停下。
  * 海里的东西不用换气。物理量按米、千克、秒算，一格 meterPerU 米
  */
 export interface DeepConfig {
@@ -1033,15 +1033,17 @@ export interface DeepConfig {
   /** 冷泉：几处、多大（格），离开局站位至少多远（格） */
   readonly seeps: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly clearU: number }
   /**
-   * 潜水钟：钟口半径与放下时钟口离谷底多高（米），钟口底下那一圈喘得上气；吊起来升到多高（米）。
-   * 钟底下每秒补多少点体力，憋着气每秒掉多少点；气见底后满血的标准身体几秒呛死，每 tickMs 结算一次。
-   * 开局 firstMs 后第一次挪窝，之后隔 intervalMs 上下 jitterMs；先预兆 warnMs（还喘得上气），再用 hoistMs 吊起、按 speedMs（米/秒）挪过去、用 lowerMs 放下；
-   * 新落点离旧的 moveU 格之间，离边与石头至少 roomU 格
+   * 潜艇：艇长、艇宽（格），艇身从艇底往上多高（米，挡子弹按它）；门口那一片喘得上气的半圆的半径（格）；开走时浮到离谷底多高（米）。
+   * 门口每秒补多少点体力，憋着气每秒掉多少点；气见底后满血的标准身体几秒呛死，每 tickMs 结算一次。
+   * 开局 firstMs 后第一次开走，之后隔 intervalMs 上下 jitterMs；先预兆 warnMs（门口还喘得上气），再用 riseMs 浮起、按 speedMs（米/秒）开过去、用 settleMs 落下；
+   * 新落点离旧的 moveU 格之间，艇身离边与石头至少 roomU 格
    */
-  readonly bell: {
-    readonly radiusM: number
-    readonly hangM: number
-    readonly liftM: number
+  readonly sub: {
+    readonly lengthU: number
+    readonly beamU: number
+    readonly heightM: number
+    readonly doorU: number
+    readonly cruiseM: number
     readonly breath: number
     readonly hold: number
     readonly drownSec: number
@@ -1050,8 +1052,8 @@ export interface DeepConfig {
     readonly intervalMs: number
     readonly jitterMs: number
     readonly warnMs: number
-    readonly hoistMs: number
-    readonly lowerMs: number
+    readonly riseMs: number
+    readonly settleMs: number
     readonly speedMs: number
     readonly moveU: readonly [number, number]
     readonly roomU: number

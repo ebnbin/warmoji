@@ -14,8 +14,8 @@ varying vec2 outTexCoord;
 #pragma phaserTemplate(fragmentHeader)
 `
 
-/** 队员的头灯最多几盏 */
-export const MAX_LAMPS = 6
+/** 朝前照的灯最多几盏：队员的头灯，加上潜艇艇首的两盏探照灯 */
+export const MAX_LAMPS = 8
 
 /**
  * 海水对红、绿、蓝三色光的衰减系数，每米：红光一两米就被吃掉，蓝光走得最远，灯光照远了只剩青蓝。
@@ -25,8 +25,8 @@ export const ATTENUATION = [0.45, 0.16, 0.05] as const
 
 /**
  * 谷底的光：地面的固有色乘上照到它的光，再加上水里散射回来的光与被搅亮的浮游生物。
- * 头顶的天光只剩一丝深蓝，朝上的地方吃得多，越高越亮（离海面近一点）、越往陡坎下越暗；钟上的探照灯朝下照，按 I·cosθ/r² 落在地面上，光走过的每一米按三色的衰减系数吃掉，远处只剩青蓝；
- * 队员的头灯朝着各自面朝的方向亮，身后也漏一点。灯光在水里被悬浮的颗粒散射回镜头，灯四周罩着一团泛青的光晕。
+ * 头顶的天光只剩一丝深蓝，朝上的地方吃得多，越高越亮（离海面近一点）、越往陡坎下越暗；潜艇门上的灯朝下照，按 I·cosθ/r² 落在地面上，光走过的每一米按三色的衰减系数吃掉，远处只剩青蓝；
+ * 队员的头灯与艇首的探照灯朝着各自的方向亮，身后也漏一点。灯光在水里被悬浮的颗粒散射回镜头，灯四周罩着一团泛青的光晕。
  * 被搅动的浮游生物发出蓝绿的冷光，叠在最上面。最后按曝光压成画面的颜色，加一点抖动免得暗处出色带
  */
 export const SEABED_FRAG = `${HEADER}
@@ -38,7 +38,7 @@ uniform vec4 uRect;
 uniform vec4 uField0;
 uniform vec2 uHeight;
 uniform float uMpp;
-uniform vec4 uBell;
+uniform vec4 uDoor;
 uniform vec4 uLamp[${MAX_LAMPS}];
 uniform vec4 uLampDir[${MAX_LAMPS}];
 uniform float uLampCount;
@@ -67,15 +67,15 @@ void main ()
   float sky = (0.55 + 0.45 * max(n.z, 0.0)) * exp(0.05 * min(z, 16.0) + 0.03 * min(z, 0.0));
   vec3 light = uSky * sky;
   vec3 haze = vec3(0.0);
-  if (uBell.w > 0.0) {
-    vec3 l = vec3(uBell.xy * uMpp, uBell.z) - p;
+  if (uDoor.w > 0.0) {
+    vec3 l = vec3(uDoor.xy * uMpp, uDoor.z) - p;
     float r = length(l);
     vec3 ld = l / max(r, 0.001);
     float spot = smoothstep(0.22, 0.8, ld.z);
     vec3 fall = exp(-ATT * r);
-    light += uBell.w * spot * max(dot(n, ld), 0.0) / (r * r + 0.4) * fall;
+    light += uDoor.w * spot * max(dot(n, ld), 0.0) / (r * r + 0.4) * fall;
     float dh = length(l.xy);
-    haze += uBell.w * 0.0026 * exp(-ATT * (dh * 0.8 + 1.5)) / (dh * dh * 0.25 + 1.0);
+    haze += uDoor.w * 0.0026 * exp(-ATT * (dh * 0.8 + 1.5)) / (dh * dh * 0.25 + 1.0);
   }
   for (int k = 0; k < ${MAX_LAMPS}; k++) {
     if (float(k) >= uLampCount) break;
