@@ -9,6 +9,7 @@ import { FloeView } from '../maps/floe/view'
 import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
 import { NexusView } from '../maps/nexus/view'
+import { PetriView } from '../maps/petri/view'
 import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
 import { MapleView } from '../maps/maple/view'
@@ -42,4 +43,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   circuit: () => new CircuitView(),
   deep: () => new DeepView(),
   nexus: () => new NexusView(),
+  petri: () => new PetriView(),
 }

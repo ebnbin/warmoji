@@ -10,6 +10,7 @@ import { floe } from '../../maps/floe/world'
 import { meadow } from '../../maps/meadow/world'
 import { nexus } from '../../maps/nexus/world'
 import { nebula } from '../../maps/nebula/world'
+import { petri } from '../../maps/petri/world'
 import { ruins } from '../../maps/ruins/world'
 import { sakura } from '../../maps/sakura/world'
 import { maple } from '../../maps/maple/world'
@@ -39,6 +40,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   circuit,
   deep,
   nexus,
+  petri,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

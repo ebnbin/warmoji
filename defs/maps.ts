@@ -167,6 +167,16 @@ const CIRCUIT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const PETRI_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'blob', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'slime', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'rat', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'mushroom', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'crab', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 const NEXUS_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
   { kind: 'invader', sinceWave: 1, base: 15, perWave: 0.6, min: 10, max: 28 },
@@ -1229,5 +1239,49 @@ export const MAPS = {
       },
     },
     boss: 'croc',
+  },
+  petri: {
+    emoji: '1f9eb',
+    name: '培养皿',
+    desc: '实验室灯箱上的一只血琼脂培养皿：队伍和敌人缩得比菌落还小，在樱桃红的琼脂上作战，圆形的玻璃皿壁谁也翻不出去。皿底用记号笔分了四区，按四区划线接种过，贴着皿壁的一圈也长满了菌：菌落一刻不停地往外长，我方角色踩进去就被粘住、几乎走不动，敌人却照常在上面走。子弹和攻击都伤不了菌落，只有怪物死在哪里，那里的菌落才被溶掉一圈、露出干净的琼脂，过一阵菌落又从边上长回来；皿壁边那一圈怎么也溶不干净。菌落长过的金币被盖住，捡不到，把那块清干净才露出来',
+    kind: 'petri',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(204 16% 80%)',
+      bgTo: 'hsl(212 14% 38%)',
+      map: hslToInt(352, 0.62, 0.32),
+      shadow: 0x000000,
+    },
+    // 光从头顶的灯照下来，脚下的灯箱又从下面透上来，背光面不暗、影子淡
+    light: { sun: 0xfffaf4, shade: 0xcac2c6, shadow: { color: 0x2a0710, alpha: 0.3, length: 0.6 } },
+    decor: {
+      emojis: ['1f9eb'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: PETRI_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'drop',
+      look: 'splash',
+      boss: 'wall',
+      kinds: {
+        wall: { name: '皿壁', at: { kind: 'rim', segU: 3 }, enter: 'climb', weight: 3, perSec: 1.5 },
+        drip: { name: '滴落', at: { kind: 'ground' }, enter: 'drop', look: 'splash', weight: 1 },
+      },
+    },
+    finalWaveSub: '蛛后翻过皿壁爬了进来——它在菌落上照样走，趁它走进菌落时打倒它，倒下时能溶出一大片！',
+    petri: {
+      mmPerU: 2.7,
+      dish: { radiusU: 16, wallU: 0.45 },
+      plazaU: 5,
+      streak: { quadrants: [3, 4], strokes: [4, 6], band: [0.5, 0.92], spacingU: [0.3, 0.8, 1.8, 3.6], colonyU: [0.3, 0.55], strays: [1, 3] },
+      colony: { cellU: 0.15, stepMs: 100, growth: 0.14, frontU: 0.05, waveU: 4, patchy: 0.3, preS: 12, mature: 0.6, matureS: 30, rimU: 0.5 },
+      edge: 0.43,
+      stick: { viscosity: 10, exertion: 0.6 },
+      lysis: { radiusU: 2, holdS: 12, halfLifeS: 4, lysePerS: 4 },
+    },
+    boss: 'treant',
   },
 } as const satisfies Record<string, MapDef>

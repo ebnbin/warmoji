@@ -45,6 +45,7 @@ import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layou
 import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
+import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -630,6 +631,46 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(a.axis === b.axis && warpApart(a, b, w.lenU) >= w.pairU, `${where} 的第 ${k / 2} 对门朝向不同或隔得太近`)
     }
     for (const axis of [0, 1]) need(plan.spots.filter((p) => p.axis === axis).length >= 12, `${where} 摆得下${axis === 0 ? '竖' : '横'}门的地方不到 12 处，门挪不开`)
+  }
+}
+
+/**
+ * 培养皿：皿放得进安全区，开局空地空得出出生点、落在划线区以内；四区划线的区数、道数是范围，每区落菌的间距一区比一区稀；
+ * 菌落的前沿在格子上长得圆（过渡带宽过一格），显式积分不出负数也不发散，皿边常驻的一圈宽过一格、碰不到开局空地；
+ * 算作菌落的密度线、黏脚、溶菌的参数说得通，标准身体溶出的圈盖得过它掉的金币；
+ * 抽一批种子真的生成一遍：每只皿都接种上了菌落，皿心的空地上没有，开局站位四周空着
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'petri') === (m.petri !== undefined), `maps.${id} 是培养皿当且仅当写了 petri`)
+  const p = m.petri
+  if (!p) continue
+  const at = `maps.${id}.petri`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { dish, streak, colony, stick, lysis } = p
+  need(p.mmPerU > 0 && dish.radiusU > 0 && dish.wallU > 0, `${at} 的毫米每格、皿的半径与壁厚须为正`)
+  need(dish.radiusU + dish.wallU <= (FRAME_U - SAFE_U * 2) / 2, `${at}.dish 须放得进方框的安全区`)
+  need(p.plazaU - 0.5 >= SPAWN_CLEAR_U && p.plazaU < dish.radiusU * streak.band[0], `${at}.plazaU 须空得出出生点要的格数，且落在划线区以内`)
+  need(range(streak.quadrants, true) && streak.quadrants[0] >= 1 && streak.quadrants[1] <= 4, `${at}.streak.quadrants 须在 1 到 4 区之间`)
+  need(range(streak.strokes, true) && streak.strokes[0] >= 1, `${at}.streak.strokes 须至少划一道`)
+  need(streak.band[0] > 0 && streak.band[0] < streak.band[1] && streak.band[1] < 1, `${at}.streak.band 须在 (0, 1) 倍半径之间、由内到外`)
+  need(streak.spacingU.every((g, i) => g > 0 && (i === 0 || g >= streak.spacingU[i - 1]!)), `${at}.streak.spacingU 须为正、一区比一区稀`)
+  need(streak.colonyU[0] > 0 && range(streak.colonyU, false) && range(streak.strays, true), `${at}.streak 的菌落半径须为正的范围，杂菌个数为非负整数范围`)
+  need(colony.cellU > 0 && colony.stepMs > 0 && colony.growth > 0 && colony.frontU > 0 && colony.waveU > 0 && colony.preS >= 0 && colony.matureS > 0, `${at}.colony 的格子、步长、增长率、前沿速度、波长与长熟的时间须为正，先长的时间不为负`)
+  need(colony.patchy >= 0 && colony.patchy < 1 && colony.mature > 0 && colony.mature < 1, `${at}.colony 的起伏须在 [0, 1) 内，长熟的密度在 (0, 1) 内`)
+  need(frontWidthU(p) >= colony.cellU, `${at}.colony 增长率最高处前沿的过渡带只有 ${frontWidthU(p).toFixed(3)} 格，须宽过一格格子：太窄的前沿在格子上长不圆`)
+  const dt = colony.stepMs / 1000
+  need((diffusionU(p) / colony.cellU ** 2) * dt <= 0.3 && colony.growth * (1 + colony.patchy) * dt <= 0.5, `${at}.colony.stepMs 太长：显式积分会出负数或发散`)
+  need(colony.rimU >= colony.cellU && colony.rimU < dish.radiusU - p.plazaU, `${at}.colony.rimU 须宽过一格格子，且碰不到开局的空地`)
+  need(p.edge > 0 && p.edge < 1, `${at}.edge 须在 (0, 1) 内`)
+  need(stick.viscosity >= 1 && stick.exertion >= 0, `${at}.stick 的黏度须不小于 1，多耗的体力不为负`)
+  need(lysis.holdS > 0 && lysis.halfLifeS > 0 && lysis.lysePerS > 0, `${at}.lysis 的留存、半衰期与溶菌速度须为正`)
+  need(lysis.radiusU >= 1, `${at}.lysis.radiusU 须不小于 1 格：标准身体溶出的圈盖得过它掉的金币散开的范围`)
+  for (let s = 0; s < 16; s++) {
+    const plan = petriPlan(p, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
+    need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
+    need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
   }
 }
 

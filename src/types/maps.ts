@@ -1217,6 +1217,65 @@ export interface DeepConfig {
     readonly roomU: number
   }
 }
+/**
+ * 培养皿：实验室灯箱上的一只血琼脂培养皿，队伍和敌人缩到菌落的尺度，在琼脂上作战；一格 mmPerU 毫米。圆形的玻璃皿壁是硬边界，挡身体也挡子弹，看得穿。
+ * 开局按四区划线接种过：菌落按反应扩散（费希尔方程）往外长，前沿匀速推进，越厚越黏脚，敌我走得都慢、更费体力。
+ * 身体死在哪里就放出一团溶菌物质：浓度高过最低抑菌浓度的地方菌落被溶掉、也长不出来；它按半衰期衰减，抑菌圈慢慢缩小，菌落再从边上长回来。
+ * 菌落长过的掉落物被盖住：捡不到也吸不走，那块清干净才露出来
+ */
+export interface PetriConfig {
+  readonly mmPerU: number
+  /** 皿：琼脂面（皿壁内侧）的半径、玻璃壁厚，格；皿心在方框正中 */
+  readonly dish: { readonly radiusU: number; readonly wallU: number }
+  /** 开局站的那片空地的半径（格）：接种不落在里面 */
+  readonly plazaU: number
+  /**
+   * 接种：皿底用记号笔分成四区，从随机一区起顺着一个方向依次划 quadrants 个区，每区在 band 倍半径之间来回划 strokes 道；
+   * 第 k 区沿线每隔 spacingU[k] 格落一个菌落，一区比一区稀：头一区连成菌苔，末一区只剩零星的单菌落；菌落开局半径 colonyU 格；另有 strays 个落在别处的杂菌
+   */
+  readonly streak: {
+    readonly quadrants: readonly [number, number]
+    readonly strokes: readonly [number, number]
+    readonly band: readonly [number, number]
+    readonly spacingU: readonly [number, number, number, number]
+    readonly colonyU: readonly [number, number]
+    readonly strays: readonly [number, number]
+  }
+  /**
+   * 菌落：格子边长 cellU 格、每 stepMs 积分一步；局部按逻辑斯谛增长率 growth（每秒）长满，前沿每秒推进 frontU 格；
+   * 增长率按波长 waveU 格的噪声在 1 ± patchy 倍之间起伏，前沿长得高低不齐；开局先长 preS 秒；密度过 mature 起算长熟，matureS 秒长到最厚；
+   * 贴着皿壁 rimU 格宽的一圈永远长满、溶不掉，菌落从那里一直往里长
+   */
+  readonly colony: {
+    readonly cellU: number
+    readonly stepMs: number
+    readonly growth: number
+    readonly frontU: number
+    readonly waveU: number
+    readonly patchy: number
+    readonly preS: number
+    readonly mature: number
+    readonly matureS: number
+    readonly rimU: number
+  }
+  /** 密度过 edge 的地方就是菌落：画成菌落，粘住我方角色，盖住躺在那里的掉落物；不到的地方就是干净的琼脂 */
+  readonly edge: number
+  /** 我方角色踩进菌落：黏度 viscosity、每走一格多耗 exertion 点体力；敌人不受影响 */
+  readonly stick: {
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /**
+   * 溶菌：标准身体死后当场溶掉半径 radiusU 格的一圈，holdS 秒后那圈才缩没；个头大的按半径等比例铺得更开。
+   * 溶菌物质按 halfLifeS 秒的半衰期衰减；高过最低抑菌浓度的地方菌落长不出来，每秒按 lysePerS 乘超出的倍数溶掉，低于它时增长按浓度打折
+   */
+  readonly lysis: {
+    readonly radiusU: number
+    readonly holdS: number
+    readonly halfLifeS: number
+    readonly lysePerS: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1291,7 +1350,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1323,6 +1382,7 @@ export interface MapDef {
   readonly circuit?: CircuitConfig
   readonly nexus?: NexusConfig
   readonly deep?: DeepConfig
+  readonly petri?: PetriConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

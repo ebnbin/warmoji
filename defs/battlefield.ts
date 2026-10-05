@@ -38,6 +38,13 @@ export const BATTLEFIELD = {
       { id: 'circuit_brownout', emoji: '1faab', name: '电压骤降', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'circuit_jam', emoji: '1f4e1', name: '电磁干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    petri: [
+      { id: 'petri_nutrient', emoji: '1f9eb', name: '营养充足', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'petri_penicillin', emoji: '1f48a', name: '青霉素', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'petri_chill', emoji: '1f9ca', name: '冷藏抑菌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'petri_biofilm', emoji: '1f9a0', name: '菌膜缠身', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'petri_incubator', emoji: '1f321', name: '培养箱闷热', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
     meadow: [
       { id: 'meadow_breeze', emoji: '1f32c', name: '山风送爽', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
       { id: 'meadow_bloom', emoji: '1f33c', name: '花香提神', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },

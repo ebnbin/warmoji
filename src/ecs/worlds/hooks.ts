@@ -49,6 +49,7 @@ import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
 import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
+import type { PetriState } from '../../maps/petri/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -104,11 +105,12 @@ export interface WorldState {
   circuit: CircuitState | null
   nexus: NexusState | null
   deep: DeepState | null
+  petri: PetriState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -131,7 +133,8 @@ export interface WorldHooks {
   pull(sim: Sim, x: number, y: number): Point
   /** 这里是不是汇（黑洞的视界）：进了这里的身体、弹体就停下，由地图吞掉 */
   sink(sim: Sim, x: number, y: number): boolean
-  surface(sim: Sim, x: number, y: number): Surface
+  /** 这里的地面；body 是踩在上面的身体，有的地面只对一部分身体起作用，不给就只算对谁都一样的那部分 */
+  surface(sim: Sim, x: number, y: number, body?: number): Surface
   /** 在这里朝 (dx, dy) 赶路的费力倍率：逆着介质更累，顺着更省力 */
   effort(sim: Sim, x: number, y: number, dx: number, dy: number): number
   /** 地面自己的接触力学：接管这一步就把位置与速度写进 out 并返回 true，否则按常规积分 */
@@ -182,6 +185,10 @@ export interface WorldHooks {
   breath?(sim: Sim, eid: number): number
   /** 这张图要队伍盯住的一处：在屏幕外时队长身边画一个指过去的箭头；不写就没有 */
   beacon?(sim: Sim): Point | null
+  /** 一具身体死了（倒下等复活的不算），这时它的位置与半径还在；不写就什么也不做 */
+  died?(sim: Sim, eid: number): void
+  /** 地面此刻盖住了 (x, y) 处躺着的掉落物：捡不到、吸不走，露出来以后照常；不写就从不盖住 */
+  covers?(sim: Sim, x: number, y: number): boolean
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
