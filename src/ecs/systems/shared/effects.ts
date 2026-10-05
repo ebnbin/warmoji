@@ -27,7 +27,7 @@ import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { eachAlly, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
-import { aimLayer, BLAST_M, breachAt, covered, FLOOR, hiOf, layerZ, loOf, STANDARD } from '../../utils/pass'
+import { aimLayer, BLAST_M, bandAt, breachAt, covered, floorAt, FLOOR, hiOf, layerZ, loOf, STANDARD } from '../../utils/pass'
 import { HIT } from '../../utils/hitTags'
 import { layerMul, setStatLayer } from '../../utils/stats'
 import { isSameEntity } from '../../utils/identity'
@@ -190,7 +190,7 @@ type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K]
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   blast: (sim, src, fx, at) => {
     applyBlast(sim, src, at.x, at.y, at.baseDamage * fx.ratio, fx.radius, fx.knockback, at.exclude)
-    breachAt(sim, at.x, at.y, BLAST_M, fx.radius, fx.breach ?? 0)
+    breachAt(sim, at.x, at.y, floorAt(sim, at.x, at.y) + BLAST_M, fx.radius, fx.breach ?? 0)
     if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
 
@@ -223,7 +223,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       x: at.x,
       y: at.y,
       radius: fx.def.radius,
-      src: { ...flying(src), tint: 0xa5d86a, band: FLOOR },
+      src: { ...flying(src), tint: 0xa5d86a, band: bandAt(floorAt(sim, at.x, at.y), FLOOR) },
       durationMs: fx.def.durationMs,
       enterMs: fx.def.enterMs,
       color: fx.def.color,
@@ -273,7 +273,8 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       onHit: fx.onHit,
       homingDeg: fx.projectile.homingDeg,
       linger: fx.projectile.linger,
-      z: layerZ(aimLayer(STANDARD[0], STANDARD[1], loOf(sim.world, t.eid), hiOf(sim.world, t.eid))),
+      h: layerZ(aimLayer(STANDARD[0], STANDARD[1], loOf(sim.world, t.eid), hiOf(sim.world, t.eid))),
+      aim: t,
     })
   },
 

@@ -1,12 +1,12 @@
 import { hasComponent, query } from 'bitecs'
-import { Barrier, Faction, Homing, Linger, PrevPos, Proj, PROJ_SET, Radius, Tint, Transform, Vel, VisOff } from '../components'
+import { Barrier, Faction, Floor, Homing, Linger, PrevPos, Proj, PROJ_SET, Radius, Tint, Transform, Vel, VisOff } from '../components'
 import { projHitUids, projSrc, barrierSrc } from '../store'
 import { crossing } from '../entities/barrier'
 import { cullProjectile } from './shared/projectile'
 import { isSameEntity } from '../utils/identity'
 import { nearestTarget } from '../utils/targets'
 import { flying, WORLD_SOURCE } from '../utils/source'
-import { boltProbe, boltZ, breachAt, CHEST_M, impactAt, lobZ, shotPass } from '../utils/pass'
+import { boltFloor, boltProbe, boltZ, boltZAt, breachAt, CHEST_M, impactAt, shotPass } from '../utils/pass'
 import { flatSource } from '../entities/projectile'
 import { ballistic } from './shared/body'
 import { LIFT_PER_M } from '../../util/units'
@@ -48,7 +48,7 @@ function home(sim: Sim, eid: number): boolean {
   return true
 }
 
-/** 会反弹的技能墙把弹体弹回去并归自己 */
+/** 会反弹的技能墙把弹体弹回去并归自己：平射从此在弹回时的高度平着飞 */
 function reflect(sim: Sim, eid: number, b: number, x0: number, y0: number, x1: number, y1: number): void {
   const n = crossing(sim, b, x0, y0, x1, y1) ?? { x: -Vel.x[eid]!, y: -Vel.y[eid]! }
   const nl = Math.hypot(n.x, n.y) || 1
@@ -62,6 +62,11 @@ function reflect(sim: Sim, eid: number, b: number, x0: number, y0: number, x1: n
   Transform.x[eid] = x0
   Transform.y[eid] = y0
   Faction.v[eid] = Faction.v[b]!
+  if (Proj.arc[eid]! <= 0) {
+    Proj.z[eid] = boltZ(eid)
+    Proj.g[eid] = boltFloor(eid, Proj.flown[eid]!)
+    Proj.dg[eid] = 0
+  }
   const src = barrierSrc[b]
   if (src) projSrc[eid] = Proj.arc[eid]! > 0 ? flying(src) : flatSource(flying(src), Proj.z[eid]!)
   projHitUids[eid] = new Set()
@@ -114,7 +119,7 @@ export function moveProjectiles(sim: Sim): void {
         len *= b.t
         Proj.dieAt[eid] = sim.elapsedMs
         impactAt(sim, b)
-        breachAt(sim, b.x, b.y, Proj.arc[eid]! > 0 ? lobZ(Proj.z[eid]!, Proj.arc[eid]!, Math.min(1, (Proj.flown[eid]! + len) / Proj.reach[eid]!)) : Proj.z[eid]!, Proj.radius[eid]!, Proj.breach[eid]!)
+        breachAt(sim, b.x, b.y, boltZAt(eid, Proj.flown[eid]! + len), Proj.radius[eid]!, Proj.breach[eid]!)
       }
     }
     const moved = sim.hooks.wrap(sim, ax + stepX, ay + stepY)
@@ -123,7 +128,12 @@ export function moveProjectiles(sim: Sim): void {
     PrevPos.x[eid] = moved.x - stepX
     PrevPos.y[eid] = moved.y - stepY
     Proj.flown[eid] = Proj.flown[eid]! + len
-    if (Proj.arc[eid]! > 0) VisOff.y[eid] = -Math.max(0, boltZ(eid) - CHEST_M) * LIFT_PER_M
+    // 画面按飞行的基准抬起；抛射再按高出齐胸多少抬，平射贴着它的高度飞
+    const lob = Proj.arc[eid]! > 0
+    const base = boltFloor(eid, lob ? Math.min(Proj.flown[eid]!, Proj.reach[eid]!) : Proj.flown[eid]!)
+    Floor.z[eid] = base
+    if (lob) VisOff.y[eid] = -Math.max(0, boltZ(eid) - base - CHEST_M) * LIFT_PER_M
+    else if (Proj.dg[eid] !== 0 && projSrc[eid]) projSrc[eid] = flatSource(projSrc[eid]!, boltZ(eid))
     if (Proj.spin[eid] !== 0) Transform.rot[eid] = Transform.rot[eid]! + Proj.spin[eid]! * dt
     else if (hasComponent(sim.world, eid, Homing) || hasComponent(sim.world, eid, Linger)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
   }

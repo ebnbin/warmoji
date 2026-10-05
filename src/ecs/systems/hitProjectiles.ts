@@ -8,7 +8,7 @@ import { strike } from './shared/damage'
 import { HIT } from '../utils/hitTags'
 import { cullProjectile } from './shared/projectile'
 import { projHitUids, projOnHit, projSrc } from '../store'
-import { hiOf, inSpan, lobZ, loOf } from '../utils/pass'
+import { bandOf, boltZAt, inBand } from '../utils/pass'
 import type { Sim } from '../sim'
 
 function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -23,7 +23,7 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
   return (px - cx) * (px - cx) + (py - cy) * (py - cy)
 }
 
-/** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；落在地上的不打；平射只打占着它那一层的，抛射只打飞过时的高度落在身段里的；敌我同一条 */
+/** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；落在地上的不打；平射只打占着它那个高度的，抛射只打飞过时的高度落在身段里的；敌我同一条 */
 export function hitProjectiles(sim: Sim): void {
   if (sim.over) return
   for (const eid of [...query(sim.world, PROJ_SET)]) {
@@ -46,7 +46,7 @@ export function hitProjectiles(sim: Sim): void {
       const rr = pr + radius
       if (segDistSq(x, y, sx, sy, bx, by) > rr * rr) return
       const along = segLen2 > 0 ? Math.max(0, Math.min(1, ((x - sx) * segX + (y - sy) * segY) / segLen2)) : 0
-      if (arc > 0 && !inSpan(loOf(sim.world, t), hiOf(sim.world, t), lobZ(Proj.z[eid]!, arc, Math.min(1, (Proj.flown[eid]! - segLen * (1 - along)) / Proj.reach[eid]!)))) return
+      if (arc > 0 && !inBand(bandOf(sim, t), boltZAt(eid, Proj.flown[eid]! - segLen * (1 - along)))) return
       found.push({ eid: t, t: along, x, y })
     })
     if (found.length === 0) continue

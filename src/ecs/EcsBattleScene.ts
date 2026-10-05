@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { UNIT } from '../util/units'
+import { LIFT_PER_M, UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
@@ -29,10 +29,11 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Floor, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
+import { LYING_DEPTH } from './render/bands'
 import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
@@ -503,8 +504,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.paint = paint
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
-    // 布景躺在地上，和最底下那一段 z 的精灵画在同一层
-    new SpriteBatch(this, LayerType.Decor, SPRITE_BANDS[0]!.depth, atlas, this.ctx.decor, light, lightAt)
+    // 布景躺在地上，和躺着的精灵画在同一层
+    new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
     if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
@@ -751,7 +752,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.aimGfx ??= this.add.graphics().setDepth(40)
     const g = this.aimGfx
     const x = Transform.x[sim.leader]!
-    const y = Transform.y[sim.leader]!
+    const y = Transform.y[sim.leader]! - Floor.z[sim.leader]! * LIFT_PER_M
     const ex = x + dir.x * sk.rangeU * UNIT
     const ey = y + dir.y * sk.rangeU * UNIT
     g.clear()
@@ -978,7 +979,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
     const camOff = handoverCamOffset(sim)
     this.anchor.x = leaderX(sim) + camOff.x
-    this.anchor.y = leaderY(sim) + camOff.y
+    this.anchor.y = leaderY(sim) + camOff.y - Floor.z[sim.leader]! * LIFT_PER_M
     this.aimLens(delta)
     this.map.step(this.ctx, sim, delta)
     this.fog?.show(leaderX(sim), leaderY(sim), sim.fight.rules.vision * UNIT, VISION_FOG_ALPHA)

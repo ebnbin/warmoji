@@ -17,6 +17,7 @@ import { updateAnims } from '../updateAnims'
 import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
 import { updateZones } from '../updateZones'
+import { settleFloors } from '../settleFloors'
 import { castRequests, stepAbilities } from './abilities'
 import { stepSim } from '../../sim'
 import type { Sim } from '../../sim'
@@ -45,6 +46,7 @@ const FRAME_PIPELINE = pipeline([
   { run: spawnStep, after: [fireOrders, fireCarriers] },
   { run: tickHold, after: [stepSim] },
   { run: tickRescue, after: [stepSim] },
+  settleFloors,
 ])
 
 export function stepFrame(sim: Sim): void {

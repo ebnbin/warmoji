@@ -1,13 +1,14 @@
 import Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
-import { UNIT } from '../util/units'
+import { LIFT_PER_M, UNIT } from '../util/units'
 import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
 import { rewindMs } from '../data/abilities'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, ENEMY_SET, Hp, Res, Transform, VisOff } from './components'
+import { Alive, ENEMY_SET, Floor, Hp, Res, Transform, VisOff } from './components'
+import { floorAt } from './utils/pass'
 import { abilityDef, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -28,6 +29,11 @@ import type { Sim } from './sim'
 
 /** 按世界坐标画：顶点原样记下，渲染时再乘镜头 */
 const WORLD = new Phaser.GameObjects.Components.TransformMatrix()
+
+/** 身体在画面上按脚下的地面抬起多少，像素 */
+function lift(eid: number): number {
+  return Floor.z[eid]! * LIFT_PER_M
+}
 
 const SWEAT = '1f4a6'
 const SWEAT_SIZE = 0.42 * UNIT
@@ -102,7 +108,7 @@ function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
     z: SWEAT_Z,
     frame: sim.frames.index(SWEAT, 'player'),
     x: Transform.x[body]! + VisOff.x[body]! + size * 0.34,
-    y: Transform.y[body]! + VisOff.y[body]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4,
+    y: Transform.y[body]! + VisOff.y[body]! - lift(body) - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4,
     w: SWEAT_SIZE,
     h: SWEAT_SIZE,
     color: 0xffffff,
@@ -134,7 +140,7 @@ function bars(sim: Sim, o: Scratch): void {
     const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!
     const sta = m === sim.leader ? staminaLeft(m) : 1
     const x = Transform.x[m]! + VisOff.x[m]! - BAR_W / 2
-    let y = Transform.y[m]! + VisOff.y[m]! + charSize(m) * 0.62
+    let y = Transform.y[m]! + VisOff.y[m]! - lift(m) + charSize(m) * 0.62
     rect(o, x, y, BAR_W, 6, back)
     rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, a))
     y += 7
@@ -159,12 +165,13 @@ function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void 
   if (!d || (lit && lx + d.x >= v.x && lx + d.x <= v.right && ly + d.y >= v.y && ly + d.y <= v.bottom)) return
   const u = norm(d.x, d.y)
   const r = charSize(sim.leader) * 0.75 + 0.3 * UNIT
+  const py = ly - lift(sim.leader)
   const tipX = lx + u.x * (r + 0.4 * UNIT)
-  const tipY = ly + u.y * (r + 0.4 * UNIT)
+  const tipY = py + u.y * (r + 0.4 * UNIT)
   const w = 0.25 * UNIT
   const a = hostShown(sim.leader)
-  tri(o, WORLD, tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), ly + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), ly + u.y * r - u.x * (w + 3), packTint(0x000000, 0.35 * a))
-  tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(color, 0.95 * a))
+  tri(o, WORLD, tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), py + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), py + u.y * r - u.x * (w + 3), packTint(0x000000, 0.35 * a))
+  tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, py + u.y * r + u.x * w, lx + u.x * r + u.y * w, py + u.y * r - u.x * w, packTint(color, 0.95 * a))
 }
 
 /** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚；冷却中一起淡下去，也随队长显隐 */
@@ -180,7 +187,7 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
     z: ECHO_Z,
     frame: sim.frames.index(lookOf(sim, lead), 'player'),
     x: at.x,
-    y: at.y,
+    y: at.y - floorAt(sim, at.x, at.y) * LIFT_PER_M,
     w: Transform.w[lead]!,
     h: Transform.h[lead]!,
     color: ECHO_COLOR,
@@ -191,7 +198,11 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const n = pts.length / 2
   for (let i = 1; i < n; i++) {
     const a = (TRAIL_ALPHA_OLD + ((TRAIL_ALPHA_NEW - TRAIL_ALPHA_OLD) * i) / (n - 1)) * dim
-    segment(trail, WORLD, pts[i * 2 - 2]!, pts[i * 2 - 1]!, pts[i * 2]!, pts[i * 2 + 1]!, TRAIL_WIDTH, packTint(ECHO_COLOR, a))
+    const ax = pts[i * 2 - 2]!
+    const ay = pts[i * 2 - 1]!
+    const bx = pts[i * 2]!
+    const by = pts[i * 2 + 1]!
+    segment(trail, WORLD, ax, ay - floorAt(sim, ax, ay) * LIFT_PER_M, bx, by - floorAt(sim, bx, by) * LIFT_PER_M, TRAIL_WIDTH, packTint(ECHO_COLOR, a))
   }
 }
 
@@ -200,7 +211,7 @@ function rescueMarks(sim: Sim, reach: number): Mark[] {
   const out: Mark[] = []
   for (const m of sim.characters) {
     if (Alive.v[m] || !revivable(sim, m)) continue
-    out.push({ x: Transform.x[m]!, y: Transform.y[m]!, r: reach, color: rescuing(sim, m, reach) ? INSIDE_COLOR : OUTSIDE_COLOR })
+    out.push({ x: Transform.x[m]!, y: Transform.y[m]! - lift(m), r: reach, color: rescuing(sim, m, reach) ? INSIDE_COLOR : OUTSIDE_COLOR })
   }
   return out
 }

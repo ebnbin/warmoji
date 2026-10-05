@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { FOLLOW_IN_MS } from '../../data/abilities'
 import { Alive, Drive, Motion, MOTION, Phys, Radius, Span, Transform, VisOff } from '../components'
-import { breachAt, LAYER_M } from '../utils/pass'
+import { breachAt, floorAt, LAYER_M } from '../utils/pass'
 import { hoverPx } from '../utils/ground'
 import { GROUND } from '../worlds/hooks'
 import { approach, ballistic, bodyDt, drift } from './shared/body'
@@ -153,7 +153,9 @@ export function moveBodies(sim: Sim): void {
     if (dashing && Motion.breach[eid]! > 0) {
       const sp = Math.hypot(vx, vy) || 1
       const r = Radius.v[eid]!
-      Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, next.x + (vx / sp) * r * 0.6, next.y + (vy / sp) * r * 0.6, ((Span.lo[eid]! + Span.hi[eid]! + 1) / 2) * LAYER_M, r, Motion.breach[eid]!)
+      const hx = next.x + (vx / sp) * r * 0.6
+      const hy = next.y + (vy / sp) * r * 0.6
+      Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, hx, hy, floorAt(sim, hx, hy) + ((Span.lo[eid]! + Span.hi[eid]! + 1) / 2) * LAYER_M, r, Motion.breach[eid]!)
     }
     const to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
     const d = sim.hooks.worldDelta(sim, x, y, to.x, to.y)

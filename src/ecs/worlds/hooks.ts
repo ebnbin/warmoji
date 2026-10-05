@@ -136,6 +136,8 @@ export interface WorldHooks {
   wallHit?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   /** (x, y) 处立着的实心，挡身体的与挡弹体的都算，取规则用的那份；只给开发面板画高度，不写就当没有 */
   solidAt?(sim: Sim, x: number, y: number): Solid | null
+  /** (x, y) 处能站的地面离基准面多高，米：站在上面的身体、地上的东西都从它量起；不写就是平地 */
+  floorZ?(sim: Sim, x: number, y: number): number
   /** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里，按材质的强度折算能打掉多少，返回实际用掉的；不写就什么也打不坏 */
   breach?(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number
   /** 弹体或出手撞上了障碍：给画面崩点碎屑 */

@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Depth, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
+import { Depth, Floor, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
+import { LIFT_PER_M } from '../../util/units'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
@@ -9,7 +10,7 @@ import { quadNode, SpriteBatch } from './sprites'
 import type { LightAt, PaintSprite } from './sprites'
 export { SPRITE_BANDS } from './bands'
 
-/** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画 */
+/** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画；站在高处的按脚下的地面抬起来 */
 export class EcsSpriteBatch extends SpriteBatch {
   private readonly world: EcsWorld
   private order: number[] = []
@@ -56,7 +57,7 @@ export class EcsSpriteBatch extends SpriteBatch {
       if (frame < 0) continue
       self.draw(
         node, drawingContext,
-        Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]!, Transform.rot[eid]!,
+        Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - Floor.z[eid]! * LIFT_PER_M, Transform.rot[eid]!,
         Transform.w[eid]!, Transform.h[eid]!, Sprite.flipX[eid]!, frame, Quad.v[eid]!,
         Tint.color[eid]!, Tint.alpha[eid]!, Tint.effect[eid]!,
       )
