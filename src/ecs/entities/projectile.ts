@@ -1,11 +1,12 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
-import { Depth, Faction, Homing, Linger, PrevPos, Proj, Projectile, Quad, Sprite, Tint, Transform, Vel, VisOff } from '../components'
+import { Depth, Faction, Floor, Homing, Linger, PrevPos, Proj, Projectile, Quad, Sprite, Tint, Transform, Vel, VisOff } from '../components'
 import { projHitUids, projOnHit, projSrc } from '../store'
 import type { Effect } from '../../types/abilityDefs'
 import type { Source } from '../utils/source'
-import { layerAt } from '../utils/pass'
+import { floorAt } from '../utils/pass'
+import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
 
 /** 抛射最近抛出这么远，像素：贴脸的目标也画得出一道弧 */
@@ -26,8 +27,10 @@ interface BoltSpec {
   readonly onHit?: readonly Effect[]
   readonly homingDeg?: number
   readonly linger?: number
-  /** 平射飞的、抛射出手的离地高度，米 */
-  readonly z: number
+  /** 平射飞的、抛射出手的高度：离出手处的地面多高，米 */
+  readonly h: number
+  /** 平射瞄着哪里：飞行的基准从出手处的地面连到那里的地面；不写就连到飞得到的最远处 */
+  readonly aim?: Point
   /** 抛射拱起的高度（米）与抛到多远（像素）：落地就停 */
   readonly arc?: number
   readonly reach?: number
@@ -36,10 +39,9 @@ interface BoltSpec {
   readonly through?: boolean
 }
 
-/** 平射的来源只打它那一层 */
+/** 平射的来源只打占着它此刻离基准面 z 米这个高度的身体 */
 export function flatSource(src: Source, z: number): Source {
-  const k = layerAt(z)
-  return { ...src, band: [k, k] }
+  return { ...src, band: [z, z] }
 }
 
 /** 弹体：直线飞行（追踪的会转向）、一帧扫掠一段的飞行物，敌我同一种；无朝向的弹体自转；会落地的飞完躺在地上等召回；抛射的抛到瞄准的地方落地；平射的只打得到占着它那一层的身体 */
@@ -78,7 +80,15 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   }
   const arc = spec.arc ?? 0
   const reach = arc > 0 ? Math.max(MIN_LOB_PX, Math.min(spec.reach ?? Infinity, (spec.speed * spec.lifeMs) / 1000)) : 0
-  Proj.z[eid] = spec.z
+  // 飞行的基准连到哪里：抛射是全程尽头的落点，平射是瞄准的地方，没瞄准就是飞得到的最远处
+  const aim = spec.aim
+  const far = arc > 0 ? reach : aim ? Math.hypot(aim.x - x, aim.y - y) : (spec.speed * spec.lifeMs) / 1000
+  const to = arc > 0 || !aim ? { x: x + Math.cos(angle) * far, y: y + Math.sin(angle) * far } : aim
+  const g = floorAt(sim, x, y)
+  Proj.z[eid] = g + spec.h
+  Proj.g[eid] = g
+  Proj.dg[eid] = far > 0 ? (floorAt(sim, to.x, to.y) - g) / far : 0
+  Floor.z[eid] = g
   Proj.arc[eid] = arc
   Proj.reach[eid] = reach
   Proj.flown[eid] = 0
@@ -90,6 +100,6 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   Depth.z[eid] = 8
   projOnHit[eid] = spec.onHit
   projHitUids[eid] = new Set()
-  projSrc[eid] = arc > 0 ? spec.src : flatSource(spec.src, spec.z)
+  projSrc[eid] = arc > 0 ? spec.src : flatSource(spec.src, Proj.z[eid]!)
   return eid
 }

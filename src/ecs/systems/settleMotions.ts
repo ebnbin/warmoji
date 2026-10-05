@@ -6,7 +6,7 @@ import { targetsWithin } from '../utils/targets'
 import { hit } from './shared/damage'
 import { applyAbilityEffects, applyBlast, applyOnHit, struckOf } from './shared/effects'
 import { abilityDef, abilityOnHit, motionFx } from '../store'
-import { BLAST_M, breachAt, covered } from '../utils/pass'
+import { BLAST_M, breachAt, covered, floorAt } from '../utils/pass'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
@@ -34,7 +34,7 @@ function landHits(sim: Sim, m: number, e: number): void {
   const color = Payload.color[e]!
   const damage = Motion.dmg[m]!
   applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
-  breachAt(sim, x, y, BLAST_M, radius, abilityDef[e]?.breach ?? 0)
+  breachAt(sim, x, y, floorAt(sim, x, y) + BLAST_M, radius, abilityDef[e]?.breach ?? 0)
   playSfx('boom')
   spawnFxCircle(sim, x, y, radius, {
     fill: color,

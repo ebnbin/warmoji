@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Ring, RING_SET, Tint, Transform } from '../components'
+import { Floor, Ring, RING_SET, Tint, Transform } from '../components'
+import { LIFT_PER_M } from '../../util/units'
 import { fan, place, ringStrip } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
@@ -66,7 +67,7 @@ export class RingLayer {
       const r = Ring.radius[eid]! * (b.scaleLo + (b.scaleHi - b.scaleLo) * t)
       const a = (b.alphaHi + (b.alphaLo - b.alphaHi) * t) * Tint.alpha[eid]!
       const x = Transform.x[eid]!
-      const y = Transform.y[eid]! + Ring.dy[eid]!
+      const y = Transform.y[eid]! + Ring.dy[eid]! - Floor.z[eid]! * LIFT_PER_M
       const color = Ring.color[eid]!
       fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * a))
       ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, packTint(color, Ring.lineAlpha[eid]! * a))

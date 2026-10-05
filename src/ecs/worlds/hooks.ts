@@ -50,6 +50,7 @@ import type { RuinsState } from '../../maps/ruins/world'
 import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
+import type { DreamlandWorld } from '../../maps/dreamland/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -106,11 +107,12 @@ export interface WorldState {
   nexus: NexusState | null
   deep: DeepState | null
   petri: PetriState | null
+  dreamland: DreamlandWorld | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -141,6 +143,8 @@ export interface WorldHooks {
   contact(sim: Sim, eid: number, dt: number, x: number, y: number, vx: number, vy: number, out: BodyStep): boolean
   /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
+  /** 跟随中的身体从 from 被拉到 next 时的位置修正；不写就照拉，隔着障碍也贴到宿主身上 */
+  follow?(sim: Sim, eid: number, from: Point, next: Point): Point
   /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
   /** 能站的地面：出怪口沿它的外边界摆，翻进从它外面起跳；默认是 basin，冰面外是海、空腔外是软壳层这类没有硬墙的地图另给 */
@@ -152,6 +156,8 @@ export interface WorldHooks {
   wallHit?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   /** (x, y) 处立着的实心，挡身体的与挡弹体的都算，取规则用的那份；只给开发面板画高度，不写就当没有 */
   solidAt?(sim: Sim, x: number, y: number): Solid | null
+  /** (x, y) 处能站的地面离基准面多高，米：站在上面的身体、地上的东西都从它量起；不写就是平地 */
+  floorZ?(sim: Sim, x: number, y: number): number
   /** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里，按材质的强度折算能打掉多少，返回实际用掉的；不写就什么也打不坏 */
   breach?(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number
   /** 弹体或出手撞上了障碍：给画面崩点碎屑 */

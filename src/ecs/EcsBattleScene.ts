@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { UNIT } from '../util/units'
+import { LIFT_PER_M, UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
@@ -29,10 +29,11 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Floor, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
+import { LYING_DEPTH } from './render/bands'
 import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
@@ -82,6 +83,7 @@ import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from
 import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
+import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
@@ -505,8 +507,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
     const cutAt = this.map.cutAt?.bind(this.map)
-    // 布景躺在地上，和最底下那一段 z 的精灵画在同一层
-    new SpriteBatch(this, LayerType.Decor, SPRITE_BANDS[0]!.depth, atlas, this.ctx.decor, light, lightAt)
+    // 布景躺在地上，和躺着的精灵画在同一层
+    new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt)
     if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
@@ -757,7 +759,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.aimGfx ??= this.add.graphics().setDepth(40)
     const g = this.aimGfx
     const x = Transform.x[sim.leader]!
-    const y = Transform.y[sim.leader]!
+    const y = Transform.y[sim.leader]! - Floor.z[sim.leader]! * LIFT_PER_M
     const ex = x + dir.x * sk.rangeU * UNIT
     const ey = y + dir.y * sk.rangeU * UNIT
     g.clear()
@@ -985,7 +987,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const camOff = handoverCamOffset(sim)
     const slide = camSlideOffset(sim)
     this.anchor.x = leaderX(sim) + camOff.x + slide.x
-    this.anchor.y = leaderY(sim) + camOff.y + slide.y
+    this.anchor.y = leaderY(sim) + camOff.y + slide.y - Floor.z[sim.leader]! * LIFT_PER_M
     this.aimLens(delta)
     this.map.step(this.ctx, sim, delta)
     this.fog?.show(leaderX(sim), leaderY(sim), sim.fight.rules.vision * UNIT, VISION_FOG_ALPHA)
@@ -1013,17 +1015,39 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 }
 
-/** 船上的一局：甲板此刻往哪边倾、倾多少，以及站着会滑的门槛 */
+/** 船上的倾斜仪盘边代表的倾角，度：再倾也压在盘边上 */
+const SHIP_FULL_DEG = 10
+
+/** 船上或梦幻乐园里的一局：甲板或台面此刻往哪边倾、倾多少，站着会滑的门槛；台子还有预警里要倾向的边与开着的入口 */
 function tiltSnapshot(sim: Sim): TiltSnapshot | null {
   const ship = sim.worldState.ship
   const cfg = MAPS[sim.mapId].ship
-  if (!ship || !cfg) return null
-  const t = deckTilt(ship)
+  if (ship && cfg) {
+    const t = deckTilt(ship)
+    return {
+      down: t.down,
+      deg: (t.angle * 180) / Math.PI,
+      slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
+      fullDeg: SHIP_FULL_DEG,
+      outline: { kind: 'hull', bow: { x: ship.deck.bx, y: ship.deck.by } },
+      next: -1,
+      open: -1,
+    }
+  }
+  const land = sim.worldState.dreamland
+  const lcfg = MAPS[sim.mapId].dreamland
+  if (!land || !lcfg) return null
+  const s = land.s
+  const plan = s.plan
+  const len = Math.hypot(s.sx, s.sy)
   return {
-    down: t.down,
-    deg: (t.angle * 180) / Math.PI,
-    bow: { x: ship.deck.bx, y: ship.deck.by },
-    slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
+    down: len > 0 ? { x: s.sx / len, y: s.sy / len } : { x: 0, y: 0 },
+    deg: (tiltOf(plan, s.sx, s.sy) * 180) / Math.PI,
+    slipDeg: (Math.atan(lcfg.friction.body.static) * 180) / Math.PI,
+    fullDeg: (tiltOf(plan, fullSlope(lcfg, plan), 0) * 180) / Math.PI,
+    outline: { kind: 'stage', normals: plan.normals },
+    next: s.op.phase === 'warn' ? s.op.next : -1,
+    open: openSide(s, lcfg),
   }
 }
 

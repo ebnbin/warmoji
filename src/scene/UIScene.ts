@@ -431,11 +431,11 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     })
   }
 
-  /** 在船上打的一局：甲板往哪边倾、倾多少，随时看得见 */
+  /** 在船上或梦幻乐园里打的一局：甲板或台面往哪边倾、倾多少，台子下一次往哪倾、哪个入口开着，随时看得见 */
   private updateTilt(t: HudSnapshot['tilt']): void {
     if (!t) return
-    this.tiltDial ??= new TiltDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius, t.bow, t.slipDeg)
-    this.tiltDial.setTilt(t.down, t.deg)
+    this.tiltDial ??= new TiltDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius, t)
+    this.tiltDial.setTilt(t, this.time.now)
   }
 
   /** 在溶洞里打的一局：太阳月亮走到哪、离天黑或天亮还有多久，随时看得见 */

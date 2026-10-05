@@ -74,6 +74,9 @@ export const Depth = {
 /** 画面位置 = Transform + VisOff；能力从画面位置出手，命中判定只看 Transform */
 export const VisOff = { x: f32(), y: f32() }
 
+/** 脚下的地面离基准面多高，米：画面按它把东西抬起来，只管画、不管出手；弹体是它飞行的基准 */
+export const Floor = { z: f32() }
+
 export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth, VisOff]
 
 export const Slot = { v: i32() }
@@ -222,9 +225,15 @@ export const Projectile = {}
 
 export const Vel = { x: f32(), y: f32() }
 
-/** 弹体：pierce 是还能贯穿的次数（身体与障碍共用）；z 是平射飞的、抛射出手的离地高度，arc 是抛射拱起的高度（米，平射为 0），reach 是抛射的全程、flown 是已经飞了多远（像素）；breach 是撞上障碍时的破坏力，through 为 1 的不受障碍阻挡 */
+/**
+ * 弹体：pierce 是还能贯穿的次数（身体与障碍共用）；z 是出手时离基准面多高，g 是出手处的地面、dg 是飞行的基准每飞一像素升降多少（米），
+ * 平射离基准一直是出手时那么高，抛射落到落点的地面；arc 是抛射拱起的高度（米，平射为 0），reach 是抛射的全程、flown 是已经飞了多远（像素）；
+ * breach 是撞上障碍时的破坏力，through 为 1 的不受障碍阻挡
+ */
 export const Proj = {
   z: f32(),
+  g: f32(),
+  dg: f32(),
   damage: f32(),
   radius: f32(),
   kb: f32(),

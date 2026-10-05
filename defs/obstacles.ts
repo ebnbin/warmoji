@@ -32,5 +32,11 @@ export const OBSTACLES = {
     glass: { name: '玻璃', phase: false, opaque: false, pierce: null, strength: null },
     // 天枢的立柱、电梯井与全息台
     structure: { name: '建筑', phase: true, opaque: true, pierce: null, strength: null },
+    // 梦幻乐园的摇摆台：台身连着台面，谁也穿不过去
+    stage: { name: '摇摆台', phase: false, opaque: true, pierce: null, strength: null },
+    // 梦幻乐园的传送带：低过它的弹体落在带面上
+    belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
+    // 梦幻乐园四周的布景
+    scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning

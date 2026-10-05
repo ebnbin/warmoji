@@ -3,12 +3,13 @@ import { Bolt, Faction, Linger, Payload, Proj, Uid } from '../../components'
 import { abilityDef, projHitUids, projOnHit, projSrc } from '../../store'
 import { abilityPiercesWalls } from '../../../data/abilities'
 import type { Effect } from '../../../types/abilityDefs'
+import type { Point } from '../../../util/vec'
 import { spawnBolt } from '../../entities/projectile'
 import { flying, sourceOf } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 能力朝某个方向射出自己的弹体：平射的在离地 z 米飞，抛射的从那里出手、抛到 reach 像素远（瞄准的目标那里） */
-export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, z: number, damage: number, onHit: readonly Effect[] | undefined, reach?: number): void {
+/** 能力朝某个方向射出自己的弹体：平射的离地 h 米朝 aim 飞，抛射的从那么高出手、抛到 aim 那里；没有 aim 就沿着方向飞 */
+export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, h: number, damage: number, onHit: readonly Effect[] | undefined, aim?: Point): void {
   const def = abilityDef[e]
   spawnBolt(sim, x, y, angle, {
     faction: Faction.v[e]!,
@@ -25,9 +26,10 @@ export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, 
     onHit,
     homingDeg: Bolt.homingDeg[e]!,
     linger: Bolt.linger[e]!,
-    z,
+    h,
+    aim,
     arc: Bolt.arc[e]!,
-    reach,
+    reach: aim ? Math.hypot(aim.x - x, aim.y - y) : undefined,
     breach: def?.breach,
     through: def !== undefined && abilityPiercesWalls(def),
   })

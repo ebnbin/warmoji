@@ -5,6 +5,7 @@ import type { MapView } from './views'
 import { CaveView } from '../maps/cave/view'
 import { CircuitView } from '../maps/circuit/view'
 import { DesertView } from '../maps/desert/view'
+import { DreamlandView } from '../maps/dreamland/view'
 import { FloeView } from '../maps/floe/view'
 import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
@@ -44,4 +45,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   deep: () => new DeepView(),
   nexus: () => new NexusView(),
   petri: () => new PetriView(),
+  dreamland: () => new DreamlandView(),
 }

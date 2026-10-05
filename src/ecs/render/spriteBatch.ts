@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Depth, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
+import { Depth, Floor, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
+import { LIFT_PER_M } from '../../util/units'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
@@ -14,7 +15,7 @@ const MAX_CUTS = 2
 const CUTS: SpriteCut[] = Array.from({ length: MAX_CUTS }, (): SpriteCut => ({ dx: 0, dy: 0, axis: 0, at: 0, keep: 1 }))
 const LOCAL: LocalCut = { axis: 0, at: 0, keep: 1 }
 
-/** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画；地图要切的精灵（正穿过传送门的）按份画 */
+/** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画；站在高处的按脚下的地面抬起来，地图要切的精灵（正穿过传送门的）按份画 */
 export class EcsSpriteBatch extends SpriteBatch {
   private readonly world: EcsWorld
   private order: number[] = []
@@ -65,6 +66,7 @@ export class EcsSpriteBatch extends SpriteBatch {
       const gy = Transform.y[eid]!
       const w = Transform.w[eid]!
       const h = Transform.h[eid]!
+      const lift = Floor.z[eid]! * LIFT_PER_M
       const n = self.cutAt ? self.cutAt(gx, gy, w * 0.5, h * 0.5, CUTS) : 0
       for (let k = 0; k < Math.max(1, n); k++) {
         const c = n > 0 ? CUTS[k]! : null
@@ -75,7 +77,7 @@ export class EcsSpriteBatch extends SpriteBatch {
         }
         self.draw(
           node, drawingContext,
-          gx + VisOff.x[eid]! + (c?.dx ?? 0), gy + VisOff.y[eid]! + (c?.dy ?? 0), Transform.rot[eid]!,
+          gx + VisOff.x[eid]! + (c?.dx ?? 0), gy + VisOff.y[eid]! - lift + (c?.dy ?? 0), Transform.rot[eid]!,
           w, h, Sprite.flipX[eid]!, frame, Quad.v[eid]!,
           Tint.color[eid]!, Tint.alpha[eid]!, Tint.effect[eid]!, c ? LOCAL : undefined,
         )
