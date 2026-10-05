@@ -57,6 +57,9 @@ const WARP_LIGHT_U = 2.6
 const WARP_FILL = 0.5
 /** 激光从门柱顶上多高（格）打下来 */
 const BEAM_U = 5
+/** 门四周的光晕多宽（格，横过门线量），光环多久漾开一圈（秒） */
+const HALO_U = 2.6
+const HALO_RIPPLE_S = 1.8
 /** 穿门时门那头冒出的错位横条：几条、留多久 */
 const GLITCH_SLICES = 6
 const GLITCH_MS = [120, 260] as const
@@ -515,7 +518,20 @@ export class NexusView implements MapView {
     const b = { x: e.x * UNIT + jitter, y: e.y * UNIT }
     const f = this.floorFx!
     const g = this.standFx!
-    // 地上：门线一道亮线，门柱脚下的光圈
+    // 地上：门四周一圈呼吸的光晕，一道道光环从门线往外漾开；门线一道亮线，门柱脚下的光圈
+    const mx = (a.x + b.x) / 2
+    const my = (a.y + b.y) / 2
+    const long = len * UNIT * 1.35
+    const wide = HALO_U * UNIT
+    const hw = spot.axis === 1 ? long : wide
+    const hh = spot.axis === 1 ? wide : long
+    f.fillStyle(color, (0.13 + 0.05 * Math.sin(t * 3 + i)) * on)
+    f.fillEllipse(mx, my, hw, hh)
+    for (let n = 0; n < 2; n++) {
+      const k = (t / HALO_RIPPLE_S + n / 2 + i * 0.37) % 1
+      f.lineStyle(2, color, (1 - k) * 0.55 * on)
+      f.strokeEllipse(mx, my, hw * (0.75 + 0.5 * k), hh * (0.75 + 0.9 * k))
+    }
     f.fillStyle(color, 0.28 * on)
     for (const q of [a, b]) f.fillCircle(q.x, q.y, post * 2)
     if (closing >= 0) {

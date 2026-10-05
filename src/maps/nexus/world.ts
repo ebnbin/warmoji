@@ -561,8 +561,12 @@ export const nexus: WorldHooks = {
     if (eid >= 0) record(sim, s, eid, best, bx + hop.dx, by + hop.dy)
     return hop
   },
+  /** 寻路还没铺到队长、或这里接不上寻路时按直线 */
   toLeader(sim, x, y) {
-    return navDist(nexusOf(sim).nav, x / UNIT, y / UNIT) * UNIT
+    const d = navDist(nexusOf(sim).nav, x / UNIT, y / UNIT)
+    if (Number.isFinite(d)) return d * UNIT
+    const lead = leaderPoint(sim)
+    return Math.hypot(x - lead.x, y - lead.y)
   },
   onStart(sim) {
     nexusOf(sim)
