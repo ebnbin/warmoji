@@ -14,8 +14,8 @@ export { SPRITE_BANDS } from './bands'
 const FILL_AMBIENT = 0.15
 
 /**
- * 一个单位此刻受的光，由地图按它的位置写入：k、f 是画面上指向主光、补光的单位向量；
- * 补光是在精灵上再叠一层 color 的剪影，朝着它的一角浓度是 fill，0 就是没有补光
+ * 一个单位此刻受的光，由地图按它的位置写入：k 指向主光，长 1 时明暗按 sun 到 shade 分满，短些就淡些，为 0 就是四面一样亮；
+ * f 是指向补光的单位向量，补光是在精灵上再叠一层 color 的剪影，朝着它的一角浓度是 fill，0 就是没有补光
  */
 export interface LocalLight {
   kx: number
@@ -148,19 +148,11 @@ export class EcsSpriteBatch extends EcsLayer {
     let hw = (flipX ? -1 : 1) * w * 0.5
     const hh = h * 0.5
 
-    this.atlas.uvInto(frame, this.uv)
+    this.atlas.uvInto(frame, this.uv, quad)
     let u0 = this.uv[0]!
-    let v0 = this.uv[1]!
+    const v0 = this.uv[1]!
     let u1 = this.uv[2]!
-    let v1 = this.uv[3]!
-    if (quad !== 0) {
-      const um = (u0 + u1) / 2
-      const vm = (v0 + v1) / 2
-      if (quad === 1 || quad === 3) u1 = um
-      else u0 = um
-      if (quad === 1 || quad === 2) v1 = vm
-      else v0 = vm
-    }
+    const v1 = this.uv[3]!
 
     const light = this.lit && effect === 0 ? this.light : undefined
     const l = this.local

@@ -172,12 +172,20 @@ export class EcsAtlas {
     return -1
   }
 
-  uvInto(frame: number, out: Float32Array): void {
+  /** 一帧在图集页上的 u0、v0、u1、v1；quad 非零时只取它的四分之一格 */
+  uvInto(frame: number, out: Float32Array, quad = 0): void {
     const b = frame * 4
     out[0] = this.uv[b]!
     out[1] = this.uv[b + 1]!
     out[2] = this.uv[b + 2]!
     out[3] = this.uv[b + 3]!
+    if (quad === 0) return
+    const um = (out[0] + out[2]) / 2
+    const vm = (out[1] + out[3]) / 2
+    if (quad === 1 || quad === 3) out[2] = um
+    else out[0] = um
+    if (quad === 1 || quad === 2) out[3] = vm
+    else out[1] = vm
   }
 
   get pageCount(): number {

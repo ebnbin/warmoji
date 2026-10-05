@@ -888,6 +888,8 @@ export const MAPS = {
       map: hslToInt(34, 0.24, 0.34),
       shadow: 0x000000,
     },
+    // 洞里的明暗由光照层按天窗与火把画，精灵只按光从哪边来分出迎光面与背光面；光不从太阳来，不投影
+    light: { sun: 0xffffff, shade: 0x86827e },
     decor: {
       emojis: ['1f9b4', '1f578', '26cf'],
       sizeU: [0.35, 0.7],

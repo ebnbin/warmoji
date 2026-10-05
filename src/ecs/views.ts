@@ -53,8 +53,10 @@ import { FloePainter } from './render/floePainter'
 import type { FloeConfig } from '../types/maps'
 import { castShade, drawBat, drawFlame, drawHalo as drawCaveHalo, drawRim, drawSmoke, encodeField, fieldOf, GLOW_FRAG, heightRange, LIGHT_FRAG, MAX_BLOCKS, MAX_TORCHES, modulateMode, paintSky, RELIEF_PPU, SHADE_BINS, SHADE_ROWS, SKY_PPU } from './render/cave'
 import { CavePainter } from './render/cavePainter'
-import { diffuseLux, directLux, heightM, inPool, roomOf, torchesLux, torchSpot } from './worlds/cave'
-import type { CaveLayout, CaveState } from './worlds/cave'
+import { diffuseLux, directLux, heightM, inPool, lightToward, roomOf, torchesLux, torchSpot } from './worlds/cave'
+import type { CaveLayout, CaveState, Toward } from './worlds/cave'
+import { UprightMask } from './render/upright'
+import { paintedEmojiOn } from '../emoji/style'
 import { skyColor, sunColor, viewU, visibility } from '../data/cave'
 import { GROUND_PPU } from '../data/texel'
 import { charSize } from './systems/shared/scale'
@@ -2825,6 +2827,10 @@ const CAVE_FLOOR = [0.035, 0.026, 0.02] as const
 const CAVE_SCATTER = 0.012
 /** 天窗口那圈植物的贴图每格多少像素 */
 const CAVE_RIM_PPU = 24
+const CAVE_MASK_KEY = 'cave-mask'
+/** 立着的东西的遮罩图边长，像素：盖住镜头拍到的范围，四边再各外扩 CAVE_MASK_PAD 倍 */
+const CAVE_MASK_PX = 512
+const CAVE_MASK_PAD = 0.1
 /** 太阳落到这个高度蝙蝠出洞、黎明升到这个高度回洞，度：洞里还看得清，一群黑影预告天要黑了、天快亮了 */
 const BAT_OUT_DEG = 1
 const BAT_IN_DEG = -1
@@ -2901,6 +2907,10 @@ class CaveView extends BoundedView {
   private dripAt = 0
   private sunDeg = 0
   private vignette?: Phaser.Filters.Vignette
+  private mask?: UprightMask
+  /** 这一帧洞里的光与点着的火把：单位按它分明暗 */
+  private lights?: { s: CaveState; torch: NonNullable<MapDef['cave']>['torch']; spots: Point[]; lits: number[] }
+  private readonly toward: Toward = { x: 0, y: 0, e: 0 }
 
   /** 洞里越亮看得越远：短边看到 viewU 格；洞里的光算出来之前按标准 */
   followZoom(): number {
@@ -2994,6 +3004,9 @@ class CaveView extends BoundedView {
     const u = this.u
     const fieldRect = [f.x0, f.y0, f.w, f.h]
     const heightLo = heightRange(L)
+    const maskTex = scene.textures.addDynamicTexture(CAVE_MASK_KEY, CAVE_MASK_PX, CAVE_MASK_PX)
+    if (maskTex && v.atlas) this.mask = new UprightMask(scene, v.world, v.atlas, maskTex)
+    const mask = this.mask
     this.visuals.push(
       scene.add
         .shader(
@@ -3024,13 +3037,15 @@ class CaveView extends BoundedView {
               set('uBlock[0]', u.block)
               set('uBlockCount', u.blockCount)
               set('uFloor', CAVE_FLOOR)
+              set('uMask', 5)
+              set('uMask0', mask?.rect ?? [0, 0, 1, 1])
             },
           },
           f.x0,
           f.y0,
           f.w,
           f.h,
-          [CAVE_FIELD_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_SHADE_KEY],
+          [CAVE_FIELD_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_SHADE_KEY, CAVE_MASK_KEY],
         )
         .setOrigin(0, 0)
         .setDepth(CAVE_LIGHT_DEPTH)
@@ -3163,7 +3178,11 @@ class CaveView extends BoundedView {
     this.viewU += (want - this.viewU) * (1 - Math.exp(-dt / CAVE_VIEW_TAU))
     const dark = 1 - visibility(cfg.view, s.light.hallLux)
     if (this.vignette) this.vignette.strength = 0.18 + 0.22 * dark
-    this.stepEyes(v.scene, sim, s, adapt)
+    const lights = { s, torch: cfg.torch, ...this.torchLights(sim, s) }
+    this.lights = lights
+    this.stepEyes(v.scene, sim, s, adapt, lights.spots, lights.lits)
+    const view = v.scene.cameras.main.worldView
+    this.mask?.paint(view.x - view.width * CAVE_MASK_PAD, view.y - view.height * CAVE_MASK_PAD, view.width * (1 + 2 * CAVE_MASK_PAD), view.height * (1 + 2 * CAVE_MASK_PAD), paintedEmojiOn())
     for (const g of this.glows) {
       const x = (diffuseLux(s.light, g.x, g.y) + directLux(L, sky, g.x, g.y, 0)) / adapt
       g.img.setAlpha((0.5 + 0.12 * Math.sin(now / 900 + g.phase)) * (1 - smoothCave(0.04, 0.5, x)))
@@ -3243,9 +3262,8 @@ class CaveView extends BoundedView {
     }
   }
 
-  /** 黑暗里的敌人与快要出来的敌人（在它进场的起点）：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
-  private stepEyes(scene: Phaser.Scene, sim: Sim, s: CaveState, adapt: number): void {
-    const cfg = MAPS[sim.mapId].cave!
+  /** 点着的火把在哪、多亮 */
+  private torchLights(sim: Sim, s: CaveState): { spots: Point[]; lits: number[] } {
     const spots: Point[] = []
     const lits: number[] = []
     for (const m of sim.characters) {
@@ -3254,6 +3272,22 @@ class CaveView extends BoundedView {
       spots.push(torchSpot(Transform.x[m]!, Transform.y[m]!, charSize(m)))
       lits.push(t.lit)
     }
+    return { spots, lits }
+  }
+
+  /** 立着的身体朝光多的一侧亮：天光不分方向，直射与火把按迎着它受的照度定方向，有方向的光占得越多明暗越分明 */
+  lightAt(x: number, y: number, out: LocalLight): void {
+    const c = this.lights
+    if (!c) return
+    const t = this.toward
+    lightToward(c.s.layout, c.s.light, c.s.sky, c.torch, c.spots, c.lits, x, y, t)
+    out.kx = t.e > 0 ? t.x / t.e : 0
+    out.ky = t.e > 0 ? t.y / t.e : 0
+  }
+
+  /** 黑暗里的敌人与快要出来的敌人（在它进场的起点）：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
+  private stepEyes(scene: Phaser.Scene, sim: Sim, s: CaveState, adapt: number, spots: readonly Point[], lits: readonly number[]): void {
+    const cfg = MAPS[sim.mapId].cave!
     let used = 0
     if (spots.length > 0) {
       const view = sim.view
@@ -3412,6 +3446,9 @@ class CaveView extends BoundedView {
       fx.halo.destroy()
     }
     this.torches.clear()
+    this.mask?.destroy()
+    this.mask = undefined
+    this.lights = undefined
     this.data = undefined
     this.eyes = []
     this.glows = []
@@ -3420,7 +3457,7 @@ class CaveView extends BoundedView {
     this.rippleGfx = undefined
     this.embers = undefined
     this.smoke = undefined
-    for (const key of [CAVE_ALBEDO_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_FIELD_KEY, CAVE_SHADE_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [CAVE_ALBEDO_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_FIELD_KEY, CAVE_SHADE_KEY, CAVE_MASK_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }
 
