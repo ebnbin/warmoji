@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { removeEntity } from 'bitecs'
-import { UNIT } from '../../util/units'
+import { FRAME_U, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
 import { GROUND_PPU } from '../../data/texel'
 import { viewport } from '../../util/apply'
@@ -12,7 +12,7 @@ import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
 import { DesertPainter } from './painter'
 import { encodeInfo, GROUND_FRAG } from './shader'
 import { HEIGHT_SPAN, newTrackTex, stampPrint, TIME_QUANT, TRACK_TILE } from './stamp'
-import { desertOf, desertPlanOf } from './world'
+import { desertOf } from './world'
 import { wrapU } from './terrain'
 import type { PixelRect } from './ground'
 import type { DesertPlan, Landmark } from './terrain'
@@ -21,6 +21,7 @@ import type { TrackTex } from './stamp'
 import type { DesertState } from './world'
 import type { EcsAtlas } from '../atlas'
 import type { MapView, ViewCtx } from '../views'
+import { FRAME, FRAME_MID } from '../frame'
 import type { Framing } from '../lens'
 import type { Sim } from '../sim'
 import type { DesertConfig } from '../../types/maps'
@@ -126,7 +127,6 @@ function drawDust(ctx: CanvasRenderingContext2D, size: number): void {
 export class DesertView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
   private decorEids: number[] = []
-  private plan?: DesertPlan
   private painter?: DesertPainter
   private ground?: Phaser.GameObjects.Shader
   private tracks?: { tex: Phaser.Textures.CanvasTexture; data: TrackTex; at: number }
@@ -142,18 +142,9 @@ export class DesertView implements MapView {
     return v.def.desert!
   }
 
-  private sizeU(v: ViewCtx): number {
-    return v.def.size!.w
-  }
-
-  private planOf(v: ViewCtx): DesertPlan {
-    if (!this.plan) this.plan = desertPlanOf(this.cfgOf(v), this.sizeU(v), v.run.decorSeed)
-    return this.plan
-  }
-
-  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const p = this.planOf(v)
-    return { w: p.sizeU * UNIT, h: p.sizeU * UNIT, origin: { x: p.start.x * UNIT, y: p.start.y * UNIT } }
+  /** 一圈就是方框，出发点在一圈的正中 */
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
   }
 
   build(v: ViewCtx): void {
@@ -163,8 +154,8 @@ export class DesertView implements MapView {
   }
 
   /** 四边首尾相接：跟随时连续地跟着队长、不设边，固定取景时正好拍一圈 */
-  framing(v: ViewCtx): Framing {
-    return { map: { x: 0, y: 0, w: v.w, h: v.h }, edge: 'wrap' }
+  framing(): Framing {
+    return { map: FRAME, edge: 'wrap' }
   }
 
   /** 屏幕太宽时拉近：看到的长边不超过 viewMaxU 格 */
@@ -176,7 +167,7 @@ export class DesertView implements MapView {
   /** 布景也成对：横竖各隔半圈再摆一份，和沙丘、标志物一样分不出是哪一处 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const rng = new Rng(v.run.decorSeed)
-    const n = this.sizeU(v)
+    const n = FRAME_U
     for (const d of rollDecor(v.def.decor, () => rng.next(), n, n)) {
       for (const k of [0, n / 2]) {
         this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: ((d.xU + k) % n) * UNIT, y: ((d.yU + k) % n) * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
@@ -227,6 +218,7 @@ export class DesertView implements MapView {
             set('uInfo', 2)
             set('uRect', u.rect)
             set('uPeriod', [plan.sizeU * UNIT, plan.sizeU * UNIT])
+            set('uInfoN', plan.cols)
             set('uTrack', u.track)
             set('uScale', [plan.sizeU, plan.meterPerU, cfg.tracks.lifeS])
             set('uSun', [plan.light.x / sunLen, plan.light.y / sunLen, plan.light.z / sunLen])

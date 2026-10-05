@@ -8,7 +8,7 @@ import { traces } from '../store'
 import { approach } from '../systems/shared/body'
 import { phases } from '../utils/pass'
 import { leaderX, leaderY } from '../utils/team'
-import { desertPlanFor, gridAt, slopeAt, solidAt, sunAt, wrapU } from './terrain'
+import { gridAt, makePlan, slopeAt, solidAt, sunAt, wrapU } from './terrain'
 import { desertMarks } from './marks'
 import { paceOf } from './gait'
 import { newTracks, packAt, stepTracks } from './tracks'
@@ -43,16 +43,11 @@ function cfgOf(sim: Sim): DesertConfig {
   return MAPS[sim.mapId].desert!
 }
 
-/** 这一局的沙漠地形：视图要它定出发点与画地面，规则要它定一切，两边按同一个种子各要一次 */
-export function desertPlanOf(cfg: DesertConfig, sizeU: number, decorSeed: number): DesertPlan {
-  return desertPlanFor(cfg, sizeU, decorSeed)
-}
-
 export function desertOf(sim: Sim): DesertState {
   let s = sim.worldState.desert
   if (!s) {
     const cfg = cfgOf(sim)
-    const plan = desertPlanOf(cfg, sim.mapW / UNIT, sim.run.decorSeed)
+    const plan = makePlan(cfg, sim.run.decorSeed)
     s = { plan, marks: desertMarks(plan), tracks: newTracks(plan.sizeU) }
     sim.worldState.desert = s
   }

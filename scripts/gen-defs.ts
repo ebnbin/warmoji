@@ -447,7 +447,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 沙漠：地图是边长为 2 的幂的正方形，地面、印子与地形的贴图才按一圈平铺得上；镜头看到的长边比一圈小，平常的屏幕不用拉近；
+ * 沙漠：一圈就是方框，地面与印子的贴图每格的像素数是整数、沙地横竖挪半圈落在整像素上；镜头看到的长边比一圈小，平常的屏幕不用拉近；
  * 最大的沙丘从脊线中点往哪边伸都不到半圈（按离它最近的那一份算高才对）；坡度、休止角、走路的代谢说得通；平时的风吹不起沙、沙暴吹得起，
  * 一场沙暴在下一场之前刮完；标准身体的印子平时留得住一阵，沙暴最猛时累到见底的印子也在一阵里填平；印子贴图记得下一小时落下的沙
  */
@@ -456,13 +456,13 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const d = m.desert
   if (!d) continue
   const at = `maps.${id}.desert`
-  const w = m.size?.w ?? MAP_DEFAULTS.width
-  const h = m.size?.h ?? MAP_DEFAULTS.height
-  const pow2 = (n: number): boolean => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0
+  need(m.size === undefined, `maps.${id} 是沙漠，一圈就是方框，不写 size`)
+  const w = FRAME_U
+  const h = FRAME_U
   const span = (r: readonly [number, number]): boolean => r[0] > 0 && r[0] <= r[1]
   const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 1 && r[0] <= r[1]
-  need(w === h && pow2(w), `${at} 的地图须是边长为 2 的幂的正方形：环面按一圈平铺，贴图要能重复`)
-  need(pow2(d.tracks.perU), `${at}.tracks.perU 须是 2 的幂：印子贴图按一圈平铺`)
+  need(Number.isInteger(GROUND_PPU) && (w * GROUND_PPU) % 2 === 0, `${at} 的沙地贴图须每格整数个像素、一圈的像素数是偶数：横竖挪半圈落在整像素上`)
+  need(Number.isInteger(d.tracks.perU) && d.tracks.perU > 0, `${at}.tracks.perU 须是正整数：印子贴图每格整数个格子`)
   need(d.meterPerU > 0 && d.sunDeg > 5 && d.sunDeg < 85, `${at} 的米每格须为正、太阳的仰角在 5 到 85 度之间`)
   need(d.viewMaxU >= VIEW.minLong / UNIT && d.viewMaxU <= w - 4, `${at}.viewMaxU 须不小于平常屏幕的长边 ${VIEW.minLong / UNIT} 格、比一圈小 4 格以上：每样东西只画一份`)
   const dc = d.dunes

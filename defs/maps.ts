@@ -919,7 +919,6 @@ export const MAPS = {
     name: '沙漠',
     desc: '一片走不出去的沙海：一直朝一个方向走，会从另一头绕回来，看到的还是那几座沙丘、那几样标志、那一群怪；沙丘和标志还都是一对一对的，分不清是回到了原地还是到了另一处。松沙上赶路、爬沙丘格外耗体力，丘间实一点的沙和踩实的脚印省力些，背阴处歇得回得快；走过的地方留下脚印，越累印子越深，见底时拖着脚走；脚印过一会儿就被风吹平',
     kind: 'desert',
-    size: { w: 32, h: 32 },
     stamina: { exertion: 0.75, regen: 0.55 },
     palette: {
       bgFrom: 'hsl(35 43% 54%)',
@@ -950,11 +949,11 @@ export const MAPS = {
       meterPerU: 0.5,
       viewMaxU: 26,
       sunDeg: 36,
-      dunes: { pairs: [2, 3], heightM: [0.3, 0.6], lobes: [1, 3], stossSlope: 0.28, leeSlope: 0.48, width: 1, turnDeg: 25 },
+      dunes: { pairs: [4, 7], heightM: [0.3, 0.6], lobes: [1, 3], stossSlope: 0.28, leeSlope: 0.48, width: 1, turnDeg: 25 },
       windSpreadDeg: 50,
-      swell: { heightM: 0.15, waves: 3 },
-      flats: { loose: [0.4, 0.7], patches: 4 },
-      landmarks: { pairs: 3, gapU: 7 },
+      swell: { heightM: 0.15, waves: 5 },
+      flats: { loose: [0.4, 0.7], patches: 6 },
+      landmarks: { pairs: 6, gapU: 7 },
       gait: { softSand: 1.8, packRelief: 0.5, maxPower: 2.6, downhillMax: 1.25 },
       shadeRegen: 1.25,
       tracks: {
