@@ -29,7 +29,7 @@ import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
-import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
+import { bulgeU, deckEdgeAngle, halfBeamAt, hydrostatics, spawnS, spritOf, stability, staticHeel } from '../src/data/ship.ts'
 import { depth, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/ecs/ruins/layout.ts'
 import { bodyField } from '../src/ecs/ruins/masonry.ts'
@@ -142,8 +142,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 船：甲板收得拢、桅杆两边走得过去；空船正浮稳定。身体之间不互相挤开，最坏是最多的怪全叠在最宽处的舷墙边：
- * 那时也不翻、甲板边不入水（直舷公式还成立），倾角还得超过身体脚下的摩擦角，闲着的身体才滑得起来
+ * 船：连舷墙放得进安全区，首斜桅伸出船头也还在方框里；甲板收得拢、桅杆两边走得过去，出发的地方前后都有桅杆、四周空得开；空船正浮稳定。
+ * 身体之间不互相挤开，最坏是最多的怪全叠在最宽处的舷墙边：那时也不翻、甲板边不入水（直舷公式还成立），倾角还得超过身体脚下的摩擦角，闲着的身体才滑得起来
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'ship') === (m.ship !== undefined), `maps.${id} 是船当且仅当写了 ship`)
@@ -157,9 +157,17 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(h.beamU > 0 && h.lengthU > h.beamU, `maps.${id}.ship.hull 的船宽须为正、船长大于船宽`)
   need(h.bow > 0 && h.stern > 0 && h.bow + h.stern < 1 && h.bowPow > 0 && h.sternPow >= 1, `maps.${id}.ship.hull 船头与船尾收拢的两段不重叠，收拢的指数为正、船尾的不小于 1`)
   need(h.transom > 0 && h.transom < 1 && h.transomBulge >= 0, `maps.${id}.ship.hull.transom 须在 0 到 1 之间、横板不往里凹`)
-  need(h.bulwarkU > 0 && h.seaU > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、海面、窄缝与桅杆须为正`)
-  need(h.masts.length >= 2, `maps.${id}.ship.hull.masts 至少两根：队伍从最前面两根桅杆之间出发`)
-  for (const at of h.masts) need(at > 0 && at < 1 && halfBeamAt(h, at * h.lengthU) >= h.mastU + 2, `maps.${id}.ship.hull.masts 的 ${at} 须立在甲板上、两边各留得出两格的路`)
+  need(h.bulwarkU > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、窄缝与桅杆须为正`)
+  const outU = h.lengthU + bulgeU(h) + h.bulwarkU * 2
+  need(outU <= FRAME_U - SAFE_U * 2 && h.beamU + h.bulwarkU * 2 <= FRAME_U - SAFE_U * 2, `maps.${id}.ship.hull 连舷墙 ${+outU.toFixed(2)}×${h.beamU + h.bulwarkU * 2} 格，放不进安全区`)
+  need(outU / 2 - h.bulwarkU + (spritOf(h).boom.s - h.lengthU) + 1 <= FRAME_U / 2, `maps.${id}.ship 的第一斜桅伸出船头后离方框边不到一格：船一纵摇端头就甩出方框`)
+  const start = spawnS(h)
+  need(h.masts.some((at) => at * h.lengthU < start) && h.masts.some((at) => at * h.lengthU > start), `maps.${id}.ship.hull.masts 须在出发的地方前后都有：队伍从两根桅杆之间出发`)
+  need(halfBeamAt(h, start) >= SPAWN_CLEAR_U, `maps.${id}.ship 出发的地方离舷墙不到 ${SPAWN_CLEAR_U} 格`)
+  for (const at of h.masts) {
+    need(at > 0 && at < 1 && halfBeamAt(h, at * h.lengthU) >= h.mastU + 2, `maps.${id}.ship.hull.masts 的 ${at} 须立在甲板上、两边各留得出两格的路`)
+    need(Math.abs(at * h.lengthU - start) >= SPAWN_CLEAR_U + h.mastU, `maps.${id}.ship.hull.masts 的 ${at} 离出发的地方不到 ${SPAWN_CLEAR_U} 格`)
+  }
   need(d.draftM > 0 && d.depthM > d.draftM && d.midship > 0 && d.midship <= 1 && d.kgM > 0 && d.rho > 0, `maps.${id}.ship.hydro 的吃水、型深、舯剖面系数、重心与密度须合理：型深大于吃水，系数在 (0, 1] 内`)
   need(d.rollGyration > 0 && d.pitchGyration > 0 && d.rollAdded >= 0 && d.pitchAdded >= 0, `maps.${id}.ship.hydro 的惯性半径须为正、附加质量不为负`)
   need(d.rollDamping > 0 && d.rollDamping < 1 && d.pitchDamping > 0 && d.pitchDamping < 1, `maps.${id}.ship.hydro 的阻尼比须在 0 到 1 之间`)

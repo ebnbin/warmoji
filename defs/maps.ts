@@ -677,7 +677,7 @@ export const MAPS = {
   ship: {
     emoji: '26f5',
     name: '帆船',
-    desc: '一艘在海上航行的三桅帆船，舷墙围着的甲板就是战场。甲板上的一切都有重量：人群挤到哪边，船就往哪边倾，海浪也推着它来回摇。船一倾，往高处走就吃力变慢、往低处走更快；站着不动会顺着甲板往低处滑，金币也跟着溜，散落的炮弹满甲板滚——别被怪物堵在低的那一侧',
+    desc: '一艘在海上航行的双桅帆船，舷墙围着的甲板就是战场。甲板上的一切都有重量：人群挤到哪边，船就往哪边倾，海浪也推着它来回摇。船一倾，往高处走就吃力变慢、往低处走更快；站着不动会顺着甲板往低处滑，金币也跟着溜，散落的炮弹满甲板滚——别被怪物堵在低的那一侧',
     kind: 'ship',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
@@ -709,7 +709,7 @@ export const MAPS = {
     finalWaveSub: '巨鳄爬上了甲板——它有一吨重，它往哪边走，船就往哪边倾！',
     ship: {
       meterPerU: 0.45,
-      hull: { lengthU: 48, beamU: 18, bow: 0.42, bowPow: 0.85, stern: 0.2, sternPow: 2.5, transom: 0.62, transomBulge: 0.05, bulwarkU: 0.45, seaU: 5, neckU: 0.6, masts: [0.22, 0.5, 0.76], mastU: 0.45 },
+      hull: { lengthU: 34.2, beamU: 18, bow: 0.42, bowPow: 0.85, stern: 0.2, sternPow: 2.5, transom: 0.62, transomBulge: 0.05, bulwarkU: 0.45, neckU: 0.6, masts: [0.34, 0.65], mastU: 0.45 },
       hydro: { draftM: 2, midship: 0.78, kgM: 2.5, depthM: 4.2, rho: 1025, rollGyration: 0.38, pitchGyration: 0.26, rollAdded: 0.2, pitchAdded: 0.8, rollDamping: 0.15, pitchDamping: 0.35 },
       weight: { bodyKg: 75, bodyRadiusU: 0.45, bodyHeightM: 0.9, pickupKg: 0.05, ballKg: 14.5 },
       sea: {

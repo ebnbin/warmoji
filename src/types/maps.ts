@@ -283,7 +283,7 @@ export interface Friction {
  */
 export interface ShipConfig {
   readonly meterPerU: number
-  /** 甲板的平面形状，格：船长沿地图的长边，船头朝右（竖屏朝上） */
+  /** 甲板的平面形状，格：船摆在方框正中，横屏船头朝右、竖屏朝上 */
   readonly hull: {
     /** 甲板从船尾横板到船首柱的长、最宽处的宽 */
     readonly lengthU: number
@@ -296,12 +296,11 @@ export interface ShipConfig {
     readonly sternPow: number
     readonly transom: number
     readonly transomBulge: number
-    /** 舷墙的厚度；船壳外至少留多宽的海面 */
+    /** 舷墙的厚度 */
     readonly bulwarkU: number
-    readonly seaU: number
     /** 窄过两倍 neckU 的尖角填掉 */
     readonly neckU: number
-    /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路 */
+    /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路，队伍从船长正中出发，前后各有桅杆 */
     readonly masts: readonly number[]
     readonly mastU: number
   }

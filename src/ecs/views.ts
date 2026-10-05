@@ -32,7 +32,7 @@ import { roomAt } from './worlds/basin'
 import { gatesNow } from './worlds/gates'
 import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, WAVE_TILE, WET_PPU } from './render/ship'
 import { SUN } from '../data/light'
-import { deckPoint, makeDeck as makeDeckFrame, shipSizeU } from './worlds/ship'
+import { deckPoint } from './worlds/ship'
 import type { ShipState } from './worlds/ship'
 import { GRAVITY, halfBeamAt } from '../data/ship'
 import type { ShipConfig } from '../types/maps'
@@ -88,6 +88,8 @@ export interface ViewCtx {
   readonly def: MapDef
   /** 战斗镜头：地图不自己动镜头；跟着屏幕走的东西（底色与遮罩、暗角、闪屏、震屏、按镜头撒的粒子）都经它的屏幕层 */
   readonly lens: Lens
+  /** 开战时屏幕是竖的：按屏幕摆向的地图据此定朝向，之后不随屏幕转 */
+  readonly portrait: boolean
   w: number
   h: number
   atlas?: EcsAtlas
@@ -1498,12 +1500,11 @@ function drawLantern(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * 船：海面由着色器画，正午的松石绿浅海、风浪两层交错、白浪、船舷、水线白沫、船头浪与尾流；甲板是一张程序画出的木板贴图；
+ * 船：海面由着色器画，正午的松石绿浅海、风浪两层交错、白浪、船舷、水线白沫、船头浪与尾流，铺满方框；甲板是一张程序画出的木板贴图；
  * 桅杆、帆桁、索具与帆按高度随船的横摇纵摇甩开，影子背着太阳投在甲板上；吊灯按单摆挂着，白天不点；
  * 炮弹顺坡滚，低的一侧舷边溅浪花，海鸥在桅顶上空盘旋。船长沿进场时屏幕的长边摆，之后不再随屏幕转
  */
 class ShipView extends BoundedView {
-  private size?: { w: number; h: number; origin: Point }
   private readonly u = { time: 0, roll: 0, pitch: 0 }
   private rig?: Phaser.GameObjects.Graphics
   private shade?: Phaser.GameObjects.Graphics
@@ -1519,19 +1520,12 @@ class ShipView extends BoundedView {
   private sprayAt = 0
   private creakAt = 0
 
-  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    if (!this.size) {
-      const cfg = v.def.ship!
-      const sz = shipSizeU(cfg)
-      const across = viewport.logicalWidth >= viewport.logicalHeight
-      const w = (across ? sz.long : sz.short) * UNIT
-      const h = (across ? sz.short : sz.long) * UNIT
-      const deck = makeDeckFrame(cfg, w, h)
-      const at = [...cfg.hull.masts].sort((a, b) => a - b)
-      const s = ((at[at.length - 2]! + at[at.length - 1]!) / 2) * cfg.hull.lengthU
-      this.size = { w, h, origin: deckPoint(deck, s, 0) }
-    }
-    return this.size
+  layout(): { w: number; h: number; origin: Point } {
+    return { w: FRAME.w, h: FRAME.h, origin: FRAME_MID }
+  }
+
+  framing(): Framing {
+    return { map: FRAME, edge: 'frame' }
   }
 
   build(v: ViewCtx): void {
@@ -1564,8 +1558,7 @@ class ShipView extends BoundedView {
     const er = Math.ceil((v.h / UNIT) * EDGE_PPU)
     if (!scene.textures.exists(edgeKey)) canvasTexture(scene, edgeKey, ec, er, (ctx) => drawEdgeField(ctx, cfg, deck, ec, er))
     const h = cfg.hull
-    const pad = (MAP.cameraMargin + 8) * UNIT
-    const rect = [-pad, -pad, v.w + pad * 2, v.h + pad * 2]
+    const rect = [FRAME.x, FRAME.y, FRAME.w, FRAME.h]
     const freeU = (cfg.hydro.depthM - cfg.hydro.draftM) / cfg.meterPerU
     const shadowU = freeU * SHADOW_PER_U
     const away = { x: -SUN.x / sunH, y: -SUN.y / sunH }
@@ -1659,7 +1652,7 @@ class ShipView extends BoundedView {
     for (let i = 0; i < 3; i++) {
       const m = masts[Math.floor(rng.next() * masts.length)]!
       const img = scene.add.image(0, 0, GULL_KEY).setDepth(37).setScale(GULL_SCALE).setAlpha(0.88)
-      this.gulls.push({ s: m.s + (rng.next() * 2 - 1) * 6, t: (rng.next() * 2 - 1) * 4, r: (5 + rng.next() * 6) * UNIT, a: rng.next() * Math.PI * 2, w: (0.18 + rng.next() * 0.14) * (rng.next() < 0.5 ? -1 : 1), img, flapAt: 0 })
+      this.gulls.push({ s: m.s + (rng.next() * 2 - 1) * 4.5, t: (rng.next() * 2 - 1) * 3, r: (3.5 + rng.next() * 4.5) * UNIT, a: rng.next() * Math.PI * 2, w: (0.18 + rng.next() * 0.14) * (rng.next() < 0.5 ? -1 : 1), img, flapAt: 0 })
       this.visuals.push(img)
     }
     this.spray = scene.add

@@ -17,13 +17,34 @@ export interface Hatch {
   readonly wid: number
 }
 
-/** 相邻两根桅杆正中各一个格栅舱口 */
+/** 舱口中心离桅杆多远、沿船长多长，格 */
+const HATCH_GAP_U = 3.6
+const HATCH_LEN_U = 2.4
+
+/** 最后一根桅杆之后、最前一根之前各一个格栅舱口：桅杆之间留给队伍出发 */
 export function hatchesOf(h: Hull): Hatch[] {
-  const at = [...h.masts].sort((a, b) => a - b).map((f) => f * h.lengthU)
-  return at.slice(1).map((b, i) => {
-    const a = at[i]!
-    return { s: (a + b) / 2, len: Math.min(3.4, (b - a) * 0.34), wid: Math.min(3, h.beamU * 0.17) }
-  })
+  const at = h.masts.map((f) => f * h.lengthU)
+  const wid = Math.min(3, h.beamU * 0.17)
+  return [
+    { s: Math.min(...at) - HATCH_GAP_U, len: HATCH_LEN_U, wid },
+    { s: Math.max(...at) + HATCH_GAP_U, len: HATCH_LEN_U, wid },
+  ]
+}
+
+/** 船头往前伸出的一根杆的端头：在船长方向 s 格处，离甲板 h 米 */
+export interface Spar {
+  readonly s: number
+  readonly h: number
+}
+
+/** 首斜桅与第一斜桅的端头 */
+export function spritOf(h: Hull): { sprit: Spar; boom: Spar } {
+  return { sprit: { s: h.lengthU + 3.4, h: 3.8 }, boom: { s: h.lengthU + 5, h: 4.6 } }
+}
+
+/** 队伍出发的地方在船长方向几格处：船长的正中，摆在方框正中 */
+export function spawnS(h: Hull): number {
+  return (h.lengthU - bulgeU(h)) / 2
 }
 
 /** 船尾舵轮在船长方向几格处 */

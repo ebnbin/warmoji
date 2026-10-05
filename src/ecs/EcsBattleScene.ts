@@ -414,7 +414,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
     this.lens = new Lens(this)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, w: 0, h: 0 }
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, portrait: viewport.logicalWidth < viewport.logicalHeight, w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
@@ -496,7 +496,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       sand: burstEmitter(this, [0xe8c27a, 0xd9a85b, 0xf3dca5, 0xc8954a], 120, 700, { gravityY: 160 }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
-    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
+    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)

@@ -865,7 +865,7 @@ function shipCfg(sim: Sim): ShipConfig {
 function shipOf(sim: Sim): ShipState {
   let s = sim.worldState.ship
   if (!s) {
-    s = makeShip(shipCfg(sim), sim.mapW, sim.mapH, new Rng(sim.run.decorSeed ^ 0x5b1d))
+    s = makeShip(shipCfg(sim), !sim.portrait, new Rng(sim.run.decorSeed ^ 0x5b1d))
     sim.worldState.ship = s
   }
   return s
