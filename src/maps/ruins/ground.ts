@@ -2,18 +2,28 @@ import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { UNIT } from '../../util/units'
+import { crownCover, growCrowns } from '../crown'
+import { CANOPY_PPU, coverLeaves, GRADE, LIT, litterAt, MULCH } from '../foliage'
 import { toLocal, toWorld } from './layout'
 import type { RuinsConfig } from '../../types/maps'
 import type { Basin } from '../basin'
+import type { Crowns } from '../crown'
 import type { Door, Fallen, Frame, Space, Tree } from './layout'
 import type { Grid, Structure } from './masonry'
 
-/** 树冠贴图每格多少像素：树冠边是软的，用不着地面那么细 */
-export const CANOPY_PPU = 16
-/** 树按这么大（格）的格子分桶，画一个像素只看附近几桶 */
-const BUCKET_U = 2
-/** 树影最多拖出这么远（格） */
+/** 落叶的密度场与那里落的是哪棵树的叶子，按这么粗的格子先算好，格 */
+const LITTER_FIELD_U = 0.5
+/** 树冠投在地上的影子：树高、太阳斜，影子顺着背光的方向挪开这么远（格）；影子的边软多宽（格）；树影最深遮掉多少阳光 */
 const TREE_SHADOW_U = 7
+const PENUMBRA_U = 0.14
+const TREE_SHADE = 0.4
+const PENUMBRA = [
+  [0, 0],
+  [-PENUMBRA_U, -PENUMBRA_U],
+  [PENUMBRA_U, -PENUMBRA_U],
+  [-PENUMBRA_U, PENUMBRA_U],
+  [PENUMBRA_U, PENUMBRA_U],
+] as const
 /** 一段鼓形柱身多长，格 */
 const DRUM_U = 0.9
 /** 立面按假想的斜俯视画：墙每高一米，朝屏幕下方的那一面露出多宽（格）；整面最多露出 FACE_MAX_U 格，再高的墙按比例压扁 */
@@ -25,14 +35,16 @@ const COURSE_MIN_PX = 3.5
 const DRUM_M = 0.62
 /** 墙投下的影子挡掉多少阳光 */
 const WALL_SHADE = 0.34
+/** 墙根积叶：离挡人的墙或木板这么远（格）以内积着落叶，越近越厚 */
+const FOOT_REACH_U = 1.4
 
 const LXY = Math.hypot(SUN.x, SUN.y)
 const LEN = Math.hypot(SUN.x, SUN.y, SUN.z)
 const LX = SUN.x / LEN
 const LY = SUN.y / LEN
 const LZ = SUN.z / LEN
-/** 太阳每升高一米，影子在地上往外拖多少米 */
-const SHADOW_PER_M = LXY / SUN.z
+/** 太阳在画面上的水平方向（单位向量，指向太阳） */
+const TO_SUN = { x: SUN.x / LXY, y: SUN.y / LXY }
 /** 影子的光线每往太阳那边走一米升高多少米 */
 const RISE = SUN.z / LXY
 
@@ -104,62 +116,34 @@ export function pixelBuffer(rect: PixelRect): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray((rect.x1 - rect.x0) * (rect.y1 - rect.y0) * 4)
 }
 
-/** 地面与树冠贴图的大小，像素：铺满地图与外面一圈 */
+/** 地面与树冠贴图的大小，像素：铺满整张地图 */
 export function textureSize(sc: Pick<PaintScene, 'w' | 'h'>, layer: PaintLayer): { w: number; h: number } {
   const ppu = layer === 'ground' ? GROUND_PPU : CANOPY_PPU
   return { w: Math.round(sc.w * ppu), h: Math.round(sc.h * ppu) }
 }
 
-/** 树按位置分桶：键是桶的行列 */
-interface TreeIndex {
-  readonly cols: number
-  readonly buckets: Map<number, number[]>
-}
-
-/** 一局里不变的：树影与树冠的分桶，每棵树的影子落在哪；每根石柱占着哪几格 */
+/**
+ * 一局里不变的：树上的叶子与枝条；每根石柱占着哪几格；落叶有多厚与那里落的是哪棵树的叶子（−1 是哪棵都不挨着），
+ * 按 LITTER_FIELD_U 的格子，格点 (i, j) 在 (i·LITTER_FIELD_U, j·LITTER_FIELD_U)
+ */
 export interface Static {
-  readonly shadows: TreeIndex
-  readonly crowns: TreeIndex
-  readonly cast: readonly { readonly x: number; readonly y: number; readonly r: number }[]
+  readonly crowns: Crowns
   readonly columns: ReadonlyMap<number, readonly number[]>
+  readonly litter: Float32Array
+  readonly owner: Int32Array
+  readonly litterCols: number
+  readonly litterRows: number
 }
 
-/** 跟着砌体变的：每格被挡住太阳的高度（米，低于它就在影子里）、地面上的影子（模糊过，边是软的），每格被周围的墙挡掉多少天光 */
+/** 跟着砌体变的：每格被挡住太阳的高度（米，低于它就在影子里）、地面上的影子（模糊过，边是软的），每格被周围的墙挡掉多少天光，每格离最近的挡人的墙或木板多远（格） */
 export interface Prepared {
   readonly shadow: Float32Array
   readonly ground: Float32Array
   readonly ao: Float32Array
-}
-
-function shadowOf(cfg: RuinsConfig, tr: Tree): { x: number; y: number; r: number } {
-  const off = Math.min(TREE_SHADOW_U, (tr.h * 0.65 * SHADOW_PER_M) / cfg.meterPerU)
-  return { x: tr.x - (SUN.x / LXY) * off, y: tr.y - (SUN.y / LXY) * off, r: tr.r * 0.92 }
-}
-
-function indexTrees(sc: PaintScene, discs: readonly { x: number; y: number; r: number }[], pad: number): TreeIndex {
-  const cols = Math.ceil(sc.w / BUCKET_U) + 1
-  const buckets = new Map<number, number[]>()
-  discs.forEach((c, k) => {
-    const r = c.r + pad
-    for (let by = Math.max(0, Math.floor((c.y - r) / BUCKET_U)); by <= Math.floor((c.y + r) / BUCKET_U); by++) {
-      for (let bx = Math.max(0, Math.floor((c.x - r) / BUCKET_U)); bx <= Math.min(cols - 1, Math.floor((c.x + r) / BUCKET_U)); bx++) {
-        const key = by * cols + bx
-        let list = buckets.get(key)
-        if (!list) buckets.set(key, (list = []))
-        list.push(k)
-      }
-    }
-  })
-  return { cols, buckets }
-}
-
-const NONE: readonly number[] = []
-function near(ix: TreeIndex, x: number, y: number): readonly number[] {
-  return ix.buckets.get(Math.floor(y / BUCKET_U) * ix.cols + Math.floor(x / BUCKET_U)) ?? NONE
+  readonly foot: Float32Array
 }
 
 export function prepareStatic(sc: PaintScene): Static {
-  const cast = sc.trees.map((t) => shadowOf(sc.cfg, t))
   const columns = new Map<number, number[]>()
   for (let i = 0; i < sc.sid.length; i++) {
     const s = sc.sid[i]!
@@ -168,7 +152,68 @@ export function prepareStatic(sc: PaintScene): Static {
     if (!list) columns.set(s, (list = []))
     list.push(i)
   }
-  return { shadows: indexTrees(sc, cast, 1.4), crowns: indexTrees(sc, sc.trees, 0.1), cast, columns }
+  const crowns = growCrowns(sc.trees, sc.seed, sc.cfg.meterPerU, { x0: 0, y0: 0, w: sc.w, h: sc.h })
+  // 落叶有多厚：枫树底下最厚、往外渐稀；台地边外的林子里铺满、台地边上积着一溜；台地上被风吹成一片一片，别处零零星星。
+  // 顺带记下这里挨着哪棵树：落在树底下的多半是这棵树的叶子
+  const cols = Math.ceil(sc.w / LITTER_FIELD_U) + 1
+  const rows = Math.ceil(sc.h / LITTER_FIELD_U) + 1
+  const litter = new Float32Array(cols * rows)
+  const owner = new Int32Array(cols * rows).fill(-1)
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const x = i * LITTER_FIELD_U
+      const y = j * LITTER_FIELD_U
+      let d = 0.22 + 0.5 * smooth(0.32, 0.68, fbm(x / 6.5, y / 6.5, sc.seed + 31, 3))
+      d = Math.max(d, 0.65 * smooth(0.5, 0.76, fbm(x / 2.4 + 9, y / 2.4, sc.seed + 33, 2)))
+      let best = 1.7
+      sc.trees.forEach((tr, k) => {
+        const q = Math.hypot(tr.x - x, tr.y - y) / tr.r
+        if (q < 2) d = Math.max(d, smooth(2, 0.9, q))
+        if (q < best) {
+          best = q
+          owner[j * cols + i] = k
+        }
+      })
+      d = Math.max(d, 0.85 * smooth(1.8, -0.4, siteRoom(sc.basin, x, y)))
+      litter[j * cols + i] = Math.min(1, d)
+    }
+  }
+  return { crowns, columns, litter, owner, litterCols: cols, litterRows: rows }
+}
+
+/** (x, y) 格处落叶的密度：密度场的双线性插值 */
+function litterDens(stat: Static, x: number, y: number): number {
+  const u = Math.min(stat.litterCols - 1.001, Math.max(0, x / LITTER_FIELD_U))
+  const v = Math.min(stat.litterRows - 1.001, Math.max(0, y / LITTER_FIELD_U))
+  const ix = Math.floor(u)
+  const iy = Math.floor(v)
+  const fx = u - ix
+  const fy = v - iy
+  const i = iy * stat.litterCols + ix
+  const a = stat.litter[i]!
+  const b = stat.litter[i + 1]!
+  const c = stat.litter[i + stat.litterCols]!
+  const d = stat.litter[i + stat.litterCols + 1]!
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
+}
+
+/** (x, y) 处落的多半是哪棵树的叶子，−1 是哪棵都不挨着 */
+function ownerAt(stat: Static, x: number, y: number): number {
+  const i = Math.round(x / LITTER_FIELD_U)
+  const j = Math.round(y / LITTER_FIELD_U)
+  return i < 0 || j < 0 || i >= stat.litterCols || j >= stat.litterRows ? -1 : stat.owner[j * stat.litterCols + i]!
+}
+
+/**
+ * 树冠投在地上的树影有多深：从这一点往太阳那边挪 TREE_SHADOW_U，看那里头顶上叶子盖得多密（高度图里有叶子的格点占几成，四周几个点一起看，边就软了）。
+ * 叶子叠着叶子，大半是实的影子，叶缝里漏下一个个圆圆的光斑
+ */
+function dappleAt(c: Crowns, x: number, y: number): number {
+  const qx = x + TO_SUN.x * TREE_SHADOW_U
+  const qy = y + TO_SUN.y * TREE_SHADOW_U
+  let cover = 0
+  for (const [ox, oy] of PENUMBRA) cover += crownCover(c, qx + ox, qy + oy)
+  return (cover / PENUMBRA.length) * TREE_SHADE
 }
 
 /** 这一点落在哪根还立着的石柱的圆里：返回它的序号加一与剩下的层数（取它各格里最高的），不在为 0 */
@@ -385,9 +430,32 @@ function groundShade(g: Grid, shadow: Float32Array): Float32Array {
   return a
 }
 
+/** 每格离最近的挡人的墙或木板多远（格）：只在 FOOT_REACH_U 以内找，再远的记 FOOT_REACH_U */
+function wallFoot(sc: PaintScene, st: PaintState): Float32Array {
+  const g = sc.grid
+  const reach = Math.ceil(FOOT_REACH_U / g.cell)
+  const out = new Float32Array(g.cols * g.rows).fill(FOOT_REACH_U)
+  for (let j = 0; j < g.rows; j++) {
+    for (let i = 0; i < g.cols; i++) {
+      if (heightAt(sc, st, i, j) <= 0) continue
+      for (let dj = -reach; dj <= reach; dj++) {
+        for (let di = -reach; di <= reach; di++) {
+          const ii = i + di
+          const jj = j + dj
+          if (ii < 0 || jj < 0 || ii >= g.cols || jj >= g.rows) continue
+          const d = Math.sqrt(di * di + dj * dj) * g.cell
+          const k = jj * g.cols + ii
+          if (d < out[k]!) out[k] = d
+        }
+      }
+    }
+  }
+  return out
+}
+
 export function prepare(sc: PaintScene, st: PaintState): Prepared {
   const shadow = shadowHeights(sc, st)
-  return { shadow, ground: groundShade(sc.grid, shadow), ao: occlusion(sc, st) }
+  return { shadow, ground: groundShade(sc.grid, shadow), ao: occlusion(sc, st), foot: wallFoot(sc, st) }
 }
 
 /** 砌体格子里的场在局部 (u, v) 格处按格心双线性取值，格子外为零 */
@@ -427,35 +495,35 @@ function siteRoom(b: Basin, x: number, y: number): number {
   return Math.min(r, -Math.max(-x, -y, x - (b.cols * b.cell) / UNIT, y - (b.rows * b.cell) / UNIT))
 }
 
-/** 几种砌墙的石头：暖色的石灰岩与砂岩，偏灰的，带赭色的 */
+/** 几种砌墙的石头：冷灰的花岗岩与青石，偏蓝的，偏暖的，一地红叶衬着才显得出 */
 const STONES = [
-  [214, 192, 152],
-  [202, 178, 138],
-  [220, 200, 162],
-  [192, 174, 144],
-  [208, 178, 130],
-  [198, 170, 132],
+  [182, 184, 186],
+  [168, 172, 176],
+  [192, 194, 194],
+  [158, 164, 170],
+  [176, 176, 172],
+  [166, 170, 176],
 ] as const
-/** 塔楼的石头更灰更旧 */
+/** 塔楼的石头更深更旧 */
 const TOWER_STONES = [
-  [184, 172, 150],
-  [172, 160, 140],
-  [194, 180, 156],
-  [164, 154, 138],
+  [150, 154, 158],
+  [140, 144, 150],
+  [160, 164, 166],
+  [132, 138, 144],
 ] as const
 /** 铺地的石板 */
 const SLABS = [
-  [184, 168, 140],
-  [172, 158, 132],
-  [194, 178, 148],
-  [166, 156, 136],
+  [158, 160, 160],
+  [146, 150, 152],
+  [168, 170, 168],
+  [138, 142, 146],
 ] as const
-/** 赤陶地砖 */
+/** 褪了色的赤陶地砖 */
 const TILES = [
-  [156, 96, 66],
-  [142, 88, 62],
-  [166, 108, 74],
-  [132, 84, 64],
+  [134, 98, 80],
+  [122, 90, 74],
+  [146, 106, 86],
+  [114, 84, 70],
 ] as const
 /** 风化的木板 */
 const WOOD = [
@@ -463,11 +531,11 @@ const WOOD = [
   [108, 84, 58],
   [138, 108, 74],
 ] as const
-/** 几种野花：白、黄、淡紫 */
+/** 几种野菊：白、黄、赭黄 */
 const FLOWERS = [
   [236, 232, 222],
-  [228, 200, 74],
-  [184, 160, 214],
+  [226, 196, 78],
+  [214, 168, 96],
 ] as const
 
 /** 一个像素的颜色、表面离地多高（米）与法线（世界方向，z 朝上） */
@@ -503,15 +571,15 @@ function toWorldDir(f: Frame, du: number, dv: number): { x: number; y: number } 
   return { x: du * f.cos - dv * f.sin, y: du * f.sin + dv * f.cos }
 }
 
-/** 草地：一片片深浅不一，草叶斜着长，零星开着成簇的野花；lush 越大越绿 */
+/** 草地：入了秋的草，枯黄里泛着褐，一片片深浅不一，有的地方还留着一点绿；草叶斜着长，零星开着几丛野菊；lush 越大越绿 */
 function grass(o: Px, x: number, y: number, seed: number, lush: number, flowers: number): void {
   const patch = fbm(x / 6, y / 6, seed + 3, 2)
   const mid = fbm(x / 2, y / 2, seed + 5, 2)
-  const dry = clamp01(smooth(0.42, 0.75, patch) * 0.9 - lush * 0.4)
-  const green = clamp01(0.5 + (mid - 0.5) * 1.2 + lush * 0.25)
-  let r = 98 + (70 - 98) * green + (152 - 98) * dry
-  let g = 124 + (108 - 124) * green + (138 - 124) * dry
-  let b = 54 + (44 - 54) * green + (78 - 54) * dry
+  const dry = clamp01(smooth(0.42, 0.75, patch) * 0.9 - lush * 0.3)
+  const green = clamp01(0.45 + (mid - 0.5) * 1.2 + lush * 0.3) * 0.55
+  let r = 128 + (96 - 128) * green + (150 - 128) * dry
+  let g = 112 + (108 - 112) * green + (128 - 112) * dry
+  let b = 66 + (54 - 66) * green + (78 - 66) * dry
   const blade = valueNoise(x * 6 + y * 2, y * 22 - x * 2.5, seed + 13)
   const tuft = valueNoise(x * 3.3 + 7.1, y * 3.3, seed + 15)
   const grain = valueNoise(x * 7, y * 7, seed + 9) * 0.5 + valueNoise(x * 17, y * 17, seed + 11) * 0.5
@@ -538,7 +606,7 @@ function dirt(o: Px, x: number, y: number, seed: number): void {
   set(o, (112 + 18 * tone) * (0.9 + 0.2 * grain), (96 + 14 * tone) * (0.9 + 0.2 * grain), (74 + 10 * tone) * (0.9 + 0.2 * grain))
   const peb = cellNearest(x * 7, y * 7, seed + 29)
   const pd = Math.sqrt(peb.dx * peb.dx + peb.dy * peb.dy)
-  if (pd < 0.16 && peb.h < 0.55) mix(o, 150 + 30 * peb.h, 142 + 26 * peb.h, 124 + 20 * peb.h, smooth(0.16, 0.1, pd))
+  if (pd < 0.16 && peb.h < 0.55) mix(o, 142 + 28 * peb.h, 138 + 24 * peb.h, 128 + 18 * peb.h, smooth(0.16, 0.1, pd))
 }
 
 /**
@@ -593,12 +661,12 @@ function paving(o: Px, u: number, v: number, x: number, y: number, sp: Space, se
   const wear = 0.95 + 0.1 * fbm(x * 0.9, y * 0.9, s + 43, 2)
   set(o, c[0] * tint * (0.93 + 0.1 * grain) * wear, c[1] * tint * (0.93 + 0.1 * grain) * wear, c[2] * tint * (0.93 + 0.1 * grain) * wear)
   const crack = smooth(0.04, 0.012, cellEdge(x * 1.9, y * 1.9, s + 45)) * hash(id, 11, s) * sp.worn * 0.5
-  mix(o, 96, 86, 68, crack)
-  const lichen = smooth(0.66, 0.8, fbm(x * 1.2, y * 1.2, s + 47, 2)) * 0.35
-  mix(o, 176, 172, 116, lichen)
+  mix(o, 72, 74, 74, crack)
+  const lichen = smooth(0.66, 0.8, fbm(x * 1.2, y * 1.2, s + 47, 2)) * 0.3
+  mix(o, 156, 154, 120, lichen)
   // 石缝：窄窄一道，长着苔藓与草，越破的地方草越多、从缝里漫到石板上
   const moss = smooth(0.3, 0.6, fbm(x / 2, y / 2, s + 49, 2))
-  mix(o, 82 + 24 * moss, 90 + 40 * moss, 56 + 8 * moss, (1 - inside) * 0.9)
+  mix(o, 78 + 18 * moss, 84 + 30 * moss, 54 + 8 * moss, (1 - inside) * 0.9)
   const creep = smooth(0.5, 0.75, fbm(x * 0.8, y * 0.8, s + 51, 3)) * (0.3 + 0.7 * sp.worn) * smooth(0.25, 0.02, edge)
   if (creep > 0) {
     grass(PX2, x, y, seed + 43, 0.7, 0)
@@ -640,12 +708,12 @@ function pathAt(sc: PaintScene, u: number, v: number): number {
   return best
 }
 
-/** 地上的碎石：盖住多少看深浅，薄处零零星星，厚处堆满；碎块是有棱角的多边形，每个面朝向不一、按太阳打光，大块夹着小块；石块之间是灰白的灰浆粉 */
+/** 地上的碎石：盖住多少看深浅，薄处零零星星，厚处堆满；碎块是有棱角的多边形，每个面朝向不一、按太阳打光，大块夹着小块；石块之间是灰白的石粉 */
 function rubbleOn(o: Px, f: Frame, x: number, y: number, depth: number, seed: number): void {
   const cover = smooth(0.025, 0.15, depth)
   if (cover <= 0) return
   const dust = 0.88 + 0.2 * valueNoise(x * 11, y * 11, seed + 51)
-  mix(o, 182 * dust, 166 * dust, 138 * dust, cover * 0.6)
+  mix(o, 166 * dust, 164 * dust, 158 * dust, cover * 0.6)
   let topZ = 0
   for (let k = 0; k < 2; k++) {
     const scale = k === 0 ? 6 : 2.6
@@ -668,7 +736,7 @@ function rubbleOn(o: Px, f: Frame, x: number, y: number, depth: number, seed: nu
     o.nx = w.x
     o.ny = w.y
     o.nz = 1
-    mix(o, 92, 84, 70, smooth(0.16, 0.09, e) * 0.6)
+    mix(o, 76, 76, 74, smooth(0.16, 0.09, e) * 0.6)
   }
   o.z = Math.max(o.z, depth)
 }
@@ -689,8 +757,8 @@ function drum(o: Px, sc: PaintScene, u: number, v: number, x: number, y: number)
     const tone = 0.9 + 0.14 * hash(k, Math.floor(fc.u * 13), sc.seed)
     const flute = 0.95 + 0.05 * Math.cos(t * Math.PI * 7)
     const grain = 0.92 + 0.12 * valueNoise(x * 16, y * 16, sc.seed + 61)
-    set(o, 206 * tone * flute * grain, 194 * tone * flute * grain, 168 * tone * flute * grain)
-    mix(o, 92, 84, 70, joint * 0.8)
+    set(o, 186 * tone * flute * grain, 188 * tone * flute * grain, 188 * tone * flute * grain)
+    mix(o, 78, 80, 82, joint * 0.8)
     const n = toWorldDir(sc.frame, -fc.dv * t, fc.du * t)
     o.nx = n.x
     o.ny = n.y
@@ -777,8 +845,8 @@ function masonryTop(o: Px, sc: PaintScene, s: number, n: number, u: number, v: n
     const c = STONES[2]!
     const grain = 0.92 + 0.12 * valueNoise(x * 18, y * 18, seed + 71) + rough * (valueNoise(x * 6, y * 6, seed + 73) - 0.5)
     set(o, c[0] * grain, c[1] * grain, c[2] * grain)
-    mix(o, 112, 102, 84, flute * 0.55)
-    mix(o, 96, 88, 72, smooth(0.9, 1, rr) * 0.5)
+    mix(o, 92, 94, 94, flute * 0.55)
+    mix(o, 78, 80, 82, smooth(0.9, 1, rr) * 0.5)
     const bevel = smooth(0.82, 1, rr)
     const w = toWorldDir(sc.frame, du * bevel * 1.4, dv * bevel * 1.4)
     o.nx = w.x + (valueNoise(x * 7, y * 7, seed + 75) - 0.5) * rough
@@ -792,9 +860,9 @@ function masonryTop(o: Px, sc: PaintScene, s: number, n: number, u: number, v: n
   const pit = smooth(0.06, 0.015, cellEdge(x * 3.1, y * 3.1, seed + 79)) * 0.18
   const kk = tone * (0.9 + 0.16 * grain) * (1 - pit)
   set(o, c[0] * kk, c[1] * kk, c[2] * kk)
-  // 地衣与苔藓：顶上一片片的黄绿色斑；矮的墙顶积了土，长着苔藓和草
-  const lichen = smooth(0.6, 0.76, fbm(x * 1.1, y * 1.1, seed + 81, 2)) * 0.4
-  mix(o, 176, 166, 104, lichen)
+  // 地衣与枯草：顶上一片片赭黄的地衣斑；矮的墙顶积了土，长着枯了的草
+  const lichen = smooth(0.6, 0.76, fbm(x * 1.1, y * 1.1, seed + 81, 2)) * 0.36
+  mix(o, 168, 150, 96, lichen)
   const low = smooth(1.3, 0.3, hM)
   const moss = smooth(0.45, 0.62, fbm(x / 1.6, y / 1.6, seed + 83, 2)) * (0.25 + 0.6 * low)
   if (moss > 0) {
@@ -803,7 +871,7 @@ function masonryTop(o: Px, sc: PaintScene, s: number, n: number, u: number, v: n
   }
   // 灰缝：凹下去，背光那侧更暗
   const joint = 1 - smooth(0.015, 0.045, Math.min(edgeA, edgeB))
-  mix(o, 104, 96, 80, joint * 0.85)
+  mix(o, 84, 86, 88, joint * 0.85)
   const w = toWorldDir(sc.frame, na, nb)
   o.nx = w.x * 0.55
   o.ny = w.y * 0.55
@@ -830,8 +898,8 @@ function facade(o: Px, sc: PaintScene, sid: number, zf: number, scale: number, a
   const tone = (0.86 + 0.18 * hash(j, k + 1, seed)) * (0.9 + 0.14 * valueNoise(x * 15, y * 15, seed + 3))
   set(o, c[0] * tone, c[1] * tone, c[2] * tone)
   const joint = Math.max(smooth(0.2, 0.08, Math.min(fz, 1 - fz)), smooth(0.06, 0.02, Math.min(fa, 1 - fa) * len))
-  mix(o, 72, 66, 54, joint * 0.85)
-  mix(o, 78, 90, 56, smooth(0.45, 0, zf) * 0.45)
+  mix(o, 60, 62, 66, joint * 0.85)
+  mix(o, 70, 80, 60, smooth(0.45, 0, zf) * 0.45)
   o.nx = nx
   o.ny = ny
   o.nz = 0.15
@@ -846,10 +914,10 @@ function columnSide(o: Px, sc: PaintScene, sid: number, zf: number, t: number, x
   const flute = smooth(0.4, 0.95, Math.cos(across * 16))
   const tone = 0.9 + 0.12 * valueNoise(x * 18, y * 18, sc.seed + sid * 13)
   set(o, c[0] * tone, c[1] * tone, c[2] * tone)
-  mix(o, 110, 100, 82, flute * 0.35)
+  mix(o, 92, 94, 94, flute * 0.35)
   const fz = fract(zf / DRUM_M)
-  mix(o, 88, 80, 66, smooth(0.07, 0.02, Math.min(fz, 1 - fz)) * 0.8)
-  mix(o, 78, 90, 56, smooth(0.4, 0, zf) * 0.4)
+  mix(o, 74, 76, 78, smooth(0.07, 0.02, Math.min(fz, 1 - fz)) * 0.8)
+  mix(o, 70, 80, 60, smooth(0.4, 0, zf) * 0.4)
   o.nx = t
   o.ny = Math.sqrt(Math.max(0, 1 - t * t))
   o.nz = 0.12
@@ -918,10 +986,38 @@ function planks(o: Px, sc: PaintScene, u: number, v: number): void {
   o.top = true
 }
 
+/** 落叶一层层撒上去：每层按多少格一片的格子撒、哈希的种子、占密度的几成、叶子多大 */
+const LITTER_LAYERS = [
+  [3.2, 81, 0.62, 0.6],
+  [4.4, 83, 0.8, 0.62],
+  [5.8, 85, 0.95, 0.62],
+] as const
+
+/** (x, y) 处落叶有多厚：密度场按这种地面留得住几成（bare）打折；墙根另积着一层，离墙（foot，格）越近越厚，顺着墙一段厚一段薄 */
+function litterThick(stat: Static, x: number, y: number, bare: number, foot: number, seed: number): number {
+  const drift = 0.6 + 0.4 * smooth(0.3, 0.7, fbm(x / 1.6, y / 1.6, seed + 123, 2))
+  return Math.max(litterDens(stat, x, y) * bare, 0.8 * drift * smooth(FOOT_REACH_U, 0.15, foot))
+}
+
+/** 地上的落叶：铺得厚的地方先透出一层半烂的红褐，再一片片撒上落叶，叠在一起时后撒的压着先撒的；颜色多半是挨着的那棵树的叶色 */
+function litterOn(o: Px, stat: Static, x: number, y: number, dens: number, seed: number): void {
+  if (dens <= 0.02) return
+  const mottle = valueNoise(x * 4.5, y * 4.5, seed + 18) * 0.6 + valueNoise(x * 11, y * 11, seed + 20) * 0.4
+  const layer = smooth(0.55, 1, dens) * (0.45 + 0.4 * mottle)
+  const tint = valueNoise(x * 0.7 + 3, y * 0.7, seed + 29)
+  mix(o, MULCH[0] + (tint - 0.5) * 26 + (mottle - 0.5) * 30, MULCH[1] + (tint - 0.5) * 16 + (mottle - 0.5) * 20, MULCH[2] + (tint - 0.5) * 8 + (mottle - 0.5) * 14, layer * 0.85)
+  const owner = ownerAt(stat, x, y)
+  for (const [scale, sd, k, small] of LITTER_LAYERS) {
+    const a = litterAt(x, y, scale, seed + sd, Math.min(0.92, dens * k), owner, stat.crowns.palette, small)
+    if (a > 0) mix(o, LIT[0]!, LIT[1]!, LIT[2]!, a)
+  }
+}
+
 /**
- * 地面：台地上院落外是草地，通到院门的小路踩出了泥；院落里回廊与房间铺着石板、碎拼石或赤陶砖，回廊院里是草；台地边外是陡坡，
- * 乱石与灌木，越往下越暗。塌下的碎石盖在上面，倒下的石柱横在地上；挡人的墙露出墙顶的石块和朝屏幕下方的立面，跨得过的残基贴着地面，封门处钉着木板。
- * 按法线与太阳打光，往太阳那边被墙挡住的地方在影子里，墙脚一道接地线、被周围的墙挡掉天光，树冠背着太阳投下软影。只画 rect 那一块
+ * 地面：台地上院落外是入了秋的草地，通到院门的小路踩出了泥；院落里回廊与房间铺着石板、碎拼石或赤陶砖，回廊院里是草；台地边外是陡坡，
+ * 乱石与转红的灌木，越往下越暗。枫叶落了一地：墙根、墙角与台地边积得厚，铺地的中间与路上稀。塌下的碎石盖在上面，倒下的石柱横在地上；
+ * 挡人的墙露出墙顶的石块和朝屏幕下方的立面，跨得过的残基贴着地面，封门处钉着木板。
+ * 按法线与太阳打光，往太阳那边被墙挡住的地方在影子里，墙脚一道接地线、被周围的墙挡掉天光，枫树背着太阳投下斑驳透光的树影。只画 rect 那一块
  */
 export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: PaintState, out: Uint8ClampedArray, rect: PixelRect): void {
   const g = sc.grid
@@ -941,6 +1037,8 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
       const cj = Math.floor((v - g.v0) / g.cell)
       const cell = ci >= 0 && cj >= 0 && ci < g.cols && cj < g.rows ? cj * g.cols + ci : -1
       const room = siteRoom(sc.basin, x, y)
+      const ao = cell >= 0 ? sample(g, prep.ao, u, v) : 0
+      const foot = cell >= 0 ? sample(g, prep.foot, u, v) : FOOT_REACH_U
       o.z = 0
       o.nx = 0
       o.ny = 0
@@ -966,6 +1064,7 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
       } else if (col) {
         masonryTop(o, sc, col.sid, col.n, u, v, x, y)
         foundation(o, x, y, seed)
+        litterOn(o, stat, x, y, litterThick(stat, x, y, 0.7, foot, seed), seed)
       } else if (n > sc.walk && !pillar) {
         const h = n * hc
         const look = sightAt(sc, st, x, y, h)
@@ -994,6 +1093,7 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
       } else if (n > 0 && !pillar) {
         masonryTop(o, sc, sid, n, u, v, x, y)
         foundation(o, x, y, seed)
+        litterOn(o, stat, x, y, litterThick(stat, x, y, 0.7, foot, seed), seed)
       } else if (cell >= 0 && st.timber[cell]! > 0) {
         const h = st.timber[cell]! * hc
         const look = sightAt(sc, st, x, y, h)
@@ -1006,15 +1106,17 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
         }
       } else {
         const sp = spaceAt(sc, u, v)
+        // 这种地面上落叶留得住几成
+        let bare = 1
         if (room < 0.25) {
-          // 台地边外的陡坡：乱石与灌木，坡面朝外倾，越往下越暗
+          // 台地边外的陡坡：乱石与转红的灌木，坡面朝外倾，越往下越暗
           const down = -room
           const st0 = cellNearest(x * 1.8, y * 1.8, seed + 101)
           const sd = Math.sqrt(st0.dx * st0.dx + st0.dy * st0.dy) / (0.3 + 0.25 * st0.h)
           const rock = sd < 1 ? smooth(1, 0.8, sd) : 0
           const scrub = smooth(0.48, 0.62, fbm(x / 2.2, y / 2.2, seed + 103, 3))
           dirt(o, x, y, seed + 7)
-          mix(o, 96, 90, 70, 0.4)
+          mix(o, 86, 78, 64, 0.4)
           if (rock > 0) {
             const c = STONES[Math.floor(st0.h * 977) % STONES.length]!
             const tone = 0.62 + 0.2 * st0.h
@@ -1022,7 +1124,7 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
           }
           grass(PX2, x, y, seed + 105, 0.2, 0)
           mix(o, PX2.r * 0.75, PX2.g * 0.8, PX2.b * 0.7, smooth(0.6, 0, down) * 0.8)
-          mix(o, 46, 62, 34, scrub * 0.9)
+          mix(o, 104 + 30 * valueNoise(x * 3, y * 3, seed + 119), 56 + 14 * valueNoise(x * 3, y * 3, seed + 121), 36, scrub * 0.85)
           const h = 0.15
           const gx = (siteRoom(sc.basin, x + h, y) - siteRoom(sc.basin, x - h, y)) / (2 * h)
           const gy = (siteRoom(sc.basin, x, y + h) - siteRoom(sc.basin, x, y - h)) / (2 * h)
@@ -1031,15 +1133,18 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
           o.ny = -gy * slope
           o.nz = 1
           far = 1 - 0.55 * smooth(0.2, 6, down)
+          bare = 0.9
         } else if (!sp) {
           const path = pathAt(sc, u, v)
-          grass(o, x, y, seed, 0.15, 0.6)
+          grass(o, x, y, seed, 0.15, 0.3)
           if (path > 0) {
             dirt(PX2, x, y, seed + 11)
             mix(o, PX2.r, PX2.g, PX2.b, path * smooth(0.25, 0.6, fbm(x * 1.3, y * 1.3, seed + 107, 2) + path * 0.5))
           }
+          bare = 1 - 0.7 * path
         } else if (sp.kind === 'garth') {
-          grass(o, x, y, seed + 1, 0.55, 1)
+          grass(o, x, y, seed + 1, 0.55, 0.5)
+          bare = 0.9
         } else if (sp.kind === 'tower') {
           dirt(o, x, y, seed + 3)
           const weed = smooth(0.55, 0.75, fbm(x * 1.2, y * 1.2, seed + 109, 2))
@@ -1047,10 +1152,13 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
             grass(PX2, x, y, seed + 111, 0.5, 0)
             mix(o, PX2.r, PX2.g, PX2.b, weed * 0.8)
           }
+          bare = 0.8
         } else {
           const alongU = sp.kind === 'walk' ? Math.abs(u - (sp.u0 + sp.u1) / 2) < Math.abs(v - (sp.v0 + sp.v1) / 2) * ((sp.u1 - sp.u0) / (sp.v1 - sp.v0)) : sp.u1 - sp.u0 >= sp.v1 - sp.v0
           paving(o, u, v, x, y, sp, seed, alongU)
+          bare = 0.5
         }
+        litterOn(o, stat, x, y, litterThick(stat, x, y, bare, foot, seed), seed)
         if (cell >= 0 && !drum(o, sc, u, v, x, y)) rubbleOn(o, f, x, y, sample(g, st.rubble, u, v), seed)
         // 墙脚的接地线：挨着挡人的墙与木板，地面上一道深色的线
         if (cell >= 0) {
@@ -1062,127 +1170,39 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
             o.b *= k
           }
         }
-        // 墙脚的常春藤：伸到地上的一小片
+        // 墙脚的爬山虎：红透了的一小片，伸到地上
         if (cell >= 0) {
-          const ao = sample(g, prep.ao, u, v)
           const ivy = smooth(0.62, 0.74, fbm(x / 1.4, y / 1.4, seed + 113, 3)) * smooth(0.08, 0.2, ao)
-          if (ivy > 0) mix(o, 58 + 20 * valueNoise(x * 9, y * 9, seed + 115), 86 + 26 * valueNoise(x * 9, y * 9, seed + 117), 40, ivy * 0.9)
+          if (ivy > 0) mix(o, 142 + 40 * valueNoise(x * 9, y * 9, seed + 115), 46 + 20 * valueNoise(x * 9, y * 9, seed + 117), 34, ivy * 0.9)
         }
       }
-      // 光：朝太阳的面亮；往太阳那边被挡住的在影子里；墙脚被挡掉天光；树影；坡下暗
+      // 光：朝太阳的面亮；往太阳那边被挡住的在影子里；墙脚被挡掉天光；斑驳的树影；坡下暗；整张往秋天的暖里调
       const nl = 1 / Math.sqrt(o.nx * o.nx + o.ny * o.ny + o.nz * o.nz)
       const lambert = Math.max(0, (o.nx * LX + o.ny * LY + o.nz * LZ) * nl)
       const sh = cell < 0 ? 0 : o.top ? smooth(-0.02, 0.1, sample(g, prep.shadow, u, v) - o.z) : sample(g, prep.ground, u, v) * smooth(0.6, 0.05, o.z) + smooth(-0.02, 0.1, sample(g, prep.shadow, u, v) - o.z) * smooth(0.05, 0.6, o.z)
-      let tree = 0
-      for (const k of near(stat.shadows, x, y)) {
-        const c = stat.cast[k]!
-        const tr = sc.trees[k]!
-        const soft = 0.45 + tr.h * 0.08
-        const dd = Math.sqrt((x - c.x) * (x - c.x) + (y - c.y) * (y - c.y))
-        tree = Math.max(tree, smooth(c.r + soft, c.r - soft, dd))
-      }
-      const shade = Math.max(sh * WALL_SHADE, tree * 0.4)
-      const ao = cell >= 0 ? sample(g, prep.ao, u, v) : 0
+      const shade = Math.max(sh * WALL_SHADE, dappleAt(stat.crowns, x, y))
       const sun = 0.82 * lambert * (1 - Math.min(1, shade / WALL_SHADE))
       const sky = 0.48 * (1 - 0.55 * ao)
       const k = (sky + Math.max(0, sun)) * far
       const lit = Math.max(0, sun) / Math.max(0.001, sky + Math.max(0, sun))
       const o0 = (py - rect.y0) * w * 4 + (px - rect.x0) * 4
-      out[o0] = o.r * k * (0.92 + 0.16 * lit)
-      out[o0 + 1] = o.g * k * (0.97 + 0.05 * lit)
-      out[o0 + 2] = o.b * k * (1.08 - 0.18 * lit)
+      out[o0] = o.r * k * (0.92 + 0.16 * lit) * GRADE.r
+      out[o0 + 1] = o.g * k * (0.97 + 0.05 * lit) * GRADE.g
+      out[o0 + 2] = o.b * k * (1.08 - 0.18 * lit) * GRADE.b
       out[o0 + 3] = 255
     }
   }
 }
 
-/** 一棵树的树冠由几团叶簇叠成：中间一团最高，外圈几团低一些；按树的序号定，每次画都一样 */
-function clumps(tr: Tree, k: number): { x: number; y: number; r: number; top: number }[] {
-  const out = [{ x: tr.x, y: tr.y, r: tr.r * 0.62, top: tr.h }]
-  const n = 7 + Math.floor(tr.r * 2.5)
-  for (let i = 0; i < n; i++) {
-    const h1 = fract(Math.sin(k * 12.9898 + i * 78.233) * 43758.5453)
-    const h2 = fract(Math.sin(k * 39.346 + i * 11.135) * 24634.6345)
-    const a = i * 2.39996 + h1 * 0.8
-    const rr = tr.r * (0.34 + 0.16 * h2)
-    const dist = (tr.r - rr) * (0.55 + 0.45 * Math.sqrt(h1))
-    out.push({ x: tr.x + Math.cos(a) * dist, y: tr.y + Math.sin(a) * dist, r: rr, top: tr.h * (0.93 - 0.08 * (dist / tr.r)) })
-  }
-  return out
-}
-
-/** 树冠的颜色：橡树与栗树的几种绿，夕照下偏暖 */
-const LEAF = [
-  [64, 92, 40],
-  [76, 100, 44],
-  [56, 86, 46],
-  [88, 104, 44],
-  [70, 90, 36],
-] as const
-
 /**
- * 树冠：每棵树由几团叶簇叠成，看得见的是最高的那团；叶簇按球面打光，向阳面偏暖偏黄、背阴面偏冷，低处被上面的叶簇遮着更暗，
- * 叶面有细碎的明暗与亮斑；边缘柔和。像素带透明度，只画 rect 那一块
+ * 树冠：台地边外的枫树，一片片掌状的叶子叠出来的树冠，每一点取最高的那片叶子，它的边上透出底下那片叶子，再底下是叶缝里的枝条，
+ * 什么都没有就透明、露出地面。按太阳打光，边缘柔和，像素带透明度，只画 rect 那一块
  */
-export function paintCanopy(sc: PaintScene, stat: Static, out: Uint8ClampedArray, rect: PixelRect): void {
-  const seed = sc.seed
+export function paintCanopy(stat: Static, out: Uint8ClampedArray, rect: PixelRect): void {
   const ppu = CANOPY_PPU
   const w = rect.x1 - rect.x0
-  const shapes = sc.trees.map((tr, k) => clumps(tr, k))
+  const c = stat.crowns
   for (let py = rect.y0; py < rect.y1; py++) {
-    for (let px = rect.x0; px < rect.x1; px++) {
-      const x = (px + 0.5) / ppu
-      const y = (py + 0.5) / ppu
-      let best = -Infinity
-      let nx = 0
-      let ny = 0
-      let nz = 1
-      let alpha = 0
-      let tree = -1
-      let top = 0
-      const ragged = 0.84 + 0.2 * valueNoise(x * 5.5, y * 5.5, seed + 67)
-      for (const k of near(stat.crowns, x, y)) {
-        const tr = sc.trees[k]!
-        if ((x - tr.x) ** 2 + (y - tr.y) ** 2 > (tr.r + 0.1) ** 2) continue
-        for (const c of shapes[k]!) {
-          const dx = x - c.x
-          const dy = y - c.y
-          const d2 = dx * dx + dy * dy
-          const r = c.r * ragged
-          if (d2 >= r * r) continue
-          const cz = Math.sqrt(r * r - d2)
-          const hgt = c.top - r + cz * 1.1
-          alpha = Math.max(alpha, smooth(r, r - 0.08, Math.sqrt(d2)))
-          if (hgt <= best) continue
-          best = hgt
-          nx = dx / r
-          ny = dy / r
-          nz = cz / r
-          tree = k
-          top = tr.h
-        }
-      }
-      const o = ((py - rect.y0) * w + px - rect.x0) * 4
-      if (tree < 0 || alpha <= 0) {
-        out[o + 3] = 0
-        continue
-      }
-      const pal = LEAF[tree % LEAF.length]!
-      const leaf = valueNoise(x * 15, y * 15, seed + 61) * 0.55 + valueNoise(x * 34, y * 34, seed + 63) * 0.45
-      const bx = valueNoise(x * 7 + 0.3, y * 7, seed + 69) - valueNoise(x * 7 - 0.3, y * 7, seed + 69)
-      const by = valueNoise(x * 7, y * 7 + 0.3, seed + 69) - valueNoise(x * 7, y * 7 - 0.3, seed + 69)
-      const mx = nx + bx * 0.9
-      const my = ny + by * 0.9
-      const ml = Math.sqrt(mx * mx + my * my + nz * nz)
-      const lit = clamp01(((mx * LX + my * LY + nz * LZ) / ml + 0.3) / 1.3)
-      const low = smooth(0, 1.4, top - best)
-      const kk = (0.34 + 0.66 * lit) * (1 - 0.32 * low) * (0.84 + 0.24 * leaf)
-      const warm = lit * lit
-      const sparkle = smooth(0.78, 0.92, leaf) * lit * 0.25
-      out[o] = (pal[0] * (0.84 + 0.34 * warm) + 44 * sparkle) * kk
-      out[o + 1] = (pal[1] * (0.9 + 0.18 * warm) + 36 * sparkle) * kk
-      out[o + 2] = (pal[2] * (1.12 - 0.34 * warm) + 8 * sparkle) * kk
-      out[o + 3] = alpha * 255
-    }
+    for (let px = rect.x0; px < rect.x1; px++) coverLeaves(c, (px + 0.5) / ppu, (py + 0.5) / ppu, out, ((py - rect.y0) * w + px - rect.x0) * 4, 0, 0, 0, 0)
   }
 }

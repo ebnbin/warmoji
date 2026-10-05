@@ -24,7 +24,7 @@ self.onmessage = (e: MessageEvent<PaintJob>) => {
   if (job.layer === 'ground') {
     prep ??= prepare(scene, state)
     paintGround(scene, stat, prep, state, pixels, job.rect)
-  } else paintCanopy(scene, stat, pixels, job.rect)
+  } else paintCanopy(stat, pixels, job.rect)
   const piece: PaintPiece = { index: job.index, layer: job.layer, rect: job.rect, pixels }
   self.postMessage(piece, { transfer: [pixels.buffer] })
 }

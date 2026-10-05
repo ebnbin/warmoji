@@ -70,7 +70,7 @@ export class RuinsPainter {
         if (layer === 'ground') {
           prep ??= prepare(this.scene, state)
           paintGround(this.scene, this.local, prep, state, pixels, rect)
-        } else paintCanopy(this.scene, this.local, pixels, rect)
+        } else paintCanopy(this.local, pixels, rect)
         take({ index, layer, rect, pixels })
         if (performance.now() - t < SLICE_MS) continue
         await nextTick()
