@@ -1,4 +1,4 @@
-import { UNIT } from '../../util/units.ts'
+import { FRAME_U, SPAWN_CLEAR_U, UNIT } from '../../util/units.ts'
 import { fbm } from '../../util/noise.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin, roomAt } from '../worlds/basin.ts'
@@ -14,6 +14,8 @@ const FOOT_CLEAR_U = 0.15
 const FENCE_CLEAR_U = 0.2
 /** 几条林缘交汇的内角按这么大（格）磨圆 */
 const CORNER_U = 2.5
+/** 各条边离地图中线至少这么远（格）：出生点四周空出 SPAWN_CLEAR_U 格，再让过坡脚、栅栏里侧不能走的那条与栅格 */
+const MID_CLEAR_U = SPAWN_CLEAR_U + 0.5
 /** 林间小路的路口从林缘往草地这边也算进去这么多（格）：路口的凹槽只在林缘这一带，不会顺着路线穿过对面的林子 */
 const NOTCH_BACK_U = 3
 /** 林子里那段小路画多长，格 */
@@ -75,11 +77,13 @@ const MIDS: readonly Point[] = [
   { x: 0, y: 0.5 },
 ]
 
+/** 地图坐标就是方框坐标：本地的 [0, size]² 落在方框正中 */
 function frameOf(side: number, mirror: boolean, size: number): Frame {
   const n = NORMALS[side]!
   const t = mirror ? { x: n.y, y: -n.x } : { x: -n.y, y: n.x }
   const m = MIDS[side]!
-  return { ox: m.x * size - (size / 2) * t.x, oy: m.y * size - (size / 2) * t.y, nx: n.x, ny: n.y, tx: t.x, ty: t.y }
+  const o = (FRAME_U - size) / 2
+  return { ox: o + m.x * size - (size / 2) * t.x, oy: o + m.y * size - (size / 2) * t.y, nx: n.x, ny: n.y, tx: t.x, ty: t.y }
 }
 
 export function toLocal(f: Frame, x: number, y: number, out: Local): Local {
@@ -139,10 +143,15 @@ function bulge(e: Edges, k: number, u: number): number {
   return s
 }
 
+/** 一条边离它那条地图边多远，格：夹在地图以内，也不逼近地图中线 */
+function edgeIn(e: Edges, d: number): number {
+  return Math.min(Math.max(d, 0), e.size / 2 - MID_CLEAR_U)
+}
+
 /** 坡脚在 b 处离陡坡那条地图边多远，格 */
 export function footAt(e: Edges, b: number): number {
   const c = e.bank
-  return c.inset + c.bend * swing(b / c.wave + 3.7, 1.9, e.seed + 51, 3) - bulge(e, 0, b)
+  return edgeIn(e, c.inset + c.bend * swing(b / c.wave + 3.7, 1.9, e.seed + 51, 3) - bulge(e, 0, b))
 }
 
 /** 坡顶在 b 处比坡脚高多少，米：顺着坡脚慢慢变 */
@@ -169,13 +178,14 @@ function wiggle(e: Edges, u: number, k: number): number {
   return f.bend * swing(u / f.wave + k * 7.1, k * 3.3, e.seed + 31 * k, 3) + f.scallop * swing(u / 2.2 + k * 1.7, 5.5, e.seed + 31 * k + 9, 2) + bulge(e, k, u)
 }
 
-/** 进林子多深，格，林子里为正：几条林缘交汇的内角磨圆，林间小路的路口凹进去 */
+/** 进林子多深，格，林子里为正：几条林缘交汇的内角磨圆，林间小路的路口凹进去，地图正中出生点四周空着 */
 export function forestDepth(e: Edges, a: number, b: number): number {
   const S = e.size
   const f = e.forest
-  let d = f.low + wiggle(e, a, 1) - b
-  if (e.far === 'forest') d = smax(d, a - (S - f.far - wiggle(e, b, 2)), CORNER_U)
-  if (e.high === 'forest') d = smax(d, b - (S - f.high - wiggle(e, a, 3)), CORNER_U)
+  let d = edgeIn(e, f.low + wiggle(e, a, 1)) - b
+  if (e.far === 'forest') d = smax(d, a - (S - edgeIn(e, f.far + wiggle(e, b, 2))), CORNER_U)
+  if (e.high === 'forest') d = smax(d, b - (S - edgeIn(e, f.high + wiggle(e, a, 3))), CORNER_U)
+  d = Math.min(d, Math.hypot(a - S / 2, b - S / 2) - MID_CLEAR_U)
   const n = e.notch
   const da = a - n.a
   const db = b - n.b
@@ -187,7 +197,7 @@ export function forestDepth(e: Edges, a: number, b: number): number {
 /** 栅栏顺着它的坐标 u 处，它离陡坡那条边或 low 那条边多远（与 u 垂直的坐标 v），格 */
 export function fenceV(e: Edges, u: number): number {
   const f = e.fence
-  return e.size - f.inset + f.skew * (u - e.size / 2) + f.kink * Math.max(0, u - f.kinkAt)
+  return e.size - edgeIn(e, f.inset - f.skew * (u - e.size / 2) - f.kink * Math.max(0, u - f.kinkAt))
 }
 
 /** 栅栏那条边上的坐标：u 顺着栅栏，v 与它垂直、往栅栏外增大 */
@@ -419,6 +429,7 @@ interface Sketch {
 /** 按种子定边：陡坡在哪条边、哪条边是栅栏，各条边怎么弯，林间小路开在哪；能走的面积不在范围里就是 null */
 function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
   const S = cfg.sizeU
+  const pad = (FRAME_U - S) / 2
   const seed = Math.floor(rng.next() * 0x7fffffff)
   const frame = frameOf(Math.floor(rng.next() * 4), rng.next() < 0.5, S)
   const fenceFar = rng.next() < cfg.fence.farChance
@@ -457,7 +468,7 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
     notch: NO_NOTCH,
   }
   // 坡顶得画得进地面贴图，外面还留一格草甸
-  for (let b = -cfg.padU; b <= S + cfg.padU; b += 0.25) if (footAt(base, b) - bankWidth(base, b) < 1 - cfg.padU) return null
+  for (let b = -pad; b <= S + pad; b += 0.25) if (footAt(base, b) - bankWidth(base, b) < 1 - pad) return null
   // 林间小路开在一条林缘的中段：栅栏在侧边时多半开在对边的林子上
   const onFar = !fenceFar && rng.next() < 0.7
   const onHigh = fenceFar && rng.next() < 0.5
@@ -470,41 +481,18 @@ function sketch(cfg: MeadowConfig, rng: Rng): Sketch | null {
   const turn = (rng.next() * 2 - 1) * 12 * DEG
   const into: Local = { a: g.a * Math.cos(turn) - g.b * Math.sin(turn), b: g.a * Math.sin(turn) + g.b * Math.cos(turn) }
   const edges: Edges = { ...base, notch: { a: hit.a, b: hit.b, ua: into.a, ub: into.b, depth: cfg.trail.notchU, half: cfg.trail.widthU / 2 } }
-  // 能走的地面：按细格子栅格化，留下与草地中部连通的一块
+  // 能走的地面：按细格子栅格化，只铺地图那块，留下与出生点连通的一块；出生点在地图正中，各条边都给它让出了地方
   const tmp: Local = { a: 0, b: 0 }
-  let keep: Local = { a: S / 2, b: S / 2 }
-  let keepRoom = -Infinity
-  for (let a = 1; a < S; a += 1) {
-    for (let b = 1; b < S; b += 1) {
-      const room = Math.min(a - footAt(edges, b), -forestDepth(edges, a, b), -beyondFence(edges, a, b))
-      if (room > keepRoom) {
-        keepRoom = room
-        keep = { a, b }
-      }
-    }
-  }
   const cell = BASIN_CELL_U * UNIT
   const n = Math.ceil(S / BASIN_CELL_U) + 2
   const open = (px: number, py: number): boolean => {
     toLocal(frame, px / UNIT, py / UNIT, tmp)
     return openAt(edges, tmp.a, tmp.b)
   }
-  const keepAt = toMap(frame, keep.a, keep.b)
-  const basin = makeBasin(open, -cell, -cell, n, n, cell, { x: keepAt.x * UNIT, y: keepAt.y * UNIT }, cfg.neckU * UNIT)
+  const start = toMap(frame, S / 2, S / 2)
+  const basin = makeBasin(open, pad * UNIT - cell, pad * UNIT - cell, n, n, cell, { x: start.x * UNIT, y: start.y * UNIT }, cfg.neckU * UNIT)
   let cells = 0
-  let best = 0
-  let start: Point = keepAt
-  for (let cy = 0; cy < n; cy++) {
-    for (let cx = 0; cx < n; cx++) {
-      const room = basin.room[cy * n + cx]!
-      if (room <= 0) continue
-      cells++
-      if (room > best) {
-        best = room
-        start = { x: (-cell + (cx + 0.5) * cell) / UNIT, y: (-cell + (cy + 0.5) * cell) / UNIT }
-      }
-    }
-  }
+  for (const room of basin.room) if (room > 0) cells++
   const area = cells * BASIN_CELL_U * BASIN_CELL_U
   if (area < cfg.areaU2[0] || area > cfg.areaU2[1]) return null
   // 路口要连着草地：路口外半格能走
@@ -548,7 +536,7 @@ function onCurve(c: { pts: Local[]; s: number[] }, at: number): { p: Local; t: L
 function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
   const { rng, frame, edges: e } = k
   const S = cfg.sizeU
-  const pad = cfg.padU
+  const pad = (FRAME_U - S) / 2
   const inside = (a: number, b: number, room: number): boolean => {
     const p = toMap(frame, a, b)
     return roomAt(k.basin, p.x * UNIT, p.y * UNIT) >= room * UNIT
@@ -651,8 +639,8 @@ function furnish(cfg: MeadowConfig, k: Sketch): MeadowPlan | null {
     const root = log.root > 0 ? logB : logA
     return Math.hypot(x - root.x, y - root.y) > r * 0.5 + 1.3
   }
-  const lo = -pad
-  const hi = S + pad
+  const lo = 0
+  const hi = FRAME_U
   const tmp: Local = { a: 0, b: 0 }
   const place = (x: number, y: number, r: number, overlap: number, kind: Tree['kind'], h: number): boolean => {
     toLocal(frame, x, y, tmp)

@@ -1,5 +1,5 @@
 import { tileFbm, tileNoise } from './noise'
-import { duneCover, duneGrad, flatLooseAt, heightAt, smooth, swellAt, twinFbm, wrapU } from './terrain'
+import { duneCover, duneGrad, flatLooseAt, heightAt, smooth, swellAt, twinFbm, wavesOf, wrapU } from './terrain'
 import { shadowBox, shadowCover, slabAt } from './landmarks'
 import type { DesertPlan, Landmark } from './terrain'
 
@@ -127,7 +127,7 @@ const RIPPLE_BEND = 30
  * 波矢取整数、两个分量之和是偶数，一圈里排整数道，横竖各挪半圈也接得上。dune 是这里沙丘的高（米）；返回高（米）
  */
 function rippleAt(p: DesertPlan, kx: number, ky: number, x: number, y: number, dune: number): number {
-  const warp = (twinFbm(p, x, y, 5, p.seed + 41, 2) - 0.5) * 14 + (twinFbm(p, x, y, 22, p.seed + 43, 1) - 0.5) * 2.6 + dune * RIPPLE_BEND
+  const warp = (twinFbm(p, x, y, wavesOf(p, 6.4), p.seed + 41, 2) - 0.5) * 14 + (twinFbm(p, x, y, wavesOf(p, 1.45), p.seed + 43, 1) - 0.5) * 2.6 + dune * RIPPLE_BEND
   const ph = ((kx * x + ky * y) / p.sizeU) * Math.PI * 2 + warp
   return RIPPLE_M * (Math.sin(ph) + 0.28 * Math.sin(2 * ph + 0.6))
 }
@@ -328,8 +328,8 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       const lee = smooth(0.12, 0.4, -(dune.x * wc + dune.y * ws))
       const crest = smooth(0.15, 0.45, dune.h) * (1 - smooth(0.03, 0.15, steep))
       const firm = span > 0 ? (p.flatLoose[1] - flatLooseAt(p, x, y)) / span : 0
-      const tint = twinFbm(p, x, y, 5, p.seed + 31, 3)
-      const wide = twinFbm(p, x, y, 2, p.seed + 33, 2)
+      const tint = twinFbm(p, x, y, wavesOf(p, 6.4), p.seed + 31, 3)
+      const wide = twinFbm(p, x, y, wavesOf(p, 16), p.seed + 33, 2)
       const grain = twinFbm(p, x, y, size * 9, p.seed + 35, 1) * 0.5 + twinFbm(p, x, y, size * 23, p.seed + 37, 1) * 0.5
 
       // 沙丘的细沙与丘间的沙按盖住的程度混；整片沙漠的色调大片地偏红、偏淡；顶上的沙更细更淡
@@ -346,7 +346,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       let b = (fb + (db - fb) * cover) * (1 - drift * 0.3) * k
 
       // 风纹：背风坡上的沙一直在往下滑、留不住，顶上被风削平；成片地有的新鲜清楚、有的被吹糊了；凹里积着深色的重矿物
-      const fresh = smooth(0.3, 0.7, twinFbm(p, x, y, 3, p.seed + 45, 2))
+      const fresh = smooth(0.3, 0.7, twinFbm(p, x, y, wavesOf(p, 10.7), p.seed + 45, 2))
       const rip = (1 - 0.85 * lee) * (1 - 0.6 * crest) * (0.35 + 0.65 * fresh)
       if (rip > 0.01) {
         const re = 0.5 / ppu

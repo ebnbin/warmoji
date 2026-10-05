@@ -5,39 +5,22 @@ import type { NebulaConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Basin } from './basin'
 
-/** 地图的半边长，格：镜头往外再看 marginU 格正好到壳层外缘 */
-export function nebulaHalfU(cfg: NebulaConfig, marginU: number): number {
-  return cfg.shell.outerU - marginU
-}
-
-/** 星云在地图上的摆法，像素：球心在地图正中，黑洞与队伍的出发点隔着球心相对；holeU 是黑洞离球心多远，格 */
+/** 星云在地图上的摆法，像素：球心在方框正中，队伍从球心出发；holeU 是黑洞离球心多远，格 */
 export interface NebulaLayout {
   readonly cx: number
   readonly cy: number
   readonly hx: number
   readonly hy: number
-  readonly sx: number
-  readonly sy: number
   readonly holeU: number
 }
 
-/** 黑洞的方位与离球心多远由布景种子定下：视图在开战前就要按它摆镜头 */
-export function nebulaLayout(cfg: NebulaConfig, seed: number, halfPx: number): NebulaLayout {
+/** 黑洞的方位与离球心多远由布景种子定下 */
+export function nebulaLayout(cfg: NebulaConfig, seed: number, center: Point): NebulaLayout {
   const rng = new Rng(seed ^ 0x6e65)
   const [near, far] = cfg.hole.fromCenterU
   const holeU = near + rng.next() * (far - near)
   const a = rng.next() * Math.PI * 2
-  const ux = Math.cos(a)
-  const uy = Math.sin(a)
-  return {
-    cx: halfPx,
-    cy: halfPx,
-    hx: halfPx + ux * holeU * UNIT,
-    hy: halfPx + uy * holeU * UNIT,
-    sx: halfPx - ux * cfg.hole.startU * UNIT,
-    sy: halfPx - uy * cfg.hole.startU * UNIT,
-    holeU,
-  }
+  return { cx: center.x, cy: center.y, hx: center.x + Math.cos(a) * holeU * UNIT, hy: center.y + Math.sin(a) * holeU * UNIT, holeU }
 }
 
 /** 一次吸积闪耀：吞下的时刻，毫秒；放出的光能折成平时吸积多少秒的光 */
@@ -115,8 +98,8 @@ function cavityOf(cfg: NebulaConfig, L: NebulaLayout): Basin {
   return { cols, rows: cols, cell, x0, y0, room }
 }
 
-export function makeNebula(cfg: NebulaConfig, seed: number, halfPx: number): NebulaState {
-  const layout = nebulaLayout(cfg, seed, halfPx)
+export function makeNebula(cfg: NebulaConfig, seed: number, center: Point): NebulaState {
+  const layout = nebulaLayout(cfg, seed, center)
   return {
     layout,
     cavity: cavityOf(cfg, layout),
@@ -158,11 +141,6 @@ export function gravityAt(s: NebulaState, cfg: NebulaConfig, x: number, y: numbe
 export function inHorizon(s: NebulaState, x: number, y: number): boolean {
   const r = s.rs * UNIT
   return (x - s.layout.hx) ** 2 + (y - s.layout.hy) ** 2 < r * r
-}
-
-/** 离球心多远，格 */
-export function fromCenterU(s: NebulaState, x: number, y: number): number {
-  return Math.hypot(x - s.layout.cx, y - s.layout.cy) / UNIT
 }
 
 /** 身体走不出来的半径，像素：fall 是质量/阻力，speedU 是它此刻最快能走多快（格/秒） */
@@ -346,7 +324,7 @@ export function settleSpot(s: NebulaState, cfg: NebulaConfig, x: number, y: numb
 export function spawnSpot(s: NebulaState, cfg: NebulaConfig, next: () => number, clearPx: number, insetPx: number, lx: number, ly: number, nearPx: number): Point {
   const L = s.layout
   const lim = cfg.shell.innerU * UNIT - insetPx
-  let best: Point = { x: L.sx, y: L.sy }
+  let best: Point = { x: L.cx, y: L.cy }
   let bestD = -1
   for (let i = 0; i < 32; i++) {
     const r = Math.sqrt(next()) * lim

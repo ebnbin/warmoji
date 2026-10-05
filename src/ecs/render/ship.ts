@@ -4,7 +4,7 @@ import { GROUND_PPU } from '../../data/texel'
 import { fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import type { ShipConfig } from '../../types/maps'
-import { bulgeU, halfBeamAt, hatchesOf, helmOf, skylightOf } from '../../data/ship'
+import { bulgeU, halfBeamAt, hatchesOf, helmOf, skylightOf, spritOf } from '../../data/ship'
 import { deckPoint } from '../worlds/ship'
 import type { Deck } from '../worlds/ship'
 import type { Point } from '../../util/vec'
@@ -56,14 +56,14 @@ export interface Mast {
   readonly yards: readonly { readonly h: number; readonly half: number }[]
 }
 
-/** 桅杆从船尾往船头排：后桅两层横帆、主桅与前桅三层；帆桁按船宽定长，伸出舷外 */
+/** 桅杆从船尾往船头排，从船头数第二根是主桅，三根时最后面那根是后桅：后桅两层横帆、主桅与前桅三层；帆桁按船宽定长，伸出舷外 */
 export function rigOf(cfg: ShipConfig): Mast[] {
   const h = cfg.hull
   const at = [...h.masts].sort((a, b) => a - b)
   const beam = h.beamU
   return at.map((f, i) => {
     const mizzen = at.length > 2 && i === 0
-    const main = i === Math.floor(at.length / 2)
+    const main = i === at.length - 2
     const height = mizzen ? 13 : main ? 17.5 : 15.5
     const k = mizzen ? 0.8 : main ? 1 : 0.94
     const yards = mizzen
@@ -873,7 +873,7 @@ function bellied(a: Point, b: Point, belly: Point, n: number): Point[] {
 }
 
 /**
- * 索具：桅杆、桅楼、帆桁上收拢的横帆、侧支索与前后支索、首斜桅与三角帆、后桅的纵帆、主桅顶的长旗。
+ * 索具：桅杆、桅楼、帆桁上收拢的横帆、侧支索与前后支索、首斜桅与三角帆、最后面那根桅杆的纵帆、主桅顶的长旗。
  * 每一点都按高度随船的横摇、纵摇甩开，所以船一倾，桅杆看上去就往低的一侧斜，纵帆从一条线张成一片
  */
 export function drawRig(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose, time: number, wind: { s: number; t: number }): void {
@@ -889,10 +889,9 @@ export function drawRig(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose, time: n
   const lee = { s: wind.s / lw, t: wind.t / lw }
   const leeW = (u: number): Point => ({ x: (deck.bx * lee.s + deck.sx * lee.t) * u * UNIT, y: (deck.by * lee.s + deck.sy * lee.t) * u * UNIT })
   const fore = masts[masts.length - 1]!
-  const main = masts[Math.floor(masts.length / 2)]!
-  const mizzen = masts[0]!
-  const sprit = { s: L + 7.5, h: 3.8 }
-  const boom = { s: L + 11, h: 4.6 }
+  const main = masts[masts.length - 2]!
+  const aft = masts[0]!
+  const { sprit, boom } = spritOf(h)
   // 三角帆：从前桅顶斜拉到首斜桅与第一斜桅的端头
   for (const [head, tack, belly] of [
     [fore.height * 0.8, boom, 0.6],
@@ -910,11 +909,11 @@ export function drawRig(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose, time: n
     g.lineStyle(0.05 * UNIT, RIGGING, 0.7)
     line(a, b)
   }
-  // 后桅的纵帆：斜桁与帆杠之间
-  const gaff0 = P(mizzen.s - 0.3, 0, mizzen.height * 0.62)
-  const gaff1 = P(mizzen.s - 6.5, 0, mizzen.height * 0.8)
-  const boom0 = P(mizzen.s - 0.3, 0, 2.4)
-  const boom1 = P(mizzen.s - 8.6, 0, 2.7)
+  // 最后面那根桅杆的纵帆：斜桁与帆杠之间
+  const gaff0 = P(aft.s - 0.3, 0, aft.height * 0.62)
+  const gaff1 = P(aft.s - 6.5, 0, aft.height * 0.8)
+  const boom0 = P(aft.s - 0.3, 0, 2.4)
+  const boom1 = P(aft.s - 8.6, 0, 2.7)
   g.fillStyle(SAIL_SHADE, SAIL_ALPHA)
   g.fillPoints([...bellied(gaff0, gaff1, leeW(0.25), 6), ...bellied(boom1, boom0, leeW(0.55), 6), ...bellied(boom0, gaff0, leeW(0.15), 3).slice(1, -1)], true)
   g.fillStyle(SAIL, SAIL_ALPHA)
@@ -1060,7 +1059,7 @@ function shadowRun(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose, sun: { s: nu
   if (open) g.strokePath()
 }
 
-/** 桅杆、下帆桁与后桅帆杠投在甲板上的影子：背着太阳拉长，船一摇影子也跟着摆 */
+/** 桅杆、下帆桁与最后面那根桅杆的帆杠投在甲板上的影子：背着太阳拉长，船一摇影子也跟着摆 */
 export function drawRigShadow(g: Pen, cfg: ShipConfig, deck: Deck, pose: Pose): void {
   const hs = Math.hypot(SUN.x, SUN.y)
   const away = { x: -SUN.x / hs, y: -SUN.y / hs }

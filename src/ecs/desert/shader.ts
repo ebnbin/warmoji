@@ -13,7 +13,8 @@ export function encodeInfo(p: DesertPlan): Uint8ClampedArray<ArrayBuffer> {
 
 /**
  * 地面的片元着色器：四边形跟着镜头，盖住看得到的那一片，坐标按世界像素、y 朝下；画布纹理上传时上下翻了，所以纹理的 v 取 1 − y/一圈。
- * 三张图都按一圈平铺，接缝处严丝合缝。沙地照搬画好的贴图；印子按盖下以来过了多久往平地收，按太阳打出阴阳面，坑底暗、翻出来的沙略深
+ * 三张图都按一圈平铺：边长不是 2 的幂的贴图显卡不肯重复，坐标先折回一圈里；沙地与印子的格子细，接缝处差不到一个格子，
+ * 晒到的太阳格子粗，按四个格心自己插值才接得上。沙地照搬画好的贴图；印子按盖下以来过了多久往平地收，按太阳打出阴阳面，坑底暗、翻出来的沙略深
  */
 export const GROUND_FRAG = `
 #pragma phaserTemplate(shaderName)
@@ -33,6 +34,8 @@ uniform sampler2D uTracks;
 uniform sampler2D uInfo;
 uniform vec4 uRect;
 uniform vec2 uPeriod;
+/** 晒到的太阳那张图每边几格 */
+uniform float uInfoN;
 /** 印子贴图每边几格、高的编码范围（米）、时刻的一档（秒）、此刻（秒） */
 uniform vec4 uTrack;
 /** 一圈多少格、一格多少米、印子过多少秒被吹平 */
@@ -41,19 +44,33 @@ uniform vec3 uSun;
 
 /** 印子此刻的高（米）：盖下时的高按过了多久往平地收 */
 float trackH(vec2 uv) {
-  vec4 c = texture2D(uTracks, uv);
+  vec4 c = texture2D(uTracks, fract(uv));
   float h0 = (c.r * 255.0 - 128.0) / 127.0 * uTrack.y;
   float t0 = (c.g * 65280.0 + c.b * 255.0) * uTrack.z;
   return h0 * max(0.0, 1.0 - (uTrack.w - t0) / uScale.z);
+}
+
+/** 晒到几成太阳：四个格心按一圈折回再插值 */
+float litAt(vec2 uv) {
+  vec2 q = uv * uInfoN - 0.5;
+  vec2 i = floor(q);
+  vec2 f = q - i;
+  vec2 a = (mod(i, uInfoN) + 0.5) / uInfoN;
+  vec2 b = (mod(i + 1.0, uInfoN) + 0.5) / uInfoN;
+  float g00 = texture2D(uInfo, a).g;
+  float g10 = texture2D(uInfo, vec2(b.x, a.y)).g;
+  float g01 = texture2D(uInfo, vec2(a.x, b.y)).g;
+  float g11 = texture2D(uInfo, b).g;
+  return mix(mix(g00, g10, f.x), mix(g01, g11, f.x), f.y);
 }
 
 void main ()
 {
   vec2 tc = outTexCoord;
   vec2 p = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
-  vec2 uv = vec2(p.x / uPeriod.x, 1.0 - p.y / uPeriod.y);
+  vec2 uv = fract(vec2(p.x / uPeriod.x, 1.0 - p.y / uPeriod.y));
   vec3 col = texture2D(uSand, uv).rgb;
-  float lit = texture2D(uInfo, uv).g;
+  float lit = litAt(uv);
 
   float tx = 1.0 / uTrack.x;
   float h = trackH(uv);

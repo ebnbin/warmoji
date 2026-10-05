@@ -4,5 +4,4 @@ export const MAP_DEFAULTS = {
   width: 25,
   height: 25,
   cameraMargin: 4,
-  openMargin: 8,
 } as const satisfies MapDefaults

@@ -1,15 +1,17 @@
-import { UNIT } from '../../util/units'
+import { SPAWN_CLEAR_U, UNIT } from '../../util/units'
 import { fbm } from '../../util/noise'
+import { FRAME } from '../frame'
 import { Rng } from '../../util/rng'
 import { makeBasin, roomAt } from './basin'
 import type { Basin } from './basin'
 import type { Landmark } from './gates'
 import type { VolcanoConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
+import type { Rect } from '../frame'
 
 /**
  * 地形与熔岩的格子场：地面高度、熔岩厚度都以格计，温度 1 是刚喷出。
- * 格子 (0, 0) 的左上角在 (x0, y0) 像素，场比地图大出镜头能看到的一圈；能走的盆地另有更细的距离场。
+ * 格子 (0, 0) 的左上角在 (x0, y0) 像素，场铺满方框；能走的盆地另有更细的距离场。
  */
 export interface LavaField {
   readonly basin: Basin
@@ -74,15 +76,15 @@ export const NO_SPILL: Spill = { cells: [], share: [] }
 const SPILL_CELLS = 1.5
 
 /** 火山口：随机挑一条地图边，落在这条边的中段、离边 insetU；朝地图里的方向垂直于这条边 */
-function craterOf(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: number): { x: number; y: number; inX: number; inY: number } {
+function craterOf(rng: Rng, cfg: VolcanoConfig, map: Rect): { x: number; y: number; inX: number; inY: number } {
   const side = Math.floor(rng.next() * 4)
   const along = 0.25 + rng.next() * 0.5
   const [near, far] = cfg.cone.insetU
   const inset = (near + rng.next() * (far - near)) * UNIT
-  if (side === 0) return { x: along * mapW, y: inset, inX: 0, inY: 1 }
-  if (side === 1) return { x: mapW - inset, y: along * mapH, inX: -1, inY: 0 }
-  if (side === 2) return { x: along * mapW, y: mapH - inset, inX: 0, inY: -1 }
-  return { x: inset, y: along * mapH, inX: 1, inY: 0 }
+  if (side === 0) return { x: map.x + along * map.w, y: map.y + inset, inX: 0, inY: 1 }
+  if (side === 1) return { x: map.x + map.w - inset, y: map.y + along * map.h, inX: -1, inY: 0 }
+  if (side === 2) return { x: map.x + along * map.w, y: map.y + map.h - inset, inX: 0, inY: -1 }
+  return { x: map.x + inset, y: map.y + along * map.h, inX: 1, inY: 0 }
 }
 
 /**
@@ -112,9 +114,9 @@ function gully(cfg: VolcanoConfig, seed: number, dx: number, dy: number, dU: num
 }
 
 /** 方形地图里离四条边多远，格，角按 cornerU 的半径磨圆；地图外为负 */
-function edgeDepthU(x: number, y: number, mapW: number, mapH: number, cornerU: number): number {
-  const qx = Math.min(x, mapW - x) / UNIT
-  const qy = Math.min(y, mapH - y) / UNIT
+function edgeDepthU(x: number, y: number, map: Rect, cornerU: number): number {
+  const qx = Math.min(x - map.x, map.x + map.w - x) / UNIT
+  const qy = Math.min(y - map.y, map.y + map.h - y) / UNIT
   if (qx >= 0 && qy >= 0 && qx < cornerU && qy < cornerU) return cornerU - Math.hypot(cornerU - qx, cornerU - qy)
   return Math.min(qx, qy)
 }
@@ -145,28 +147,28 @@ function rimRise(cfg: VolcanoConfig, depthU: number, tall: number): number {
 }
 
 /**
- * 按种子生成地形：先定下能走的盆地（方形里起伏的边，扣掉山体），再铺高度：火山加上朝地图里的整体下倾与起伏，
- * 盆地边外立起崖壁与高地（靠近火山处让给山体）；火山口里灌上熔岩湖，再补上开局前那几次喷发留下的岩石。
+ * 按种子生成地形：先定下能走的盆地（地图矩形里起伏的边，扣掉山体，出生点四周总空着），再铺高度：火山加上朝地图里的整体下倾与起伏，
+ * 盆地边外立起崖壁与高地（靠近火山处让给山体）；火山口里灌上熔岩湖，再补上开局前那几次喷发留下的岩石。格子铺满方框
  */
-export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: number, marginPx: number): LavaField {
+export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point): LavaField {
   const cell = cfg.cellU * UNIT
-  const cols = Math.ceil((mapW + marginPx * 2) / cell)
-  const rows = Math.ceil((mapH + marginPx * 2) / cell)
+  const cols = Math.ceil(FRAME.w / cell)
+  const rows = Math.ceil(FRAME.h / cell)
   const n = cols * rows
-  const c = craterOf(rng, cfg, mapW, mapH)
+  const c = craterOf(rng, cfg, map)
   const seed = Math.floor(rng.next() * 0x7fffffff)
   const cone = cfg.cone
   const open = (x: number, y: number): boolean =>
-    edgeDepthU(x, y, mapW, mapH, cfg.rim.cornerU) > rimInsetU(cfg, seed, x, y) &&
-    Math.hypot(x - c.x, y - c.y) / UNIT > footU(cfg, seed, Math.atan2(y - c.y, x - c.x))
-  const basin = makeBasin(open, -marginPx, -marginPx, cols * 2, rows * 2, cell / 2, { x: mapW / 2, y: mapH / 2 }, cfg.rim.neckU * UNIT)
+    Math.hypot(x - spawn.x, y - spawn.y) < SPAWN_CLEAR_U * UNIT ||
+    (edgeDepthU(x, y, map, cfg.rim.cornerU) > rimInsetU(cfg, seed, x, y) && Math.hypot(x - c.x, y - c.y) / UNIT > footU(cfg, seed, Math.atan2(y - c.y, x - c.x)))
+  const basin = makeBasin(open, FRAME.x, FRAME.y, cols * 2, rows * 2, cell / 2, spawn, cfg.rim.neckU * UNIT)
   const f: LavaField = {
     basin,
     cols,
     rows,
     cell,
-    x0: -marginPx,
-    y0: -marginPx,
+    x0: FRAME.x,
+    y0: FRAME.y,
     ground: new Float32Array(n),
     lava: new Float32Array(n),
     heat: new Float32Array(n),

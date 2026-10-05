@@ -1,11 +1,13 @@
 import { UNIT } from '../../util/units'
 import { fbm } from '../../util/noise'
+import { FRAME } from '../frame'
 import type { Rng } from '../../util/rng'
 import type { Point } from '../../util/vec'
 import type { CaveConfig } from '../../types/maps'
 import { daysAt, moonAt, moonDirectLux, moonSkyLux, phaseAngle, skyLux, sunAt, sunDirectLux, SYNODIC_DAYS, torchLux } from '../../data/cave'
 import type { SkyDir } from '../../data/cave'
 import type { Landmark } from './gates'
+import type { Rect } from '../frame'
 
 const DEG = Math.PI / 180
 
@@ -83,8 +85,8 @@ export const SHADOW_U = { stalagmite: 1.2, column: 2 } as const
 
 /** 一局的溶洞：按种子生成，模拟与画面都从这里读；全是数据，能整个发给画地面的线程 */
 export interface CaveLayout {
-  readonly w: number
-  readonly h: number
+  /** 地图矩形，像素：洞厅与支洞都在里面；距离场、光照与流场铺满方框 */
+  readonly map: Rect
   readonly seed: number
   readonly ceilingM: number
   readonly wallU: number
@@ -281,9 +283,9 @@ function spread01(n: number): number {
 }
 
 /** 方形地图里离四条边多远，格，角按 cornerU 的半径磨圆；地图外为负 */
-function edgeDepthU(x: number, y: number, w: number, h: number, cornerU: number): number {
-  const qx = Math.min(x, w - x) / UNIT
-  const qy = Math.min(y, h - y) / UNIT
+function edgeDepthU(x: number, y: number, map: Rect, cornerU: number): number {
+  const qx = Math.min(x - map.x, map.x + map.w - x) / UNIT
+  const qy = Math.min(y - map.y, map.y + map.h - y) / UNIT
   if (qx >= 0 && qy >= 0 && qx < cornerU && qy < cornerU) return cornerU - Math.hypot(cornerU - qx, cornerU - qy)
   return Math.min(qx, qy)
 }
@@ -433,8 +435,8 @@ interface Anchor {
 }
 
 /** 离哪条地图边最近：0 上、1 右、2 下、3 左 */
-function nearestSide(x: number, y: number, w: number, h: number): number {
-  const d = [y, w - x, h - y, x]
+function nearestSide(x: number, y: number, map: Rect): number {
+  const d = [y - map.y, map.x + map.w - x, map.y + map.h - y, x - map.x]
   let best = 0
   for (let k = 1; k < 4; k++) if (d[k]! < d[best]!) best = k
   return best
@@ -444,12 +446,16 @@ function nearestSide(x: number, y: number, w: number, h: number): number {
  * 按种子生成溶洞：先在四条边上挑出支洞的位置，洞厅的边在那里往里让出岩体；再开大小天窗（天窗下堆着碎石坡），
  * 放水潭、石柱与成丛的石笋，荧光长在洞壁脚下与支洞里；最后算出能走的地面与距离场
  */
-function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rng): CaveLayout {
+function makeCave(cfg: CaveConfig, map: Rect, rng: Rng): CaveLayout {
   const seed = Math.floor(rng.next() * 0x7fffffff)
   const hall = cfg.hall
   const al = cfg.alcoves
-  const cx = w / 2
-  const cy = h / 2
+  const { x: ox, y: oy, w, h } = map
+  const cx = ox + w / 2
+  const cy = oy + h / 2
+  /** 地图里随便一点 */
+  const anyX = (): number => ox + rng.next() * w
+  const anyY = (): number => oy + rng.next() * h
   // 支洞：沿地图一周均匀分开，避开四个角；岩体要厚到够支洞往外走再拐弯
   const count = pickInt(rng, al.count)
   const turn = rng.next() * 4
@@ -461,17 +467,17 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
     const along = pick(rng, al.alongU) * UNIT
     const dir = f < 0.5 ? 1 : -1
     const sides = [
-      { ex: f * w, ey: 0, nx: 0, ny: 1, tx: dir, ty: 0 },
-      { ex: w, ey: f * h, nx: -1, ny: 0, tx: 0, ty: dir },
-      { ex: (1 - f) * w, ey: h, nx: 0, ny: -1, tx: -dir, ty: 0 },
-      { ex: 0, ey: (1 - f) * h, nx: 1, ny: 0, tx: 0, ty: -dir },
+      { ex: ox + f * w, ey: oy, nx: 0, ny: 1, tx: dir, ty: 0 },
+      { ex: ox + w, ey: oy + f * h, nx: -1, ny: 0, tx: 0, ty: dir },
+      { ex: ox + (1 - f) * w, ey: oy + h, nx: 0, ny: -1, tx: -dir, ty: 0 },
+      { ex: ox, ey: oy + (1 - f) * h, nx: 1, ny: 0, tx: 0, ty: -dir },
     ] as const
     anchors.push({ side, ...sides[side]!, along })
   }
   const need = al.outU + al.pocketU + 1.2
   const insetAt = (x: number, y: number): number => {
     const base = hall.insetU[0] + (hall.insetU[1] - hall.insetU[0]) * spread01(fbm(x / UNIT / hall.waveU, y / UNIT / hall.waveU, seed + 101, 2))
-    const side = nearestSide(x, y, w, h)
+    const side = nearestSide(x, y, map)
     let lift = 0
     for (const a of anchors) {
       if (a.side !== side) continue
@@ -483,7 +489,7 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
     // 让出的岩体边上也起伏，不是一道直墙
     return Math.max(base, lift + (lift / need) * 1.5 * fbm(x / UNIT / 2.6, y / UNIT / 2.6, seed + 107, 2))
   }
-  const inHall = (x: number, y: number): boolean => edgeDepthU(x, y, w, h, hall.cornerU) > insetAt(x, y)
+  const inHall = (x: number, y: number): boolean => edgeDepthU(x, y, map, hall.cornerU) > insetAt(x, y)
   const alcoves: Alcove[] = anchors.map((a) => {
     const depth = insetAt(a.ex + a.nx * need * UNIT, a.ey + a.ny * need * UNIT)
     const reach = Math.max(al.pocketU + 0.7, depth - al.outU) * UNIT
@@ -537,8 +543,8 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
       let best: Opening | null = null
       let bestGap = sky.gapU * UNIT
       for (let tries = 0; tries < PLACE_TRIES * 4; tries++) {
-        const x = rng.next() * w
-        const y = rng.next() * h
+        const x = anyX()
+        const y = anyY()
         if (!hallHolds(x, y, r * (1 + sky.jitter), UNIT)) continue
         const gap = Math.min(...openings.map((o) => Math.hypot(o.x - x, o.y - y) - (o.r + r) * (1 + sky.jitter)))
         if (gap < bestGap) continue
@@ -553,14 +559,15 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   const mainR = openings[0]!.r
   const mounds: Mound[] = openings.map((o) => ({ x: o.x, y: o.y, r: o.r * sky.rubbleSpread, h: (sky.rubbleM * o.r) / mainR }))
   const underSky = (x: number, y: number, pad: number): boolean => openings.some((o) => Math.hypot(o.x - x, o.y - y) < o.r * (1 + sky.jitter) + pad)
-  // 水潭：在洞厅里低洼的地方，不压碎石坡
+  // 水潭：在洞厅里低洼的地方，不压碎石坡，不挨着出生点
   const pools: Pool[] = []
   const poolCount = pickInt(rng, cfg.pools.count)
   for (let tries = 0; tries < poolCount * PLACE_TRIES && pools.length < poolCount; tries++) {
     const size = pick(rng, cfg.pools.sizeU) * UNIT
-    const x = rng.next() * w
-    const y = rng.next() * h
+    const x = anyX()
+    const y = anyY()
     if (!hallHolds(x, y, size * 1.2, 0.6 * UNIT)) continue
+    if (Math.hypot(x - cx, y - cy) < cfg.formations.clearU * UNIT + size * 1.25) continue
     if (mounds.some((m) => Math.hypot(m.x - x, m.y - y) < m.r + size * 0.8)) continue
     if (pools.some((p) => Math.hypot(p.x - x, p.y - y) < Math.max(p.rx, p.ry) + size + 0.6 * UNIT)) continue
     pools.push({ x, y, rx: size, ry: size * (0.5 + rng.next() * 0.35), rot: rng.next() * Math.PI, seed: seed + 400 + pools.length * 17 })
@@ -573,8 +580,8 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   const columnCount = pickInt(rng, f.columns)
   for (let tries = 0; tries < columnCount * PLACE_TRIES && columns.length < columnCount; tries++) {
     const r = pick(rng, f.columnU) * UNIT
-    const x = rng.next() * w
-    const y = rng.next() * h
+    const x = anyX()
+    const y = anyY()
     if (Math.hypot(x - cx, y - cy) < clear + r) continue
     if (!hallHolds(x, y, r, 1.3 * UNIT) || underSky(x, y, r + 0.8 * UNIT) || wet(x, y, r)) continue
     if (columns.some((c) => Math.hypot(c.x - x, c.y - y) < c.r + r + 3 * UNIT)) continue
@@ -585,8 +592,8 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   const clusters: Point[] = []
   const clusterCount = pickInt(rng, f.clusters)
   for (let tries = 0; tries < clusterCount * PLACE_TRIES && clusters.length < clusterCount; tries++) {
-    const x = rng.next() * w
-    const y = rng.next() * h
+    const x = anyX()
+    const y = anyY()
     if (hallHolds(x, y, 0, 0.8 * UNIT) && !underSky(x, y, UNIT) && Math.hypot(x - cx, y - cy) > clear) clusters.push({ x, y })
   }
   const stalagmiteCount = pickInt(rng, f.stalagmites)
@@ -604,8 +611,8 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
       x = c.x + Math.cos(a) * d
       y = c.y + Math.sin(a) * d
     } else {
-      x = rng.next() * w
-      y = rng.next() * h
+      x = anyX()
+      y = anyY()
     }
     const block = r >= f.blockU * UNIT
     if (Math.hypot(x - cx, y - cy) < (block ? clear : clear * 0.6) + r) continue
@@ -617,18 +624,19 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   }
   const blockers: Circle[] = [...columns, ...stalagmites.filter((s) => s.block)]
   const open = (x: number, y: number): boolean => {
-    if (x < 0.5 * UNIT || y < 0.5 * UNIT || x > w - 0.5 * UNIT || y > h - 0.5 * UNIT) return false
+    if (x < ox + 0.5 * UNIT || y < oy + 0.5 * UNIT || x > ox + w - 0.5 * UNIT || y > oy + h - 0.5 * UNIT) return false
     if (!inHall(x, y) && !inAlcove(x, y)) return false
     for (const b of blockers) if ((x - b.x) ** 2 + (y - b.y) ** 2 < b.r * b.r) return false
     return true
   }
   const cell = 0.25 * UNIT
-  const cols = Math.ceil((w + margin * 2) / cell)
-  const rows = Math.ceil((h + margin * 2) / cell)
+  const cols = Math.ceil(FRAME.w / cell)
+  const rows = Math.ceil(FRAME.h / cell)
   const neck = hall.neckU * UNIT
   const center = { x: cx, y: cy }
-  const shell = carve((x, y) => x > 0.5 * UNIT && y > 0.5 * UNIT && x < w - 0.5 * UNIT && y < h - 0.5 * UNIT && (inHall(x, y) || inAlcove(x, y)), -margin, -margin, cols, rows, cell, center, neck)
-  const rock = carve(open, -margin, -margin, cols, rows, cell, center, neck)
+  const inMap = (x: number, y: number): boolean => x > ox + 0.5 * UNIT && y > oy + 0.5 * UNIT && x < ox + w - 0.5 * UNIT && y < oy + h - 0.5 * UNIT
+  const shell = carve((x, y) => inMap(x, y) && (inHall(x, y) || inAlcove(x, y)), FRAME.x, FRAME.y, cols, rows, cell, center, neck)
+  const rock = carve(open, FRAME.x, FRAME.y, cols, rows, cell, center, neck)
   // 圆形的石头按精确的距离收边：栅格化出来的边是锯齿
   for (const b of blockers) {
     const c0 = Math.max(0, Math.floor((b.x - b.r - 2 * UNIT - rock.x0) / cell))
@@ -657,15 +665,15 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
       x = e.x + Math.cos(t) * a.pocket * 0.8
       y = e.y + Math.sin(t) * a.pocket * 0.8
     } else {
-      x = rng.next() * w
-      y = rng.next() * h
+      x = anyX()
+      y = anyY()
     }
     const room = roomOf(rock, x, y)
     if (room < 0.1 * UNIT || room > 1.4 * UNIT || underSky(x, y, UNIT)) continue
     if (glows.some((g) => Math.hypot(g.x - x, g.y - y) < 2.5 * UNIT)) continue
     glows.push({ x, y, r: (0.3 + rng.next() * 0.35) * UNIT, hue: rng.next() })
   }
-  const near = makeNear(-margin, -margin, w + margin * 2, h + margin * 2, [
+  const near = makeNear(FRAME.x, FRAME.y, FRAME.w, FRAME.h, [
     mounds.map((m) => ({ x: m.x, y: m.y, reach: m.r })),
     pools.map((p) => ({ x: p.x, y: p.y, reach: Math.max(p.rx, p.ry) * 1.5 })),
     columns.map((c) => ({ x: c.x, y: c.y, reach: c.r * 1.3 + SHADOW_U.column * UNIT })),
@@ -675,16 +683,15 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   const spawns: number[] = []
   const bossSpawns: number[] = []
   const step = 0.5 * UNIT
-  for (let y = step / 2; y < h; y += step) {
-    for (let x = step / 2; x < w; x += step) {
+  for (let y = oy + step / 2; y < oy + h; y += step) {
+    for (let x = ox + step / 2; x < ox + w; x += step) {
       const room = roomOf(rock, x, y)
       if (room >= UNIT) spawns.push(x, y)
       if (room >= 1.6 * UNIT) bossSpawns.push(x, y)
     }
   }
   return {
-    w,
-    h,
+    map,
     seed,
     ceilingM: hall.ceilingM,
     wallU: hall.wallU,
@@ -789,13 +796,13 @@ function viewFactor(L: CaveLayout, patches: readonly SkyPatch[], area: number, x
   return Math.min(1, sum)
 }
 
-function makeLight(L: CaveLayout, cfg: CaveConfig, margin: number): CaveLight {
+function makeLight(L: CaveLayout, cfg: CaveConfig): CaveLight {
   const cell = 0.5 * UNIT
-  const cols = Math.ceil((L.w + margin * 2) / cell)
-  const rows = Math.ceil((L.h + margin * 2) / cell)
+  const cols = Math.ceil(FRAME.w / cell)
+  const rows = Math.ceil(FRAME.h / cell)
   const n = cols * rows
-  const x0 = -margin
-  const y0 = -margin
+  const x0 = FRAME.x
+  const y0 = FRAME.y
   const z = new Float32Array(n)
   const air = new Uint8Array(n)
   const hall = new Uint8Array(n)
@@ -839,7 +846,7 @@ function makeLight(L: CaveLayout, cfg: CaveConfig, margin: number): CaveLight {
       const deep = inAlcove(x, y)
       const room = roomOf(L.rock, x, y)
       alcove[i] = deep ? 1 : 0
-      hall[i] = !deep && room > 0 && x > 0 && y > 0 && x < L.w && y < L.h ? 1 : 0
+      hall[i] = !deep && room > 0 ? 1 : 0
       if (shell >= 0 && z[i]! < L.ceilingM) view[i] = viewFactor(L, patches, area, x, y, z[i]!, room > 0 && (deep || shell < 2.5 * UNIT))
     }
   }
@@ -1138,11 +1145,11 @@ export interface CaveFlow {
   from: number
 }
 
-/** 半径 0.45 格的身体挤得过去的格子才算通 */
+/** 半径 0.45 格的身体挤得过去的格子才算通；铺满方框，格子 (0, 0) 在世界原点 */
 function makeFlow(L: CaveLayout): CaveFlow {
   const cell = 0.5 * UNIT
-  const cols = Math.ceil(L.w / cell)
-  const rows = Math.ceil(L.h / cell)
+  const cols = Math.ceil(FRAME.w / cell)
+  const rows = Math.ceil(FRAME.h / cell)
   const pass = new Uint8Array(cols * rows)
   for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) pass[cy * cols + cx] = roomOf(L.rock, (cx + 0.5) * cell, (cy + 0.5) * cell) >= 0.4 * UNIT ? 1 : 0
   const n = cols * rows
@@ -1341,9 +1348,9 @@ function caveMarks(L: CaveLayout): Record<string, Landmark[]> {
   }
 }
 
-export function makeCaveState(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rng, sec: number): CaveState {
-  const layout = makeCave(cfg, w, h, margin, rng)
-  const light = makeLight(layout, cfg, margin)
+export function makeCaveState(cfg: CaveConfig, map: Rect, rng: Rng, sec: number): CaveState {
+  const layout = makeCave(cfg, map, rng)
+  const light = makeLight(layout, cfg)
   const age0 = rng.next() * SYNODIC_DAYS
   const sky = skyAt(cfg, sec, age0, { hour: 0, days: 0, sun: { x: 0, y: -1, elev: 0 }, moon: { x: 0, y: -1, elev: 0 }, age: 0, phase: 0, sunLux: 0, skyLux: 0, moonLux: 0, moonSkyLux: 0 })
   stepLight(light, layout, cfg, sky)

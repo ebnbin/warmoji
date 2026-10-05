@@ -1,4 +1,4 @@
-import { UNIT } from '../../util/units.ts'
+import { FRAME_U, UNIT } from '../../util/units.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin, roomAt } from '../worlds/basin.ts'
 import { textWidth } from './font.ts'
@@ -228,7 +228,6 @@ export interface CopperGrid {
 
 /** 按种子生成的一块电路板：全是数据，能整个发给画画的线程 */
 export interface CircuitPlan {
-  readonly size: number
   readonly seed: number
   readonly arena: Arena
   readonly basin: Basin
@@ -918,13 +917,13 @@ function rasterCopper(arena: Arena, copper: readonly Shape[][], parts: readonly 
   return { x0, y0, cell, cols, rows, net, dist }
 }
 
-/** 罩外的布景：一圈排得密密的贴片件、几颗芯片和电感，空处打过孔 */
-function furnishOutside(d: Draft, size: number, pad: number, holes: readonly Point[]): void {
+/** 罩外的布景：一圈排得密密的贴片件、几颗芯片和电感，空处打过孔；都在方框以内 */
+function furnishOutside(d: Draft, holes: readonly Point[]): void {
   const mpu = d.mpu
   const rng = d.rng
   const a = d.arena
-  const lo = -pad + 0.6
-  const hi = size + pad - 0.6
+  const lo = 0.6
+  const hi = FRAME_U - 0.6
   const clear = (p: Part): boolean => {
     if (holes.some((h) => boxDist(p.x, p.y, p.bw, p.bh, h.x, h.y) < 2.4)) return false
     for (const c of [
@@ -969,11 +968,16 @@ function furnishOutside(d: Draft, size: number, pad: number, holes: readonly Poi
 /** 一次尝试：定屏蔽罩与朝向，摆芯片，布带电的线，布开关与铜板、电弧，再布不带电的细线与布景；哪一步不合格返回 null */
 function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   const S = cfg.sizeU
+  // 地图摆在方框正中，罩子的中心就是方框正中
+  const pad = (FRAME_U - S) / 2
   const mpu = cfg.mmPerU
   const seed = Math.floor(rng.next() * 0x7fffffff)
   const inset = [0, 1, 2, 3].map(() => between(rng, cfg.frame.insetU))
   const cut = [0, 1, 2, 3].map(() => between(rng, cfg.frame.chamferU))
-  const arena: Arena = { x0: inset[0]!, y0: inset[1]!, x1: S - inset[2]!, y1: S - inset[3]!, cut: [cut[0]!, cut[1]!, cut[2]!, cut[3]!] }
+  const aw = S - inset[0]! - inset[2]!
+  const ah = S - inset[1]! - inset[3]!
+  const mid = FRAME_U / 2
+  const arena: Arena = { x0: mid - aw / 2, y0: mid - ah / 2, x1: mid + aw / 2, y1: mid + ah / 2, cut: [cut[0]!, cut[1]!, cut[2]!, cut[3]!] }
   // 朝向：u 轴转四个方向之一，v 轴再看要不要翻过来
   const k = Math.floor(rng.next() * 4)
   const ux = [1, 0, -1, 0][k]!
@@ -1337,7 +1341,7 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   const cell = BASIN_CELL_U * UNIT
   const nb = Math.ceil(S / BASIN_CELL_U) + 2
   const start: Point = { x: cx, y: cy }
-  const basin = makeBasin(open, -cell, -cell, nb, nb, cell, { x: cx * UNIT, y: cy * UNIT }, cfg.neckU * UNIT)
+  const basin = makeBasin(open, pad * UNIT - cell, pad * UNIT - cell, nb, nb, cell, { x: cx * UNIT, y: cy * UNIT }, cfg.neckU * UNIT)
   let cells = 0
   for (let i = 0; i < basin.room.length; i++) if (basin.room[i]! > 0) cells++
   const area = cells * BASIN_CELL_U * BASIN_CELL_U
@@ -1463,20 +1467,22 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
     const hex = Math.floor(rng.next() * 0xffffff).toString(16).toUpperCase().padStart(6, '0')
     sticker = { x: t.x, y: t.y, w, h, rot, code: `SN${hex}` }
   }
+  const lo = pad * 0.55
+  const hi = FRAME_U - pad * 0.55
   const holes = [
-    { x: -cfg.padU * 0.45, y: -cfg.padU * 0.45 },
-    { x: S + cfg.padU * 0.45, y: -cfg.padU * 0.45 },
-    { x: S + cfg.padU * 0.45, y: S + cfg.padU * 0.45 },
-    { x: -cfg.padU * 0.45, y: S + cfg.padU * 0.45 },
+    { x: lo, y: lo },
+    { x: hi, y: lo },
+    { x: hi, y: hi },
+    { x: lo, y: hi },
   ]
-  furnishOutside(d, S, cfg.padU, holes)
+  furnishOutside(d, holes)
   for (const p of d.parts.filter((q) => !q.inside && q.kind === 'ic')) fanOut(d, p, new Set(), (x, y, r) => !occupied(x, y, r) && arenaRoom(arena, x, y) < -FRAME_WALL_U - FRAME_LIP_U - r)
   // 铺铜上每隔一段打一个过孔，把地连到底层
   const stitch = 2.6
   const sx = rng.next() * stitch
   const sy = rng.next() * stitch
-  for (let y = -cfg.padU + sy; y < S + cfg.padU; y += stitch) {
-    for (let x = -cfg.padU + sx; x < S + cfg.padU; x += stitch) {
+  for (let y = sy; y < FRAME_U; y += stitch) {
+    for (let x = sx; x < FRAME_U; x += stitch) {
       if (rng.next() < 0.25 || occupied(x, y, 0.75)) continue
       d.vias.push({ x, y, r: 0.3, hole: 0.13, open: false })
     }
@@ -1487,7 +1493,6 @@ function attempt(cfg: CircuitConfig, rng: Rng): CircuitPlan | null {
   const copper = rasterCopper(arena, d.copper, d.parts, [button])
   const clocks: Clock[] = [{ nets: [clockNet], led: { x: led.x, y: led.y }, chip: { x: u3.x, y: u3.y }, phaseMs: rng.next() * (cfg.clock.offMs + cfg.clock.warnMs + cfg.clock.onMs) }]
   return {
-    size: S,
     seed,
     arena,
     basin,

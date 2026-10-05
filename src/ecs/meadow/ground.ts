@@ -1,6 +1,7 @@
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
+import { FRAME_U } from '../../util/units'
 import { bankHeight, bankShape, bankWidth, beyondFence, footAt, forestDepth, toLocal } from './layout'
 import type { Edges, Local, MeadowPlan, Tree } from './layout'
 import type { MeadowConfig } from '../../types/maps'
@@ -89,17 +90,14 @@ export function pixelBuffer(rect: PixelRect): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray((rect.x1 - rect.x0) * (rect.y1 - rect.y0) * 4)
 }
 
-/** 地面与树冠铺满地图外 padU 格 */
-export function groundArea(sc: PaintScene): Area {
-  const pad = sc.cfg.padU
-  return { x0: -pad, y0: -pad, w: sc.plan.size + pad * 2, h: sc.plan.size + pad * 2 }
-}
+/** 地面与树冠铺满方框 */
+export const GROUND_AREA: Area = { x0: 0, y0: 0, w: FRAME_U, h: FRAME_U }
 
 const PPU: Record<PaintLayer, number> = { ground: GROUND_PPU, canopy: CANOPY_PPU }
 
 /** 一层贴图的大小，像素 */
-export function textureSize(sc: PaintScene, layer: PaintLayer): { w: number; h: number } {
-  const a = groundArea(sc)
+export function textureSize(layer: PaintLayer): { w: number; h: number } {
+  const a = GROUND_AREA
   return { w: Math.round(a.w * PPU[layer]), h: Math.round(a.h * PPU[layer]) }
 }
 
@@ -321,7 +319,7 @@ function unrolled(s: number, w: number, h: number, mpu: number): number {
 }
 
 function makeFields(sc: PaintScene): Fields {
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const cell = FIELD_U
   const cols = Math.ceil(area.w / cell) + 2
   const rows = Math.ceil(area.h / cell) + 2
@@ -336,7 +334,7 @@ function makeFields(sc: PaintScene): Fields {
   const { plan, cfg } = sc
   const e = plan.edges
   const turf = cfg.turf
-  const line = footLine(e, -cfg.padU - plan.size, plan.size * 2 + cfg.padU)
+  const line = footLine(e, -FRAME_U, FRAME_U * 2)
   const L: Local = { a: 0, b: 0 }
   const N: Near = { climb: 0, width: 0, height: 0 }
   for (let j = 0; j < rows; j++) {
@@ -485,7 +483,7 @@ function pathSegments(sc: PaintScene): { paths: Segment[]; trail: Segment[] } {
 }
 
 export function prepare(sc: PaintScene): Prepared {
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const plan = sc.plan
   const crowns = buckets(area)
   plan.trees.forEach((t, k) => file(crowns, k, t.x - t.r - 0.1, t.y - t.r - 0.1, t.x + t.r + 0.1, t.y + t.r + 0.1))
@@ -626,7 +624,7 @@ function meadowGrass(sc: PaintScene, prep: Prepared, x: number, y: number, tex: 
  * 坡挡住太阳的地方落在影子里；树、栅栏与倒木也背着太阳投下影子；林子里离草地越远越暗。只画 rect 那一块
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const plan = sc.plan
   const cfg = sc.cfg
   const f = prep.fields
@@ -951,7 +949,7 @@ const CROWN = {
  * 每一点取最高的那个面，按太阳打光：向阳的一面偏暖偏亮、背阴的一面偏冷偏暗，低处被上面的枝叶遮着更暗；林子深处暗下去。边缘柔和，像素带透明度，只画 rect 那一块
  */
 export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const plan = sc.plan
   const seed = plan.seed
   const ppu = CANOPY_PPU
@@ -1095,13 +1093,13 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
 
 /** 草浪着色器用的遮罩：草地、牧场与坡上那层草甸为 1，坡面上越陡越淡，栅栏底下淡一些，林子里为 0；按地面贴图的范围，每格 MASK_PPU 个像素，满 alpha */
 export function grassMask(sc: PaintScene): { data: Uint8ClampedArray<ArrayBuffer>; w: number; h: number } {
-  const area = groundArea(sc)
+  const area = GROUND_AREA
   const w = Math.round(area.w * MASK_PPU)
   const h = Math.round(area.h * MASK_PPU)
   const data = new Uint8ClampedArray(w * h * 4)
   const { plan, cfg } = sc
   const e = plan.edges
-  const line = footLine(e, -cfg.padU - plan.size, plan.size * 2 + cfg.padU)
+  const line = footLine(e, -FRAME_U, FRAME_U * 2)
   // 过了最宽的坡面再往外一格，遮罩已经是满的，不用再找最近的坡脚
   const cap = cfg.bank.heightM[1] / cfg.bank.riseM[0] + 1
   const L: Local = { a: 0, b: 0 }

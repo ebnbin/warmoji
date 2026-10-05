@@ -1,4 +1,5 @@
 import { SUN } from '../../data/light'
+import { FRAME_U, SPAWN_CLEAR_U } from '../../util/units'
 import { Rng } from '../../util/rng'
 import { tileFbm } from './noise'
 import { LANDMARK_KINDS, landmarkShape, shadowBox, shadowCover } from './landmarks'
@@ -15,6 +16,8 @@ const CELL_U = 0.25
 const MARCH_U = 0.2
 /** 摆沙丘与标志物，挑不出合格的位置就放宽一点再挑，每轮最多试这么多次 */
 const TRIES = 120
+/** 找出发点的格点间距，格 */
+const START_STEP_U = 0.5
 /** 剖面 (1 − t²)² 最陡处的坡度是高除以半长再乘这个数 */
 const BUMP_SLOPE = 8 / (3 * Math.sqrt(3))
 
@@ -69,7 +72,7 @@ export interface DesertPlan {
   readonly flatPatches: number
   readonly dunes: readonly Dune[]
   readonly landmarks: readonly Landmark[]
-  /** 队伍出发的地方，格：离第一样标志物几步远 */
+  /** 队伍出发的地方，格：一圈的正中，离第一样标志物几步远 */
   readonly start: Point
   readonly cols: number
   readonly cell: number
@@ -86,6 +89,11 @@ export function smooth(e0: number, e1: number, x: number): number {
 /** 环面上的最短差：落在 [−size/2, size/2) */
 export function wrapU(d: number, size: number): number {
   return d - Math.round(d / size) * size
+}
+
+/** 一圈里排几个噪声格点，才是 u 格一个：取整，一圈里接得上 */
+export function wavesOf(p: DesertPlan, u: number): number {
+  return Math.max(1, Math.round(p.sizeU / u))
 }
 
 /** 成对对称的噪声：按 (x − y, x + y) 取一圈有 waves 个格点的噪声，横竖各挪半圈不变 */
@@ -361,28 +369,46 @@ function sunGrid(p: DesertPlan, heights: Float32Array): Float32Array {
   return out
 }
 
-/** 出发点：离第一样标志物几步远、在丘间平地上、不压着别的标志物 */
-function startNear(p: DesertPlan, rng: Rng): Point {
+/**
+ * 出发点：离每样标志物都至少 SPAWN_CLEAR_U 格的格点里，挑在丘间平地上、离第一样标志物再远一格的，开局就看得见一样标志物；
+ * 一处都不够远就挑离标志物最远的
+ */
+function startOf(p: DesertPlan): Point {
   const first = p.landmarks[0]!
-  let best: Point = { x: first.x, y: first.y }
-  let bestScore = -Infinity
-  for (let k = 0; k < 48; k++) {
-    const a = rng.next() * Math.PI * 2
-    const d = first.shape.reach + 2.2 + rng.next() * 1.5
-    const x = (((first.x + Math.cos(a) * d) % p.sizeU) + p.sizeU) % p.sizeU
-    const y = (((first.y + Math.sin(a) * d) % p.sizeU) + p.sizeU) % p.sizeU
-    const clear = Math.min(...p.landmarks.map((l) => torusDist(p.sizeU, x, y, l.x, l.y) - l.shape.reach))
-    const score = Math.min(clear, 2) - duneAt(p, x, y) * 6
-    if (score > bestScore) {
-      bestScore = score
+  let best: Point = { x: 0, y: 0 }
+  let top = -Infinity
+  let roomiest = best
+  let widest = -Infinity
+  for (let y = 0; y < p.sizeU; y += START_STEP_U) {
+    for (let x = 0; x < p.sizeU; x += START_STEP_U) {
+      let clear = Infinity
+      for (const l of p.landmarks) clear = Math.min(clear, torusDist(p.sizeU, x, y, l.x, l.y) - l.shape.reach)
+      if (clear > widest) {
+        widest = clear
+        roomiest = { x, y }
+      }
+      if (clear < SPAWN_CLEAR_U) continue
+      const off = torusDist(p.sizeU, x, y, first.x, first.y) - first.shape.reach - SPAWN_CLEAR_U - 1
+      const score = -duneAt(p, x, y) * 6 - Math.abs(off)
+      if (score <= top) continue
+      top = score
       best = { x, y }
     }
   }
-  return best
+  return top > -Infinity ? best : roomiest
 }
 
-/** 按种子生成这一局的沙漠：盛行风大体背着太阳吹，一对对的沙丘与标志物，再铺晒到的太阳与沙的松实 */
-export function makePlan(cfg: DesertConfig, sizeU: number, decorSeed: number): DesertPlan {
+/** 一圈里 (x, y) 挪 (dx, dy) 之后在哪，格 */
+function shifted<T extends Point>(o: T, dx: number, dy: number, size: number): T {
+  return { ...o, x: (((o.x + dx) % size) + size) % size, y: (((o.y + dy) % size) + size) % size }
+}
+
+/**
+ * 按种子生成这一局的沙漠：盛行风大体背着太阳吹，一对对的沙丘与标志物；挑好出发点后把沙丘与标志物一起挪到出发点落在一圈的正中，
+ * 再铺晒到的太阳与沙的松实。一圈是方框的边长
+ */
+export function makePlan(cfg: DesertConfig, decorSeed: number): DesertPlan {
+  const sizeU = FRAME_U
   const seed = (decorSeed ^ PLAN_SEED) >>> 0
   const rng = new Rng(seed)
   const away = Math.atan2(-SUN.y, -SUN.x)
@@ -412,11 +438,14 @@ export function makePlan(cfg: DesertConfig, sizeU: number, decorSeed: number): D
     sun: new Float32Array(0),
     soft: new Float32Array(0),
   }
-  const landmarks = placeLandmarks(cfg, rng, windAngle, sizeU, (x, y) => duneAt(base, x, y))
+  const placed = { ...base, landmarks: placeLandmarks(cfg, rng, windAngle, sizeU, (x, y) => duneAt(base, x, y)) }
+  const start = startOf(placed)
+  const dx = sizeU / 2 - start.x
+  const dy = sizeU / 2 - start.y
+  const draft = { ...placed, dunes: placed.dunes.map((d) => shifted(d, dx, dy, sizeU)), landmarks: placed.landmarks.map((l) => shifted(l, dx, dy, sizeU)) }
   const n = base.cols
   const heights = new Float32Array(n * n)
   const soft = new Float32Array(n * n)
-  const draft = { ...base, landmarks }
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const x = (i + 0.5) * CELL_U
@@ -425,18 +454,5 @@ export function makePlan(cfg: DesertConfig, sizeU: number, decorSeed: number): D
       soft[j * n + i] = looseAt(draft, x, y)
     }
   }
-  const sun = sunGrid(draft, heights)
-  const plan = { ...draft, sun, soft }
-  return { ...plan, start: startNear(plan, rng) }
-}
-
-const cache = new WeakMap<DesertConfig, { readonly seed: number; readonly plan: DesertPlan }>()
-
-/** 同一个种子与配置只生成一次：视图排版时与模拟开局时各要一次 */
-export function desertPlanFor(cfg: DesertConfig, sizeU: number, decorSeed: number): DesertPlan {
-  const hit = cache.get(cfg)
-  if (hit?.seed === decorSeed && hit.plan.sizeU === sizeU) return hit.plan
-  const plan = makePlan(cfg, sizeU, decorSeed)
-  cache.set(cfg, { seed: decorSeed, plan })
-  return plan
+  return { ...draft, sun: sunGrid(draft, heights), soft }
 }
