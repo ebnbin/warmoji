@@ -356,6 +356,19 @@ const PENUMBRA = [
   [PENUMBRA_U, PENUMBRA_U],
 ] as const
 
+/** 树冠边上的地面被伸出来的枝叶挡掉一圈天光：离树冠的边多远（格）以内、最多暗多少 */
+const CROWN_AO_U = 0.45
+const CROWN_AO = 0.3
+const RING = Array.from({ length: 8 }, (_, k) => [Math.cos((k * Math.PI) / 4) * CROWN_AO_U, Math.sin((k * Math.PI) / 4) * CROWN_AO_U] as const)
+
+/** 这一点四周一圈有几成头顶上盖着叶子：挨着树冠越近、被树冠围得越多，越暗 */
+function overhang(prep: Prepared, x: number, y: number): number {
+  const c = prep.crowns
+  let n = 0
+  for (const [ox, oy] of RING) n += crownCover(c, x + ox, y + oy)
+  return n / RING.length
+}
+
 /**
  * 桥面投下的影子：按桥面离地多高顺着背光挪开；z 是受影子的那一面（地面或水面）的高程（米），桥面两头落在岸顶（桥心水面高 bankM 米处）。
  * 往太阳那边找两三次就对上了
@@ -401,6 +414,8 @@ const OLD = [
 ] as const
 /** 落叶铺厚了，底下透出来的那层：半烂的叶子，暗暗的红褐 */
 const MULCH = [146, 70, 46] as const
+/** 落在地上的叶子干了、沾了土，比树上的暗这么多 */
+const FALLEN = 0.9
 /** 地上的一片落叶边缘柔和多宽（格）：半个像素 */
 const LITTER_AA_U = 0.6 / GROUND_PPU
 
@@ -458,14 +473,14 @@ function litterAt(x: number, y: number, scale: number, seed: number, dens: numbe
   const pal = owner >= 0 && pick < 0.78 ? palettes[owner]! : Math.floor(hash2(hx, hy, seed + 8) * 4)
   leafColor(pal, 0.25 + 0.75 * hash2(hx, hy, seed + 9), LIT)
   const age = hash2(hx, hy, seed + 10)
-  if (age > 0.6) {
+  if (age > 0.5) {
     const o = OLD[Math.floor(hash2(hx, hy, seed + 11) * OLD.length)]!
-    const k = smooth(0.6, 0.95, age) * 0.85
+    const k = smooth(0.5, 0.95, age) * 0.85
     LIT[0] = LIT[0]! + (o[0] - LIT[0]!) * k
     LIT[1] = LIT[1]! + (o[1] - LIT[1]!) * k
     LIT[2] = LIT[2]! + (o[2] - LIT[2]!) * k
   }
-  const vary = 0.86 + 0.2 * hash2(hx, hy, seed + 12)
+  const vary = (0.8 + 0.2 * hash2(hx, hy, seed + 12)) * FALLEN
   const vein = lobe >= 0 && axis < 0.05 ? (1 - axis / 0.05) * 0.16 * (1 - along) : 0
   const curl = smooth(-0.025, -0.004, edge) * 0.2
   const k = vary * (1 - vein) * (1 - curl)
@@ -623,7 +638,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         bridgeShadow(plan.bridge, cfg.flow.bankM, zs, mpu, x, y),
         fenceShadow(fe, prep.stakes, wr.crest, cfg.sill.heightM, mpu, zs, x, y),
       )
-      const ao = (1 - 0.18 * smooth(th + 1.2, th, Math.abs(wall))) * (1 - 0.2 * smooth(-1.2, 0.3, forest)) * (1 - 0.42 * smooth(0, 2.5, forest))
+      const ao = (1 - 0.18 * smooth(th + 1.2, th, Math.abs(wall))) * (1 - 0.2 * smooth(-1.2, 0.3, forest)) * (1 - 0.42 * smooth(0, 2.5, forest)) * (1 - CROWN_AO * overhang(prep, x, y))
       const sky = AMBIENT * (0.75 + 0.25 * nz) * ao
       const sun = DIRECT * lambert * (1 - shade) * ao
       out[o] = r * (sky * SKY.r + sun * SUNLIGHT.r) * GRADE.r
@@ -687,7 +702,7 @@ function leafShade(c: Crowns, i: number, x: number, y: number, d: number, lobe: 
   const lam = Math.max(0, (nx * LX + ny * LY + LZ) / (Math.sqrt(nx * nx + ny * ny + 1) * SUN_3D))
   // 晒到的直射光；背阴的叶子透过上面的叶子透下来的光是红的：越背阴，绿与蓝压得越低，暗处是饱满的深红、不发褐
   const direct = lam * (1 - SELF_SHADE * shadow) * (1 - 0.5 * buried)
-  const k = (0.5 + 0.72 * direct) * (1 - 0.16 * smooth(-0.02, -0.002, d))
+  const k = (0.54 + 0.76 * direct) * (1 - 0.16 * smooth(-0.02, -0.002, d))
   const dim = 1 - Math.min(1, direct / 0.75)
   LS[0] = r * k * GRADE.r
   LS[1] = g * k * (1 - 0.22 * dim) * GRADE.g

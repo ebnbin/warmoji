@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
-import { SUN } from '../../data/light'
+import { AWAY, SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { Rng } from '../../util/rng'
 import { decorSprite, keepDecor } from '../../ecs/decor'
@@ -14,7 +14,7 @@ import { CANOPY_PPU, groundArea, textureSize } from './ground'
 import { MaplePainter } from './painter'
 import { encodeWater, WATER_FRAG, Z_MIN, Z_SPAN } from './shader'
 import { BRIDGE_PPU, drawBridge } from './bridge'
-import { drawPetal } from './leaf'
+import { drawLeaf, LEAF_COLORS } from './leaf'
 import { drawFence, FENCE_DEPTH_U, FENCE_PPU } from './fence'
 import { bridgeLocal, ROCK_FACE_U, rocksLocal, weirLocal } from './layout'
 import { mapleOf, maplePlanFor } from './world'
@@ -29,34 +29,47 @@ import type { Framing } from '../../ecs/lens'
 import type { Sim } from '../../ecs/sim'
 import type { Point } from '../../util/vec'
 
-const BG = 0x2b231f
+const BG = 0x2c1a15
 const KEYS: Record<PaintLayer, string> = { ground: 'maple-ground', canopy: 'maple-canopy', shade: 'maple-shade' }
 const BED_KEY = 'maple-bed'
 const LEVEL_KEY = 'maple-level'
 const FLOW_KEY = 'maple-flow'
 const BRIDGE_KEY = 'maple-bridge'
 const FENCE_KEY = 'maple-fence'
-const PETAL_KEY = 'maple-petal'
+/** 第 i 种叶色的枫叶的正面与背面 */
+const leafKey = (i: number, back: boolean): string => `maple-leaf-${i}${back ? '-back' : ''}`
 /** 开局最多几个线程分着画 */
 const PAINT_THREADS = 4
 /** 贴图按这么多像素高的条分块交给线程 */
 const STRIP_PX = 64
-/** 桥与竹栅画在这一层：水面与水上的花瓣之上，站在地上与水里的身体之下；桥下的身体挪到 UNDER_Z，画在桥下 */
+/** 桥与竹栅画在这一层：水面与水上的枫叶之上，站在地上与水里的身体之下；桥下的身体挪到 UNDER_Z，画在桥下 */
 const BRIDGE_DEPTH = 4
 const UNDER_Z = 3.5
-/** 水上漂着几片花瓣、漂多久（秒）还没漂走就换一片 */
-const AFLOAT = 210
-const AFLOAT_LIFE_S = 40
-/** 树上飘落的花瓣：镜头里同时最多几片、多久飘下一片（秒）、落地后多久淡去（秒） */
-const FALLING = 36
-const FALL_EVERY_S = 0.14
-const LANDED_S = 2.5
-/** 花瓣多大（格） */
-const PETAL_U = 0.16
-const PETAL_PX = 32
-const PETAL_TINTS = [0xffffff, 0xfff0f4, 0xffe2ea, 0xfad0dc] as const
+/** 水上漂着几片枫叶、漂多久（秒）还没漂走就换一片 */
+const AFLOAT = 130
+const AFLOAT_LIFE_S = 45
+/** 树上飘落的枫叶：镜头里同时最多几片、多久飘下一片（秒）、落地后多久淡去（秒） */
+const FALLING = 26
+const FALL_EVERY_S = 0.2
+const LANDED_S = 6
+/** 枫叶多大（格）：最小与最大 */
+const LEAF_U = [0.26, 0.36] as const
+const LEAF_PX = 64
+/** 飘落的叶子离地每高一米，画面上往上抬多少格、影子往背光的方向挪开多少格 */
+const FALL_LIFT_U = 0.16
+const FALL_SHADOW_U = 0.7
 
-/** 水上的一片花瓣；漂到竹栅前就停在离竹栅 stop 格的地方 */
+/** 按各叶色占的几成挑一种 */
+function pickColor(r: number): number {
+  let acc = 0
+  for (let i = 0; i < LEAF_COLORS.length; i++) {
+    acc += LEAF_COLORS[i]!.weight
+    if (r < acc) return i
+  }
+  return 0
+}
+
+/** 水上的一片枫叶：多大（格），漂到竹栅前就停在离竹栅 stop 格的地方 */
 interface Afloat {
   x: number
   y: number
@@ -64,9 +77,14 @@ interface Afloat {
   spin: number
   age: number
   stop: number
+  size: number
   readonly img: Phaser.GameObjects.Image
 }
 
+/**
+ * 树上飘下的一片枫叶：位置（格）、离地多高与往下落多快（米、米/秒）；左右荡的幅度与相位、在画面上转的角度与转速，
+ * 绕自己的中脉翻的角度与翻的快慢（翻过去露出背面）；叶色、多大（格）；落地多久了（没落地是负的），地上的影子
+ */
 interface Falling {
   x: number
   y: number
@@ -75,8 +93,14 @@ interface Falling {
   sway: number
   phase: number
   rot: number
+  spin: number
+  flip: number
+  flipRate: number
+  color: number
+  size: number
   landed: number
   readonly img: Phaser.GameObjects.Image
+  readonly shadow: Phaser.GameObjects.Image
 }
 
 function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
@@ -93,14 +117,17 @@ function upload(tex: Phaser.Textures.CanvasTexture): void {
   tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
 }
 
-/** 花瓣的贴图只画一次，之后每局都用 */
-function ensurePetal(scene: Phaser.Scene): void {
-  if (!scene.textures.exists(PETAL_KEY)) canvasTexture(scene, PETAL_KEY, PETAL_PX, PETAL_PX, (ctx) => drawPetal(ctx, PETAL_PX))
+/** 枫叶的贴图只画一次，之后每局都用 */
+function ensureLeaves(scene: Phaser.Scene): void {
+  LEAF_COLORS.forEach((c, i) => {
+    for (const back of [false, true]) if (!scene.textures.exists(leafKey(i, back))) canvasTexture(scene, leafKey(i, back), LEAF_PX, LEAF_PX, (ctx) => drawLeaf(ctx, LEAF_PX, c.rgb, back))
+  })
 }
 
 /**
- * 樱庭：地面、树冠与瓦顶、水面上的影子是开局在后台线程画好的贴图；溪水由着色器按解出来的水深与流速画。
- * 木桥架在溪上，桥下漂过的身体画在桥下；下游的石槛上立着竹栅。花瓣从樱树上飘下来，落进水里的顺着水流漂，漂到竹栅前就堆在那里。树冠与瓦顶盖在一切之上
+ * 红叶林：地面、树冠与瓦顶、水面上的影子是开局在后台线程画好的贴图；溪水由着色器按解出来的水深与流速画。
+ * 木桥架在溪上，桥下漂过的身体画在桥下；下游的石槛上立着竹栅。枫叶从树上翻着跟头飘下来，地上跟着一块影子；落进水里的顺着水流漂，
+ * 漂到竹栅前就堆在那里，落在地上的过一阵淡去。树冠与瓦顶盖在一切之上
  */
 export class MapleView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -129,14 +156,14 @@ export class MapleView implements MapView {
 
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
-    ensurePetal(v.scene)
+    ensureLeaves(v.scene)
   }
 
   framing(): Framing {
     return { map: FRAME, edge: 'frame' }
   }
 
-  /** 零星的落樱：只落在空地上，离墙根、林缘有一点距离，不落在桥上 */
+  /** 零星的几片大红叶：只落在空地上，离墙根、林缘有一点距离，不落在桥上 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const plan = this.planOf(v)
     const rng = new Rng(v.run.decorSeed)
@@ -196,8 +223,8 @@ export class MapleView implements MapView {
     }
     const rng = new Rng(v.run.decorSeed ^ 0x9e7a1)
     for (let k = 0; k < AFLOAT; k++) {
-      const img = scene.add.image(0, 0, PETAL_KEY).setDepth(1.6).setTint(PETAL_TINTS[k % PETAL_TINTS.length]!)
-      const p: Afloat = { x: 0, y: 0, rot: 0, spin: 0, age: 0, stop: 0.12 + 0.3 * rng.next(), img }
+      const img = scene.add.image(0, 0, leafKey(pickColor(rng.next()), false)).setDepth(1.6)
+      const p: Afloat = { x: 0, y: 0, rot: 0, spin: 0, age: 0, stop: 0.14 + 0.36 * rng.next(), size: LEAF_U[0] + (LEAF_U[1] - LEAF_U[0]) * rng.next(), img }
       this.drift(p, rng.next())
       p.age = rng.next() * AFLOAT_LIFE_S
       this.afloat.push(p)
@@ -205,7 +232,7 @@ export class MapleView implements MapView {
     }
     this.ripples = scene.add.graphics().setDepth(2)
     this.visuals.push(this.ripples)
-    v.lens.screen.vignette(0.78, 0.18, 0x2a160c)
+    v.lens.screen.vignette(0.78, 0.18, 0x2e1008)
   }
 
   /** 水面：三张数据图与水面上的影子喂给着色器 */
@@ -285,27 +312,45 @@ export class MapleView implements MapView {
     )
   }
 
-  /** 一片花瓣落在水上随便一处 */
+  /** 一片枫叶落在水上随便一处 */
   private drift(p: Afloat, r: number): void {
     const s = this.spots[Math.floor(r * this.spots.length)]
     if (!s) return
     p.x = (s.x + (Math.random() - 0.5) * 0.4) * UNIT
     p.y = (s.y + (Math.random() - 0.5) * 0.4) * UNIT
     p.rot = Math.random() * Math.PI * 2
-    p.spin = (Math.random() * 2 - 1) * 0.8
+    p.spin = (Math.random() * 2 - 1) * 0.5
     p.age = 0
   }
 
-  /** 镜头里的樱树上飘下一片花瓣 */
-  private blossom(v: ViewCtx, plan: MaplePlan): void {
+  /** 镜头里的枫树上飘下一片叶子：从树冠底下随便一处、半截树高上落下来，地上跟着它的影子 */
+  private shed(v: ViewCtx, plan: MaplePlan): void {
     const seen = plan.trees.filter((t: Tree) => v.lens.screen.sees(t.x * UNIT, t.y * UNIT))
     const t = seen[Math.floor(Math.random() * seen.length)]
     if (!t) return
     const a = Math.random() * Math.PI * 2
-    const d = Math.sqrt(Math.random()) * t.r
-    const img = v.scene.add.image(0, 0, PETAL_KEY).setDepth(21).setTint(PETAL_TINTS[Math.floor(Math.random() * PETAL_TINTS.length)]!)
-    this.visuals.push(img)
-    this.falling.push({ x: t.x + Math.cos(a) * d, y: t.y + Math.sin(a) * d, z: t.h * (0.6 + 0.3 * Math.random()), vz: 0.9 + Math.random() * 0.5, sway: 0.25 + Math.random() * 0.35, phase: Math.random() * 10, rot: Math.random() * Math.PI * 2, landed: -1, img })
+    const d = Math.sqrt(Math.random()) * t.r * 0.9
+    const color = pickColor(Math.random())
+    const shadow = v.scene.add.image(0, 0, leafKey(color, false)).setDepth(1.25).setTint(0x2a0e06)
+    const img = v.scene.add.image(0, 0, leafKey(color, false)).setDepth(21)
+    this.visuals.push(shadow, img)
+    this.falling.push({
+      x: t.x + Math.cos(a) * d,
+      y: t.y + Math.sin(a) * d,
+      z: t.h * (0.55 + 0.35 * Math.random()),
+      vz: 0.8 + Math.random() * 0.5,
+      sway: 0.35 + Math.random() * 0.35,
+      phase: Math.random() * 10,
+      rot: Math.random() * Math.PI * 2,
+      spin: (Math.random() * 2 - 1) * 1.6,
+      flip: Math.random() * Math.PI * 2,
+      flipRate: (Math.random() < 0.5 ? -1 : 1) * (1.6 + Math.random() * 2.4),
+      color,
+      size: LEAF_U[0] + (LEAF_U[1] - LEAF_U[0]) * Math.random(),
+      landed: -1,
+      img,
+      shadow,
+    })
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -319,7 +364,7 @@ export class MapleView implements MapView {
     const toPx = UNIT / cfg.meterPerU
     const f = this.flow
     const wr = plan.weir
-    // 水上的花瓣顺着水流漂，缓水里打着转慢慢聚起来；漂到竹栅前就被水压在那里，顺着竹栅挪
+    // 水上的枫叶顺着水流漂，缓水里打着转慢慢聚起来；漂到竹栅前就被水压在那里，顺着竹栅挪
     for (const p of this.afloat) {
       flowAt(water, p.x / UNIT, p.y / UNIT, f)
       p.age += dt
@@ -335,43 +380,60 @@ export class MapleView implements MapView {
       }
       p.rot += p.spin * dt * (0.3 + Math.hypot(f.u, f.v))
       const fade = Math.min(1, p.age / 1.2)
-      p.img.setPosition(p.x, p.y).setRotation(p.rot).setAlpha(0.92 * fade).setDisplaySize(PETAL_U * UNIT, PETAL_U * UNIT)
+      p.img.setPosition(p.x, p.y).setRotation(p.rot).setAlpha(0.95 * fade).setDisplaySize(p.size * UNIT, p.size * UNIT)
     }
-    // 树上飘下的花瓣：没有风，左右轻轻摆着落下；落进水里就接着在水上漂，落在地上的过一会儿淡去
+    // 树上飘下的枫叶：一边左右荡、一边在画面上打转、一边绕中脉翻跟头（翻过去露出背面、侧着时看着窄），地上的影子离它越来越近；
+    // 落进水里就接着在水上漂，落在地上的过一阵淡去
     this.fallAt -= dt
     if (this.fallAt <= 0 && this.falling.length < FALLING) {
       this.fallAt = FALL_EVERY_S
-      this.blossom(v, plan)
+      this.shed(v, plan)
     }
     const mpu = cfg.meterPerU
     this.falling = this.falling.filter((p) => {
       if (p.landed < 0) {
         p.phase += dt
-        p.z -= p.vz * dt
-        const sx = Math.sin(p.phase * 2.1) * p.sway
-        const sy = Math.cos(p.phase * 1.7) * p.sway * 0.6
-        p.rot += dt * 2.4
+        p.z -= p.vz * dt * (0.75 + 0.5 * Math.abs(Math.cos(p.flip)))
+        const sx = Math.sin(p.phase * 2.6) * p.sway
+        const sy = Math.cos(p.phase * 1.9) * p.sway * 0.6
+        p.x += sx * dt
+        p.y += sy * dt
+        p.rot += (p.spin + sx * 0.8) * dt
+        p.flip += p.flipRate * dt
         if (p.z <= 0) {
-          flowAt(water, p.x / UNIT, p.y / UNIT, f)
+          p.shadow.destroy()
+          this.visuals = this.visuals.filter((o) => o !== p.shadow)
+          flowAt(water, p.x, p.y, f)
           if (f.h > 0.05) {
             const old = this.afloat.reduce((a, b) => (b.age > a.age ? b : a), this.afloat[0]!)
             old.x = p.x * UNIT
             old.y = p.y * UNIT
             old.age = 0
+            old.size = p.size
+            old.img.setTexture(leafKey(p.color, false))
             p.img.destroy()
             this.visuals = this.visuals.filter((o) => o !== p.img)
             return false
           }
           p.landed = 0
+          p.img.setTexture(leafKey(p.color, false)).setDepth(1.2).setPosition(p.x * UNIT, p.y * UNIT).setDisplaySize(p.size * UNIT, p.size * UNIT)
+          return true
         }
-        const flip = 0.45 + 0.55 * Math.abs(Math.sin(p.phase * 3.3))
-        p.img.setPosition((p.x + sx * dt) * UNIT, (p.y + sy * dt - (p.z / mpu) * 0.08) * UNIT).setRotation(p.rot).setDisplaySize(PETAL_U * UNIT, PETAL_U * UNIT * flip)
-        p.x += sx * dt
-        p.y += sy * dt
+        const face = Math.cos(p.flip)
+        const wide = 0.18 + 0.82 * Math.abs(face)
+        const tex = leafKey(p.color, face < 0)
+        if (p.img.texture.key !== tex) p.img.setTexture(tex)
+        p.img.setPosition(p.x * UNIT, (p.y - (p.z / mpu) * FALL_LIFT_U) * UNIT).setRotation(p.rot).setDisplaySize(p.size * UNIT, p.size * UNIT * wide)
+        const off = (p.z / mpu) * FALL_SHADOW_U * 0.25
+        p.shadow
+          .setPosition((p.x + AWAY.x * off) * UNIT, (p.y + AWAY.y * off) * UNIT)
+          .setRotation(p.rot)
+          .setDisplaySize(p.size * UNIT, p.size * UNIT * wide)
+          .setAlpha(0.28 * Math.max(0.25, 1 - p.z / 6))
         return true
       }
       p.landed += dt
-      p.img.setDepth(1.2).setAlpha(Math.max(0, 1 - p.landed / LANDED_S))
+      p.img.setAlpha(Math.max(0, 1 - Math.max(0, p.landed - LANDED_S * 0.6) / (LANDED_S * 0.4)))
       if (p.landed < LANDED_S) return true
       p.img.destroy()
       this.visuals = this.visuals.filter((o) => o !== p.img)

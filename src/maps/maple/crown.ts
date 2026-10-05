@@ -234,7 +234,7 @@ function grow(t: Tree, k: number, pal: number, seed: number, mpu: number, leaves
         const size = LEAF_U * (0.82 + 0.36 * rng.next())
         // 晒得到多少：长在树冠外表面上的晒得足，越往里（比树冠的外表面低得越多）越背阴；朝着太阳那边的晒得多一点
         const sun = rho > 1e-3 ? (((x - t.x) * TO_SUN.x + (y - t.y) * TO_SUN.y) / rho) * Math.min(1, rho / R) : 0
-        const e = Math.min(1, Math.max(0, 1.05 - 1.1 * smooth01((dome(rho) - z + 0.05) / 0.75) + 0.16 * sun + sp.tone + (rng.next() - 0.5) * 0.2))
+        const e = Math.min(1, Math.max(0, 0.95 - 1.1 * smooth01((dome(rho) - z + 0.05) / 0.75) + 0.3 * sun + sp.tone + (rng.next() - 0.5) * 0.2))
         leafColor(pal, e, col)
         const vary = sp.bright * (1 + (rng.next() - 0.5) * 0.16)
         const pick = rng.next()
