@@ -96,7 +96,7 @@ function flee(sim: Sim): void {
   }
 }
 
-/** 探测到敌人后保持在 standoffDist 附近：远了靠近，近了后退，带内不动 */
+/** 探测到敌人后保持在 standoffDist 附近：远了靠近（直线要穿过传送门就按地图的寻路走，不会穿过去又折回来），近了后退，带内不动 */
 function standoff(sim: Sim): void {
   const band = AI.standoffBandU * UNIT
   for (const eid of query(sim.world, [Standoff, Ctl, Transform, Phys, Stats])) {
@@ -114,7 +114,7 @@ function standoff(sim: Sim): void {
     }
     const stand = Standoff.standoffDist[eid]!
     if (dist > stand + band) {
-      const d = norm(dx, dy)
+      const d = sim.hooks.portal?.(sim, -1, ex, ey, ex + dx, ey + dy) ? sim.hooks.chaseDir(sim, eid, ex + dx, ey + dy) : norm(dx, dy)
       drive(eid, d.x, d.y, sp)
       continue
     }
@@ -176,7 +176,7 @@ function orbit(sim: Sim): void {
   }
 }
 
-/** 奔向最近的金币吃掉，没有金币就慢速游荡 */
+/** 奔向最近的金币吃掉（直线要穿过传送门就按地图的寻路走），没有金币就慢速游荡 */
 function coinThief(sim: Sim): void {
   const thieves = query(sim.world, [CoinThief, Ctl, Transform, Phys, Stats, Radius])
   if (thieves.length === 0) return
@@ -221,7 +221,7 @@ function coinThief(sim: Sim): void {
       }
       continue
     }
-    const dir = norm(coinX - ex, coinY - ey)
+    const dir = sim.hooks.portal?.(sim, -1, ex, ey, coinX, coinY) ? sim.hooks.chaseDir(sim, eid, coinX, coinY) : norm(coinX - ex, coinY - ey)
     drive(eid, dir.x, dir.y, sp)
   }
 }
