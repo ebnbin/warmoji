@@ -1,5 +1,5 @@
 import { Rng } from '../../util/rng'
-import { REMNANT_CRAB, REMNANT_KNOTS, REMNANT_PLANETARY, REMNANT_SHELL } from './remnants'
+import { REMNANT_CRAB, REMNANT_KNOTS, REMNANT_PLANETARY, REMNANT_SHELL, REMNANT_SPAN } from './remnants'
 import { hue, planck, scattered } from './spectrum'
 import type { Rgb } from './spectrum'
 
@@ -51,7 +51,7 @@ const PLANETARY_GROW_S = 30
 /** 电离氢区的 O 型主星、反射星云的 B 型星团、红超巨星、渐近巨星支的红巨星、行星状星云中心的白矮星的色温，开尔文 */
 const O_K = 38000
 const B_K = 16000
-const GIANT_K = 3500
+const GIANT_K = 3300
 const AGB_K = 3100
 const WD_K = 100000
 /** 星点有多亮 */
@@ -65,21 +65,25 @@ const O_SPREAD = 0.5
 const B_SPREAD = 1.1
 /** 星光被尘埃散射出来有多亮 */
 const O_SCATTER = 1.5
-const B_SCATTER = 3.5
+const B_SCATTER = 4.5
 const GIANT_SCATTER = 2.8
 const AGB_SCATTER = 1.2
 /** 电离区的发光与电离前沿那一圈亮边有多亮 */
-const HII_GAIN = 1.1
+const HII_GAIN = 0.8
 const HII_FRONT = 0.7
 /** B 型星团只电离得了身边小小一团 */
 const B_ION_U = 1.3
-const B_ION = 0.4
+const B_ION = 0.25
 /** 红超巨星半规则地脉动：亮度上下这么多 */
 const GIANT_PULSE = 0.18
 /** 超新星照到旁边的单位与星尘上有多亮 */
 const SN_POWER = 60
+/** 星点连同星团与超新星的晕画多远、超新星的光回波照多远与照多久：格、秒；光回波按 e^(−(d/(ECHO_U/3))²) 在 ECHO_U 以内淡到看不见 */
+const STAR_REACH_U = 3
+export const ECHO_U = 14
+const ECHO_S = 12
 /** 黑洞吸积的起伏：光度按 e^(±LUM_SWING) 慢慢涨落，谱在软硬之间来回；各由几个周期（秒）随机的正弦叠成 */
-const LUM_SWING = 0.55
+const LUM_SWING = 0.4
 const LUM_PERIODS_S: readonly (readonly [number, number])[] = [
   [23, 37],
   [41, 67],
@@ -131,7 +135,7 @@ interface Phenomenon {
 
 /** 交给着色器的天象：每个槽各一个 vec4，按槽拼成数组 */
 export interface CosmosUniforms {
-  /** 位置（格，以球心为原点、z 朝上）、在不在演 */
+  /** 位置（格，以球心为原点、z 朝上）、它的光与遗迹够得着多远（格，0 是这个槽空着） */
   readonly at: Float32Array
   /** 星点的颜色乘亮度、星团散开多远（格，0 是一颗星） */
   readonly star: Float32Array
@@ -356,7 +360,12 @@ export class Cosmos {
     else if (p.kind === 'cluster') this.cluster(p, t)
     else if (p.kind === 'giant') this.giant(p, t)
     else this.planetary(p, t)
-    u.at.set([p.x, p.y, p.z, 1], o)
+    let reach = g.r + g.g + g.b > 0 || g.flash > 0 ? STAR_REACH_U : 0
+    if (g.ion > 0) reach = Math.max(reach, g.ionU * 1.4 + 0.6)
+    if (g.sr + g.sg + g.sb > 0) reach = Math.max(reach, g.reachU)
+    if (g.remnant > 0) reach = Math.max(reach, g.remnantU * REMNANT_SPAN)
+    if (g.flash > 0 && now - g.flashAt < ECHO_S) reach = Math.max(reach, ECHO_U)
+    u.at.set([p.x, p.y, p.z, reach], o)
     u.star.set([g.r, g.g, g.b, g.spread], o)
     u.ion.set([g.ionU, g.highU, g.ion, g.front], o)
     u.scatter.set([g.sr, g.sg, g.sb, g.reachU], o)

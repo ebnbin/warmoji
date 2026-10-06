@@ -1,5 +1,5 @@
 import { cellNearest, fbm, valueNoise } from '../../util/noise'
-import { COSMOS_SLOTS, SN_COOL_K, SN_COOL_S, SN_FALL_S, SN_HOT_K, SN_RISE_S } from './cosmos'
+import { COSMOS_SLOTS, ECHO_U, SN_COOL_K, SN_COOL_S, SN_FALL_S, SN_HOT_K, SN_RISE_S } from './cosmos'
 import { paintRemnants, REMNANT_PLANETARY, REMNANT_PX, REMNANT_SPAN } from './remnants'
 import { C2, hue, LAMBDA, planck, scattered, WHITE_K } from './spectrum'
 import type { Rgb } from './spectrum'
@@ -255,7 +255,7 @@ uniform vec4 uEvScatter[SLOTS];
 uniform vec4 uEvRemnant[SLOTS];
 uniform vec4 uEvFlash[SLOTS];
 
-const float DISK_GAIN = 0.4;
+const float DISK_GAIN = 0.16;
 const float LIMB_MAX = 2.4;
 const float ION_SAT = 1.2;
 const float HOLE_FLUX = 110.0;
@@ -272,9 +272,10 @@ const vec3 SHOCK = vec3(1.0, 0.3, 0.07);
 const vec3 SYNC = vec3(0.55, 0.68, 1.0);
 const vec3 EXTINCTION = vec3(1.0, 1.25, 1.46);
 const float DUST_TAU = 1.0;
+const float DUST_FLOOR = 0.2;
 const vec3 WALL = vec3(0.008, 0.008, 0.013);
 const vec3 DUST = vec3(0.13, 0.115, 0.11);
-const vec3 DIFFUSE = vec3(0.07, 0.008, 0.024);
+const vec3 DIFFUSE = vec3(0.05, 0.006, 0.018);
 const vec3 METEOR = vec3(1.0, 0.55, 0.25);
 const vec3 STAR_RED = ${STAR_HUES[0]};
 const vec3 STAR_ORANGE = ${STAR_HUES[1]};
@@ -288,6 +289,7 @@ const float SN_HOT_K = ${glsl(SN_HOT_K)};
 const float SN_COOL_K = ${glsl(SN_COOL_K)};
 const float SN_COOL_S = ${glsl(SN_COOL_S)};
 const float SPAN = ${glsl(REMNANT_SPAN)};
+const float ECHO_FALL = ${glsl((ECHO_U / 3) ** 2)};
 const float PLANETARY = ${glsl(REMNANT_PLANETARY)};
 
 float hash(vec2 p) {
@@ -339,13 +341,13 @@ vec3 starLayer(vec2 p, float scale, float seed, float rare) {
   vec2 i = floor(g);
   vec2 f = fract(g);
   float h = hash(i + seed);
-  float on = step(rare, h);
+  if (h < rare) return vec3(0.0);
   vec2 at = vec2(hash(i + seed + 17.1), hash(i + seed + 41.7)) * 0.7 + 0.15;
   float d = length(f - at) / scale * uUnit;
   float b = pow((h - rare) / (1.0 - rare), 3.0);
   float t = hash(i + seed + 5.3);
   float pulse = 1.0 + 0.45 * step(0.88, hash(i + seed + 23.9)) * sin(uTime * (0.7 + hash(i + seed + 31.1)) + h * 40.0);
-  return starHue(t) * on * b * (0.7 + 0.6 * t) * pulse * exp(-d * d * 0.35);
+  return starHue(t) * b * (0.7 + 0.6 * t) * pulse * exp(-d * d * 0.35);
 }
 
 vec3 stars(vec2 p) {
@@ -466,104 +468,107 @@ void main ()
     vec2 sky = -K * uCam.z;
     float floorOn = step(r, a);
     float shellOn = step(a, r) * step(r, outer);
-    float body = floorOn + shellOn;
-    vec3 hit = floorHit(p, K, a);
-    vec2 s = mix(p, hit.xy, floorOn);
-    vec3 P = vec3(s, -hit.z * floorOn);
-    vec3 n = floorOn > 0.5 ? -P / a : vec3(-p / max(r, 1e-3), 0.0);
-    float blur = smoothstep(0.25, 0.35, rs / bp) * floorOn;
-    float sharp = 1.0 - blur;
-    vec4 raw = sheetAt(s);
-    vec4 nb = mix(raw, SHEET_MEAN, blur) * body;
-    vec2 grad = (vec2(sheetAt(s + vec2(0.2, 0.0)).r, sheetAt(s + vec2(0.0, 0.2)).r) - raw.r) * 5.0 * sharp * body;
-    float skin = mix(exp(1.0 - pow(max(0.0, r - inner) / (a - inner), uShell.w + 1.0)), 1.0, floorOn);
-    float limb = floorOn > 0.5 ? min(LIMB_MAX, 1.0 / max(0.05, abs(dot(normalize(vec3(-K, -1.0)), n)))) : LIMB_MAX * skin;
+    if (floorOn + shellOn < 0.5) col = stars(sky) + galaxies(sky);
+    else {
+      vec3 hit = floorHit(p, K, a);
+      vec2 s = mix(p, hit.xy, floorOn);
+      vec3 P = vec3(s, -hit.z * floorOn);
+      vec3 n = floorOn > 0.5 ? -P / a : vec3(-p / max(r, 1e-3), 0.0);
+      float blur = smoothstep(0.25, 0.35, rs / bp) * floorOn;
+      float sharp = 1.0 - blur;
+      vec4 raw = sheetAt(s);
+      vec4 nb = mix(raw, SHEET_MEAN, blur);
+      vec2 grad = (vec2(sheetAt(s + vec2(0.2, 0.0)).r, sheetAt(s + vec2(0.0, 0.2)).r) - raw.r) * 5.0 * sharp;
+      float skin = mix(exp(1.0 - pow(max(0.0, r - inner) / (a - inner), uShell.w + 1.0)), 1.0, floorOn);
+      float limb = floorOn > 0.5 ? min(LIMB_MAX, 1.0 / max(0.05, abs(dot(normalize(vec3(-K, -1.0)), n)))) : LIMB_MAX * skin;
 
-    vec3 L = vec3(hole, 0.0) - P;
-    float d = length(L);
-    vec3 Ld = L / d;
-    float flux = lumAt(now - d / c) * max(dot(n, Ld), 0.0) * (0.3 + 0.7 * abs(Ld.z)) / (d * d) * HOLE_FLUX;
-    float cone = smoothstep(uCone.w - 0.08, uCone.w + 0.04, dot(-Ld, uCone.xyz));
-    flux *= 1.0 + 0.6 * cone;
-    float lit = ionized(flux);
-    float U = flux / (0.35 + nb.r) * (0.6 + 0.9 * uHard) * (1.0 + 3.0 * cone);
-    float hi = smoothstep(0.35, 1.8, U);
-    float he = smoothstep(4.0, 10.0, U);
-    float low = 1.0 - smoothstep(0.1, 0.7, U);
-    vec3 line = DIFFUSE + lit * 0.7 * (mix(BALMER, LOWEX, low * 0.7) * (1.0 - 0.75 * hi) + mix(OIII, HEII, he) * hi * 1.1);
-    vec3 glow = uDisk * SCATTER * flux * 0.05;
-    vec3 rims = mix(BALMER, OIII, hi) * nb.b * lit * 0.55 * skin;
+      vec3 L = vec3(hole, 0.0) - P;
+      float d = length(L);
+      vec3 Ld = L / d;
+      float flux = lumAt(now - d / c) * max(dot(n, Ld), 0.0) * (0.3 + 0.7 * abs(Ld.z)) / (d * d) * HOLE_FLUX;
+      float cone = smoothstep(uCone.w - 0.08, uCone.w + 0.04, dot(-Ld, uCone.xyz));
+      flux *= 1.0 + 0.6 * cone;
+      float lit = ionized(flux);
+      float U = flux / (0.35 + nb.r) * (0.6 + 0.9 * uHard) * (1.0 + 3.0 * cone);
+      float hi = smoothstep(0.35, 1.8, U);
+      float he = smoothstep(4.0, 10.0, U);
+      float low = 1.0 - smoothstep(0.1, 0.7, U);
+      vec3 line = DIFFUSE + lit * 0.55 * (mix(BALMER, LOWEX, low * 0.7) * (1.0 - 0.75 * hi) + mix(OIII, HEII, he) * hi * 1.1);
+      vec3 glow = uDisk * SCATTER * flux * 0.05;
+      vec3 rims = mix(BALMER, OIII, hi) * nb.b * lit * 0.55 * skin;
 
-    vec3 M = vec3(hm, 0.0) - P;
-    float dm = length(M);
-    float mflux = uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
-    glow += METEOR * mflux * 0.1;
-    line += SHOCK * ionized(mflux) * 0.4;
+      vec3 M = vec3(hm, 0.0) - P;
+      float dm = length(M);
+      float mflux = uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
+      glow += METEOR * mflux * 0.1;
+      line += SHOCK * ionized(mflux) * 0.4;
 
-    vec3 fil = vec3(0.0);
-    vec3 pts = vec3(0.0);
-    for (int i = 0; i < SLOTS; i++) {
-      vec4 at = uEvAt[i];
-      if (at.w < 0.5) continue;
-      vec3 D = P - at.xyz;
-      float dd = length(D);
-      vec4 ion = uEvIon[i];
-      if (ion.z > 0.0) {
-        float R = ion.x * (1.15 - 0.5 * nb.r);
-        float inside = 1.0 - smoothstep(R * 0.72, R, dd);
-        float high = 1.0 - smoothstep(ion.y * 0.5, ion.y, dd);
-        line += ion.z * inside * (BALMER * (1.0 - 0.75 * high) + OIII * high * 1.1);
-        line += ion.w * LOWEX * exp(-pow((dd - R) / (0.1 * R + 0.3), 2.0));
-        rims += ion.z * inside * max(0.0, dot(grad, D.xy) / max(dd, 1e-3)) * mix(BALMER, OIII, high) * 0.35 * skin;
-      }
-      vec4 sc = uEvScatter[i];
-      glow += sc.rgb / (dd * dd + 2.0) * (1.0 - smoothstep(sc.w * 0.5, sc.w, dd));
-      vec4 fl = uEvFlash[i];
-      vec4 rem = uEvRemnant[i];
-      vec3 nC = normalize(at.xyz);
-      vec3 t1 = normalize(vec3(-nC.y, nC.x, 0.0) + vec3(1e-4, 0.0, 0.0));
-      vec3 t2 = cross(nC, t1);
-      vec4 st = uEvStar[i];
-      if (dd < 3.0 && sharp > 0.0) {
-        float k0 = starShape(dd);
-        if (st.w > 0.0) {
-          for (int k = 1; k < 5; k++) {
-            float fk = float(k);
-            vec2 off = (vec2(hash(vec2(fl.z, fk)), hash(vec2(fk, fl.z + 3.1))) - 0.5) * 2.0 * st.w;
-            k0 += (0.3 + 0.4 * hash(vec2(fl.z + fk, 7.7))) * starShape(length(D - t1 * off.x - t2 * off.y));
+      vec3 fil = vec3(0.0);
+      vec3 pts = vec3(0.0);
+      for (int i = 0; i < SLOTS; i++) {
+        vec4 at = uEvAt[i];
+        vec3 D = P - at.xyz;
+        float dd = length(D);
+        if (dd >= at.w) continue;
+        vec4 ion = uEvIon[i];
+        if (ion.z > 0.0) {
+          float R = ion.x * (1.15 - 0.5 * nb.r);
+          float inside = 1.0 - smoothstep(R * 0.72, R, dd);
+          float high = 1.0 - smoothstep(ion.y * 0.5, ion.y, dd);
+          float edge = (dd - R) / (0.1 * R + 0.3);
+          line += ion.z * inside * (BALMER * (1.0 - 0.75 * high) + OIII * high * 1.1) + ion.w * LOWEX * exp(-edge * edge);
+          rims += ion.z * inside * max(0.0, dot(grad, D.xy) / max(dd, 1e-3)) * mix(BALMER, OIII, high) * 0.35 * skin;
+        }
+        vec4 sc = uEvScatter[i];
+        glow += sc.rgb / (dd * dd * 0.5 + 2.0) * (1.0 - smoothstep(sc.w * 0.5, sc.w, dd));
+        vec4 fl = uEvFlash[i];
+        vec4 rem = uEvRemnant[i];
+        vec4 st = uEvStar[i];
+        bool nearStar = dd < 3.0 && sharp > 0.0;
+        bool inRemnant = rem.z > 0.0 && dd < rem.x * SPAN;
+        if (nearStar || inRemnant) {
+          vec3 nC = normalize(at.xyz);
+          vec3 t1 = normalize(vec3(-nC.y, nC.x, 0.0) + vec3(1e-4, 0.0, 0.0));
+          vec3 t2 = cross(nC, t1);
+          if (nearStar) {
+            float k0 = starShape(dd);
+            if (st.w > 0.0) {
+              for (int k = 1; k < 5; k++) {
+                float fk = float(k);
+                vec2 off = (vec2(hash(vec2(fl.z, fk)), hash(vec2(fk, fl.z + 3.1))) - 0.5) * 2.0 * st.w;
+                k0 += (0.3 + 0.4 * hash(vec2(fl.z + fk, 7.7))) * starShape(length(D - t1 * off.x - t2 * off.y));
+              }
+            }
+            pts += st.rgb * k0 * sharp;
+          }
+          if (inRemnant) {
+            vec2 l = vec2(dot(D, t1), dot(D, t2)) / rem.x;
+            float ca = cos(rem.w);
+            float sa = sin(rem.w);
+            l = vec2(ca * l.x - sa * l.y, (sa * l.x + ca * l.y) / fl.w);
+            vec3 m = remnantAt(l, rem.y) * rem.z * sharp;
+            if (abs(rem.y - PLANETARY) < 0.5) fil += m.r * mix(OIII, HEII, 0.35) + m.g * mix(BALMER, LOWEX, 0.5) + m.b * LOWEX * 0.6;
+            else fil += (m.r * OIII + m.g * SHOCK + m.b * SYNC) * (0.5 + nb.r);
           }
         }
-        pts += st.rgb * k0 * sharp;
+        if (fl.y > 0.0) {
+          float te = now - fl.x;
+          if (nearStar) pts += tint(planck(snTemp(te))) * snShape(te) * (starShape(dd) * 6.0 + 0.5 * exp(-dd * dd / 1.2)) * sharp;
+          float echo = snShape(te - dd / c) / (dd * dd + 1.0) * exp(-dd * dd / ECHO_FALL) * 22.0;
+          line += ionized(echo) * mix(BALMER, OIII, 0.75);
+          glow += tint(planck(snTemp(te - dd / c))) * SCATTER * echo * 0.05;
+        }
       }
-      if (fl.y > 0.0) {
-        float te = now - fl.x;
-        if (dd < 3.0) pts += tint(planck(snTemp(te))) * snShape(te) * (starShape(dd) * 6.0 + 0.5 * exp(-dd * dd / 1.2)) * sharp;
-        float echo = snShape(te - dd / c) / (dd * dd + 1.0) * 30.0;
-        line += ionized(echo) * mix(BALMER, OIII, 0.6);
-        glow += tint(planck(snTemp(te - dd / c))) * SCATTER * echo * 0.08;
-      }
-      if (rem.z > 0.0 && dd < rem.x * SPAN) {
-        vec2 l = vec2(dot(D, t1), dot(D, t2)) / rem.x;
-        float ca = cos(rem.w);
-        float sa = sin(rem.w);
-        l = vec2(ca * l.x - sa * l.y, (sa * l.x + ca * l.y) / fl.w);
-        vec3 m = remnantAt(l, rem.y) * rem.z * sharp;
-        if (abs(rem.y - PLANETARY) < 0.5) fil += m.r * mix(OIII, HEII, 0.35) + m.g * mix(BALMER, LOWEX, 0.5) + m.b * LOWEX * 0.6;
-        else fil += (m.r * OIII + m.g * SHOCK + m.b * SYNC) * (0.5 + nb.r);
-      }
-    }
 
-    float dust = nb.g;
-    vec3 ext = exp(-dust * DUST_TAU * EXTINCTION);
-    vec2 starAt = mix(sky, s, floorOn);
-    vec3 star = stars(starAt) * sharp;
-    vec3 shine = (nb.r * limb * line + fil * skin) * ext + pts * skin * sqrt(ext) + glow * (dust + 0.25 * nb.r) * skin + rims;
-    float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - dust);
-    vec3 far = star;
-    if (floorOn < 0.5 && (shellOn < 0.5 || clear > 0.0)) far += galaxies(sky);
-    vec3 onFloor = (WALL + star * 0.5) * (1.0 - dust) + DUST * dust * 0.05 + shine + nests(s, dust) * sharp * sqrt(ext);
-    vec3 inShell = mix(DUST * 0.06 * (0.4 + nb.r), far, clear) + shine;
-    col = floorOn * onFloor + shellOn * inShell + (1.0 - body) * far;
+      float dust = nb.g;
+      vec3 ext = exp(-dust * DUST_TAU * EXTINCTION);
+      vec2 starAt = mix(sky, s, floorOn);
+      vec3 star = stars(starAt) * sharp;
+      vec3 shine = (nb.r * limb * line + fil * skin) * ext + pts * skin * sqrt(ext) + glow * (DUST_FLOOR + dust + 0.25 * nb.r) * skin + rims;
+      float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - dust);
+      if (floorOn > 0.5) col = (WALL + star * 0.5) * (1.0 - dust) + DUST * dust * 0.05 + shine + nests(s, dust) * sharp * sqrt(ext);
+      else col = mix(DUST * 0.06 * (0.4 + nb.r), clear > 0.0 ? star + galaxies(sky) : star, clear) + shine;
+    }
   }
 
   float ri = 3.0 * rs;
