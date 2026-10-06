@@ -2,6 +2,7 @@ import { MAPS } from '../data/maps'
 import type { MapDef, MapId } from '../types/maps'
 import { BoundedView, DayNightView, IceView, NebulaOldView, OldRiverView, OldRuinsView, SpaceView, TorusView } from './views'
 import type { MapView } from './views'
+import { CanyonView } from '../maps/canyon/view'
 import { CaveView } from '../maps/cave/view'
 import { CircuitView } from '../maps/circuit/view'
 import { DesertView } from '../maps/desert/view'
@@ -46,4 +47,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   nexus: () => new NexusView(),
   petri: () => new PetriView(),
   dreamland: () => new DreamlandView(),
+  canyon: () => new CanyonView(),
 }

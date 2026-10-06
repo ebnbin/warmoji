@@ -3,6 +3,7 @@ import type { MapDef, MapId } from '../../types/maps'
 import { bounded, ice, nebulaOld, oldRiver, oldRuins, space, torus } from './hooks'
 import type { WorldHooks } from './hooks'
 import { withBuilt } from './built'
+import { canyon } from '../../maps/canyon/world'
 import { cave } from '../../maps/cave/world'
 import { circuit } from '../../maps/circuit/world'
 import { desert } from '../../maps/desert/world'
@@ -43,6 +44,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   nexus,
   petri,
   dreamland,
+  canyon,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

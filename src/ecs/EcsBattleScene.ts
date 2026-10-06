@@ -81,6 +81,7 @@ import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
 import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import { bridgeSnapshot } from '../maps/canyon/hud'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -507,10 +508,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
     const cutAt = this.map.cutAt?.bind(this.map)
+    const lookOf = this.map.lookOf?.bind(this.map)
     // 布景躺在地上，和躺着的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt)
-    if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt, lookOf)
+    if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow, lookOf)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
@@ -610,6 +612,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      bridge: sim ? bridgeSnapshot(sim) : null,
     }
   }
 

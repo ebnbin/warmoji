@@ -88,4 +88,4 @@ export function rollDecor(
 
 export const MAP = fromJson<MapDefaults>(mapDefaultsJson)
 
-export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', meteor: '天体', blackhole: '黑洞', lava: '熔岩', collapse: '塌方', shock: '触电', arc: '电弧', drown: '呛水' }
+export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', meteor: '天体', blackhole: '黑洞', lava: '熔岩', collapse: '塌方', shock: '触电', arc: '电弧', drown: '呛水', fall: '坠崖' }

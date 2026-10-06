@@ -38,6 +38,24 @@ export interface SpriteCut {
   keep: 1 | -1
 }
 
+/** 地图给一个实体的样子：按脚底缩放 scale 倍，颜色再乘上 tint，透明度再乘 alpha */
+export interface BodyLook {
+  scale: number
+  tint: number
+  alpha: number
+}
+
+/** 地图按实体改它画出来的样子（比如掉进深谷里的画得小、蒙一层雾色）：改了 out 返回 true，照常画返回 false */
+export type LookOf = (eid: number, out: BodyLook) => boolean
+
+/** 两个颜色逐通道相乘 */
+export function mulColor(a: number, b: number): number {
+  const r = (((a >> 16) & 0xff) * ((b >> 16) & 0xff)) / 255
+  const g = (((a >> 8) & 0xff) * ((b >> 8) & 0xff)) / 255
+  const bl = ((a & 0xff) * (b & 0xff)) / 255
+  return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(bl)
+}
+
 /** 地图按身体在地上的位置 (x, y) 与精灵的半宽半高把它切成几份画：份数写进 out 并返回，0 是照常整张画 */
 export type CutAt = (x: number, y: number, hw: number, hh: number, out: SpriteCut[]) => number
 

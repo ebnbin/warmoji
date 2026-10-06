@@ -1333,6 +1333,73 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/** 吊桥的一种结实程度：叫什么，载重上限（公斤） */
+export interface BridgeKind {
+  readonly name: string
+  readonly capKg: number
+}
+/**
+ * 索桥：一道很深的峡谷里立着几座砂岩石台，台与台之间只靠绳索和木板搭的吊桥相连；石台是实地，峡谷是走不了的虚空。
+ * 按透视，谷底画在石台往下 depthU 格的地方，朝着镜头的那一面崖壁露在台边下面；谷底能走的只有露出来的那部分
+ */
+export interface CanyonConfig {
+  /**
+   * 石台：中间那座半径 centerU，别的 count − 1 座半径 radiusU、台心离方框正中 ringU；轮廓按 wobble 倍半径起伏；
+   * 两座台的边至少隔 gapU[0] 格（桥不会太短），能搭桥的最远隔 gapU[1] 格；台在谷底露出来的部分彼此至少留 clearU 格的路
+   */
+  readonly mesas: {
+    readonly count: readonly [number, number]
+    readonly centerU: readonly [number, number]
+    readonly radiusU: readonly [number, number]
+    readonly ringU: readonly [number, number]
+    readonly wobble: number
+    readonly gapU: readonly [number, number]
+    readonly clearU: number
+  }
+  /** 谷底画在台面往下多少格：露出来的崖壁就这么高 */
+  readonly depthU: number
+  /**
+   * 吊桥：桥面宽 widthU 格；连通所有石台以后再多搭 extra 座成环；结实程度按 kinds 的次序由弱到强，每种至少一座。
+   * 桥上所有站着的身体的重量加起来超过上限 strainMs 毫秒就崩断；断了 downMs 毫秒后开始重新拉绳，拉 rebuildMs 毫秒搭好。
+   * 标准身体（半径 refRadiusU 格、质量 1）重 bodyKg 公斤，别的按质量乘半径之比的立方；
+   * 空桥中间垂下 sagM 米，压到上限时再多垂 loadSagM 米
+   */
+  readonly bridge: {
+    readonly widthU: number
+    readonly extra: readonly [number, number]
+    readonly kinds: readonly BridgeKind[]
+    readonly bodyKg: number
+    readonly refRadiusU: number
+    readonly strainMs: number
+    readonly downMs: number
+    readonly rebuildMs: number
+    readonly sagM: number
+    readonly loadSagM: number
+  }
+  /** 掉下去：落 ms 毫秒到谷底，摔掉生命上限的 hurt 倍（最多 hurtCap 点），落地后懵 stunMs 毫秒；敌我一样 */
+  readonly fall: {
+    readonly ms: number
+    readonly hurt: number
+    readonly hurtCap: number
+    readonly stunMs: number
+  }
+  /**
+   * 攀爬点：每座台在朝着镜头的崖壁上挂 perMesa 根绳梯，彼此隔开 spacingU 格；
+   * 走到绳梯脚下就往上爬，标准身体爬 ms 毫秒，别的按重量的立方根
+   */
+  readonly climb: {
+    readonly perMesa: readonly [number, number]
+    readonly spacingU: number
+    readonly ms: number
+  }
+  /** 谷底：一条河半宽 riverU 格，蹚水黏度 wade、每格多耗 wadeExertion 点体力；谷底的格子边长 cellU 格 */
+  readonly gorge: {
+    readonly riverU: readonly [number, number]
+    readonly wade: number
+    readonly wadeExertion: number
+    readonly cellU: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1407,7 +1474,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'canyon'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,13 +1508,14 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly canyon?: CanyonConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown' | 'fall'
 
 export interface DecorInstance {
   emoji: string

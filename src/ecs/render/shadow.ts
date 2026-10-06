@@ -12,6 +12,7 @@ import { bottomAt, footY } from '../utils/ground'
 import { UNDER_Z } from './bands'
 import { EcsLayer, LayerType } from './layer'
 import { packTint, TINT_FILL } from './tint'
+import type { BodyLook, LookOf } from './sprites'
 
 /** 压在地面、水面与地上的 emoji 之上，所有身体之下 */
 const SHADOW_DEPTH = 2.5
@@ -44,14 +45,17 @@ export class EcsShadowBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
   private readonly xy = new Float32Array(8)
   private readonly tints = new Uint32Array(4)
+  private readonly lookOf: LookOf | undefined
+  private readonly look: BodyLook = { scale: 1, tint: 0xffffff, alpha: 1 }
   /** 须是复用的持久对象；multiTexturing 须显式开，缺省为单纹理且会与核心逐帧互相翻转 */
   private readonly renderOptions = {
     multiTexturing: true,
   } as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions
 
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, shadow: NonNullable<UnitLight['shadow']>) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, shadow: NonNullable<UnitLight['shadow']>, lookOf?: LookOf) {
     super(scene, LayerType.Shadow, SHADOW_DEPTH)
     this.world = world
+    this.lookOf = lookOf
     this.atlas = atlas
     this.color = shadow.color
     this.kx = AWAY.x * shadow.length
@@ -92,14 +96,25 @@ export class EcsShadowBatch extends EcsLayer {
   /** 一张精灵的影子：ground 是它脚下那块地在平地上的画面纵坐标，两者都按脚下的地面抬起；精灵上的一点比地面高多少，影子就顺着太阳的方位往外铺多远、淡多少 */
   private cast(node: Phaser.Renderer.WebGL.RenderNodes.BatchHandlerQuad, drawingContext: Phaser.Renderer.WebGL.DrawingContext, eid: number, flat: number): void {
     const frame = Sprite.frame[eid]!
-    const alpha = Tint.alpha[eid]!
+    let alpha = Tint.alpha[eid]!
     if (frame < 0 || alpha <= 0 || Depth.z[eid]! < UNDER_Z) return
     const lift = Floor.z[eid]! * LIFT_PER_M
     const ground = flat - lift
-    const hh = Transform.h[eid]! * 0.5
-    const hw = (Sprite.flipX[eid] ? -1 : 1) * Transform.w[eid]! * 0.5
+    let hh = Transform.h[eid]! * 0.5
+    let hw = (Sprite.flipX[eid] ? -1 : 1) * Transform.w[eid]! * 0.5
+    let sink = 0
+    const look = this.look
+    look.scale = 1
+    look.tint = 0xffffff
+    look.alpha = 1
+    if (this.lookOf?.(eid, look)) {
+      sink = hh * (1 - look.scale)
+      hh *= look.scale
+      hw *= look.scale
+      alpha *= look.alpha
+    }
     const m = this.spriteMatrix
-    m.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - lift, Transform.rot[eid]!, 1, 1)
+    m.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - lift + sink, Transform.rot[eid]!, 1, 1)
     const xy = this.xy
     const tints = this.tints
     // 四个角按 TL、BL、TR、BR

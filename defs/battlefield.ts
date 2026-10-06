@@ -38,6 +38,13 @@ export const BATTLEFIELD = {
       { id: 'circuit_brownout', emoji: '1faab', name: '电压骤降', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'circuit_jam', emoji: '1f4e1', name: '电磁干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    canyon: [
+      { id: 'canyon_updraft', emoji: '1f985', name: '谷风托举', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'canyon_sunset', emoji: '1f305', name: '落日余晖', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'canyon_echo', emoji: '1f4e3', name: '回声震慑', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'canyon_vertigo', emoji: '1f635_200d_1f4ab', name: '临渊目眩', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'canyon_dust', emoji: '1f32c', name: '谷风扬沙', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
     petri: [
       { id: 'petri_nutrient', emoji: '1f9eb', name: '营养充足', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'petri_penicillin', emoji: '1f48a', name: '青霉素', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },

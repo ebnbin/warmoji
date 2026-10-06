@@ -28,6 +28,8 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  /** 在索桥打的一局才有：离队长最近的那座桥压着多重、断了还要多久搭好 */
+  bridge: BridgeSnapshot | null
 }
 
 /**
@@ -58,6 +60,22 @@ export interface SubmarineSnapshot {
   readonly phase: 'down' | 'warn' | 'away'
   readonly ratio: number
   readonly inSec: number
+}
+
+/**
+ * 一座吊桥：叫什么，结实程度是第几档（共 grades 档，越大越结实），此刻桥上压着多重、上限多重（公斤）；完好、断了还是正重新拉绳，
+ * 断了或正拉绳时这一段还剩的比例与还有几秒；队长是不是正站在它上面
+ */
+export interface BridgeSnapshot {
+  readonly name: string
+  readonly grade: number
+  readonly grades: number
+  readonly kg: number
+  readonly cap: number
+  readonly phase: 'up' | 'down' | 'rebuild'
+  readonly ratio: number
+  readonly inSec: number
+  readonly on: boolean
 }
 
 export interface WaveSummary {

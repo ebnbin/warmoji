@@ -1209,6 +1209,52 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/** 索桥：六八拍的多利亚调，三角波像拨弦一样一串串分解和弦，回声拖得很长，像在峡谷两壁间来回撞；正弦波吹一支孤零零的长调，低音与低沉的鼓点一下下落在谷底 */
+function buildCanyon(): BgmScore {
+  const chords = [0, 0, 6, 6, 3, 3, 0, 0, 5, 5, 3, 3, 6, 6, 0, 0]
+  return track(
+    {
+      bpm: 68,
+      stepsPerBeat: 3,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 68) * 1.5, feedback: 0.5, level: 0.4 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.04, release: 0.6, octave: -1 }
+      const pluck: Voice = { wave: 'triangle', vol: 0.05, attack: 0.003, release: 0.32, octave: 0, echo: true }
+      const air: Voice = { wave: 'triangle', vol: 0.022, attack: 0.9, release: 1.4, octave: 0 }
+      const whistle: Voice = { wave: 'sine', vol: 0.085, attack: 0.08, release: 0.5, octave: 1, echo: true }
+      b.bass(bass, chords, 'r--f--')
+      b.arp(pluck, chords, [0, 2, 3, 4, 3, 2])
+      b.pad(air, chords, [0, 2], 0.003)
+      b.line(whistle, [
+        [0, 0, 7, 3], [0, 3, 9, 2], [0, 5, 8, 1],
+        [1, 0, 7, 6],
+        [2, 0, 6, 3], [2, 3, 4, 3],
+        [3, 0, 5, 6],
+        [4, 0, 3, 2], [4, 2, 4, 1], [4, 3, 5, 3],
+        [5, 0, 7, 6],
+        [6, 0, 4, 3], [6, 3, 2, 3],
+        [7, 0, 0, 6],
+        [8, 0, 9, 3], [8, 3, 11, 2], [8, 5, 10, 1],
+        [9, 0, 9, 6],
+        [10, 0, 8, 3], [10, 3, 7, 3],
+        [11, 0, 5, 6],
+        [12, 0, 6, 2], [12, 2, 7, 1], [12, 3, 8, 3],
+        [13, 0, 7, 6],
+        [14, 0, 4, 3], [14, 3, 1, 3],
+        [15, 0, 0, 6],
+      ])
+      b.drums('tom', 'x.....', 0, 16, 0.06)
+      b.drums('kick', '...o..', 4, 16, 0.045)
+      b.drums('hat', '..o..o', 8, 16, 0.014)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1234,6 +1280,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   nexus: buildNexus,
   deep: buildDeep,
   petri: buildPetri,
+  canyon: buildCanyon,
   dreamland: buildDreamland,
 }
 

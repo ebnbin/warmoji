@@ -177,6 +177,17 @@ const PETRI_MIX: readonly EnemyMixRow[] = [
   { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
+const CANYON_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 70, perWave: -2, min: 34, max: 70 },
+  { kind: 'snake', sinceWave: 1, base: 12, perWave: 0.4, min: 8, max: 20 },
+  { kind: 'boar', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'skeleton', sinceWave: 2, base: 8, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'gargoyle', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 11 },
+  { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'creeper', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 const NEXUS_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
   { kind: 'invader', sinceWave: 1, base: 15, perWave: 0.6, min: 10, max: 28 },
@@ -1347,5 +1358,63 @@ export const MAPS = {
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
     },
     boss: 'eclipse',
+  },
+  canyon: {
+    emoji: '1f3de',
+    name: '索桥',
+    desc: '一道很深的峡谷，几座赭红的砂岩石台立在谷中，台与台之间只靠绳索和木板搭的吊桥相连；谷底很深，一线青绿的河在雾里若隐若现。石台是实地，峡谷是虚空：从桥上或台边掉下去不会立刻死，只是摔得不轻，要在谷底走到挂着绳梯的崖脚，爬上来才能回到台上。吊桥只容一两个身位，桥上的人越重，桥垂得越低、晃得越厉害；每座桥都有载重上限，压过了上限绳索就崩断，桥上的人一个不剩全掉下去，过一阵绳索才一截截重新拉起来。敌人也走桥追人，一拥而上就会把桥压断——守住桥头、分批过桥，或者把追兵引上桥',
+    kind: 'canyon',
+    stamina: { exertion: 0.5, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(16 48% 44%)',
+      bgTo: 'hsl(252 30% 16%)',
+      map: hslToInt(14, 0.46, 0.46),
+      shadow: 0x000000,
+    },
+    // 傍晚的斜阳：台面上暖，背光面透着谷里的蓝紫，影子拖得长
+    light: { sun: 0xffe8cc, shade: 0xa892a8, shadow: { color: 0x24112c, alpha: 0.42, length: 1.15 } },
+    decor: {
+      emojis: ['1fab6', '1faa8', '1f9b4'],
+      sizeU: [0.3, 0.6],
+      alpha: [0.5, 0.8],
+      density: [0.006, 0.01],
+    },
+    mix: CANYON_MIX,
+    // 谷里的从朝着镜头的崖壁爬上台沿；头目从对岸的崖顶跳到离队伍远的石台上
+    gates: {
+      snapU: 4,
+      fallback: 'drop',
+      look: 'sand',
+      boss: 'summit',
+      kinds: {
+        ledge: { name: '崖边', at: { kind: 'mark' }, enter: 'climb', look: 'sand', snapU: 6, weight: 3, perSec: 1.5 },
+        summit: { name: '崖顶', at: { kind: 'mark' }, enter: 'drop', look: 'sand', snapU: 5, weight: 0.5, perSec: 0.5, only: ['gargoyle', 'rhino'] },
+      },
+    },
+    finalWaveSub: '暴龙从崖顶跳了下来——它有近一吨重，踩上哪座桥哪座就断，把它引上桥！',
+    canyon: {
+      mesas: { count: [6, 8], centerU: [5.6, 6.2], radiusU: [2.4, 4.4], ringU: [9.5, 14.5], wobble: 0.22, gapU: [3, 8.5], clearU: 1.4 },
+      depthU: 2.8,
+      bridge: {
+        widthU: 1.3,
+        extra: [1, 2],
+        kinds: [
+          { name: '朽桥', capKg: 260 },
+          { name: '旧桥', capKg: 420 },
+          { name: '新桥', capKg: 640 },
+        ],
+        bodyKg: 70,
+        refRadiusU: 0.45,
+        strainMs: 250,
+        downMs: 13000,
+        rebuildMs: 5000,
+        sagM: 0.5,
+        loadSagM: 1.6,
+      },
+      fall: { ms: 700, hurt: 0.25, hurtCap: 150, stunMs: 600 },
+      climb: { perMesa: [1, 2], spacingU: 4, ms: 1600 },
+      gorge: { riverU: [0.45, 0.75], wade: 2.2, wadeExertion: 1, cellU: 0.25 },
+    },
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

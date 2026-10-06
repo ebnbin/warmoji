@@ -10,7 +10,7 @@ import type { EcsAtlas } from './atlas'
 import type { EcsWorld } from './world'
 import type { MapDef, TorusConfig } from '../types/maps'
 import type { Point } from '../util/vec'
-import type { LocalLight, PaintSprite, SpriteCut } from './render/sprites'
+import type { BodyLook, LocalLight, PaintSprite, SpriteCut } from './render/sprites'
 import type { RunState } from '../run/state'
 import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
@@ -70,6 +70,8 @@ export interface MapView {
   lightAt?(x: number, y: number, out: LocalLight): void
   /** 身体在地上的 (x, y)、精灵半宽半高 hw×hh：要切成几份画（正穿过传送门的一份在门这边、一份在门那边），写进 out 返回份数，0 是整张画 */
   cutAt?(x: number, y: number, hw: number, hh: number, out: SpriteCut[]): number
+  /** 实体画出来的样子：要改就写进 out 返回 true，不写就照常画 */
+  lookOf?(eid: number, out: BodyLook): boolean
   resize(v: ViewCtx): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void

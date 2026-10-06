@@ -63,9 +63,9 @@ function distanceTo(on: Uint8Array, cols: number, rows: number): Float64Array {
 
 /**
  * 按 open 栅格化能走的地面（参数是格心的像素坐标）：窄过 2·neck 像素的缝和尖角填成岩壁，
- * 只留下与 keep 连通的那一块，再算有符号距离。
+ * 只留下与 keep 连通的那一块（给了几点就留下连着其中任一点的几块），再算有符号距离。
  */
-export function makeBasin(open: (x: number, y: number) => boolean, x0: number, y0: number, cols: number, rows: number, cell: number, keep: Point, neck: number): Basin {
+export function makeBasin(open: (x: number, y: number) => boolean, x0: number, y0: number, cols: number, rows: number, cell: number, keep: Point | readonly Point[], neck: number): Basin {
   const n = cols * rows
   const walk = new Uint8Array(n)
   const wall = new Uint8Array(n)
@@ -84,9 +84,12 @@ export function makeBasin(open: (x: number, y: number) => boolean, x0: number, y
   const opened = new Uint8Array(n)
   for (let i = 0; i < n; i++) opened[i] = walk[i] && toCore[i]! * cell <= neck + cell * 0.5 ? 1 : 0
   const reach = new Uint8Array(n)
-  const start = Math.min(rows - 1, Math.max(0, Math.floor((keep.y - y0) / cell))) * cols + Math.min(cols - 1, Math.max(0, Math.floor((keep.x - x0) / cell)))
-  const stack = [start]
-  reach[start] = opened[start]!
+  const stack: number[] = []
+  for (const k of 'x' in keep ? [keep] : keep) {
+    const start = Math.min(rows - 1, Math.max(0, Math.floor((k.y - y0) / cell))) * cols + Math.min(cols - 1, Math.max(0, Math.floor((k.x - x0) / cell)))
+    reach[start] = opened[start]!
+    stack.push(start)
+  }
   const visit = (j: number): void => {
     if (j < 0 || j >= n || reach[j] || !opened[j]) return
     reach[j] = 1

@@ -47,6 +47,7 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { canyonPlan, CENTER_WOBBLE, insideBy, mesaAt } from '../src/maps/canyon/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -707,6 +708,56 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(belt.speedU < slowest, `${at}.belt.speedU 须慢过最慢的队员（${slowest} 格/秒），逆着传送带也走得动`)
   need(f.body.static >= f.body.kinetic && f.body.kinetic > 0 && f.coin.static >= f.coin.kinetic && f.coin.kinetic > 0, `${at}.friction 的静摩擦须不小于动摩擦、动摩擦为正`)
   need(gait.flatResistance > 0 && gait.downhillMax >= 1 && gait.effortMin > 0 && gait.effortMin <= 1, `${at}.gait 的平地阻力须为正、下坡倍率不小于 1、最少的费力在 (0, 1] 内`)
+}
+
+/**
+ * 索桥：石台的大小、间距、崖高与桥宽说得通，桥按由弱到强排、上限正、标准身体一个人压不断最弱的桥、全队最多的人一起上压得断它；
+ * 断桥先断后拉、掉与爬的时长为正、摔一下不致命；抽一批种子真的摆一遍：台都放得进安全区、开局站位四周空着、所有台走桥连通、
+ * 每座台都挂着绳梯、绳梯脚下在谷底站得开且谷底每一处都走得到某根绳梯
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'canyon') === (m.canyon !== undefined), `maps.${id} 是索桥当且仅当写了 canyon`)
+  const c = m.canyon
+  if (!c) continue
+  const at = `maps.${id}.canyon`
+  const span = (v: readonly [number, number]): boolean => v[0] > 0 && v[0] <= v[1]
+  const ints = (v: readonly [number, number]): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && v[0] <= v[1]
+  const { mesas, bridge: b, fall, climb, gorge } = c
+  need(ints(mesas.count) && mesas.count[0] >= 3 && span(mesas.centerU) && span(mesas.radiusU) && span(mesas.ringU) && span(mesas.gapU), `${at}.mesas 的个数、半径、离正中的距离与桥的跨度须为正的范围，至少三座台`)
+  need(mesas.centerU[0] * (1 - mesas.wobble * CENTER_WOBBLE) - 0.5 >= SPAWN_CLEAR_U, `${at}.mesas.centerU 须让中间那座台空得出出生点要的 ${SPAWN_CLEAR_U} 格`)
+  need(mesas.wobble >= 0 && mesas.wobble < 0.4 && mesas.clearU > 0, `${at}.mesas 的起伏须在 [0, 0.4) 内，谷底的路须为正`)
+  need(mesas.gapU[0] > b.widthU, `${at}.mesas.gapU 最短的桥须长过桥宽`)
+  need(c.depthU > 0 && b.widthU > 0 && b.widthU < 2.5, `${at} 的崖高须为正，桥宽须在 (0, 2.5) 格内：吊桥只容一两个身位`)
+  need(b.kinds.length >= 2 && b.kinds.every((k, i) => k.capKg > 0 && (i === 0 || k.capKg > b.kinds[i - 1]!.capKg)), `${at}.bridge.kinds 须至少两种、上限为正、由弱到强`)
+  need(b.bodyKg > 0 && b.refRadiusU > 0 && b.kinds[0]!.capKg > b.bodyKg * 1.5, `${at}.bridge 一个标准身体须压不断最弱的桥`)
+  need(b.kinds[0]!.capKg < b.bodyKg * TEAM_BASELINE.team.maxSize, `${at}.bridge 全队一起上须压得断最弱的桥：分批过桥才有意义`)
+  need(ints(b.extra) && b.strainMs >= 0 && b.downMs > 0 && b.rebuildMs > 0 && b.sagM >= 0 && b.loadSagM > 0, `${at}.bridge 的环数为非负整数范围，断、拉绳的时长为正，垂度不为负`)
+  need(fall.ms > 0 && fall.hurt > 0 && fall.hurt < 1 && fall.hurtCap > 0 && fall.stunMs >= 0, `${at}.fall 的时长为正，摔掉的比例在 (0, 1) 内、上限为正，懵的时长不为负`)
+  need(ints(climb.perMesa) && climb.perMesa[0] >= 1 && climb.spacingU > 0 && climb.ms > 0, `${at}.climb 每座台至少一根绳梯，间距与爬的时长为正`)
+  need(span(gorge.riverU) && gorge.wade >= 1 && gorge.wadeExertion >= 0 && gorge.cellU > 0, `${at}.gorge 的河宽为正、蹚水不比平地快、费力不为负、格子为正`)
+  for (let k = 0; k < 16; k++) {
+    const plan = canyonPlan(c, k * 7919 + 13)
+    const where = `${at} 第 ${k} 个样本`
+    const mid = FRAME_U / 2
+    need(plan.mesas.every((ms) => ms.box[0] >= SAFE_U && ms.box[1] >= SAFE_U && ms.box[2] <= FRAME_U - SAFE_U && ms.box[3] + c.depthU <= FRAME_U - SAFE_U), `${where} 有台或它的崖脚出了安全区`)
+    need(roomAt(plan.top, mid * UNIT, mid * UNIT) >= (SPAWN_CLEAR_U - 0.5) * UNIT && mesaAt(plan.mesas, mid, mid) === 0, `${where} 开局站位四周不够空`)
+    const root = plan.mesas.map((_, i) => i)
+    const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i]!)))
+    for (const sp of plan.spans) root[find(sp.a)] = find(sp.b)
+    need(plan.mesas.every((_, i) => find(i) === find(0)), `${where} 的石台没有全部走桥连通`)
+    need(new Set(plan.spans.map((sp) => sp.kind)).size === Math.min(b.kinds.length, plan.spans.length), `${where} 不是每种结实程度的桥都有`)
+    need(plan.spans.every((sp) => Math.hypot(sp.bx - sp.ax, sp.by - sp.ay) >= mesas.gapU[0] - 1e-6), `${where} 有桥短过 ${mesas.gapU[0]} 格`)
+    need(plan.mesas.every((_, i) => plan.climbs.some((cl) => cl.mesa === i)), `${where} 有台没挂绳梯`)
+    need(plan.climbs.every((cl) => roomAt(plan.floor, cl.foot.x * UNIT, cl.foot.y * UNIT) >= 0.3 * UNIT && insideBy(plan.mesas[cl.mesa]!, cl.top.x, cl.top.y) > 0.3), `${where} 有绳梯脚下站不开或爬上去落不到台面上`)
+    let open = 0
+    let lost = 0
+    for (let i = 0; i < plan.floor.room.length; i++) {
+      if (plan.floor.room[i]! <= 0) continue
+      open++
+      if (!Number.isFinite(plan.nav.dist[i]!)) lost++
+    }
+    need(open > 0 && lost === 0, `${where} 谷底有 ${lost} 格走不到任何一根绳梯`)
+  }
 }
 
 /**
