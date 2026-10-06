@@ -89,7 +89,8 @@ void main ()
 
 /**
  * 地砖：每块瓷砖按掩码知道自己是不是会亮的瓷砖、属于哪间房、那间房的待机律动与它在律动里的相位，按着色图知道那间房的主色。
- * 闲着时缝里透着房间的主色，按律动明灭：从中心一圈圈往外的脉冲、顺着一个方向扫过的光波、棋盘式明灭、几乎不动的微光。
+ * 闲着时缝里透着房间的主色，按律动明灭：从中心一圈圈往外的脉冲、顺着一个方向扫过的光波、棋盘式明灭、几乎不动的微光；
+ * 律动按各间房自己的钟走（uClock，秒），熄了灯的房间停在那一刻，也只剩一点微光（uPower 是各间的灯亮几成）。
  * 被队伍踩过亮信号蓝、被敌人踩过亮信号红：四边一道亮线、往里一道细线、块面淡淡染一层，光渗到隔壁；刚踩上的一脚从中心扩一圈方框。
  * 队长在传送台上充能时，一圈光从台心扩到整间房，扫过的瓷砖亮起来，圈里的都染上一层。输出按预乘透明度
  */
@@ -97,7 +98,8 @@ export const TILES_FRAG = `${HEADER}
 uniform sampler2D uData;
 uniform sampler2D uMask;
 uniform sampler2D uTint;
-uniform float uTime;
+uniform vec4 uClock;
+uniform vec4 uPower;
 uniform vec3 uTeam;
 uniform vec3 uFoe;
 uniform vec4 uCharge;
@@ -109,20 +111,25 @@ vec2 texel(vec2 cell) {
   return vec2((cell.x + 0.5) / N, 1.0 - (cell.y + 0.5) / N);
 }
 
+/** 第 room 间的那一份 */
+float pick(vec4 v, float room) {
+  return room < 0.5 ? v.x : room < 1.5 ? v.y : room < 2.5 ? v.z : v.w;
+}
+
 /** 掩码里这块瓷砖的律动：没有瓷砖为 −1 */
 float kindOf(vec4 m) {
   return floor(m.r * 255.0 / 50.0 + 0.5) - 1.0;
 }
 
-float idle(float kind, float phase, vec2 cell) {
-  if (kind < 0.5) return pow(max(0.0, cos(6.2832 * (phase * 2.4 - uTime * 0.3))), 10.0);
-  if (kind < 1.5) return pow(max(0.0, cos(3.1416 * (phase - uTime * 0.13))), 30.0);
+float idle(float kind, float phase, vec2 cell, float t) {
+  if (kind < 0.5) return pow(max(0.0, cos(6.2832 * (phase * 2.4 - t * 0.3))), 10.0);
+  if (kind < 1.5) return pow(max(0.0, cos(3.1416 * (phase - t * 0.13))), 30.0);
   if (kind < 2.5) {
     float parity = mod(cell.x + cell.y, 2.0);
-    float s = sin(uTime * 1.05 + parity * 3.1416 + phase * 0.5);
+    float s = sin(t * 1.05 + parity * 3.1416 + phase * 0.5);
     return smoothstep(0.35, 0.95, s);
   }
-  return 0.16 + 0.08 * sin(uTime * 0.35 + phase * 6.2832);
+  return 0.16 + 0.08 * sin(t * 0.35 + phase * 6.2832);
 }
 
 void main ()
@@ -152,7 +159,7 @@ void main ()
   float inset = exp(-abs(edge - 0.12) / max(aa * 0.7, 0.01));
   float rim = exp(-edge / 0.06);
   // 闲着：缝里透着房间的主色，按律动明灭
-  float b = idle(kind, m.b, cell);
+  float b = idle(kind, m.b, cell, pick(uClock, room)) * (0.25 + 0.75 * pick(uPower, room));
   vec3 col = tint * b * (0.55 * seam + 0.22 * rim + 0.05);
   float a = b * (0.5 * seam + 0.16 * rim + 0.04);
   // 踩过的瓷砖
@@ -188,11 +195,12 @@ void main ()
 
 /**
  * 地砖的数据图，每格一个像素、不透明（画布会按透明度预乘，数据必须满 alpha）：
- * R 队伍踩亮的余光，G 敌人踩亮的余光，B 刚踩上那一脚还剩多少（都在 0 到 1）
+ * R 队伍踩亮的余光，G 敌人踩亮的余光，B 刚踩上那一脚还剩多少（都在 0 到 1）；每块按它那间房的钟（rooms 是每块属于哪间，−1 的不亮）
  */
-export function encodeTiles(out: Uint8ClampedArray, team: Float32Array, foe: Float32Array, teamFrom: Float32Array, foeFrom: Float32Array, now: number, teamFadeMs: number, foeFadeMs: number, flashMs: number): void {
+export function encodeTiles(out: Uint8ClampedArray, team: Float32Array, foe: Float32Array, teamFrom: Float32Array, foeFrom: Float32Array, rooms: Int8Array, clocks: readonly number[], teamFadeMs: number, foeFadeMs: number, flashMs: number): void {
   for (let i = 0; i < team.length; i++) {
     const o = i * 4
+    const now = clocks[Math.max(0, rooms[i]!)]!
     const t = Math.exp(-(now - team[i]!) / teamFadeMs)
     const e = Math.exp(-(now - foe[i]!) / foeFadeMs)
     const fl = Math.max(Math.exp(-(now - teamFrom[i]!) / flashMs), Math.exp(-(now - foeFrom[i]!) / flashMs))

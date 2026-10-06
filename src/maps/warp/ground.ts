@@ -223,6 +223,18 @@ function padBase(out: Rgb, r: number, R: number, ang: number, aa: number): void 
   if (t < 0.2) mixIn(out, [60, 78, 102], 0.6 * (1 - t / 0.2))
 }
 
+/** 标本管的底座：一圈钢的斜面迎光亮、背光暗，往里一圈房间颜色的灯，正中暗的管底 */
+function pedestal(out: Rgb, color: Rgb, r: number, R: number, dx: number, dy: number): void {
+  const t = r / R
+  set(out, STEEL, 0.6)
+  if (t > 0.8) {
+    const lit = -(dx * LX + dy * LY) / Math.max(r, 1e-3)
+    for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 + 0.6 * lit * smooth(0.8, 1, t))
+  }
+  addGlow(out, color, 1.1 * Math.exp(-(((t - 0.74) / 0.05) ** 2)))
+  if (t < 0.68) mixIn(out, [12, 22, 34], 0.8)
+}
+
 /** 地砖：一格一块，冷白偏青，块与块之间一道缝，迎光的两边一线亮、背光的两边一线暗，块面有一点不匀；离墙、立柱与凹槽近的地方暗一点 */
 function tile(out: Rgb, x: number, y: number, ao: number, aa: number): void {
   const fx = x - Math.floor(x)
@@ -277,6 +289,9 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
     padBase(out, pd, pr, Math.atan2(y - pad.y, x - pad.x), aa)
     return
   }
+  const v = room.vault
+  const vd = Math.hypot(x - v.x, y - v.y)
+  if (vd < v.r) return pedestal(out, color, vd, v.r, x - v.x, y - v.y)
   const inFloor = x >= f.x0 && x < f.x1 && y >= f.y0 && y < f.y1
   if (inFloor) {
     if (room.pit && sdBox(room.pit, x, y) < 0) return pit(out, color, room.pit, x, y, aa)
@@ -291,6 +306,7 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
       ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(grow(b, 0.12), sx, sy)) / 0.25) * 0.55)
     }
     ao = Math.max(ao, Math.exp(-Math.max(0, pd - pr) / 0.18) * 0.4)
+    ao = Math.max(ao, Math.exp(-Math.max(0, vd - v.r) / 0.25) * 0.5)
     tile(out, x, y, ao, aa)
     if (room.shape === 'hall') emblem(out, color, room, x, y)
     return

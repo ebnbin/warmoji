@@ -27,16 +27,22 @@ export interface Plate {
   readonly y: number
 }
 
+/** 一根立着的圆柱的底面，格 */
+export interface Disc {
+  readonly x: number
+  readonly y: number
+  readonly r: number
+}
+
 /**
- * 一间房，格：在环上排第 index，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状、签名（主色与地板的待机律动）、敌人配方（cfg.recipes 的第几种）；
- * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；toward 是传送台朝下一间的方向
+ * 一间房，格：在环上排第 index，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状；季节（0 春到 3 冬，也是签名：主色与地板的待机律动）；
+ * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；标本管；toward 是传送台朝下一间的方向
  */
 export interface WarpRoom {
   readonly index: number
   readonly quad: number
   readonly shape: WarpShape
   readonly sign: number
-  readonly recipe: number
   readonly slab: Box
   readonly floor: Box
   readonly center: Point
@@ -45,6 +51,7 @@ export interface WarpRoom {
   readonly pillars: readonly Box[]
   readonly pit: Box | null
   readonly deck: Box | null
+  readonly vault: Disc
   readonly toward: Point
 }
 
@@ -126,14 +133,15 @@ function plate(cfg: WarpConfig, u: number, v: number, along: 0 | 1): Box {
   return along === 0 ? { x0: u - h, y0: v - 0.5, x1: u + h, y1: v + 0.5 } : { x0: u - 0.5, y0: v - h, x1: u + 0.5, y1: v + h }
 }
 
-/** 一间房局部的布置：能走的方块，立柱、凹槽、机柜台与出怪板 */
-function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: Box; pillars: Box[]; pit: Box | null; deck: Box | null; plates: Box[] } {
+/** 一间房局部的布置：能走的方块，立柱、凹槽、机柜台、出怪板与标本管；标本管立在外角，狭长那间立在机柜台正中 */
+function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: Box; pillars: Box[]; pit: Box | null; deck: Box | null; plates: Box[]; vault: Point } {
   const { f0, f1, pad } = roomFrame(cfg)
   const full: Box = { x0: f0, y0: f0, x1: f1, y1: f1 }
   const mid = (f0 + f1) / 2
   const near = cfg.emitters.plateU / 2 + 2
   const far = Math.round(f1 - (f1 - f0) * 0.38)
   const walls = [plate(cfg, f0 + near + 1, f0 + 0.5, 0), plate(cfg, far, f0 + 0.5, 0), plate(cfg, f0 + 0.5, f0 + near + 1, 1), plate(cfg, f0 + 0.5, far, 1)]
+  const corner = { x: f0 + cfg.vault.insetU, y: f0 + cfg.vault.insetU }
   if (shape === 'narrow') {
     const n = cfg.room.narrowU
     const cut = f1 - n
@@ -144,6 +152,7 @@ function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: B
         pit: null,
         deck: { x0: f0, y0: f0, x1: cut, y1: f1 },
         plates: [plate(cfg, cut + n / 2, f0 + 0.5, 0), plate(cfg, cut + 0.5, f0 + near + 1, 1), plate(cfg, cut + 0.5, far - 1, 1)],
+        vault: { x: (f0 + cut) / 2, y: mid },
       }
     }
     return {
@@ -152,11 +161,12 @@ function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: B
       pit: null,
       deck: { x0: f0, y0: f0, x1: f1, y1: cut },
       plates: [plate(cfg, f0 + 0.5, cut + n / 2, 1), plate(cfg, f0 + near + 1, cut + 0.5, 0), plate(cfg, far - 1, cut + 0.5, 0)],
+      vault: { x: mid, y: (f0 + cut) / 2 },
     }
   }
   if (shape === 'cloister') {
     const h = cfg.pitU / 2
-    return { floor: full, pillars: [], pit: { x0: mid - h, y0: mid - h, x1: mid + h, y1: mid + h }, deck: null, plates: walls }
+    return { floor: full, pillars: [], pit: { x0: mid - h, y0: mid - h, x1: mid + h, y1: mid + h }, deck: null, plates: walls, vault: corner }
   }
   if (shape === 'pillars') {
     const p = cfg.pillars
@@ -168,28 +178,28 @@ function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: B
         list.push(b)
       }
     }
-    return { floor: full, pillars: list, pit: null, deck: null, plates: walls }
+    return { floor: full, pillars: list, pit: null, deck: null, plates: walls, vault: corner }
   }
-  return { floor: full, pillars: [], pit: null, deck: null, plates: walls }
+  return { floor: full, pillars: [], pit: null, deck: null, plates: walls, vault: corner }
 }
 
-/** 半径 rad 格的身体在 (x, y) 能不能站：落在这间能走的方块里、不碰立柱与凹槽 */
-function openIn(room: Pick<WarpRoom, 'floor' | 'pillars' | 'pit'>, x: number, y: number): boolean {
+/** (x, y) 能不能站：落在这间能走的方块里、不碰立柱、凹槽与标本管 */
+function openIn(room: Pick<WarpRoom, 'floor' | 'pillars' | 'pit' | 'vault'>, x: number, y: number): boolean {
   if (!inBox(room.floor, x, y)) return false
   if (room.pit && inBox(room.pit, x, y)) return false
+  if (Math.hypot(x - room.vault.x, y - room.vault.y) < room.vault.r) return false
   return !room.pillars.some((b) => inBox(b, x, y))
 }
 
 /**
- * 按种子摆一座跃迁站：环的方向；四种形状、四种签名、四种配方各自打乱分给四间房（狭长那间横竖也按种子）；
+ * 按种子摆一座跃迁站：环的方向；四种形状打乱分给四间房（狭长那间横竖也按种子）；四季顺着环排，从哪一季起按种子；
  * 队伍从大厅出发。能走的地面四间各算一遍距离场，取最大合成一张
  */
 export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
   const rng = new Rng(seed)
   const mirror = rng.next() < 0.5
   const shapes = shuffled(rng, SHAPES)
-  const signs = shuffled(rng, [0, 1, 2, 3])
-  const recipes = shuffled(rng, [0, 1, 2, 3])
+  const spring = Math.floor(rng.next() * 4)
   const tall = rng.next() < 0.5
   const frame = roomFrame(cfg)
   const quads = [0, 1, 2, 3].map((i) => {
@@ -208,8 +218,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
       index: i,
       quad: quads[i]! === 2 ? 3 : quads[i]! === 3 ? 2 : quads[i]!,
       shape,
-      sign: signs[i]!,
-      recipe: recipes[i]!,
+      sign: (spring + i) % 4,
       slab: at({ x0: frame.slab0, y0: frame.slab0, x1: frame.slab1, y1: frame.slab1 }),
       floor,
       center: { x: (floor.x0 + floor.x1) / 2, y: (floor.y0 + floor.y1) / 2 },
@@ -218,17 +227,14 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
       pillars: l.pillars.map(at),
       pit: l.pit && at(l.pit),
       deck: l.deck && at(l.deck),
+      vault: { ...place(i, mirror, l.vault.x, l.vault.y), r: cfg.vault.radiusU },
       toward: placeDir(i, mirror, 1, 0),
     }
   })
   const hall = rooms.find((r) => r.shape === 'hall')!
   const cell = BASIN_CELL_U * UNIT
   const n = Math.round(FRAME_U / BASIN_CELL_U)
-  const parts = rooms.map((room) => {
-    const keep = room.pit ? { x: (room.floor.x0 + 0.5) * UNIT, y: (room.floor.y0 + 0.5) * UNIT } : { x: room.center.x * UNIT, y: room.center.y * UNIT }
-    const q = room.pillars.some((b) => inBox(b, keep.x / UNIT, keep.y / UNIT)) ? { x: (room.floor.x0 + 0.5) * UNIT, y: (room.floor.y0 + 0.5) * UNIT } : keep
-    return makeBasin((x, y) => openIn(room, x / UNIT, y / UNIT), 0, 0, n, n, cell, q, cfg.neckU * UNIT)
-  })
+  const parts = rooms.map((room) => makeBasin((x, y) => openIn(room, x / UNIT, y / UNIT), 0, 0, n, n, cell, { x: room.pad.x * UNIT, y: room.pad.y * UNIT }, cfg.neckU * UNIT))
   const room = new Float32Array(n * n)
   for (let i = 0; i < room.length; i++) room[i] = Math.max(...parts.map((b) => b.room[i]!))
   const tiles = new Int8Array(FRAME_U * FRAME_U).fill(-1)

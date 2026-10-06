@@ -748,7 +748,7 @@ export const MAPS = {
   warp: {
     emoji: '1f300',
     name: '跃迁',
-    desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，立在朝向下一块的那条边上，四块连成单向的一圈。队长踏上传送台，台子充能、光圈扩满整间房，然后整支队伍连同召唤物一起被送到下一块平台的传送台上，不管队员在房间哪个角落；到的那座台子要冷却一阵。四间房同时在刷怪：队伍不在的房间，敌人往那间的传送台聚，传送台隔一阵发一趟车，台上站着谁就送谁，追兵就这样一批批从你身后的传送台涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去：哪间堆着多少敌人、往哪儿走，都写在地板上。四间房形状、颜色和出的敌人各不相同，选去哪间就是选和什么打',
+    desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，四块连成单向的一圈：队长踏上传送台充满能，整支队伍连同召唤物、连同站在台上的敌人一起被送到下一块，到的那座台子要冷却一阵。这座站是模拟出来的，只在有人看着的地方运转：队伍离开一间，那里的灯过一会儿慢慢暗下去，房里的怪物越走越慢、最后定格在原地，打不着也不会动；怪物也只在队伍所在的那间出现。绕一圈回来，灯慢慢亮起，被你甩下的怪物还在原地，从停下的那一刻接着扑过来。四间房按环是春夏秋冬，外角各立一根标本管，泡着樱花、仙人掌、枫叶和一块冰；走完冬天，又回到同一个春天',
     kind: 'warp',
     stamina: { exertion: 0.4, regen: 1.1 },
     palette: {
@@ -766,29 +766,28 @@ export const MAPS = {
       density: [0, 0],
     },
     mix: WARP_MIX,
-    // 每间房的出怪板按那间的配方只放出那几种：一间幽灵、一间肉盾、一间成群的小东西、一间什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那间。头目从核心柱里被抛出来
+    // 怪物只从队伍所在那间的出怪板上凝成形，别的房间暗着、什么也不发生；吸附半径盖满整张图。头目从核心柱里被抛出来
     gates: {
       snapU: 60,
       fallback: 'rise',
       look: 'glow',
       boss: 'core',
       kinds: {
-        ghosts: { name: '幽灵间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
-        tanks: { name: '重甲间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
-        swarm: { name: '虫群间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
-        mixed: { name: '混编间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
+        plate: { name: '出怪板', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1, perSec: 2.5 },
         core: { name: '核心柱', at: { kind: 'mark' }, enter: 'lob', look: 'glow', weight: 1, reachU: 40, only: ['mecha'] },
       },
     },
-    finalWaveSub: '失控核心从核心柱里冲了出来——它落在哪间，就把哪间变成战场！',
+    finalWaveSub: '失控核心从核心柱里冲了出来——甩开它也没用，绕一圈回来，它还停在原地等你！',
     warp: {
       room: { lipU: 1, gapU: 2, narrowU: 8 },
       neckU: 0.4,
       pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
       pitU: 8,
-      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
+      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, spillU: 3.5 },
       emitters: { plateU: 2, markU: 0.6, clearU: 3 },
-      recipes: ['ghosts', 'tanks', 'swarm', 'mixed'],
+      dormant: { holdMs: 2500, dimMs: 3500, wakeMs: 2400, stillBelow: 0.5 },
+      vault: { insetU: 1.2, radiusU: 0.95, heightM: 2.6 },
+      specimens: ['1f338', '1f335', '1f341', '1f9ca'],
       core: { radiusU: 1.5 },
       tiles: { teamFadeMs: 4500, foeFadeMs: 2600 },
     },

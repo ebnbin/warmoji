@@ -1044,8 +1044,8 @@ export interface WarpConfig {
   readonly pitU: number
   /**
    * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
-   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
-   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物、连同站在台上的敌人一起穿行 transitMs 到下一间的传送台，
+   * 到的那座台子冷却 cooldownMs；跟着过来的敌人以 spillU 格/秒往台外涌
    */
   readonly pad: {
     readonly radiusU: number
@@ -1055,14 +1055,19 @@ export interface WarpConfig {
     readonly drainMs: number
     readonly transitMs: number
     readonly cooldownMs: number
-    readonly shuttleMs: number
-    readonly warnMs: number
     readonly spillU: number
   }
   /** 出怪板：一块长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
   readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
-  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
-  readonly recipes: readonly [string, string, string, string]
+  /**
+   * 休眠：模拟只在队伍所在的那间跑。队伍离开一间，那里的灯先亮着 holdMs，再用 dimMs 暗下去；队伍到了一间，灯用 wakeMs 亮起来。
+   * 灯亮到几成，房里的敌人就按几成的速度走，暗过 stillBelow 就定格：不动、不出手、也打不着
+   */
+  readonly dormant: { readonly holdMs: number; readonly dimMs: number; readonly wakeMs: number; readonly stillBelow: number }
+  /** 标本管：每间房的外角立一根，管心离能走的方块的外角 insetU 格、半径 radiusU 格、高 heightM 米；狭长那间立在机柜台正中 */
+  readonly vault: { readonly insetU: number; readonly radiusU: number; readonly heightM: number }
+  /** 标本管里泡着的东西，按春、夏、秋、冬：四间房按环的次序是四季，绕一圈又回到同一个春天 */
+  readonly specimens: readonly [string, string, string, string]
   /** 核心柱：半径（格），头目从这里被抛进队长所在的那间 */
   readonly core: { readonly radiusU: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */

@@ -3,15 +3,17 @@ import { query } from 'bitecs'
 import { FRAME_U, LIFT_PER_M, UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Due, ENEMY_SET, Telegraph, Transform } from '../../ecs/components'
+import { Alive, Due, Telegraph, Transform } from '../../ecs/components'
+import { decorSprite } from '../../ecs/decor'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
 import { nextRoom } from './layout'
 import { WarpPainter } from './painter'
-import { CORE_GLOW, FOE_GLOW, lift, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
+import { CORE_GLOW, DARK, FOE_GLOW, lift, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
 import { encodeTiles, TILES_FRAG, VOID_FRAG } from './shader'
-import { textureSize } from './ground'
+import { FACE_U, textureSize } from './ground'
 import { warpPlanFor } from './world'
+import type { Decor } from '../../ecs/decor'
 import type { Hop, WarpState } from './world'
 import type { WarpPlan, WarpRoom } from './layout'
 import type { PaintScene, PixelRect } from './ground'
@@ -47,6 +49,19 @@ const PAD_LIGHT_U = 2.6
 const PAD_FILL = 0.45
 /** 核心柱照亮四周的身体：多远（格）以内 */
 const CORE_LIGHT_U = 6
+/** 熄透的房间压上多浓的暗色；熄了灯的东西还留着几成光 */
+const DARK_MAX = 0.8
+const STANDBY = 0.15
+/** 灯刚亮起来的那一段一闪一闪：每一下多久，毫秒 */
+const FLICKER_MS = 70
+/** 标本管里的东西多大（格）、上下浮多少（格）；管里往上冒的气泡有几个 */
+const SPECIMEN_U = 0.95
+const BOB_U = 0.12
+const BUBBLES = 6
+/** 熄灯房间正中的暂停号：两竖条多高、多宽、隔多远，格 */
+const PAUSE = { h: 2.4, w: 0.55, gap: 0.6 } as const
+/** 队伍所在那间四角的取景框：离平台边多远、两臂多长，格 */
+const FINDER = { inset: 0.45, arm: 2.2 } as const
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const ease = (t: number): number => t * t * (3 - 2 * t)
@@ -127,12 +142,15 @@ interface Uniforms {
   px: number
   charge: [number, number, number, number]
   chargeRoom: number
+  clock: [number, number, number, number]
+  power: [number, number, number, number]
 }
 
 /**
  * 跃迁：底下是望得见底的虚空，网格上流着数据光流，正中的核心柱一路照进深处；镜头跟着队长走，整块方框在画面上往四周平铺。四块平台的地面、台沿与平台的影子是开局在后台线程画好的贴图。
- * 地砖按谁踩过亮起信号蓝或信号红、慢慢暗下去，闲着时按各间的律动透出房间的主色；传送台、光桥、核心柱、出怪板上凝成形的敌人、
- * 被送过虚空的身体散成的光块都每帧现画
+ * 地砖按谁踩过亮起信号蓝或信号红、慢慢暗下去，闲着时按各间的律动透出房间的主色；传送台、光桥、核心柱、标本管、出怪板上凝成形的敌人、
+ * 被送过虚空的身体散成的光块都每帧现画。每间房按自己的灯压一层暗色：熄了灯的房间正中一个暂停号，房里的一切都按那间的钟走、停在熄灯那一刻；
+ * 队伍所在那间四角一副取景框，亮灯、熄灯时一道扫描线扫过整块平台
  */
 export class WarpView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -144,10 +162,15 @@ export class WarpView implements MapView {
   private floorFx?: Phaser.GameObjects.Graphics
   private glowFx?: Phaser.GameObjects.Graphics
   private airFx?: Phaser.GameObjects.Graphics
-  private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1 }
+  private shadeFx?: Phaser.GameObjects.Graphics
+  private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1, clock: [0, 0, 0, 0], power: [1, 1, 1, 1] }
   private jumpsSeen = 0
-  private shuttleSeen: number[] = []
   private charging = false
+  /** 各间房此刻画出来的灯亮几成（亮起来时会闪）与各间自己的钟，秒 */
+  private readonly vp = [1, 1, 1, 1]
+  private readonly rt = [0, 0, 0, 0]
+  /** 四根标本管里泡着的东西 */
+  private specimens: Decor[] = []
 
   private planOf(v: ViewCtx): WarpPlan {
     if (!this.plan) this.plan = warpPlanFor(v.def.warp!, v.run.decorSeed)
@@ -194,7 +217,13 @@ export class WarpView implements MapView {
     return { map: FRAME, edge: 'wrap', tile: true }
   }
 
-  decor(_v: ViewCtx, _atlas: EcsAtlas): void {}
+  /** 四根标本管里泡着的东西：按那间房的季节 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const plan = this.planOf(v)
+    const cfg = v.def.warp!
+    this.specimens = plan.rooms.map((room) => decorSprite(atlas, cfg.specimens[room.sign]!, room.vault.x * UNIT, room.vault.y * UNIT, SPECIMEN_U * UNIT, 0, 1))
+    v.decor.push(...this.specimens)
+  }
 
   async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
     const plan = this.planOf(v)
@@ -219,11 +248,11 @@ export class WarpView implements MapView {
     this.floor(v, plan)
     this.floorFx = scene.add.graphics().setDepth(-0.8)
     this.glowFx = scene.add.graphics().setDepth(-0.75).setBlendMode(Phaser.BlendModes.ADD)
+    this.shadeFx = scene.add.graphics().setDepth(9.4)
     this.airFx = scene.add.graphics().setDepth(9.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.visuals.push(this.floorFx, this.glowFx, this.airFx)
+    this.visuals.push(this.floorFx, this.glowFx, this.shadeFx, this.airFx)
     const st = sim.worldState.warp
     this.jumpsSeen = st?.jumps ?? 0
-    this.shuttleSeen = st ? st.pads.map((p) => p.shuttledAt) : []
     v.lens.screen.vignette(0.9, 0.12, 0x020610)
   }
 
@@ -252,7 +281,8 @@ export class WarpView implements MapView {
               set('uData', 0)
               set('uMask', 1)
               set('uTint', 2)
-              set('uTime', u.time)
+              set('uClock', u.clock)
+              set('uPower', u.power)
               set('uTeam', rgb(TEAM_GLOW))
               set('uFoe', rgb(FOE_GLOW))
               set('uCharge', u.charge)
@@ -274,27 +304,160 @@ export class WarpView implements MapView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const st = sim.worldState.warp
     const cfg = this.cfg
-    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx) return
+    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx || !this.shadeFx) return
     this.state = st
     const now = sim.elapsedMs
     const t = sim.fxMs / 1000
     this.u.time = t
     this.u.px = 1 / (v.lens.screen.zoom() * UNIT)
+    this.lights(st, now)
     const tl = st.tiles
-    encodeTiles(this.tiles.img.data, tl.team, tl.foe, tl.teamFrom, tl.foeFrom, now, cfg.tiles.teamFadeMs, cfg.tiles.foeFadeMs, FLASH_MS)
+    encodeTiles(this.tiles.img.data, tl.team, tl.foe, tl.teamFrom, tl.foeFrom, st.plan.tiles, st.lights.map((l) => l.clock), cfg.tiles.teamFadeMs, cfg.tiles.foeFadeMs, FLASH_MS)
     push(this.tiles)
     this.floorFx.clear()
     this.glowFx.clear()
     this.airFx.clear()
+    this.shadeFx.clear()
     this.chargeRing(st, cfg)
-    this.sounds(v, st, cfg)
-    st.plan.rooms.forEach((room) => this.bridge(st, cfg, room, now, t))
-    st.plan.rooms.forEach((room) => this.pad(sim, st, cfg, room, now, t))
+    this.sounds(st, cfg)
+    st.plan.rooms.forEach((room) => this.bridge(st, cfg, room, now))
+    st.plan.rooms.forEach((room) => this.pad(sim, st, cfg, room, now))
     this.core(sim, st, t)
-    this.pillars(st, cfg, t)
+    this.pillars(st, cfg)
+    st.plan.rooms.forEach((room) => this.vault(cfg, room))
     this.forming(sim, st, cfg, now)
     for (const h of st.hops) this.voxels(h, cfg, now)
     this.ripples(st, now)
+    st.plan.rooms.forEach((room) => this.shade(st, room, t))
+  }
+
+  /**
+   * 各间房画出来的灯与钟：队伍所在那间灯还没全亮时一闪一闪地亮起来，越亮闪得越少；熄灯一路平平地暗下去。
+   * 着色器要的各间的钟与灯也在这里给
+   */
+  private lights(st: WarpState, now: number): void {
+    st.lights.forEach((l, i) => {
+      let p = l.power
+      if (i === st.teamRoom && p < 1 && p > 0) {
+        const n = noise(Math.floor(now / FLICKER_MS), i + 1)
+        if (n > 0.25 + 0.75 * p) p *= 0.3
+      }
+      this.vp[i] = p
+      this.rt[i] = l.clock / 1000
+      this.u.clock[i] = l.clock / 1000
+      this.u.power[i] = p
+    })
+  }
+
+  /** 熄了灯的东西还留几成光 */
+  private glow(room: WarpRoom): number {
+    return STANDBY + (1 - STANDBY) * this.vp[room.index]!
+  }
+
+  /**
+   * 一间房的灯：按灯暗了几成在整块平台（连同朝下的侧面）上压一层暗色，熄透了正中一个暂停号；亮灯、熄灯的半路上一道扫描线扫过平台，
+   * 亮灯从上往下、熄灯从下往上；队伍所在那间四角一副取景框，角上一颗录像的红点一闪一闪
+   */
+  private shade(st: WarpState, room: WarpRoom, t: number): void {
+    const g = this.shadeFx!
+    const a = this.airFx!
+    const p = this.vp[room.index]!
+    const power = st.lights[room.index]!.power
+    const b = room.slab
+    const x0 = b.x0 * UNIT
+    const y0 = b.y0 * UNIT
+    const w = (b.x1 - b.x0) * UNIT
+    const h = (b.y1 - b.y0 + FACE_U) * UNIT
+    if (p < 1) {
+      g.fillStyle(DARK, DARK_MAX * (1 - p))
+      g.fillRect(x0, y0, w, h)
+    }
+    const off = 1 - power
+    if (off > 0.02) {
+      const cx = room.center.x * UNIT
+      const cy = room.center.y * UNIT
+      const ph = PAUSE.h * UNIT
+      const pw = PAUSE.w * UNIT
+      const gap = PAUSE.gap * UNIT
+      g.fillStyle(CORE_GLOW, 0.3 * off * off)
+      g.fillRect(cx - gap / 2 - pw, cy - ph / 2, pw, ph)
+      g.fillRect(cx + gap / 2, cy - ph / 2, pw, ph)
+    }
+    if (power > 0 && power < 1) {
+      const sy = y0 + h * power
+      const k = Math.sin(Math.PI * power)
+      for (const [lw, al] of [
+        [0.9, 0.12],
+        [0.35, 0.3],
+        [0.1, 0.9],
+      ] as const) {
+        a.fillStyle(lw < 0.2 ? 0xffffff : CORE_GLOW, al * k)
+        a.fillRect(x0, sy - (lw * UNIT) / 2, w, lw * UNIT)
+      }
+    }
+    if (room.index !== st.teamRoom || p <= 0) return
+    const fi = FINDER.inset * UNIT
+    const arm = FINDER.arm * UNIT
+    g.lineStyle(0.12 * UNIT, CORE_GLOW, 0.6 * p)
+    for (const [cx, sx] of [
+      [x0 + fi, 1],
+      [x0 + w - fi, -1],
+    ] as const) {
+      for (const [cy, sy] of [
+        [y0 + fi, 1],
+        [b.y1 * UNIT - fi, -1],
+      ] as const) {
+        g.lineBetween(cx, cy, cx + sx * arm, cy)
+        g.lineBetween(cx, cy, cx, cy + sy * arm)
+      }
+    }
+    if (Math.sin(t * Math.PI * 2 * 0.8) > -0.2) {
+      g.fillStyle(0xff3048, 0.85 * p)
+      g.fillCircle(x0 + fi + 0.6 * UNIT, y0 + fi + 0.6 * UNIT, 0.2 * UNIT)
+    }
+  }
+
+  /**
+   * 标本管：外角立着的一根玻璃管，管里是那间房颜色的液体，泡着那一季的东西，按房间的钟上下浮、慢慢转，气泡往上冒；
+   * 熄了灯就停在那一刻
+   */
+  private vault(cfg: WarpConfig, room: WarpRoom): void {
+    const f = this.floorFx!
+    const a = this.airFx!
+    const color = SIGNS[room.sign]!.color
+    const lit = this.glow(room)
+    const t = this.rt[room.index]!
+    const r = room.vault.r * UNIT * 0.82
+    const x = room.vault.x * UNIT
+    const base = room.vault.y * UNIT
+    const h = cfg.vault.heightM * LIFT_PER_M
+    const top = base - h
+    f.fillStyle(shade(color, 0.35), 0.55)
+    f.fillRect(x - r, top, r * 2, h)
+    f.fillStyle(color, 0.22)
+    f.fillRect(x - r, top + h * 0.12, r * 2, h * 0.88)
+    const spec = this.specimens[room.index]
+    if (spec) {
+      spec.x = x
+      spec.y = base - h * 0.5 + Math.sin(t * 1.3 + room.index) * BOB_U * UNIT
+      spec.rot = Math.sin(t * 0.7 + room.index * 2) * 0.35
+    }
+    for (let k = 0; k < BUBBLES; k++) {
+      const s = (t * (0.25 + 0.1 * noise(k, room.index)) + k / BUBBLES) % 1
+      const bx = x + (noise(k + 7, room.index) - 0.5) * r * 1.4 + Math.sin(t * 3 + k) * 0.05 * UNIT
+      a.fillStyle(lift(color, 0.6), 0.5 * lit * Math.sin(Math.PI * s))
+      a.fillCircle(bx, base - h * 0.1 - h * 0.78 * s, (0.05 + 0.04 * noise(k, 3)) * UNIT)
+    }
+    // 玻璃：两边一线亮，左边一道高光，管口与管底各一圈
+    a.lineStyle(0.05 * UNIT, lift(color, 0.5), 0.55 * lit)
+    a.lineBetween(x - r, top, x - r, base)
+    a.lineBetween(x + r, top, x + r, base)
+    a.fillStyle(0xffffff, 0.16 * lit)
+    a.fillRect(x - r * 0.62, top + h * 0.08, r * 0.18, h * 0.8)
+    a.lineStyle(0.08 * UNIT, CORE_GLOW, 0.7 * lit)
+    a.strokeEllipse(x, top, r * 2, r * 0.7)
+    a.lineStyle(0.06 * UNIT, color, 0.6 * lit)
+    a.strokeEllipse(x, base, r * 2, r * 0.7)
   }
 
   /** 着色器里那圈扩满整间房的充能光：半径随充能从台边扩到房间最远的角 */
@@ -315,8 +478,8 @@ export class WarpView implements MapView {
     this.u.chargeRoom = i
   }
 
-  /** 开始充能、整队出发、送来一批敌人：在镜头里才响 */
-  private sounds(v: ViewCtx, st: WarpState, cfg: WarpConfig): void {
+  /** 开始充能、整队出发 */
+  private sounds(st: WarpState, cfg: WarpConfig): void {
     const p = st.pads[st.teamRoom]
     const charging = !!p && p.charge > 0 && p.charge < cfg.pad.chargeMs
     if (charging && !this.charging && p.charge < 200) playSfx('charge')
@@ -325,19 +488,15 @@ export class WarpView implements MapView {
       this.jumpsSeen = st.jumps
       playSfx('jump')
     }
-    st.pads.forEach((pad, i) => {
-      if (pad.shuttledAt === this.shuttleSeen[i]) return
-      this.shuttleSeen[i] = pad.shuttledAt
-      const to = nextRoom(st.plan, i)
-      if (pad.shuttled > 0 && v.lens.screen.sees(to.pad.x * UNIT, to.pad.y * UNIT, 2 * UNIT)) playSfx('warp')
-    })
   }
 
   /**
-   * 光桥：第 i 间的传送台与下一间的传送台之间一道光。平时只是一串淡淡的人字纹往下一间流；队长充能时越来越亮，
-   * 整队出发、一趟车送人过去的那一阵整条桥亮起来，队伍是信号蓝、敌人是信号红
+   * 光桥：第 i 间的传送台与下一间的传送台之间一道光。平时只是一串淡淡的人字纹往下一间流，按出发那间的钟走、随那间的灯明暗；
+   * 队长充能时越来越亮，整队出发的那一阵整条桥亮成信号蓝，跟着走的敌人再叠一道信号红
    */
-  private bridge(st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number, t: number): void {
+  private bridge(st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number): void {
+    const t = this.rt[room.index]!
+    const lit = this.glow(room)
     const to = nextRoom(st.plan, room.index)
     const color = SIGNS[to.sign]!.color
     const R = cfg.pad.radiusU
@@ -354,16 +513,15 @@ export class WarpView implements MapView {
     const pad = st.pads[room.index]!
     const charge = pad.charge / cfg.pad.chargeMs
     const sinceJump = now - pad.jumpedAt
-    const sinceShuttle = now - pad.shuttledAt
     const live = cfg.pad.transitMs + 250
     const teamHot = sinceJump >= 0 && sinceJump < live ? 1 - sinceJump / live : 0
-    const foeHot = pad.shuttled > 0 && sinceShuttle >= 0 && sinceShuttle < live ? 1 - sinceShuttle / live : 0
+    const foeHot = pad.carried > 0 ? teamHot * 0.6 : 0
     const g = this.glowFx!
     const f = this.floorFx!
     // 桥身：一道暗的底，上面同色的细线
     f.lineStyle(0.22 * UNIT, shade(color, 0.22), 0.55)
     f.lineBetween(a.x, a.y, b.x, b.y)
-    g.lineStyle(0.07 * UNIT, color, 0.35 + 0.5 * charge)
+    g.lineStyle(0.07 * UNIT, color, (0.35 + 0.5 * charge) * lit)
     g.lineBetween(a.x, a.y, b.x, b.y)
     // 人字纹往下一间流，充能时流得快、亮得多
     const step = 0.9 * UNIT
@@ -376,7 +534,7 @@ export class WarpView implements MapView {
       const c = { x: a.x + ux * s, y: a.y + uy * s }
       const w = 0.24 * UNIT
       const back = 0.22 * UNIT
-      g.lineStyle(0.09 * UNIT, color, (0.45 + 0.55 * charge) * fade)
+      g.lineStyle(0.09 * UNIT, color, (0.45 + 0.55 * charge) * fade * lit)
       g.lineBetween(c.x - ux * back + nx * w, c.y - uy * back + ny * w, c.x, c.y)
       g.lineBetween(c.x - ux * back - nx * w, c.y - uy * back - ny * w, c.x, c.y)
     }
@@ -400,7 +558,7 @@ export class WarpView implements MapView {
     // 一团光沿桥从这头冲到那头，和穿行的身体一起到
     for (const [since, glow, on] of [
       [sinceJump, TEAM_GLOW, true],
-      [sinceShuttle, FOE_GLOW, pad.shuttled > 0],
+      [sinceJump - 90, FOE_GLOW, pad.carried > 0],
     ] as const) {
       if (!on || since < 0 || since > cfg.pad.transitMs) continue
       const k = ease(since / cfg.pad.transitMs)
@@ -420,9 +578,11 @@ export class WarpView implements MapView {
 
   /**
    * 一座传送台：外圈是下一间房的颜色。能用时台面上三道人字纹朝下一间滑过去；刚到站、还在冷却时外圈发灰，一段弧随冷却走满；
-   * 队长站上来充能，台面一层层亮成信号蓝、往里收的圈越收越快；发车前台面上亮起一圈圈往里收的红；出发、到站时亮一下
+   * 队长站上来充能，台面一层层亮成信号蓝、往里收的圈越收越快；出发、到站时亮一下。台子按那间的钟走、随那间的灯明暗
    */
-  private pad(sim: Sim, st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number, t: number): void {
+  private pad(sim: Sim, st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number): void {
+    const t = this.rt[room.index]!
+    const lit = this.glow(room)
     const to = nextRoom(st.plan, room.index)
     const color = SIGNS[to.sign]!.color
     const p = st.pads[room.index]!
@@ -436,7 +596,7 @@ export class WarpView implements MapView {
     const rimColor = cooling ? 0x5d6878 : color
     f.lineStyle(0.1 * UNIT, shade(rimColor, 0.5), 1)
     f.strokeCircle(x, y, R * 0.93)
-    g.lineStyle(0.06 * UNIT, rimColor, cooling ? 0.5 : 0.85 + 0.15 * Math.sin(t * 3))
+    g.lineStyle(0.06 * UNIT, rimColor, (cooling ? 0.5 : 0.85 + 0.15 * Math.sin(t * 3)) * lit)
     g.strokeCircle(x, y, R * 0.93)
     if (cooling) {
       const k = clamp01(1 - (p.coolUntil - now) / cfg.pad.cooldownMs)
@@ -458,7 +618,7 @@ export class WarpView implements MapView {
         const cy = y + uy * s * R
         const w = 0.42 * R
         const back = 0.32 * R
-        g.lineStyle(0.08 * UNIT, color, al)
+        g.lineStyle(0.08 * UNIT, color, al * lit)
         g.lineBetween(cx - ux * back + nx * w, cy - uy * back + ny * w, cx, cy)
         g.lineBetween(cx - ux * back - nx * w, cy - uy * back - ny * w, cx, cy)
       }
@@ -481,17 +641,6 @@ export class WarpView implements MapView {
         this.airFx!.fillRect(mx - 0.12 * UNIT, my - h, 0.24 * UNIT, h)
         this.airFx!.fillStyle(0xffffff, 0.25 * charge)
         this.airFx!.fillRect(mx - 0.035 * UNIT, my - h, 0.07 * UNIT, h)
-      }
-    }
-    // 发车前：台面上一圈圈往里收的红
-    const warn = p.shuttleAt - now
-    if (warn > 0 && warn < cfg.pad.warnMs) {
-      const k = 1 - warn / cfg.pad.warnMs
-      const al = this.crowd(sim, cfg, room) ? 0.7 : 0.18
-      for (let j = 0; j < 2; j++) {
-        const s = 1 - ((k * 2 + j / 2) % 1)
-        g.lineStyle(0.06 * UNIT, FOE_GLOW, al * k)
-        g.strokeCircle(x, y, R * (0.2 + 0.7 * s))
       }
     }
     // 出发与到站
@@ -518,23 +667,16 @@ export class WarpView implements MapView {
         this.airFx!.fillRect(px - R * w, py - h, R * w * 2, h)
       }
     }
-    column(p.jumpedAt, TEAM_GLOW, 1, x, y, true)
-    column(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0, x, y, true)
-    column(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, to.pad.x * UNIT, to.pad.y * UNIT, false)
-    column(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, to.pad.x * UNIT, to.pad.y * UNIT, false)
-    flash(p.jumpedAt, TEAM_GLOW, 1, x, y)
-    flash(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0.25, x, y)
+    const foes = p.carried > 0 ? 0.7 : 0
     const tx = to.pad.x * UNIT
     const ty = to.pad.y * UNIT
+    column(p.jumpedAt, TEAM_GLOW, 1, x, y, true)
+    column(p.jumpedAt + 60, FOE_GLOW, foes, x, y, true)
+    column(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, tx, ty, false)
+    column(p.jumpedAt + cfg.pad.transitMs + 60, FOE_GLOW, foes, tx, ty, false)
+    flash(p.jumpedAt, TEAM_GLOW, 1, x, y)
     flash(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, tx, ty)
-    flash(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, tx, ty)
-  }
-
-  /** 此刻有没有敌人站在这座台上 */
-  private crowd(sim: Sim, cfg: WarpConfig, room: WarpRoom): boolean {
-    const r = cfg.pad.radiusU * UNIT
-    for (const e of query(sim.world, ENEMY_SET)) if (Alive.v[e] && Math.hypot(Transform.x[e]! - room.pad.x * UNIT, Transform.y[e]! - room.pad.y * UNIT) <= r) return true
-    return false
+    flash(p.jumpedAt + cfg.pad.transitMs + 60, FOE_GLOW, foes, tx, ty)
   }
 
   /**
@@ -591,27 +733,29 @@ export class WarpView implements MapView {
     }
   }
 
-  /** 立柱：墩子上立着一根半透明的光柱，一圈圈光往上走 */
-  private pillars(st: WarpState, cfg: WarpConfig, t: number): void {
+  /** 立柱：墩子上立着一根半透明的光柱，一圈圈光往上走；按那间的钟走、随那间的灯明暗 */
+  private pillars(st: WarpState, cfg: WarpConfig): void {
     const g = this.airFx!
     const h = cfg.pillars.heightM * LIFT_PER_M
     for (const room of st.plan.rooms) {
       if (room.pillars.length === 0) continue
+      const t = this.rt[room.index]!
+      const lit = this.glow(room)
       const color = SIGNS[room.sign]!.color
       room.pillars.forEach((b, k) => {
         const x0 = b.x0 * UNIT + 0.12 * UNIT
         const w = (b.x1 - b.x0) * UNIT - 0.24 * UNIT
         const base = b.y1 * UNIT - 0.25 * UNIT
-        g.fillStyle(color, 0.1)
+        g.fillStyle(color, 0.1 * lit)
         g.fillRect(x0, base - h, w, h)
-        g.fillStyle(lift(color, 0.5), 0.16)
+        g.fillStyle(lift(color, 0.5), 0.16 * lit)
         g.fillRect(x0 + w * 0.35, base - h, w * 0.3, h)
         for (let j = 0; j < 3; j++) {
           const s = (t * 0.45 + j / 3 + k * 0.17) % 1
-          g.fillStyle(lift(color, 0.6), 0.45 * Math.sin(Math.PI * s))
+          g.fillStyle(lift(color, 0.6), 0.45 * Math.sin(Math.PI * s) * lit)
           g.fillRect(x0, base - h * s - 0.03 * UNIT, w, 0.06 * UNIT)
         }
-        g.fillStyle(0xffffff, 0.3)
+        g.fillStyle(0xffffff, 0.3 * lit)
         g.fillRect(x0, base - h - 0.04 * UNIT, w, 0.08 * UNIT)
       })
     }
@@ -750,7 +894,7 @@ export class WarpView implements MapView {
       out.fx = (room.pad.x - px) / l
       out.fy = (room.pad.y - py) / l
       out.color = p.charge > 0 ? TEAM_GLOW : SIGNS[nextRoom(st.plan, room.index).sign]!.color
-      out.fill = PAD_FILL * (1 - d / PAD_LIGHT_U)
+      out.fill = PAD_FILL * (1 - d / PAD_LIGHT_U) * this.glow(room)
     }
     if (best < PAD_LIGHT_U) return
     const d = Math.hypot(x / UNIT - st.plan.core.x, y / UNIT - st.plan.core.y)
@@ -772,7 +916,9 @@ export class WarpView implements MapView {
     this.floorFx = undefined
     this.glowFx = undefined
     this.airFx = undefined
+    this.shadeFx = undefined
     this.state = undefined
+    this.specimens = []
     for (const key of [GROUND_KEY, TILES_KEY, MASK_KEY, TINT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }
