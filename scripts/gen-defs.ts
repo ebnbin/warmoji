@@ -47,6 +47,8 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { lawnSdf, wonderPlan } from '../src/maps/wonderland/layout.ts'
+import { passage, passes, wonderField } from '../src/maps/wonderland/field.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -672,6 +674,95 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 奇境：草坪放得进方框的安全区；各样东西的个数、大小说得通；变大变小的倍率、时长与茶点的钟点说得通。
+ * 体型的规矩按层算：原样的身体跨不过也钻不过矮篱、茶碟、门拱与椅子，变大的跨得过它们、跨不过高篱、茶杯与桌子，变小的钻得过门拱、椅子、老鼠洞与桌布底下、什么都跨不过。
+ * 抽一批种子真的摆一遍：花坛、牌篱与茶杯不少于下限，开局站位四周空着，原样的身体走得到大半个草坪，花坛里变大变小都进得去，摆茶点的空地与桌子底下都有
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'wonderland') === (m.wonderland !== undefined), `maps.${id} 是奇境当且仅当写了 wonderland`)
+  const w = m.wonderland
+  if (!w) continue
+  const at = `maps.${id}.wonderland`
+  const range = (v: readonly [number, number], min: number, int = false): boolean => v[0] >= min && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  need(w.meterPerU > 0 && w.tileU > 0, `${at} 的米每格与黑白格的边长须为正`)
+  need(range(w.lawn.halfU, 1) && w.lawn.halfU[1] + w.lawn.wobbleU <= FRAME_U / 2 - SAFE_U, `${at}.lawn.halfU 加上起伏须放得进方框的安全区`)
+  need(range(w.lawn.cornerU, 0) && w.lawn.cornerU[1] < w.lawn.halfU[0] && w.lawn.wobbleU >= 0 && w.lawn.waveU > 0 && w.lawn.hedgeM > 0, `${at}.lawn 的圆角、起伏、波长与树篱高须说得通`)
+  need(w.plazaU >= SPAWN_CLEAR_U, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格`)
+  const t = w.table
+  need(range(t.lengthU, t.widthU) && t.widthU > 0 && t.offU > t.widthU / 2 && range(t.chairs, 2, true) && t.chairU > 0, `${at}.table 的长宽、离站位的距离与椅子须说得通，桌头桌尾各一把椅子`)
+  need(range(w.cups.count, 1, true) && range(w.cups.radiusU, 0.5) && w.cups.saucer > 1 && w.cups.heightM > w.cups.saucerM, `${at}.cups 须至少一只，茶碟比杯口大、比杯子矮`)
+  need(range(w.saucers.count, 0, true) && range(w.saucers.radiusU, 0.5) && range(w.mushrooms.count, 0, true) && range(w.mushrooms.capU, w.mushrooms.stemU), `${at} 的茶碟与蘑菇须说得通，菌盖比菌柄大`)
+  need(range(w.cards.rows, 1, true) && range(w.cards.lengthU, w.cards.holeU * 3) && w.cards.bend >= 0 && w.cards.bend <= 1 && w.cards.cardU > 0 && w.cards.thickU > 0, `${at}.cards 须至少一排，每排长过老鼠洞三倍`)
+  need(range(w.beds.count, 1, true) && range(w.beds.hoops, 1, true) && w.beds.thickU > 0, `${at}.beds 须至少一个花坛，每个至少一个门拱`)
+  need(range(w.beds.lengthU, w.hoops.widthU + 2.4 + w.beds.thickU * 2) && range(w.beds.widthU, 1.8), `${at}.beds 的长边须嵌得下门拱`)
+  need(range(w.hoops.free, 0, true) && w.hoops.widthU > 0 && w.gapU.tallU > 0 && w.gapU.lowU > 0, `${at} 的门拱与空当须为正`)
+  const z = w.size
+  need(z.grow.scale > 1 && z.shrink.scale > 0 && z.shrink.scale < 1, `${at}.size 变大须大于原样、变小须小于原样`)
+  need([z.grow, z.shrink].every((d) => d.speed > 0 && d.mass > 0 && d.ms > z.warnMs) && z.warnMs > 0, `${at}.size 的移速、质量须为正，时长须长过闪烁的预警`)
+  const sv = w.serve
+  need(sv.firstMs >= sv.warnMs && sv.intervalMs > sv.warnMs && sv.lifeMs > sv.warnMs && sv.radiusU > 0, `${at}.serve 的头一轮、间隔与摆放的时长须长过预警`)
+  need(range(sv.each, 1, true) && sv.max >= sv.each[1], `${at}.serve 每轮至少一份，场上的上限须摆得下一轮`)
+  // 体型的规矩：按身段的层数算跨得过多高、身子顶多高，与 utils/pass 的算法一致
+  const B = OBSTACLES.body
+  const LAYER = B.heightM / B.layers
+  const reachOf = (k: number): { clearM: number; topM: number; phase: boolean } => {
+    const n = k === 1 ? B.layers : Math.max(1, k > 1 ? Math.ceil(B.layers * k - 1e-9) : Math.floor(B.layers * k + 1e-9))
+    return { clearM: Math.floor(n * B.step) * LAYER, topM: n * LAYER, phase: false }
+  }
+  const std = reachOf(1)
+  const big = reachOf(z.grow.scale)
+  const small = reachOf(z.shrink.scale)
+  const low = [
+    ['矮篱', w.beds.heightM, 0],
+    ['茶碟', w.saucers.heightM, 0],
+    ['杯下的茶碟', w.cups.saucerM, 0],
+    ['门拱', w.hoops.heightM, w.hoops.gapM],
+    ['椅子', t.chairM, t.chairGapM],
+  ] as const
+  for (const [name, top, gap] of low) {
+    need(!passes(std, top, gap, LAYER), `${at}：原样的身体过得去${name}，体型就没了用处`)
+    need(passes(big, top, gap, LAYER), `${at}：变大的身体跨不过${name}`)
+  }
+  for (const [name, top, gap] of [['门拱', w.hoops.heightM, w.hoops.gapM], ['椅子', t.chairM, t.chairGapM], ['老鼠洞', w.cards.heightM, w.cards.holeM], ['桌布底下', t.heightM, t.gapM]] as const) {
+    need(passes(small, top, gap, LAYER) && std.topM > gap && big.topM > gap, `${at}：${name}底下须只有变小的身体钻得过`)
+  }
+  for (const [name, top] of [['扑克牌篱', w.cards.heightM], ['茶杯', w.cups.heightM], ['茶壶', w.teapot.heightM], ['茶桌', t.heightM], ['菌柄', w.mushrooms.heightM]] as const) {
+    need(!passes(big, top, 0, LAYER), `${at}：变大的身体跨得过${name}`)
+  }
+  need(!passes(small, w.beds.heightM, 0, LAYER) && !passes(small, w.saucers.heightM, 0, LAYER), `${at}：变小的身体跨得过矮篱或茶碟`)
+  for (let s = 0; s < 24; s++) {
+    const where = `${at} 第 ${s} 个样本`
+    let plan
+    try {
+      plan = wonderPlan(w, s * 7919 + 13)
+    } catch (e) {
+      need(false, `${where} 摆不下：${(e as Error).message}`)
+      continue
+    }
+    const f = wonderField(plan, LAYER)
+    const normal = passage(f, std).basin
+    const bigB = passage(f, big).basin
+    const smallB = passage(f, small).basin
+    need(roomAt(normal, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT * 0.9, `${where} 的开局站位四周不够空`)
+    let lawn = 0
+    let reach = 0
+    for (let y = 0.5; y < FRAME_U; y += 1) {
+      for (let x = 0.5; x < FRAME_U; x += 1) {
+        if (lawnSdf(plan, x, y) > -0.5) continue
+        lawn++
+        if (roomAt(normal, x * UNIT, y * UNIT) > 0) reach++
+      }
+    }
+    need(reach >= lawn * 0.6, `${where} 原样的身体只走得到草坪的 ${Math.round((reach / lawn) * 100)}%`)
+    for (const b of plan.beds) {
+      need(roomAt(bigB, b.x * UNIT, b.y * UNIT) > 0 && roomAt(smallB, b.x * UNIT, b.y * UNIT) > 0 && roomAt(normal, b.x * UNIT, b.y * UNIT) < 0, `${where} 的花坛须只有变大、变小的进得去`)
+    }
+    need(f.spots.open.length >= 40 && f.spots.under.length > 0 && f.spots.bed.length > 0, `${where} 摆茶点的地方不够：空地 ${f.spots.open.length}、花坛 ${f.spots.bed.length}、桌下 ${f.spots.under.length}`)
+    need(plan.hole.ny > 0, `${where} 的兔子洞须开在上方的树篱脚下`)
   }
 }
 

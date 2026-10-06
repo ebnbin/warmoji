@@ -34,4 +34,4 @@ export interface StatMods {
 }
 
 /** 常驻修正的来源：角色定位、装备与等级、精英、当前形态、复制来的、永久成长、这一场的规则、关卡给这一批敌人的 */
-export type StatLayer = 'role' | 'gear' | 'elite' | 'form' | 'copy' | 'grow' | 'fight' | 'group'
+export type StatLayer = 'role' | 'gear' | 'elite' | 'form' | 'copy' | 'grow' | 'fight' | 'group' | 'size'

@@ -28,6 +28,7 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  wonder: WonderSnapshot | null
 }
 
 /**
@@ -58,6 +59,16 @@ export interface SubmarineSnapshot {
   readonly phase: 'down' | 'warn' | 'away'
   readonly ratio: number
   readonly inSec: number
+}
+
+/** 奇境的怀表：离下一轮茶点还有几秒、这一轮走了多少；队长的体型（-1 变小、0 原样、1 变大）、还剩的比例与秒数，快变回去了没有 */
+export interface WonderSnapshot {
+  readonly serveIn: number
+  readonly turn: number
+  readonly size: number
+  readonly ratio: number
+  readonly sizeSec: number
+  readonly warn: boolean
 }
 
 export interface WaveSummary {

@@ -54,4 +54,9 @@ export const SFX = {
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
+  // 奇境：吃下蛋糕往上长的一串、喝下药水往下缩的一串，茶点端上来的小银铃，快变回原样的滴答
+  grow: { wave: 'triangle', freq: 196, freqEnd: 330, duration: 0.55, volume: 0.22, attack: 0.01, decayPow: 1, steps: [1, 1.26, 1.5, 2], throttleMs: 160, jitter: 0.05 },
+  shrink: { wave: 'sine', freq: 1320, freqEnd: 900, duration: 0.5, volume: 0.18, attack: 0.005, decayPow: 1, steps: [1, 0.8, 0.67, 0.5], throttleMs: 160, jitter: 0.05 },
+  serve: { wave: 'sine', freq: 2093, duration: 0.5, volume: 0.12, attack: 0.002, decayPow: 1.8, steps: [1, 1.5, 1.26, 2], throttleMs: 1500 },
+  tick: { wave: 'square', freq: 2400, freqEnd: 2000, duration: 0.03, volume: 0.05, throttleMs: 200 },
 } as const satisfies Record<string, SfxDef>

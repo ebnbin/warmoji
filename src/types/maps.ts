@@ -1333,6 +1333,79 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/** 一种体型：画面与判定半径乘 scale，身段的层数也乘它（变大向上取整、变小向下取整，至少一层），移速乘 speed，质量乘 mass；持续 ms 毫秒 */
+export interface WonderSize {
+  readonly scale: number
+  readonly speed: number
+  readonly mass: number
+  readonly ms: number
+}
+/**
+ * 奇境：巨人尺度花园里的疯帽子茶会，一格 meterPerU 米。玫瑰树篱围着黑白格的草坪，草坪上摆着长茶桌、巨大的茶壶茶杯、扑克牌士兵排成的高篱、矮篱围着的花坛和槌球门拱。
+ * 场上按茶点的钟点端出「吃我」蛋糕与「喝我」药水，身体碰到就吃：蛋糕变大、药水变小，敌我通吃。
+ * 每样障碍有顶高与底下的空隙：跨得过顶的从上面过去，整个身子矮过空隙的从底下钻过去，其余的挡住
+ */
+export interface WonderlandConfig {
+  readonly meterPerU: number
+  /** 草坪：圆角方形的半边长与圆角半径（格），边按波长 waveU 的噪声起伏 wobbleU 格；四围的玫瑰树篱高 hedgeM 米 */
+  readonly lawn: { readonly halfU: readonly [number, number]; readonly cornerU: readonly [number, number]; readonly wobbleU: number; readonly waveU: number; readonly hedgeM: number }
+  /** 开局站的空地半径，格：什么都不摆在里面 */
+  readonly plazaU: number
+  /** 黑白格草坪一格多宽，格 */
+  readonly tileU: number
+  /** 茶桌：长宽（格），桌面多高、桌布垂下来离地还剩多高（米），桌心离开局站位多远（格）；桌边推进去的椅子几把，椅子多宽、多高、椅面下空多高 */
+  readonly table: {
+    readonly lengthU: readonly [number, number]
+    readonly widthU: number
+    readonly heightM: number
+    readonly gapM: number
+    readonly offU: number
+    readonly chairs: readonly [number, number]
+    readonly chairU: number
+    readonly chairM: number
+    readonly chairGapM: number
+  }
+  /** 立在草坪上的大茶壶：壶身长宽（格）、高（米） */
+  readonly teapot: { readonly lengthU: number; readonly widthU: number; readonly heightM: number }
+  /** 立着的大茶杯：几只、杯口半径（格）、高（米）；垫着的茶碟按杯口半径的 saucer 倍、高 saucerM 米 */
+  readonly cups: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly heightM: number; readonly saucer: number; readonly saucerM: number }
+  /** 散落的茶碟：几只、半径（格）、高（米） */
+  readonly saucers: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly heightM: number }
+  /** 扑克牌士兵的高篱：几排、每排多长（格）、拐不拐弯的概率，一张牌多宽、篱多厚（格）、多高（米）；每排一个老鼠洞，洞多宽（格）、多高（米） */
+  readonly cards: {
+    readonly rows: readonly [number, number]
+    readonly lengthU: readonly [number, number]
+    readonly bend: number
+    readonly cardU: number
+    readonly thickU: number
+    readonly heightM: number
+    readonly holeU: number
+    readonly holeM: number
+  }
+  /** 矮篱围的花坛：几个、长宽（格），篱多厚（格）、多高（米）；篱上嵌几个槌球门拱 */
+  readonly beds: { readonly count: readonly [number, number]; readonly lengthU: readonly [number, number]; readonly widthU: readonly [number, number]; readonly thickU: number; readonly heightM: number; readonly hoops: readonly [number, number] }
+  /** 槌球门拱：草坪上另立几个，拱多宽（格）、顶多高、拱下空多高（米） */
+  readonly hoops: { readonly free: readonly [number, number]; readonly widthU: number; readonly heightM: number; readonly gapM: number }
+  /** 大蘑菇：几棵、菌柄半径（格）、菌盖半径（格）、多高（米） */
+  readonly mushrooms: { readonly count: readonly [number, number]; readonly stemU: number; readonly capU: readonly [number, number]; readonly heightM: number }
+  /** 障碍之间、障碍与树篱之间至少空出多宽，格：高的按 tallU，矮的按 lowU */
+  readonly gapU: { readonly tallU: number; readonly lowU: number }
+  /** 变大与变小；变回原样前 warnMs 毫秒开始闪；吃了相反的那样就变回原样 */
+  readonly size: { readonly grow: WonderSize; readonly shrink: WonderSize; readonly warnMs: number }
+  /**
+   * 茶点：开局 firstMs 毫秒后第一轮，之后每 intervalMs 毫秒一轮；每轮先在要摆的地方预警 warnMs 毫秒，再摆出蛋糕与药水各 each 份；
+   * 场上同一样最多 max 份，摆出来 lifeMs 毫秒没人吃就收走（最后 warnMs 毫秒闪）；身体碰到半径 radiusU 格就吃掉
+   */
+  readonly serve: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly warnMs: number
+    readonly each: readonly [number, number]
+    readonly max: number
+    readonly lifeMs: number
+    readonly radiusU: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1407,7 +1480,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'wonderland'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,6 +1514,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly wonderland?: WonderlandConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

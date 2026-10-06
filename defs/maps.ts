@@ -212,6 +212,16 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const WONDER_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'rat', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'mushroom', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'raccoon', sinceWave: 2, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'chameleon', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'knight', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1347,5 +1357,66 @@ export const MAPS = {
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
     },
     boss: 'eclipse',
+  },
+  wonderland: {
+    emoji: '1f3a9',
+    name: '奇境',
+    desc: '黄昏里一座巨人尺度的花园，疯帽子的茶会摆在黑白格的草坪上：长桌铺着垂到地的桌布，茶壶茶杯大得像房子，扑克牌士兵肩并肩排成高篱，矮篱围着玫瑰花坛，槌球门拱插在草里。到了茶点的钟点，草坪上会端出「吃我」的蛋糕和「喝我」的药水，谁碰到谁吃：蛋糕让人变大，跨得过矮篱、门拱和茶碟，可也又慢又显眼；药水让人变小，钻得过门拱、老鼠洞和桌布底下，又快又难打中，可一挨打就飞出老远。敌人踩到一样会吃',
+    kind: 'wonderland',
+    stamina: { exertion: 0.4, regen: 1.1 },
+    palette: {
+      bgFrom: 'hsl(274 42% 36%)',
+      bgTo: 'hsl(238 48% 12%)',
+      map: hslToInt(152, 0.34, 0.3),
+      shadow: 0x000000,
+    },
+    // 黄昏：低低的太阳把迎光的一面照得发金，背光的一面沉进暮色的蓝紫，影子拖得长
+    light: { sun: 0xffe7c2, shade: 0x8c84b8, shadow: { color: 0x22163e, alpha: 0.42, length: 0.95 } },
+    decor: {
+      emojis: ['1f339', '1f344', '1f570'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: WONDER_MIX,
+    // 从玫瑰树篱的缝里钻出来、翻过树篱、从兔子洞里跑出来、被大茶壶的壶嘴喷出来、从扑克牌篱的老鼠洞里溜出来、从桌布底下爬出来、从草里冒出来；暴龙从兔子洞里挤出来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'petals',
+      boss: 'hole',
+      kinds: {
+        rose: { name: '树篱缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'hole', minU: 3 } }, enter: 'walk', look: 'petals', weight: 3, perSec: 1.5, only: ['zombie', 'mushroom', 'raccoon', 'knight', 'chameleon'] },
+        hedge: { name: '树篱', at: { kind: 'rim', segU: 3, away: { mark: 'hole', minU: 3 } }, enter: 'climb', look: 'leaves', weight: 1.5, perSec: 1, only: ['zombie', 'raccoon', 'chameleon', 'ghost'] },
+        hole: { name: '兔子洞', at: { kind: 'mark' }, enter: 'walk', look: 'puff', snapU: 8, weight: 2, perSec: 1, only: ['rat', 'raccoon', 'zombie', 'rhino'] },
+        teapot: { name: '茶壶嘴', at: { kind: 'mark' }, enter: 'lob', look: 'steam', reachU: 8, snapU: 8, weight: 1.5, perSec: 1, only: ['rat', 'mushroom'] },
+        mouse: { name: '老鼠洞', at: { kind: 'mark' }, enter: 'walk', look: 'puff', weight: 2, perSec: 1, only: ['rat', 'chameleon'] },
+        cloth: { name: '桌布下', at: { kind: 'mark' }, enter: 'walk', look: 'puff', snapU: 5, weight: 1.5, perSec: 1, only: ['zombie', 'rat', 'raccoon'] },
+        lawn: { name: '草坪', at: { kind: 'ground' }, enter: 'rise', look: 'leaves', weight: 1 },
+      },
+    },
+    finalWaveSub: '暴龙从兔子洞里挤了出来——它也吃茶点：别让它吃到蛋糕，喂它一瓶药水再打！',
+    wonderland: {
+      meterPerU: 0.5,
+      lawn: { halfU: [16, 17.2], cornerU: [3, 6], wobbleU: 0.45, waveU: 6, hedgeM: 3.8 },
+      plazaU: 4,
+      tileU: 3,
+      table: { lengthU: [13, 16], widthU: 3.2, heightM: 2.4, gapM: 0.65, offU: 7, chairs: [3, 4], chairU: 1.5, chairM: 1, chairGapM: 0.65 },
+      teapot: { lengthU: 5.4, widthU: 4, heightM: 4.2 },
+      cups: { count: [1, 2], radiusU: [1.3, 1.7], heightM: 2.6, saucer: 1.35, saucerM: 0.7 },
+      saucers: { count: [2, 4], radiusU: [1.2, 1.8], heightM: 0.7 },
+      cards: { rows: [2, 4], lengthU: [5, 8.5], bend: 0.4, cardU: 1.1, thickU: 0.5, heightM: 3, holeU: 0.8, holeM: 0.65 },
+      beds: { count: [2, 3], lengthU: [5, 6.5], widthU: [3.6, 4.4], thickU: 0.6, heightM: 0.95, hoops: [1, 2] },
+      hoops: { free: [3, 5], widthU: 1.1, heightM: 1, gapM: 0.65 },
+      mushrooms: { count: [1, 2], stemU: 0.6, capU: [2, 2.6], heightM: 3.4 },
+      gapU: { tallU: 1.8, lowU: 1.3 },
+      size: {
+        grow: { scale: 1.7, speed: 0.8, mass: 3, ms: 12000 },
+        shrink: { scale: 0.5, speed: 1.3, mass: 0.3, ms: 12000 },
+        warnMs: 2500,
+      },
+      serve: { firstMs: 5000, intervalMs: 15000, warnMs: 2500, each: [1, 2], max: 3, lifeMs: 30000, radiusU: 0.35 },
+    },
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

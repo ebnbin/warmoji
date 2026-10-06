@@ -149,6 +149,13 @@ export const BATTLEFIELD = {
       { id: 'dreamland_dizzy', emoji: '1f635_200d_1f4ab', name: '转晕了', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'dreamland_sticky', emoji: '1f36d', name: '糖浆粘脚', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    wonderland: [
+      { id: 'wonder_tea', emoji: '1fad6', name: '再续一杯', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'wonder_tarts', emoji: '1f967', name: '红心馅饼', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'wonder_croquet', emoji: '1f9a9', name: '火烈鸟球槌', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'wonder_six', emoji: '1f555', name: '永远六点钟', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'wonder_fall', emoji: '1f573', name: '跌进兔子洞', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
 } as const satisfies BattlefieldTuning

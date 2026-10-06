@@ -1209,6 +1209,56 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/** 奇境：茶会上的六八拍，大调的和弦里偶尔拐一个全音阶的弯，像梦里走错了一步；拨弦似的方波琶音，三角波唱着摇摆的旋律，正弦的钟在乐句头上敲一下，嗒、嘀的是怀表在走 */
+function buildWonderland(): BgmScore {
+  const chords = [0, 0, 5, 5, 3, 3, 4, 4, 0, 2, 5, 1, 3, 4, 0, 0]
+  return track(
+    {
+      bpm: 76,
+      stepsPerBeat: 3,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 62,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 76) * 0.5, feedback: 0.3, level: 0.22 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.15, attack: 0.008, release: 0.1, octave: -2 }
+      const pluck: Voice = { wave: 'square', vol: 0.028, attack: 0.002, release: 0.06, octave: 0 }
+      const lead: Voice = { wave: 'triangle', vol: 0.11, attack: 0.015, release: 0.12, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.055, attack: 0.002, release: 0.5, octave: 2, echo: true }
+      b.bass(bass, chords, 'r..o..')
+      b.arp(pluck, chords, [0, 1, 2, 3, 2, 1])
+      b.line(lead, [
+        [0, 0, 4, 2], [0, 2, 5, 1], [0, 3, 4, 2], [0, 5, 2, 1],
+        [1, 0, 0, 3], [1, 3, 2, 3],
+        [2, 0, 5, 2], [2, 2, 7, 1], [2, 3, 6, 2], [2, 5, 5, 1],
+        [3, 0, 4, 6],
+        [4, 0, 3, 2], [4, 2, 4, 1], [4, 3, 5, 2], [4, 5, 3, 1],
+        [5, 0, 2, 3], [5, 3, 5, 3],
+        [6, 0, 4, 2], [6, 2, 3, 1], [6, 3, 2, 2], [6, 5, 1, 1],
+        [7, 0, 4, 3], [7, 3, 6, 1], [7, 4, 8, 2],
+        [8, 0, 7, 2], [8, 2, 9, 1], [8, 3, 7, 2], [8, 5, 4, 1],
+        [9, 0, 6, 3], [9, 3, 4, 3],
+        [10, 0, 5, 2], [10, 2, 7, 1], [10, 3, 9, 2], [10, 5, 8, 1],
+        [11, 0, 8, 3], [11, 3, 6, 3],
+        [12, 0, 5, 2], [12, 2, 4, 1], [12, 3, 3, 2], [12, 5, 5, 1],
+        [13, 0, 4, 3], [13, 3, 1, 2], [13, 5, 2, 1],
+        [14, 0, 0, 6],
+        [15, 0, 4, 1], [15, 1, 5, 1], [15, 2, 6, 1], [15, 3, 7, 3],
+      ])
+      // 乐句尾上全音阶往上拐的一串：大调的 do re mi 接一个升高的 fa，像梦里踩空了一级
+      for (const bar of [7, 15]) {
+        for (let k = 0; k < 4; k++) b.note(bell, bar, 2 + k, 7 + k, 1, k === 3 ? Math.pow(2, 1 / 12) : 1)
+      }
+      b.line(bell, [[0, 0, 7, 3], [4, 0, 8, 3], [8, 0, 9, 3], [12, 0, 7, 3]])
+      b.drums('hat', 'x.....', 0, 16, 0.03)
+      b.drums('tom', '...o..', 0, 16, 0.035)
+      b.drums('kick', 'x.....', 4, 16, 0.1)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1235,6 +1285,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  wonderland: buildWonderland,
 }
 
 const cache = new Map<BgmId, BgmScore>()

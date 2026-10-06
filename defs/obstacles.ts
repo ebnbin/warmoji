@@ -38,5 +38,15 @@ export const OBSTACLES = {
     belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
     // 梦幻乐园四周的布景
     scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
+    // 奇境四围的玫瑰树篱与花坛的矮篱
+    hedge: { name: '树篱', phase: true, opaque: true, pierce: null, strength: null },
+    // 奇境扑克牌士兵排成的高篱
+    card: { name: '纸牌', phase: true, opaque: true, pierce: null, strength: null },
+    // 奇境的大茶壶、茶杯与茶碟
+    china: { name: '瓷器', phase: true, opaque: true, pierce: null, strength: null },
+    // 奇境茶桌垂到地的桌布
+    cloth: { name: '桌布', phase: true, opaque: true, pierce: null, strength: null },
+    // 奇境的槌球门拱与椅子：细细的铁丝与椅腿，子弹与视线从空里过去
+    wicket: { name: '门拱', phase: true, opaque: false, pierce: 0, strength: null },
   },
 } as const satisfies ObstacleTuning

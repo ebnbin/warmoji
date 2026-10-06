@@ -78,9 +78,10 @@ import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhas
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
+import { serveCountdown, sizeNow } from '../maps/wonderland/world'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot, WonderSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -610,6 +611,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      wonder: sim ? wonderSnapshot(sim) : null,
     }
   }
 
@@ -1059,6 +1061,24 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 在奇境打的一局：茶点的钟点与队长的体型 */
+function wonderSnapshot(sim: Sim): WonderSnapshot | null {
+  const cfg = MAPS[sim.mapId].wonderland
+  if (!sim.worldState.wonderland || !cfg) return null
+  const c = serveCountdown(sim)
+  const z = sizeNow(sim, sim.leader)
+  const total = z.size > 0 ? cfg.size.grow.ms : z.size < 0 ? cfg.size.shrink.ms : 1
+  const left = z.size !== 0 ? Math.max(0, z.until - sim.elapsedMs) : 0
+  return {
+    serveIn: c.leftMs / 1000,
+    turn: 1 - c.leftMs / c.intervalMs,
+    size: z.size,
+    ratio: z.until > 0 ? left / total : 1,
+    sizeSec: left / 1000,
+    warn: z.size !== 0 && (z.until === 0 || left < cfg.size.warnMs),
+  }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {
