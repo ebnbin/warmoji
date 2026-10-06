@@ -1,4 +1,8 @@
 import { cellNearest, fbm, valueNoise } from '../../util/noise'
+import { COSMOS_SLOTS, SN_COOL_K, SN_COOL_S, SN_FALL_S, SN_HOT_K, SN_RISE_S } from './cosmos'
+import { paintRemnants, REMNANT_PLANETARY, REMNANT_PX, REMNANT_SPAN } from './remnants'
+import { C2, hue, LAMBDA, planck, scattered, WHITE_K } from './spectrum'
+import type { Rgb } from './spectrum'
 
 /** 星云数据贴图每格多少像素：气体是软的，细节交给着色器 */
 export const NEBULA_PPU = 16
@@ -152,8 +156,12 @@ export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, 
   }
 }
 
+/** 要画的是哪一张：星云的数据贴图，或超新星遗迹与行星状星云的图集 */
+export type SheetLayer = 'sheet' | 'remnant'
+
 /** 一块画好的像素在贴图上的行范围：[r0, r1) */
 export interface SheetBand {
+  readonly layer: SheetLayer
   readonly r0: number
   readonly r1: number
 }
@@ -168,21 +176,41 @@ export interface SheetPiece {
   readonly pixels: Uint8ClampedArray<ArrayBuffer>
 }
 
-export function bandBuffer(s: NebulaSheet, band: SheetBand): Uint8ClampedArray<ArrayBuffer> {
-  return new Uint8ClampedArray(sheetPx(s) * (band.r1 - band.r0) * 4)
+/** 这一张有多宽，像素 */
+export function layerPx(s: NebulaSheet, layer: SheetLayer): number {
+  return layer === 'sheet' ? sheetPx(s) : REMNANT_PX
 }
+
+export function bandBuffer(s: NebulaSheet, band: SheetBand): Uint8ClampedArray<ArrayBuffer> {
+  return new Uint8ClampedArray(layerPx(s, band.layer) * (band.r1 - band.r0) * 4)
+}
+
+export function paintBand(s: NebulaSheet, band: SheetBand, out: Uint8ClampedArray): void {
+  if (band.layer === 'sheet') paintNebula(s, out, band.r0, band.r1)
+  else paintRemnants(s.seed, out, band.r0, band.r1)
+}
+
+/** GLSL 的浮点字面量 */
+const glsl = (x: number): string => (Number.isInteger(x) ? x.toFixed(1) : String(x))
+const glslRgb = (c: Rgb): string => `vec3(${c.map(glsl).join(', ')})`
+/** 星场按色温分布上色的四个节点：冷的红矮星、橙黄的星、白的星、蓝白的热星 */
+const STAR_HUES = [3300, 4800, 6800, 20000].map((k) => glslRgb(hue(planck(k))))
 
 /**
  * 星云的片元着色器：四边形盖住镜头能到的整片，坐标以格计、以球心为原点。画面是透视相机拍的：镜头在活动的平面上方 H 格，
  * 平面上的东西照原样，平面以下越深的东西在画面上越小、跟着镜头移得越慢。
  * 空腔里看到的是球壳下半部的内壁：从镜头经过这个像素往下的光线先被黑洞按 α = 2r_s/b + (15π/16)(r_s/b)² 弯折（b 是光线离黑洞最近的距离），
  * 再打到内壁上，所以黑洞周围的星云被扭曲，正对黑洞后面那一片成像成爱因斯坦环；b 小于阴影半径的光线掉进黑洞，是黑的。
- * 内壁上是一层稀薄的电离气体，透过云团之间的空隙看得到后面暗的尘埃和嵌在星云里的星：气体被吸积盘照亮，亮度按到黑洞的距离平方反比、
- * 入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；全电离了就不再更亮。氢复合发的 Hα、Hβ、Hγ 按 2.86 : 1 : 0.47 混成粉色，
- * 再加上星云的连续谱；挡在前面的尘埃按波长消光，蓝光比红光挡得多，尘埃多的地方偏红。
- * 薄层斜着看光程更长，碗沿更亮。壳层的密度从内壁往外涨：光深到 1 的那一层是看得见的内壁（碗按它的半径画），再往外光照不进去，迅速暗成厚厚的尘埃；外缘以外是无穷远处的星。
+ * 颜色都是真彩色。内壁上是一层稀薄的气体，谁照它、照得多硬，它就发什么光：电离参数高的地方氧被电离两次，[O III] 500.7 nm 发青绿，再高氦也电离两次，
+ * He II 468.6 nm 发蓝；低一些是氢复合的 Hα、Hβ、Hγ 按 2.86 : 1 : 0.47 混成的玫红；再低电离度不够，[N II] 与 [S II] 让它偏深红；全电离了就不再更亮。
+ * 电离区的边上是一圈电离前沿，云团朝着电离源的那一面被削出亮边。电离源是黑洞的吸积盘（亮度按距离平方反比、入射角与薄盘朝下更亮的方向，
+ * 光度取光传过来那一刻的）与天象里的恒星：O 型星电离出一个按斯特龙根半径长大的泡，主星死后氢慢慢复合，二次电离的氧先暗。
+ * 尘埃自己不发光，把星光按波长的 −1.7 次方散射出来：被热星照着发蓝，被红超巨星照着发金黄；挡在前面的尘埃按波长消光，蓝光比红光挡得多。
+ * 超新星亮起来再边冷却边暗下去，它的光按光速传开、照亮周围的气体与尘埃（光回波）；遗迹按图集画，撞上越稠的气体越亮。
+ * 恒星按黑体色上色，少数缓慢地脉动；壳层外缘以外是无穷远处的星与星系。薄层斜着看光程更长，碗沿更亮。
+ * 壳层的密度从内壁往外涨：光深到 1 的那一层是看得见的内壁（碗按它的半径画），再往外光照不进去，迅速暗成厚厚的尘埃。
  * 吸积盘是平面上的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨；
- * 盘面的光按引力红移与横向多普勒 g = √(1 − 3r_s/2r) 变红变暗，颜色取黑体色
+ * 盘面的光按引力红移与横向多普勒 g = √(1 − 3r_s/2r) 降温，颜色与亮度都按普朗克定律取
  */
 export const NEBULA_FRAG = `
 #pragma phaserTemplate(shaderName)
@@ -197,7 +225,9 @@ precision mediump float;
 varying vec2 outTexCoord;
 #pragma phaserTemplate(outVariables)
 #pragma phaserTemplate(fragmentHeader)
+#define SLOTS ${COSMOS_SLOTS}
 uniform sampler2D uNeb;
+uniform sampler2D uRem;
 uniform float uTime;
 uniform vec4 uRect;
 uniform float uUnit;
@@ -215,21 +245,50 @@ uniform vec4 uFlareK2;
 uniform vec4 uMeteor;
 uniform float uSeed;
 uniform float uGlow;
+uniform vec3 uDisk;
+uniform float uHard;
+uniform vec4 uCone;
+uniform vec4 uEvAt[SLOTS];
+uniform vec4 uEvStar[SLOTS];
+uniform vec4 uEvIon[SLOTS];
+uniform vec4 uEvScatter[SLOTS];
+uniform vec4 uEvRemnant[SLOTS];
+uniform vec4 uEvFlash[SLOTS];
 
-const float DISK_GAIN = 1.8;
+const float DISK_GAIN = 0.4;
 const float LIMB_MAX = 2.4;
 const float ION_SAT = 1.2;
+const float HOLE_FLUX = 110.0;
 const vec4 SHEET_MEAN = vec4(0.22, 0.3, 0.05, 1.0);
-const vec3 H_ALPHA = vec3(1.0, 0.0, 0.03);
-const vec3 H_BETA = vec3(0.0, 0.75, 1.0);
-const vec3 H_GAMMA = vec3(0.3, 0.0, 1.0);
-const vec3 BALMER = (H_ALPHA * 2.86 + H_BETA + H_GAMMA * 0.47) / 3.0 * 0.74 + vec3(0.26);
+const vec3 LAMBDA = ${glslRgb(LAMBDA)};
+const float C2 = ${glsl(C2)};
+const float WHITE_K = ${glsl(WHITE_K)};
+const vec3 SCATTER = ${glslRgb(scattered([1, 1, 1]))};
+const vec3 BALMER = vec3(1.0, 0.16, 0.32);
+const vec3 OIII = vec3(0.0, 1.0, 0.7);
+const vec3 HEII = vec3(0.12, 0.4, 1.0);
+const vec3 LOWEX = vec3(1.0, 0.02, 0.07);
+const vec3 SHOCK = vec3(1.0, 0.3, 0.07);
+const vec3 SYNC = vec3(0.55, 0.68, 1.0);
 const vec3 EXTINCTION = vec3(1.0, 1.25, 1.46);
 const float DUST_TAU = 1.0;
-const vec3 FRONT = vec3(1.0, 0.64, 0.8);
-const vec3 SELF_GLOW = vec3(0.14, 0.06, 0.09);
-const vec3 WALL = vec3(0.045, 0.022, 0.042);
-const vec3 DUST = vec3(0.27, 0.17, 0.17);
+const vec3 WALL = vec3(0.008, 0.008, 0.013);
+const vec3 DUST = vec3(0.13, 0.115, 0.11);
+const vec3 DIFFUSE = vec3(0.07, 0.008, 0.024);
+const vec3 METEOR = vec3(1.0, 0.55, 0.25);
+const vec3 STAR_RED = ${STAR_HUES[0]};
+const vec3 STAR_ORANGE = ${STAR_HUES[1]};
+const vec3 STAR_WHITE = ${STAR_HUES[2]};
+const vec3 STAR_BLUE = ${STAR_HUES[3]};
+const vec3 GALAXY_CORE = ${glslRgb(hue(planck(4500)))};
+const vec3 GALAXY_DISK = ${glslRgb(hue(planck(11000)))};
+const float SN_RISE = ${glsl(SN_RISE_S)};
+const float SN_FALL = ${glsl(SN_FALL_S)};
+const float SN_HOT_K = ${glsl(SN_HOT_K)};
+const float SN_COOL_K = ${glsl(SN_COOL_K)};
+const float SN_COOL_S = ${glsl(SN_COOL_S)};
+const float SPAN = ${glsl(REMNANT_SPAN)};
+const float PLANETARY = ${glsl(REMNANT_PLANETARY)};
 
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -257,15 +316,25 @@ float lumAt(float t) {
   return l;
 }
 
-vec3 blackbody(float k) {
-  float t = clamp(k, 1000.0, 15000.0) / 100.0;
-  float r = t <= 66.0 ? 1.0 : clamp(1.2929 * pow(t - 60.0, -0.1332), 0.0, 1.0);
-  float g = t <= 66.0 ? clamp(0.3901 * log(t) - 0.6318, 0.0, 1.0) : clamp(1.1299 * pow(t - 60.0, -0.0755), 0.0, 1.0);
-  float b = t >= 66.0 ? 1.0 : (t <= 19.0 ? 0.0 : clamp(0.5432 * log(t - 10.0) - 1.1963, 0.0, 1.0));
-  return vec3(r, g, b);
+/** 黑体在三个通道上的亮度，以白点色温的黑体为 1 */
+vec3 planck(float k) {
+  vec3 x = C2 / (LAMBDA * max(k, 800.0));
+  vec3 x0 = C2 / (LAMBDA * WHITE_K);
+  return exp(x0 - x) * (1.0 - exp(-x0)) / (1.0 - exp(-x));
 }
 
-float starLayer(vec2 p, float scale, float seed, float rare) {
+vec3 tint(vec3 c) {
+  return c / max(max(c.r, c.g), max(c.b, 1e-6));
+}
+
+/** 星按色温分布上色：多数是橙黄的冷星，少数是蓝白的热星 */
+vec3 starHue(float h) {
+  vec3 c = mix(STAR_RED, STAR_ORANGE, smoothstep(0.0, 0.45, h));
+  c = mix(c, STAR_WHITE, smoothstep(0.45, 0.78, h));
+  return mix(c, STAR_BLUE, smoothstep(0.84, 0.98, h));
+}
+
+vec3 starLayer(vec2 p, float scale, float seed, float rare) {
   vec2 g = p * scale;
   vec2 i = floor(g);
   vec2 f = fract(g);
@@ -274,16 +343,28 @@ float starLayer(vec2 p, float scale, float seed, float rare) {
   vec2 at = vec2(hash(i + seed + 17.1), hash(i + seed + 41.7)) * 0.7 + 0.15;
   float d = length(f - at) / scale * uUnit;
   float b = pow((h - rare) / (1.0 - rare), 3.0);
-  return on * b * exp(-d * d * 0.35);
+  float t = hash(i + seed + 5.3);
+  float pulse = 1.0 + 0.45 * step(0.88, hash(i + seed + 23.9)) * sin(uTime * (0.7 + hash(i + seed + 31.1)) + h * 40.0);
+  return starHue(t) * on * b * (0.7 + 0.6 * t) * pulse * exp(-d * d * 0.35);
 }
 
-float stars(vec2 p) {
+vec3 stars(vec2 p) {
   return starLayer(p, 1.7, uSeed, 0.86) * 1.4 + starLayer(p, 3.9, uSeed + 7.0, 0.93) * 0.8 + starLayer(p, 0.6, uSeed + 3.0, 0.95) * 2.4;
 }
 
-vec3 starTint(vec2 p) {
-  float h = hash(floor(p * 1.7) + uSeed + 5.0);
-  return mix(vec3(1.0, 0.82, 0.62), vec3(0.78, 0.86, 1.0), step(0.7, h));
+/** 极远处的星系：椭圆星系是一团橙黄的老星，旋涡星系是橙黄的核球外面一圈蓝白的盘 */
+vec3 galaxies(vec2 p) {
+  vec2 i = floor(p * 0.2);
+  if (hash(i + uSeed + 91.0) < 0.5) return vec3(0.0);
+  vec2 at = (i + vec2(hash(i + uSeed + 13.0), hash(i + uSeed + 29.0)) * 0.6 + 0.2) / 0.2;
+  vec2 d = p - at;
+  float ang = hash(i + uSeed + 47.0) * 6.2832;
+  vec2 q = vec2(cos(ang) * d.x + sin(ang) * d.y, (cos(ang) * d.y - sin(ang) * d.x) / (0.25 + 0.7 * hash(i + uSeed + 53.0)));
+  float size = 0.2 + 0.4 * hash(i + uSeed + 61.0);
+  float rr = dot(q, q) / (size * size);
+  float spiral = step(0.4, hash(i + uSeed + 71.0));
+  float bright = 0.2 + 0.45 * hash(i + uSeed + 83.0) * hash(i + uSeed + 89.0);
+  return (GALAXY_CORE * exp(-rr * mix(3.0, 9.0, spiral)) + GALAXY_DISK * exp(-rr * 1.4) * 0.45 * spiral) * bright;
 }
 
 /** 吸积盘上第 i 圈薄环里的湍流：整圈按环心的开普勒（Paczyński–Wiita）角速度转，里圈比外圈转得快 */
@@ -324,6 +405,41 @@ vec4 sheetAt(vec2 s) {
   return texture2D(uNeb, vec2(uv.x, 1.0 - uv.y));
 }
 
+/** 遗迹图集第 tile 块在局部坐标 l（以遗迹半径为 1）处 */
+vec3 remnantAt(vec2 l, float tile) {
+  vec2 cell = vec2(mod(tile, 2.0), floor(tile / 2.0));
+  vec2 uv = (cell + clamp(l / (2.0 * SPAN) + 0.5, 0.004, 0.996)) * 0.5;
+  return texture2D(uRem, vec2(uv.x, 1.0 - uv.y)).rgb;
+}
+
+/** 超新星爆发 t 秒后的光变（峰值约 0.8）与色温 */
+float snShape(float t) {
+  return t <= 0.0 ? 0.0 : (1.0 - exp(-t / SN_RISE)) * exp(-t / SN_FALL);
+}
+
+float snTemp(float t) {
+  return SN_COOL_K + SN_HOT_K * exp(-max(t, 0.0) / SN_COOL_S);
+}
+
+/** 一颗星：亮的核加一圈淡淡的晕，d 以格计 */
+float starShape(float d) {
+  return exp(-d * d / 0.006) + 0.12 * exp(-d * d / 0.12);
+}
+
+/** 嵌在内壁云里的年轻恒星，照亮身边一小团尘埃：热星照出蓝的、冷星照出金黄的反射星云 */
+vec3 nests(vec2 p, float dust) {
+  vec2 i = floor(p * 0.2);
+  float h = hash(i + uSeed + 101.0);
+  if (h < 0.7) return vec3(0.0);
+  vec2 at = (i + 0.3 + vec2(hash(i + uSeed + 107.0), hash(i + uSeed + 113.0)) * 0.4) / 0.2;
+  vec2 d = p - at;
+  float rr = dot(d, d);
+  float size = 0.35 + 0.3 * hash(i + uSeed + 127.0);
+  vec3 c = starHue(hash(i + uSeed + 131.0) * 0.45 + 0.55 * step(0.5, hash(i + uSeed + 137.0)));
+  float bright = 0.4 + 0.6 * (h - 0.7) / 0.3;
+  return c * bright * (SCATTER * exp(-rr / (size * size)) * (0.2 + dust) * 0.7 + starShape(sqrt(rr)) * 0.9);
+}
+
 void main ()
 {
   vec2 tc = outTexCoord;
@@ -350,31 +466,104 @@ void main ()
     vec2 sky = -K * uCam.z;
     float floorOn = step(r, a);
     float shellOn = step(a, r) * step(r, outer);
+    float body = floorOn + shellOn;
     vec3 hit = floorHit(p, K, a);
     vec2 s = mix(p, hit.xy, floorOn);
     vec3 P = vec3(s, -hit.z * floorOn);
     vec3 n = floorOn > 0.5 ? -P / a : vec3(-p / max(r, 1e-3), 0.0);
     float blur = smoothstep(0.25, 0.35, rs / bp) * floorOn;
-    vec4 nb = mix(sheetAt(s), SHEET_MEAN, blur) * (floorOn + shellOn);
+    float sharp = 1.0 - blur;
+    vec4 raw = sheetAt(s);
+    vec4 nb = mix(raw, SHEET_MEAN, blur) * body;
+    vec2 grad = (vec2(sheetAt(s + vec2(0.2, 0.0)).r, sheetAt(s + vec2(0.0, 0.2)).r) - raw.r) * 5.0 * sharp * body;
     float skin = mix(exp(1.0 - pow(max(0.0, r - inner) / (a - inner), uShell.w + 1.0)), 1.0, floorOn);
     float limb = floorOn > 0.5 ? min(LIMB_MAX, 1.0 / max(0.05, abs(dot(normalize(vec3(-K, -1.0)), n)))) : LIMB_MAX * skin;
+
     vec3 L = vec3(hole, 0.0) - P;
     float d = length(L);
     vec3 Ld = L / d;
-    float flux = lumAt(now - d / c) * max(dot(n, Ld), 0.0) * (0.3 + 0.7 * abs(Ld.z)) / (d * d) * 260.0;
+    float flux = lumAt(now - d / c) * max(dot(n, Ld), 0.0) * (0.3 + 0.7 * abs(Ld.z)) / (d * d) * HOLE_FLUX;
+    float cone = smoothstep(uCone.w - 0.08, uCone.w + 0.04, dot(-Ld, uCone.xyz));
+    flux *= 1.0 + 0.6 * cone;
+    float lit = ionized(flux);
+    float U = flux / (0.35 + nb.r) * (0.6 + 0.9 * uHard) * (1.0 + 3.0 * cone);
+    float hi = smoothstep(0.35, 1.8, U);
+    float he = smoothstep(4.0, 10.0, U);
+    float low = 1.0 - smoothstep(0.1, 0.7, U);
+    vec3 line = DIFFUSE + lit * 0.7 * (mix(BALMER, LOWEX, low * 0.7) * (1.0 - 0.75 * hi) + mix(OIII, HEII, he) * hi * 1.1);
+    vec3 glow = uDisk * SCATTER * flux * 0.05;
+    vec3 rims = mix(BALMER, OIII, hi) * nb.b * lit * 0.55 * skin;
+
     vec3 M = vec3(hm, 0.0) - P;
     float dm = length(M);
-    flux += uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
-    float lit = ionized(flux);
-    vec3 gas = nb.r * limb * (SELF_GLOW + BALMER * lit * 0.8);
-    vec3 front = nb.b * lit * FRONT * 0.6 * skin;
+    float mflux = uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
+    glow += METEOR * mflux * 0.1;
+    line += SHOCK * ionized(mflux) * 0.4;
+
+    vec3 fil = vec3(0.0);
+    vec3 pts = vec3(0.0);
+    for (int i = 0; i < SLOTS; i++) {
+      vec4 at = uEvAt[i];
+      if (at.w < 0.5) continue;
+      vec3 D = P - at.xyz;
+      float dd = length(D);
+      vec4 ion = uEvIon[i];
+      if (ion.z > 0.0) {
+        float R = ion.x * (1.15 - 0.5 * nb.r);
+        float inside = 1.0 - smoothstep(R * 0.72, R, dd);
+        float high = 1.0 - smoothstep(ion.y * 0.5, ion.y, dd);
+        line += ion.z * inside * (BALMER * (1.0 - 0.75 * high) + OIII * high * 1.1);
+        line += ion.w * LOWEX * exp(-pow((dd - R) / (0.1 * R + 0.3), 2.0));
+        rims += ion.z * inside * max(0.0, dot(grad, D.xy) / max(dd, 1e-3)) * mix(BALMER, OIII, high) * 0.35 * skin;
+      }
+      vec4 sc = uEvScatter[i];
+      glow += sc.rgb / (dd * dd + 2.0) * (1.0 - smoothstep(sc.w * 0.5, sc.w, dd));
+      vec4 fl = uEvFlash[i];
+      vec4 rem = uEvRemnant[i];
+      vec3 nC = normalize(at.xyz);
+      vec3 t1 = normalize(vec3(-nC.y, nC.x, 0.0) + vec3(1e-4, 0.0, 0.0));
+      vec3 t2 = cross(nC, t1);
+      vec4 st = uEvStar[i];
+      if (dd < 3.0 && sharp > 0.0) {
+        float k0 = starShape(dd);
+        if (st.w > 0.0) {
+          for (int k = 1; k < 5; k++) {
+            float fk = float(k);
+            vec2 off = (vec2(hash(vec2(fl.z, fk)), hash(vec2(fk, fl.z + 3.1))) - 0.5) * 2.0 * st.w;
+            k0 += (0.3 + 0.4 * hash(vec2(fl.z + fk, 7.7))) * starShape(length(D - t1 * off.x - t2 * off.y));
+          }
+        }
+        pts += st.rgb * k0 * sharp;
+      }
+      if (fl.y > 0.0) {
+        float te = now - fl.x;
+        if (dd < 3.0) pts += tint(planck(snTemp(te))) * snShape(te) * (starShape(dd) * 6.0 + 0.5 * exp(-dd * dd / 1.2)) * sharp;
+        float echo = snShape(te - dd / c) / (dd * dd + 1.0) * 30.0;
+        line += ionized(echo) * mix(BALMER, OIII, 0.6);
+        glow += tint(planck(snTemp(te - dd / c))) * SCATTER * echo * 0.08;
+      }
+      if (rem.z > 0.0 && dd < rem.x * SPAN) {
+        vec2 l = vec2(dot(D, t1), dot(D, t2)) / rem.x;
+        float ca = cos(rem.w);
+        float sa = sin(rem.w);
+        l = vec2(ca * l.x - sa * l.y, (sa * l.x + ca * l.y) / fl.w);
+        vec3 m = remnantAt(l, rem.y) * rem.z * sharp;
+        if (abs(rem.y - PLANETARY) < 0.5) fil += m.r * mix(OIII, HEII, 0.35) + m.g * mix(BALMER, LOWEX, 0.5) + m.b * LOWEX * 0.6;
+        else fil += (m.r * OIII + m.g * SHOCK + m.b * SYNC) * (0.5 + nb.r);
+      }
+    }
+
     float dust = nb.g;
+    vec3 ext = exp(-dust * DUST_TAU * EXTINCTION);
     vec2 starAt = mix(sky, s, floorOn);
-    vec3 star = starTint(starAt) * stars(starAt);
-    vec3 onFloor = (WALL + star * 0.5 * (1.0 - blur)) * (1.0 - dust) + gas * exp(-dust * DUST_TAU * EXTINCTION) + DUST * dust * (0.08 + flux * 0.12) + front;
+    vec3 star = stars(starAt) * sharp;
+    vec3 shine = (nb.r * limb * line + fil * skin) * ext + pts * skin * sqrt(ext) + glow * (dust + 0.25 * nb.r) * skin + rims;
     float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - dust);
-    vec3 inShell = mix(DUST * 0.12 * (0.4 + nb.r), star, clear) + gas + front;
-    col = floorOn * onFloor + shellOn * inShell + (1.0 - floorOn - shellOn) * star;
+    vec3 far = star;
+    if (floorOn < 0.5 && (shellOn < 0.5 || clear > 0.0)) far += galaxies(sky);
+    vec3 onFloor = (WALL + star * 0.5) * (1.0 - dust) + DUST * dust * 0.05 + shine + nests(s, dust) * sharp * sqrt(ext);
+    vec3 inShell = mix(DUST * 0.06 * (0.4 + nb.r), far, clear) + shine;
+    col = floorOn * onFloor + shellOn * inShell + (1.0 - body) * far;
   }
 
   float ri = 3.0 * rs;
@@ -388,20 +577,18 @@ void main ()
     float rb = log(x) * 9.0 - 0.5;
     float i = floor(rb);
     float churn = mix(diskBand(i, ang, now, rs, c), diskBand(i + 1.0, ang, now, rs, c), smoothstep(0.0, 1.0, fract(rb)));
-    float heat = temp / uLight.w;
-    vec3 disk = blackbody(temp) * heat * heat * heat * heat * (0.6 + 0.8 * churn) * DISK_GAIN;
-    float cover = smoothstep(ri * 0.97, ri * 1.05, b) * (1.0 - smoothstep(ro * 0.82, ro, b)) * (0.55 + 0.45 * churn);
+    vec3 disk = planck(temp) * (0.6 + 0.8 * churn) * DISK_GAIN;
+    float cover = smoothstep(ri * 0.97, ri * 1.05, b) * (1.0 - smoothstep(ro * 0.82, ro, b)) * (0.75 + 0.25 * churn);
     col = mix(col, disk, cover);
   }
   if (bp < shadowR * 1.2) {
     float ring = exp(-pow((bp - shadowR * 1.02) / (rs * 0.05), 2.0));
-    float tr = uLight.w * 0.8 * tq;
-    col += blackbody(tr) * pow(tr / uLight.w, 4.0) * DISK_GAIN * 0.5 * ring;
+    col += planck(uLight.w * 0.8 * tq) * DISK_GAIN * 0.5 * ring;
   }
 
   vec2 mq = p - hm;
   float mglow = uMeteor.z * uMeteor.w / (dot(mq, mq) * 9.0 + 1.0);
-  col += vec3(1.0, 0.55, 0.25) * mglow * 0.08;
+  col += METEOR * mglow * 0.08;
   col = 1.0 - exp(-col * uLight.z);
   gl_FragColor = vec4(col, 1.0);
 }
