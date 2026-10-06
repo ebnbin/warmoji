@@ -44,7 +44,7 @@ const SHINE_KEY = 'volcano-shine'
 const VOLCANO_GRAVITY = 9.81
 /** 熔岩映在身体上的补光：光色，最浓叠到多少；辉光场的值（喷发时按两倍算）到 span 时叠到最浓的六成多 */
 const LAVA_ON_BODY = { color: 0xffa45c, max: 0.55, span: 0.2 } as const
-/** 喷完以后火山口里的熔岩多久回落、结壳、暗下去，毫秒 */
+/** 喷完以后火山口里的熔岩多久结满壳、暗下去，毫秒 */
 const SETTLE_MS = 30000
 /** 熔岩喷泉喷得最猛时每秒抛出几块岩浆 */
 const FOUNTAIN_RATE = 160
@@ -52,7 +52,7 @@ const FOUNTAIN_RATE = 160
 const AIR_RATE = 0.8
 const DUST_SHARE = 0.06
 /** 按镜头找冒汽的地方，每格²每秒看几处 */
-const STEAM_RATE = 1
+const STEAM_RATE = 4
 
 interface Bomb {
   x: number
@@ -97,7 +97,7 @@ interface Crater {
 
 /**
  * 火山口此刻的样子：平时口底黑着，只冒一缕白汽；预兆时口底的裂缝透红，熔岩从通道里涌上来，口沿的雪被烤化，白汽变浓、冒起灰烟；
- * 喷发时熔岩漫过口沿，灰柱冲起，下风落灰；喷完熔岩回落、结壳变暗，汽慢慢小下去
+ * 喷发时熔岩漫过口沿，随流量变小凉下来、结出硬壳，灰柱冲起，下风落灰；喷完口里的熔岩结满壳、暗下去，汽慢慢小下去
  */
 function craterNow(cfg: VolcanoConfig, s: VolcanoState, now: number): Crater {
   const e = cfg.eruption
@@ -120,11 +120,11 @@ function craterNow(cfg: VolcanoConfig, s: VolcanoState, now: number): Crater {
   if (s.phase === 'erupt') {
     const vigor = effusion(e, t) / e.rate
     return {
-      pool: [0.45 + 0.67 * Math.min(1, t / e.peakMs), 0.85 + 0.15 * vigor, vigor, 1],
+      pool: [0.45 + 0.67 * Math.min(1, t / e.peakMs), 0.6 + 0.4 * vigor, vigor, 1],
       warn: 0,
       vigor,
       melt: { reachU: rimU + 1.5 + 0.8 * vigor, heat: 1 },
-      ash: 0.01 + 0.12 * vigor,
+      ash: 0.02 + 0.25 * vigor,
       fallout: 0.25 + 0.75 * vigor,
       breath: 1,
       plume: 3 + 4 * vigor,
@@ -132,7 +132,7 @@ function craterNow(cfg: VolcanoConfig, s: VolcanoState, now: number): Crater {
     }
   }
   const k = s.count > 0 ? clamp01(1 - t / SETTLE_MS) : 0
-  return { pool: [1.12 * k, 0.85 * k, 0, k], warn: 0, vigor: 0, melt: { reachU: rimU + 1.5 * k, heat: k }, ash: 0.01 * k, fallout: 0.25 * k, breath: 0.8 + 2.5 * k, plume: 2.5 * k, column: 0 }
+  return { pool: [k > 0 ? 1.12 : 0, 0.6 * k, 0, k], warn: 0, vigor: 0, melt: { reachU: rimU + 1.5 * k, heat: k }, ash: 0.02 * k, fallout: 0.25 * k, breath: 0.8 + 2.5 * k, plume: 2.5 * k, column: 0 }
 }
 
 /** 从 (x, y) 周围 spread 像素以内随机几处各冒一团，冒 n 的整数部分那么多团，返回剩下的零头 */
@@ -421,8 +421,8 @@ export class VolcanoView extends BoundedView {
       lifespan: { min: 1400, max: 2600 },
       speedX: { min: WIND.x * 0.2, max: WIND.x * 0.7 },
       speedY: { min: -34, max: -12 },
-      scale: { start: 0.25, end: 1.3 },
-      alpha: { start: 0.32, end: 0 },
+      scale: { start: 0.3, end: 1.6 },
+      alpha: { start: 0.42, end: 0 },
       tint: [0xf4f6f8, 0xe4e8ec],
     })
     this.sparks = dots(37, {
@@ -630,7 +630,7 @@ export class VolcanoView extends BoundedView {
       const x = view.x + Math.random() * view.w
       const y = view.y + Math.random() * view.h
       const i = cellAt(f, x, y)
-      if (i >= 0 && Math.random() < sn.steam[i]! * 0.5) this.steam?.emitParticleAt(x, y, 1)
+      if (i >= 0 && Math.random() < sn.steam[i]! * 0.8) this.steam?.emitParticleAt(x, y, 1)
     }
   }
 

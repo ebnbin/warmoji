@@ -501,8 +501,8 @@ float plates(vec2 p) {
 /**
  * 熔岩的片元着色器，四边形盖住整块场地，坐标以格计、y 朝下。四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。熔岩按温度从白黄到暗红，冷下来结出暗色硬壳，壳块之间的缝透出熔岩；
  * 壳块与热熔岩上漂着的硬壳按流向图顺坡往下漂；按扭曲过的坐标采样，边缘不顺着格子走。
- * 火山口里的熔岩按 uPool 画：x 漫到口沿的几成（不到两成半时淡出），y 温度，z 喷涌的劲，w 口底裂缝透出的红光。
- * 预兆时口底的裂缝先透出红光，熔岩从通道里涌上来；喷发时熔岩从口底中心往上翻、往外漫过参差的口沿，涌口白热、不结壳；喷完熔岩往下回落，结壳变暗。
+ * 火山口里的熔岩按 uPool 画：x 漫到口沿的几成（不到两成半时淡出），y 温度（凉到一成半以下淡出），z 喷涌的劲，w 口底裂缝透出的红光。
+ * 预兆时口底的裂缝先透出红光，熔岩从通道里涌上来；喷发时熔岩从口底中心往上翻、往外漫过参差的口沿，涌口白热、不结壳；喷完口里的熔岩结满壳，暗下去，淡进黑黢黢的口底。
  * 输出按预乘透明度：熔岩盖在地上，辉光、余烬叠加发亮。
  */
 export const LAVA_FRAG = `${FRAG_PRELUDE}
@@ -549,7 +549,7 @@ void main ()
   vec2 outward = rc / max(rr, 0.001);
   float bulge = vnoise(outward * 1.6 + vec2(uTime * 0.05, 5.0)) * 0.6 + vnoise(outward * 4.1 + vec2(2.0, uTime * 0.08)) * 0.4;
   float lip = uCrater.z * uPool.x * (0.78 + 0.4 * bulge) + ragged * 0.8;
-  float filled = smoothstep(0.0, 0.25, uPool.x);
+  float filled = smoothstep(0.0, 0.25, uPool.x) * smoothstep(0.0, 0.15, uPool.y);
   float pool = (1.0 - smoothstep(lip - 0.35, lip, rr)) * filled;
   float inner = pool * (1.0 - smoothstep(uCrater.z * 0.55, uCrater.z * 1.05, rr));
   float gush = (1.0 - smoothstep(0.0, uCrater.z * 0.42, rr)) * pool * vigor;

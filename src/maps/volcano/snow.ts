@@ -127,7 +127,7 @@ export function makeSnow(f: LavaField, cfg: VolcanoConfig, marks: GroundMarks, n
       const across = -ox * wy + oy * wx
       const down = Math.max(0, along)
       const plume = Math.exp(-down / 13) * Math.exp(-((across / (1.3 + 0.3 * down)) ** 2)) * smooth(-2.5, 0.5, along)
-      s.fan[i] = Math.max(plume, 0.7 * Math.exp(-dU / 2.4))
+      s.fan[i] = Math.max(plume, 0.8 * Math.exp(-dU / 3.5))
       s.cover[i] = f.lava[i]! > 0 ? 0 : s.full[i]! * clamp01((now - f.rockAt[i]! - c.warmMs) / c.coverMs)
       s.ash[i] = s.grime[i]!
     }
