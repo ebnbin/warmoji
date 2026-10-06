@@ -118,7 +118,7 @@ export function makeSnow(f: LavaField, cfg: VolcanoConfig, marks: GroundMarks, n
       const steep = smooth(cone.blockU + 0.3, cone.blockU - 0.6, dU) * smooth(cone.craterU, cone.craterU + 0.5, dU)
       const bearing = Math.atan2(oy, ox)
       const rib = smooth(0.52, 0.72, fbm(Math.cos(bearing) * 14 + 5, Math.sin(bearing) * 14 + dU * 0.35, seed + 81, 2)) * steep
-      const full = 1.4 * fall - 0.1 + lift * (1 - 0.7 * fall) - 0.75 * rib
+      const full = 1.2 * fall - 0.05 + lift * (1 - 0.7 * fall) - 0.75 * rib
       s.full[i] = clamp01(full) * keep
       s.fall[i] = fall
       s.dist[i] = dU + (rough - 0.5) * 1.2
@@ -223,7 +223,7 @@ function tone(c: number): number {
 }
 
 /**
- * 雪面受的光：按高度场打光，朝阳的一面暖白，挡住太阳的地方只剩泛蓝的天光；盆地外越远越暗，和地面一样。
+ * 雪面受的光：按高度场打光，朝阳的一面暖白，背阴与被挡住太阳的地方泛蓝；云底下的影子发虚，挡光的只压暗七成。盆地外越远越暗，和地面一样。
  * 每格 SHINE_PPC 个像素，只画 rect 里的格子，out 按整张图逐行排
  */
 export function shineSnow(f: Pick<LavaField, 'basin' | 'cols' | 'rows' | 'cell' | 'x0' | 'y0' | 'ground'>, cfg: VolcanoConfig, out: Uint8ClampedArray, rect: CellRect): void {
@@ -246,7 +246,7 @@ export function shineSnow(f: Pick<LavaField, 'basin' | 'cols' | 'rows' | 'cell' 
       const lambert = Math.max(0, (nx * SUN.x + ny * SUN.y + SUN.z) * nl)
       let over = 0
       for (const k of SHADOW_STEPS) over = Math.max(over, bilinear(f.ground, f, u + sunU * k, v + sunV * k) - g0 - k * sunRise)
-      const sun = lambert * (1 - smooth(0, 0.4, over)) * SUN_I
+      const sun = lambert * (1 - 0.7 * smooth(0, 0.6, over)) * SUN_I
       const sky = (0.6 + 0.4 * nl) * SKY_I
       const roomU = roomAt(f.basin, f.x0 + (u + 0.5) * f.cell, f.y0 + (v + 0.5) * f.cell) / UNIT
       const far = 1 - 0.45 * smooth(0.6, 4.5, -roomU)
@@ -260,7 +260,7 @@ export function shineSnow(f: Pick<LavaField, 'basin' | 'cols' | 'rows' | 'cell' 
 }
 
 /**
- * 积雪的片元着色器，四边形盖住整块场地，取样同熔岩着色器。积雪量和噪声比出盖没盖住：薄的时候只盖住噪声低的洼处，斑驳成片，越厚连成一片；
+ * 积雪的片元着色器，四边形盖住整块场地，取样同熔岩着色器。积雪量和噪声比出盖没盖住：薄的时候只盖住噪声低的洼处，斑驳成片，越厚连成一片；雪的边按一个像素宽抗锯齿，不会大片发虚；
  * 雪面的明暗来自光照图，顺风有浅浅的雪纹，向阳干净的雪上零星闪光；灰顺着风一缕缕染在雪上；熔岩与火山口的红光映在雪上。
  * 雪化了的地方按湿地压暗地面。输出按预乘透明度
  */
@@ -280,15 +280,20 @@ void main ()
   vec2 cell = vec2(tc.x, 1.0 - tc.y) * uGrid;
   vec4 sn = texture2D(uSnow, tc);
   float n = vnoise(cell * 0.45 + 3.1) * 0.55 + vnoise(cell * 1.2 + 7.7) * 0.3 + vnoise(cell * 3.1 + 1.3) * 0.15;
-  n = clamp((n - 0.5) * 2.0 + 0.5, 0.04, 0.96);
-  float cover = smoothstep(n - 0.04, n + 0.04, sn.r);
+  n = clamp((n - 0.5) * 1.8 + 0.5, 0.02, 0.98);
+#ifdef GL_OES_standard_derivatives
+  float aa = clamp(fwidth(sn.r - n) * 0.75, 0.002, 0.05);
+#else
+  float aa = 0.04;
+#endif
+  float cover = smoothstep(-aa, aa, sn.r - n);
   float wet = sn.b * (1.0 - cover);
   if (cover < 0.002 && wet < 0.002) {
     gl_FragColor = vec4(0.0);
     return;
   }
   vec3 lit = texture2D(uShine, tc).rgb;
-  float thick = smoothstep(n, n + 0.22, sn.r);
+  float thick = max(smoothstep(0.0, 0.12, sn.r - n), smoothstep(0.96, 1.0, sn.r));
   vec2 q = vec2(dot(cell, uWind), dot(cell, vec2(-uWind.y, uWind.x)));
   float swell = vnoise(cell * 0.35 + 31.0) - 0.5 + (vnoise(cell * 9.0 + 5.0) - 0.5) * 0.3;
   vec3 col = lit * (1.0 + 0.06 * swell) * mix(0.82, 1.0, thick);

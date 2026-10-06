@@ -444,10 +444,11 @@ function blur(a: Float32Array, cols: number, rows: number, r: number): void {
   }
 }
 
-/** 画在场地上的着色器都从这里开头：Phaser 的模板与精度，共用的哈希、值噪声与细胞噪声里次近与最近特征点的距离差 */
+/** 画在场地上的着色器都从这里开头：Phaser 的模板与精度，开着求导的扩展（不支持的设备上 GL_OES_standard_derivatives 没有定义），共用的哈希、值噪声与细胞噪声里次近与最近特征点的距离差 */
 export const FRAG_PRELUDE = `
 #pragma phaserTemplate(shaderName)
 #pragma phaserTemplate(extensions)
+#extension GL_OES_standard_derivatives : enable
 #pragma phaserTemplate(features)
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -550,12 +551,13 @@ void main ()
   float lip = uCrater.z * uPool.x * (0.78 + 0.4 * bulge) + ragged * 0.8;
   float filled = smoothstep(0.0, 0.25, uPool.x);
   float pool = (1.0 - smoothstep(lip - 0.35, lip, rr)) * filled;
+  float inner = pool * (1.0 - smoothstep(uCrater.z * 0.55, uCrater.z * 1.05, rr));
   float gush = (1.0 - smoothstep(0.0, uCrater.z * 0.42, rr)) * pool * vigor;
+  heat = mix(heat, max(heat, uPool.y), max(inner, pool * (1.0 - cover)));
   cover = max(cover, pool);
-  heat = mix(heat, max(heat, uPool.y), pool);
   if (cover > 0.001) {
-    vec2 dir = mix(ax.gb * 2.0 - 1.0, outward * smoothstep(0.0, uCrater.z * 0.35, rr), pool);
-    float speed = (0.3 + 0.8 * heat) * 2.1 * mix(1.0, 0.1 + 0.9 * vigor, pool);
+    vec2 dir = mix(ax.gb * 2.0 - 1.0, outward * smoothstep(0.0, uCrater.z * 0.35, rr), inner);
+    float speed = (0.3 + 0.8 * heat) * 2.1 * mix(1.0, 0.1 + 0.9 * vigor, inner);
     float ph = fract(uTime / 2.2);
     float ph2 = fract(ph + 0.5);
     float w = abs(1.0 - 2.0 * ph);

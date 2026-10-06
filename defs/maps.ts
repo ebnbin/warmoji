@@ -773,7 +773,7 @@ export const MAPS = {
         enemyDps: 45,
         tickMs: 250,
       },
-      snow: { radiusU: 16, edgeU: 5.5, wobble: 0.2, shiftU: 2, warmMs: 15000, coverMs: 90000, buryMs: 60000 },
+      snow: { radiusU: 17, edgeU: 6.5, wobble: 0.2, shiftU: 2, warmMs: 15000, coverMs: 90000, buryMs: 60000 },
     },
     boss: 'rhino',
   },
