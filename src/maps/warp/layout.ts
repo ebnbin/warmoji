@@ -28,8 +28,8 @@ export interface Plate {
 }
 
 /**
- * 一间房，格：第 index 间，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状、签名（主色与地板的待机律动）、敌人配方（cfg.recipes 的第几种）；
- * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台
+ * 一间房，格：在环上排第 index，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状、签名（主色与地板的待机律动）、敌人配方（cfg.recipes 的第几种）；
+ * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；toward 是传送台朝下一间的方向
  */
 export interface WarpRoom {
   readonly index: number
@@ -45,10 +45,11 @@ export interface WarpRoom {
   readonly pillars: readonly Box[]
   readonly pit: Box | null
   readonly deck: Box | null
+  readonly toward: Point
 }
 
 /**
- * 这一局的跃迁站，格：四间房各占一个象限，mirror 为真时左右翻过来；队伍从开局那间的中心出发；
+ * 这一局的跃迁站，格：四间房按环排（第 i 间的传送台送到第 i + 1 间），mirror 为真时环逆时针；队伍从开局那间的中心出发；
  * 能走的地面；每块瓷砖属于哪间房（不会亮的为 −1）；核心柱在正中
  */
 export interface WarpPlan {
@@ -56,7 +57,7 @@ export interface WarpPlan {
   readonly rooms: readonly WarpRoom[]
   readonly start: Point
   readonly basin: Basin
-  /** 每间房自己能走的地面，按房间的次序：身体只在自己那间里挪 */
+  /** 每间房自己能走的地面，按环的次序：身体只在自己那间里挪 */
   readonly basins: readonly Basin[]
   readonly tiles: Int8Array
   readonly core: Point
@@ -78,6 +79,13 @@ function placeBox(turn: number, mirror: boolean, b: Box): Box {
   const a = place(turn, mirror, b.x0, b.y0)
   const c = place(turn, mirror, b.x1, b.y1)
   return { x0: Math.min(a.x, c.x), y0: Math.min(a.y, c.y), x1: Math.max(a.x, c.x), y1: Math.max(a.y, c.y) }
+}
+
+/** 方向只转不平移 */
+function placeDir(turn: number, mirror: boolean, dx: number, dy: number): Point {
+  const a = place(turn, mirror, MID, MID)
+  const b = place(turn, mirror, MID + dx, MID + dy)
+  return { x: b.x - a.x, y: b.y - a.y }
 }
 
 export function inBox(b: Box, x: number, y: number): boolean {
@@ -210,6 +218,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
       pillars: l.pillars.map(at),
       pit: l.pit && at(l.pit),
       deck: l.deck && at(l.deck),
+      toward: placeDir(i, mirror, 1, 0),
     }
   })
   const hall = rooms.find((r) => r.shape === 'hall')!
@@ -242,4 +251,9 @@ export function roomIndexAt(plan: WarpPlan, x: number, y: number): number {
   const quad = (x < MID ? 0 : 1) + (y < MID ? 0 : 1) * 2
   const q = quad === 2 ? 3 : quad === 3 ? 2 : quad
   return plan.rooms.find((r) => r.quad === q)!.index
+}
+
+/** 第 i 间的下一间：它的传送台送到那里 */
+export function nextRoom(plan: WarpPlan, i: number): WarpRoom {
+  return plan.rooms[(i + 1) % plan.rooms.length]!
 }

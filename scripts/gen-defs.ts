@@ -716,7 +716,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 
 /**
  * 跃迁：四间房的平台、台沿与能走的方块都落在整格上，能走的方块放得下开局的空地，狭长的那间横竖都装得下传送台；
- * 传送台站得下队长和跟在身后的队员，充能、发车与传送门开关的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与核心柱；
+ * 传送台站得下队长和跟在身后的队员，充能、冷却、发车的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与核心柱；
  * 抽一批种子真的生成一遍：开局站位四周空着，每间房的传送台与出怪板都落在那间能走的地方上，四间各有会亮的瓷砖
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -733,10 +733,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(pad.radiusU >= squad * 0.75 && pad.edgeU >= 0 && pad.cornerU - pad.radiusU >= 0.5 && f.f1 - f.pad.y - pad.radiusU >= 0.5, `${at}.pad 的台面太小或贴到了内角`)
   need(f.pad.x - pad.radiusU >= f.f1 - r.narrowU && f.pad.y - pad.radiusU >= f.f1 - r.narrowU, `${at}.pad 落出了狭长那间`)
-  need(pad.chargeMs > 0 && pad.drainMs > 0 && pad.transitMs > 0 && pad.spillU >= 0, `${at}.pad 的充能、漏能与穿行的时长须为正`)
-  const po = c.portal
-  need(po.closedMs[0] > 0 && po.closedMs[0] <= po.closedMs[1] && po.warnMs > 0 && po.openMs[0] <= po.openMs[1], `${at}.portal 的关、预告、开的时长须为正、范围从小到大`)
-  need(po.openMs[0] > pad.chargeMs + pad.transitMs && po.openMs[0] >= pad.shuttleMs, `${at}.portal 最短的一次开着须充得满能、送得过去，也赶得上发一趟车`)
+  need(pad.chargeMs > 0 && pad.drainMs > 0 && pad.transitMs > 0 && pad.cooldownMs > pad.chargeMs && pad.spillU >= 0, `${at}.pad 的充能、漏能与穿行的时长须为正，冷却比充能长`)
   need(pad.shuttleMs > pad.warnMs + pad.transitMs && pad.warnMs > 0, `${at}.pad 发车的间隔须放得下预警与穿行`)
   need(Number.isInteger(pl.count) && pl.count >= 1 && pl.sizeU > 0 && pl.stepU > pl.sizeU + 2 * c.neckU && pl.firstU + (pl.count - 1) * pl.stepU + pl.sizeU < f.f1 - f.f0 && pl.heightM > 0, `${at}.pillars 的根数、边长与间距说不通，或立出了能走的方块`)
   need(c.pitU > 0 && c.pitU < f.f1 - f.f0 - 4, `${at}.pitU 的凹槽须为正，四周还留得下回廊`)

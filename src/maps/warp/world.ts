@@ -14,7 +14,7 @@ import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { bounded, wanderIn, ZERO } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { inBox, roomIndexAt, warpPlan } from './layout'
+import { inBox, nextRoom, roomIndexAt, warpPlan } from './layout'
 import { clearWalk, flowDir, flowTo, navDist, navGrid } from './nav'
 import type { NavField, NavGrid } from './nav'
 import type { WarpPlan } from './layout'
@@ -49,21 +49,13 @@ const SHIPPED: Mover = { self: false, free: true }
 
 const FIELD: Solid = { topM: Infinity, material: 'field' }
 
-/** 传送门此刻是关着、预告着要开，还是开着 */
-export type PortalPhase = 'closed' | 'warn' | 'open'
-
 /**
- * 全图唯一的传送门：入口在 from 那间的传送台，出口在 to 那间的传送台，单向；这一段从 since 起、到 until 为止。
- * 每次从关着转到预告时，入口就是队伍此刻所在的那间，出口在另外三间里抽。开着时队长站在入口攒下的充能（毫秒），下一趟发车的时刻；
- * 这一次开着时队伍从入口出发、上一趟发车的时刻与那一趟送走了几只（画面用）
+ * 一座传送台此刻：队长站在上面攒下的充能（毫秒），队伍到这里以后冷却到哪一刻，下一趟发车的时刻；
+ * 上一次队伍从这里出发、上一趟发车的时刻与那一趟送走了几只（画面用）
  */
-export interface Portal {
-  phase: PortalPhase
-  from: number
-  to: number
-  since: number
-  until: number
+export interface PadState {
   charge: number
+  coolUntil: number
   shuttleAt: number
   jumpedAt: number
   shuttledAt: number
@@ -105,7 +97,7 @@ export interface Tiles {
 }
 
 /**
- * 跃迁站此刻：按种子定下的站，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间；传送门；
+ * 跃迁站此刻：按种子定下的站，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间；四座传送台；
  * 寻路的底子、各间到传送台的步数场与到队长的步数场；地砖；画面要的送人、发车与力场受击的记录
  */
 export interface WarpState {
@@ -113,7 +105,7 @@ export interface WarpState {
   readonly solids: Solids
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
   teamRoom: number
-  readonly portal: Portal
+  readonly pads: PadState[]
   readonly grids: readonly NavGrid[]
   readonly toPad: readonly NavField[]
   toLeader: NavField | null
@@ -164,7 +156,14 @@ export function warpOf(sim: Sim): WarpState {
       solids: makeSolids((x, y) => (plan.rooms.some((r) => inBox(r.floor, x / UNIT, y / UNIT)) ? null : FIELD), b.x0, b.y0, b.cols, b.rows, b.cell),
       marks: marksOf(cfg, plan),
       teamRoom: roomIndexAt(plan, plan.start.x, plan.start.y),
-      portal: { phase: 'closed', from: 0, to: 1, since: 0, until: between(sim, cfg.portal.closedMs), charge: 0, shuttleAt: Infinity, jumpedAt: -1e9, shuttledAt: -1e9, shuttled: 0 },
+      pads: plan.rooms.map((_, i) => ({
+        charge: 0,
+        coolUntil: 0,
+        shuttleAt: cfg.pad.shuttleMs * (0.7 + i * 0.25),
+        jumpedAt: -1e9,
+        shuttledAt: -1e9,
+        shuttled: 0,
+      })),
       grids,
       toPad: plan.rooms.map((r, i) => flowTo(grids[i]!, r.pad.x * UNIT, r.pad.y * UNIT)),
       toLeader: null,
@@ -186,10 +185,6 @@ export function warpOf(sim: Sim): WarpState {
 /** (x, y) 像素落在哪间房 */
 function roomOf(s: WarpState, x: number, y: number): number {
   return roomIndexAt(s.plan, x / UNIT, y / UNIT)
-}
-
-function between(sim: Sim, r: readonly [number, number]): number {
-  return r[0] + (r[1] - r[0]) * sim.rng.next()
 }
 
 /** 半径 r 的身体站在第 i 座传送台上：身体中心落在台面里 */
@@ -243,13 +238,12 @@ function logHop(s: WarpState, h: Hop): void {
 }
 
 /**
- * 传送门发车：入口台上的敌人都送到出口的传送台上；team 为真时是队长充满了能，整支队伍连同召唤物不论在房间哪里一起走。
- * 身体没有实体地穿过虚空，落地时散在出口的台上；敌人落地后往台外涌
+ * 第 i 座传送台发车：台上的敌人都送到下一间的传送台上；team 为真时是队长充满了能，整支队伍连同召唤物不论在房间哪里一起走。
+ * 身体没有实体地穿过虚空，落地时散在对面的台上；敌人落地后往台外涌
  */
-function depart(sim: Sim, s: WarpState, cfg: WarpConfig, team: boolean): number {
-  const i = s.portal.from
+function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolean): number {
   const from = s.plan.rooms[i]!
-  const to = s.plan.rooms[s.portal.to]!
+  const to = nextRoom(s.plan, i)
   const now = sim.elapsedMs
   const ms = cfg.pad.transitMs
   let k = 0
@@ -281,7 +275,8 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, team: boolean): number 
       Transform.y[e] = Transform.y[e]! + dy
     }
     s.teamRoom = to.index
-    s.portal.jumpedAt = now
+    s.pads[to.index]!.coolUntil = now + ms + cfg.pad.cooldownMs
+    s.pads[i]!.jumpedAt = now
     s.jumps++
   }
   let foes = 0
@@ -315,50 +310,27 @@ function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
   }
 }
 
-/**
- * 传送门：关着到点就预告——入口定在队伍此刻所在的那间，出口在另外三间里抽；预告完打开，开着时队长站在入口的台上攒能、走开就漏，
- * 满了整队出发；开着时每隔一阵发一趟车；到点关上
- */
-function stepPortal(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
+/** 四座传送台：队长站在队伍所在那间的台上攒能、走开就漏，满了整队出发；每座台到点发一趟车 */
+function stepPads(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
   const now = sim.elapsedMs
-  const p = s.portal
   const lead = sim.leader
   const lx = Transform.x[lead]!
   const ly = Transform.y[lead]!
   const ready = Alive.v[lead] === 1 && !inTransit(lead)
   if (ready) s.teamRoom = roomOf(s, lx, ly)
-  if (p.phase === 'closed' && now >= p.until) {
-    const others = s.plan.rooms.map((r) => r.index).filter((i) => i !== s.teamRoom)
-    p.phase = 'warn'
-    p.from = s.teamRoom
-    p.to = others[Math.floor(sim.rng.next() * others.length)]!
-    p.since = now
-    p.until = now + cfg.portal.warnMs
-    p.shuttled = 0
-  } else if (p.phase === 'warn' && now >= p.until) {
-    p.phase = 'open'
-    p.since = now
-    p.until = now + between(sim, cfg.portal.openMs)
-    p.shuttleAt = now + cfg.pad.shuttleMs
-  } else if (p.phase === 'open' && now >= p.until) {
-    p.phase = 'closed'
-    p.since = now
-    p.until = now + between(sim, cfg.portal.closedMs)
-    p.charge = 0
-    p.shuttleAt = Infinity
-  }
-  if (p.phase !== 'open') return
-  const standing = ready && p.from === s.teamRoom && onPad(s, cfg, p.from, lx, ly)
-  p.charge = standing ? p.charge + delta : Math.max(0, p.charge - (delta * cfg.pad.chargeMs) / cfg.pad.drainMs)
-  if (p.charge >= cfg.pad.chargeMs) {
-    p.charge = 0
-    depart(sim, s, cfg, true)
-  }
-  if (now >= p.shuttleAt) {
-    p.shuttleAt += cfg.pad.shuttleMs
-    p.shuttled = depart(sim, s, cfg, false)
-    p.shuttledAt = now
-  }
+  s.pads.forEach((p, i) => {
+    const standing = ready && i === s.teamRoom && now >= p.coolUntil && onPad(s, cfg, i, lx, ly)
+    p.charge = standing ? p.charge + delta : Math.max(0, p.charge - (delta * cfg.pad.chargeMs) / cfg.pad.drainMs)
+    if (p.charge >= cfg.pad.chargeMs) {
+      p.charge = 0
+      depart(sim, s, cfg, i, true)
+    }
+    if (now >= p.shuttleAt) {
+      p.shuttleAt += cfg.pad.shuttleMs
+      p.shuttled = depart(sim, s, cfg, i, false)
+      p.shuttledAt = now
+    }
+  })
 }
 
 /** 活着、脚沾地的身体踩亮脚下的瓷砖 */
@@ -512,15 +484,13 @@ export const warp: WorldHooks = {
     return ZERO
   },
   /**
-   * 走到队长的路：只有传送门的入口在这一间、出口在队伍那间时才走得通，门一下就到，所以只算走到入口的路，再加上出口走到队长的路
+   * 走到队长的路：传送台一下就到，下一间的台子又正是那一间的出口，所以别的房间里只算走到自己那间传送台的路，再加上队伍那间从传送台走到队长的路
    */
   toLeader(sim, x, y) {
     const s = warpOf(sim)
     const lead = leaderPoint(sim)
     const room = roomOf(s, x, y)
     if (room === s.teamRoom) return Math.hypot(lead.x - x, lead.y - y)
-    const p = s.portal
-    if (p.phase === 'closed' || p.from !== room || p.to !== s.teamRoom) return Infinity
     const pad = s.plan.rooms[s.teamRoom]!.pad
     const there = s.toLeader && s.navRoom === s.teamRoom ? navDist(s.grids[s.teamRoom]!, s.toLeader, pad.x * UNIT, pad.y * UNIT) : Infinity
     return (navDist(s.grids[room]!, s.toPad[room]!, x, y) + there) * UNIT
@@ -538,7 +508,7 @@ export const warp: WorldHooks = {
   tick(sim, delta) {
     const cfg = cfgOf(sim)
     const s = warpOf(sim)
-    stepPortal(sim, s, cfg, delta)
+    stepPads(sim, s, cfg, delta)
     spill(sim, s, cfg)
     stepTiles(sim, s)
     stepNav(sim, s)
