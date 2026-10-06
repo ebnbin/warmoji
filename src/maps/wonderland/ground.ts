@@ -144,7 +144,7 @@ export function prepare(sc: PaintScene): Prepared {
     const r1 = Math.min(bcols - 1, Math.floor(t.y1 / BUCKET_U))
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        if (k === 0 && !hedgeSeen(grids, c, r, t.hmax)) continue
+        if (t.wide && !hedgeSeen(grids, c, r, t.hmax)) continue
         buckets[r * bcols + c]!.push(k)
       }
     }

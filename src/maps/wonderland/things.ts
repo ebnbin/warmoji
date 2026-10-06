@@ -41,7 +41,7 @@ export interface Surf {
 }
 
 /**
- * 花园里立着的一样东西，格：地上占的外接框、最高多高（米），画在挡人的那一层（occ）还是地面那一层；
+ * 花园里立着的一样东西，格：地上占的外接框、最高多高（米）；
  * over 是跨得过它要多高（米）：跨得过的身体站在它上面也不被它挡住
  */
 export abstract class Thing {
@@ -50,8 +50,9 @@ export abstract class Thing {
   x1 = 0
   y1 = 0
   hmax = 0
-  occ = true
   over = Infinity
+  /** 铺满整个方框的（四围的树篱）：只放进看得见它的那几桶 */
+  wide = false
 
   protected box(s: Shape, pad = 0): void {
     const [x0, y0, x1, y1] = boundsOf(s)
@@ -288,6 +289,7 @@ class Hedge extends Thing {
     this.x1 = FRAME_U
     this.y1 = FRAME_U
     this.hmax = H + 0.7
+    this.wide = true
   }
 
   span(x: number, y: number, s: Span): boolean {
@@ -885,35 +887,25 @@ class Cup extends Thing {
 
 // ————————————————————————————— 扑克牌篱、矮篱、门拱、蘑菇 —————————————————————————————
 
-/** 一张牌在牌面上的花色：p 是到花色中心的偏移（以花色大小为 1），在花色里为负 */
+/** 牌面上的一个花色：p 是到花色中心的偏移（以花色大小为 1，往下为正），在花色里为负 */
 function pip(suit: number, px: number, py: number): number {
   const x = Math.abs(px)
+  /** 心形：上面两个圆，下面收成一个尖；flip 为真时倒过来 */
+  const heart = (y: number): number => {
+    const lobes = Math.hypot(x - 0.3, y + 0.2) - 0.36
+    const tip = y > -0.2 ? Math.max(x - (0.72 - y) * 0.88, y - 0.72) : 1
+    return Math.min(lobes, tip)
+  }
+  const stem = Math.max(x - 0.07 - Math.max(0, py - 0.35) * 0.35, Math.abs(py - 0.55) - 0.25)
   switch (suit) {
-    case 0: {
-      // 红心
-      const y = -py * 1.1 + 0.2
-      const a = Math.hypot(x - 0.32, y - 0.3) - 0.36
-      const b = y - 0.6 > -x * 1.3 ? 1 : -1
-      return Math.min(a, b > 0 ? 1 : y < -0.75 + x * 1.15 ? 1 : -0.01 - Math.min(0.2, x * 0))
-    }
+    case 0:
+      return heart(py)
     case 1:
-      // 方块
-      return x * 1.25 + Math.abs(py) - 0.8
-    case 2: {
-      // 黑桃
-      const y = py * 1.1 + 0.15
-      const a = Math.hypot(x - 0.3, y - 0.25) - 0.34
-      const top = y < -0.7 + x * 1.1 ? 1 : -1
-      const stem = Math.max(x - 0.08 - (py - 0.45) * 0.3, Math.abs(py - 0.65) - 0.25)
-      return Math.min(top < 0 ? -0.01 : Math.max(a, -1) * (y > 0.2 ? 1 : 1), stem, a)
-    }
-    default: {
-      // 梅花
-      const a = Math.hypot(x, py + 0.35) - 0.3
-      const b = Math.hypot(x - 0.36, py + 0.02) - 0.3
-      const stem = Math.max(x - 0.08 - (py - 0.3) * 0.25, Math.abs(py - 0.55) - 0.3)
-      return Math.min(a, b, stem)
-    }
+      return x * 1.3 + Math.abs(py) - 0.85
+    case 2:
+      return Math.min(heart(-py + 0.12), stem)
+    default:
+      return Math.min(Math.hypot(x, py + 0.32) - 0.28, Math.hypot(x - 0.33, py + 0.02) - 0.28, stem)
   }
 }
 
