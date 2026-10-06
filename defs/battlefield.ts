@@ -149,6 +149,13 @@ export const BATTLEFIELD = {
       { id: 'dreamland_dizzy', emoji: '1f635_200d_1f4ab', name: '转晕了', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'dreamland_sticky', emoji: '1f36d', name: '糖浆粘脚', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    savanna: [
+      { id: 'savanna_dusk', emoji: '1f307', name: '晚风送凉', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'savanna_water', emoji: '1f4a7', name: '痛饮一口', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'savanna_dust', emoji: '1f32b', name: '红尘迷眼', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'savanna_thorn', emoji: '1f335', name: '刺扎脚底', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'savanna_heat', emoji: '1f975', name: '旱季燥热', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
 } as const satisfies BattlefieldTuning

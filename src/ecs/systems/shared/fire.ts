@@ -196,7 +196,9 @@ function burst(sim: Sim, x: number, y: number, radius: number, color: number, bo
     durationMs: 400,
     depth: 7,
   })
-  if (boom) spawnFxBoom(sim, x, y, radius * 1.5)
+  if (!boom) return
+  spawnFxBoom(sim, x, y, radius * 1.5)
+  sim.hooks.blast?.(sim, x, y, radius)
 }
 
 /** 打一遍：返回真正落到身上的身体；不带伤害的形状只碰不打 */

@@ -79,6 +79,9 @@ export const Floor = { z: f32() }
 
 export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth, VisOff]
 
+/** 地图自己立着的东西（水坑的兽群）：只画、投影，不是身体，不参与规则；位置由地图每帧写 */
+export const Prop = {}
+
 export const Slot = { v: i32() }
 
 export const Breath = { phase: f32() }

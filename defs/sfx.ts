@@ -54,4 +54,8 @@ export const SFX = {
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
+  // 水坑：象群受惊扬鼻子的长鸣、兽群狂奔的蹄声、鬣狗的怪笑
+  trumpet: { wave: 'sawtooth', freq: 520, freqEnd: 760, duration: 0.9, volume: 0.14, attack: 0.06, decayPow: 0.7, steps: [1, 1.12, 1.2, 1.26, 1.3, 1.28, 1.22], throttleMs: 1500, jitter: 0.08 },
+  hooves: { wave: 'noise', freq: 210, freqEnd: 70, duration: 2.6, volume: 0.6, attack: 0.25, decayPow: 0.9, steps: [1, 0.55, 1.1, 0.5, 0.95, 0.6, 1.15, 0.5, 1, 0.55, 1.1, 0.5], throttleMs: 2000 },
+  cackle: { wave: 'triangle', freq: 820, freqEnd: 640, duration: 0.8, volume: 0.07, attack: 0.01, decayPow: 0.9, steps: [1, 1.3, 1, 1.35, 1.05, 1.4, 1.1, 1.45], throttleMs: 5000, jitter: 0.12 },
 } as const satisfies Record<string, SfxDef>

@@ -1333,6 +1333,101 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/** 兽群里的一种大型食草动物：名字与 emoji，一局几头；身体的半径（格）挡人挡子弹，高（米）矮过它的抛射从上面过去，画出来的 emoji 边长是半径的 art 倍；平时走、狂奔各多快（格/秒） */
+export interface BeastKind {
+  readonly name: string
+  readonly emoji: string
+  readonly count: readonly [number, number]
+  readonly radiusU: number
+  readonly heightM: number
+  readonly art: number
+  readonly walkU: number
+  readonly runU: number
+}
+export interface SavannaConfig {
+  readonly meterPerU: number
+  /** 能走的草地大体是 sizeU 见方、四角圆钝的一块，摆在方框正中 */
+  readonly sizeU: number
+  /** 能走的地面有多大，格²：生成出来不在这个范围里就换一组随机数 */
+  readonly areaU2: readonly [number, number]
+  /** 窄过两倍 neckU 的缝与尖角不能走 */
+  readonly neckU: number
+  /** 黄昏的太阳低：每米高的东西在地上投下多长的影子，格 */
+  readonly shadowUPerM: number
+  /** 深草丛与刺灌丛的边：比方框里那块方地往里收 insetU 格之间，按噪声弯出最多 bendU（一圈弯 waves 次）；边上一溜 grassU 格宽的草高起来 */
+  readonly edge: {
+    readonly insetU: readonly [number, number]
+    readonly bendU: number
+    readonly waves: number
+    readonly grassU: number
+  }
+  /** 山丘：占一边、沿边 spanU 格长的一段，花岗岩的大石头半径 boulderU 格、高 heightM 米，从边上往草地里伸进 reachU 格 */
+  readonly kopje: {
+    readonly spanU: readonly [number, number]
+    readonly boulderU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly reachU: readonly [number, number]
+  }
+  /** 水坑：半径（格）按 wobble 扭成不圆的一汪，离开局站位 offU 格；水边 shoreU 格宽的一圈湿泥，再往外 flatU 格的龟裂干泥 */
+  readonly pond: {
+    readonly radiusU: readonly [number, number]
+    readonly wobble: number
+    readonly offU: readonly [number, number]
+    readonly shoreU: number
+    readonly flatU: number
+  }
+  /** 蚁丘：几座、底半径（格）、多高（米） */
+  readonly mounds: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly heightM: readonly [number, number] }
+  /** 金合欢：几棵、伞形树冠半径（格）、多高（米），树干半径（格） */
+  readonly acacias: { readonly count: readonly [number, number]; readonly crownU: readonly [number, number]; readonly heightM: readonly [number, number]; readonly trunkU: number }
+  /** 枯树：几棵、多高（米），树干半径（格） */
+  readonly snags: { readonly count: readonly [number, number]; readonly heightM: readonly [number, number]; readonly trunkU: number }
+  /** 障碍离开局站位至少 clearU 格，彼此至少隔 gapU 格 */
+  readonly clearU: number
+  readonly gapU: number
+  /**
+   * 兽群：几种动物；平时在水边喝水、在离水 homeU 格之间吃草，走到一处歇 restMs 毫秒再挪地方，挪去喝水的占 drinkShare；
+   * 动物彼此至少隔 spaceU 格
+   */
+  readonly herd: {
+    readonly kinds: Readonly<Record<string, BeastKind>>
+    readonly homeU: readonly [number, number]
+    readonly restMs: readonly [number, number]
+    readonly drinkShare: number
+    readonly spaceU: number
+  }
+  /**
+   * 惊慌（0 到 1，满了就要狂奔）：离动物 blastU 格以内炸一下，按离得多近最多涨 blast；子弹或攻击打中一头涨 hit；
+   * 一头身边同时挤着 crowdFree 个以上的身体，多出来的每个每秒涨 crowd；quietMs 没受惊就每秒落 decay。
+   * 跑完一趟 tiredMs 以内受惊只涨 tired 倍
+   */
+  readonly fear: {
+    readonly blast: number
+    readonly blastU: number
+    readonly hit: number
+    readonly crowd: number
+    readonly crowdFree: number
+    readonly decay: number
+    readonly quietMs: number
+    readonly tiredMs: number
+    readonly tired: number
+  }
+  /**
+   * 狂奔：惊慌满了先预警 warnMs（扬鼻子、刨地、扬尘，地上画出跑道），再朝背着惊扰的方向狂奔 runMs、各头的方向左右偏开最多 spreadDeg，
+   * 慢下来要 slowMs；跑道画 laneU 格长。跑得比狂奔速度的 trample 倍快时，撞上的身体挨标准身体满血 damage 的伤害（个头越大挨得越少），
+   * 被以 tossU 格/秒顶开（个头越大越重、顶得越近）；同一趟里一头只撞同一个身体一次
+   */
+  readonly stampede: {
+    readonly warnMs: number
+    readonly runMs: number
+    readonly slowMs: number
+    readonly spreadDeg: number
+    readonly laneU: number
+    readonly trample: number
+    readonly damage: number
+    readonly tossU: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1341,8 +1436,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，dust 红土扬尘，straw 枯草屑 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'dust' | 'straw'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1407,7 +1502,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'savanna'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,13 +1536,14 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly savanna?: SavannaConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown' | 'trample'
 
 export interface DecorInstance {
   emoji: string

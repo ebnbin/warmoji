@@ -35,6 +35,8 @@ const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const
 /** 阳音阶：日本民谣里明亮的五声音阶 */
 const YO = [0, 2, 5, 7, 9] as const
+/** 混合利底亚：大调降七级，暖而不甜 */
+const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10] as const
 /** 平调子：筝最常用的定弦，幽幽的五声音阶 */
 const HIRA = [0, 2, 3, 7, 8] as const
 
@@ -1209,6 +1211,54 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/** 水坑：慢悠悠的十二八拍，混合利底亚调式；拇指琴的琶音三拍对两拍地错着拨，低音只在小节头上一沉，暖暖的三角波像远处的号角拖着长音，手鼓在后半拍上闷闷地应，沙锤一直沙沙地响 */
+function buildSavanna(): BgmScore {
+  const chords = [0, 0, 6, 6, 3, 3, 4, 0, 0, 0, 6, 3, 5, 4, 3, 0]
+  return track(
+    {
+      bpm: 76,
+      stepsPerBeat: 3,
+      stepsPerBar: 12,
+      bars: 16,
+      rootMidi: 52,
+      scale: MIXOLYDIAN,
+      echo: { delaySec: (60 / 76) * (2 / 3), feedback: 0.3, level: 0.24 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.17, attack: 0.02, release: 0.4, octave: -1 }
+      const kalimba: Voice = { wave: 'sine', vol: 0.05, attack: 0.002, release: 0.22, octave: 1, echo: true }
+      const horn: Voice = { wave: 'triangle', vol: 0.09, attack: 0.12, release: 0.5, octave: 0 }
+      const pad: Voice = { wave: 'triangle', vol: 0.02, attack: 0.6, release: 0.8, octave: 0 }
+      b.bass(bass, chords, 'r-----..f...')
+      b.arp(kalimba, chords, [0, 2, 1, 3, 2, 4, 0, 2, 1, 4, 3, 2])
+      b.pad(pad, chords, [0, 1, 2])
+      b.line(horn, [
+        [0, 0, 4, 9], [0, 9, 5, 3],
+        [1, 0, 4, 6], [1, 6, 2, 6],
+        [2, 0, 6, 9], [2, 9, 5, 3],
+        [3, 0, 3, 12],
+        [4, 0, 3, 6], [4, 6, 5, 6],
+        [5, 0, 7, 9], [5, 9, 6, 3],
+        [6, 0, 4, 6], [6, 6, 6, 6],
+        [7, 0, 4, 12],
+        [8, 0, 7, 9], [8, 9, 8, 3],
+        [9, 0, 9, 6], [9, 6, 7, 6],
+        [10, 0, 8, 9], [10, 9, 6, 3],
+        [11, 0, 5, 12],
+        [12, 0, 5, 6], [12, 6, 7, 6],
+        [13, 0, 6, 6], [13, 6, 4, 6],
+        [14, 0, 3, 9], [14, 9, 2, 3],
+        [15, 0, 0, 12],
+      ])
+      b.drums('kick', 'x.....x.....', 0, 16, 0.13)
+      b.drums('tom', '....x.....x.', 0, 16, 0.07)
+      b.drums('tom', '...x.x..x.x.', 7, 8, 0.06)
+      b.drums('tom', '...x.x..x.xx', 15, 16, 0.07)
+      b.drums('hat', 'o.oo.oo.oo.o', 0, 16, 0.022)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1235,6 +1285,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  savanna: buildSavanna,
 }
 
 const cache = new Map<BgmId, BgmScore>()

@@ -534,6 +534,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
+      dust: burstEmitter(this, [0xb7704a, 0xc98a5e, 0xa35f3e, 0xd9a47a], 70, 1400, { gravityY: -22, scale: { start: 0.8, end: 2.2 }, alpha: { start: 0.5, end: 0 } }),
+      straw: burstEmitter(this, [0xe0c27e, 0xc9a35c, 0xf0dca0, 0xa98a4a], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)

@@ -38,5 +38,7 @@ export const OBSTACLES = {
     belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
     // 梦幻乐园四周的布景
     scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
+    // 水坑边的兽群：又大又重，挡身体、挡子弹也挡视线，打不穿也打不死，穿墙的身体穿得过去
+    beast: { name: '兽群', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning

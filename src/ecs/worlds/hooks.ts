@@ -51,6 +51,7 @@ import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
 import type { DreamlandWorld } from '../../maps/dreamland/world'
+import type { SavannaState } from '../../maps/savanna/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -108,11 +109,12 @@ export interface WorldState {
   deep: DeepState | null
   petri: PetriState | null
   dreamland: DreamlandWorld | null
+  savanna: SavannaState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, savanna: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -191,6 +193,8 @@ export interface WorldHooks {
   breath?(sim: Sim, eid: number): number
   /** 这张图要队伍盯住的一处：在屏幕外时队长身边画一个指过去的箭头；不写就没有 */
   beacon?(sim: Sim): Point | null
+  /** (x, y) 处炸了一下，炸开 r 像素：爆炸、落地的冲击与带响的范围攻击都算；不写就什么也不做 */
+  blast?(sim: Sim, x: number, y: number, r: number): void
   /** 一具身体死了（倒下等复活的不算），这时它的位置与半径还在；不写就什么也不做 */
   died?(sim: Sim, eid: number): void
   /** 地面此刻盖住了 (x, y) 处躺着的掉落物：捡不到、吸不走，露出来以后照常；不写就从不盖住 */

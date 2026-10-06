@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
 import type { QueryTerm } from 'bitecs'
-import { Alive, Depth, Drop, Faction, Floor, Held, Mounted, Pickup, Proj, Projectile, Radius, RENDERABLE, Sprite, Tint, Transform, VisOff } from '../components'
+import { Alive, Depth, Drop, Faction, Floor, Held, Mounted, Pickup, Proj, Projectile, Prop, Radius, RENDERABLE, Sprite, Tint, Transform, VisOff } from '../components'
 import { LIFT_PER_M } from '../../util/units'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -28,6 +28,8 @@ const SHOTS: QueryTerm[] = [Projectile, Proj, ...RENDERABLE]
 const DROPS: QueryTerm[] = [Drop, ...RENDERABLE]
 /** 地上的金币与道具：一跳一跳地离地 */
 const PICKUPS: QueryTerm[] = [Pickup, ...RENDERABLE]
+/** 地图自己立着的东西：脚踩在精灵的画框下沿 */
+const PROPS: QueryTerm[] = [Prop, ...RENDERABLE]
 
 /** 离地的东西投在地上的影子：剪影从脚下的地面顺着太阳的方位铺出去，先画进一层再按浓度整层叠上去，重叠处不会越叠越黑；被地图上的东西挡住的不投 */
 export class EcsShadowBatch extends EcsLayer {
@@ -87,6 +89,7 @@ export class EcsShadowBatch extends EcsLayer {
     for (const eid of query(w, SHOTS)) if (Proj.arc[eid]! > 0) self.cast(node, drawingContext, eid, bottomAt(eid, Transform.y[eid]!))
     for (const eid of query(w, DROPS)) self.cast(node, drawingContext, eid, bottomAt(eid, Drop.toY[eid]!))
     for (const eid of query(w, PICKUPS)) self.cast(node, drawingContext, eid, bottomAt(eid, Transform.y[eid]!))
+    for (const eid of query(w, PROPS)) self.cast(node, drawingContext, eid, bottomAt(eid, Transform.y[eid]!))
   }
 
   /** 一张精灵的影子：ground 是它脚下那块地在平地上的画面纵坐标，两者都按脚下的地面抬起；精灵上的一点比地面高多少，影子就顺着太阳的方位往外铺多远、淡多少 */

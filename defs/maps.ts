@@ -212,6 +212,16 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const SAVANNA_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
+  { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 30 },
+  { kind: 'boar', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'snake', sinceWave: 3, base: 8, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'skeleton', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'knight', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1347,5 +1357,71 @@ export const MAPS = {
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
     },
     boss: 'eclipse',
+  },
+  savanna: {
+    emoji: '1f418',
+    name: '水坑',
+    desc: '旱季黄昏，稀树草原上一处还没干透的水坑。四周是枯黄的深草丛和刺灌丛，一边是花岗岩堆成的山丘，草地上立着蚁丘、枯树和几棵金合欢。水坑边聚着一群大象、犀牛、水牛、斑马和长颈鹿，它们不帮任何一方：不打谁，也打不死，又大又重，挡路、挡子弹，挤着谁就把谁推开。可它们会受惊——附近炸响、挨了打、被一大群身体挤着，惊慌就一点点涨满（右上角的兽群盘看得到）；涨满时象群扬鼻子、水牛刨地、尘土扬起，地上现出一道道跑道，随即整群朝背着惊扰的方向狂奔，踩到谁就把谁撞飞，敌我都一样；跑出一段才慢下来，再回到水边',
+    kind: 'savanna',
+    stamina: { exertion: 0.45, regen: 1.1 },
+    palette: {
+      bgFrom: 'hsl(318 30% 46%)',
+      bgTo: 'hsl(262 32% 16%)',
+      map: hslToInt(40, 0.42, 0.62),
+      shadow: 0x000000,
+    },
+    // 黄昏的太阳低：迎光的一面暖，背光的一面透着天上的紫，影子拖得长
+    light: { sun: 0xfff1dc, shade: 0xbcaecb, shadow: { color: 0x241433, alpha: 0.4, length: 1.45 } },
+    decor: {
+      emojis: ['1f33e'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: SAVANNA_MIX,
+    // 地上的从深草丛里钻出来、从山丘的石头后面翻过来；蝗群从天上落下来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'dust',
+      boss: 'kopje',
+      kinds: {
+        grass: { name: '深草丛', at: { kind: 'rim', segU: 3, away: { mark: 'kopje', minU: 3 } }, enter: 'climb', look: 'straw', weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'snake', 'chameleon', 'knight', 'skeleton'] },
+        kopje: { name: '山丘', at: { kind: 'mark' }, enter: 'climb', look: 'dust', snapU: 5, weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'knight', 'boar', 'rhino'] },
+        swarm: { name: '蝗群', at: { kind: 'ground' }, enter: 'drop', look: 'straw', weight: 2, only: ['locust'] },
+      },
+    },
+    finalWaveSub: '暴龙从山丘后面闯了出来，兽群炸了窝——别站在它们的跑道上！',
+    savanna: {
+      meterPerU: 0.5,
+      sizeU: 35,
+      areaU2: [820, 1120],
+      neckU: 0.35,
+      shadowUPerM: 0.85,
+      edge: { insetU: [0.5, 2.5], bendU: 1.6, waves: 7, grassU: 1.4 },
+      kopje: { spanU: [13, 18], boulderU: [1.1, 2.4], heightM: [2.2, 4.5], reachU: [1.5, 3.5] },
+      pond: { radiusU: [2.6, 3.2], wobble: 0.2, offU: [8, 9.5], shoreU: 1.1, flatU: 2.4 },
+      mounds: { count: [2, 3], radiusU: [0.65, 0.95], heightM: [2.2, 3.2] },
+      acacias: { count: [2, 4], crownU: [2, 2.9], heightM: [5, 7], trunkU: 0.24 },
+      snags: { count: [1, 1], heightM: [4, 5.5], trunkU: 0.28 },
+      clearU: 5.5,
+      gapU: 3,
+      herd: {
+        kinds: {
+          elephant: { name: '大象', emoji: '1f418', count: [2, 3], radiusU: 1.2, heightM: 3.2, art: 2.7, walkU: 0.75, runU: 7.5 },
+          rhino: { name: '犀牛', emoji: '1f98f', count: [1, 1], radiusU: 0.95, heightM: 1.7, art: 2.5, walkU: 0.7, runU: 8.5 },
+          buffalo: { name: '水牛', emoji: '1f403', count: [3, 4], radiusU: 0.85, heightM: 1.6, art: 2.6, walkU: 0.8, runU: 8.5 },
+          zebra: { name: '斑马', emoji: '1f993', count: [3, 4], radiusU: 0.7, heightM: 1.5, art: 2.7, walkU: 0.9, runU: 9.5 },
+          giraffe: { name: '长颈鹿', emoji: '1f992', count: [1, 2], radiusU: 0.75, heightM: 5, art: 3.6, walkU: 0.8, runU: 8 },
+        },
+        homeU: [1.5, 7],
+        restMs: [3500, 9000],
+        drinkShare: 0.45,
+        spaceU: 0.5,
+      },
+      fear: { blast: 0.6, blastU: 6, hit: 0.07, crowd: 0.06, crowdFree: 2, decay: 0.06, quietMs: 3000, tiredMs: 9000, tired: 0.35 },
+      stampede: { warnMs: 1800, runMs: 2800, slowMs: 1600, spreadDeg: 10, laneU: 18, trample: 0.5, damage: 0.3, tossU: 11 },
+    },
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

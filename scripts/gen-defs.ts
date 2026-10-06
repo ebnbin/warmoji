@@ -47,6 +47,8 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { savannaPlan } from '../src/maps/savanna/layout.ts'
+import { newHerd } from '../src/maps/savanna/herd.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -672,6 +674,59 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 水坑：参数说得通；动物比标准身体大、跑起来比走快，狂奔比队伍跑得快、跑一趟跑得出几格；
+ * 抽一批种子真的生成一遍：开局站位四周空得开，山丘的石头缝里有出怪的地标，每一种动物都摆得下，没有一头压着开局站位
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'savanna') === (m.savanna !== undefined), `maps.${id} 是水坑当且仅当写了 savanna`)
+  const c = m.savanna
+  if (!c) continue
+  const at = `maps.${id}.savanna`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { edge, kopje, pond, mounds, acacias, snags, herd, fear, stampede: st } = c
+  need(c.meterPerU > 0 && c.sizeU > 0 && c.neckU > 0 && c.shadowUPerM > 0, `${at} 的米每格、草地边长、窄缝与影长须为正`)
+  need(c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
+  need(c.areaU2[0] > 0 && range(c.areaU2, false) && c.areaU2[1] < c.sizeU * c.sizeU, `${at}.areaU2 须为正的范围、小于整块方地`)
+  need(range(edge.insetU, false) && edge.insetU[1] + edge.bendU * 2 < c.sizeU / 4 && edge.waves >= 1 && edge.grassU > 0, `${at}.edge 的收进与弯须让边落在方地以内、离中线够远，弯的圈数与草带宽须为正`)
+  need(kopje.spanU[0] > 0 && range(kopje.spanU, false) && kopje.spanU[1] < c.sizeU, `${at}.kopje.spanU 须为正、短过一条边`)
+  need(kopje.boulderU[0] > c.neckU && range(kopje.boulderU, false) && kopje.heightM[0] > OBSTACLES.body.heightM && range(kopje.heightM, false) && range(kopje.reachU, false), `${at}.kopje 的石头须比窄缝大、比标准身体高，伸进草地的范围不为负`)
+  need(pond.radiusU[0] > 1 && range(pond.radiusU, false) && pond.wobble >= 0 && pond.wobble < 0.5 && range(pond.offU, false) && pond.shoreU > 0 && pond.flatU > 0, `${at}.pond 的半径须大过一格、扭得不过半，湿泥与干泥的宽须为正`)
+  need(pond.offU[0] - pond.radiusU[1] * (1 + pond.wobble) >= SPAWN_CLEAR_U, `${at}.pond.offU 离开局站位太近，开局站位四周空不出 ${SPAWN_CLEAR_U} 格`)
+  need(range(mounds.count, true) && mounds.radiusU[0] > 0 && range(mounds.radiusU, false) && mounds.heightM[0] > 0 && range(mounds.heightM, false), `${at}.mounds 须为正的范围`)
+  need(range(acacias.count, true) && acacias.crownU[0] > 0 && range(acacias.crownU, false) && acacias.heightM[0] > OBSTACLES.body.heightM && range(acacias.heightM, false) && acacias.trunkU > 0, `${at}.acacias 须为正的范围，树冠高过标准身体`)
+  need(range(snags.count, true) && snags.heightM[0] > 0 && range(snags.heightM, false) && snags.trunkU > 0, `${at}.snags 须为正的范围`)
+  need(c.clearU >= SPAWN_CLEAR_U && c.gapU > 0, `${at}.clearU 须空得出出生点要的格数，gapU 为正`)
+  const kinds = Object.entries(herd.kinds)
+  need(kinds.length > 0, `${at}.herd.kinds 至少要有一种动物`)
+  for (const [k, b] of kinds) {
+    const w = `${at}.herd.kinds.${k}`
+    need(range(b.count, true) && b.count[1] >= 1, `${w}.count 须为非负整数范围、至少一头`)
+    need(b.radiusU > OBSTACLES.body.refRadiusU && b.heightM > 0 && b.art > 1, `${w} 须比标准身体大，高与画的倍数为正`)
+    need(b.walkU > 0 && b.runU > b.walkU * 3, `${w} 走的速度须为正，狂奔要比走快得多`)
+    need(/^[0-9a-f_]+$/.test(b.emoji), `${w}.emoji 须是码位`)
+  }
+  need(range(herd.homeU, false) && herd.homeU[0] > 0 && range(herd.restMs, false) && herd.drinkShare >= 0 && herd.drinkShare <= 1 && herd.spaceU >= 0, `${at}.herd 的范围须说得通`)
+  need(fear.blast > 0 && fear.blast <= 1 && fear.blastU > 0 && fear.hit > 0 && fear.hit < 1 && fear.crowd > 0 && Number.isInteger(fear.crowdFree) && fear.crowdFree >= 0, `${at}.fear 的炸响、挨打与挤的惊扰须在 (0, 1] 内，挤的门槛是非负整数`)
+  need(fear.decay > 0 && fear.quietMs >= 0 && fear.tiredMs >= 0 && fear.tired > 0 && fear.tired <= 1, `${at}.fear 的回落须为正，跑累了的倍数在 (0, 1] 内`)
+  need(st.warnMs >= 1000, `${at}.stampede.warnMs 至少一秒：跑道画出来要来得及躲`)
+  need(st.runMs > 0 && st.slowMs > 0 && st.spreadDeg >= 0 && st.spreadDeg < 45 && st.laneU > 0, `${at}.stampede 的时长与跑道须为正，偏开不过 45 度`)
+  need(st.trample > 0 && st.trample < 1 && st.damage > 0 && st.damage <= 1 && st.tossU > 0, `${at}.stampede 的踩踏门槛须在 (0, 1) 内，伤害在 (0, 1] 内，顶开的速度为正`)
+  for (let s = 0; s < 16; s++) {
+    const plan = savannaPlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位四周不够空`)
+    need(plan.marks.kopje!.length >= 2, `${where} 的山丘没有石头缝可出怪`)
+    let open = 0
+    for (const v of plan.basin.room) if (v > 0) open++
+    const area = open * (plan.basin.cell / UNIT) ** 2
+    need(area >= c.areaU2[0] && area <= c.areaU2[1], `${where} 的草地有 ${area.toFixed(0)} 格²，不在 areaU2 里`)
+    const h = newHerd(c, plan, s * 31 + 7, c.clearU)
+    for (const [k, b] of kinds) need(h.beasts.filter((x) => x.kind === k).length >= b.count[0], `${where} 摆不下 ${b.count[0]} 头${b.name}`)
+    need(h.beasts.every((b) => Math.hypot(b.x - plan.start.x * UNIT, b.y - plan.start.y * UNIT) >= b.r + SPAWN_CLEAR_U * UNIT), `${where} 有动物压着开局站位`)
   }
 }
 

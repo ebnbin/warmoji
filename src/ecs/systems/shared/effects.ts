@@ -59,6 +59,7 @@ export function applyBlast(
   knockback: number,
   exclude?: ReadonlySet<number>,
 ): Struck[] {
+  sim.hooks.blast?.(sim, x, y, radius)
   const list = covered(sim, src, x, y, targetsWithin(sim, src, x, y, radius))
   const struck: Struck[] = []
   for (const i of circleHitIndices({ x, y }, radius, list)) {
