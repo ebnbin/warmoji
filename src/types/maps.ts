@@ -996,7 +996,7 @@ export interface PetriConfig {
  * 地布与天幕连同地上的敌人、金币从右往左推成新的一幅，推进大幕的退场，新布景依次吊下来，角色原地放下。一幕是故事的一章，按故事的次序轮下去
  */
 export interface TheaterConfig {
-  /** 台面多宽多高，格：宽是半个台面宽（台中线两边各这么宽），台面在方框正中 */
+  /** 台面多宽多高，格：摆在方框正中 */
   readonly size: { readonly wU: number; readonly hU: number }
   /** 开局站的那片空地的半径，格：开局那一幕的布景不落在里面 */
   readonly plazaU: number
