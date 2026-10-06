@@ -13,12 +13,13 @@ export type { Rect } from '../maps/frame'
 /**
  * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；
  * clamp 跟随时镜头停在地图外 cameraMargin 格再加设备安全区；open 不设边；wrap 四边回绕、一圈就是地图矩形；
- * fit 的图平时就整张放进一屏、不跟随
+ * fit 的图平时就整张放进一屏、不跟随；tile 的图跟随时也把地图矩形四周平铺出一圈副本（只画，不是世界），只用在 wrap 的图上
  */
 export interface Framing {
   readonly map: Rect
   readonly edge: 'frame' | 'clamp' | 'open' | 'wrap'
   readonly fit?: boolean
+  readonly tile?: boolean
 }
 
 /** follow 跟着锚点走；map 固定把地图矩形整张放进一屏 */
@@ -47,7 +48,7 @@ export interface Screen {
   sees(x: number, y: number, pad?: number): boolean
 }
 
-/** 环面固定取景时，八台镜像镜头各比主镜头偏几圈 */
+/** 环面固定取景、或平铺的图跟随时，八台镜像镜头各比主镜头偏几圈 */
 const MIRRORS = [
   [-1, -1],
   [0, -1],
@@ -77,7 +78,7 @@ interface Quake {
 }
 
 /**
- * 战斗镜头：只有它摆镜头。每帧按模式定下拍哪里、拍多大；环面固定取景时另开八台镜像镜头，把一圈外的东西画回框里。
+ * 战斗镜头：只有它摆镜头。每帧按模式定下拍哪里、拍多大；环面固定取景、或平铺的图跟随时另开八台镜像镜头，把一圈外的东西画回框里、把地图四周平铺出副本。
  * 震屏所有镜头一起震，屏幕上的幅度按跟随时的缩放算；盖满屏幕的底色与遮罩随缩放保持铺满
  */
 export class Lens {
@@ -149,6 +150,7 @@ export class Lens {
     let cx: number
     let cy: number
     let wrap = false
+    let clip = false
     if (follow) {
       zoom = f.edge === 'frame' ? Math.max(followZoom, W / f.map.w, H / f.map.h) : followZoom
       cx = anchor.x
@@ -158,6 +160,8 @@ export class Lens {
         cx = clampSpan(cx, b.x, b.w, W / zoom)
         cy = clampSpan(cy, b.y, b.h, H / zoom)
       }
+      wrap = f.edge === 'wrap' && f.tile === true
+      clip = wrap
     } else if (f.edge === 'wrap') {
       const r = f.fit ? f.map : cellOf(f.map, anchor)
       port = fitIn(area, r.w, r.h)
@@ -178,7 +182,7 @@ export class Lens {
       cx = clampSpan(cx, f.map.x, f.map.w, W / zoom)
       cy = clampSpan(cy, f.map.y, f.map.h, H / zoom)
     }
-    this.place(port, zoom, cx, cy, wrap)
+    this.place(port, zoom, cx, cy, wrap, clip)
   }
 
   /** 只让主镜头画：自己已按周期铺满一圈的东西，镜像镜头不再画一遍 */
@@ -231,7 +235,11 @@ export class Lens {
     return { x: (Math.random() * 2 - 1) * k * port.w, y: (Math.random() * 2 - 1) * k * port.h }
   }
 
-  private place(port: Port, zoom: number, cx: number, cy: number, wrap: boolean): void {
+  /**
+   * 摆好主镜头与镜像镜头。clip 为真时（平铺的图跟随时）每台镜像镜头只开在屏幕上露出那一圈副本的那一块：视野碰不到的那一圈不画，
+   * 碰到的只画露出的那一条，往外取整到整像素——多出来的那一点拍到的是方框外，什么都没有，不会盖住主镜头
+   */
+  private place(port: Port, zoom: number, cx: number, cy: number, wrap: boolean, clip: boolean): void {
     const main = this.scene.cameras.main
     setPort(main, port)
     main.setZoom(zoom)
@@ -240,11 +248,40 @@ export class Lens {
       const cams = this.scene.cameras
       if (this.mirrors.length === 0) this.mirrors = MIRRORS.map(() => cams.add(port.x, port.y, port.w, port.h))
       const m = this.framing.map
+      const vw = port.w / zoom
+      const vh = port.h / zoom
+      const vx = cx - vw / 2
+      const vy = cy - vh / 2
       this.mirrors.forEach((c, i) => {
         const [dx, dy] = MIRRORS[i]!
-        setPort(c, port)
+        if (!clip) {
+          c.setVisible(true)
+          setPort(c, port)
+          c.setZoom(zoom)
+          c.setScroll(cx + dx * m.w - port.w / 2, cy + dy * m.h - port.h / 2)
+          return
+        }
+        // 这一圈副本在世界里占的方形与视野相交的那一块，换成屏幕上的整像素
+        const x0 = Math.max(vx, m.x + dx * m.w)
+        const y0 = Math.max(vy, m.y + dy * m.h)
+        const x1 = Math.min(vx + vw, m.x + (dx + 1) * m.w)
+        const y1 = Math.min(vy + vh, m.y + (dy + 1) * m.h)
+        if (x1 <= x0 || y1 <= y0) {
+          c.setVisible(false)
+          return
+        }
+        const sx0 = Math.max(port.x, Math.floor(port.x + (x0 - vx) * zoom) - 1)
+        const sy0 = Math.max(port.y, Math.floor(port.y + (y0 - vy) * zoom) - 1)
+        const sx1 = Math.min(port.x + port.w, Math.ceil(port.x + (x1 - vx) * zoom) + 1)
+        const sy1 = Math.min(port.y + port.h, Math.ceil(port.y + (y1 - vy) * zoom) + 1)
+        const sub: Port = { x: sx0, y: sy0, w: sx1 - sx0, h: sy1 - sy0 }
+        c.setVisible(true)
+        setPort(c, sub)
         c.setZoom(zoom)
-        c.setScroll(cx + dx * m.w - port.w / 2, cy + dy * m.h - port.h / 2)
+        // 这台镜头视口正中对着的世界点，再挪回方框里那一份
+        const wx = vx + (sx0 + sub.w / 2 - port.x) / zoom - dx * m.w
+        const wy = vy + (sy0 + sub.h / 2 - port.y) / zoom - dy * m.h
+        c.setScroll(wx - sub.w / 2, wy - sub.h / 2)
       })
     } else if (this.mirrors.length > 0) {
       for (const c of this.mirrors) this.scene.cameras.remove(c)

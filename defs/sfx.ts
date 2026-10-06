@@ -54,4 +54,7 @@ export const SFX = {
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
+  // 跃迁：传送台充能越升越高的嗡鸣，整队被送走的那一下
+  charge: { wave: 'sine', freq: 180, freqEnd: 760, duration: 1.4, volume: 0.13, attack: 1.1, decayPow: 0.5, throttleMs: 1200 },
+  jump: { wave: 'sawtooth', freq: 140, freqEnd: 1500, duration: 0.42, volume: 0.17, attack: 0.008, decayPow: 1.3, throttleMs: 300 },
 } as const satisfies Record<string, SfxDef>
