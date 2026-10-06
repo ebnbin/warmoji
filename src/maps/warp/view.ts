@@ -34,8 +34,8 @@ const VOID_PAD_U = 40
 /** 刚踩上那一脚的方框扩到四边要多久，毫秒 */
 const FLASH_MS = 260
 /** 送走一个身体时它散成多少个光块，个头每大一格多几个 */
-const VOXELS = 9
-const VOXELS_PER_U = 8
+const VOXELS = 16
+const VOXELS_PER_U = 14
 /** 光块散开、聚拢各占穿行前后多久，毫秒 */
 const SCATTER_MS = 220
 const GATHER_MS = 320
@@ -365,7 +365,7 @@ export class WarpView implements MapView {
     // 桥身：一道暗的底，上面同色的细线
     f.lineStyle(0.22 * UNIT, shade(color, 0.22), 0.55)
     f.lineBetween(a.x, a.y, b.x, b.y)
-    g.lineStyle(0.05 * UNIT, color, 0.25 + 0.5 * charge)
+    g.lineStyle(0.07 * UNIT, color, 0.35 + 0.5 * charge)
     g.lineBetween(a.x, a.y, b.x, b.y)
     // 人字纹往下一间流，充能时流得快、亮得多
     const step = 0.9 * UNIT
@@ -376,9 +376,9 @@ export class WarpView implements MapView {
       if (s < 0) continue
       const fade = Math.sin((Math.PI * s) / span)
       const c = { x: a.x + ux * s, y: a.y + uy * s }
-      const w = 0.16 * UNIT
-      const back = 0.16 * UNIT
-      g.lineStyle(0.06 * UNIT, color, (0.3 + 0.6 * charge) * fade)
+      const w = 0.24 * UNIT
+      const back = 0.22 * UNIT
+      g.lineStyle(0.09 * UNIT, color, (0.45 + 0.55 * charge) * fade)
       g.lineBetween(c.x - ux * back + nx * w, c.y - uy * back + ny * w, c.x, c.y)
       g.lineBetween(c.x - ux * back - nx * w, c.y - uy * back - ny * w, c.x, c.y)
     }
@@ -388,15 +388,35 @@ export class WarpView implements MapView {
     ] as const) {
       if (hot <= 0) continue
       for (const [w, al] of [
-        [0.9, 0.12],
-        [0.5, 0.25],
-        [0.18, 0.8],
+        [1.6, 0.1],
+        [0.9, 0.22],
+        [0.4, 0.5],
+        [0.18, 0.9],
       ] as const) {
         g.lineStyle(w * UNIT * (0.6 + 0.4 * hot), glow, al * hot)
         g.lineBetween(a.x, a.y, b.x, b.y)
       }
       g.lineStyle(0.06 * UNIT, 0xffffff, hot)
       g.lineBetween(a.x, a.y, b.x, b.y)
+    }
+    // 一团光沿桥从这头冲到那头，和穿行的身体一起到
+    for (const [since, glow, on] of [
+      [sinceJump, TEAM_GLOW, true],
+      [sinceShuttle, FOE_GLOW, pad.shuttled > 0],
+    ] as const) {
+      if (!on || since < 0 || since > cfg.pad.transitMs) continue
+      const k = ease(since / cfg.pad.transitMs)
+      const q = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }
+      g.lineStyle(0.3 * UNIT, glow, 0.5)
+      g.lineBetween(a.x, a.y, q.x, q.y)
+      for (const [r, al, c] of [
+        [0.9, 0.2, glow],
+        [0.55, 0.45, glow],
+        [0.25, 1, 0xffffff],
+      ] as const) {
+        g.fillStyle(c, al)
+        g.fillCircle(q.x, q.y, r * UNIT)
+      }
     }
   }
 
@@ -486,6 +506,24 @@ export class WarpView implements MapView {
       g.lineStyle(0.08 * UNIT, lift(c, 0.5), (1 - k) * strength)
       g.strokeCircle(px, py, R * (0.9 + 1.4 * k))
     }
+    const column = (at: number, c: number, strength: number, px: number, py: number, rising: boolean): void => {
+      const d = now - at
+      if (d < 0 || d > BURST_MS || strength <= 0) return
+      const k = d / BURST_MS
+      const h = 3.2 * UNIT * (rising ? 0.4 + 0.6 * ease(k) : 1 - 0.6 * ease(k))
+      for (const [w, al] of [
+        [1, 0.16],
+        [0.6, 0.3],
+        [0.22, 0.7],
+      ] as const) {
+        this.airFx!.fillStyle(w < 0.3 ? 0xffffff : c, al * (1 - k) * strength)
+        this.airFx!.fillRect(px - R * w, py - h, R * w * 2, h)
+      }
+    }
+    column(p.jumpedAt, TEAM_GLOW, 1, x, y, true)
+    column(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0, x, y, true)
+    column(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, to.pad.x * UNIT, to.pad.y * UNIT, false)
+    column(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, to.pad.x * UNIT, to.pad.y * UNIT, false)
     flash(p.jumpedAt, TEAM_GLOW, 1, x, y)
     flash(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0.25, x, y)
     const tx = to.pad.x * UNIT
@@ -520,13 +558,19 @@ export class WarpView implements MapView {
     const r = (this.cfg?.core.radiusU ?? 1.5) * UNIT
     const rise = 3.2 * LIFT_PER_M * 2
     // 往上冲出平台的那一截光
-    for (const [w, al] of [
-      [1.0, 0.08],
-      [0.55, 0.16],
-      [0.22, 0.4],
-    ] as const) {
-      g.fillStyle(tint, al * (1 + hot))
-      g.fillRect(cx - r * w, cy - rise, r * w * 2, rise)
+    const slices = 14
+    for (let j = 0; j < slices; j++) {
+      const s0 = j / slices
+      const fade = (1 - s0) ** 1.6
+      for (const [w, al] of [
+        [0.95, 0.07],
+        [0.5, 0.14],
+        [0.2, 0.35],
+      ] as const) {
+        const ww = r * w * (1 - 0.35 * s0)
+        g.fillStyle(tint, al * fade * (1 + hot))
+        g.fillRect(cx - ww, cy - rise * (s0 + 1 / slices), ww * 2, rise / slices)
+      }
     }
     for (const [k, al] of [
       [2.6, 0.05],
@@ -596,7 +640,7 @@ export class WarpView implements MapView {
           f.fillRect(p.box.x0 * UNIT, p.box.y0 * UNIT, (p.box.x1 - p.box.x0) * UNIT, (p.box.y1 - p.box.y0) * UNIT)
         }
       }
-      const n = boss ? 22 : 10
+      const n = boss ? 26 : 12
       const spread = (boss ? 2.4 : 1.1) * UNIT
       for (let j = 0; j < n; j++) {
         const h1 = noise(e * 31 + j, Math.floor(born))
@@ -607,7 +651,7 @@ export class WarpView implements MapView {
         if (s <= 0) continue
         const r = spread * (1 - ease(s)) + 0.1 * UNIT
         const lifted = (1 - s) * 0.9 * UNIT
-        const size = (0.11 + 0.08 * h2) * UNIT * (boss ? 1.5 : 1)
+        const size = (0.18 + 0.12 * h2) * UNIT * (boss ? 1.5 : 1)
         g.fillStyle(j % 3 === 0 ? 0xffffff : FOE_GLOW, 0.35 + 0.55 * s)
         g.fillRect(x + Math.cos(ang) * r - size / 2, y + Math.sin(ang) * r * 0.7 - lifted - size / 2, size, size)
       }
@@ -639,7 +683,7 @@ export class WarpView implements MapView {
       const ang = a * Math.PI * 2
       const off = h.r * (0.4 + 0.8 * b)
       const lag = c * 0.25
-      const size = (0.1 + 0.1 * b) * UNIT
+      const size = (0.26 + 0.22 * b) * UNIT
       let x: number
       let y: number
       let al: number

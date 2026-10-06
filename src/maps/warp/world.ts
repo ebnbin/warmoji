@@ -451,14 +451,16 @@ export const warp: WorldHooks = {
     const w = FRAME_U * UNIT
     return x < -m || x > w + m || y < -m || y > w + m
   },
-  /** 平常的敌人随手落在四间房里，出怪口再按种类把它送到配方接它的那间；头目落在队伍所在那间、离队长远的地方 */
+  /** 平常的敌人随手落在四间房里，出怪口再按种类把它送到配方接它的那间；头目落在队伍所在那间、离队长远、也不落在传送台上的地方 */
   spawnPoint(sim, boss) {
     const s = warpOf(sim)
     if (!boss) return randomIn(sim, s, Math.floor(sim.rng.next() * s.plan.rooms.length), UNIT)
     const lead = leaderPoint(sim)
     const far = SPAWN.minPlayerDist * UNIT * 1.6
+    const pad = s.plan.rooms[s.teamRoom]!.pad
+    const clear = (cfgOf(sim).pad.radiusU + 2.5) * UNIT
     let p = randomIn(sim, s, s.teamRoom, 1.5 * UNIT)
-    for (let k = 0; k < 24 && Math.hypot(p.x - lead.x, p.y - lead.y) < far; k++) p = randomIn(sim, s, s.teamRoom, 1.5 * UNIT)
+    for (let k = 0; k < 32 && (Math.hypot(p.x - lead.x, p.y - lead.y) < far || Math.hypot(p.x - pad.x * UNIT, p.y - pad.y * UNIT) < clear); k++) p = randomIn(sim, s, s.teamRoom, 1.5 * UNIT)
     return p
   },
   center(sim) {

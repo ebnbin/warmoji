@@ -1405,7 +1405,7 @@ export const MAPS = {
       neckU: 0.4,
       pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
       pitU: 8,
-      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 450, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
+      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
       emitters: { plateU: 2, markU: 0.6, clearU: 3 },
       recipes: ['ghosts', 'tanks', 'swarm', 'mixed'],
       core: { radiusU: 1.5 },
