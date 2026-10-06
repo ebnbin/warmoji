@@ -5,7 +5,7 @@ import { AWAY } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { playSfx } from '../../audio/sfx'
 import { Rng } from '../../util/rng'
-import { Alive, Faction, Pickup, Radius, Span, Transform, Uid, VisOff } from '../../ecs/components'
+import { Alive, Faction, Phys, Pickup, Radius, Span, Transform, Uid, VisOff } from '../../ecs/components'
 import { ART } from '../../ecs/utils/ground'
 import { canvasTexture, drawSpark } from '../textures'
 import { FRAME } from '../frame'
@@ -474,9 +474,9 @@ export class SwampView implements MapView {
       const r = Radius.v[eid]!
       // 走过留下的纹
       const last = this.trailAt.get(eid) ?? 0
-      if (now - last > 380) {
+      if (now - last > 520 && Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) > cfg.sink.walkU * UNIT) {
         this.trailAt.set(eid, now)
-        this.rings.push({ x: Transform.x[eid]!, y: foot, r0: rw, r1: rw * 2.1, age: 0, life: 1.4, alpha: 0.28, color: MUD.sheen })
+        this.rings.push({ x: Transform.x[eid]!, y: foot, r0: rw * 0.9, r1: rw * 1.8, age: 0, life: 1.1, alpha: 0.16, color: MUD.sheen })
       }
       if (m.trapped && m.effort > 0.3 && Math.random() < 0.25) sim.out.bursts.push({ x: Transform.x[eid]!, y: foot, count: 1, kind: 'mud' })
       // 呛泥：身边不停冒泡

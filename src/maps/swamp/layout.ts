@@ -355,7 +355,7 @@ function tryPlan(cfg: SwampConfig, rng: Rng, seed: number): SwampPlan | null {
       hummocks.push({ x, y, r, wob: wobbleOf(rng, 0.14), rag: RAG.mound, seed: Math.floor(rng.next() * 0xffff), kind: 'mound' })
       const off = rng.next() * Math.PI * 2
       const lean = rng.next() * r * 0.18
-      trees.push({ x: x + Math.cos(off) * lean, y: y + Math.sin(off) * lean, trunk: between(rng, c.trunkU), h: between(rng, c.heightM), crown: r * (1.05 + rng.next() * 0.25), inWater: false, seed: Math.floor(rng.next() * 0x7fffffff) })
+      trees.push({ x: x + Math.cos(off) * lean, y: y + Math.sin(off) * lean, trunk: between(rng, c.trunkU), h: between(rng, c.heightM), crown: r * (0.78 + rng.next() * 0.14), inWater: false, seed: Math.floor(rng.next() * 0x7fffffff) })
       ok = true
     }
   }
@@ -390,12 +390,13 @@ function tryPlan(cfg: SwampConfig, rng: Rng, seed: number): SwampPlan | null {
   for (const m of mounds) {
     if (walks.length >= nw) break
     // 栈道铺到土台上离树干还有一截的地方
-    const d = Math.hypot(m.x - cx, m.y - cy)
-    const stop = m.r * 0.5
-    const ux = (m.x - cx) / d
-    const uy = (m.y - cy) / d
+    const t = trees.find((q) => Math.hypot(q.x - m.x, q.y - m.y) < m.r)!
+    const d = Math.hypot(t.x - cx, t.y - cy)
+    const stop = Math.max(m.r * 0.5, t.trunk * 1.5 + 0.5)
+    const ux = (t.x - cx) / d
+    const uy = (t.y - cy) / d
     const from = cfg.plaza.radiusU * 0.6
-    const w = layWalk(rng, cfg, { x: cx + ux * from, y: cy + uy * from }, { x: m.x - ux * stop, y: m.y - uy * stop }, false, breakable)
+    const w = layWalk(rng, cfg, { x: cx + ux * from, y: cy + uy * from }, { x: t.x - ux * stop, y: t.y - uy * stop }, false, breakable)
     if (dry(w)) walks.push(w)
   }
   if (walks.length < cfg.walks.count[0]) return null
@@ -404,7 +405,8 @@ function tryPlan(cfg: SwampConfig, rng: Rng, seed: number): SwampPlan | null {
   let best = -1
   for (let k = 0; k < 24; k++) {
     const a = rng.next() * Math.PI * 2
-    const gap = Math.min(...taken.map((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))))
+    // 离土台与水洼的方向远，岸又近（栈桥伸得出去）的方向好
+    const gap = Math.min(...taken.map((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))))) + (maxR - shoreAt(sh, a)) * 0.25
     if (gap > best) {
       best = gap
       pierA = a

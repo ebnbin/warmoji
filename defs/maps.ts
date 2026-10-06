@@ -1346,7 +1346,7 @@ export const MAPS = {
     finalWaveSub: '巨鳄从水里爬上了岸——它个头大，蹚泥如走平地，泥潭拦不住它！',
     swamp: {
       meterPerU: 0.5,
-      shore: { radiusU: [15, 17.8], neckU: 0.4 },
+      shore: { radiusU: [14.6, 17.2], neckU: 0.4 },
       plaza: { radiusU: 5.2, wobble: 0.07 },
       ponds: { count: [1, 2], radiusU: [1.3, 2.2], clearU: 1.4 },
       cypress: { count: [3, 5], moundU: [1.6, 2.3], trunkU: [0.4, 0.55], heightM: [14, 22], ringU: [9.8, 12.6], gapU: 1.8, shoreCount: [4, 7] },

@@ -157,20 +157,21 @@ function sinkBody(sim: Sim, s: SwampState, cfg: SwampConfig, eid: number, dt: nu
     const rate = mud ? 1.5 / cfg.heave.pullS : 1 / k.recoverS
     m.d = Math.max(0, m.d - rate * dt)
     m.effort = 0
-    if (m.trapped && (!mud || m.d < k.free)) free(s, m, eid)
+    if (m.trapped && (!mud || m.d < k.free)) free(sim, s, m, eid)
     if (m.d <= 0 && !m.trapped) s.mire.delete(eid)
     return
   }
   const st = track(s, eid)
   const w = weightOf(cfg, eid)
-  const moving = Math.min(1, Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) / (k.walkU * UNIT))
-  const sink = (w * (1 - moving * (1 - k.walkMul))) / k.sinkS
   // 朝哪使劲：单位方向乘使了几成劲，按时间常数记着；方向来回换就互相抵掉
   const dx = Drive.x[eid]!
   const dy = Drive.y[eid]!
   const want = Math.hypot(dx, dy)
   const full = Math.max(1e-6, Stats.moveSpeed[eid]! * UNIT * 0.6)
   const push = Math.min(1, want / full)
+  // 自己在走才算走：被挤、被推着动的不算
+  const moving = push * Math.min(1, Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) / (k.walkU * UNIT))
+  const sink = (w * (1 - moving * (1 - k.walkMul))) / k.sinkS
   const a = 1 - Math.exp(-dt / cfg.heave.tauS)
   st.hx += ((want > 0 ? (dx / want) * push : 0) - st.hx) * a
   st.hy += ((want > 0 ? (dy / want) * push : 0) - st.hy) * a
@@ -188,14 +189,17 @@ function sinkBody(sim: Sim, s: SwampState, cfg: SwampConfig, eid: number, dt: nu
   st.effort = Math.min(1, Math.hypot(st.hx, st.hy)) * tired
   const pull = ((1 - k.free) / (cfg.heave.pullS * Math.sqrt(w))) * st.effort
   st.d = Math.max(0, Math.min(1, st.d + (sink * (1 - st.effort) - pull) * dt))
-  if (st.d < k.free) free(s, st, eid)
+  if (st.d < k.free) free(sim, s, st, eid)
 }
 
-/** 拔出来了：冒一团泥浆 */
-function free(s: SwampState, m: Mire, eid: number): void {
+/** 拔出来了：甩起一团泥浆 */
+function free(sim: Sim, s: SwampState, m: Mire, eid: number): void {
   m.trapped = false
   m.effort = 0
-  note(s, { kind: 'free', x: Transform.x[eid]!, y: Transform.y[eid]!, r: Radius.v[eid]! })
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  note(s, { kind: 'free', x, y, r: Radius.v[eid]! })
+  sim.out.bursts.push({ x, y, count: 7, kind: 'mud' })
 }
 
 /** 陷到最深的呛泥掉血：满血的标准身体 chokeSec 秒呛死，每 tickMs 结算一次；敌我一样 */

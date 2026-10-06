@@ -47,7 +47,7 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
-import { blobDist, inPond, inShore, swampPlan } from '../src/maps/swamp/layout.ts'
+import { blobDist, inPond, inShore, swampPlan, walkPoint } from '../src/maps/swamp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -722,7 +722,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(roomAt(plan.basin, p.x * UNIT, p.y * UNIT) > 0, `${where} 有一座落羽杉土台走不到`)
     }
     for (const w of plan.walks) {
-      const end = w.pts[w.pts.length - 1]!
+      const end = walkPoint(w, w.at[w.at.length - 1]! - 0.4)
       need(roomAt(plan.basin, end.x * UNIT, end.y * UNIT) > 0, `${where} 有一条栈道的尽头不在能走的地上`)
       for (const p of w.pts) need(inPond(plan, p.x, p.y) < 0, `${where} 有一条栈道铺进了水洼`)
     }

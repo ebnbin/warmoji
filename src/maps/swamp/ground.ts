@@ -436,8 +436,8 @@ function mud(x: number, y: number, seed: number, wet: number, out: Rgb): void {
   const gv = (hgtAt(u, v + e) - hgtAt(u, v - e)) / (2 * e)
   const gx = gu * 0.8 - gv * 0.6
   const gy = gu * 0.6 + gv * 0.8
-  const nx = -gx * 0.9
-  const ny = -gy * 0.9
+  const nx = -gx * 0.55
+  const ny = -gy * 0.55
   const nl = Math.hypot(nx, ny, 1)
   light(nx / nl, ny / nl, 1 / nl, 0, LIT)
   const damp = smooth(0.52, 0.72, hgt) * (1 - wet * 0.7)
@@ -455,15 +455,15 @@ function mud(x: number, y: number, seed: number, wet: number, out: Rgb): void {
   out[1] = out[1]! * (1 - sky) + 188 * sky + 150 * spec
   out[2] = out[2]! * (1 - sky) + 150 * sky + 108 * spec
   // 低洼处积着一汪水，映着淡金色的天光，水边一圈更湿更暗
-  const pool = smooth(0.33, 0.285, hgt)
-  const rim = smooth(0.37, 0.33, hgt) * (1 - pool)
+  const pool = smooth(0.3, 0.26, hgt)
+  const rim = smooth(0.34, 0.3, hgt) * (1 - pool)
   if (rim > 0) for (let c = 0; c < 3; c++) out[c] = out[c]! * (1 - 0.32 * rim)
   if (pool > 0) {
     const sky = 0.8 + 0.2 * valueNoise(x * 0.6, y * 0.6, seed + 9)
-    const k = pool * 0.75
-    out[0] = lerp(out[0]!, 150 * sky, k)
-    out[1] = lerp(out[1]!, 140 * sky, k)
-    out[2] = lerp(out[2]!, 104 * sky, k)
+    const k = pool * 0.6
+    out[0] = lerp(out[0]!, 132 * sky, k)
+    out[1] = lerp(out[1]!, 126 * sky, k)
+    out[2] = lerp(out[2]!, 98 * sky, k)
   }
   // 冒过的泥泡留下的小圆坑，坑边一点亮
   const cx = Math.floor(x * 1.6)
@@ -755,10 +755,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const t = plan.trees[k]!
         const qx = x - sx * CROWN_SHADOW_U * (t.inWater ? 1.2 : 1)
         const qy = y - sy * CROWN_SHADOW_U * (t.inWater ? 1.2 : 1)
-        for (const c of prep.clumps[k]!) {
-          const d = Math.hypot(qx - c.x, qy - c.y)
-          shade = Math.max(shade, smooth(c.r * 1.05, c.r * 0.55, d) * (0.85 + 0.15 * valueNoise(qx * 4, qy * 4, seed + 81)))
-        }
+        const d = Math.hypot(qx - t.x, qy - t.y) / t.crown
+        const ragged = 0.85 + 0.3 * fbm(qx * 1.2, qy * 1.2, seed + 81, 2)
+        shade = Math.max(shade, smooth(1.05, 0.45, d * ragged) * (0.8 + 0.2 * valueNoise(qx * 5, qy * 5, seed + 83)))
       }
       if (shade > 0) {
         const k = 1 - 0.38 * shade

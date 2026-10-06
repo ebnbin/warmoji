@@ -1,8 +1,9 @@
 /** 着色器用的噪声：格点哈希与平滑的值噪声，叠几层成 fbm */
 const NOISE = `
 vec2 hash2(vec2 p) {
-  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-  return fract(sin(p) * 43758.5453);
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.xx + q.yz) * q.zy);
 }
 
 float vnoise(vec2 p) {
@@ -66,12 +67,12 @@ void main ()
   vec2 p = uArea.xy + vec2(tc.x, 1.0 - tc.y) * uArea.zw;
   vec2 drift = uWind * uTime * 0.12;
   float swell = fbm(p * 0.22 - drift * 0.5);
-  float ripple = vnoise(vec2(dot(p, vec2(0.6, 0.8)) * 5.0 - uTime * 0.7, dot(p, vec2(-0.8, 0.6)) * 1.4) + swell * 3.0);
-  float fine = vnoise(p * 9.0 + vec2(uTime * 0.35, -uTime * 0.25));
-  float glint = smoothstep(0.7, 0.95, ripple) * (0.45 + 0.55 * smoothstep(0.4, 0.75, swell));
+  vec2 q = p * 2.6 + vec2(swell * 2.5, -swell * 1.5) - drift * 2.0;
+  float ripple = vnoise(q) * 0.6 + vnoise(q * 2.3 + vec2(uTime * 0.3, 0.0)) * 0.4;
+  float glint = smoothstep(0.74, 0.92, ripple) * (0.4 + 0.6 * smoothstep(0.45, 0.75, swell));
   float far = 0.35 + 0.65 * m.g;
-  float a = (glint * 0.16 + smoothstep(0.65, 0.95, fine) * 0.05 * swell) * water * far;
-  float dark = smoothstep(0.35, 0.1, ripple) * 0.07 * water * far;
+  float a = glint * 0.13 * water * far;
+  float dark = smoothstep(0.3, 0.12, ripple) * 0.06 * water * far;
   vec3 c = vec3(1.0, 0.95, 0.8);
   gl_FragColor = vec4(c * a, a + dark);
 }
@@ -108,6 +109,8 @@ void main ()
   a = clamp(a, 0.0, 0.7);
   float warm = smoothstep(0.0, 1.0, 1.0 - (p.x + p.y) / (uFrame * 2.0));
   vec3 c = mix(vec3(0.83, 0.88, 0.85), vec3(1.0, 0.93, 0.78), warm * 0.7);
-  gl_FragColor = vec4(c * a, a);
+  // 晨光：从太阳那边斜斜地照过来一层淡金，只提亮、不遮挡
+  float glow = 0.1 * warm * warm;
+  gl_FragColor = vec4(c * a + vec3(1.0, 0.84, 0.55) * glow * (1.0 - a), a);
 }
 `
