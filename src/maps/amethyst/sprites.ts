@@ -96,3 +96,28 @@ export function drawMoth(ctx: CanvasRenderingContext2D, w: number, h: number): v
   ctx.ellipse(cx, cy, w * 0.05, h * 0.28, 0, 0, Math.PI * 2)
   ctx.fill()
 }
+
+/** 从上往下看的蝙蝠：深褐的身子，两片带骨的膜翼 */
+export function drawBat(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const cx = w / 2
+  const cy = h * 0.5
+  ctx.fillStyle = '#2b2019'
+  for (const side of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(cx, cy - h * 0.12)
+    ctx.quadraticCurveTo(cx + side * w * 0.2, cy - h * 0.42, cx + side * w * 0.48, cy - h * 0.18)
+    ctx.lineTo(cx + side * w * 0.4, cy + h * 0.05)
+    ctx.quadraticCurveTo(cx + side * w * 0.34, cy - h * 0.02, cx + side * w * 0.28, cy + h * 0.14)
+    ctx.quadraticCurveTo(cx + side * w * 0.2, cy + h * 0.02, cx + side * w * 0.12, cy + h * 0.2)
+    ctx.quadraticCurveTo(cx + side * w * 0.06, cy + h * 0.08, cx, cy + h * 0.12)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.fillStyle = '#1a130e'
+  ctx.beginPath()
+  ctx.ellipse(cx, cy, w * 0.05, h * 0.26, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(cx, cy - h * 0.26, w * 0.035, 0, Math.PI * 2)
+  ctx.fill()
+}

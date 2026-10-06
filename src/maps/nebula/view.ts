@@ -6,8 +6,13 @@ import type { LocalLight } from '../../ecs/render/sprites'
 import type { Sim } from '../../ecs/sim'
 import { canvasTexture } from '../textures'
 import { mix } from '../color'
-import { drawCloud, drawGlint, drawHalo, NEBULA_FRAG, NEBULA_PPU, sheetPx } from './render'
+import { drawCloud, drawGlint, drawHalo, layerPx, NEBULA_FRAG, NEBULA_PPU, sheetPx } from './render'
 import type { NebulaSheet, SheetBand } from './render'
+import { Cosmos } from './cosmos'
+import type { CosmicLight } from './cosmos'
+import { REMNANT_PX } from './remnants'
+import { hue, planck, rgbInt } from './spectrum'
+import type { Rgb } from './spectrum'
 import { NebulaPainter } from './painter'
 import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES } from './model'
 import type { NebulaState } from './model'
@@ -20,17 +25,22 @@ import { FRAME, FRAME_MID } from '../frame'
 import { BoundedView } from '../../ecs/views'
 import type { ViewCtx } from '../../ecs/views'
 
-const NEBULA_BG = 0x030205
+const NEBULA_BG = 0x020203
 const NEBULA_SHEET_KEY = 'nebula-sheet'
+const NEBULA_REMNANT_KEY = 'nebula-remnant'
 const NEBULA_CLOUD_KEY = 'nebula-cloud'
 const NEBULA_GLINT_KEY = 'nebula-glint'
 const NEBULA_HALO_KEY = 'nebula-halo'
 /** 光晕贴图的半径是阴影半径的几倍 */
 const HALO_EDGE = 4
-/** 吸积盘的光色：光晕与照在身体上的暖光 */
-const DISK_LIGHT = 0xffb27a
-/** 吸积盘照在身体上的暖光比照在星尘上的弱多少 */
+/** 照在身体与星尘上的吸积盘光取盘上这么热的一圈的颜色，以最热那一圈为 1 */
+const DISK_LIGHT_K = 0.8
+/** 吸积盘照在身体上的光比照在星尘上的弱多少 */
 const DISK_ON_BODY = 0.6
+/** 天象里的星照到星尘上、超新星照到身体上有多亮；超新星照在身体上最多这么亮 */
+const STAR_ON_DUST = 4
+const FLASH_ON_BODY = 0.5
+const FLASH_MAX = 0.45
 /** 开局最多几个线程分着画星云 */
 const NEBULA_THREADS = 4
 /** 着色器的曝光：光的强度乘它再按 1 − e^(−x) 压进画面 */
@@ -53,14 +63,14 @@ interface TrailPoint {
   readonly at: number
 }
 
-/** 一粒星尘，像素与像素/秒 */
+/** 一粒星尘，像素与像素/秒；albedo 是它反光的本事 */
 interface Speck {
   x: number
   y: number
   vx: number
   vy: number
   size: number
-  tint: number
+  albedo: number
 }
 
 /** 一条被潮汐拉长、绕进黑洞的细流 */
@@ -79,6 +89,7 @@ function diskLight(lum: number, dU: number): number {
 
 /**
  * 星云：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按透视、黑洞的引力透镜、吸积盘的光与光回波画出来；
+ * 内壁上此起彼伏地演着天象：恒星诞生、发光、死去，把周围的气体与尘埃照成各种颜色。
  * 黑洞是一块阴影，外面一圈光子环和正对着看的吸积盘，周围那圈被弯过来的星云光就是走不出来的地方。
  * 星尘按同一套引力往里漂，越近越快；被吞的身体拉成细流绕进去，吸积盘随之一亮。流星在内壁上先亮起来再冲进空腔，
  * 身后拖着冷却变红的热迹与背向黑洞的尾巴，照亮它经过的星云，扎进对面的壳层就碎掉
@@ -86,7 +97,15 @@ function diskLight(lum: number, dU: number): number {
 export class NebulaView extends BoundedView {
   /** 黑洞在哪、此刻多亮：单位按它受光 */
   private hole?: { x: number; y: number; lum: number }
+  /** 此刻最亮的一颗超新星：在哪（格，以球心为原点）、什么颜色、多亮 */
+  private burst?: CosmicLight
+  /** 球心，像素 */
+  private center?: Point
   private painter?: NebulaPainter
+  private cosmos?: Cosmos
+  /** 吸积盘此刻照出去的光的颜色 */
+  private disk: Rgb = [1, 1, 1]
+  private diskTint = 0xffffff
   private readonly u = {
     time: 0,
     rs: 0,
@@ -95,6 +114,8 @@ export class NebulaView extends BoundedView {
     flareK: [0, 0, 0, 0, 0, 0, 0, 0],
     meteor: [0, 0, 0, 0],
     glow: 1,
+    hard: 0.5,
+    disk: [1, 1, 1],
   }
   private halo?: Phaser.GameObjects.Image
   private dust: Speck[] = []
@@ -154,15 +175,22 @@ export class NebulaView extends BoundedView {
     }
     const px = sheetPx(sheet)
     const tex = canvasTexture(scene, NEBULA_SHEET_KEY, px, px)
+    const rem = canvasTexture(scene, NEBULA_REMNANT_KEY, REMNANT_PX, REMNANT_PX)
     const painter = new NebulaPainter(sheet, Math.max(1, Math.min(NEBULA_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const bands: SheetBand[] = []
-    for (let r = 0; r < px; r += 8) bands.push({ r0: r, r1: Math.min(px, r + 8) })
+    for (let r = 0; r < px; r += 8) bands.push({ layer: 'sheet', r0: r, r1: Math.min(px, r + 8) })
+    for (let r = 0; r < REMNANT_PX; r += 16) bands.push({ layer: 'remnant', r0: r, r1: Math.min(REMNANT_PX, r + 16) })
     await painter.paint(bands, (p) => {
-      tex.getContext().putImageData(new ImageData(p.pixels, px, p.band.r1 - p.band.r0), 0, p.band.r0)
+      const to = p.band.layer === 'sheet' ? tex : rem
+      to.getContext().putImageData(new ImageData(p.pixels, layerPx(sheet, p.band.layer), p.band.r1 - p.band.r0), 0, p.band.r0)
     })
     if (this.painter !== painter) return
     tex.refresh()
+    rem.refresh()
+    const cosmos = new Cosmos((v.run.decorSeed ^ 0x636f) >>> 0, sheet.wallU)
+    this.cosmos = cosmos
+    this.center = { x: L.cx, y: L.cy }
     const u = this.u
     const x0 = L.cx - reach * UNIT
     const y0 = L.cy - reach * UNIT
@@ -175,6 +203,7 @@ export class NebulaView extends BoundedView {
             fragmentSource: NEBULA_FRAG,
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               set('uNeb', 0)
+              set('uRem', 1)
               set('uTime', u.time)
               set('uRect', [x0, y0, side, side])
               set('uUnit', UNIT)
@@ -193,13 +222,23 @@ export class NebulaView extends BoundedView {
               set('uMeteor', u.meteor)
               set('uSeed', (v.run.decorSeed % 997) + 0.5)
               set('uGlow', u.glow)
+              set('uDisk', u.disk)
+              set('uHard', u.hard)
+              set('uCone', cosmos.cone)
+              const c = cosmos.uniforms
+              set('uEvAt[0]', c.at)
+              set('uEvStar[0]', c.star)
+              set('uEvIon[0]', c.ion)
+              set('uEvScatter[0]', c.scatter)
+              set('uEvRemnant[0]', c.remnant)
+              set('uEvFlash[0]', c.flash)
             },
           },
           x0,
           y0,
           side,
           side,
-          [NEBULA_SHEET_KEY],
+          [NEBULA_SHEET_KEY, NEBULA_REMNANT_KEY],
         )
         .setOrigin(0, 0)
         .setDepth(-2),
@@ -207,7 +246,7 @@ export class NebulaView extends BoundedView {
     this.dustGfx = scene.add.graphics().setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
     this.streamGfx = scene.add.graphics().setDepth(29.5).setBlendMode(Phaser.BlendModes.ADD)
     this.tailGfx = scene.add.graphics().setDepth(33.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD).setTint(DISK_LIGHT)
+    this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD)
     this.knot = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(33).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa860).setVisible(false)
     this.coma = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a4a).setVisible(false)
     this.core = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34.1).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff1d6).setVisible(false)
@@ -271,17 +310,28 @@ export class NebulaView extends BoundedView {
       }
       if (Math.hypot(x - L.cx, y - L.cy) < lim && !inNebulaHorizon(s, x, y)) break
     }
-    const warm = Math.random()
-    return { x, y, vx: 0, vy: 0, size: 0.6 + Math.random() * 1.1, tint: warm < 0.6 ? 0xffc89a : warm < 0.9 ? 0xffa88e : 0xd9b6ff }
+    return { x, y, vx: 0, vy: 0, size: 0.6 + Math.random() * 1.1, albedo: 0.6 + Math.random() * 0.4 }
   }
 
-  /** 把黑洞此刻的大小、光度与最近几次闪耀交给着色器；时间都按对局的秒 */
+  /** 把黑洞此刻的大小、光度、最近几次闪耀与星云里此刻的天象交给着色器；时间都按对局的秒 */
   private syncUniforms(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, now: number): void {
     const u = this.u
     u.time = now / 1000
     u.rs = s.rs
-    u.base = (s.gm / cfg.hole.gm) ** 2
-    u.glow = luminosity(s, cfg, now) ** 0.25
+    const cosmos = this.cosmos
+    if (cosmos) {
+      cosmos.update(u.time)
+      let burst: CosmicLight | undefined
+      for (const l of cosmos.lights) if (l.flash && (!burst || l.power > burst.power)) burst = l
+      this.burst = burst
+    }
+    const swing = cosmos?.lum ?? 1
+    u.base = (s.gm / cfg.hole.gm) ** 2 * swing
+    u.glow = (luminosity(s, cfg, now) * swing) ** 0.25
+    u.hard = cosmos?.hard ?? 0.5
+    this.disk = hue(planck(cfg.disk.innerK * DISK_LIGHT_K * u.glow))
+    this.diskTint = rgbInt(this.disk)
+    u.disk = [...this.disk]
     for (let i = 0; i < MAX_FLARES; i++) {
       const f = s.flares[i]
       u.flareT[i] = f ? f.at / 1000 : 0
@@ -296,16 +346,16 @@ export class NebulaView extends BoundedView {
     const now = sim.elapsedMs
     const dt = Math.min(delta, 50) / 1000
     this.syncUniforms(s, cfg, now)
-    const lum = luminosity(s, cfg, now)
+    const lum = luminosity(s, cfg, now) * (this.cosmos?.lum ?? 1)
     this.hole = { x: s.layout.hx, y: s.layout.hy, lum }
     const shadow = SHADOW_RS * s.rs * UNIT
-    if (this.halo) this.halo.setDisplaySize(shadow * HALO_EDGE * 2, shadow * HALO_EDGE * 2).setAlpha(Math.min(0.5, 0.1 * Math.sqrt(lum)))
+    if (this.halo) this.halo.setDisplaySize(shadow * HALO_EDGE * 2, shadow * HALO_EDGE * 2).setAlpha(Math.min(0.5, 0.1 * Math.sqrt(lum))).setTint(this.diskTint)
     this.stepDust(s, cfg, v.lens.screen, dt, lum)
     this.stepStreams(s, now)
     this.stepMeteor(v, s, cfg, now, lum)
   }
 
-  /** 单位朝黑洞的一侧受吸积盘的暖光，背面偏冷：主光换成黑洞的方向，离得越近、黑洞越亮，暖光补得越多 */
+  /** 单位朝黑洞的一侧受吸积盘的光：主光换成黑洞的方向，离得越近、黑洞越亮，补光越多；附近炸了超新星时，比盘光亮就换成它的光 */
   lightAt(x: number, y: number, out: LocalLight): void {
     const h = this.hole
     if (!h) return
@@ -315,11 +365,26 @@ export class NebulaView extends BoundedView {
     if (d <= 0) return
     out.kx = out.fx = dx / d
     out.ky = out.fy = dy / d
-    out.color = DISK_LIGHT
+    out.color = this.diskTint
     out.fill = Math.min(1, diskLight(h.lum, d / UNIT)) * DISK_ON_BODY
+    const f = this.burst
+    const c = this.center
+    if (!f || !c) return
+    const fx = (c.x - x) / UNIT + f.x
+    const fy = (c.y - y) / UNIT + f.y
+    const fd = Math.hypot(fx, fy)
+    const fill = Math.min(FLASH_MAX, (f.power * FLASH_ON_BODY) / (fd * fd + f.z * f.z + 1))
+    if (fill <= out.fill || fd <= 0) return
+    out.fx = fx / fd
+    out.fy = fy / fd
+    out.color = rgbInt(f.color)
+    out.fill = fill
   }
 
-  /** 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。离黑洞或飞过的流星越近被照得越亮 */
+  /**
+   * 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。
+   * 它自己不发光，反射照到它身上的光：吸积盘、星云里的星与超新星、飞过的流星，离谁近就带着谁的颜色、被照得越亮
+   */
   private stepDust(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, screen: Screen, dt: number, lum: number): void {
     const g = this.dustGfx!
     g.clear()
@@ -328,6 +393,8 @@ export class NebulaView extends BoundedView {
     const mw = this.u.meteor[3]! * this.u.meteor[2]!
     const mx = L.cx + this.u.meteor[0]! * UNIT
     const my = L.cy + this.u.meteor[1]! * UNIT
+    const lights = this.cosmos?.lights ?? []
+    const disk = this.disk
     for (let i = 0; i < this.dust.length; i++) {
       let p = this.dust[i]!
       let left = dt
@@ -346,23 +413,37 @@ export class NebulaView extends BoundedView {
         p = this.speck(s, cfg, screen, false)
         this.dust[i] = p
       }
-      const dU = Math.hypot(p.x - L.hx, p.y - L.hy) / UNIT
+      const kd = diskLight(lum, Math.hypot(p.x - L.hx, p.y - L.hy) / UNIT)
       const dm = Math.hypot(p.x - mx, p.y - my) / UNIT
-      const light = Math.min(1, diskLight(lum, dU) + (mw * 2) / (dm * dm + 1))
+      const km = (mw * 2) / (dm * dm + 1)
+      let r = disk[0] * kd + km
+      let gr = disk[1] * kd + km * 0.62
+      let b = disk[2] * kd + km * 0.4
+      const ox = (p.x - L.cx) / UNIT
+      const oy = (p.y - L.cy) / UNIT
+      for (const l of lights) {
+        const k = (l.power * STAR_ON_DUST) / ((ox - l.x) ** 2 + (oy - l.y) ** 2 + l.z * l.z + 1)
+        r += l.color[0] * k
+        gr += l.color[1] * k
+        b += l.color[2] * k
+      }
+      const peak = Math.max(r, gr, b)
+      const light = Math.min(1, peak) * p.albedo
+      const tint = peak > 0 ? rgbInt([r / peak, gr / peak, b / peak]) : this.diskTint
       const sp = Math.hypot(p.vx, p.vy)
       const tail = Math.min(sp * 0.045, 1.6 * UNIT)
       const alpha = Math.min(0.85, 0.12 + 0.75 * light)
       const across = p.size * (1 + light)
-      g.lineStyle(across, p.tint, (alpha * across) / (across + tail))
+      g.lineStyle(across, tint, (alpha * across) / (across + tail))
       if (tail > 1) g.lineBetween(p.x - (p.vx / sp) * tail, p.y - (p.vy / sp) * tail, p.x, p.y)
       else {
-        g.fillStyle(p.tint, alpha)
+        g.fillStyle(tint, alpha)
         g.fillCircle(p.x, p.y, p.size * (1 + light) * 0.8)
       }
     }
   }
 
-  /** 被吞的身体拉成细流，绕着黑洞转进视界；越靠近视界引力红移越重，越暗 */
+  /** 被吞的身体拉成细流，绕着黑洞转进视界，被加热得跟吸积盘一样亮；越靠近视界引力红移越重，越暗 */
   private stepStreams(s: NebulaState, now: number): void {
     const g = this.streamGfx!
     for (const e of s.swallows.splice(0)) {
@@ -392,7 +473,7 @@ export class NebulaView extends BoundedView {
         const p0 = at(u0)
         const p1 = at(u1)
         const redshift = (1 - rh / radius((u0 + u1) / 2)) ** 2
-        g.lineStyle(width * (0.4 + (0.6 * k) / 10), 0xffd2a0, (1 - t) * ((k + 1) / 10) * 0.9 * redshift)
+        g.lineStyle(width * (0.4 + (0.6 * k) / 10), this.diskTint, (1 - t) * ((k + 1) / 10) * 0.9 * redshift)
         g.lineBetween(p0.x, p0.y, p1.x, p1.y)
       }
     }
@@ -512,6 +593,9 @@ export class NebulaView extends BoundedView {
   destroy(v: ViewCtx): void {
     this.painter?.close()
     this.painter = undefined
+    this.cosmos = undefined
+    this.burst = undefined
+    this.center = undefined
     super.destroy(v)
     this.dust = []
     this.streams = []
@@ -527,6 +611,6 @@ export class NebulaView extends BoundedView {
     this.wake = undefined
     this.sparks = undefined
     this.debris = undefined
-    if (v.scene.textures.exists(NEBULA_SHEET_KEY)) v.scene.textures.remove(NEBULA_SHEET_KEY)
+    for (const key of [NEBULA_SHEET_KEY, NEBULA_REMNANT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }
