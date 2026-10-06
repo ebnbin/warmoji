@@ -105,7 +105,7 @@ void main ()
   float cloud = smoothstep(0.38, 0.78, bank * 0.6 + wisp * 0.4);
   float edge = max(abs(p.x - uFrame * 0.5), abs(p.y - uFrame * 0.5)) / (uFrame * 0.5);
   float rim = smoothstep(0.7, 1.0, edge);
-  float a = cloud * mix(0.07, 0.36, water) + rim * 0.34 + 0.03;
+  float a = cloud * mix(0.07, 0.28, water) + rim * 0.34 + 0.03;
   a = clamp(a, 0.0, 0.7);
   float warm = smoothstep(0.0, 1.0, 1.0 - (p.x + p.y) / (uFrame * 2.0));
   vec3 c = mix(vec3(0.83, 0.88, 0.85), vec3(1.0, 0.93, 0.78), warm * 0.7);

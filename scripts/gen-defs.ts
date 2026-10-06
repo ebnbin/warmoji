@@ -726,6 +726,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(roomAt(plan.basin, end.x * UNIT, end.y * UNIT) > 0, `${where} 有一条栈道的尽头不在能走的地上`)
       for (const p of w.pts) need(inPond(plan, p.x, p.y) < 0, `${where} 有一条栈道铺进了水洼`)
     }
+    const pier = plan.walks.find((w) => w.pier)
+    const tip = pier?.pts[pier.pts.length - 1]
+    need(tip !== undefined && inShore(plan, tip.x, tip.y) < -1.5, `${where} 的栈桥没伸进水里`)
     for (const h of plan.hummocks) need(h.kind === 'plaza' || (inShore(plan, h.x, h.y) > h.r && inPond(plan, h.x, h.y) < -h.r * 0.5 && blobDist(h.x, h.y, h.r, h.wob, h.x, h.y) > 0), `${where} 有土墩落在了水里`)
   }
 }

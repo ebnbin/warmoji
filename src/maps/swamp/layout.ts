@@ -403,16 +403,18 @@ function tryPlan(cfg: SwampConfig, rng: Rng, seed: number): SwampPlan | null {
   const taken = [...mounds.map((m) => angleOf(m.x, m.y)), ...ponds.map((p) => angleOf(p.x, p.y))]
   let pierA = 0
   let best = -1
-  for (let k = 0; k < 24; k++) {
+  // 栈桥伸得出去（岸外留得下）的方向里，挑离土台与水洼最远的；哪个方向都伸不出去就换一组随机数
+  for (let k = 0; k < 36; k++) {
     const a = rng.next() * Math.PI * 2
-    // 离土台与水洼的方向远，岸又近（栈桥伸得出去）的方向好
-    const gap = Math.min(...taken.map((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))))) + (maxR - shoreAt(sh, a)) * 0.25
+    if (maxR - 0.5 - shoreAt(sh, a) < PIER_OUT_U) continue
+    const gap = Math.min(...taken.map((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))))
     if (gap > best) {
       best = gap
       pierA = a
     }
   }
-  const reach = Math.min(shoreAt(sh, pierA) + PIER_OUT_U, maxR - 0.8)
+  if (best < 0) return null
+  const reach = shoreAt(sh, pierA) + PIER_OUT_U
   const from = cfg.plaza.radiusU * 0.6
   const pier = layWalk(rng, cfg, { x: cx + Math.cos(pierA) * from, y: cy + Math.sin(pierA) * from }, { x: cx + Math.cos(pierA) * reach, y: cy + Math.sin(pierA) * reach }, true, breakable)
   if (!dry(pier)) return null

@@ -4,7 +4,7 @@ import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { OBSTACLES } from '../../data/obstacles'
-import { Alive, Drive, Faction, Grow, Hp, LevelUp, Motion, MOTION, Phys, Pickup, Radius, Slot, Span, Stats, Transform, Uid } from '../../ecs/components'
+import { Alive, Anchored, Drive, Faction, Grow, Hp, LevelUp, Motion, MOTION, Phys, Pickup, Radius, Slot, Span, Stats, Transform, Uid } from '../../ecs/components'
 import { bodyDt } from '../../ecs/systems/shared/body'
 import { hit } from '../../ecs/systems/shared/damage'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
@@ -117,6 +117,11 @@ export function weightOf(cfg: SwampConfig, eid: number): number {
 /** 个子大得蹚泥如走平地 */
 export function wades(cfg: SwampConfig, eid: number): boolean {
   return Radius.v[eid]! >= cfg.sink.wadeU * UNIT
+}
+
+/** 会陷进泥里的身体：有血有属性的角色与敌人；钉在原地的（不吃击退的、立着的）与召出来绕着飞的小东西不陷 */
+function sinks(sim: Sim, eid: number): boolean {
+  return hasComponent(sim.world, eid, Hp) && hasComponent(sim.world, eid, Stats) && !hasComponent(sim.world, eid, Anchored)
 }
 
 /** 陷到 d 时泥有多黏：刚沾泥到陷到困住之间按深度插，被困住时最黏 */
@@ -284,7 +289,7 @@ export const swamp: WorldHooks = {
   ...bounded,
   surface(sim, x, y, body) {
     const g = groundOf(sim)
-    if (body === undefined || !hasComponent(sim.world, body, Faction)) return g
+    if (body === undefined || !hasComponent(sim.world, body, Faction) || !sinks(sim, body)) return g
     const cfg = cfgOf(sim)
     const s = swampOf(sim)
     if (wades(cfg, body)) return g
@@ -371,8 +376,8 @@ export const swamp: WorldHooks = {
   tick(sim, delta) {
     const cfg = cfgOf(sim)
     const s = swampOf(sim)
-    for (const eid of query(sim.world, [Faction, Phys, Transform, Radius, Alive])) {
-      if (!Alive.v[eid]) continue
+    for (const eid of query(sim.world, [Faction, Phys, Transform, Radius, Alive, Hp])) {
+      if (!Alive.v[eid] || !sinks(sim, eid)) continue
       const dt = bodyDt(sim, eid)
       if (dt > 0) sinkBody(sim, s, cfg, eid, dt)
     }
