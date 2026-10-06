@@ -204,6 +204,63 @@ export const EXPERIMENTS = {
       ],
     },
   },
+  pincer: {
+    emoji: '1f38f',
+    name: '两岸夹击',
+    desc: '五批敌人轮流从樱林、寺墙、溪岸和林缘压过来，最后一批四面合围，清完一批才来下一批；溪水挡住大半的路，桥是两岸之间的咽喉。清空全部就赢，不限时',
+    note: '清场当胜利条件、成组的敌人定好来向：节奏跟着清怪的速度走，每批之间有喘息，迎下一批之前先想好站在哪一岸',
+    team: { slots: [{ tags: ['defense'] }, { tags: ['damage', 'area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 120_000 }],
+    fight: {
+      name: '两岸夹击',
+      map: 'sakura',
+      clockSec: 90,
+      phases: [
+        {
+          intro: { title: '两岸夹击', sub: '清空五批敌人' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'blob', weight: 1 },
+            { kind: 'slime', weight: 1 },
+            { kind: 'snake', weight: 1 },
+          ],
+          spawns: [
+            {
+              kind: 'waves',
+              atMs: 3000,
+              gapMs: 2500,
+              squads: [
+                { count: 10, at: { kind: 'gate', gate: 'grove' }, banner: { title: '第一批', sub: '樱林里钻出来了' } },
+                {
+                  count: 12,
+                  mix: [
+                    { kind: 'ghost', weight: 2 },
+                    { kind: 'zombie', weight: 1 },
+                  ],
+                  at: { kind: 'gate', gate: 'wall' },
+                  banner: { title: '第二批', sub: '翻过寺墙来了' },
+                },
+                {
+                  count: 14,
+                  elites: 2,
+                  mix: [
+                    { kind: 'snake', weight: 2 },
+                    { kind: 'turtle', weight: 1 },
+                    { kind: 'crab', weight: 1 },
+                  ],
+                  at: { kind: 'gate', gate: 'bank' },
+                  banner: { title: '第三批', sub: '从溪里爬上岸，带着精英' },
+                },
+                { count: 18, eliteChance: 0.15, at: { kind: 'gate', gate: 'thicket' }, banner: { title: '第四批', sub: '林缘一圈都是' } },
+                { count: 24, elites: 3, spreadMs: 3000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '四面合围' } },
+              ],
+            },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      ],
+    },
+  },
   circumnavigate: {
     emoji: '1f9ed',
     name: '环游沙海',
@@ -276,7 +333,7 @@ export const EXPERIMENTS = {
   sandHunt: {
     emoji: '1f43e',
     name: '沙海追猎',
-    desc: '三名悬赏目标在沙海里逃窜：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
+    desc: '两名怪盗在沙海里逃窜，第 30 秒又追加一名狼骑：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
     note: '环面上的追逐：逃跑的目标永远有路可走，追不上就只能抄近路截它',
     team: { slots: [{ tags: ['mobile', 'damage'] }, { tags: ['ranged'] }, { tags: ['control'] }], level: 2 },
     stars: [{ kind: 'time', ms: 80_000 }, { kind: 'downs', count: 0 }],
@@ -297,14 +354,51 @@ export const EXPERIMENTS = {
             {
               kind: 'batch',
               atMs: 2000,
-              squad: { count: 3, enemy: 'raccoon', elites: 3, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
-              banner: { title: '悬赏发布', sub: '三名怪盗在沙海里逃窜' },
+              squad: { count: 2, enemy: 'raccoon', elites: 2, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '悬赏发布', sub: '两名怪盗在沙海里逃窜' },
+            },
+            {
+              kind: 'batch',
+              atMs: 30_000,
+              squad: { count: 1, enemy: 'knight', elites: 1, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '追加悬赏', sub: '一名狼骑也上了榜' },
             },
           ],
           ends: [
             { kind: 'bounty' },
             { kind: 'time', ms: 120_000, lose: true },
           ],
+        },
+      ],
+    },
+  },
+  bareHands: {
+    emoji: '270a',
+    name: '赤手空拳',
+    desc: '不能放主动技能，只剩普攻、走位和换人；第 30 到 50 秒怪一下子多起来，丘顶还会翻下一群。沙丘坡度耗体力，踩着脚印走省力，撑过 75 秒',
+    note: '把技能锁住：打法只剩走位和站位，沙丘、脚印和首尾相接的沙海就是手里仅有的工具',
+    team: { slots: [{ tags: ['damage'] }, { tags: ['defense'] }, { tags: ['mobile'] }], level: 2 },
+    stars: [{ kind: 'switches', count: 0 }, { kind: 'downs', count: 0 }],
+    fight: {
+      name: '赤手空拳',
+      map: 'desert',
+      clockSec: 90,
+      rules: { skills: false },
+      phases: [
+        {
+          intro: { title: '赤手空拳', sub: '不能放主动技能，撑过 75 秒' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'locust', weight: 2 },
+            { kind: 'snake', weight: 1 },
+            { kind: 'skeleton', weight: 1 },
+          ],
+          spawns: [
+            { kind: 'stream', intervalMul: 1.3 },
+            { kind: 'stream', fromMs: 30_000, untilMs: 50_000, intervalMul: 1 },
+            { kind: 'batch', atMs: 40_000, squad: { count: 8, eliteChance: 0.2, at: { kind: 'gate', gate: 'crest' } }, banner: { title: '丘顶', sub: '一群从沙丘顶上翻下来' } },
+          ],
+          ends: [{ kind: 'time', ms: 75_000 }],
         },
       ],
     },
@@ -416,6 +510,34 @@ export const EXPERIMENTS = {
       ],
     },
   },
+  slowSwap: {
+    emoji: '1f40a',
+    name: '换人要等',
+    desc: '深海自己的头目巨鳄从陡坎下翻上来，打倒它；换队长要冷却 8 秒，离开潜艇门口就得憋气，谁在前面顶着、什么时候换下来喘口气都得算好',
+    note: '换人冷却让「轮着换人放技能」变成要算计的事；头目战加上换气点，站位和换人一起被地图卡住',
+    team: { slots: [{ tags: ['defense'] }, { tags: ['damage', 'ranged'] }, { tags: ['support'] }, { tags: ['damage'] }], level: 3 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 90_000 }],
+    fight: {
+      name: '换人要等',
+      map: 'deep',
+      clockSec: 120,
+      rules: { leader: { switchCdMs: 8000 } },
+      phases: [
+        {
+          mix: [
+            { kind: 'zombie', weight: 2 },
+            { kind: 'puffer', weight: 1 },
+            { kind: 'snake', weight: 1 },
+          ],
+          spawns: [
+            { kind: 'stream', intervalMs: 2500 },
+            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'croc', at: { kind: 'gate', gate: 'abyss' } }, banner: { title: '巨鳄', sub: '深海的头目翻上来了' } },
+          ],
+          ends: [{ kind: 'boss' }],
+        },
+      ],
+    },
+  },
   demolition: {
     emoji: '1f3d7',
     name: '拆迁',
@@ -452,7 +574,7 @@ export const EXPERIMENTS = {
     desc: '塔楼是院落一角最高的一间：队长在塔楼里累计站满 45 秒；怪物从门洞涌进来，石像鬼和骷髅兵还会翻墙',
     note: '把据点放进墙里：高墙挡子弹也挡视线，守的是门口，翻墙进来的却从背后落下',
     team: { slots: [{ tags: ['defense'] }, { tags: ['area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
-    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 80_000 }],
+    stars: [{ kind: 'switches', count: 0 }, { kind: 'time', ms: 80_000 }],
     fight: {
       name: '守塔',
       map: 'ruins',
@@ -502,6 +624,49 @@ export const EXPERIMENTS = {
           spawns: [{ kind: 'stream', intervalMs: 700 }],
           cues: [{ cue: 'quake', atMs: 4000, every: 6000 }],
           ends: [{ kind: 'time', ms: 70_000 }],
+        },
+      ],
+    },
+  },
+  rubbleRescue: {
+    emoji: '26d1',
+    name: '废墟救援',
+    desc: '五轮敌人轮番上阵，最后一轮暴龙亲自撞进来，余震一阵接一阵：倒下的队员不会自己起来，队长到身边站 2.5 秒才扶得起，军医的急救包也能救；全队累计倒下 4 次就输',
+    note: '倒下不再是等时间：扶人要顶着火力和落石，能倒下的次数有限，减员成了要管的资源',
+    team: { slots: ['medic', 'guard', { tags: ['area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
+    stars: [{ kind: 'downs', count: 1 }, { kind: 'time', ms: 150_000 }],
+    fight: {
+      name: '废墟救援',
+      map: 'ruins',
+      clockSec: 90,
+      rules: { revive: false, rescue: { ms: 2500, radius: 1.2 } },
+      phases: [
+        {
+          intro: { title: '废墟救援', sub: '倒下要队长去扶，累计倒下 4 次就输' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'skeleton', weight: 2 },
+            { kind: 'knight', weight: 1 },
+          ],
+          spawns: [
+            {
+              kind: 'waves',
+              atMs: 3000,
+              gapMs: 3000,
+              squads: [
+                { count: 8, banner: { title: '第一轮', sub: '热身' } },
+                { count: 12, elites: 1, banner: { title: '第二轮', sub: '来了个精英' } },
+                { count: 14, eliteChance: 0.1, banner: { title: '第三轮', sub: '越来越多' } },
+                { count: 10, elites: 3, banner: { title: '第四轮', sub: '精英小队' } },
+                { count: 1, enemy: 'rhino', stats: { mul: { maxHp: 0.4 } }, banner: { title: '最后一轮', sub: '暴龙撞进来了' } },
+              ],
+            },
+          ],
+          cues: [{ cue: 'quake', atMs: 8000, every: 10_000 }],
+          ends: [
+            { kind: 'cleared' },
+            { kind: 'downs', count: 4 },
+          ],
         },
       ],
     },
@@ -601,6 +766,39 @@ export const EXPERIMENTS = {
       ],
     },
   },
+  darkAmbush: {
+    emoji: '1f440',
+    name: '暗处伏击',
+    desc: '入夜的晶洞里，敌人不打预兆，一阵阵直接冒在队伍四周和身后，火把照不到的地方冒出来之前什么都看不见；清完最后一阵就赢',
+    note: '刷怪位置与预兆当变量：敌人不再从远处走来，也不提前示警，考验被包围时的反应',
+    team: { slots: [{ tags: ['area'] }, { tags: ['control'] }, { tags: ['defense'] }], level: 2 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 55_000 }],
+    fight: {
+      name: '暗处伏击',
+      map: 'amethyst',
+      clockSec: 70,
+      rules: { surprise: true },
+      phases: [
+        {
+          intro: { title: '暗处伏击', sub: '当心四周和身后' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'skeleton', weight: 2 },
+            { kind: 'chameleon', weight: 1 },
+            { kind: 'rat', weight: 1 },
+          ],
+          spawns: [
+            { kind: 'batch', atMs: 3000, squad: { count: 8, at: { kind: 'ring', dist: 4 } }, banner: { title: '包围', sub: '敌人从暗处冒出来' } },
+            { kind: 'batch', atMs: 11_000, squad: { count: 6, eliteChance: 0.3, at: { kind: 'behind', dist: 3 } }, banner: { title: '背后！', sub: '有东西摸到了身后' } },
+            { kind: 'batch', atMs: 19_000, squad: { count: 12, elites: 1, at: { kind: 'ring', dist: 5 } }, banner: { title: '再次包围', sub: '圈子更大了' } },
+            { kind: 'batch', atMs: 27_000, squad: { count: 8, elites: 2, at: { kind: 'behind', dist: 3 } }, banner: { title: '背后！', sub: '精英摸上来了' } },
+            { kind: 'batch', atMs: 35_000, squad: { count: 18, eliteChance: 0.2, spreadMs: 1500, at: { kind: 'ring', dist: 6 } }, banner: { title: '最后的合围', sub: '清掉它们' } },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      ],
+    },
+  },
   iceShove: {
     emoji: '1f9ca',
     name: '推下海',
@@ -690,6 +888,42 @@ export const EXPERIMENTS = {
       ],
     },
   },
+  ironIce: {
+    emoji: '26f8',
+    name: '冰上铁人',
+    desc: '撑过 60 秒，谁都不许倒下，被打倒、掉进海里冻僵都算；敌人伤害提高三成，身上带光圈的敌人陆续上场：打死带增益的掉下好东西，打死带减益的掉下的别让队长踩上去',
+    note: '倒下即负：从「打得快」变成「不失误」，冰面打滑、阵风推人，护住脆皮比输出更要紧',
+    team: { slots: [{ tags: ['defense'] }, { tags: ['support'] }, { tags: ['damage', 'ranged'] }], level: 2 },
+    stars: [{ kind: 'kills', count: 60 }, { kind: 'skills', count: 0 }],
+    fight: {
+      name: '冰上铁人',
+      map: 'floe',
+      clockSec: 90,
+      enemyMods: { mul: { damage: 1.3 } },
+      phases: [
+        {
+          intro: { title: '冰上铁人', sub: '撑过 60 秒，谁都不许倒下' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'boar', weight: 1 },
+            { kind: 'snake', weight: 1 },
+            { kind: 'blob', weight: 1 },
+          ],
+          spawns: [
+            { kind: 'stream', intervalMs: 1300 },
+            { kind: 'batch', atMs: 5000, squad: { count: 2, carry: 'buff' }, banner: { title: '带增益的敌人', sub: '打死它们，让队长去捡' } },
+            { kind: 'batch', atMs: 18_000, squad: { count: 2, carry: 'debuff' }, banner: { title: '带减益的敌人', sub: '打死它们掉下的别去踩' } },
+            { kind: 'batch', atMs: 32_000, squad: { count: 2, carry: 'buff' } },
+            { kind: 'batch', atMs: 45_000, squad: { count: 2, carry: 'debuff' } },
+          ],
+          ends: [
+            { kind: 'time', ms: 60_000 },
+            { kind: 'downs', count: 1 },
+          ],
+        },
+      ],
+    },
+  },
   lavaLure: {
     emoji: '1f525',
     name: '引火烧身',
@@ -768,7 +1002,7 @@ export const EXPERIMENTS = {
     desc: '在每一个喷气孔上站满 3 秒，火山怪会从喷气孔里钻出来；第 20 秒火山喷发，熔岩顺着地势漫下来，可能正好淹过还没去的那几个',
     note: '到访当目标、地图改写路线：熔岩会封住一些去处，又在凉透后重新放行，先去哪个得看熔岩往哪流',
     team: { slots: [{ tags: ['mobile'] }, { tags: ['defense'] }, { tags: ['area'] }], level: 2 },
-    stars: [{ kind: 'time', ms: 60_000 }, { kind: 'hazard', by: 'lava', damage: 0 }],
+    stars: [{ kind: 'time', ms: 60_000 }, { kind: 'skills', count: 0 }],
     fight: {
       name: '喷气孔巡查',
       map: 'volcano',
@@ -1049,6 +1283,36 @@ export const EXPERIMENTS = {
       ],
     },
   },
+  elitePatrol: {
+    emoji: '1f46e',
+    name: '精英巡逻',
+    desc: '场上最多六只敌人，但只只都是精英，你不在的房间里的会坐班车追过来；队伍伤害提高两成半，两分钟内击杀 20 只',
+    note: '数量少、质量高：全员精英加场上上限，换掉了割草的节奏；四间房和传送台让你挑在哪儿接战',
+    team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['support'] }], level: 3 },
+    stars: [{ kind: 'time', ms: 90_000 }, { kind: 'downs', count: 0 }],
+    fight: {
+      name: '精英巡逻',
+      map: 'warp',
+      clockSec: 70,
+      rules: { mods: { mul: { damage: 1.25 } } },
+      phases: [
+        {
+          intro: { title: '精英巡逻', sub: '只只都是精英，击杀 20 只' },
+          mix: [
+            { kind: 'alien', weight: 2 },
+            { kind: 'ghost', weight: 2 },
+            { kind: 'gargoyle', weight: 1 },
+            { kind: 'turtle', weight: 1 },
+          ],
+          spawns: [{ kind: 'stream', intervalMs: 1800, eliteChance: 1, cap: 6 }],
+          ends: [
+            { kind: 'kills', count: 20 },
+            { kind: 'time', ms: 120_000, lose: true },
+          ],
+        },
+      ],
+    },
+  },
   sterile: {
     emoji: '1f9eb',
     name: '无菌操作',
@@ -1229,6 +1493,37 @@ export const EXPERIMENTS = {
             { kind: 'kills', count: 8, by: 'meteor' },
             { kind: 'time', ms: 120_000, lose: true },
           ],
+        },
+      ],
+    },
+  },
+  eventHorizon: {
+    emoji: '1f9ff',
+    name: '视界边缘',
+    desc: '你操控的法师就是队长，不能换人，他倒下就输，被黑洞吞掉也算；所有敌人只追他，还会一阵阵围上来。撑过 60 秒',
+    note: '队长倒下就输：玩家本人成了要护住的目标；黑洞把能退的路收窄，绕着视界放风筝又会被吸过去',
+    team: { slots: ['mage', { tags: ['defense'] }, { tags: ['support'] }], level: 2 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'kills', count: 60 }],
+    fight: {
+      name: '视界边缘',
+      map: 'nebula',
+      clockSec: 60,
+      chaseLeader: true,
+      rules: { leader: { lock: true, critical: true } },
+      phases: [
+        {
+          intro: { title: '视界边缘', sub: '你倒下就输，撑过 60 秒' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'alien', weight: 2 },
+            { kind: 'chameleon', weight: 1 },
+          ],
+          spawns: [
+            { kind: 'stream', intervalMul: 1.2 },
+            { kind: 'batch', atMs: 20_000, squad: { count: 8, elites: 1, at: { kind: 'ring', dist: 5 } }, banner: { title: '合围', sub: '敌人围住了你' } },
+            { kind: 'batch', atMs: 40_000, squad: { count: 6, eliteChance: 0.15, at: { kind: 'behind', dist: 3 } }, banner: { title: '背后！', sub: '有东西摸到了身后' } },
+          ],
+          ends: [{ kind: 'time', ms: 60_000 }],
         },
       ],
     },

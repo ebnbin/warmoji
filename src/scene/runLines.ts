@@ -88,6 +88,7 @@ function phaseGoalText(p: { readonly ends: readonly Gated<EndRule>[]; readonly n
 /** 一场自己的规则：我方规则、敌人都盯着队长、过关奖励 */
 export function fightRuleLines(f: FightDef): string[] {
   const out = ruleLines(f.rules)
+  if (f.enemyMods) out.push(`敌人${modTexts(f.enemyMods).join('、')}`)
   if (f.chaseLeader) out.push('敌人都盯着队长')
   const reward = rewardText(f.reward)
   if (reward) out.push(reward)
