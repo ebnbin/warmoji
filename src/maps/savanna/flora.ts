@@ -89,14 +89,16 @@ export function crownColor(plates: readonly Plate[], seed: number, x: number, y:
     const sy = y + L.y * 0.35
     if (Math.hypot(sx - p.x, sy - p.y) < p.r * 0.92) shade = Math.max(shade, 0.65)
   }
-  const q = cellNearest(x * 3.2, y * 3.2, seed + 13)
-  const clump = clamp01(0.5 + (q.dx * L.x + q.dy * L.y) * 1.6) * smooth(0.75, 0.2, Math.hypot(q.dx, q.dy))
-  const leaf = (0.72 + 0.32 * clump) * (0.84 + 0.3 * valueNoise(x * 19, y * 19, seed + 17))
+  const q = cellNearest(x * 4.5, y * 4.5, seed + 13)
+  const clump = clamp01(0.5 + (q.dx * L.x + q.dy * L.y) * 1.6)
+  const feather = valueNoise(x * 24, y * 24, seed + 17) * 0.6 + valueNoise(x * 11, y * 11, seed + 19) * 0.4
+  const gap = smooth(0.3, 0.18, feather)
+  const leaf = (0.84 + 0.16 * clump) * (0.8 + 0.34 * feather) * (1 - 0.3 * gap)
   const tier = top / Math.max(1, plates.length - 1)
   const lit = clamp01((0.5 + 0.35 * rim + 0.15 * tier) * (1 - shade))
-  out[0] = (0.2 + 0.36 * lit + 0.14 * smooth(0.65, 1, lit)) * leaf
-  out[1] = (0.25 + 0.36 * lit) * leaf
-  out[2] = (0.23 + 0.13 * lit) * leaf
+  out[0] = (0.22 + 0.38 * lit + 0.09 * smooth(0.62, 1, lit)) * leaf
+  out[1] = (0.26 + 0.36 * lit + 0.04 * smooth(0.62, 1, lit)) * leaf
+  out[2] = (0.24 + 0.1 * lit) * leaf
   return cover
 }
 
@@ -106,10 +108,10 @@ export function spiresOf(plan: SavannaPlan): Lump[] {
   plan.mounds.forEach((m, i) => {
     const rng = new Rng(plan.seed ^ (0x7e7 + i * 131))
     out.push({ x: m.x, y: m.y, r: m.r, h: m.h })
-    const n = rng.int(2, 3)
+    const n = rng.int(3, 4)
     for (let k = 0; k < n; k++) {
       const ang = rng.next() * Math.PI * 2
-      const d = m.r * (0.35 + 0.3 * rng.next())
+      const d = m.r * (0.3 + 0.35 * rng.next())
       out.push({ x: m.x + Math.cos(ang) * d, y: m.y + Math.sin(ang) * d, r: m.r * (0.4 + 0.25 * rng.next()), h: m.h * (0.45 + 0.35 * rng.next()) })
     }
   })

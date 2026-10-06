@@ -12,7 +12,8 @@ import { FRAME, FRAME_MID } from '../frame'
 import { CANOPY_PPU, GROUND_AREA, paintCrown, textureSize } from './ground'
 import { SavannaPainter } from './painter'
 import { MAX_RIPPLES, WATER_FRAG } from './shader'
-import { drawChevron, drawDust, drawHyena, drawVulture } from './critters'
+import { drawChevron, drawDust, drawHyena, drawPerched, drawVulture } from './critters'
+import { snagTwigs } from './flora'
 import { herdCenter, phaseProgress, runPath } from './herd'
 import { pondGap, pondRadius } from './layout'
 import { beastSize, savannaPlanFor } from './world'
@@ -36,6 +37,7 @@ const HYENA_KEY = 'savanna-hyena'
 const DUST_KEY = 'savanna-dust'
 const CHEVRON_KEY = 'savanna-chevron'
 const MOTE_KEY = 'savanna-mote'
+const PERCHED_KEY = 'savanna-perched'
 const crownKey = (i: number): string => `savanna-crown-${i}`
 const reflKey = (id: string): string => `savanna-refl-${id}`
 /** 开局最多几个线程分着画；贴图按这么多像素高的条分块交给线程 */
@@ -99,6 +101,7 @@ function ensureArt(scene: Phaser.Scene): void {
   if (!scene.textures.exists(HYENA_KEY)) canvasTexture(scene, HYENA_KEY, 96, 48, (ctx) => drawHyena(ctx, 96, 48))
   if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
   if (!scene.textures.exists(CHEVRON_KEY)) canvasTexture(scene, CHEVRON_KEY, 64, 64, (ctx) => drawChevron(ctx, 64))
+  if (!scene.textures.exists(PERCHED_KEY)) canvasTexture(scene, PERCHED_KEY, 64, 32, (ctx) => drawPerched(ctx, 64, 32))
   if (!scene.textures.exists(MOTE_KEY)) canvasTexture(scene, MOTE_KEY, 16, 16, (ctx) => drawDust(ctx, 16))
 }
 
@@ -120,6 +123,7 @@ export class SavannaView implements MapView {
   private refl: { img: Phaser.GameObjects.Image; readonly id: string }[] = []
   private hyenas: Hyena[] = []
   private vultures: Vulture[] = []
+  private perched: { readonly img: Phaser.GameObjects.Image; readonly x: number; readonly y: number; readonly heading: number; readonly alt: number; phase: number }[] = []
   private seen: HerdPhase = 'calm'
   private dustDebt = 0
   private cackleAt = 0
@@ -211,6 +215,7 @@ export class SavannaView implements MapView {
     this.visuals.push(this.dust)
     this.prowl(v, plan)
     this.soar(v, plan)
+    this.roost(v, plan)
     this.motes(v)
     this.cackleAt = CACKLE_MS.min
     this.seen = st.herd.phase
@@ -309,6 +314,19 @@ export class SavannaView implements MapView {
         alt: VULTURE.altM[0] + Math.random() * (VULTURE.altM[1] - VULTURE.altM[0]),
         img,
       })
+    }
+  }
+
+  /** 枯树上歇着的两只秃鹫：落在最外头的枝梢上，脸朝外 */
+  private roost(v: ViewCtx, plan: SavannaPlan): void {
+    const twigs = snagTwigs(plan).filter((t) => t.w < 0.06)
+    const picks = [twigs[Math.floor(twigs.length * 0.2)], twigs[Math.floor(twigs.length * 0.7)]]
+    for (const t of picks) {
+      if (!t) continue
+      const heading = Math.atan2(t.by - t.ay, t.bx - t.ax)
+      const img = v.scene.add.image(t.bx * UNIT, t.by * UNIT, PERCHED_KEY).setDepth(DEPTH.canopy + 0.1).setDisplaySize(0.75 * UNIT, 0.38 * UNIT).setRotation(heading)
+      this.visuals.push(img)
+      this.perched.push({ img, x: t.bx * UNIT, y: t.by * UNIT, heading, alt: t.bz, phase: Math.random() * 10 })
     }
   }
 
@@ -566,10 +584,17 @@ export class SavannaView implements MapView {
     }
   }
 
-  /** 秃鹫：慢慢绕大圈，翅膀几乎不动，偶尔微微侧一下；影子按高度落在背着太阳的地方 */
+  /** 秃鹫：慢慢绕大圈，翅膀几乎不动，偶尔微微侧一下；影子按高度落在背着太阳的地方。枯树上的两只隔一阵转转头 */
   private stepVultures(v: ViewCtx, dt: number): void {
     const g = this.shadows!
     const mpu = v.def.savanna!.shadowUPerM
+    for (const p of this.perched) {
+      p.phase += dt
+      const look = Math.sin(p.phase * 0.7) > 0.6 ? Math.sin(p.phase * 3) * 0.5 : 0
+      p.img.setRotation(p.heading + look)
+      g.fillStyle(0x1a0c22, 0.2)
+      g.fillEllipse(p.x + AWAY.x * p.alt * mpu * UNIT, p.y + AWAY.y * p.alt * mpu * UNIT, 0.6 * UNIT, 0.3 * UNIT)
+    }
     for (const b of this.vultures) {
       b.a += b.rate * dt
       const x = b.cx + Math.cos(b.a) * b.r
@@ -600,6 +625,7 @@ export class SavannaView implements MapView {
     this.refl = []
     this.hyenas = []
     this.vultures = []
+    this.perched = []
     this.lanes = undefined
     this.shadows = undefined
     this.dust = undefined

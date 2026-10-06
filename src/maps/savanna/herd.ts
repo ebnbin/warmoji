@@ -68,7 +68,7 @@ const between = (rng: Rng, r: readonly [number, number]): number => r[0] + rng.n
 /** 水边 b 喝水的地方，像素：岸在 ang 方向上，往外让出它的半径 */
 function shoreSpot(plan: SavannaPlan, b: { r: number }, ang: number): Point {
   const p = plan.pond
-  const d = pondRadius(p, ang) * UNIT + b.r + 0.12 * UNIT
+  const d = pondRadius(p, ang) * UNIT + b.r + 0.3 * UNIT
   return { x: p.x * UNIT + Math.cos(ang) * d, y: p.y * UNIT + Math.sin(ang) * d }
 }
 

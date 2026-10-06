@@ -47,6 +47,8 @@ const HIT_REACH_U = 0.6
 const CROWD_U = 0.12
 /** 挨打的动物闪白多久，毫秒 */
 const FLINCH_MS = 90
+/** 惊慌涨过它，平时的动物就抬起头张望 */
+const UNEASY = 0.35
 /** 绕开动物：往前看多远（格），绕的时候离它多远（格） */
 const LOOK_U = 2.6
 const CLEAR_U = 0.35
@@ -304,7 +306,7 @@ function watchBosses(sim: Sim, s: SavannaState, cfg: SavannaConfig): void {
   }
 }
 
-/** 画兽群的实体跟上每一头：脚踩在身体中心往下一点；走着一颠一颠，吃草喝水时低头，预警时扬起头刨地，狂奔时上下窜；挨打闪白 */
+/** 画兽群的实体跟上每一头：脚踩在身体中心往下一点；走着一颠一颠，吃草喝水时低头，不安时抬头张望，预警时扬起头刨地，狂奔时上下窜；挨打闪白。转角为正时朝左的头往上抬 */
 function pose(sim: Sim, s: SavannaState, cfg: SavannaConfig): void {
   const h = s.herd
   const ly = leaderY(sim)
@@ -318,7 +320,7 @@ function pose(sim: Sim, s: SavannaState, cfg: SavannaConfig): void {
     let up = 0
     if (h.phase === 'alarm') {
       const k = Math.min(1, (now - h.at) / 300)
-      rot = (0.16 * k + Math.sin(now / 38 + i) * 0.035) * b.face
+      rot = -(0.16 * k + Math.sin(now / 38 + i) * 0.035) * b.face
       up = Math.abs(Math.sin(now / 90 + i * 1.7)) * 0.08 * UNIT
     } else if (sp > 2) {
       rot = Math.sin(t * Math.PI * 2) * 0.05
@@ -326,9 +328,12 @@ function pose(sim: Sim, s: SavannaState, cfg: SavannaConfig): void {
     } else if (sp > 0.1) {
       rot = Math.sin(t * Math.PI * 2) * 0.025
       up = Math.abs(Math.sin(t * Math.PI * 2)) * 0.035 * UNIT
+    } else if (h.phase === 'calm' && h.fear >= UNEASY) {
+      // 不安了：抬起头来张望，不吃也不喝
+      rot = -(0.05 + 0.03 * Math.sin(now / 400 + i * 2)) * b.face
     } else {
       const low = b.drink ? 0.11 : 0.05 * (0.5 + 0.5 * Math.sin(t * 0.7 + i))
-      rot = -low * b.face + Math.sin(t * 1.3) * 0.01
+      rot = low * b.face + Math.sin(t * 1.3) * 0.01
     }
     Transform.x[eid] = b.x
     Transform.y[eid] = b.y + b.r * FOOT - (size * ART) / 2

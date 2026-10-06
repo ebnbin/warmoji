@@ -326,7 +326,7 @@ const PATH = [0.74, 0.6, 0.47] as const
 const DRY_MUD = [0.7, 0.6, 0.5] as const
 const CRACK = [0.3, 0.24, 0.21] as const
 const WET_MUD = [0.3, 0.24, 0.21] as const
-const GRANITE = [0.8, 0.71, 0.63] as const
+const GRANITE = [0.86, 0.77, 0.68] as const
 const LICHEN = [0.82, 0.62, 0.28] as const
 const LATERITE = [0.8, 0.5, 0.34] as const
 const THORN = [0.33, 0.36, 0.25] as const
@@ -375,12 +375,12 @@ function grass(sc: PaintScene, x: number, y: number, tall: number): void {
   if (here > 0) {
     const lit = clamp01(0.55 + (TUFT.u * L.x + TUFT.v * L.y) * 0.8)
     const tip = 0.78 + 0.3 * lit + 0.12 * blade2
-    mixc(RGB, [STRAW[0] * tip * 1.06, STRAW[1] * tip, STRAW[2] * tip * 0.86], here * 0.35, RGB)
+    mixc(RGB, [STRAW[0] * tip * 1.06, STRAW[1] * tip, STRAW[2] * tip * 0.86], here * 0.22, RGB)
     TMP[0] = TUFT.u
     TMP[1] = TUFT.v
   }
   const under = tussock(seed, x - AWAY.x * 0.2, y - AWAY.y * 0.2, dens)
-  TUFT.shade = under * (1 - here) * 0.45
+  TUFT.shade = under * (1 - here) * 0.32
 }
 
 /** 水面底下：黄昏的天映在水里，中间是丁香紫，往暗处是深紫，靠岸的浅水透着泥 */
@@ -449,7 +449,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           grass(sc, x, y, tall)
           tuftShade = TUFT.shade
           if (TUFT.cover > 0) {
-            const k = TUFT.cover * 0.6
+            const k = TUFT.cover * 0.35
             nx += TUFT.u * k
             ny += TUFT.v * k
           }
@@ -576,19 +576,21 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           const dy = (y - m.y) / m.r
           const d = Math.hypot(dx, dy) || 1e-6
           const ang = Math.atan2(dy, dx)
-          const flute = Math.sin(ang * 11 + fbm(x * 2.5, y * 2.5, seed + 89, 2) * 5)
-          // 圆锥的侧面：顶上陡、脚下缓；竖棱让法线左右偏一点
+          // 圆锥的侧面：顶上陡、脚下缓；身上一个个土疙瘩，雨水冲出的几道浅沟
+          const bx = fbm(x * 3.2, y * 3.2, seed + 89, 3) - 0.5
+          const by = fbm(x * 3.2 + 7.7, y * 3.2, seed + 89, 3) - 0.5
+          const flute = Math.sin(ang * 6 + bx * 6) * 0.5
           const slope = 0.45 + 0.9 * (1 - d)
-          nx = (dx / d) * slope - (dy / d) * flute * 0.22
-          ny = (dy / d) * slope + (dx / d) * flute * 0.22
+          nx = (dx / d) * slope + bx * 1.1 - (dy / d) * flute * 0.18
+          ny = (dy / d) * slope + by * 1.1 + (dx / d) * flute * 0.18
           nz = 1
-          const tone = 0.88 + 0.16 * valueNoise(x * 10, y * 10, seed + 97) + 0.06 * flute
+          const tone = 0.92 + 0.1 * valueNoise(x * 6, y * 6, seed + 97) + 0.05 * flute + 0.12 * (1 - d)
           mixc(LATERITE, SOIL, smooth(0.2, 0.95, d) * 0.45, RGB)
           RGB[0] = RGB[0]! * tone
           RGB[1] = RGB[1]! * tone
           RGB[2] = RGB[2]! * tone
           const vent = cellNearest(x * 5, y * 5, seed + 101)
-          if (d < 0.5 && vent.h < 0.35 && Math.hypot(vent.dx, vent.dy) < 0.13) {
+          if (d < 0.32 && vent.h < 0.2 && Math.hypot(vent.dx, vent.dy) < 0.1) {
             RGB[0] = RGB[0]! * 0.3
             RGB[1] = RGB[1]! * 0.25
             RGB[2] = RGB[2]! * 0.25
@@ -614,6 +616,11 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         g = RGB[1]!
         b = RGB[2]!
       }
+      // 低低的太阳那一边的空气暖一些、亮一些，背着它的那一边透着暮色的紫
+      const hz = ((x - FRAME_U / 2) * L.x + (y - FRAME_U / 2) * L.y) / (Math.hypot(L.x, L.y) * FRAME_U * 0.5)
+      r *= 1 + 0.1 * hz
+      g *= 1 + 0.05 * hz
+      b *= 1 - 0.03 * hz
       if (gloss > 0) {
         // 湿泥映着天：粉紫的一层亮
         const sheen = gloss * (0.28 + 0.25 * fbm(x * 0.7, y * 0.7, seed + 107, 2)) * (1 - shadow * 0.5)
@@ -690,9 +697,9 @@ export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         if (cov <= 0) continue
         const side = clamp01(0.55 + 0.45 * (1 - s.d / Math.max(ww, 1e-3)))
         const tone = 0.62 + 0.3 * side + 0.08 * valueNoise(x * 20, y * 20, seed + 227)
-        r = r * (1 - cov) + 0.66 * tone * cov
-        g = g * (1 - cov) + 0.6 * tone * cov
-        b = b * (1 - cov) + 0.52 * tone * cov
+        r = r * (1 - cov) + 0.9 * tone * cov
+        g = g * (1 - cov) + 0.84 * tone * cov
+        b = b * (1 - cov) + 0.76 * tone * cov
         a = Math.max(a, cov)
       }
       const lightR = SKY_RGB[0] * AMBIENT + SUN_RGB[0] * DIRECT * L.z

@@ -48,6 +48,42 @@ export function drawVulture(ctx: CanvasRenderingContext2D, w: number, h: number)
   ctx.fill()
 }
 
+/** 歇在枯枝上的秃鹫：翅膀收拢成一个长长的背，颈上一圈浅色的翎，光秃的小脑袋粉灰 */
+export function drawPerched(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const cx = w * 0.5
+  const cy = h * 0.5
+  const g = ctx.createLinearGradient(cx - w * 0.4, cy - h * 0.4, cx + w * 0.3, cy + h * 0.4)
+  g.addColorStop(0, '#6b5444')
+  g.addColorStop(1, '#2d211b')
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.moveTo(cx - w * 0.42, cy)
+  ctx.quadraticCurveTo(cx - w * 0.2, cy - h * 0.36, cx + w * 0.12, cy - h * 0.3)
+  ctx.quadraticCurveTo(cx + w * 0.24, cy, cx + w * 0.12, cy + h * 0.3)
+  ctx.quadraticCurveTo(cx - w * 0.2, cy + h * 0.36, cx - w * 0.42, cy)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(160, 130, 105, 0.6)'
+  ctx.lineWidth = h * 0.05
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(cx - w * 0.3, cy + s * h * 0.08)
+    ctx.quadraticCurveTo(cx - w * 0.05, cy + s * h * 0.2, cx + w * 0.08, cy + s * h * 0.16)
+    ctx.stroke()
+  }
+  ctx.fillStyle = '#e4d6c6'
+  ctx.beginPath()
+  ctx.ellipse(cx + w * 0.17, cy, w * 0.08, h * 0.2, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#c99a86'
+  ctx.beginPath()
+  ctx.ellipse(cx + w * 0.3, cy, w * 0.08, h * 0.11, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#4a3a30'
+  ctx.beginPath()
+  ctx.ellipse(cx + w * 0.39, cy, w * 0.04, h * 0.05, 0, 0, Math.PI * 2)
+  ctx.fill()
+}
+
 /** 鬣狗：前高后低的身子，肩宽、腰细、屁股窄；沙黄的毛上一块块深褐的斑，脊背上一溜深色的鬃，圆耳朵，短尾巴是黑的 */
 export function drawHyena(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const cx = w * 0.5

@@ -69,8 +69,12 @@ void main ()
   vec2 s = normalize(uSun);
   float band = dot(q, vec2(-s.y, s.x)) / R;
   float lane = exp(-band * band * 6.0) * smoothstep(-1.1, 0.2, dot(q, s) / R);
-  float spark = hash(floor(g * 9.0) + floor(uTime * 3.0 + hash(floor(g * 9.0)) * 3.0));
-  float glint = lane * smoothstep(0.84, 0.97, spark) * (0.55 + 0.45 * crest);
+  // 碎金是一粒粒圆的亮点，各自按自己的节拍一闪
+  vec2 cellG = floor(g * 7.0);
+  vec2 center = (cellG + 0.25 + 0.5 * vec2(hash(cellG + 3.1), hash(cellG + 7.7))) / 7.0;
+  float tw = 0.5 + 0.5 * sin(uTime * (2.0 + 3.0 * hash(cellG)) + hash(cellG + 1.3) * 6.28);
+  float dot0 = smoothstep(0.035, 0.0, length(g - center)) * step(0.45, hash(cellG + 9.1));
+  float glint = lane * dot0 * tw * (0.6 + 0.4 * crest) * 1.4;
   col += vec3(1.0, 0.86, 0.6) * glint;
   a += glint;
   col += vec3(1.0, 0.8, 0.7) * lane * 0.1;

@@ -137,7 +137,7 @@ function makeKopje(cfg: SavannaConfig, rng: Rng, e: EdgeShape, start: Point): Ko
       const rb = between(rng, k.boulderU) * (1 + 0.25 * row) * (0.6 + 0.4 * bell)
       const ab = a + ((rng.next() * 2 - 1) * 0.6 * r) / er
       const db = at + r * 0.4 + rb * (0.55 + row * 0.75)
-      back.push({ x: start.x + Math.cos(ab) * db, y: start.y + Math.sin(ab) * db, r: rb, h: between(rng, k.heightM) * (1 + 0.35 * row) * (0.55 + 0.45 * bell) })
+      back.push({ x: start.x + Math.cos(ab) * db, y: start.y + Math.sin(ab) * db, r: rb, h: between(rng, k.heightM) * (1 + 0.12 * row) * (0.55 + 0.45 * bell) })
     }
     const next = between(rng, k.boulderU) * (0.65 + 0.35 * bell)
     a += ((r + next) * BOULDER_OVERLAP) / Math.max(1, er - depth)
