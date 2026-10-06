@@ -186,7 +186,6 @@ export class SavannaView implements MapView {
     }
     this.reflections(v, st)
     this.water(v, plan)
-    // 跑道先整层画实，再按浓度整层叠上去：几条叠在一起的地方不会越叠越浓
     this.lanes = scene.add.graphics().setDepth(DEPTH.lane)
     this.shadows = scene.add.graphics().setDepth(-0.85)
     this.visuals.push(this.lanes, this.shadows)
@@ -404,10 +403,11 @@ export class SavannaView implements MapView {
     let n = 0
     if (show > 0) {
       const blink = h.phase === 'alarm' ? 0.75 + 0.25 * Math.sin(st.clock / 70) : 1
+      g.setAlpha(0.3 * show * blink)
       const lanes: { path: Point[]; w: number }[] = []
       h.beasts.forEach((b, i) => {
         const path = this.paths[i]
-        if (path && path.length >= 2) lanes.push({ path, w: b.r * 1.6 })
+        if (path && path.length >= 2) lanes.push({ path, w: b.r * 1.2 })
       })
       for (const l of lanes) {
         g.lineStyle(l.w + 0.18 * UNIT, 0x3a1424, 1)
@@ -420,7 +420,7 @@ export class SavannaView implements MapView {
       h.beasts.forEach((b, i) => {
         const path = this.paths[i]
         if (!path || path.length < 2) return
-        const w = b.r * 1.6
+        const w = b.r * 1.2
         // 箭头：沿着跑道往前流
         let len = 0
         const seg: number[] = [0]
