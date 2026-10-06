@@ -150,6 +150,7 @@ export class Lens {
     let cx: number
     let cy: number
     let wrap = false
+    let clip = false
     if (follow) {
       zoom = f.edge === 'frame' ? Math.max(followZoom, W / f.map.w, H / f.map.h) : followZoom
       cx = anchor.x
@@ -160,6 +161,7 @@ export class Lens {
         cy = clampSpan(cy, b.y, b.h, H / zoom)
       }
       wrap = f.edge === 'wrap' && f.tile === true
+      clip = wrap
     } else if (f.edge === 'wrap') {
       const r = f.fit ? f.map : cellOf(f.map, anchor)
       port = fitIn(area, r.w, r.h)
@@ -180,7 +182,7 @@ export class Lens {
       cx = clampSpan(cx, f.map.x, f.map.w, W / zoom)
       cy = clampSpan(cy, f.map.y, f.map.h, H / zoom)
     }
-    this.place(port, zoom, cx, cy, wrap)
+    this.place(port, zoom, cx, cy, wrap, clip)
   }
 
   /** 只让主镜头画：自己已按周期铺满一圈的东西，镜像镜头不再画一遍 */
@@ -233,7 +235,11 @@ export class Lens {
     return { x: (Math.random() * 2 - 1) * k * port.w, y: (Math.random() * 2 - 1) * k * port.h }
   }
 
-  private place(port: Port, zoom: number, cx: number, cy: number, wrap: boolean): void {
+  /**
+   * 摆好主镜头与镜像镜头。clip 为真时（平铺的图跟随时）每台镜像镜头只开在屏幕上露出那一圈副本的那一块：视野碰不到的那一圈不画，
+   * 碰到的只画露出的那一条，往外取整到整像素——多出来的那一点拍到的是方框外，什么都没有，不会盖住主镜头
+   */
+  private place(port: Port, zoom: number, cx: number, cy: number, wrap: boolean, clip: boolean): void {
     const main = this.scene.cameras.main
     setPort(main, port)
     main.setZoom(zoom)
@@ -242,11 +248,40 @@ export class Lens {
       const cams = this.scene.cameras
       if (this.mirrors.length === 0) this.mirrors = MIRRORS.map(() => cams.add(port.x, port.y, port.w, port.h))
       const m = this.framing.map
+      const vw = port.w / zoom
+      const vh = port.h / zoom
+      const vx = cx - vw / 2
+      const vy = cy - vh / 2
       this.mirrors.forEach((c, i) => {
         const [dx, dy] = MIRRORS[i]!
-        setPort(c, port)
+        if (!clip) {
+          c.setVisible(true)
+          setPort(c, port)
+          c.setZoom(zoom)
+          c.setScroll(cx + dx * m.w - port.w / 2, cy + dy * m.h - port.h / 2)
+          return
+        }
+        // 这一圈副本在世界里占的方形与视野相交的那一块，换成屏幕上的整像素
+        const x0 = Math.max(vx, m.x + dx * m.w)
+        const y0 = Math.max(vy, m.y + dy * m.h)
+        const x1 = Math.min(vx + vw, m.x + (dx + 1) * m.w)
+        const y1 = Math.min(vy + vh, m.y + (dy + 1) * m.h)
+        if (x1 <= x0 || y1 <= y0) {
+          c.setVisible(false)
+          return
+        }
+        const sx0 = Math.max(port.x, Math.floor(port.x + (x0 - vx) * zoom) - 1)
+        const sy0 = Math.max(port.y, Math.floor(port.y + (y0 - vy) * zoom) - 1)
+        const sx1 = Math.min(port.x + port.w, Math.ceil(port.x + (x1 - vx) * zoom) + 1)
+        const sy1 = Math.min(port.y + port.h, Math.ceil(port.y + (y1 - vy) * zoom) + 1)
+        const sub: Port = { x: sx0, y: sy0, w: sx1 - sx0, h: sy1 - sy0 }
+        c.setVisible(true)
+        setPort(c, sub)
         c.setZoom(zoom)
-        c.setScroll(cx + dx * m.w - port.w / 2, cy + dy * m.h - port.h / 2)
+        // 这台镜头视口正中对着的世界点，再挪回方框里那一份
+        const wx = vx + (sx0 + sub.w / 2 - port.x) / zoom - dx * m.w
+        const wy = vy + (sy0 + sub.h / 2 - port.y) / zoom - dy * m.h
+        c.setScroll(wx - sub.w / 2, wy - sub.h / 2)
       })
     } else if (this.mirrors.length > 0) {
       for (const c of this.mirrors) this.scene.cameras.remove(c)
