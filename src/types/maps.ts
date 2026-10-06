@@ -1335,7 +1335,7 @@ export interface PetriConfig {
 }
 /**
  * 舞台剧：一座剧场的舞台，台面就是战场：台口一排脚灯，台下是乐池与观众席，两边侧幕与红丝绒大幕，顶上帷幔，台后挂着画好的天幕。
- * 台上铺着画好的地布，画的都能走；台上立着布景片，挡人，高的也挡子弹和视线。隔一阵换一幕：白色聚光灯打在台上，旧布景依次吊上去，
+ * 台上铺着画好的地布，画的都能走；台上立着布景片，挡人，高的也挡子弹和视线。隔一阵换一幕：台上暗下来只留一束发白的追光，旧布景依次吊上去，
  * 地布与天幕从右往左推成新的一幅，新布景依次吊下来，落地时压着谁就把谁挤开。一幕是故事的一章，按故事的次序轮下去
  */
 export interface TheaterConfig {
@@ -1352,7 +1352,7 @@ export interface TheaterConfig {
   /** 一幕立几件布景 */
   readonly pieces: readonly [number, number]
   /**
-   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；白色聚光灯用 lightMs 亮起来（收回去也是），
+   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；台上用 lightMs 暗下来只留追光（亮回来也是），
    * 旧布景在 staggerMs 里先后起吊、每件 flyMs 吊出视线，地布与天幕用 slideMs 从右往左推成新的，新布景再照样先后吊下来
    */
   readonly turn: {

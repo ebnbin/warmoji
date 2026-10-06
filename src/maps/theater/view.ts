@@ -34,8 +34,8 @@ const BACK_KEY = 'theater-back'
 const PAINT_THREADS = 4
 const STRIP_PX = 64
 /**
- * 各层的深度：天幕、地布、幕牌、两边侧幕、落点的影子、布景投的影子、台上的布景；聚光灯照在布景上、身体下面；
- * 吊在半空的布景与吊绳在谁头上，顶上的帷幔再盖住它们
+ * 各层的深度：天幕、地布、幕牌、两边侧幕、落点的影子、布景投的影子、台上的布景；追光的白照在布景上、身体下面；
+ * 吊在半空的布景与吊绳在谁头上，顶上的帷幔再盖住它们；换幕时光圈外暗下来，盖住所有东西
  */
 const DROP_DEPTH = -0.95
 const FLOOR_DEPTH = -0.9
@@ -47,6 +47,7 @@ const STAND_DEPTH = 2.7
 const SPOT_DEPTH = 2.85
 const FLY_DEPTH = 63
 const VALANCE_DEPTH = 64
+const DARK_DEPTH = 65
 /** 影子的浓度，每米高的东西影子铺多长（格） */
 const SHADOW_ALPHA = 0.3
 const SHADOW_PER_M = STAND_U_PER_M * 0.75
@@ -66,15 +67,15 @@ const SWAY_U = 0.18
 const SWAY_MS = 260
 /** 离台面不到这么高（占吊起来的比例）就算落在台上，画在身体后面 */
 const LANDED = 0.02
-/** 白色聚光灯：一束跟着队长，几束在台上来回扫；光斑半径（格），最亮时中间盖上多浓的白，台上整体泛白多少 */
-const FOLLOW_U = 6
-const SWEEPS = [
-  { r: 8, ax: 11, ay: 7, fx: 1 / 900, fy: 1 / 1300, ph: 0 },
-  { r: 7.5, ax: 12, ay: 8, fx: 1 / 1100, fy: 1 / 800, ph: 2.1 },
-  { r: 7, ax: 10, ay: 9, fx: 1 / 1250, fy: 1 / 1000, ph: 4.2 },
-] as const
-const SPOT_MAX = 0.82
-const HAZE_MAX = 0.22
+/**
+ * 换幕时的灯：台上暗下来，只留一束追光跟着队长；追光半径、边上糊开多宽（格），光圈外最暗时多暗（不全黑）；
+ * 光圈里白得发亮，压一层多浓的白：推景时光圈里看得出在换，但白花花的不显眼
+ */
+const SPOT_U = 4.5
+const SPOT_SOFT_U = 3.5
+const DARK_MAX = 0.78
+const WASH_MAX = 0.6
+const DARK_KEY = 'theater-dark'
 const SPOT_KEY = 'theater-spot'
 const LEGS_KEY = 'theater-legs'
 const VALANCE_KEY = 'theater-valance'
@@ -175,7 +176,7 @@ function inside(poly: readonly Point[], x: number, y: number): boolean {
  * 舞台剧：地布、台板、台口、乐池、观众席与两边的幕是开局在后台线程画好的贴图；每一幕的地布画在白底上、乘到粗布上，是一张贴图；
  * 布景的正面与盒子的顶面画进每幕一张图集，按倒下的程度贴在四边形上：立着的画在身体后面，平躺的贴着页面，影子画在页面上、整层按一个浓度叠。
  * 站在立着的布景背后、被它的正面挡住的身体挪到最底下那一层，露出来的只有高过布景的那截。
- * 换幕时几束白色聚光灯打在台上，照到的地方发白；旧布景挂着吊绳一件件升进帷幔后面，地布与天幕从右边侧幕后面推出新的一幅、把旧的推进左边侧幕，新布景一件件吊下来，落点先投下影子
+ * 换幕时台上暗下来，一束发白的追光跟着队长；旧布景挂着吊绳一件件升进帷幔后面，地布与天幕从右边侧幕后面推出新的一幅、把旧的推进左边侧幕，新布景一件件吊下来，落点先投下影子
  */
 export class TheaterView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -189,8 +190,8 @@ export class TheaterView implements MapView {
   private dropB?: Phaser.GameObjects.Image
   private cardA?: Phaser.GameObjects.Image
   private cardB?: Phaser.GameObjects.Image
-  private spots: Phaser.GameObjects.Image[] = []
-  private haze?: Phaser.GameObjects.Rectangle
+  private dark?: Phaser.GameObjects.Image
+  private wash?: Phaser.GameObjects.Image
   private marks?: Phaser.GameObjects.Graphics
   private ropes?: Phaser.GameObjects.Graphics
   private stand?: QuadLayer
@@ -260,14 +261,24 @@ export class TheaterView implements MapView {
       canvasTexture(scene, key, scratch.width, scratch.height, (ctx) => ctx.drawImage(scratch, 0, 0))
       this.visuals.push(scene.add.image(0, 0, key).setOrigin(0, 0).setDisplaySize(FRAME_U * UNIT, FRAME_U * UNIT).setDepth(depth))
     }
-    this.spots = [FOLLOW_U, ...SWEEPS.map((w) => w.r)].map((r) => scene.add.image(0, 0, SPOT_KEY).setDepth(SPOT_DEPTH).setDisplaySize(r * 2 * UNIT, r * 2 * UNIT).setVisible(false))
-    this.haze = scene.add.rectangle(stage.x0 * UNIT, stage.y0 * UNIT, (stage.x1 - stage.x0) * UNIT, (stage.y1 - stage.y0) * UNIT, 0xfffbea).setOrigin(0, 0).setDepth(SPOT_DEPTH).setVisible(false)
+    const n = 512
+    const span = FRAME_U * 3
+    canvasTexture(scene, DARK_KEY, n, n, (ctx) => {
+      const g = ctx.createRadialGradient(n / 2, n / 2, (SPOT_U / span) * n, n / 2, n / 2, ((SPOT_U + SPOT_SOFT_U) / span) * n)
+      g.addColorStop(0, 'rgba(10,5,16,0)')
+      g.addColorStop(1, 'rgba(10,5,16,1)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, n, n)
+    })
+    this.dark = scene.add.image(0, 0, DARK_KEY).setDepth(DARK_DEPTH).setDisplaySize(span * UNIT, span * UNIT).setVisible(false)
+    const wr = (SPOT_U + SPOT_SOFT_U * 0.6) * 2 * UNIT
+    this.wash = scene.add.image(0, 0, SPOT_KEY).setDepth(SPOT_DEPTH).setDisplaySize(wr, wr).setVisible(false)
     this.marks = scene.add.graphics().setDepth(MARK_DEPTH)
     this.ropes = scene.add.graphics().setDepth(FLY_DEPTH - 0.01)
     this.shadow = new QuadLayer(scene, SHADOW_DEPTH, SHADOW_ALPHA)
     this.stand = new QuadLayer(scene, STAND_DEPTH)
     this.fly = new QuadLayer(scene, FLY_DEPTH)
-    this.visuals.push(this.floorA, this.floorB, this.dropA, this.dropB, this.cardA, this.cardB, ...this.spots, this.haze, this.marks, this.ropes, this.shadow, this.stand, this.fly, this.traps(scene, stage))
+    this.visuals.push(this.floorA, this.floorB, this.dropA, this.dropB, this.cardA, this.cardB, this.dark, this.wash, this.marks, this.ropes, this.shadow, this.stand, this.fly, this.traps(scene, stage))
     const c = st.clock
     this.sheet(v, st, c.act)
     if (c.phase === 'change') this.sheet(v, st, c.act - 1)
@@ -437,23 +448,12 @@ export class TheaterView implements MapView {
     }
   }
 
-  /** 白色聚光灯：一束跟着队长，几束在台上来回扫，照到的地方发白；台上整体也泛白一点 */
+  /** 换幕时的灯：光圈外暗下来（不全黑），追光跟着队长，光圈里压一层白，照在地布与布景上、不压身体 */
   private lights(cfg: TheaterConfig, c: StageClock, sim: Sim): void {
     const k = glare(cfg, c)
-    const stage = this.stage!
     const lead = leaderPoint(sim)
-    const cx = (stage.x0 + stage.x1) / 2
-    const cy = (stage.y0 + stage.y1) / 2
-    this.spots.forEach((img, i) => {
-      img.setVisible(k > 0.001).setAlpha(k * SPOT_MAX)
-      if (i === 0) {
-        img.setPosition(lead.x, lead.y)
-        return
-      }
-      const w = SWEEPS[i - 1]!
-      img.setPosition((cx + Math.sin(c.at * w.fx + w.ph) * w.ax) * UNIT, (cy + Math.cos(c.at * w.fy + w.ph) * w.ay) * UNIT)
-    })
-    this.haze!.setVisible(k > 0.001).setAlpha(k * HAZE_MAX)
+    this.dark!.setVisible(k > 0.001).setAlpha(k * DARK_MAX).setPosition(lead.x, lead.y)
+    this.wash!.setVisible(k > 0.001).setAlpha(k * WASH_MAX).setPosition(lead.x, lead.y)
   }
 
   /**
@@ -594,6 +594,6 @@ export class TheaterView implements MapView {
     this.ready = false
     for (const s of this.sheets.values()) for (const key of [s.floorKey, s.dropKey, s.cardKey, s.atlasKey]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
     this.sheets.clear()
-    for (const k of [BACK_KEY, SPOT_KEY, LEGS_KEY, VALANCE_KEY]) if (v.scene.textures.exists(k)) v.scene.textures.remove(k)
+    for (const k of [BACK_KEY, SPOT_KEY, DARK_KEY, LEGS_KEY, VALANCE_KEY]) if (v.scene.textures.exists(k)) v.scene.textures.remove(k)
   }
 }

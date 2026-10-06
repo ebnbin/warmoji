@@ -535,7 +535,7 @@ export function actOf(cfg: TheaterConfig, stage: Stage, index: number): Act {
   return { index, chapter, seed: base, blend, pieces: ordered }
 }
 
-/** 换幕的一段：stand 演着，change 换幕——白色的聚光灯亮起来，旧布景依次吊上去，地布与天幕从右往左推过去换成新的，新布景依次吊下来，灯收回去 */
+/** 换幕的一段：stand 演着，change 换幕——台上暗下来只留追光，旧布景依次吊上去，地布与天幕从右往左推过去换成新的，新布景依次吊下来，灯亮回来 */
 export type Phase = 'stand' | 'change'
 
 /** 此刻演到哪：act 是正演着或正换上的那一幕（change 时旧的是 act - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换幕在几时（毫秒） */
@@ -615,7 +615,7 @@ export function slid(cfg: TheaterConfig, c: StageClock): number {
   return easeInOut(clamp01((c.at - flyLen(cfg)) / cfg.turn.slideMs))
 }
 
-/** 白色聚光灯此刻多亮：0 是没开，1 是最亮；换幕一开头亮起来，新布景落完前收回去 */
+/** 换幕的灯收得多紧：0 是满台亮着，1 是光圈外暗到底、只剩追光；换幕一开头收起来，新布景落完前放开 */
 export function glare(cfg: TheaterConfig, c: StageClock): number {
   if (c.phase === 'stand') return 0
   const t = cfg.turn
