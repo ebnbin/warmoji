@@ -276,10 +276,10 @@ export const EXPERIMENTS = {
   sandHunt: {
     emoji: '1f43e',
     name: '沙海追猎',
-    desc: '四名悬赏目标在沙海里逃窜：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
+    desc: '三名悬赏目标在沙海里逃窜：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
     note: '环面上的追逐：逃跑的目标永远有路可走，追不上就只能抄近路截它',
     team: { slots: [{ tags: ['mobile', 'damage'] }, { tags: ['ranged'] }, { tags: ['control'] }], level: 2 },
-    stars: [{ kind: 'time', ms: 70_000 }, { kind: 'downs', count: 0 }],
+    stars: [{ kind: 'time', ms: 80_000 }, { kind: 'downs', count: 0 }],
     fight: {
       name: '沙海追猎',
       map: 'desert',
@@ -297,13 +297,13 @@ export const EXPERIMENTS = {
             {
               kind: 'batch',
               atMs: 2000,
-              squad: { count: 4, enemy: 'raccoon', elites: 4, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
-              banner: { title: '悬赏发布', sub: '四名怪盗在沙海里逃窜' },
+              squad: { count: 3, enemy: 'raccoon', elites: 3, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '悬赏发布', sub: '三名怪盗在沙海里逃窜' },
             },
           ],
           ends: [
             { kind: 'bounty' },
-            { kind: 'time', ms: 100_000, lose: true },
+            { kind: 'time', ms: 120_000, lose: true },
           ],
         },
       ],
@@ -516,7 +516,7 @@ export const EXPERIMENTS = {
     fight: {
       name: '日落前寻晶',
       map: 'amethyst',
-      clockSec: 15,
+      clockSec: 10,
       phases: [
         {
           intro: { title: '日落前寻晶', sub: '天黑之前走遍每一颗小晶洞' },
@@ -765,7 +765,7 @@ export const EXPERIMENTS = {
   ventWalk: {
     emoji: '2668',
     name: '喷气孔巡查',
-    desc: '在每一个喷气孔上站满 5 秒，火山怪会从喷气孔里钻出来；第 20 秒火山喷发，熔岩顺着地势漫下来，可能正好淹过还没去的那几个',
+    desc: '在每一个喷气孔上站满 3 秒，火山怪会从喷气孔里钻出来；第 20 秒火山喷发，熔岩顺着地势漫下来，可能正好淹过还没去的那几个',
     note: '到访当目标、地图改写路线：熔岩会封住一些去处，又在凉透后重新放行，先去哪个得看熔岩往哪流',
     team: { slots: [{ tags: ['mobile'] }, { tags: ['defense'] }, { tags: ['area'] }], level: 2 },
     stars: [{ kind: 'time', ms: 60_000 }, { kind: 'hazard', by: 'lava', damage: 0 }],
@@ -795,7 +795,7 @@ export const EXPERIMENTS = {
           ],
           cues: [{ cue: 'erupt', atMs: 10_000 }],
           ends: [
-            { kind: 'visit', mark: 'vent', radius: 1.2, ms: 5000 },
+            { kind: 'visit', mark: 'vent', radius: 1.2, ms: 3000 },
             { kind: 'time', ms: 100_000, lose: true },
           ],
         },
