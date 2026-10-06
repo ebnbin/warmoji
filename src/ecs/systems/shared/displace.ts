@@ -68,8 +68,9 @@ export function endMotion(eid: number): void {
   motionFx[eid] = undefined
 }
 
-/** 穿行的起点与落点各闪一下：起点收拢、落点散开 */
+/** 穿行的起点与落点各闪一下：起点收拢、落点散开；被吊起的不闪 */
 export function transitFlash(sim: Sim, eid: number, x: number, y: number, arrive: boolean): void {
+  if (Motion.look[eid] === TRANSIT.hoist) return
   spawnFxCircle(sim, x, y, Radius.v[eid]! * 1.6, { fill: Motion.color[eid]!, fillAlpha: 0.45, fromScale: arrive ? 0.3 : 1, toScale: arrive ? 1.6 : 0.2, durationMs: arrive ? 300 : 260, depth: 14 })
 }
 

@@ -1209,6 +1209,51 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/** 舞台剧：八音盒似的六八拍摇篮曲，大调；竖琴分解和弦一路拨着，钢片琴领奏、带着回声，低音管只踩每小节头，长笛在乐句里垫一口气，一小节换一个和弦 */
+function buildTheater(): BgmScore {
+  const chords = [0, 0, 5, 3, 0, 4, 1, 4, 5, 5, 3, 0, 1, 4, 0, 0]
+  return track(
+    {
+      bpm: 58 * 3,
+      stepsPerBeat: 1,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 62,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 58) * 0.5, feedback: 0.3, level: 0.24 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.13, attack: 0.02, release: 0.3, octave: -2 }
+      const harp: Voice = { wave: 'triangle', vol: 0.05, attack: 0.003, release: 0.35, octave: 0, echo: true }
+      const flute: Voice = { wave: 'sine', vol: 0.03, attack: 0.25, release: 0.5, octave: 1 }
+      const celesta: Voice = { wave: 'sine', vol: 0.085, attack: 0.004, release: 0.55, octave: 2, echo: true }
+      b.bass(bass, chords, 'r--f--')
+      b.arp(harp, chords, [0, 1, 2, 3, 2, 1])
+      b.pad(flute, chords, [1, 2])
+      b.line(celesta, [
+        [0, 0, 4, 3], [0, 3, 2, 2], [0, 5, 4, 1],
+        [1, 0, 7, 4], [1, 4, 6, 1], [1, 5, 4, 1],
+        [2, 0, 5, 3], [2, 3, 7, 2], [2, 5, 5, 1],
+        [3, 0, 3, 6],
+        [4, 0, 4, 3], [4, 3, 2, 2], [4, 5, 4, 1],
+        [5, 0, 8, 4], [5, 4, 7, 1], [5, 5, 6, 1],
+        [6, 0, 5, 3], [6, 3, 3, 2], [6, 5, 2, 1],
+        [7, 0, 1, 6],
+        [8, 0, 7, 3], [8, 3, 9, 2], [8, 5, 7, 1],
+        [9, 0, 5, 4], [9, 4, 4, 1], [9, 5, 5, 1],
+        [10, 0, 6, 3], [10, 3, 5, 2], [10, 5, 3, 1],
+        [11, 0, 4, 6],
+        [12, 0, 3, 3], [12, 3, 5, 2], [12, 5, 6, 1],
+        [13, 0, 8, 3], [13, 3, 7, 2], [13, 5, 6, 1],
+        [14, 0, 4, 3], [14, 3, 2, 3],
+        [15, 0, 0, 6],
+      ])
+      b.drums('tom', 'x.....', 0, 16, 0.04)
+      b.drums('hat', '...o..', 4, 16, 0.016)
+    },
+  )
+}
+
 /** 跃迁：多利亚调式的电子乐，八分音符的八度低音一路往前推；方波琶音一级级往上爬、到小节末尾冲上去，像充能；铺底带一点失谐，三角波的主旋律隔着回声在虚空里回荡 */
 function buildWarp(): BgmScore {
   const chords = [0, 0, 3, 3, 4, 4, 2, 6, 0, 0, 3, 3, 5, 4, 6, 6]
@@ -1284,6 +1329,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  theater: buildTheater,
   warp: buildWarp,
 }
 

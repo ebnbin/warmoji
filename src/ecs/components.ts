@@ -534,8 +534,8 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const MOTION = { none: 0, dash: 1, arc: 2, follow: 3, transit: 4 } as const
 
-/** 穿行的样子：隐身是起点消失、落点出现，残影是半透明的身体沿直线划过去 */
-export const TRANSIT = { hidden: 0, streak: 1 } as const
+/** 穿行的样子：隐身是起点消失、落点出现，残影是半透明的身体沿直线划过去，吊起是被吊绳吊在半空、照常看得见、起落不闪 */
+export const TRANSIT = { hidden: 0, streak: 1, hoist: 2 } as const
 
 /** 脚本位移：冲刺按速度走（seek 为 1 时追着 ref 转向、碰到就停），弧线沿 f→t 腾空飞，跟随从 f 被拉过去再贴着 ref 偏移 t，穿行没有实体地沿 f→t 移过去（look 是样子、color 是颜色）；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
 export const Motion = {
