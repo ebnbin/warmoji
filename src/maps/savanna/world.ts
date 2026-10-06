@@ -47,6 +47,8 @@ const HIT_REACH_U = 0.6
 const CROWD_U = 0.25
 /** 挨打的动物闪白多久，毫秒 */
 const FLINCH_MS = 90
+/** 两次闪白至少隔这么久，毫秒：一串子弹打在同一头身上时它一下下哆嗦，不一直白着 */
+const FLINCH_GAP_MS = 450
 /** 惊慌涨过它，平时的动物就抬起头张望 */
 const UNEASY = 0.35
 /** 绕开动物：往前看多远（格），绕的时候离它多远（格） */
@@ -404,7 +406,7 @@ export const savanna: WorldHooks = {
       }
     }
     if (!near) return
-    near.flinch = s.clock
+    if (s.clock - near.flinch >= FLINCH_GAP_MS) near.flinch = s.clock
     scare(s.herd, cfgOf(sim), x, y, cfgOf(sim).fear.hit, s.clock)
   },
   /** 离哪一头 blastU 格以内炸响，按离最近那头多近让惊慌涨，炸得越开离得越近 */
