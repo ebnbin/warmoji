@@ -13,12 +13,14 @@ import { meadow } from '../../maps/meadow/world'
 import { nexus } from '../../maps/nexus/world'
 import { nebula } from '../../maps/nebula/world'
 import { petri } from '../../maps/petri/world'
+import { warp } from '../../maps/warp/world'
 import { ruins } from '../../maps/ruins/world'
 import { sakura } from '../../maps/sakura/world'
 import { maple } from '../../maps/maple/world'
 import { ship } from '../../maps/ship/world'
 import { volcano } from '../../maps/volcano/world'
 import { deep } from '../../maps/deep/world'
+import { theater } from '../../maps/theater/world'
 
 const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   bounded,
@@ -44,7 +46,9 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   deep,
   nexus,
   petri,
+  warp,
   dreamland,
+  theater,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

@@ -12,12 +12,14 @@ import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
 import { NexusView } from '../maps/nexus/view'
 import { PetriView } from '../maps/petri/view'
+import { WarpView } from '../maps/warp/view'
 import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
 import { MapleView } from '../maps/maple/view'
 import { ShipView } from '../maps/ship/view'
 import { VolcanoView } from '../maps/volcano/view'
 import { DeepView } from '../maps/deep/view'
+import { TheaterView } from '../maps/theater/view'
 
 export function viewFor(mapId: MapId): MapView {
   return MAKE[MAPS[mapId].kind]()
@@ -47,5 +49,7 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   deep: () => new DeepView(),
   nexus: () => new NexusView(),
   petri: () => new PetriView(),
+  warp: () => new WarpView(),
   dreamland: () => new DreamlandView(),
+  theater: () => new TheaterView(),
 }

@@ -80,7 +80,8 @@ import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { StageSnapshot, ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import { CHAPTERS, chapterOf } from '../maps/theater/model'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { amethystClock } from '../maps/amethyst/world'
 import { deckTilt } from '../maps/ship/model'
@@ -536,6 +537,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
       shards: burstEmitter(this, [0xb48cff, 0x8e5bd9, 0xe2d2ff, 0x6a3fc0], 210, 620, { gravityY: 260, rotate: { min: 0, max: 360 } }),
+      paper: burstEmitter(this, [0xfbf3df, 0xf1e4c4, 0xffffff, 0xe6d3ad], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
@@ -612,6 +614,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? (clockSnapshot(sim) ?? amethystClock(sim)) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      stage: sim ? stageSnapshot(sim) : null,
     }
   }
 
@@ -1061,6 +1064,24 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 新一幕开演以后，幕名在换幕盘下面写这么久，毫秒 */
+const STAGE_TITLE_MS = 4500
+/** 离换幕不到这么久，换幕盘闪着催人，毫秒 */
+const STAGE_WARN_MS = 3000
+
+/** 在舞台剧里打的一局：换幕的倒计时 */
+function stageSnapshot(sim: Sim): StageSnapshot | null {
+  const s = sim.worldState.theater
+  if (!s) return null
+  const c = s.clock
+  const fresh = c.phase === 'stand' && c.at < STAGE_TITLE_MS && c.act > 0
+  const ch = CHAPTERS[chapterOf(s.stage, c.act)]!
+  const title = fresh || c.phase === 'change' ? `第${ch.num}幕 · ${ch.name}` : null
+  if (c.phase === 'change') return { phase: 'turn', ratio: 0, inSec: 0, title }
+  const left = c.len - c.at
+  return { phase: left < STAGE_WARN_MS ? 'warn' : 'stand', ratio: 1 - c.at / c.len, inSec: left / 1000, title }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {

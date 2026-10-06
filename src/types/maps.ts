@@ -1396,7 +1396,7 @@ export interface DeepConfig {
   }
 }
 /**
- * 培养皿：实验室灯箱上的一只血琼脂培养皿，队伍和敌人缩到菌落的尺度，在琼脂上作战；一格 mmPerU 毫米。圆形的玻璃皿壁是硬边界，挡身体也挡子弹，看得穿。
+ * 培养皿：实验室灯箱上的一只营养琼脂培养皿，队伍和敌人缩到菌落的尺度，在琼脂上作战；一格 mmPerU 毫米。圆形的玻璃皿壁是硬边界，挡身体也挡子弹，看得穿。
  * 开局按四区划线接种过：菌落按反应扩散（费希尔方程）往外长，前沿匀速推进，越厚越黏脚，敌我走得都慢、更费体力。
  * 身体死在哪里就放出一团溶菌物质：浓度高过最低抑菌浓度的地方菌落被溶掉、也长不出来；它按半衰期衰减，抑菌圈慢慢缩小，菌落再从边上长回来。
  * 菌落长过的掉落物被盖住：捡不到也吸不走，那块清干净才露出来
@@ -1454,6 +1454,80 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/**
+ * 舞台剧：一座剧场的舞台，台面就是战场：台口一排脚灯，台下是乐池与观众席，两边红丝绒大幕，顶上帷幔，台后挂着画好的天幕。
+ * 台上铺着画好的地布，画的都能走；台上立着布景片，挡人，高的也挡子弹和视线。隔一阵换一幕：台上暗下来，每个角色头上一束发白的追光，角色被吊绳吊起，旧布景依次吊上去，
+ * 地布与天幕连同地上的敌人、金币从右往左推成新的一幅，推进大幕的退场，新布景依次吊下来，角色原地放下。一幕是故事的一章，按故事的次序轮下去
+ */
+export interface TheaterConfig {
+  /** 台面多宽多高，格：宽是半个台面宽（台中线两边各这么宽），台面在方框正中 */
+  readonly size: { readonly wU: number; readonly hU: number }
+  /** 开局站的那片空地的半径，格：开局那一幕的布景不落在里面 */
+  readonly plazaU: number
+  /** 布景离台边、离台中线（一溜活门）至少多远，格：离台边高的按 tall，矮的按 low */
+  readonly margin: { readonly tall: number; readonly low: number; readonly aisle: number }
+  /** 布景之间至少留多宽的路，格：两件高的之间按 tall（头目也挤得过去），有一件矮的就按 low（头目跨得过矮的） */
+  readonly gapU: { readonly tall: number; readonly low: number }
+  /** 矮的布景多高，米：齐腰，挡身体，子弹从上面飞过去，个子大的跨得过 */
+  readonly lowM: number
+  /** 一幕立几件布景 */
+  readonly pieces: readonly [number, number]
+  /**
+   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；台上用 lightMs 暗下来、每个角色头上留一束追光（亮回来也是），
+   * 旧布景在 staggerMs 里先后起吊、每件 flyMs 吊出视线，地布与天幕用 slideMs 从右往左推成新的，新布景再照样先后吊下来
+   */
+  readonly turn: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly lightMs: number
+    readonly staggerMs: number
+    readonly flyMs: number
+    readonly slideMs: number
+  }
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
+}
+/** 跃迁站的四间房各是什么样：空旷的大厅、立着几排柱子、绕着中央凹槽的回廊、狭长的一条 */
+export type WarpShape = 'hall' | 'pillars' | 'cloister' | 'narrow'
+export interface WarpConfig {
+  /**
+   * 方框切成 2×2 四间房，每间是方框的四分之一，画面上整块往四周平铺。平台摆在那一格正中，四边离格边都是 gapU 格（平铺后房与房之间都隔两倍的虚空），
+   * 四边一圈 lipU 格宽的台沿；狭长的那间只有 narrowU 格宽，其余铺成机柜台。能走的地方都落在整格上
+   */
+  readonly room: { readonly lipU: number; readonly gapU: number; readonly narrowU: number }
+  /** 窄过两倍 neckU 的缝不能走 */
+  readonly neckU: number
+  /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着传送台 padClearU 格以内的不立 */
+  readonly pillars: { readonly firstU: number; readonly stepU: number; readonly count: number; readonly sizeU: number; readonly heightM: number; readonly padClearU: number }
+  /** 回廊正中凹槽的边长，格 */
+  readonly pitU: number
+  /**
+   * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
+   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
+   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   */
+  readonly pad: {
+    readonly radiusU: number
+    readonly edgeU: number
+    readonly cornerU: number
+    readonly chargeMs: number
+    readonly drainMs: number
+    readonly transitMs: number
+    readonly cooldownMs: number
+    readonly shuttleMs: number
+    readonly warnMs: number
+    readonly spillU: number
+  }
+  /** 出怪板：一块长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
+  readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
+  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
+  readonly recipes: readonly [string, string, string, string]
+  /** 核心柱：半径（格），头目从这里被抛进队长所在的那间 */
+  readonly core: { readonly radiusU: number }
+  /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
+  readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1462,8 +1536,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，shards 迸开的碎晶 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'shards'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，shards 迸开的碎晶，paper 碎纸屑 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'shards' | 'paper'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1528,7 +1602,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'theater' | 'warp'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1563,6 +1637,8 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly theater?: TheaterConfig
+  readonly warp?: WarpConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
