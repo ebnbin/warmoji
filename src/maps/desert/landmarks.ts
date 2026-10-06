@@ -1,8 +1,10 @@
 import { Rng } from '../../util/rng'
 
 /** 沙漠里的标志物：一棵枯死的金合欢、一根拴着破布的路标杆、一座石堆、一副半埋的驼骨、一块风蚀的岩盘 */
-export type LandmarkKind = 'tree' | 'post' | 'cairn' | 'bones' | 'rock'
-export const LANDMARK_KINDS: readonly LandmarkKind[] = ['tree', 'post', 'cairn', 'bones', 'rock']
+export type MarkerKind = 'tree' | 'post' | 'cairn' | 'bones' | 'rock'
+export const LANDMARK_KINDS: readonly MarkerKind[] = ['tree', 'post', 'cairn', 'bones', 'rock']
+/** 地上立着的东西：标志物，加上只做点缀的仙人掌（不当刷怪口） */
+export type LandmarkKind = MarkerKind | 'cactus'
 
 /** 一段枝干、木杆或骨头：两端相对标志物中心的位置（格）与离地高度（米），两端的半径（格） */
 export interface Limb {
@@ -206,6 +208,31 @@ function rock(rng: Rng, windAngle: number): LandmarkShape {
   return { kind: 'rock', limbs: [], stones: [], slab, solids, reach: slab.length * 0.85, top: slab.height }
 }
 
+/** 柱形仙人掌：一根粗干，带零到两条先横伸再朝上翘的侧臂；只有脚下的主干挡人 */
+function cactus(rng: Rng): LandmarkShape {
+  const height = 1.3 + 0.7 * rng.next()
+  const lean = rng.next() * TAU
+  const tip = 0.02 + 0.03 * rng.next()
+  const tx = Math.cos(lean) * tip
+  const ty = Math.sin(lean) * tip
+  const limbs: Limb[] = [{ x0: 0, y0: 0, z0: 0, x1: tx, y1: ty, z1: height, r0: 0.2, r1: 0.18 }]
+  const arms = Math.floor(rng.next() * 3)
+  const turn = rng.next() * TAU
+  let reach = 0.2
+  for (let k = 0; k < arms; k++) {
+    const a = turn + k * Math.PI + (rng.next() * 2 - 1) * 0.5
+    const z = height * (0.35 + 0.2 * rng.next())
+    const out = 0.36 + 0.12 * rng.next()
+    const up = Math.min(z + 0.35 + 0.4 * rng.next(), height - 0.05)
+    const ex = Math.cos(a) * out
+    const ey = Math.sin(a) * out
+    limbs.push({ x0: 0, y0: 0, z0: z, x1: ex, y1: ey, z1: z + 0.1, r0: 0.12, r1: 0.12 })
+    limbs.push({ x0: ex, y0: ey, z0: z + 0.1, x1: ex * 1.06, y1: ey * 1.06, z1: up, r0: 0.12, r1: 0.11 })
+    reach = Math.max(reach, out * 1.06 + 0.12)
+  }
+  return { kind: 'cactus', limbs, stones: [], slab: null, solids: [{ x0: 0, y0: 0, x1: 0, y1: 0, r: 0.2 }], reach: reach + 0.05, top: height }
+}
+
 /** 按种类与种子生成一样标志物；岩盘顺着盛行风拉长 */
 export function landmarkShape(kind: LandmarkKind, seed: number, windAngle: number): LandmarkShape {
   const rng = new Rng(seed)
@@ -213,6 +240,7 @@ export function landmarkShape(kind: LandmarkKind, seed: number, windAngle: numbe
   if (kind === 'post') return post(rng)
   if (kind === 'cairn') return cairn(rng)
   if (kind === 'bones') return bones(rng)
+  if (kind === 'cactus') return cactus(rng)
   return rock(rng, windAngle)
 }
 

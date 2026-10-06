@@ -35,6 +35,7 @@ const DUNE_PALE: Rgb = [1.0, 0.86, 0.68]
 const MINERAL: Rgb = [0.5, 0.38, 0.3]
 const BARK: Rgb = [0.3, 0.23, 0.18]
 const BONE: Rgb = [0.93, 0.9, 0.82]
+const CACTUS: Rgb = [0.3, 0.44, 0.24]
 const STONE_A: Rgb = [0.62, 0.55, 0.47]
 const STONE_B: Rgb = [0.4, 0.31, 0.25]
 const SANDSTONE: Rgb = [0.72, 0.45, 0.31]
@@ -145,7 +146,7 @@ interface Prop {
 
 const PROP: Prop = { r: 0, g: 0, b: 0, a: 0, nx: 0, ny: 0, nz: 1 }
 
-/** 一个点 (qx, qy)（相对标志物中心，格）落在它地上那部分的什么上：枯树的树根与落枝、杆脚的石头、石堆、驼骨、岩盘 */
+/** 一个点 (qx, qy)（相对标志物中心，格）落在它地上那部分的什么上：枯树的树根与落枝、杆脚的石头、石堆、驼骨、岩盘、仙人掌的脚 */
 function propAt(p: DesertPlan, l: Landmark, qx: number, qy: number, out: Prop): Prop | null {
   const sh = l.shape
   out.a = 0
@@ -179,7 +180,7 @@ function propAt(p: DesertPlan, l: Landmark, qx: number, qy: number, out: Prop): 
     if (z <= best) continue
     best = z
     const k = d / r
-    const c = sh.kind === 'bones' ? BONE : BARK
+    const c = sh.kind === 'bones' ? BONE : sh.kind === 'cactus' ? CACTUS : BARK
     out.r = c[0]
     out.g = c[1]
     out.b = c[2]
@@ -259,7 +260,7 @@ const DRIFT_MOUND = 1.1
 const DRIFT_CUT = 2.6
 
 function driftSize(l: Landmark): number {
-  return l.shape.kind === 'tree' || l.shape.kind === 'post' ? 0.35 : Math.min(1.1, l.shape.reach * 0.7)
+  return l.shape.kind === 'tree' || l.shape.kind === 'post' || l.shape.kind === 'cactus' ? 0.35 : Math.min(1.1, l.shape.reach * 0.7)
 }
 
 /** 标志物顺着风在背风那边拖出的一条沙尾、脚下堆起的一圈沙，米：只让地面的光影跟着起伏 */

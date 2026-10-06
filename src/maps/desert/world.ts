@@ -163,8 +163,8 @@ function glide(plan: DesertPlan, x: number, y: number, dx: number, dy: number, r
   return len > 1e-6 ? { x: tx / len, y: ty / len } : { x: -SOLID.ny, y: SOLID.nx }
 }
 
-/** 标志物的材质：枯树、路标杆与驼骨是细的、有缝的，弹体与视线从旁边过去；石堆与岩盘是实的 */
-const MATERIAL: Record<LandmarkKind, ObstacleId> = { tree: 'landmark', post: 'landmark', bones: 'landmark', cairn: 'rock', rock: 'rock' }
+/** 标志物的材质：枯树、路标杆、驼骨与仙人掌是细的、有缝的，弹体与视线从旁边过去；石堆与岩盘是实的 */
+const MATERIAL: Record<LandmarkKind, ObstacleId> = { tree: 'landmark', post: 'landmark', bones: 'landmark', cactus: 'landmark', cairn: 'rock', rock: 'rock' }
 /** 沿线段找进出标志物实心部分的地方，按这么长一步取样，格 */
 const TRACE_STEP_U = 0.05
 

@@ -855,6 +855,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(span(d.flats.loose) && d.flats.loose[1] < 1 && Number.isInteger(d.flats.patches) && d.flats.patches >= 1, `${at}.flats 的松实须在 (0, 1) 内由实到松、斑块数为正整数`)
   need(Number.isInteger(d.landmarks.pairs) && d.landmarks.pairs >= 1 && d.landmarks.gapU > 0, `${at}.landmarks 的对数为正整数、间隔为正`)
   need(2 * d.landmarks.pairs * Math.PI * (d.landmarks.gapU / 2) ** 2 < w * h, `${at}.landmarks 摆不下：${2 * d.landmarks.pairs} 样标志物彼此隔 ${d.landmarks.gapU} 格`)
+  need(Number.isInteger(d.cacti.pairs[0]) && Number.isInteger(d.cacti.pairs[1]) && d.cacti.pairs[0] >= 1 && d.cacti.pairs[0] <= d.cacti.pairs[1] && d.cacti.gapU > 0, `${at}.cacti 的对数为由少到多的正整数、间隔为正`)
   const g = d.gait
   need(g.softSand >= 1 && g.packRelief >= 0 && g.packRelief < 1 && g.maxPower > 1 && g.downhillMax >= 1, `${at}.gait 的松沙倍率不小于 1、踩实在 [0, 1) 内、最大出力大于 1、下坡倍率不小于 1`)
   need(d.shadeRegen > m.stamina.regen, `${at}.shadeRegen 须大于向阳处的回复 ${m.stamina.regen}`)
