@@ -97,60 +97,27 @@ export function drawMoth(ctx: CanvasRenderingContext2D, w: number, h: number): v
   ctx.fill()
 }
 
-/** 从上往下看的一只蝙蝠：紫黑的身子与一对尖耳，两片膜翼张开，翼骨从腕上分出去撑起扇形的后缘，翼膜透一点紫；头朝画布上方 */
+/** 从上往下看的蝙蝠：深褐的身子，两片带骨的膜翼 */
 export function drawBat(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const cx = w / 2
-  const X = (u: number): number => cx + u * w
-  const Y = (v: number): number => v * h
+  const cy = h * 0.5
+  ctx.fillStyle = '#2b2019'
   for (const side of [-1, 1]) {
-    const sx = (u: number): number => X(side * u)
-    // 肩、腕、翼尖，后缘在指骨之间一段段往里凹
-    const shoulder = [sx(0.05), Y(0.32)] as const
-    const wrist = [sx(0.24), Y(0.12)] as const
-    const tip = [sx(0.48), Y(0.3)] as const
-    const fingers = [
-      [sx(0.4), Y(0.62)],
-      [sx(0.28), Y(0.72)],
-      [sx(0.15), Y(0.66)],
-    ] as const
-    const hip = [sx(0.05), Y(0.62)] as const
-    ctx.fillStyle = 'rgba(64, 36, 92, 0.94)'
     ctx.beginPath()
-    ctx.moveTo(shoulder[0], shoulder[1])
-    ctx.lineTo(wrist[0], wrist[1])
-    ctx.lineTo(tip[0], tip[1])
-    let prev: readonly [number, number] = tip
-    for (const f of [...fingers, hip]) {
-      ctx.quadraticCurveTo((prev[0] + f[0]) / 2 - side * w * 0.015, (prev[1] + f[1]) / 2 - h * 0.08, f[0], f[1])
-      prev = f
-    }
-    ctx.closePath()
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(132, 98, 172, 0.85)'
-    ctx.lineWidth = Math.max(1, w * 0.02)
-    ctx.beginPath()
-    ctx.moveTo(shoulder[0], shoulder[1])
-    ctx.lineTo(wrist[0], wrist[1])
-    ctx.lineTo(tip[0], tip[1])
-    for (const f of fingers) {
-      ctx.moveTo(wrist[0], wrist[1])
-      ctx.lineTo(f[0], f[1])
-    }
-    ctx.stroke()
-    // 耳朵
-    ctx.fillStyle = '#24142f'
-    ctx.beginPath()
-    ctx.moveTo(sx(0.02), Y(0.2))
-    ctx.lineTo(sx(0.055), Y(0.04))
-    ctx.lineTo(sx(0.07), Y(0.2))
+    ctx.moveTo(cx, cy - h * 0.12)
+    ctx.quadraticCurveTo(cx + side * w * 0.2, cy - h * 0.42, cx + side * w * 0.48, cy - h * 0.18)
+    ctx.lineTo(cx + side * w * 0.4, cy + h * 0.05)
+    ctx.quadraticCurveTo(cx + side * w * 0.34, cy - h * 0.02, cx + side * w * 0.28, cy + h * 0.14)
+    ctx.quadraticCurveTo(cx + side * w * 0.2, cy + h * 0.02, cx + side * w * 0.12, cy + h * 0.2)
+    ctx.quadraticCurveTo(cx + side * w * 0.06, cy + h * 0.08, cx, cy + h * 0.12)
     ctx.closePath()
     ctx.fill()
   }
-  ctx.fillStyle = '#24142f'
+  ctx.fillStyle = '#1a130e'
   ctx.beginPath()
-  ctx.ellipse(cx, Y(0.46), w * 0.055, h * 0.26, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx, cy, w * 0.05, h * 0.26, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.beginPath()
-  ctx.arc(cx, Y(0.22), w * 0.05, 0, Math.PI * 2)
+  ctx.arc(cx, cy - h * 0.26, w * 0.035, 0, Math.PI * 2)
   ctx.fill()
 }
