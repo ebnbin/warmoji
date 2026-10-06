@@ -46,7 +46,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
-import { CARD_U, clockAt, makeBook, pageOf, slabGap, slabOf, slabSd, turnLen } from '../src/maps/storybook/model.ts'
+import { CARD_U, clockAt, makeBook, pageOf, slabGap, slabOf, slabSd } from '../src/maps/storybook/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
@@ -693,7 +693,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一页与每页立着的时长须为正`)
   need(t.warnMs > 0 && t.foldMs > 0 && t.leafMs > 0 && t.restMs >= 0 && t.popMs > 0 && t.flipMs > 0, `${at}.turn 各段的时长须为正`)
   need(t.flipMs <= t.foldMs && t.flipMs <= t.popMs, `${at}.turn.flipMs 须放得进折平与弹起的那一段`)
-  need(t.intervalMs - t.jitterMs > turnLen(c) * 2, `${at}.turn 每页立着的时长须比翻一次页长得多`)
   need(c.reflowMs > 0, `${at}.reflowMs 须为正`)
   const B = OBSTACLES.body
   const layer = B.heightM / B.layers

@@ -29,7 +29,6 @@ import type { Point } from '../../util/vec'
 /** 方框外的底色：桌子底下的暗处 */
 const BG = 0x1c120c
 const BACK_KEY = 'storybook-back'
-const SWEEP_KEY = 'storybook-sweep'
 /** 开局最多几个线程分着画；贴图按这么多像素高的条分块交给线程 */
 const PAINT_THREADS = 4
 const STRIP_PX = 64
@@ -156,7 +155,6 @@ export class StorybookView implements MapView {
   private shadow?: QuadLayer
   private leaf?: QuadLayer
   private curl?: Phaser.GameObjects.Graphics
-  private sweep?: Phaser.GameObjects.Image
   private leafKeys: { front: string; back: string; page: number } | null = null
   private leafShadow: Quad | null = null
   private readonly scratch = document.createElement('canvas')
@@ -176,16 +174,6 @@ export class StorybookView implements MapView {
 
   build(v: ViewCtx): void {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, BG).setDepth(-2)))
-    if (!v.scene.textures.exists(SWEEP_KEY)) {
-      canvasTexture(v.scene, SWEEP_KEY, 64, 4, (ctx) => {
-        const g = ctx.createLinearGradient(0, 0, 64, 0)
-        g.addColorStop(0, 'rgba(40,24,12,0)')
-        g.addColorStop(0.7, 'rgba(40,24,12,1)')
-        g.addColorStop(1, 'rgba(40,24,12,0)')
-        ctx.fillStyle = g
-        ctx.fillRect(0, 0, 64, 4)
-      })
-    }
   }
 
   /** 页面上的小东西都印在插画里了 */
@@ -226,8 +214,7 @@ export class StorybookView implements MapView {
     this.stand = new QuadLayer(scene, STAND_DEPTH)
     this.leaf = new QuadLayer(scene, LEAF_DEPTH)
     this.curl = scene.add.graphics().setDepth(CURL_DEPTH)
-    this.sweep = scene.add.image(0, 0, SWEEP_KEY).setOrigin(0.5, 0).setDepth(CURL_DEPTH).setVisible(false)
-    this.visuals.push(this.spreadA, this.spreadB, this.flat, this.shadow, this.stand, this.leaf, this.curl, this.sweep, this.ribbon(scene, book))
+    this.visuals.push(this.spreadA, this.spreadB, this.flat, this.shadow, this.stand, this.leaf, this.curl, this.ribbon(scene, book))
     const c = st.clock
     this.sheet(v, st, c.page)
     if (c.phase === 'warn' || c.phase === 'fold') this.sheet(v, st, c.page + 1)
@@ -525,15 +512,11 @@ export class StorybookView implements MapView {
     return { front: make(`storybook-leaf-a-${n}`, old, 1), back: make(`storybook-leaf-b-${n}`, cur, -1), page: cur.page.index }
   }
 
-  /** 预兆：右页的下角一点点翘起来、抖着，一道页影从右往左扫过页面 */
+  /** 预兆：右页的下角一点点翘起来、抖着 */
   private warnings(c: BookClock): void {
     const g = this.curl!.clear()
-    const sweep = this.sweep!
     const book = this.book!
-    if (c.phase !== 'warn') {
-      sweep.setVisible(false)
-      return
-    }
+    if (c.phase !== 'warn') return
     const p = clamp01(c.at / c.len)
     const s = (0.5 + (CURL_U - 0.5) * Math.sqrt(p) + Math.sin(c.at / 70) * 0.08 * p) * UNIT
     const x1 = book.x1 * UNIT
@@ -550,18 +533,6 @@ export class StorybookView implements MapView {
     g.fillTriangle(x1 - s * 0.5, y1 - s * 0.5, x1 - s * 0.97, y1 - s * 0.03, x1 - s * 0.94, y1 - s * 0.94)
     g.lineStyle(0.03 * UNIT, 0x6b5536, 0.8)
     g.strokeTriangle(x1 - s, y1, x1, y1 - s, x1 - s * 0.94, y1 - s * 0.94)
-    // 页影：前半段攒着，后半段扫过两页
-    const k = clamp01((p - 0.35) / 0.6)
-    if (k <= 0) {
-      sweep.setVisible(false)
-      return
-    }
-    const x = book.x1 - (book.x1 - book.x0) * easeInOut(k)
-    sweep
-      .setVisible(true)
-      .setPosition(x * UNIT, book.y0 * UNIT)
-      .setDisplaySize(6 * UNIT, (book.y1 - book.y0) * UNIT)
-      .setAlpha(0.34 * Math.sin(Math.PI * k) + 0.05)
   }
 
   /** 每进一段响一声：预兆时哗啦一声，书页翻起来呼地一声；每件布景折平、弹起时各响一下 */
