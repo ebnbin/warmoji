@@ -1,9 +1,10 @@
 import { paintRelief, paintRows } from './ground'
+import type { Seam } from './ground'
 import type { AmethystLayout } from './layout'
 
 /** 发给画地面的线程的活：先 setup 一次，再要高度图（relief）或一段段的地面（rows） */
 export type PaintJob =
-  | { readonly kind: 'setup'; readonly layout: AmethystLayout; readonly ppu: number; readonly width: number }
+  | { readonly kind: 'setup'; readonly layout: AmethystLayout; readonly seams: readonly Seam[]; readonly ppu: number; readonly width: number }
   | { readonly kind: 'relief'; readonly size: number }
   | { readonly kind: 'rows'; readonly index: number; readonly r0: number; readonly r1: number }
 
@@ -30,12 +31,13 @@ export class AmethystPainter {
 
   constructor(
     private readonly layout: AmethystLayout,
+    private readonly seams: readonly Seam[],
     private readonly ppu: number,
     private readonly width: number,
     private readonly height: number,
     threads: number,
   ) {
-    const setup: PaintJob = { kind: 'setup', layout, ppu, width }
+    const setup: PaintJob = { kind: 'setup', layout, seams, ppu, width }
     try {
       for (let k = 0; k < threads; k++) {
         const w = new Worker(new URL('./paintWorker.ts', import.meta.url), { type: 'module' })
@@ -81,7 +83,7 @@ export class AmethystPainter {
       const b = bands[i]!
       const albedo = new Uint8ClampedArray((b.r1 - b.r0) * this.width * 4)
       const face = new Uint8ClampedArray((b.r1 - b.r0) * this.width * 4)
-      paintRows(this.layout, this.ppu, b.r0, b.r1, albedo, face)
+      paintRows(this.layout, this.seams, this.ppu, b.r0, b.r1, albedo, face)
       onRows(b.r0, b.r1, albedo, face)
       if (performance.now() - t < SLICE_MS) continue
       await yieldNow()

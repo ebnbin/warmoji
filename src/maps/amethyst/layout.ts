@@ -550,13 +550,13 @@ function grow(rng: Rng, x: number, y: number, r: number, h: number, count: numbe
   const out: Prism[] = []
   const tone = rng.next()
   const turn = rng.next() * Math.PI * 2
-  const upright = count > 5 ? 2 : 1
+  const upright = count > 6 ? 3 : count > 4 ? 2 : 1
   for (let k = 0; k < count; k++) {
     const center = k < upright
     const dir = center ? rng.next() * Math.PI * 2 : turn + ((k - upright + 0.5 * rng.next()) / (count - upright)) * Math.PI * 2
-    const top = h * (center ? 0.85 + 0.15 * rng.next() : 0.45 + 0.45 * rng.next())
-    const tilt = center ? rng.next() * 0.25 : 0.35 + rng.next() * 0.55
-    const pr = r * (center ? 0.3 + 0.08 * rng.next() : 0.18 + 0.1 * rng.next())
+    const top = h * (center ? 0.8 + 0.2 * rng.next() : 0.5 + 0.35 * rng.next())
+    const tilt = center ? rng.next() * 0.2 : 0.25 + rng.next() * 0.5
+    const pr = r * (center ? 0.32 + 0.1 * rng.next() : 0.2 + 0.1 * rng.next())
     const off = center ? r * 0.15 * rng.next() : r * 0.2 * rng.next()
     const reach = Math.min(r - pr - off, Math.tan(tilt) * top * UNIT)
     out.push({ x: x + Math.cos(dir) * off, y: y + Math.sin(dir) * off, dir, reach: Math.max(0, reach), r: pr, top, tone: clamp01(tone + (rng.next() - 0.5) * 0.4) })

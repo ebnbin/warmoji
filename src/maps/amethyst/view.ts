@@ -15,6 +15,7 @@ import { charSize } from '../../ecs/systems/shared/scale'
 import { playSfx } from '../../audio/sfx'
 import { Alive, ENEMY_SET, Telegraph, Transform, Uid } from '../../ecs/components'
 import { telegraphDef, telegraphEntry } from '../../ecs/store'
+import { gatesNow } from '../../ecs/worlds/gates'
 import { debrisAt, lowAt } from './layout'
 import { diffuseAt, directAt, facingAt, reliefAt, torchesAt } from './light'
 import { clarity, skyTint, spanAt, sunTint } from './sky'
@@ -56,12 +57,19 @@ const MOTH_DEPTH = 35
 /** 镜头与眼睛跟上亮度变化的时间常数，毫秒 */
 const VIEW_TAU = 700
 const ADAPT_TAU = 900
-const TORCH_COLOR = [1, 0.58, 0.26] as const
+/** 火光照在东西上的颜色：眼睛适应了火光，看上去几乎是白的，只带一点暖 */
+const TORCH_COLOR = [1, 0.9, 0.82] as const
 const MOON_COLOR = [0.78, 0.84, 1] as const
 /** 晶壁把光反出来时染上的紫 */
-const CRYSTAL_TINT = [0.82, 0.62, 1] as const
+const CRYSTAL_TINT = [0.84, 0.6, 1] as const
+/** 火光在晶壁之间来回反射几次以后的颜色：反一次染一次紫 */
+const TORCH_BOUNCE_COLOR = (() => {
+  const c = TORCH_COLOR.map((v, k) => v * CRYSTAL_TINT[k]! ** 3)
+  const m = Math.max(...c)
+  return c.map((v) => v / m)
+})()
 /** 最暗的地方也留一点紫黑 */
-const FLOOR = [0.032, 0.02, 0.05] as const
+const FLOOR = [0.07, 0.026, 0.11] as const
 /** 月光画面上提亮多少倍：真实的月光太暗、眼睛又只适应到 brightLux，不提亮就看不见；只是画面，刷怪与点火把按真实的照度 */
 const MOON_GAIN = 30
 /** 光柱里浮尘把多少直射光散向镜头 */
@@ -187,7 +195,10 @@ export class AmethystView extends BoundedView {
     const albedo = canvasTexture(scene, ALBEDO_KEY, W, H)
     const face = canvasTexture(scene, FACE_KEY, W, H)
     const geo = canvasTexture(scene, GEO_KEY, RW, RH)
-    const painter = new AmethystPainter(L, FACE_PPU, W, H, Math.max(1, Math.min(THREADS, navigator.hardwareConcurrency - 1)))
+    const seams = gatesNow(sim)
+      .filter((g) => g.def.at.kind === 'nooks')
+      .map((g) => ({ x: g.ax, y: g.ay, nx: g.nx, ny: g.ny }))
+    const painter = new AmethystPainter(L, seams, FACE_PPU, W, H, Math.max(1, Math.min(THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     await painter.paint(
       RW * RH,
@@ -247,6 +258,7 @@ export class AmethystView extends BoundedView {
               set('uBounceCol', u.bounceCol)
               set('uLogAdapt', u.logAdapt)
               set('uFloor', FLOOR)
+              set('uTorchBounce', TORCH_BOUNCE_COLOR)
               set('uMask0', mask?.rect ?? [0, 0, 1, 1])
             },
           },
@@ -408,7 +420,7 @@ export class AmethystView extends BoundedView {
           lit: 0,
           pop: 0,
           flame: scene.add.image(0, 0, FLAME_KEY).setDepth(FLAME_DEPTH).setBlendMode(Phaser.BlendModes.ADD).setOrigin(0.5, 0.85).setVisible(false),
-          halo: scene.add.image(0, 0, GLOW_KEY).setDepth(FLAME_DEPTH - 0.05).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a3c).setVisible(false),
+          halo: scene.add.image(0, 0, GLOW_KEY).setDepth(FLAME_DEPTH - 0.05).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa04a).setVisible(false),
           moths: Array.from({ length: MOTHS }, () => scene.add.image(0, 0, MOTH_KEY).setDepth(MOTH_DEPTH).setVisible(false)),
         }
         this.torches.set(m, fx)

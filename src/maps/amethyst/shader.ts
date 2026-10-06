@@ -68,6 +68,9 @@ const SHAFT_MAX = 0.38
 const SHINE = 56.0
 /** 直射查遮挡时沿光线取几个点 */
 const MARCH = 12
+/** 火光在晶壁之间来回反射回来的光：离火把水平 d 格处照到 TORCH_BOUNCE·I/(TORCH_ROOM² + d²)，被挡住的地方也照进去三成 */
+const TORCH_BOUNCE = 0.35
+const TORCH_ROOM = 2.5
 
 const PRELUDE = `
 #pragma phaserTemplate(shaderName)
@@ -151,7 +154,7 @@ float shadeOf(int k, vec2 d, float dist) {
 
 /**
  * 洞里的光，按 2 倍调制叠在整个战斗画面上（地面、角色、子弹、特效一起变亮变暗）：天光与反光从照度场来，朝上的面受的天光多，反光染成晶体的紫；
- * 直射看朝太阳（月亮）的那条光线在洞顶的高度上是不是落在开口里，再沿光线查高度图有没有被洞壁与晶体挡住；火把按点光源 I·cosθ/d² 照，沿影子图看有没有被挡住。
+ * 直射看朝太阳（月亮）的那条光线在洞顶的高度上是不是落在开口里，再沿光线查高度图有没有被洞壁与晶体挡住；火把按点光源 I·cosθ/d² 照，沿影子图看有没有被挡住，火光被晶壁反回来的染成紫色。
  * 有方向的光按法线图照出晶面与起伏；立着的东西（遮罩图里盖住的地方）不随地面的起伏，明暗交给精灵按光从哪边来画。
  * 照度除以眼睛适应的亮度后按色调曲线压成倍数，直射的光斑亮过原色；越暗越偏冷偏灰、泛着一点紫；最暗也留一点紫黑，不是纯黑；加一点抖动免得暗处出色带
  */
@@ -163,6 +166,7 @@ uniform vec3 uSkyCol;
 uniform vec3 uBounceCol;
 uniform float uLogAdapt;
 uniform vec3 uFloor;
+uniform vec3 uTorchBounce;
 float upright(vec2 w) {
   vec2 uv = (w - uMask0.xy) / uMask0.zw;
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
@@ -189,6 +193,7 @@ void main ()
     eMoon = uMoon.w * mix(max(dot(n, l), 0.0), 1.0, up) * through(world, z, uMoon, ${MARCH});
   }
   float eTorch = 0.0;
+  float eBounce = 0.0;
   for (int k = 0; k < ${MAX_TORCHES}; k++) {
     if (float(k) >= uTorchCount) break;
     vec4 t = uTorch[k];
@@ -198,14 +203,16 @@ void main ()
     vec3 l = vec3(d, t.w - z);
     float r2 = max(dot(l, l), 0.04);
     vec3 ld = l * inversesqrt(r2);
-    eTorch += t.z * mix(mix(max(ld.z, 0.0), max(dot(n, ld), 0.0), 0.75), 1.0, up) / r2 * shadeOf(k, d, dist);
+    float open = shadeOf(k, d, dist);
+    eTorch += t.z * mix(mix(max(ld.z, 0.0), max(dot(n, ld), 0.0), 0.75), 1.0, up) / r2 * open;
+    eBounce += t.z * ${TORCH_BOUNCE.toFixed(2)} / (${(TORCH_ROOM * TORCH_ROOM).toFixed(2)} + dist * dist) * mix(0.3, 1.0, open);
   }
-  float e = eDiff + eSun + eMoon + eTorch;
-  vec3 col = (eDiff * mix(uSkyCol, uBounceCol, lx.b) + eSun * uSunCol + eMoon * uMoonCol + eTorch * uTorchCol) / max(e, 1e-6);
+  float e = eDiff + eSun + eMoon + eTorch + eBounce;
+  vec3 col = (eDiff * mix(uSkyCol, uBounceCol, lx.b) + eSun * uSunCol + eMoon * uMoonCol + eTorch * uTorchCol + eBounce * uTorchBounce) / max(e, 1e-6);
   float lux = log(max(e, 1e-12)) * 0.4342945 + uLogAdapt;
   float scot = 1.0 - smoothstep(-2.0, 0.7, lux);
   float grey = dot(col, vec3(0.3, 0.5, 0.2));
-  col = mix(col, vec3(0.7, 0.66, 1.0) * grey, scot * 0.75);
+  col = mix(col, vec3(0.74, 0.6, 1.0) * grey, scot * 0.75);
   col /= max(max(col.r, col.g), max(col.b, 0.0001));
   float tone = ${TONE_MAX.toFixed(2)} * (1.0 - exp(-${TONE_K.toFixed(2)} * e));
   float dither = hash(gl_FragCoord.xy) - 0.5;

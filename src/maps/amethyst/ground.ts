@@ -1,4 +1,5 @@
 import { UNIT } from '../../util/units'
+import { SUN } from '../../data/light'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { roomAt } from '../basin'
 import { beamFrame, beamHalf, BIN, binAt, blockM, geodeDepth, hallDepth, heightM, hexNorm, prismFrame, prismHalf, riftDepth, skyAbove, STRIP_PAD_U, tunnelDepth, UPRIGHT } from './layout'
@@ -23,6 +24,14 @@ function hash1(n: number, seed: number): number {
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
+}
+
+/** 洞壁上出怪的晶缝，像素：口子在洞底边上的位置与朝洞里的单位方向 */
+export interface Seam {
+  readonly x: number
+  readonly y: number
+  readonly nx: number
+  readonly ny: number
 }
 
 /** 一个像素正在画的样子：固有色、表面朝向（单位向量，z 朝上）、有多亮的镜面（晶面接近 1，岩石接近 0） */
@@ -61,16 +70,23 @@ function face(p: Px, x: number, y: number, z: number): void {
   p.nz = z / l
 }
 
+const SUN_LEN = Math.hypot(SUN.x, SUN.y, SUN.z)
+
+/** 烘进晶体固有色的光：和画面里的太阳同一个方向，晶面朝着它亮、背着它暗，平光下也看得出棱角 */
+function keyed(p: Px): void {
+  dim(p, 0.6 + 0.6 * Math.max(0, (p.nx * SUN.x + p.ny * SUN.y + p.nz * SUN.z) / SUN_LEN))
+}
+
 /** 紫水晶从根到尖的颜色：根部几乎无色、发白，往尖上越来越紫，最尖处是深紫；deep 是这一块晶体本身的深浅 */
 function amethyst(p: Px, t: number, deep: number): void {
   const k = clamp01(t) ** 0.8
   const d = 0.75 + 0.5 * deep
-  paint(p, 214 + (112 - 214) * k * d * 0.95, 200 + (52 - 200) * k * d, 232 + (176 - 232) * k * d * 0.6)
+  paint(p, 226 - 108 * k * d, 212 - 158 * k * d, 244 - 40 * k * d)
 }
 
 // ————————————————————————————— 洞壁 —————————————————————————————
 
-/** 洞壁上那一圈：贴着洞底的是一排排朝洞里长的晶体（外面一排小的、里面一排大的），再往外是一层层白与灰蓝的玛瑙，最外是玄武岩 */
+/** 洞壁上那一圈：贴着洞底的是一排排朝洞里长的晶体（外面一排小的、里面一排大的），再往外是一层层浅紫与灰紫的玛瑙，最外是玄武岩 */
 function lining(p: Px, g: Geode, gi: number, u: number, wx: number, wy: number, gx: number, gy: number, seed: number): void {
   const dx = wx - g.x
   const dy = wy - g.y
@@ -114,10 +130,11 @@ function crystalRow(p: Px, along: number, u: number, width: number, tip: number,
   const side = a < 0 ? -1 : 1
   if (u < top + tipLen) face(p, ix * 0.75 + tx * side * 0.35, iy * 0.75 + ty * side * 0.35, 0.56)
   else face(p, ix * 0.45 + tx * side * 0.6, iy * 0.45 + ty * side * 0.6, 0.66)
+  keyed(p)
   p.gloss = 0.95
 }
 
-/** 玛瑙：顺着洞壁一层层的白与灰蓝，层与层之间一道细细的暗线；再往外是玄武岩 */
+/** 玛瑙：顺着洞壁一层层的浅紫与灰紫，层与层之间一道细细的暗线；再往外是玄武岩 */
 function agate(p: Px, u: number, gx: number, gy: number, seed: number): void {
   if (u > 1.06) {
     basalt(p, gx, gy, seed)
@@ -126,12 +143,12 @@ function agate(p: Px, u: number, gx: number, gy: number, seed: number): void {
   const v = ((u - 0.8) / 0.26 + 0.1 * (fbm(gx * 1.4, gy * 1.4, seed + 71, 2) - 0.5)) * 5
   const band = Math.floor(v)
   const tones = [
-    [226, 224, 234],
-    [152, 162, 186],
-    [212, 210, 224],
-    [120, 114, 138],
-    [136, 148, 174],
-    [196, 196, 212],
+    [182, 170, 206],
+    [128, 110, 162],
+    [164, 152, 194],
+    [102, 84, 136],
+    [118, 102, 158],
+    [152, 140, 186],
   ] as const
   const c = tones[((band % tones.length) + tones.length) % tones.length]!
   paint(p, c[0], c[1], c[2])
@@ -143,7 +160,7 @@ function agate(p: Px, u: number, gx: number, gy: number, seed: number): void {
 /** 玄武岩：暗得发紫的黑，一个个气孔；少数气孔里长着一点白的沸石或细小的紫晶 */
 function basalt(p: Px, gx: number, gy: number, seed: number): void {
   const n = fbm(gx * 0.8, gy * 0.8, seed + 77, 3)
-  paint(p, 34 + 12 * n, 30 + 10 * n, 44 + 12 * n)
+  paint(p, 36 + 12 * n, 26 + 8 * n, 50 + 14 * n)
   dim(p, 0.9 + 0.2 * valueNoise(gx * 11, gy * 11, seed + 79))
   p.gloss = 0.05
   const q = cellNearest(gx * 2.8, gy * 2.8, seed + 81)
@@ -154,8 +171,45 @@ function basalt(p: Px, gx: number, gy: number, seed: number): void {
     amethyst(p, 0.4 + 0.6 * (1 - d), q.h)
     face(p, q.dx, q.dy, 0.6)
     p.gloss = 0.9
-  } else if (q.h > 0.975) paint(p, 150, 148, 160)
+  } else if (q.h > 0.975) paint(p, 156, 148, 172)
   else dim(p, 0.7 + 0.25 * d)
+}
+
+/** 晶缝：洞壁上从洞底边往岩体里裂进去、越往里越窄的一道缝，缝里黑洞洞的，缝口两边是崩碎的晶面；缝口前的洞底散着崩下来的碎晶 */
+function seam(p: Px, sm: Seam, wx: number, wy: number, seed: number): boolean {
+  const dx = wx - sm.x
+  const dy = wy - sm.y
+  const depth = -(dx * sm.nx + dy * sm.ny) / UNIT
+  const across = (-dx * sm.ny + dy * sm.nx) / UNIT
+  if (depth < -0.7 || depth > 1.9 || Math.abs(across) > 0.8) return false
+  if (depth < 0) {
+    const s = cellNearest(wx / UNIT * 6, wy / UNIT * 6, seed + 181)
+    if (s.h > 0.5 + 0.5 * (-depth / 0.7) && Math.hypot(s.dx, s.dy) < 0.32) {
+      amethyst(p, 0.7, s.h)
+      face(p, s.dx, s.dy, 0.7)
+      keyed(p)
+      p.gloss = 0.9
+      return true
+    }
+    return false
+  }
+  const half = 0.3 * (1 - depth / 1.9) ** 0.8 + 0.08 * (fbm(depth * 3, across * 2 + sm.x, seed + 171, 2) - 0.5)
+  const a = Math.abs(across)
+  if (a < half) {
+    paint(p, 26 - 10 * (depth / 1.9), 12, 38 - 14 * (depth / 1.9))
+    face(p, 0, 0, 1)
+    p.gloss = 0.03
+    return true
+  }
+  if (a < half + 0.13) {
+    amethyst(p, 0.55 + 0.45 * (1 - depth / 1.9), 0.6)
+    const side = across < 0 ? 1 : -1
+    face(p, -sm.ny * side * 0.7, sm.nx * side * 0.7, 0.7)
+    keyed(p)
+    p.gloss = 0.92
+    return true
+  }
+  return false
 }
 
 // ————————————————————————————— 洞底 —————————————————————————————
@@ -166,10 +220,10 @@ function basalt(p: Px, gx: number, gy: number, seed: number): void {
  */
 function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: boolean, seed: number): void {
   const big = fbm(gx / 5, gy / 5, seed + 3, 3)
-  paint(p, 100 + 34 * big, 88 + 28 * big, 118 + 32 * big)
-  blend(p, 72, 66, 84, 0.8 * ease(0.56, 0.72, fbm(gx / 3.2, gy / 3.2, seed + 21, 2)))
+  paint(p, 100 + 30 * big, 58 + 18 * big, 126 + 34 * big)
+  blend(p, 62, 42, 90, 0.8 * ease(0.56, 0.72, fbm(gx / 3.2, gy / 3.2, seed + 21, 2)))
   dim(p, 0.92 + 0.08 * valueNoise(gx * 7, gy * 7, seed + 9) + 0.08 * valueNoise(gx * 19, gy * 19, seed + 11))
-  if (tunnel) blend(p, 56, 52, 64, 0.8)
+  if (tunnel) blend(p, 50, 36, 70, 0.8)
   p.gloss = 0.04
   // 晶粒
   const g = cellNearest(gx * 14, gy * 14, seed + 61)
@@ -179,26 +233,25 @@ function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: boolean, se
     p.gloss = 0.9
     return
   }
+  const near = 1 - ease(0.2, 1.6, wallU)
   if (!tunnel) {
-    // 晶簇壳：一片里挤满细小的晶尖，每颗一个四棱锥
-    const crust = ease(0.63, 0.72, fbm(gx / 2.4, gy / 2.4, seed + 41, 2))
+    // 晶簇壳：一层细密的小晶尖，每颗的晶面朝向都不一样，光一扫满片闪；从洞壁往洞里长，越靠壁越多
+    const lift = 0.08 * (1 - ease(0.4, 3, wallU))
+    const crust = ease(0.7 - lift, 0.78 - lift, fbm(gx / 2.4, gy / 2.4, seed + 41, 2))
     if (crust > 0) {
-      const q = cellNearest(gx * 5, gy * 5, seed + 43)
-      const d = Math.hypot(q.dx, q.dy) / (0.4 + 0.14 * q.h)
-      if (d < 1 && q.h > 0.25 * (1 - crust)) {
-        amethyst(p, 0.55 + 0.45 * (1 - d), q.h)
-        const ang = Math.atan2(q.dy, q.dx)
-        const sector = Math.floor(((ang / (Math.PI * 2) + 0.5) * 4 + q.h * 4) % 4)
-        const mid = ((sector + 0.5) / 4) * Math.PI * 2 - q.h * Math.PI * 2
-        face(p, Math.cos(mid) * 0.8, Math.sin(mid) * 0.8, 1)
-        p.gloss = 0.85
+      const q = cellNearest(gx * 7, gy * 7, seed + 43)
+      if (q.h > 1 - 1.6 * crust) {
+        amethyst(p, 0.62 + 0.38 * frac(q.h * 7.9), frac(q.h * 13.1))
+        face(p, (frac(q.h * 31.7) - 0.5) * 1.8, (frac(q.h * 57.3) - 0.5) * 1.8, 1)
+        keyed(p)
+        if (Math.hypot(q.dx, q.dy) > 0.4) dim(p, 0.55)
+        p.gloss = 0.9
         return
       }
-      if (crust > 0.5) blend(p, 52, 34, 72, 0.6)
+      if (crust > 0.5) blend(p, 50, 30, 78, 0.5)
     }
   }
   // 洞壁脚下：碎晶，越贴着壁越多
-  const near = 1 - ease(0.2, 1.6, wallU)
   const s = cellNearest(gx * 3.4, gy * 3.4, seed + 47)
   if (!tunnel && s.h > 1 - 0.55 * near - 0.04) {
     const ang = s.h * 17.3
@@ -216,14 +269,14 @@ function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: boolean, se
     }
     if (Math.abs(a) < len * 1.1 && Math.abs(b) < w + 0.05) dim(p, 0.7)
   }
-  // 玉髓卵石：磨圆的白里透蓝
+  // 玉髓卵石：磨圆的白里透紫
   const q = cellNearest(gx * 1.6, gy * 1.6, seed + 53)
   if (q.h > 0.975) {
     const r = 0.09 + 0.08 * frac(q.h * 31.3)
     const d = Math.hypot(q.dx, q.dy) / (r * 1.6)
     if (d < 1) {
       const k = 0.85 + 0.15 * (1 - d)
-      paint(p, 196 * k, 200 * k, 218 * k)
+      paint(p, 206 * k, 198 * k, 228 * k)
       face(p, q.dx, q.dy, Math.sqrt(Math.max(0.05, 1 - d * d)) * r * 1.6)
       p.gloss = 0.35
       return
@@ -235,11 +288,11 @@ function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: boolean, se
 }
 
 /**
- * 塌下来的东西：洞顶的岩粉铺了一层，上面散着从洞顶掉下的碎晶；塌顶下还压着一块块棱角分明的玄武岩，每块一个斜面，块与块之间是暗缝。
+ * 塌下来的东西：洞顶的岩粉铺了一层，上面散着从洞顶掉下的碎晶；塌顶下还压着一块块碎石，多是玄武岩、夹着几块玛瑙与紫晶，每块中间一道棱、两边斜下去，块与块之间是暗缝。
  * w 是盖上去的分量；盖住了这一点（画成了碎晶或石块）返回 true
  */
 function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, seed: number): boolean {
-  blend(p, 124, 114, 136, (blocks ? 0.55 : 0.3) * w)
+  blend(p, 120, 90, 156, (blocks ? 0.55 : 0.3) * w)
   const s = cellNearest(gx * 4.5, gy * 4.5, seed + 107)
   if (s.h > (blocks ? 0.45 : 0.6) && w > 0.35) {
     const ang = s.h * 23.1
@@ -264,11 +317,17 @@ function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, seed:
     dim(p, 1 - 0.5 * w)
     return false
   }
-  const tone = 0.7 + 0.55 * frac(q.h * 7.3)
-  blend(p, 84 * tone, 78 * tone, 96 * tone, Math.min(1, w * 1.4))
-  face(p, (frac(q.h * 41.3) - 0.5) * 1.1, (frac(q.h * 77.9) - 0.5) * 1.1, 1)
+  const kind = frac(q.h * 7.3)
+  const k = Math.min(1, w * 1.4)
+  if (kind < 0.62) blend(p, 66 + 40 * kind, 50 + 24 * kind, 92 + 40 * kind, k)
+  else if (kind < 0.86) blend(p, 184, 170, 212, k)
+  else amethyst(p, 0.6, frac(q.h * 3.9))
+  const ridge = q.h * 29.7
+  const side = q.dx * Math.cos(ridge) + q.dy * Math.sin(ridge) > 0 ? 0.75 : -0.75
+  face(p, Math.cos(ridge) * side + q.dx * 0.6, Math.sin(ridge) * side + q.dy * 0.6, 1)
+  keyed(p)
   dim(p, 0.9 + 0.12 * valueNoise(gx * 14, gy * 14, seed + 103))
-  p.gloss = 0.08
+  p.gloss = kind < 0.86 ? 0.08 : 0.9
   return true
 }
 
@@ -284,16 +343,16 @@ function nodule(p: Px, n: Nodule, wx: number, wy: number, gx: number, gy: number
   }
   if (d > 0.8) {
     const k = 0.75 + 0.35 * fbm(gx * 6, gy * 6, seed + 131, 2)
-    paint(p, 96 * k, 88 * k, 98 * k)
+    paint(p, 90 * k, 72 * k, 108 * k)
     p.gloss = 0.05
     return true
   }
   if (d > 0.62) {
     const v = ((0.8 - d) / 0.18) * 4 + 0.3 * fbm(gx * 3, gy * 3, seed + 133, 2)
     const b = Math.floor(v) % 3
-    if (b === 0) paint(p, 226, 224, 234)
-    else if (b === 1) paint(p, 146, 158, 184)
-    else paint(p, 196, 194, 212)
+    if (b === 0) paint(p, 222, 214, 236)
+    else if (b === 1) paint(p, 150, 132, 186)
+    else paint(p, 196, 186, 222)
     if (frac(v) < 0.12) dim(p, 0.75)
     p.gloss = 0.3
     return true
@@ -319,6 +378,7 @@ function nodule(p: Px, n: Nodule, wx: number, wy: number, gx: number, gy: number
   const ty = ix
   const side = a < 0 ? -1 : 1
   face(p, ix * 0.6 + tx * side * 0.45, iy * 0.6 + ty * side * 0.45, 0.62)
+  keyed(p)
   p.gloss = 0.95
   return true
 }
@@ -339,8 +399,9 @@ function prism(p: Px, q: Prism, wx: number, wy: number): boolean {
     const sector = Math.floor((((ang / (Math.PI / 3)) % 6) + 6) % 6)
     const mid = q.dir + (sector + 0.5) * (Math.PI / 3)
     amethyst(p, 0.45 + 0.55 * (1 - d), q.tone)
-    if (d > 0.9) dim(p, 0.72)
     face(p, Math.cos(mid) * 0.62, Math.sin(mid) * 0.62, 0.79)
+    keyed(p)
+    if (d > 0.84) dim(p, 0.6)
     p.gloss = 0.95
     return true
   }
@@ -373,9 +434,9 @@ function prism(p: Px, q: Prism, wx: number, wy: number): boolean {
   }
   face(p, nx, ny, Math.max(0.08, nz))
   amethyst(p, clamp01((s + q.r) / (end + q.r)), q.tone)
-  if (Math.abs(qn) < 0.12) dim(p, 1.14)
-  if (Math.abs(qn) > 0.88) dim(p, 0.7)
-  if (side !== 0) dim(p, 0.9)
+  keyed(p)
+  if (Math.abs(qn) < 0.12) dim(p, 1.12)
+  if (Math.abs(qn) > 0.8) dim(p, 0.6)
   p.gloss = 0.95
   return true
 }
@@ -425,8 +486,9 @@ function beam(p: Px, b: Beam, wx: number, wy: number): boolean {
   if (Math.abs(q) <= 0.5) amethyst(p, 0.75 + 0.25 * (s / len), deep)
   else amethyst(p, 0.62 + 0.3 * (s / len), deep)
   dim(p, band)
+  keyed(p)
   if (Math.abs(Math.abs(q) - 0.5) < 0.04) blend(p, 214, 190, 250, 0.7)
-  if (Math.abs(q) > 0.95) dim(p, 0.65)
+  if (Math.abs(q) > 0.93) dim(p, 0.6)
   p.gloss = 0.95
   return true
 }
@@ -434,10 +496,10 @@ function beam(p: Px, b: Beam, wx: number, wy: number): boolean {
 // ————————————————————————————— 整张图 —————————————————————————————
 
 /**
- * 画第 r0 到 r1 行（每格 ppu 像素）的地面固有色与表面朝向：albedo 是 RGBA 的颜色，face 的 R、G 是法线的 x、y（按 0.5 偏移）、B 是镜面的强弱，
+ * 画第 r0 到 r1 行（每格 ppu 像素）的地面固有色与表面朝向，洞壁上画出晶缝：albedo 是 RGBA 的颜色，face 的 R、G 是法线的 x、y（按 0.5 偏移）、B 是镜面的强弱，
  * 都要满 alpha（画布会按透明度预乘）。不含光，光照在着色器里随太阳、月亮与火把实时算；表面朝向先按高度场求，晶体、碎石与卵石换成它们自己的晶面
  */
-export function paintRows(L: AmethystLayout, ppu: number, r0: number, r1: number, albedo: Uint8ClampedArray, normal: Uint8ClampedArray): void {
+export function paintRows(L: AmethystLayout, seams: readonly Seam[], ppu: number, r0: number, r1: number, albedo: Uint8ClampedArray, normal: Uint8ClampedArray): void {
   const f = L.field
   const W = Math.round((f.w / UNIT) * ppu)
   const step = UNIT / ppu
@@ -466,6 +528,7 @@ export function paintRows(L: AmethystLayout, ppu: number, r0: number, r1: number
       const shell = roomAt(L.shell, wx, wy)
       if (shell < 0) rock(p, L, wx, wy, gx, gy, -shell / wallPx, s)
       else ground(p, L, wx, wy, gx, gy, shell / UNIT, s)
+      if (shell > -wallPx && shell < UNIT) for (const sm of seams) if (Math.abs(wx - sm.x) < 2 * UNIT && Math.abs(wy - sm.y) < 2 * UNIT && seam(p, sm, wx, wy, s)) break
       // 画到边上淡进底色
       const edge = Math.min(wx - f.x, f.x + f.w - wx, wy - f.y, f.y + f.h - wy) / UNIT
       if (edge < 1.5) blend(p, ROCK_BG[0], ROCK_BG[1], ROCK_BG[2], 1 - edge / 1.5)
@@ -551,7 +614,9 @@ function ground(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy
     } else if (kind === BIN.beam) {
       const b = L.beams[idx]!
       const { s, u, len } = beamFrame(b, wx, wy)
-      if (s > -0.3 * UNIT && s < len + 0.3 * UNIT) ao = Math.max(ao, 0.4 * ease(b.r + 0.4 * UNIT, b.r * 0.9, Math.abs(u)))
+      const along = Math.max(0, -s, s - len)
+      const across = Math.max(0, Math.abs(u) - beamHalf(b, Math.min(len, Math.max(0, s)), len))
+      ao = Math.max(ao, 0.4 * ease(0.4 * UNIT, 0, Math.hypot(along, across)))
     }
   }
   if (debris > 0.02 && rubble(p, gx, gy, debris, blocks, seed)) return
