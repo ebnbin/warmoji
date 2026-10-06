@@ -713,18 +713,8 @@ const ROOF: Partial<Record<PieceKind, (ctx: Ctx, W: number, H: number, rng: Rng)
     strokes(ctx, lines, 1, INK.tileLo)
     strokes(ctx, [[[0, H / 2], [W, H / 2]]], 3, INK.tileLo)
   },
-  windmill: (ctx, W, H) => {
-    ink(ctx, rect(0, 0, W, H), { fill: INK.plaster, line: LW }, W, H)
-    ink(ctx, ellipse(W / 2, H / 2, W * 0.36, H * 0.36), { fill: INK.tile, lo: INK.tileLo, line: LW }, W, H)
-  },
-  haystack: (ctx, W, H, rng) => {
-    ink(ctx, ellipse(W / 2, H / 2, W / 2 - 1, H / 2 - 1), { fill: INK.hay, lo: INK.hayLo, line: LW }, W, H)
-    strokes(ctx, Array.from({ length: 30 }, () => {
-      const a = rng.next() * 6.28
-      const r = rng.next() * W * 0.4
-      return [[W / 2 + Math.cos(a) * r, H / 2 + Math.sin(a) * r * (H / W)], [W / 2 + Math.cos(a) * (r + 6), H / 2 + Math.sin(a) * (r + 6) * (H / W)]] as Pt[]
-    }), 1, INK.hayLo)
-  },
+
+
   well: (ctx, W, H) => {
     ink(ctx, rect(0, 0, W, H), { fill: INK.stoneHi, line: LW }, W, H)
     ink(ctx, ellipse(W / 2, H / 2, W * 0.32, H * 0.32), { fill: '#2a4a6e', hi: '#5d87b8', line: LW }, W, H)
@@ -741,16 +731,7 @@ const ROOF: Partial<Record<PieceKind, (ctx: Ctx, W: number, H: number, rng: Rng)
     stones(ctx, W * 0.1, H * 0.15, W * 0.8, H * 0.7, 4, rng)
     strokes(ctx, [[[W * 0.1, H * 0.15], [W * 0.9, H * 0.15], [W * 0.9, H * 0.85], [W * 0.1, H * 0.85], [W * 0.1, H * 0.15]]], 1.6)
   },
-  hoard: (ctx, W, H, rng) => {
-    ink(ctx, ellipse(W / 2, H / 2, W / 2 - 1, H / 2 - 1), { fill: INK.gold, lo: INK.goldLo, line: LW }, W, H)
-    for (let i = 0; i < 24; i++) {
-      ctx.beginPath()
-      ctx.arc(W * (0.2 + 0.6 * rng.next()), H * (0.2 + 0.6 * rng.next()), 3.5, 0, 6.28)
-      ctx.strokeStyle = INK.goldLo
-      ctx.lineWidth = 1
-      ctx.stroke()
-    }
-  },
+
 }
 
 /** 带山墙的房子：檐口在正面高的这么多处，顶面画成从檐口坡到屋脊的两片屋顶 */

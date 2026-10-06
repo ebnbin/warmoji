@@ -37,6 +37,7 @@ const STRIP_PX = 64
 const SPREAD_DEPTH = -0.9
 const FLAT_DEPTH = -0.6
 const SHADOW_DEPTH = -0.4
+const RIBBON_DEPTH = -0.5
 const CURL_DEPTH = -0.3
 const STAND_DEPTH = 2.7
 const LEAF_DEPTH = 34
@@ -50,6 +51,8 @@ const CARD_EDGE_U = 0.06
 const LEAF_LIFT = STAND_U_PER_M / FLAT_U_PER_M
 /** 翻页时书页上的光：迎着灯最亮、侧着最暗 */
 const LEAF_LIGHT = { min: 0.62, max: 1.04 } as const
+/** 翻起来的书页盖在战场上方：留一点透，底下打成什么样还隐约看得见 */
+const LEAF_ALPHA = 0.9
 /** 图集的宽，像素；每件之间空几像素 */
 const ATLAS_W = 2048
 const ATLAS_GAP = 4
@@ -229,13 +232,61 @@ export class StorybookView implements MapView {
     this.leaf = new QuadLayer(scene, LEAF_DEPTH)
     this.curl = scene.add.graphics().setDepth(CURL_DEPTH)
     this.sweep = scene.add.image(0, 0, SWEEP_KEY).setOrigin(0.5, 0).setDepth(CURL_DEPTH).setVisible(false)
-    this.visuals.push(this.spreadA, this.spreadB, this.flat, this.shadow, this.stand, this.leaf, this.curl, this.sweep)
+    this.visuals.push(this.spreadA, this.spreadB, this.flat, this.shadow, this.stand, this.leaf, this.curl, this.sweep, this.ribbon(scene, book))
     const c = st.clock
     this.sheet(v, st, c.page)
     if (c.phase === 'warn' || c.phase === 'fold') this.sheet(v, st, c.page + 1)
     this.lastPhase = c.phase
     this.ready = true
     v.lens.screen.vignette(0.8, 0.22, 0x140a04)
+  }
+
+  /** 书签带：从书脊上头的堵头布垂下来，弯弯地搭在右页上，尾巴剪成燕尾；平躺在页面上，谁都踩得过 */
+  private ribbon(scene: Phaser.Scene, book: Book): Phaser.GameObjects.Graphics {
+    const g = scene.add.graphics().setDepth(RIBBON_DEPTH)
+    const pts: Point[] = []
+    const n = 40
+    const len = 9.5
+    for (let i = 0; i <= n; i++) {
+      const t = i / n
+      pts.push({ x: (book.gx + 0.12 + Math.sin(t * Math.PI * 1.3) * 1.1 + t * 1.6) * UNIT, y: (book.y0 - 0.35 + t * len) * UNIT })
+    }
+    const half = 0.17 * UNIT
+    const side = (k: number, off: number): Point[] =>
+      pts.map((p, i) => {
+        const q = pts[Math.min(n, i + 1)]!
+        const r = pts[Math.max(0, i - 1)]!
+        const dx = q.x - r.x
+        const dy = q.y - r.y
+        const l = Math.hypot(dx, dy) || 1
+        return { x: p.x - (dy / l) * half * k + off, y: p.y + (dx / l) * half * k + off }
+      })
+    const strip = (off: number, color: number, alpha: number): void => {
+      const a = side(1, off)
+      const b = side(-1, off).reverse()
+      const end = pts[n]!
+      g.fillStyle(color, alpha)
+      g.beginPath()
+      g.moveTo(a[0]!.x, a[0]!.y)
+      for (const p of a) g.lineTo(p.x, p.y)
+      g.lineTo(end.x + off, end.y - half * 1.2 + off)
+      for (const p of b) g.lineTo(p.x, p.y)
+      g.closePath()
+      g.fillPath()
+    }
+    strip(0.08 * UNIT, SHADOW_COLOR, 0.25)
+    strip(0, 0xa52f38, 1)
+    g.lineStyle(0.03 * UNIT, 0xd86a6f, 0.8)
+    g.beginPath()
+    pts.forEach((p, i) => (i === 0 ? g.moveTo(p.x - 2, p.y) : g.lineTo(p.x - 2, p.y)))
+    g.strokePath()
+    for (const k of [1, -1]) {
+      g.lineStyle(0.025 * UNIT, 0x5e171d, 0.9)
+      g.beginPath()
+      side(k, 0).forEach((p, i) => (i === 0 ? g.moveTo(p.x, p.y) : g.lineTo(p.x, p.y)))
+      g.strokePath()
+    }
+    return g
   }
 
   /** 第几页画好的东西：没画过就现画 */
@@ -479,7 +530,7 @@ export class StorybookView implements MapView {
     const light = LEAF_LIGHT.min + (LEAF_LIGHT.max - LEAF_LIGHT.min) * clamp01(0.5 + 0.5 * (0.45 * -nx + 0.66 * nz) / 0.8)
     const key = front ? this.leafKeys.front : this.leafKeys.back
     const uv = front ? { u0: 0, uw: 1 } : { u0: 1, uw: -1 }
-    layer.quads = [{ key, x: [gx, gx, ex, ex], y: [y0, y1, y0 - lift, y1 - lift], u0: uv.u0, v0: 1, uw: uv.uw, vh: -1, color: grey(light), alpha: 1, fill: false }]
+    layer.quads = [{ key, x: [gx, gx, ex, ex], y: [y0, y1, y0 - lift, y1 - lift], u0: uv.u0, v0: 1, uw: uv.uw, vh: -1, color: grey(light), alpha: LEAF_ALPHA, fill: false }]
     const sl = W * Math.sin(th) * SHADOW_PER_M * 1.4
     this.leafShadow = { key: '__WHITE', x: [gx, gx, ex + AWAY.x * sl, ex + AWAY.x * sl], y: [y0, y1, y0 + AWAY.y * sl, y1 + AWAY.y * sl], u0: 0, v0: 0, uw: 1, vh: 1, color: SHADOW_COLOR, alpha: 1, fill: true }
   }

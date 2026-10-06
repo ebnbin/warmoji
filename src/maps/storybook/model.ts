@@ -18,6 +18,8 @@ const REACH_CELL_U = 0.25
 /** 查连通时小个子、头目各按多大的半径，格：配比里最大的小怪、地图的头目都挤得过布景之间的路 */
 const SMALL_U = 0.65
 const BIG_U = 1.15
+/** 左页左上角印字的那一块，格：离页角多远、多宽多高 */
+export const TEXT_BOX = { x: 0, y: 0, w: 9, h: 4.8 } as const
 /** 一页最多换几次种子重摆 */
 const PAGE_TRIES = 12
 /** 一件布景最多换几个地方试 */
@@ -212,7 +214,7 @@ const WALL = S('wall', [4, 6.4], 0, [2.7, 3], 0.12)
 const TOWER = S('tower', [1.7, 1.8], 1.7, [3.9, 4.3], 0)
 const KEEP = S('keep', [2.8, 3.3], 1.8, [3.4, 3.7], 0.08)
 const TOPIARY = S('topiary', [1.6, 3], 0, 'low', 0.3)
-const PILLAR = S('pillar', [1.6, 2.6], 0, [2.8, 3.4], 0.4)
+const PILLAR = S('pillar', [2.2, 3.4], 0, [2.8, 3.4], 0.4)
 const SPIRE = S('spire', [0.9, 1.3], 0, [2.7, 3.2], 0.3)
 const CRYSTAL = S('crystal', [1.2, 1.6], 0, [2.4, 2.8], 0.35)
 const HOARD = S('hoard', [1.8, 2.6], 0, 'low', 0.3)
@@ -361,6 +363,10 @@ function fits(cfg: StorybookConfig, book: Book, p: Piece, placed: readonly Piece
     if ((c.x > book.gx) !== right || Math.abs(c.x - book.gx) < cfg.margin.gutter) return false
   }
   if (plaza && slabSd(s, book.start.x, book.start.y) < cfg.plazaU) return false
+  // 左页左上角印着章名与故事：布景不压着字
+  const tx = book.x0 + TEXT_BOX.x
+  const ty = book.y0 + TEXT_BOX.y
+  if (cs.some((c) => c.x < tx + TEXT_BOX.w && c.y < ty + TEXT_BOX.h) || (s.cx < tx + TEXT_BOX.w && s.cy < ty + TEXT_BOX.h)) return false
   for (const q of placed) {
     if (q.group === p.group) continue
     const gap = p.low || q.low ? cfg.gapU.low : cfg.gapU.tall
