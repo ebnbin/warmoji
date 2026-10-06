@@ -541,7 +541,7 @@ export function pageOf(cfg: StorybookConfig, book: Book, index: number): Page {
   return { index, chapter, number: book.number0 + index * 2, seed: base, blend, pieces: ordered }
 }
 
-/** 换页的一段：stand 立着，redraw 一道前沿扫过两页，前沿过处擦掉旧画、画上新画 */
+/** 换页的一段：stand 立着，redraw 一把大刷子来回刷过两页，刷过处就是新一页 */
 export type Phase = 'stand' | 'redraw'
 
 /** 此刻换到哪：page 是正立着或正画上的那一页（redraw 时旧的是 page - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换页在几时（毫秒） */
@@ -563,21 +563,10 @@ function jitter(book: Book, k: number): number {
   return hash01(book.seed, k, 0x1f2e3d) * 2 - 1
 }
 
-/** 一处从前沿到了算起，擦、打草稿、上色各从几时开始，毫秒：擦到七成开始打草稿，草稿打到八成开始上色 */
-export function stageStarts(cfg: StorybookConfig): { readonly erase: number; readonly sketch: number; readonly color: number } {
-  const t = cfg.turn
-  return { erase: 0, sketch: t.eraseMs * 0.7, color: t.eraseMs * 0.7 + t.sketchMs * 0.8 }
-}
-
-/** 一处从前沿到了算起，旧画擦完、新画上完色要多久，毫秒 */
-export function drawLen(cfg: StorybookConfig): number {
-  return stageStarts(cfg).color + cfg.turn.colorMs
-}
-
-/** 一次换页从前沿出发到新布景全弹起来多长，毫秒 */
+/** 一次换页从起刷到新布景全弹起来多长，毫秒 */
 export function turnLen(cfg: StorybookConfig): number {
   const t = cfg.turn
-  return t.sweepMs + drawLen(cfg) + t.flipMs
+  return t.sweepMs + t.settleMs + t.flipMs
 }
 
 /** 难度时钟走到 ms 毫秒时书换到哪 */
@@ -598,51 +587,94 @@ export function clockAt(cfg: StorybookConfig, book: Book, ms: number): BookClock
 }
 
 /**
- * 换到第 page 页时扫过两页的那道前沿：朝 (ux, uy) 推进，沿前沿按波长 waveU、幅度 amp 起伏；
- * 前沿从 lo 推到 hi（格，按 (ux, uy) 方向量），每次换页方向随机
+ * 换到第 page 页时那把大刷子怎么刷：一道道沿 (-uy, ux) 来回刷，一道刷完往 (ux, uy) 挪 step 格再刷回来，第 0 道的中线在 lo + step / 2（按 (ux, uy) 量）；
+ * 每道中间往前鼓 bow 格（手腕摆出来的弧），spans 是每道从哪刷到哪（按 (-uy, ux) 量，格），偶数道正着刷、奇数道反着刷；每道刷 rowMs 毫秒。方向每次换页随机
  */
 export interface Sweep {
   readonly ux: number
   readonly uy: number
-  readonly amp: number
-  readonly waveU: number
-  readonly phase: number
   readonly lo: number
-  readonly hi: number
+  readonly step: number
+  readonly bow: number
+  readonly spans: readonly (readonly [number, number])[]
+  readonly rowMs: number
 }
 
-export function sweepOf(book: Book, page: number): Sweep {
+/** 刷子在一道两头多刷出去多远，格；手腕的弧占道距多少 */
+const SPAN_PAD_U = 0.6
+const BOW = 0.3
+/** 刷子扫过以后平躺的布景多久（毫秒）印浓或盖掉 */
+const INK_MS = 120
+
+export function sweepOf(cfg: StorybookConfig, book: Book, page: number): Sweep {
   const a = hash01(book.seed, page, 0x5e1a7) * Math.PI * 2
   const ux = Math.cos(a)
   const uy = Math.sin(a)
-  const amp = 1 + hash01(book.seed, page, 0x2b7) * 1.2
-  const waveU = 7 + hash01(book.seed, page, 0x9c1) * 6
-  const phase = hash01(book.seed, page, 0x44d) * Math.PI * 2
-  const ds = [book.x0 * ux + book.y0 * uy, book.x1 * ux + book.y0 * uy, book.x0 * ux + book.y1 * uy, book.x1 * ux + book.y1 * uy]
-  return { ux, uy, amp, waveU, phase, lo: Math.min(...ds) - amp - 0.2, hi: Math.max(...ds) + amp + 0.2 }
+  const n = cfg.turn.strokes
+  const cs = [[book.x0, book.y0], [book.x1, book.y0], [book.x1, book.y1], [book.x0, book.y1]].map(([x, y]) => ({ s: -x! * uy + y! * ux, d: x! * ux + y! * uy }))
+  const lo = Math.min(...cs.map((c) => c.d))
+  const step = (Math.max(...cs.map((c) => c.d)) - lo) / n
+  const spans: [number, number][] = []
+  for (let r = 0; r < n; r++) {
+    // 书页与这一道（连上弧鼓出去的）相交的那一段
+    const d0 = lo + r * step - step * 0.2
+    const d1 = lo + (r + 1) * step + step * (0.2 + BOW)
+    const ss: number[] = []
+    for (let i = 0; i < 4; i++) {
+      const p = cs[i]!
+      const q = cs[(i + 1) % 4]!
+      if (p.d >= d0 && p.d <= d1) ss.push(p.s)
+      for (const d of [d0, d1]) if ((p.d - d) * (q.d - d) < 0) ss.push(p.s + ((q.s - p.s) * (d - p.d)) / (q.d - p.d))
+    }
+    spans.push([Math.min(...ss) - SPAN_PAD_U, Math.max(...ss) + SPAN_PAD_U])
+  }
+  return { ux, uy, lo, step, bow: step * BOW, spans, rowMs: cfg.turn.sweepMs / n }
 }
 
-/** (x, y) 格在前沿推进的方向上量出来有多远，算上前沿的起伏 */
-export function sweepD(sw: Sweep, x: number, y: number): number {
-  const along = -x * sw.uy + y * sw.ux
-  return x * sw.ux + y * sw.uy + sw.amp * Math.sin((along / sw.waveU) * Math.PI * 2 + sw.phase)
+/** 刷一道时走到几成：起笔慢、中间快、到头慢下来掉头 */
+function strokeAt(tau: number): number {
+  return 0.5 - 0.5 * Math.cos(Math.PI * clamp01(tau))
 }
 
-/** 前沿在换页开始后几毫秒到 (x, y) 格 */
-export function arrival(cfg: StorybookConfig, sw: Sweep, x: number, y: number): number {
-  return clamp01((sweepD(sw, x, y) - sw.lo) / (sw.hi - sw.lo)) * cfg.turn.sweepMs
+/** 第 r 道刷到 f 成（0 到 1，按这一道刷的方向）时刷子的中心，格 */
+export function brushAt(sw: Sweep, r: number, f: number): Point {
+  const [s0, s1] = sw.spans[r]!
+  const q = r % 2 === 0 ? f : 1 - f
+  const s = s0 + (s1 - s0) * q
+  const d = sw.lo + (r + 0.5) * sw.step + sw.bow * (1 - (2 * q - 1) ** 2)
+  return { x: -s * sw.uy + d * sw.ux, y: s * sw.ux + d * sw.uy }
 }
 
-/** 前沿过后 tau 毫秒的一处：旧画擦掉了多少、新画的草稿出来多少、上了多少色，都在 0 到 1 之间 */
-export function stageOf(cfg: StorybookConfig, tau: number): { readonly erase: number; readonly sketch: number; readonly color: number } {
-  const t = cfg.turn
-  const s = stageStarts(cfg)
-  return { erase: easeInOut(clamp01(tau / t.eraseMs)), sketch: easeInOut(clamp01((tau - s.sketch) / t.sketchMs)), color: easeInOut(clamp01((tau - s.color) / t.colorMs)) }
+/** 换页开始后 at 毫秒时刷子在第几道、刷到几成；刷完了为 null */
+export function brushPhase(sw: Sweep, at: number): { readonly r: number; readonly f: number } | null {
+  const r = Math.floor(at / sw.rowMs)
+  if (at < 0 || r >= sw.spans.length) return null
+  return { r, f: strokeAt(at / sw.rowMs - r) }
 }
 
-/** 前沿最早、最晚到一件布景的哪儿，毫秒 */
-function reach(cfg: StorybookConfig, sw: Sweep, p: Piece): readonly [number, number] {
-  const ts = corners(slabOf(p)).map((q) => arrival(cfg, sw, q.x, q.y))
+/** 刷子在换页开始后几毫秒刷到 (x, y) 格：落在哪一道（中线带弧）里，那一道刷到它的时候 */
+export function arrival(sw: Sweep, x: number, y: number): number {
+  const s = -x * sw.uy + y * sw.ux
+  const d = x * sw.ux + y * sw.uy
+  const n = sw.spans.length
+  let r = Math.min(n - 1, Math.max(0, Math.floor((d - sw.lo) / sw.step)))
+  for (let k = Math.max(0, r - 1); k <= r; k++) {
+    const [s0, s1] = sw.spans[k]!
+    const q = clamp01((s - s0) / (s1 - s0))
+    if (d <= sw.lo + (k + 1) * sw.step + sw.bow * (1 - (2 * q - 1) ** 2)) {
+      r = k
+      break
+    }
+  }
+  const [s0, s1] = sw.spans[r]!
+  const q = clamp01((s - s0) / (s1 - s0))
+  const f = r % 2 === 0 ? q : 1 - q
+  return (r + Math.acos(1 - 2 * f) / Math.PI) * sw.rowMs
+}
+
+/** 刷子最早、最晚刷到一件布景的哪儿，毫秒 */
+function reach(sw: Sweep, p: Piece): readonly [number, number] {
+  const ts = corners(slabOf(p)).map((q) => arrival(sw, q.x, q.y))
   return [Math.min(...ts), Math.max(...ts)]
 }
 
@@ -657,26 +689,24 @@ function springUp(v: number): number {
 
 /**
  * 一件布景此刻往后倒了多少，0 是立正、1 是平躺在页面上，冲过头时略小于 0（往前探）：
- * 旧页的布景在前沿碰到它之前折平，新页的布景等前沿过去、它脚下的画上完色再弹起来
+ * 旧页的布景在刷子碰到它之前折平，新页的布景等刷子把它整个刷出来、再过 settleMs 弹起来
  */
 export function laid(cfg: StorybookConfig, c: BookClock, book: Book, page: number, p: Piece): number {
   if (c.phase === 'stand') return page === c.page ? 0 : 1
   const t = cfg.turn
-  const sw = sweepOf(book, c.page)
-  const [first, last] = reach(cfg, sw, p)
+  const [first, last] = reach(sweepOf(cfg, book, c.page), p)
   if (page === c.page - 1) return easeInOut(clamp01((c.at - Math.max(0, first - t.flipMs)) / t.flipMs))
   if (page !== c.page) return 1
-  return 1 - springUp(clamp01((c.at - (last + drawLen(cfg))) / t.flipMs))
+  return 1 - springUp(clamp01((c.at - (last + t.settleMs)) / t.flipMs))
 }
 
-/** 一件平躺着的布景此刻印在页面上有多浓：旧页的跟着地上的画一起擦掉，新页的跟着上色 */
+/** 一件平躺着的布景此刻印在页面上有多浓：旧页的被刷子刷过就盖掉，新页的跟着刷子刷出来 */
 export function inked(cfg: StorybookConfig, c: BookClock, book: Book, page: number, p: Piece): number {
   if (c.phase === 'stand') return page === c.page ? 1 : 0
-  const sw = sweepOf(book, c.page)
   const s = slabOf(p)
-  const st = stageOf(cfg, c.at - arrival(cfg, sw, s.cx, s.cy))
-  if (page === c.page - 1) return 1 - st.erase
-  return page === c.page ? st.color : 0
+  const k = clamp01((c.at - arrival(sweepOf(cfg, book, c.page), s.cx, s.cy)) / INK_MS)
+  if (page === c.page - 1) return 1 - k
+  return page === c.page ? k : 0
 }
 
 /** 倒下不到一半的布景挡路 */

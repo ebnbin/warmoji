@@ -54,7 +54,7 @@ export const SFX = {
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
-  rustle: { wave: 'noise', freq: 3600, freqEnd: 1700, duration: 1.1, volume: 0.22, attack: 0.18, decayPow: 0.9, steps: [1, 0.7, 1.15, 0.65, 1.1, 0.8, 1.2, 0.7], throttleMs: 1500, jitter: 0.15 },
+  swish: { wave: 'noise', freq: 1800, freqEnd: 900, duration: 0.2, volume: 0.16, attack: 0.05, decayPow: 1.3, throttleMs: 120, jitter: 0.2 },
   fold: { wave: 'noise', freq: 1400, freqEnd: 500, duration: 0.18, volume: 0.13, attack: 0.01, decayPow: 1.6, throttleMs: 70, jitter: 0.3 },
   pop: { wave: 'noise', freq: 2200, freqEnd: 700, duration: 0.12, volume: 0.22, attack: 0.002, decayPow: 1.8, steps: [1, 0.6], throttleMs: 60, jitter: 0.3 },
 } as const satisfies Record<string, SfxDef>

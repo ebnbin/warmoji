@@ -691,7 +691,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < page.hU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
   need(Number.isInteger(c.pieces[0]) && Number.isInteger(c.pieces[1]) && c.pieces[0] >= 1 && c.pieces[0] <= c.pieces[1], `${at}.pieces 须为不小于 1 的整数范围`)
   need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一页与每页立着的时长须为正`)
-  need(t.sweepMs > 0 && t.eraseMs > 0 && t.sketchMs > 0 && t.colorMs > 0 && t.flipMs > 0, `${at}.turn 各段的时长须为正`)
+  need(t.sweepMs > 0 && t.settleMs >= 0 && t.flipMs > 0 && Number.isInteger(t.strokes) && t.strokes >= 2, `${at}.turn 各段的时长须为正，至少来回刷两道`)
   need(c.reflowMs > 0, `${at}.reflowMs 须为正`)
   const B = OBSTACLES.body
   const layer = B.heightM / B.layers

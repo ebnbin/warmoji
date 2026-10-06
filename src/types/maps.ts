@@ -1335,7 +1335,7 @@ export interface PetriConfig {
 }
 /**
  * 立体书：桌上摊开的一本巨型立体童话书，两页摊开就是战场，书脊在正中。页面上印着插画，印的都能走；立起来的是剪纸布景，挡人，高的也挡子弹和视线。
- * 书隔一阵换一页：一道前沿扫过两页，旧布景折平，旧画擦掉、新画画上，新布景再依次弹起来，压着谁就把谁挤开。一页是故事的一章，章按故事的次序轮下去
+ * 书隔一阵换一页：一把大刷子来回刷过两页，刷过处就是新一页，旧布景折平，新布景再依次弹起来，压着谁就把谁挤开。一页是故事的一章，章按故事的次序轮下去
  */
 export interface StorybookConfig {
   /** 一页多宽多高，格：两页摊开，书脊竖在方框正中 */
@@ -1351,17 +1351,16 @@ export interface StorybookConfig {
   /** 一页立几件布景 */
   readonly pieces: readonly [number, number]
   /**
-   * 换页：开局 firstMs 后第一次换，之后每页立 intervalMs 上下 jitterMs；一道前沿用 sweepMs 扫过两页，前沿过处 eraseMs 擦掉旧画，
-   * 新画先用 sketchMs 打出草稿、再用 colorMs 上色；旧布景在前沿碰到前折平，新布景脚下上完色就弹起来，折平或弹起要 flipMs，竖过一半时开始或不再挡路
+   * 换页：开局 firstMs 后第一次换，之后每页立 intervalMs 上下 jitterMs；一把大刷子用 sweepMs 来回刷 strokes 道盖满两页，刷过处就是新一页；
+   * 旧布景在刷子碰到前折平，新布景整个刷出来后再过 settleMs 弹起来，折平或弹起要 flipMs，竖过一半时开始或不再挡路
    */
   readonly turn: {
     readonly firstMs: number
     readonly intervalMs: number
     readonly jitterMs: number
     readonly sweepMs: number
-    readonly eraseMs: number
-    readonly sketchMs: number
-    readonly colorMs: number
+    readonly strokes: number
+    readonly settleMs: number
     readonly flipMs: number
   }
   /** 寻路最快多久重算一次，毫秒 */
