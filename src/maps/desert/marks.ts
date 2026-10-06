@@ -7,7 +7,7 @@ const BEHIND_U = 0.3
 
 /**
  * 沙漠的地标，像素，按地图一次定下（环面上基准的那一份）：crest 是每团沙包的顶，朝下风；
- * marker 是每样标志物实心部分背阴一侧的边，朝影子那边
+ * marker 是每样标志物（仙人掌不算）实心部分背阴一侧的边，朝影子那边
  */
 export function desertMarks(plan: DesertPlan): Record<string, Landmark[]> {
   const m = plan.meterPerU
@@ -17,7 +17,7 @@ export function desertMarks(plan: DesertPlan): Record<string, Landmark[]> {
   const len = Math.hypot(plan.offX, plan.offY) || 1
   const nx = plan.offX / len
   const ny = plan.offY / len
-  const marker = plan.landmarks.map((l) => {
+  const marker = plan.landmarks.filter((l) => l.kind !== 'cactus').map((l) => {
     let edge = 0
     for (const s of l.shape.solids) edge = Math.max(edge, s.x0 * nx + s.y0 * ny + s.r, s.x1 * nx + s.y1 * ny + s.r)
     const out = Math.max(0, edge - BEHIND_U)

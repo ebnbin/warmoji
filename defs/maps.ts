@@ -1152,6 +1152,7 @@ export const MAPS = {
       swell: { heightM: 0.15, waves: 5 },
       flats: { loose: [0.4, 0.7], patches: 6 },
       landmarks: { pairs: 6, gapU: 7 },
+      cacti: { pairs: [3, 5], gapU: 3 },
       gait: { softSand: 1.8, packRelief: 0.5, maxPower: 2.6, downhillMax: 1.25 },
       shadeRegen: 1.25,
       tracks: {
