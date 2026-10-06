@@ -871,7 +871,7 @@ function albedo(sc: PaintScene, P: Prepared, g: Geo, x: number, y: number, a: nu
     case MAT.pave: {
       const hs = hash(g.id, seed + 13)
       // 每块石板的颜色略有不同，有的偏粉、有的偏灰、少数发黄
-      set(C, 186 + 22 * (hs - 0.5), 160 + 14 * (hash(g.id, seed + 17) - 0.5), 138 + 16 * (hash(g.id, seed + 19) - 0.5))
+      set(C, 196 + 22 * (hs - 0.5), 166 + 14 * (hash(g.id, seed + 17) - 0.5), 140 + 16 * (hash(g.id, seed + 19) - 0.5))
       if (hs > 0.84) mixInto(C, 168, 164, 136, 0.55)
       else if (hs < 0.12) mixInto(C, 136, 128, 116, 0.55)
       scale(C, grain * (0.84 + 0.3 * blot) * (0.9 + 0.2 * hash(g.id, seed + 23)))

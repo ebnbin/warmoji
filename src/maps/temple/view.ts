@@ -52,7 +52,7 @@ const WARN = 0xff5a2a
 /** 光柱：几道、长（格）、宽（格） */
 const BEAMS = 6
 const BEAM_LEN_U = 6
-const BEAM_W_U = 1.5
+const BEAM_W_U = 1.9
 /** 金刚鹦鹉隔多久飞过一群（毫秒）、翅展（格）、飞多快（格/秒）、离地多高（米） */
 const MACAW_MS = { min: 18000, max: 36000 } as const
 const MACAW_U = 1.1
@@ -377,7 +377,7 @@ export class TempleView implements MapView {
         .setDisplaySize(BEAM_W_U * UNIT * (0.7 + 0.6 * rng.next()), len * UNIT)
         .setAlpha(0)
       this.visuals.push(img)
-      this.beams.push({ img, phase: rng.next() * 10, base: 0.06 + 0.06 * rng.next() })
+      this.beams.push({ img, phase: rng.next() * 10, base: 0.1 + 0.08 * rng.next() })
       i++
     }
   }
