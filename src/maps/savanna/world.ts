@@ -99,7 +99,7 @@ export function beastSize(cfg: SavannaConfig, b: Beast): number {
   return b.r * cfg.herd.kinds[b.kind]!.art
 }
 
-export function savannaOf(sim: Sim): SavannaState {
+function savannaOf(sim: Sim): SavannaState {
   let s = sim.worldState.savanna
   if (!s) {
     const cfg = cfgOf(sim)

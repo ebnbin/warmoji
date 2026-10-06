@@ -80,7 +80,7 @@ export interface SavannaPlan {
 const between = (rng: Rng, r: readonly [number, number]): number => r[0] + rng.next() * (r[1] - r[0])
 
 /** 草地的边在 ang 方向上离开局站位多远，格 */
-export function edgeRadius(e: EdgeShape, ang: number): number {
+function edgeRadius(e: EdgeShape, ang: number): number {
   const c = Math.abs(Math.cos(ang))
   const s = Math.abs(Math.sin(ang))
   let r = e.half / Math.pow(c ** SQUARE_P + s ** SQUARE_P, 1 / SQUARE_P) - e.inset
@@ -107,11 +107,6 @@ export function lumpGap(list: readonly Lump[], x: number, y: number): number {
   let d = Infinity
   for (const l of list) d = Math.min(d, Math.hypot(x - l.x, y - l.y) - l.r)
   return d
-}
-
-/** 角度差，落在 (−π, π] */
-function angDiff(a: number, b: number): number {
-  return Math.atan2(Math.sin(a - b), Math.cos(a - b))
 }
 
 /** 山丘：沿边铺一排挡着草地的石头，越靠中间往草地里伸得越深；后面再堆两排更大的，堆成丘 */
@@ -308,9 +303,4 @@ function kopjeMarks(k: Kopje, basin: Basin): Landmark[] {
     }
   }
   return out
-}
-
-/** 开局站位到 (x, y) 的方向是不是朝着山丘那一边（差在 half 弧度以内） */
-export function towardKopje(plan: SavannaPlan, x: number, y: number, half: number): boolean {
-  return Math.abs(angDiff(Math.atan2(y - plan.start.y, x - plan.start.x), plan.kopje.dir)) < half
 }

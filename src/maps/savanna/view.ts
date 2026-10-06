@@ -9,7 +9,7 @@ import { Alive, Pickup, Radius, Span, Transform } from '../../ecs/components'
 import { ART } from '../../ecs/utils/ground'
 import { canvasTexture } from '../textures'
 import { FRAME, FRAME_MID } from '../frame'
-import { CANOPY_PPU, GROUND_AREA, paintCrown, textureSize } from './ground'
+import { CANOPY_PPU, crownSeed, GROUND_AREA, paintCrown, textureSize } from './ground'
 import { SavannaPainter } from './painter'
 import { MAX_RIPPLES, WATER_FRAG } from './shader'
 import { drawChevron, drawDust, drawHyena, drawPerched, drawVulture } from './critters'
@@ -58,7 +58,7 @@ const HYENA_U = 1.1
 /** 鬣狗多久笑一声（毫秒） */
 const CACKLE_MS = { min: 14000, max: 30000 } as const
 /** 倒影多淡 */
-const REFL_ALPHA = 0.42
+const REFL_ALPHA = 0.5
 
 interface Hyena {
   x: number
@@ -194,7 +194,7 @@ export class SavannaView implements MapView {
     this.visuals.push(this.lanes, this.shadows)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, CANOPY_KEY).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(DEPTH.canopy))
     plan.acacias.forEach((a, i) => {
-      const c = paintCrown(a, plan.seed + i * 31, CROWN_PPU)
+      const c = paintCrown(a, crownSeed(plan, i), CROWN_PPU)
       canvasTexture(scene, crownKey(i), c.w, c.h, (ctx) => ctx.putImageData(new ImageData(c.data, c.w, c.h), 0, 0))
       const img = scene.add.image(c.x0 * UNIT, c.y0 * UNIT, crownKey(i)).setOrigin(0, 0).setDisplaySize((c.w / CROWN_PPU) * UNIT, (c.h / CROWN_PPU) * UNIT).setDepth(DEPTH.crown)
       this.visuals.push(img)

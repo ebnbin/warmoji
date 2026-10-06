@@ -264,10 +264,10 @@ const BUSH = { u: 0, v: 0 }
 function bushAt(seed: number, x: number, y: number, f: number): number {
   const zone = smooth(0.25, -0.7, f)
   if (zone <= 0) return 0
-  const clump = smooth(0.42, 0.62, fbm(x / 4, y / 4, seed + 141, 2) + 0.25 * smooth(-1.5, -5, f))
-  const q = cellNearest(x * 0.7, y * 0.7, seed + 43)
-  if (q.h >= clump * 0.9) return 0
-  const rr = 0.32 + 0.22 * ((q.h * 7.31) % 1)
+  const clump = smooth(0.4, 0.66, fbm(x / 5, y / 5, seed + 141, 3) + 0.2 * smooth(-1, -4, f))
+  const q = cellNearest(x * 0.8, y * 0.8, seed + 43)
+  if (q.h >= clump) return 0
+  const rr = 0.26 + 0.3 * ((q.h * 7.31) % 1)
   BUSH.u = q.dx / rr
   BUSH.v = q.dy / rr
   const d = Math.hypot(BUSH.u, BUSH.v) + (valueNoise(x * 7, y * 7, seed + 149) - 0.5) * 0.3
@@ -456,10 +456,10 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         } else {
           // 深草丛：草更高更密更深；刺灌丛的冠子画在上面那层，这里只垫一圈压暗的根
           grass(sc, x, y, 1)
-          mixc(RGB, [0.5, 0.44, 0.38], 0.35, RGB)
-          RGB[0] = RGB[0]! * 0.7
-          RGB[1] = RGB[1]! * 0.69
-          RGB[2] = RGB[2]! * 0.7
+          mixc(RGB, [0.56, 0.52, 0.38], 0.35, RGB)
+          RGB[0] = RGB[0]! * 0.76
+          RGB[1] = RGB[1]! * 0.76
+          RGB[2] = RGB[2]! * 0.74
           const under = bushAt(seed, x - AWAY.x * 0.15, y - AWAY.y * 0.15, f)
           ao *= 1 - 0.55 * smooth(0, 0.6, under)
           ao *= 1 - 0.25 * smooth(-0.2, -3, f)

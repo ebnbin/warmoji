@@ -91,8 +91,8 @@ void main ()
     if (r.w <= 0.0) continue;
     float rd = length(p - r.xy) / unit;
     float ring = sin(rd * 14.0 - uTime * 5.0 + r.z) * 0.5 + 0.5;
-    float fade = exp(-rd * 1.6) * smoothstep(0.05, 0.3, rd) * r.w;
-    float rr = smoothstep(0.75, 0.95, ring) * fade * 0.5;
+    float fade = exp(-rd * 2.6) * smoothstep(0.05, 0.3, rd) * r.w;
+    float rr = smoothstep(0.8, 0.97, ring) * fade * 0.35;
     col += vec3(1.0, 0.9, 0.92) * rr;
     a += rr;
   }
