@@ -1209,6 +1209,52 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/** 童话书：八音盒的摇篮曲，大调三拍子；正弦波的音梳叮叮咚咚、尾音长长地回响，低音只在每小节头上轻轻一下，三角波的和弦像翻书一样软；每四小节高处一声钟琴 */
+function buildTale(): BgmScore {
+  const chords = [0, 3, 4, 0, 5, 3, 1, 4, 0, 3, 4, 5, 3, 4, 0, 0]
+  return track(
+    {
+      bpm: 96,
+      stepsPerBeat: 2,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 62,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 96) * 1.5, feedback: 0.32, level: 0.24 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.12, attack: 0.01, release: 0.4, octave: -2 }
+      const comb: Voice = { wave: 'sine', vol: 0.085, attack: 0.002, release: 0.55, octave: 1, echo: true }
+      const tine: Voice = { wave: 'sine', vol: 0.03, attack: 0.002, release: 0.3, octave: 2, echo: true }
+      const pad: Voice = { wave: 'triangle', vol: 0.018, attack: 0.5, release: 0.8, octave: 0 }
+      const bell: Voice = { wave: 'sine', vol: 0.04, attack: 0.002, release: 0.9, octave: 3, echo: true }
+      b.bass(bass, chords, 'r.....')
+      b.pad(pad, chords, [0, 1, 2])
+      for (let bar = 0; bar < chords.length; bar++) for (const [step, tone] of [[2, 2], [4, 4]] as const) b.note(tine, bar, step, chords[bar]! + tone, 1)
+      b.line(comb, [
+        [0, 0, 4, 2], [0, 2, 2, 2], [0, 4, 4, 2],
+        [1, 0, 5, 4], [1, 4, 3, 2],
+        [2, 0, 4, 2], [2, 2, 6, 2], [2, 4, 5, 2],
+        [3, 0, 4, 6],
+        [4, 0, 7, 2], [4, 2, 5, 2], [4, 4, 7, 2],
+        [5, 0, 8, 4], [5, 4, 7, 2],
+        [6, 0, 6, 2], [6, 2, 5, 2], [6, 4, 3, 2],
+        [7, 0, 4, 6],
+        [8, 0, 4, 2], [8, 2, 2, 2], [8, 4, 4, 2],
+        [9, 0, 5, 4], [9, 4, 7, 2],
+        [10, 0, 6, 2], [10, 2, 8, 2], [10, 4, 7, 2],
+        [11, 0, 9, 6],
+        [12, 0, 8, 2], [12, 2, 7, 2], [12, 4, 5, 2],
+        [13, 0, 6, 4], [13, 4, 4, 2],
+        [14, 0, 2, 2], [14, 2, 3, 2], [14, 4, 1, 2],
+        [15, 0, 0, 6],
+      ])
+      b.line(bell, [[0, 0, 7, 6], [4, 0, 9, 6], [8, 0, 7, 6], [12, 0, 11, 6]])
+      b.drums('hat', '...o..', 4, 16, 0.012)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1235,6 +1281,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  tale: buildTale,
 }
 
 const cache = new Map<BgmId, BgmScore>()

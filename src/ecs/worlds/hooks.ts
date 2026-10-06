@@ -51,6 +51,7 @@ import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
 import type { DreamlandWorld } from '../../maps/dreamland/world'
+import type { TaleState } from '../../maps/tale/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -108,11 +109,12 @@ export interface WorldState {
   deep: DeepState | null
   petri: PetriState | null
   dreamland: DreamlandWorld | null
+  tale: TaleState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, tale: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -195,6 +197,8 @@ export interface WorldHooks {
   died?(sim: Sim, eid: number): void
   /** 地面此刻盖住了 (x, y) 处躺着的掉落物：捡不到、吸不走，露出来以后照常；不写就从不盖住 */
   covers?(sim: Sim, x: number, y: number): boolean
+  /** 这张图的怪物自己聚出来：给了就不打警示标记，预兆按它给的时长（毫秒）打，样子由地图的画面画；不写就照常 */
+  forming?(sim: Sim, boss: boolean): number
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }

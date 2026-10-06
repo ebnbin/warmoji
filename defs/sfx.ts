@@ -53,5 +53,8 @@ export const SFX = {
   chime: { wave: 'sine', freq: 1568, duration: 0.62, volume: 0.17, attack: 0.003, decayPow: 1.5, steps: [1, 1.26, 1, 1.26], throttleMs: 600 },
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
+  scribble: { wave: 'noise', freq: 4200, freqEnd: 2600, duration: 0.42, volume: 0.05, attack: 0.02, decayPow: 0.8, steps: [1, 0.7, 1.15, 0.6, 1.1, 0.75, 1.2, 0.65], throttleMs: 380, jitter: 0.2 },
+  rub: { wave: 'noise', freq: 1100, freqEnd: 700, duration: 0.5, volume: 0.07, attack: 0.03, decayPow: 0.7, steps: [1, 0.55, 1.05, 0.5, 1, 0.55], throttleMs: 420, jitter: 0.15 },
+  leaf: { wave: 'noise', freq: 700, freqEnd: 3400, duration: 0.55, volume: 0.22, attack: 0.12, decayPow: 1.3, throttleMs: 200, jitter: 0.1 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
 } as const satisfies Record<string, SfxDef>

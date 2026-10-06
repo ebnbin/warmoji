@@ -1333,6 +1333,40 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/**
+ * 童话书：一本童话绘本摊开的一页就是战场，页面按种子切成一块块地面。每一块只处在三种状态之一：铅笔稿是作者接下来要画的地方，还不存在；
+ * 笔尖沿着铅笔线描过、色块填上，就成了真的地面（墨稿）；橡皮的影子落下、颜色褪尽，就回到空白的纸，不再存在，还站在上面的身体被推到最近的墨稿上，敌我一样、不受伤。
+ * 看不见的作者一直在画新的、擦旧的：画好的地面顺着页面从一角挪向对角，地面的总量大致不变，颜色跟着四季走；新画好的那块上几笔墨迹聚成怪物
+ */
+export interface TaleConfig {
+  /** 页面的宽高与不画的页边，格：摆在方框正中，左边是书脊 */
+  readonly page: { readonly wU: number; readonly hU: number; readonly marginU: number }
+  /** 分块：块心大约隔 spacingU 格，边界按噪声扭开 warpU 格；开局那一块的半径约 firstU 格 */
+  readonly patch: { readonly spacingU: number; readonly warpU: number; readonly firstU: number }
+  /** 画好的地面占全部块数的比例：开局那一片就这么多，之后画一块、擦一块，大致保持 */
+  readonly share: number
+  /**
+   * 作者：开局先把头一片的铅笔稿描成墨稿，每隔 openMs 描一块，描线 openLineMs、上色 openFillMs；描完以后每隔 everyMs（上下 jitterMs）轮流画一块、擦一块，
+   * 第一次擦在描完之后 firstEraseMs。平时描线 lineMs、上色 fillMs，下一块的铅笔稿起稿 sketchMs；橡皮的影子先落 warnMs，颜色再用 fadeMs 褪尽
+   */
+  readonly author: {
+    readonly openMs: number
+    readonly openLineMs: number
+    readonly openFillMs: number
+    readonly everyMs: number
+    readonly jitterMs: number
+    readonly firstEraseMs: number
+    readonly sketchMs: number
+    readonly lineMs: number
+    readonly fillMs: number
+    readonly warnMs: number
+    readonly fadeMs: number
+  }
+  /** 褪尽的地方，身体按 pushU 格/秒被推回最近的墨稿 */
+  readonly pushU: number
+  /** 墨迹聚成怪物要多久，毫秒：小怪与头目 */
+  readonly form: { readonly ms: number; readonly bossMs: number }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1341,8 +1375,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，ink 溅开的墨点 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'ink'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1407,7 +1441,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'tale'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,6 +1475,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly tale?: TaleConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

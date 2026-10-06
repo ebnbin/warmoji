@@ -212,6 +212,17 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const TALE_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'rat', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
+  { kind: 'mushroom', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'ghost', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'knight', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'raccoon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'elf', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1345,6 +1356,59 @@ export const MAPS = {
       belt: { speedU: 1.5, flipMs: [9000, 15000], warnMs: 1600, turnMs: 1300 },
       friction: { body: { static: 0.17, kinetic: 0.13 }, coin: { static: 0.1, kinetic: 0.07 } },
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
+    },
+    boss: 'eclipse',
+  },
+  tale: {
+    emoji: '1f4d6',
+    name: '童话书',
+    desc: '一本童话绘本摊开的一页，整片战场就是这一页纸。只有画出来的地方才存在：淡灰的铅笔稿是作者接下来要画的地方，还站不上去；笔尖沿着铅笔线描过、色块填上，那一块才成了真的地面；橡皮的影子落到旧地面上，颜色一点点变灰变淡，褪尽就回到空白的纸，还站在上面的人和怪被轻轻推到最近的墨稿上，不受伤。作者一直在画新的、擦旧的，画好的地面顺着页面从一角挪向对角，颜色跟着四季走；新画好的那块上，几笔墨迹聚成怪物',
+    kind: 'tale',
+    stamina: { exertion: 0.4, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(30 34% 44%)',
+      bgTo: 'hsl(22 34% 18%)',
+      map: hslToInt(42, 0.5, 0.92),
+      shadow: 0x000000,
+    },
+    // 屋里的灯从左上方照下来，纸面亮，影子淡而暖
+    light: { sun: 0xfffaf0, shade: 0xd9cfc0, shadow: { color: 0x3a2814, alpha: 0.28, length: 0.6 } },
+    decor: {
+      emojis: ['1f4d6'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: TALE_MIX,
+    // 怪物都是在新画好的那几块上用墨迹聚出来的，头目也一样
+    gates: {
+      snapU: 40,
+      fallback: 'rise',
+      look: 'ink',
+      boss: 'fresh',
+      kinds: {
+        fresh: { name: '新墨', at: { kind: 'mark' }, enter: 'rise', look: 'ink', weight: 1 },
+      },
+    },
+    tale: {
+      page: { wU: 30, hU: 33, marginU: 0.8 },
+      patch: { spacingU: 5.3, warpU: 0.55, firstU: 4.6 },
+      share: 0.48,
+      author: {
+        openMs: 950,
+        openLineMs: 600,
+        openFillMs: 320,
+        everyMs: 11000,
+        jitterMs: 1500,
+        firstEraseMs: 9000,
+        sketchMs: 1400,
+        lineMs: 1900,
+        fillMs: 900,
+        warnMs: 1800,
+        fadeMs: 5200,
+      },
+      pushU: 2.4,
+      form: { ms: 1300, bossMs: 5200 },
     },
     boss: 'eclipse',
   },

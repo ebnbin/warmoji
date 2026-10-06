@@ -534,6 +534,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
+      ink: burstEmitter(this, [0x241c18, 0x3a2e28, 0x15100d], 150, 520, { scale: { start: 0.55, end: 0.2 }, alpha: { start: 0.9, end: 0 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
@@ -853,7 +854,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       reward: rewardText(this.fightDef.reward),
     })
     nextStep(run)
-    this.time.delayedCall(WAVE.summaryMs, () => this.settle())
+    this.time.delayedCall(Math.max(WAVE.summaryMs, this.map.won?.(this.ctx, sim) ?? 0), () => this.settle())
   }
 
   /** 小结之后：地上没捡的升级替玩家捡起来，逐个选完再走到下一步 */
@@ -933,6 +934,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.wdtMs = delta * worldTimeScale(sim)
     if (this.ending) {
       stepFrozenVisuals(sim)
+      this.map.ending?.(this.ctx, sim, delta)
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)

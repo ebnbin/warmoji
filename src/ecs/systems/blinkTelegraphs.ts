@@ -7,7 +7,9 @@ export function hideTelegraphs(sim: Sim): void {
   for (const eid of query(sim.world, [Telegraph, Tint])) Tint.alpha[eid] = 0
 }
 
+/** 预兆的警示标记一闪一闪；怪物自己聚出来的地图不打标记 */
 export function blinkTelegraphs(sim: Sim): void {
+  if (sim.hooks.forming) return hideTelegraphs(sim)
   const now = sim.elapsedMs
   for (const eid of query(sim.world, [Telegraph, Tint])) {
     const period = (2 * SPAWN.telegraphMs) / (Telegraph.boss[eid] ? 4 : 6)

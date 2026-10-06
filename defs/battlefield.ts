@@ -45,6 +45,13 @@ export const BATTLEFIELD = {
       { id: 'petri_biofilm', emoji: '1f9a0', name: '菌膜缠身', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
       { id: 'petri_incubator', emoji: '1f321', name: '培养箱闷热', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
+    tale: [
+      { id: 'tale_wand', emoji: '1fa84', name: '仙女棒', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'tale_boots', emoji: '1f462', name: '七里靴', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'tale_crown', emoji: '1f451', name: '从此幸福', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'tale_apple', emoji: '1f34e', name: '毒苹果', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'tale_spell', emoji: '1f4a4', name: '沉睡魔咒', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
     meadow: [
       { id: 'meadow_breeze', emoji: '1f32c', name: '山风送爽', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
       { id: 'meadow_bloom', emoji: '1f33c', name: '花香提神', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },

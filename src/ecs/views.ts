@@ -71,6 +71,10 @@ export interface MapView {
   /** 身体在地上的 (x, y)、精灵半宽半高 hw×hh：要切成几份画（正穿过传送门的一份在门这边、一份在门那边），写进 out 返回份数，0 是整张画 */
   cutAt?(x: number, y: number, hw: number, hh: number, out: SpriteCut[]): number
   resize(v: ViewCtx): void
+  /** 打赢了这一场：地图开始演收尾，返回要演多久（毫秒），场景等它演完再走；不写就不演 */
+  won?(v: ViewCtx, sim: Sim): number
+  /** 收尾的每一帧：这时战斗已经停住 */
+  ending?(v: ViewCtx, sim: Sim, delta: number): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void
 }

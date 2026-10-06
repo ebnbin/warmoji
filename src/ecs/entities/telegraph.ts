@@ -26,10 +26,11 @@ const MARK_Z = 4
 /** 从出怪口进场的预兆至少打这么久，看得清落在哪 */
 const MIN_MARK_MS = 300
 
-/** 预兆打多久：突袭时只有头目打；从出怪口进场的扣掉进场动作的时长，落地时正好是原本现身的时刻，进场动作太长的也至少打一会儿 */
+/** 预兆打多久：突袭时只有头目打；怪物自己聚出来的地图按地图的；从出怪口进场的扣掉进场动作的时长，落地时正好是原本现身的时刻，进场动作太长的也至少打一会儿 */
 export function telegraphDelay(sim: Sim, boss: boolean, delayMs: number, entry: Entry | undefined): number {
   if (sim.fight.rules.surprise && !boss) return 0
-  return entry ? Math.max(MIN_MARK_MS, delayMs - entranceMs(entry)) : delayMs
+  const ms = sim.hooks.forming?.(sim, boss) ?? delayMs
+  return entry ? Math.max(MIN_MARK_MS, ms - entranceMs(entry)) : ms
 }
 
 /** 在 (x, y) 打预兆；entry 是从出怪口进场的样子，此时 (x, y) 是它的落点 */
