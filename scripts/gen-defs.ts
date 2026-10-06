@@ -47,7 +47,7 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
-import { doorOffsets, LINE_COLORS, trainLength, transitPlan } from '../src/maps/transit/layout.ts'
+import { doorOffsets, expressDoors, LINE_COLORS, sideOpen, trainLength, transitPlan } from '../src/maps/transit/layout.ts'
 import { runShape } from '../src/maps/transit/timetable.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
@@ -681,7 +681,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
  * 磁浮站：站厅放得进安全区，横过站厅排得下最多的轨道与站台；每条轨道都有线路色与接它车厢出怪的出怪口；
  * 列车比站厅短、停稳后车头车尾外都还走得过最大的身体，道床宽过车身，车门走得过配比里最大的身体、专列的门走得过头目；
  * 一班车跑完一趟短过发车间隔，关门前的提醒短过停站；撞车的数值说得通；
- * 抽一批种子按横竖屏各生成一遍：开局站的地方四周空着、不在道床上，检票口、电梯、扶梯与专列的门都有出怪的地标，专列门外落得下脚
+ * 抽一批种子按横竖屏各生成一遍：开局站的地方四周空着、不在道床上，检票口、电梯与扶梯都有出怪的地标，每条轨道至少一侧是站台、专列停哪条都下得了车
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'transit') === (m.transit !== undefined), `maps.${id} 是磁浮站当且仅当写了 transit`)
@@ -727,14 +727,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.tracks.every((t) => Math.abs(st.v - t.v) >= tracks.bedU / 2 + 1.5), `${where} 开局站在道床上或离道床太近`)
     need(plan.platforms.every((p) => p.v1 - p.v0 >= c.platformU - 1e-6), `${where} 有站台窄过 ${c.platformU} 格`)
     const mk = plan.marks
-    need(mk.ticket.length > 0 && mk.lift.length > 0 && mk.escalator.length > 0 && mk.express.length > 0, `${where} 检票口、电梯、扶梯或专列的门缺出怪的地标`)
-    const xt = plan.tracks[plan.expressTrack]!
-    need(mk.express.every((e) => {
-      const ev = plan.horiz ? e.y / UNIT : e.x / UNIT
-      const nv = plan.horiz ? e.ny : e.nx
-      const land = ev + nv * FEEL.entrance.walk.distU[0]
-      return Math.abs(land - xt.v) >= tracks.bedU / 2 && plan.platforms.some((p) => land >= p.v0 && land <= p.v1)
-    }), `${where} 专列的门外落不到站台上：头目下车会落在道床上`)
+    need(mk.ticket.length > 0 && mk.lift.length > 0 && mk.escalator.length > 0, `${where} 检票口、电梯或扶梯缺出怪的地标`)
+    need(plan.tracks.every((t) => sideOpen(plan, c, t, -1) || sideOpen(plan, c, t, 1)) && plan.tracks.every((t) => expressDoors(plan, c, t, st.v).length > 0), `${where} 有轨道两侧都不是站台：专列停在那里头目下不了车`)
     for (const t of plan.tracks) {
       for (const ex of [false, true]) {
         const r = runShape(c, plan, t, ex)

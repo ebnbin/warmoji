@@ -16,8 +16,8 @@ import { bounded } from '../../ecs/worlds/hooks'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { alongWall, awayFromWall, keepOut, makeBasin, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { doorOffsets, fixtureRoom, toLocal, toWorld, transitPlan } from './layout'
-import { callExpress, hullSd, inCabin, nextStart, present, solidSd, trackClocks, trainNow, trainOf } from './timetable'
+import { doorOffsets, expressDoors, fixtureRoom, toLocal, toWorld, transitPlan } from './layout'
+import { callExpress, freeAt, hullSd, inCabin, nextStart, present, solidSd, trackClocks, trainNow, trainOf } from './timetable'
 import type { TrackClock, TrainNow } from './timetable'
 import type { TransitPlan } from './layout'
 import type { Basin } from '../basin'
@@ -310,6 +310,18 @@ function carMarks(cfg: TransitConfig, plan: TransitPlan, trains: readonly (Train
   return out
 }
 
+/** 专列此刻会停哪条轨道、从哪侧下车：腾出来最早的那条，一样早就挑离队长近的；下车的一侧朝着队长 */
+function expressMarks(sim: Sim, s: TransitState, cfg: TransitConfig): Landmark[] {
+  const now = sim.elapsedMs
+  const lead = local(s.plan, leaderPoint(sim).x, leaderPoint(sim).y)
+  const t = s.plan.tracks.reduce((a, b) => {
+    const fa = freeAt(cfg, s.plan, a, s.clocks[a.index]!, now) + Math.abs(a.v - lead.v) * 50
+    const fb = freeAt(cfg, s.plan, b, s.clocks[b.index]!, now) + Math.abs(b.v - lead.v) * 50
+    return fb < fa ? b : a
+  })
+  return expressDoors(s.plan, cfg, t, lead.v)
+}
+
 /** 头目的预兆要从专列下来：叫一班专列，预兆拖到专列门开足 */
 function callExpresses(sim: Sim, s: TransitState, cfg: TransitConfig): void {
   for (const e of query(sim.world, [Telegraph, Due])) {
@@ -317,7 +329,9 @@ function callExpresses(sim: Sim, s: TransitState, cfg: TransitConfig): void {
     const uid = Uid.v[e]!
     if (s.called.has(uid)) continue
     s.called.add(uid)
-    const t = s.plan.tracks[s.plan.expressTrack]!
+    const entry = telegraphEntry[e]!
+    const at = local(s.plan, entry.sx, entry.sy)
+    const t = s.plan.tracks.reduce((a, b) => (Math.abs(b.v - at.v) < Math.abs(a.v - at.v) ? b : a))
     const open = callExpress(cfg, s.plan, t, s.clocks[t.index]!, sim.elapsedMs)
     Due.at[e] = Math.max(Due.at[e]!, open + 200)
     s.at = -1
@@ -484,7 +498,8 @@ export const transit: WorldHooks = {
   },
   landmarks(sim) {
     const s = transitOf(sim)
-    return { ...s.plan.marks, ...carMarks(cfgOf(sim), s.plan, trainsOf(sim)) }
+    const cfg = cfgOf(sim)
+    return { ...s.plan.marks, ...carMarks(cfg, s.plan, trainsOf(sim)), express: expressMarks(sim, s, cfg) }
   },
   /** 队员的坑位落进车身里就挪到队长那一侧的车身外 */
   seat(sim, from, at) {

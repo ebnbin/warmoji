@@ -141,6 +141,13 @@ export function trainNow(cfg: TransitConfig, plan: TransitPlan, track: Track, c:
   return r ? trainOf(cfg, plan, track, r.start, r.express, t) : null
 }
 
+/** 现在叫专列，这条轨道几时腾得出来：有车在站里就等它开走，没有或还在预警就是现在 */
+export function freeAt(cfg: TransitConfig, plan: TransitPlan, track: Track, c: TrackClock, t: number): number {
+  const now = runAt(cfg, plan, track, c, t)
+  if (!now || (!now.express && t - now.start < runShape(cfg, plan, track, false).ms.warn)) return t
+  return now.start + runShape(cfg, plan, track, now.express).total
+}
+
 /** t 以后头一班开始预警的时刻（专列也算），找不到就是 Infinity */
 export function nextStart(cfg: TransitConfig, plan: TransitPlan, track: Track, c: TrackClock, t: number): { readonly start: number; readonly express: boolean } {
   const x = c.express
@@ -160,12 +167,13 @@ export function nextStart(cfg: TransitConfig, plan: TransitPlan, track: Track, c
 }
 
 /**
- * 叫一班专列：这条轨道上正有车就等它开走，否则马上开始预警；之后撞上的普通班次取消。返回专列门开足的时刻
+ * 叫一班专列：这条轨道上正有车在站里就等它开走，否则马上开始预警（还在预警的那一班取消）；之后撞上的普通班次也取消。返回专列门开足的时刻
  */
 export function callExpress(cfg: TransitConfig, plan: TransitPlan, track: Track, c: TrackClock, t: number): number {
   const now = runAt(cfg, plan, track, c, t)
-  const start = now ? now.start + runShape(cfg, plan, track, now.express).total : t
-  c.express = { called: t, start }
+  const warning = now !== null && !now.express && t - now.start < runShape(cfg, plan, track, false).ms.warn
+  const start = now && !warning ? now.start + runShape(cfg, plan, track, now.express).total : t
+  c.express = { called: warning ? now.start : t, start }
   const x = runShape(cfg, plan, track, true)
   return start + x.ms.warn + x.ms.arrive + x.ms.open
 }

@@ -97,11 +97,9 @@ export interface TransitPlan {
   readonly escalators: readonly Opening[]
   /** 列车停在站台正中：车身中点沿轨道的位置，格 */
   readonly berth: number
-  /** 专列停哪条轨道 */
-  readonly expressTrack: number
   readonly start: Point
   readonly basin: Basin
-  readonly marks: Readonly<Record<'ticket' | 'lift' | 'escalator' | 'express', readonly Landmark[]>>
+  readonly marks: Readonly<Record<'ticket' | 'lift' | 'escalator', readonly Landmark[]>>
   readonly seed: number
 }
 
@@ -204,8 +202,6 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
   const startU = MID + (rng.next() - 0.5) * 4
   const start = { u: startU, v: (home.v0 + home.v1) / 2 }
   const berth = MID + (rng.next() - 0.5) * 2
-  const near = tracks.filter((t) => Math.abs(t.v - start.v) < (home.v1 - home.v0) / 2 + cfg.tracks.bedU)
-  const expressTrack = (near[Math.floor(rng.next() * near.length)] ?? tracks[0]!).index
 
   const fixtures: Fixture[] = []
   const strips: Strip[] = []
@@ -300,16 +296,10 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
   const gateV = gateSide === 0 ? v0 : v1
   const gateIn = gateSide === 0 ? 1 : -1
   const escV = gateSide === 0 ? v1 : v0
-  const xt = tracks[expressTrack]!
-  const xLen = trainLength(cfg.express)
-  const xDoors = doorOffsets(cfg.express).map((d) => berth + d)
-  const homeSide = Math.sign(start.v - xt.v) || 1
-  const xEdge = xt.v + homeSide * (cfg.express.widthU / 2)
   const marks = {
     ticket: lanes.map((o) => mark(o.u, gateV, gateIn, o.w / 2)),
     lift: lifts.map((o) => mark(o.u, gateV, gateIn, o.w / 2)),
     escalator: escalators.map((o) => mark(o.u, escV, -gateIn, o.w / 2)),
-    express: xDoors.filter((u) => Math.abs(u - berth) < xLen / 2).map((u) => mark(u, xEdge, homeSide, cfg.express.doorU / 2)),
   }
   return {
     horiz,
@@ -326,10 +316,33 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
     lifts,
     escalators,
     berth,
-    expressTrack,
     start: sw,
     basin,
     marks,
     seed: scramble(seed ^ 0x51),
   }
+}
+
+/** 列车停稳后 side 那一侧（±1）车门外是站台：下车的落得了脚，不是并在一起的另一条道床 */
+export function sideOpen(plan: TransitPlan, cfg: TransitConfig, t: Track, side: number): boolean {
+  const v = t.v + side * (cfg.tracks.bedU / 2 + 1)
+  return plan.platforms.some((p) => v >= p.v0 && v <= p.v1)
+}
+
+/**
+ * 专列停在这条轨道上时朝站台那一侧的车门（世界坐标、像素）：两侧都是站台就挑离 near（横过轨道的位置，格）近的那侧；
+ * 地标朝站台里
+ */
+export function expressDoors(plan: TransitPlan, cfg: TransitConfig, t: Track, near: number): Landmark[] {
+  const x = cfg.express
+  const sides = [Math.sign(near - t.v) || 1, -(Math.sign(near - t.v) || 1)].filter((s) => sideOpen(plan, cfg, t, s))
+  const side = sides[0] ?? 1
+  const len = trainLength(x)
+  return doorOffsets(x)
+    .filter((d) => Math.abs(d) < len / 2)
+    .map((d) => {
+      const w = toWorld(plan, plan.berth + d, t.v + side * (x.widthU / 2))
+      const n = toWorld(plan, 0, side)
+      return { x: w.x * UNIT, y: w.y * UNIT, r: (x.doorU / 2) * UNIT, nx: n.x, ny: n.y }
+    })
 }
