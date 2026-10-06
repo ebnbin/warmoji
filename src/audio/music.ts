@@ -776,6 +776,56 @@ function buildCave(): BgmScore {
   )
 }
 
+/** 紫水晶洞穴：多利亚调式的三拍子，正弦波的琶音像晶体一串串地响，回声拖得长；三角波的长音慢慢唱，低音踏着根音与五音，高处偶尔一声清脆的晶鸣 */
+function buildAmethyst(): BgmScore {
+  const chords = [0, 3, 0, 6, 5, 3, 4, 0, 0, 3, 0, 6, 2, 3, 4, 4]
+  return track(
+    {
+      bpm: 84,
+      stepsPerBeat: 2,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 52,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 84) * 0.5, feedback: 0.45, level: 0.35 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.03, release: 0.4, octave: -1 }
+      const pad: Voice = { wave: 'triangle', vol: 0.026, attack: 0.6, release: 1.2, octave: 0 }
+      const glass: Voice = { wave: 'sine', vol: 0.04, attack: 0.003, release: 0.3, octave: 2, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.07, attack: 0.04, release: 0.35, octave: 1, echo: true }
+      const chime: Voice = { wave: 'sine', vol: 0.03, attack: 0.002, release: 0.5, octave: 3, echo: true }
+      b.bass(bass, chords, 'r--o--')
+      b.pad(pad, chords, [0, 1, 2], 0.004)
+      b.arp(glass, chords, [0, 1, 2, 3, 2, 1])
+      b.line(lead, [
+        [0, 0, 4, 4], [0, 4, 5, 2],
+        [1, 0, 6, 6],
+        [2, 0, 4, 3], [2, 3, 2, 3],
+        [3, 0, 1, 6],
+        [4, 0, 2, 4], [4, 4, 4, 2],
+        [5, 0, 5, 6],
+        [6, 0, 4, 3], [6, 3, 3, 3],
+        [7, 0, 2, 6],
+        [8, 0, 7, 4], [8, 4, 6, 2],
+        [9, 0, 8, 6],
+        [10, 0, 7, 3], [10, 3, 5, 3],
+        [11, 0, 4, 6],
+        [12, 0, 4, 2], [12, 2, 5, 2], [12, 4, 6, 2],
+        [13, 0, 7, 6],
+        [14, 0, 6, 3], [14, 3, 4, 3],
+        [15, 0, 4, 6],
+      ])
+      b.line(chime, [
+        [0, 5, 11, 1], [2, 1, 12, 1], [3, 4, 9, 1], [5, 2, 13, 1], [7, 5, 11, 1],
+        [9, 1, 12, 1], [10, 4, 14, 1], [12, 2, 11, 1], [13, 5, 13, 1], [15, 3, 12, 1],
+      ])
+      b.drums('kick', 'x.....', 0, 16, 0.1)
+      b.drums('hat', '...o..', 4, 16, 0.02)
+    },
+  )
+}
+
 /** 草甸：明快的大调三拍子，三角波的笛声领着唱，拨弦似的琶音一路流下去，低音踏着根音与五音，轻轻的鼓点像在草地上走 */
 function buildMeadow(): BgmScore {
   const chords = [0, 3, 4, 0, 5, 3, 1, 4, 0, 3, 4, 5, 3, 4, 1, 0]
@@ -1320,6 +1370,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   ship: buildShip,
   floe: buildFloe,
   cave: buildCave,
+  amethyst: buildAmethyst,
   meadow: buildMeadow,
   sakura: buildSakura,
   maple: buildMaple,

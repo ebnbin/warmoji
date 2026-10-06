@@ -4,6 +4,7 @@ import { bounded, ice, nebulaOld, oldRiver, oldRuins, space, torus } from './hoo
 import type { WorldHooks } from './hooks'
 import { withBuilt } from './built'
 import { cave } from '../../maps/cave/world'
+import { amethyst } from '../../maps/amethyst/world'
 import { circuit } from '../../maps/circuit/world'
 import { desert } from '../../maps/desert/world'
 import { dreamland } from '../../maps/dreamland/world'
@@ -36,6 +37,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   ship,
   floe,
   cave,
+  amethyst,
   meadow,
   sakura,
   maple,

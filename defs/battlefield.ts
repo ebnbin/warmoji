@@ -149,6 +149,13 @@ export const BATTLEFIELD = {
       { id: 'cave_slick', emoji: '1f4a7', name: '湿滑岩面', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'cave_chill', emoji: '1f976', name: '洞穴寒气', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
+    amethyst: [
+      { id: 'amethyst_prism', emoji: '1f48e', name: '晶光折射', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'amethyst_glint', emoji: '2728', name: '流光指路', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'amethyst_glare', emoji: '1f4ab', name: '晶芒刺目', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'amethyst_shards', emoji: '1faa8', name: '碎晶扎脚', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
+      { id: 'amethyst_chill', emoji: '1f976', name: '晶洞寒气', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
     dreamland: [
       { id: 'dreamland_candy', emoji: '1f36c', name: '一把糖果', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'dreamland_balloon', emoji: '1f388', name: '气球托身', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
