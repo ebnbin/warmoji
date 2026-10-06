@@ -208,9 +208,29 @@ function rock(rng: Rng, windAngle: number): LandmarkShape {
   return { kind: 'rock', limbs: [], stones: [], slab, solids, reach: slab.length * 0.85, top: slab.height }
 }
 
-/** 仙人掌：画成一个立着的 emoji，只有高矮不同；不在地上投影子，脚下的主干挡人 */
+/** 柱形仙人掌：一根粗干，带一到两条先横伸再朝上翘的侧臂，影子落在地上是仙人掌的剪影；只有脚下的主干挡人 */
 function cactus(rng: Rng): LandmarkShape {
-  return { kind: 'cactus', limbs: [], stones: [], slab: null, solids: [{ x0: 0, y0: 0, x1: 0, y1: 0, r: 0.2 }], reach: 0.25, top: 1.5 + 0.7 * rng.next() }
+  const height = 1.3 + 0.7 * rng.next()
+  const lean = rng.next() * TAU
+  const tip = 0.02 + 0.03 * rng.next()
+  const tx = Math.cos(lean) * tip
+  const ty = Math.sin(lean) * tip
+  const limbs: Limb[] = [{ x0: 0, y0: 0, z0: 0, x1: tx, y1: ty, z1: height, r0: 0.45, r1: 0.42 }]
+  const arms = 1 + Math.floor(rng.next() * 2)
+  const turn = rng.next() * TAU
+  let reach = 0.45
+  for (let k = 0; k < arms; k++) {
+    const a = turn + k * Math.PI + (rng.next() * 2 - 1) * 0.5
+    const z = height * (0.35 + 0.2 * rng.next())
+    const out = 0.85 + 0.25 * rng.next()
+    const up = Math.min(z + 0.35 + 0.4 * rng.next(), height - 0.05)
+    const ex = Math.cos(a) * out
+    const ey = Math.sin(a) * out
+    limbs.push({ x0: 0, y0: 0, z0: z, x1: ex, y1: ey, z1: z + 0.1, r0: 0.26, r1: 0.26 })
+    limbs.push({ x0: ex, y0: ey, z0: z + 0.1, x1: ex * 1.06, y1: ey * 1.06, z1: up, r0: 0.26, r1: 0.24 })
+    reach = Math.max(reach, out * 1.06 + 0.26)
+  }
+  return { kind: 'cactus', limbs, stones: [], slab: null, solids: [{ x0: 0, y0: 0, x1: 0, y1: 0, r: 0.45 }], reach: reach + 0.05, top: height }
 }
 
 /** 按种类与种子生成一样标志物；岩盘顺着盛行风拉长 */
