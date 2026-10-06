@@ -6,7 +6,7 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TiltDial } from '../ui'
+import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TempleDial, TiltDial } from '../ui'
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
@@ -58,6 +58,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private tiltDial?: TiltDial
   private submarineDial?: SubmarineDial
   private sundial?: Sundial
+  private templeDial?: TempleDial
   private squad: SquadIcon[] = []
   private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
@@ -104,6 +105,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       tilt: null,
       clock: null,
       submarine: null,
+      temple: null,
     }
 
     const stick = EDGE + Joystick.RADIUS
@@ -133,6 +135,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.tiltDial = undefined
     this.sundial = undefined
     this.submarineDial = undefined
+    this.templeDial = undefined
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
@@ -193,6 +196,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.updateTilt(s.tilt)
     this.updateClock(s.clock)
     this.updateSubmarine(s.submarine)
+    this.updateTemple(s.temple)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
     if (s.level !== this.last.level || s.levelUps !== this.last.levelUps) this.updateLevel(s.level, s.levelUps)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
@@ -450,6 +454,13 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (!b) return
     this.submarineDial ??= new SubmarineDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
     this.submarineDial.setSubmarine(b.phase, b.ratio, b.inSec, this.time.now)
+  }
+
+  /** 在神庙打的一局：哪几处机关复位好了、哪几处在发动、复位还要多久，随时看得见 */
+  private updateTemple(t: HudSnapshot['temple']): void {
+    if (!t) return
+    this.templeDial ??= new TempleDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
+    this.templeDial.setTraps(t, this.time.now)
   }
 
   private updateGoals(goals: HudSnapshot['goals']): void {

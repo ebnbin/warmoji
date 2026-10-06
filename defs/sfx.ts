@@ -54,4 +54,12 @@ export const SFX = {
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
+  // 神庙：压板咔哒一声沉下去，兽头喷镖，石刺弹起，滚石碾过石槽，翻板翻开；鹦鹉与吼猴的叫声
+  latch: { wave: 'noise', freq: 1700, freqEnd: 600, duration: 0.09, volume: 0.32, attack: 0.001, decayPow: 2.2, steps: [1, 0.55], throttleMs: 120, jitter: 0.1 },
+  darts: { wave: 'noise', freq: 3600, freqEnd: 1500, duration: 0.34, volume: 0.3, attack: 0.004, decayPow: 1.4, steps: [1, 0.7, 1.05, 0.75, 1.1], throttleMs: 140, jitter: 0.12 },
+  spikes: { wave: 'noise', freq: 2400, freqEnd: 420, duration: 0.26, volume: 0.42, attack: 0.002, decayPow: 1.6, steps: [1, 0.6, 0.95], throttleMs: 150, jitter: 0.12 },
+  grind: { wave: 'noise', freq: 110, freqEnd: 70, duration: 3.6, volume: 0.6, attack: 0.25, decayPow: 0.7, steps: [1, 1.15, 0.9, 1.2, 0.95, 1.1, 0.88, 1.15], throttleMs: 2500 },
+  trapdoor: { wave: 'sawtooth', freq: 160, freqEnd: 60, duration: 0.45, volume: 0.22, attack: 0.01, decayPow: 1.4, steps: [1, 1.12, 0.9, 1.08], throttleMs: 300, jitter: 0.1 },
+  squawk: { wave: 'sawtooth', freq: 1450, freqEnd: 900, duration: 0.32, volume: 0.07, attack: 0.008, decayPow: 1.1, steps: [1, 1.25, 0.85, 1.2], throttleMs: 3000, jitter: 0.15 },
+  howl: { wave: 'sawtooth', freq: 190, freqEnd: 150, duration: 1.4, volume: 0.07, attack: 0.25, decayPow: 0.7, steps: [1, 1.3, 1.1, 1.35, 1.05, 1.3, 1], throttleMs: 6000, jitter: 0.15 },
 } as const satisfies Record<string, SfxDef>

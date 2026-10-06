@@ -127,7 +127,7 @@ export function templeOf(sim: Sim): TempleState {
 }
 
 /** 一处机关这一步要多久（毫秒）：发动那一步由机关自己决定什么时候完，返回 Infinity */
-export function phaseMs(cfg: TempleConfig, t: Trap, phase: TrapPhase): number {
+export function trapPhaseMs(cfg: TempleConfig, t: Trap, phase: TrapPhase): number {
   const c = cfg[t.kind === 'darts' ? 'darts' : t.kind === 'spikes' ? 'spikes' : t.kind === 'boulder' ? 'boulder' : 'pit']
   if (phase === 'primed') return c.primeMs
   if (phase === 'rearm') return c.rearmMs
@@ -339,13 +339,13 @@ function stepTraps(sim: Sim, cfg: TempleConfig, s: TempleState, dt: number): voi
         if (pressed(sim, cfg, plan, t, list)) enter(run, 'primed', now)
         return
       case 'primed':
-        if (age >= phaseMs(cfg, t, 'primed')) {
+        if (age >= trapPhaseMs(cfg, t, 'primed')) {
           enter(run, 'firing', now)
           if (t.kind === 'boulder') run.roll = t.top
         }
         return
       case 'rearm':
-        if (age >= phaseMs(cfg, t, 'rearm')) enter(run, 'armed', now)
+        if (age >= trapPhaseMs(cfg, t, 'rearm')) enter(run, 'armed', now)
         return
       case 'firing':
         break

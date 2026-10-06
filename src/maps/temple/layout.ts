@@ -218,11 +218,13 @@ export function altarSd(al: Altar, a: number, b: number): number {
   return rectSd({ a0: -al.hl, a1: al.hl, b0: -al.hw, b1: al.hw }, u, v)
 }
 
-/** 兽头的嘴伸进前庭的那一小块：贴着墙脚，顺着 a 宽一格半 */
+/** 兽头顺着墙宽多少的一半（格） */
+export const HEAD_HALF_U = 1
+/** 兽头的嘴伸进前庭的那一小块：贴着墙脚，顺着 a 宽两格 */
 export function snoutRect(cfg: TempleConfig, c: Court, t: DartTrap): Rect {
   const s = cfg.walls.snoutU
   const face = c.half * t.side
-  return t.side > 0 ? { a0: t.a - 0.75, a1: t.a + 0.75, b0: face - s, b1: face + 1 } : { a0: t.a - 0.75, a1: t.a + 0.75, b0: face - 1, b1: face + s }
+  return t.side > 0 ? { a0: t.a - HEAD_HALF_U, a1: t.a + HEAD_HALF_U, b0: face - s, b1: face + 1 } : { a0: t.a - HEAD_HALF_U, a1: t.a + HEAD_HALF_U, b0: face - 1, b1: face + s }
 }
 
 /** 压板占的那一块 */
@@ -300,7 +302,7 @@ function trapsOf(cfg: TempleConfig, rng: Rng, c: Court, start: Local, altar: Alt
   for (let k = 0, tries = 0; k < nb && tries < 60; tries++) {
     const g = cfg.boulder.grooveU
     const lo = p.stairU / 2 + g / 2 + 1.2
-    const hi = c.half - g / 2 - 1.8
+    const hi = c.half - g / 2 - 3
     if (hi <= lo) return null
     const b = (lo + (hi - lo) * rng.next()) * (rng.next() < 0.5 ? -1 : 1)
     const band: Rect = { a0: -c.back - c.jungle - 4, a1: c.front, b0: b - g / 2, b1: b + g / 2 }

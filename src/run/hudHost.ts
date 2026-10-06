@@ -28,6 +28,8 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  /** 在神庙打的一局才有：每处机关此刻走到哪一步 */
+  temple: TempleSnapshot | null
 }
 
 /**
@@ -58,6 +60,11 @@ export interface SubmarineSnapshot {
   readonly phase: 'down' | 'warn' | 'away'
   readonly ratio: number
   readonly inSec: number
+}
+
+/** 神庙的机关：每处一项，按地图上的次序；phase 是复位好了、踩下去了、正在发动还是在复位，ratio 是复位走了多少 */
+export interface TempleSnapshot {
+  readonly traps: readonly { readonly kind: 'darts' | 'spikes' | 'boulder' | 'pit'; readonly phase: 'armed' | 'primed' | 'firing' | 'rearm'; readonly ratio: number }[]
 }
 
 export interface WaveSummary {

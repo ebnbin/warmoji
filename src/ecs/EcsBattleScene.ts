@@ -78,9 +78,10 @@ import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhas
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
+import { trapPhaseMs } from '../maps/temple/world'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TempleSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -610,6 +611,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      temple: sim ? templeSnapshot(sim) : null,
     }
   }
 
@@ -1059,6 +1061,19 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 在神庙打的一局：每处机关走到哪一步，复位走了多少 */
+function templeSnapshot(sim: Sim): TempleSnapshot | null {
+  const s = sim.worldState.temple
+  const cfg = MAPS[sim.mapId].temple
+  if (!s || !cfg) return null
+  return {
+    traps: s.plan.traps.map((t, k) => {
+      const run = s.runs[k]!
+      return { kind: t.kind, phase: run.phase, ratio: run.phase === 'rearm' ? (sim.elapsedMs - run.at) / trapPhaseMs(cfg, t, 'rearm') : 0 }
+    }),
+  }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {
