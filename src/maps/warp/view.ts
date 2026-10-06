@@ -50,7 +50,7 @@ const PAD_FILL = 0.45
 /** 核心柱照亮四周的身体：多远（格）以内 */
 const CORE_LIGHT_U = 6
 /** 熄透的房间压上多浓的暗色；熄了灯的东西还留着几成光 */
-const DARK_MAX = 0.8
+const DARK_MAX = 0.86
 const STANDBY = 0.15
 /** 灯刚亮起来的那一段一闪一闪：每一下多久，毫秒 */
 const FLICKER_MS = 70
