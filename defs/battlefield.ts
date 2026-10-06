@@ -149,6 +149,13 @@ export const BATTLEFIELD = {
       { id: 'dreamland_dizzy', emoji: '1f635_200d_1f4ab', name: '转晕了', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'dreamland_sticky', emoji: '1f36d', name: '糖浆粘脚', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    storybook: [
+      { id: 'storybook_wand', emoji: '1fa84', name: '仙女棒', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'storybook_slipper', emoji: '1f460', name: '水晶鞋', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'storybook_spindle', emoji: '1f4a4', name: '沉睡咒', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'storybook_apple', emoji: '1f34e', name: '毒苹果', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+      { id: 'storybook_midnight', emoji: '1f55b', name: '午夜钟声', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+    ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
 } as const satisfies BattlefieldTuning

@@ -1333,6 +1333,41 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/**
+ * 立体书：桌上摊开的一本巨型立体童话书，两页摊开就是战场，书脊在正中。页面上印着插画，印的都能走；立起来的是剪纸布景，挡人，高的也挡子弹和视线。
+ * 书隔一阵翻到下一页：先预兆，这一页的布景依次折平，书页翻过去，新一页的布景再从书脊往外依次弹起来，压着谁就把谁挤开。一页是故事的一章，章按故事的次序轮下去
+ */
+export interface StorybookConfig {
+  /** 一页多宽多高，格：两页摊开，书脊竖在方框正中 */
+  readonly page: { readonly wU: number; readonly hU: number }
+  /** 开局站的那片空地的半径，格：开局那一页的布景不落在里面 */
+  readonly plazaU: number
+  /** 布景离页边、离书脊至少多远，格：高的按 tall，矮的按 low */
+  readonly margin: { readonly tall: number; readonly low: number; readonly gutter: number }
+  /** 布景之间至少留多宽的路，格：两件高的之间按 tall（头目也挤得过去），有一件矮的就按 low（头目跨得过矮的） */
+  readonly gapU: { readonly tall: number; readonly low: number }
+  /** 矮的布景（树篱、栅栏、草垛、财宝堆）多高，米：齐腰，挡身体，子弹从上面飞过去，个子大的跨得过 */
+  readonly lowM: number
+  /** 一页立几件布景 */
+  readonly pieces: readonly [number, number]
+  /**
+   * 翻页：开局 firstMs 后第一次翻，之后每页立 intervalMs 上下 jitterMs；先预兆 warnMs，再用 foldMs 让布景依次折平，leafMs 翻过书页，
+   * 停 restMs 后用 popMs 让新一页的布景依次弹起来；一件布景折平或弹起要 flipMs，竖过一半时开始或不再挡路
+   */
+  readonly turn: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly warnMs: number
+    readonly foldMs: number
+    readonly leafMs: number
+    readonly restMs: number
+    readonly popMs: number
+    readonly flipMs: number
+  }
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1341,8 +1376,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，paper 碎纸屑 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'paper'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1407,7 +1442,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'storybook'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,6 +1476,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly storybook?: StorybookConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

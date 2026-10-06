@@ -80,7 +80,8 @@ import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { BookSnapshot, ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import { CHAPTERS, chapterOf } from '../maps/storybook/model'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -534,6 +535,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
+      paper: burstEmitter(this, [0xfbf3df, 0xf1e4c4, 0xffffff, 0xe6d3ad], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
@@ -610,6 +612,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      book: sim ? bookSnapshot(sim) : null,
     }
   }
 
@@ -1059,6 +1062,21 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 新一页立起来以后，章名在书页盘下面写这么久，毫秒 */
+const BOOK_TITLE_MS = 4500
+
+/** 在立体书里打的一局：翻页的倒计时 */
+function bookSnapshot(sim: Sim): BookSnapshot | null {
+  const s = sim.worldState.storybook
+  if (!s) return null
+  const c = s.clock
+  const fresh = c.phase === 'stand' && c.at < BOOK_TITLE_MS && c.page > 0
+  const ch = CHAPTERS[chapterOf(s.book, c.page)]!
+  const title = fresh || c.phase === 'pop' ? `第${ch.num}章 · ${ch.name}` : null
+  if (c.phase === 'stand') return { phase: 'stand', ratio: 1 - c.at / c.len, inSec: (c.len - c.at) / 1000, title }
+  return { phase: c.phase === 'warn' ? 'warn' : 'turn', ratio: 0, inSec: 0, title }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {

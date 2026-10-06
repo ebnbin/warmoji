@@ -17,6 +17,7 @@ import { MapleView } from '../maps/maple/view'
 import { ShipView } from '../maps/ship/view'
 import { VolcanoView } from '../maps/volcano/view'
 import { DeepView } from '../maps/deep/view'
+import { StorybookView } from '../maps/storybook/view'
 
 export function viewFor(mapId: MapId): MapView {
   return MAKE[MAPS[mapId].kind]()
@@ -46,4 +47,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   nexus: () => new NexusView(),
   petri: () => new PetriView(),
   dreamland: () => new DreamlandView(),
+  storybook: () => new StorybookView(),
 }

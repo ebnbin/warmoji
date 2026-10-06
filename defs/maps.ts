@@ -212,6 +212,18 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const STORYBOOK_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'rat', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
+  { kind: 'mushroom', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'ghost', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'knight', sinceWave: 3, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1345,6 +1357,53 @@ export const MAPS = {
       belt: { speedU: 1.5, flipMs: [9000, 15000], warnMs: 1600, turnMs: 1300 },
       friction: { body: { static: 0.17, kinetic: 0.13 }, coin: { static: 0.1, kinetic: 0.07 } },
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
+    },
+    boss: 'eclipse',
+  },
+  storybook: {
+    emoji: '1f4d6',
+    name: '立体书',
+    desc: '桌上摊开的一本巨型立体童话书，两页摊开就是战场，书脊的中缝竖在正中。页面上印着插画：草地、小路、溪水、花丛都只是印上去的画，哪里都能走。立起来的是剪纸布景：树篱、栅栏、草垛齐腰，挡人不挡子弹，头目跨得过；大树、小屋、城墙、塔楼、巨龙比人高，挡人也挡子弹和视线。书隔一阵翻到下一页：页角先翘起来、一道页影扫过页面、哗啦一声，随后这一页立着的布景一件件折平，成了页面上的画；书页翻过去，新一页的布景平躺在页面上，再从书脊往外一件件弹起来，弹起处站着的谁都被挤到旁边。一页是故事的一章，森林、磨坊、城堡、龙穴轮着来，每一页的摆法都不同。怪物从书脊的中缝里爬出来，从页边翻上来，也从刚立起来的布景后面走出来',
+    kind: 'storybook',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(28 34% 34%)',
+      bgTo: 'hsl(20 38% 12%)',
+      map: hslToInt(42, 0.5, 0.86),
+      shadow: 0x000000,
+    },
+    // 台灯从左上方照下来，纸面反光，背光面不暗；影子落在纸上，暖褐色
+    light: { sun: 0xfffaf0, shade: 0xd2c4b2, shadow: { color: 0x3b2614, alpha: 0.32, length: 0.7 } },
+    decor: {
+      emojis: ['1f4d6'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: STORYBOOK_MIX,
+    // 从书脊的中缝里爬出来、从页边翻上来、从刚立起来的布景后面走出来、从书页上浮出来；夜伯爵从中缝里爬出来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'paper',
+      boss: 'gutter',
+      kinds: {
+        gutter: { name: '书脊中缝', at: { kind: 'mark' }, enter: 'rise', look: 'paper', snapU: 4, weight: 3, perSec: 1.5 },
+        edge: { name: '页边', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'paper', weight: 3, perSec: 1.5, only: ['zombie', 'rat', 'skeleton', 'knight', 'mushroom', 'raccoon', 'elf'] },
+        wings: { name: '布景后', at: { kind: 'mark' }, enter: 'walk', look: 'paper', snapU: 5, weight: 3, perSec: 1, only: ['zombie', 'skeleton', 'knight', 'rat', 'raccoon', 'elf', 'gargoyle', 'mushroom'] },
+        print: { name: '书页上', at: { kind: 'ground' }, enter: 'rise', look: 'paper', weight: 1 },
+      },
+    },
+    finalWaveSub: '夜伯爵从书脊的中缝里爬了出来——翻页的时候，别和它困在同一片布景后面！',
+    storybook: {
+      page: { wU: 17, hU: 26 },
+      plazaU: 4.5,
+      margin: { tall: 2.6, low: 1.7, gutter: 1.2 },
+      gapU: { tall: 2.7, low: 1.7 },
+      lowM: 1,
+      pieces: [10, 15],
+      turn: { firstMs: 45000, intervalMs: 60000, jitterMs: 6000, warnMs: 4000, foldMs: 1800, leafMs: 1800, restMs: 700, popMs: 1800, flipMs: 520 },
+      reflowMs: 300,
     },
     boss: 'eclipse',
   },
