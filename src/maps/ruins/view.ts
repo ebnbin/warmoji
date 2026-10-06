@@ -30,7 +30,7 @@ import type { Framing } from '../../ecs/lens'
 import type { Sim } from '../../ecs/sim'
 import type { Point } from '../../util/vec'
 
-const BG = 0x1c110b
+const BG = 0x1f150a
 const GROUND_KEY = 'ruins-ground'
 const CANOPY_KEY = 'ruins-canopy'
 const DUST_KEY = 'ruins-dust'
@@ -217,7 +217,7 @@ export class RuinsView implements MapView {
     this.effects(v)
     this.roost(v, s)
     this.leaves = new FallingLeaves(scene)
-    v.lens.screen.vignette(0.74, 0.22, 0x2a1008)
+    v.lens.screen.vignette(0.74, 0.18, 0x2e1c08)
   }
 
   /** 扬尘、碎石与木屑的粒子，落石的影子 */

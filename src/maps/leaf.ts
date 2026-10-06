@@ -2,14 +2,14 @@ import { BLADE, bladeDist, STALK_LEN, STALK_W } from './blade'
 
 /** 飘落与漂在水上的枫叶：从上往下看、正中那片裂片的尖朝贴图的右边（x 正向），逐像素画一次 */
 
-/** 几种飘落的叶色与各占几成：朱红、橙红、深红、橙、金黄，还有落了几天发褐的 */
+/** 几种飘落的叶色与各占几成：正橙、金黄、橙红、黄、朱红，还有落了几天发褐的 */
 export const LEAF_COLORS: readonly { readonly weight: number; readonly rgb: readonly [number, number, number] }[] = [
-  { weight: 0.3, rgb: [230, 60, 34] },
-  { weight: 0.24, rgb: [240, 98, 36] },
-  { weight: 0.2, rgb: [214, 42, 46] },
-  { weight: 0.15, rgb: [244, 134, 40] },
-  { weight: 0.05, rgb: [236, 172, 54] },
-  { weight: 0.06, rgb: [172, 92, 54] },
+  { weight: 0.32, rgb: [246, 136, 36] },
+  { weight: 0.24, rgb: [244, 172, 48] },
+  { weight: 0.18, rgb: [238, 104, 36] },
+  { weight: 0.1, rgb: [238, 198, 70] },
+  { weight: 0.06, rgb: [226, 68, 34] },
+  { weight: 0.1, rgb: [180, 118, 58] },
 ]
 
 /** 叶片的长占贴图边长的几成：连着叶柄整个放得下 */
