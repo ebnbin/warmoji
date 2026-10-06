@@ -8,8 +8,8 @@ import type { Crowns } from './crown'
 
 /** 树冠贴图每格多少像素：一片片枫叶要看得出 */
 export const CANOPY_PPU = 36
-/** 整张画面往暖里调：秋天午后斜照的阳光，偏橙红 */
-export const GRADE = { r: 1.06, g: 0.98, b: 0.92 } as const
+/** 整张画面往暖里调：秋天午后斜照的阳光，偏橙黄 */
+export const GRADE = { r: 1.05, g: 1.0, b: 0.9 } as const
 
 const LX = SUN.x
 const LY = SUN.y
@@ -43,14 +43,14 @@ function segDist(ax: number, ay: number, bx: number, by: number, x: number, y: n
   return SEG
 }
 
-/** 落了几天的叶子：锈红、红褐、枯褐 */
+/** 落了几天的叶子：橙褐、赭黄、枯褐 */
 const OLD = [
-  [184, 88, 48],
-  [162, 90, 54],
-  [166, 116, 72],
+  [200, 120, 50],
+  [184, 132, 66],
+  [176, 142, 88],
 ] as const
-/** 落叶铺厚了，底下透出来的那层：半烂的叶子，红褐里带橙 */
-export const MULCH = [164, 86, 50] as const
+/** 落叶铺厚了，底下透出来的那层：半烂的叶子，橙褐 */
+export const MULCH = [180, 122, 62] as const
 /** 落在地上的叶子干了、沾了土，比树上的暗这么多 */
 const FALLEN = 0.94
 /** 地上的一片落叶边缘柔和多宽（格）：半个像素 */
@@ -189,13 +189,13 @@ function leafShade(c: Crowns, i: number, x: number, y: number, d: number, lobe: 
   const nx = c.nx[i]!
   const ny = c.ny[i]!
   const lam = Math.max(0, (nx * LX + ny * LY + LZ) / (Math.sqrt(nx * nx + ny * ny + 1) * SUN_3D))
-  // 晒到的直射光；背阴的叶子透过上面的叶子透下来的光是红的：越背阴，绿与蓝压得越低，暗处是饱满的深红、不发褐
+  // 晒到的直射光；背阴的叶子透过上面的叶子透下来的光是橙的：越背阴，绿与蓝压得越低，暗处是饱满的深橙、不发褐
   const direct = lam * (1 - SELF_SHADE * shadow) * (1 - 0.5 * buried)
-  const k = (0.54 + 0.76 * direct) * (1 - 0.16 * smooth(-0.02, -0.002, d))
+  const k = (0.62 + 0.7 * direct) * (1 - 0.16 * smooth(-0.02, -0.002, d))
   const dim = 1 - Math.min(1, direct / 0.75)
   LS[0] = r * k * GRADE.r
-  LS[1] = g * k * (1 - 0.22 * dim) * GRADE.g
-  LS[2] = b * k * (1 + 0.2 * dim) * GRADE.b
+  LS[1] = g * k * (1 - 0.15 * dim) * GRADE.g
+  LS[2] = b * k * (1 - 0.25 * dim) * GRADE.b
 }
 
 /** 叶缝里露出来的枝条：这一桶里罩住这一点最高的那段，朝太阳的一侧亮；颜色写进 LS，返回盖住了多少 */
