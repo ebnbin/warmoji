@@ -23,7 +23,7 @@ import { blankSky, clarity, skyAt, skyTint, spanAt, sunTint } from './sky'
 import { AmethystPainter } from './painter'
 import { FACE_PPU, heightSpan, RELIEF_PPU, ROCK_BG } from './ground'
 import { blendLux, castShade, doubleMultiply, encodeLux, LIGHT_FRAG, luxShot, MAX_TORCHES, SHADE_BINS, SHADE_ROWS, SHINE_FRAG, shootLux } from './shader'
-import { drawFlame, drawGlow, drawMoth, drawSmoke } from './sprites'
+import { drawBat, drawFlame, drawGlow, drawMoth, drawSmoke } from './sprites'
 import { LIGHT_MS, torchLights, torchSpot } from './world'
 import type { AmethystLayout } from './layout'
 import type { Facing } from './light'
@@ -48,6 +48,7 @@ const FLAME_KEY = 'amethyst-flame'
 const GLOW_KEY = 'amethyst-glow'
 const SMOKE_KEY = 'amethyst-smoke'
 const MOTH_KEY = 'amethyst-moth'
+const BAT_KEY = 'amethyst-bat'
 /** 开局最多几个线程分着画地面 */
 const THREADS = 4
 /** 洞里的光压在实体、特效与血条上面，指向箭头与伤害数字下面；晶面的闪光叠在光上；火苗自己发光，画在最上面 */
@@ -83,12 +84,31 @@ const MASK_PAD = 0.1
 const MOTHS = 3
 /** 太阳落到这个高度晶体开始遇冷，一直响到它落到负的这么多度，度 */
 const CHILL_DEG = 2
+/** 太阳落到这个高度蝙蝠出洞、黎明升到这个高度回洞，度：洞里还看得清，一群黑影预告天要黑了、天快亮了 */
+const BAT_OUT_DEG = 1
+const BAT_IN_DEG = -1
+const BAT_COUNT = 34
 const RAD = Math.PI / 180
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function ease(e0: number, e1: number, x: number): number {
   const t = clamp01((x - e0) / (e1 - e0))
   return t * t * (3 - 2 * t)
+}
+
+/** 一只蝙蝠：出洞的盘旋着朝塌顶飞、越飞越高，回洞的从塌顶盘旋着落进暗道尽头；alt 是离洞底多高（0–1） */
+interface Bat {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  readonly tx: number
+  readonly ty: number
+  alt: number
+  readonly out: boolean
+  readonly spin: number
+  readonly flap: number
+  readonly img: Phaser.GameObjects.Image
 }
 
 /** 一名队员手里的火把在画面上的样子：uid 对不上就是换了人；pop 是刚点着时火光一涨的剩余时间，毫秒 */
@@ -114,7 +134,8 @@ const faint = (x: number): number => (x < 0.002 ? 0 : x)
  * 紫水晶洞穴：地面是后台线程画的固有色与晶面朝向，光照由着色器按 2 倍调制压在整个画面上——开口下的光斑随太阳移动、被洞壁与晶体挡出影子，
  * 天光与紫色的反光从照度场来，火把按点光源照、被洞壁与高大的晶体挡住；晶面朝着反射方向时闪一下，光柱里晶尘浮动。
  * 镜头按洞里的平均照度推拉：亮时拉远看大半个洞，暗时推到火把那一圈；眼睛跟着适应，最暗只适应到 view.brightLux。
- * 火把点着、熄灭有火光与声音，冒烟和火星，夜里飞蛾绕着火飞；黑暗里的敌人露出反光的眼睛；黄昏时晶体遇冷，叮的一声闪一下；子弹敲在晶体上迸出碎晶
+ * 火把点着、熄灭有火光与声音，冒烟和火星，夜里飞蛾绕着火飞；黑暗里的敌人露出反光的眼睛；黄昏一群蝙蝠从暗道里飞出、绕着塌顶盘旋着升出去，黎明从塌顶飞回暗道；
+ * 黄昏时晶体遇冷，叮的一声闪一下；子弹敲在晶体上迸出碎晶
  */
 export class AmethystView extends BoundedView {
   private painter?: AmethystPainter
@@ -154,6 +175,7 @@ export class AmethystView extends BoundedView {
   private shards?: Phaser.GameObjects.Particles.ParticleEmitter
   private eyes: Phaser.GameObjects.Image[] = []
   private flashes: { img: Phaser.GameObjects.Image; at: number }[] = []
+  private bats: Bat[] = []
   private vignette?: Phaser.Filters.Vignette
   private mask?: UprightMask
   /** 这一帧洞里的光与点着的火把：单位按它分明暗 */
@@ -180,6 +202,7 @@ export class AmethystView extends BoundedView {
     if (!scene.textures.exists(GLOW_KEY)) canvasTexture(scene, GLOW_KEY, 64, 64, (ctx) => drawGlow(ctx, 64))
     if (!scene.textures.exists(SMOKE_KEY)) canvasTexture(scene, SMOKE_KEY, 64, 64, (ctx) => drawSmoke(ctx, 64))
     if (!scene.textures.exists(MOTH_KEY)) canvasTexture(scene, MOTH_KEY, 48, 40, (ctx) => drawMoth(ctx, 48, 40))
+    if (!scene.textures.exists(BAT_KEY)) canvasTexture(scene, BAT_KEY, 64, 32, (ctx) => drawBat(ctx, 64, 32))
   }
 
   /** 布景要等洞的形状生成以后才撒得下去，见 scatter */
@@ -439,6 +462,7 @@ export class AmethystView extends BoundedView {
     this.mask?.paint(view.x - view.w * MASK_PAD, view.y - view.h * MASK_PAD, view.w * (1 + 2 * MASK_PAD), view.h * (1 + 2 * MASK_PAD), paintedEmojiOn())
     this.stepImpacts(v, s)
     this.stepChill(v, s, sunDeg, now)
+    this.stepBats(v, s, sunDeg, dt)
     this.sunDeg = sunDeg
   }
 
@@ -622,6 +646,76 @@ export class AmethystView extends BoundedView {
     playSfx('tink')
   }
 
+  /** 黄昏太阳落到 BAT_OUT_DEG 时一群蝙蝠从暗道里飞出、绕着塌顶盘旋着升出去；黎明升到 BAT_IN_DEG 时从塌顶飞回暗道 */
+  private stepBats(v: ViewCtx, s: AmethystState, sunDeg: number, dt: number): void {
+    const L = s.layout
+    const main = L.breaches[0]
+    if (main && this.sunDeg >= BAT_OUT_DEG && sunDeg < BAT_OUT_DEG) this.flock(v, s, true)
+    if (main && this.sunDeg <= BAT_IN_DEG && sunDeg > BAT_IN_DEG) this.flock(v, s, false)
+    const t = dt / 1000
+    const kept: Bat[] = []
+    for (const b of this.bats) {
+      const dx = b.tx - b.x
+      const dy = b.ty - b.y
+      const dist = Math.hypot(dx, dy) || 1
+      const speed = (b.out ? 5.5 : 6.5) * UNIT
+      const swirl = b.spin * Math.min(1, dist / (2.5 * UNIT))
+      const wantX = (dx / dist) * speed - (dy / dist) * speed * swirl
+      const wantY = (dy / dist) * speed + (dx / dist) * speed * swirl
+      b.vx += (wantX - b.vx) * Math.min(1, t * 2.5)
+      b.vy += (wantY - b.vy) * Math.min(1, t * 2.5)
+      b.x += b.vx * t
+      b.y += b.vy * t
+      if (b.out) b.alt = Math.min(1, b.alt + t * (dist < 3 * UNIT ? 0.55 : 0.08))
+      else b.alt = Math.max(0, b.alt - t * (dist < 1.5 * UNIT ? 1.2 : 0.25))
+      const gone = b.out ? b.alt >= 1 : b.alt <= 0 && dist < 0.6 * UNIT
+      if (gone) {
+        b.img.destroy()
+        continue
+      }
+      const flap = 0.55 + 0.45 * Math.abs(Math.sin(this.u.time * 18 + b.flap))
+      const size = ((0.7 + b.alt * 0.9) * UNIT) / 64
+      b.img
+        .setPosition(b.x, b.y)
+        .setRotation(Math.atan2(b.vy, b.vx) + Math.PI / 2)
+        .setScale(size * flap, size)
+        .setAlpha(b.out ? 1 - ease(0.75, 1, b.alt) : ease(0, 0.25, b.alt) * 0.7 + 0.3)
+      kept.push(b)
+    }
+    this.bats = kept
+  }
+
+  private flock(v: ViewCtx, s: AmethystState, out: boolean): void {
+    const L = s.layout
+    const main = L.breaches[0]!
+    const homes = L.tunnels.map((t) => t.path[t.path.length - 1]!)
+    if (homes.length === 0) return
+    playSfx('flutter')
+    for (let i = 0; i < BAT_COUNT; i++) {
+      const home = homes[i % homes.length]!
+      const jx = (Math.random() - 0.5) * 1.2 * UNIT
+      const jy = (Math.random() - 0.5) * 1.2 * UNIT
+      const a = Math.random() * Math.PI * 2
+      const fromX = out ? home.x + jx : main.x + Math.cos(a) * main.r * 0.6
+      const fromY = out ? home.y + jy : main.y + Math.sin(a) * main.r * 0.6
+      const img = v.scene.add.image(fromX, fromY, BAT_KEY).setDepth(29.5).setAlpha(0)
+      this.visuals.push(img)
+      this.bats.push({
+        x: fromX,
+        y: fromY,
+        vx: 0,
+        vy: 0,
+        tx: out ? main.x : home.x + jx,
+        ty: out ? main.y : home.y + jy,
+        alt: out ? 0 : 1,
+        out,
+        spin: (0.6 + Math.random() * 0.8) * (Math.random() < 0.8 ? 1 : -1),
+        flap: Math.random() * 6.28,
+        img,
+      })
+    }
+  }
+
   destroy(v: ViewCtx): void {
     this.vignette = undefined
     this.painter?.close()
@@ -635,6 +729,7 @@ export class AmethystView extends BoundedView {
     this.data = undefined
     this.eyes = []
     this.flashes = []
+    this.bats = []
     this.embers = undefined
     this.smoke = undefined
     this.shards = undefined
