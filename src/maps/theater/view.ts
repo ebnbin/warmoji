@@ -13,7 +13,7 @@ import { FRAME, FRAME_MID } from '../frame'
 import { drawFace, drawRoof, faceSize, FLAT_U_PER_M, roofSize, STAND_U_PER_M } from './art'
 import { textureSize } from './backdrop'
 import { canvasUv, QuadLayer } from './layer'
-import { glare, lifted, slabOf, slid, trapsOf } from './model'
+import { CHAPTERS, glare, lifted, slabOf, slid, trapsOf } from './model'
 import { TheaterPainter } from './painter'
 import { paintDrop, paintMasking, paintFloor, paintSpot, PAINT_PPU } from './scenery'
 import { stageFor, actAt } from './world'
@@ -78,6 +78,35 @@ const LEGS_KEY = 'theater-legs'
 const VALANCE_KEY = 'theater-valance'
 /** 推景时两幅景接缝的影子多宽，格 */
 const SEAM_U = 0.25
+/**
+ * 台上飘落的东西：樱花瓣从樱树上、枫叶从枫树上一片片飘下来，冬天满台飘雪、火山口往上冒火星；
+ * 最多同时多少片，每棵树每秒落几片，雪每秒落几片，火星每秒冒几颗；落到台上以后多久淡掉（毫秒）；画在身体上面
+ */
+const MOTE_MAX = 140
+const MOTE_TREE_PER_S = 1.6
+const MOTE_SNOW_PER_S = 14
+const MOTE_EMBER_PER_S = 5
+const MOTE_FADE_MS = 1600
+const MOTE_DEPTH = 62
+const PETALS = [0xfae2ea, 0xf6cede, 0xf0b8ce, 0xffffff] as const
+const MAPLE_LEAVES = [0xe63c22, 0xf06224, 0xd62a2e, 0xf48628, 0xecac36] as const
+const EMBERS = [0xffe082, 0xffa726, 0xff5722] as const
+
+/** 一片飘着的：位置、速度（像素、像素每秒），落到哪一高度算着地，晃的相位，翻转的角速度，颜色，什么形状，着地后过了多久 */
+interface Mote {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  floor: number
+  phase: number
+  spin: number
+  color: number
+  shape: 'petal' | 'leaf' | 'snow' | 'ember'
+  landed: number
+  age: number
+}
+
 /** 图集的宽，像素；每件之间空几像素 */
 const ATLAS_W = 2048
 const ATLAS_GAP = 4
@@ -189,6 +218,9 @@ export class TheaterView implements MapView {
   private washes: Phaser.GameObjects.Image[] = []
   private marks?: Phaser.GameObjects.Graphics
   private ropes?: Phaser.GameObjects.Graphics
+  private motesG?: Phaser.GameObjects.Graphics
+  private motes: Mote[] = []
+  private moteDebt = 0
   private stand?: QuadLayer
   private fly?: QuadLayer
   private shadow?: QuadLayer
@@ -258,6 +290,8 @@ export class TheaterView implements MapView {
     this.dark = scene.add.image(0, 0, DARK_KEY).setOrigin(0, 0).setDepth(DARK_DEPTH).setDisplaySize(FRAME_U * UNIT, FRAME_U * UNIT).setVisible(false)
     this.marks = scene.add.graphics().setDepth(MARK_DEPTH)
     this.ropes = scene.add.graphics().setDepth(FLY_DEPTH - 0.01)
+    this.motesG = scene.add.graphics().setDepth(MOTE_DEPTH)
+    this.visuals.push(this.motesG)
     this.shadow = new QuadLayer(scene, SHADOW_DEPTH, SHADOW_ALPHA)
     this.stand = new QuadLayer(scene, STAND_DEPTH)
     this.fly = new QuadLayer(scene, FLY_DEPTH)
@@ -369,7 +403,7 @@ export class TheaterView implements MapView {
     }
   }
 
-  step(v: ViewCtx, sim: Sim, _delta: number): void {
+  step(v: ViewCtx, sim: Sim, delta: number): void {
     const st = sim.worldState.theater
     if (!st || !this.ready || !this.stage) return
     const cfg = this.cfg(v)
@@ -384,6 +418,7 @@ export class TheaterView implements MapView {
     this.pieces(cfg, c, shown)
     this.lights(cfg, c, sim, v)
     this.hangers(sim)
+    this.drift(c, cur, delta)
     this.sounds(cfg, c, shown)
     this.hide(sim, cfg, c, shown)
   }
@@ -544,6 +579,102 @@ export class TheaterView implements MapView {
     return o
   }
 
+  /** 台上飘落的：演着的时候按这一幕的布景往下落，换幕时不再落新的，落下的跟着淡掉 */
+  private drift(c: StageClock, cur: Sheet, delta: number): void {
+    const g = this.motesG!.clear()
+    const stage = this.stage!
+    const dt = Math.min(delta, 100) / 1000
+    if (c.phase === 'stand') {
+      const key = CHAPTERS[cur.act.chapter]!.key
+      const trees = cur.act.pieces.filter((p) => (key === 'spring' && p.kind === 'sakura') || (key === 'autumn' && p.kind === 'maple'))
+      const cones = key === 'winter' ? cur.act.pieces.filter((p) => p.kind === 'cone') : []
+      const rate = trees.length * MOTE_TREE_PER_S + (key === 'winter' ? MOTE_SNOW_PER_S + cones.length * MOTE_EMBER_PER_S : 0)
+      this.moteDebt += rate * dt
+      while (this.moteDebt >= 1 && rate > 0) {
+        this.moteDebt -= 1
+        if (this.motes.length >= MOTE_MAX) continue
+        const pick = Math.random() * rate
+        if (pick < trees.length * MOTE_TREE_PER_S) {
+          const p = trees[Math.floor(pick / MOTE_TREE_PER_S)]!
+          const top = p.h * STAND_U_PER_M
+          const leaf = key === 'autumn'
+          const colors = leaf ? MAPLE_LEAVES : PETALS
+          this.motes.push({
+            x: (p.x + (Math.random() - 0.5) * p.w * 0.9) * UNIT,
+            y: (p.y - top * (0.35 + Math.random() * 0.55)) * UNIT,
+            vx: (Math.random() - 0.3) * 0.5 * UNIT,
+            vy: (leaf ? 0.9 : 0.6) * UNIT,
+            floor: (p.y + (Math.random() - 0.3) * 2.2) * UNIT,
+            phase: Math.random() * 6.28,
+            spin: 3 + Math.random() * 4,
+            color: colors[Math.floor(Math.random() * colors.length)]!,
+            shape: leaf ? 'leaf' : 'petal',
+            landed: -1,
+            age: 0,
+          })
+        } else if (pick < trees.length * MOTE_TREE_PER_S + MOTE_SNOW_PER_S || cones.length === 0) {
+          const fy = stage.y0 + Math.random() * (stage.y1 - stage.y0)
+          this.motes.push({
+            x: (stage.x0 + Math.random() * (stage.x1 - stage.x0)) * UNIT,
+            y: (fy - 2 - Math.random() * 3) * UNIT,
+            vx: 0.3 * UNIT,
+            vy: 0.9 * UNIT,
+            floor: fy * UNIT,
+            phase: Math.random() * 6.28,
+            spin: 1.5 + Math.random(),
+            color: 0xffffff,
+            shape: 'snow',
+            landed: -1,
+            age: 0,
+          })
+        } else {
+          const p = cones[Math.floor(Math.random() * cones.length)]!
+          const top = p.h * STAND_U_PER_M * 0.66
+          this.motes.push({
+            x: (p.x + (Math.random() - 0.5) * 0.5) * UNIT,
+            y: (p.y - top) * UNIT,
+            vx: (Math.random() - 0.5) * 0.8 * UNIT,
+            vy: -(1.2 + Math.random()) * UNIT,
+            floor: (p.y - top - 3) * UNIT,
+            phase: Math.random() * 6.28,
+            spin: 0,
+            color: EMBERS[Math.floor(Math.random() * EMBERS.length)]!,
+            shape: 'ember',
+            landed: -1,
+            age: 0,
+          })
+        }
+      }
+    } else this.moteDebt = 0
+    const fadeAll = c.phase === 'change'
+    this.motes = this.motes.filter((m) => {
+      m.age += dt * 1000
+      if (m.landed < 0) {
+        const sway = Math.sin(m.age / 1000 * m.spin * 0.5 + m.phase)
+        m.x += (m.vx + sway * 0.35 * UNIT) * dt
+        m.y += m.vy * dt
+        const done = m.shape === 'ember' ? m.y <= m.floor : m.y >= m.floor
+        if (done) m.landed = 0
+      } else m.landed += dt * 1000 * (fadeAll ? 3 : 1)
+      if (fadeAll && m.landed < 0) m.landed = 0
+      const fade = m.landed < 0 ? 1 : 1 - m.landed / (m.shape === 'ember' ? 300 : MOTE_FADE_MS)
+      if (fade <= 0) return false
+      const flip = Math.abs(Math.cos(m.age / 1000 * m.spin + m.phase))
+      const u = UNIT
+      if (m.shape === 'snow') {
+        g.fillStyle(0xffffff, 0.85 * fade).fillCircle(m.x, m.y, 0.045 * u)
+      } else if (m.shape === 'ember') {
+        g.fillStyle(m.color, fade).fillCircle(m.x, m.y, 0.05 * u)
+      } else {
+        const r = (m.shape === 'leaf' ? 0.13 : 0.08) * u
+        const h = m.landed < 0 ? r * (0.25 + 0.75 * flip) : r * 0.7
+        g.fillStyle(m.shape === 'leaf' ? 0x5a2014 : 0xb8708a, 0.5 * fade).fillEllipse(m.x + 1, m.y + 1, r * 2, h * 2)
+        g.fillStyle(m.color, fade).fillEllipse(m.x, m.y, r * 2, h * 2)
+      }
+      return true
+    })
+  }
+
   /** 每件布景起吊时吊绳一响，落到台上时咚一声 */
   private sounds(cfg: TheaterConfig, c: StageClock, shown: readonly Sheet[]): void {
     if (c.phase !== this.lastPhase) {
@@ -603,6 +734,7 @@ export class TheaterView implements MapView {
     for (const o of this.visuals) o.destroy()
     this.visuals = []
     this.washes = []
+    this.motes = []
     v.decor.length = 0
     this.ready = false
     for (const s of this.sheets.values()) for (const key of [s.floorKey, s.dropKey, s.atlasKey]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
