@@ -1344,6 +1344,40 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/**
+ * 舞台剧：一座剧场的舞台，台面就是战场：台口一排脚灯，台下是乐池与观众席，两边红丝绒大幕，顶上帷幔，台后挂着画好的天幕。
+ * 台上铺着画好的地布，画的都能走；台上立着布景片，挡人，高的也挡子弹和视线。隔一阵换一幕：台上暗下来，每个角色头上一束发白的追光，角色被吊绳吊起，旧布景依次吊上去，
+ * 地布与天幕连同地上的敌人、金币从右往左推成新的一幅，推进大幕的退场，新布景依次吊下来，角色原地放下。一幕是故事的一章，按故事的次序轮下去
+ */
+export interface TheaterConfig {
+  /** 台面多宽多高，格：宽是半个台面宽（台中线两边各这么宽），台面在方框正中 */
+  readonly size: { readonly wU: number; readonly hU: number }
+  /** 开局站的那片空地的半径，格：开局那一幕的布景不落在里面 */
+  readonly plazaU: number
+  /** 布景离台边、离台中线（一溜活门）至少多远，格：离台边高的按 tall，矮的按 low */
+  readonly margin: { readonly tall: number; readonly low: number; readonly aisle: number }
+  /** 布景之间至少留多宽的路，格：两件高的之间按 tall（头目也挤得过去），有一件矮的就按 low（头目跨得过矮的） */
+  readonly gapU: { readonly tall: number; readonly low: number }
+  /** 矮的布景多高，米：齐腰，挡身体，子弹从上面飞过去，个子大的跨得过 */
+  readonly lowM: number
+  /** 一幕立几件布景 */
+  readonly pieces: readonly [number, number]
+  /**
+   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；台上用 lightMs 暗下来、每个角色头上留一束追光（亮回来也是），
+   * 旧布景在 staggerMs 里先后起吊、每件 flyMs 吊出视线，地布与天幕用 slideMs 从右往左推成新的，新布景再照样先后吊下来
+   */
+  readonly turn: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly lightMs: number
+    readonly staggerMs: number
+    readonly flyMs: number
+    readonly slideMs: number
+  }
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
+}
 /** 跃迁站的四间房各是什么样：空旷的大厅、立着几排柱子、绕着中央凹槽的回廊、狭长的一条 */
 export type WarpShape = 'hall' | 'pillars' | 'cloister' | 'narrow'
 export interface WarpConfig {
@@ -1392,8 +1426,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，paper 碎纸屑 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'paper'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1458,7 +1492,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'warp'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'theater' | 'warp'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1492,6 +1526,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly theater?: TheaterConfig
   readonly warp?: WarpConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string

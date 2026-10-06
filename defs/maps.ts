@@ -212,6 +212,18 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const THEATER_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'rat', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
+  { kind: 'mushroom', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'ghost', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'knight', sinceWave: 3, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
+]
+
 const WARP_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 60, perWave: -2, min: 30, max: 60 },
   { kind: 'ghost', sinceWave: 1, base: 18, perWave: 0.8, min: 14, max: 30 },
@@ -1364,7 +1376,53 @@ export const MAPS = {
     },
     boss: 'eclipse',
   },
-  warp: {
+  theater: {
+    emoji: '1f3ad',
+    name: '舞台剧',
+    desc: '一座剧场的舞台，小小的旅人们就是台上演戏的角色，台面就是战场：顶上挂着红丝绒帷幔，两边垂着红丝绒大幕、一直垂到台边，台口一排脚灯，台下是乐池和一排排空椅子，台后挂着画好的天幕。台上铺着画好的地布：草地、小溪、沙滩、海水、落叶、岩浆、冰面都只是画，哪里都能走。台上立着布景片：花篱、栅栏、石灯笼、珊瑚、蘑菇、雪堆齐腰，挡人不挡子弹，头目跨得过；樱花树、寺院、仙人掌、潜艇、残墙、枫树、火山、冰山比人高，挡人也挡子弹和视线。隔一阵就换一幕：台上暗下来，每个角色头上一束追光、只照亮自己周围（队长的大一点），光圈里白花花的；角色被吊绳吊起来，吊着时不能动、不能打、也不会受伤；旧布景挂着吊绳一件件吊上去，地布与天幕从右边大幕后面推出新的一幅、把旧的推进左边大幕，台上的怪物和金币跟着地布一起被推进大幕、就此退场，没捡的金币也没了；新布景再一件件吊下来，角色原地放下，灯亮回来。一幕是故事的一章，春夏秋冬轮着来，每一幕是两处风景连在一起：春天小溪流过草甸进了樱花院子，夏天沙漠走到海滩、再到深海，秋天红叶落满的残垣边上是一口溶洞，冬天火山脚下的岩浆烧到冰原。怪物从台上的活门里升上来，从台边爬上来，也从布景后面走出来',
+    kind: 'theater',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(356 40% 26%)',
+      bgTo: 'hsl(350 40% 8%)',
+      map: hslToInt(38, 0.45, 0.84),
+      shadow: 0x000000,
+    },
+    // 台上的灯从左上方照下来，地布反光，背光面不暗；影子落在台上，暖褐色
+    light: { sun: 0xfffaf0, shade: 0xd2c4b2, shadow: { color: 0x3b2614, alpha: 0.32, length: 0.7 } },
+    decor: {
+      emojis: ['1f3ad'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: THEATER_MIX,
+    // 从台上的活门里升上来、从台边爬上来、从布景后面走出来、从地布底下钻出来；夜伯爵从活门里升上来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'paper',
+      boss: 'trap',
+      kinds: {
+        trap: { name: '活门', at: { kind: 'mark' }, enter: 'rise', look: 'paper', snapU: 1, weight: 3, perSec: 1.5 },
+        edge: { name: '台边', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'paper', weight: 3, perSec: 1.5, only: ['zombie', 'rat', 'skeleton', 'knight', 'mushroom', 'raccoon', 'elf'] },
+        wings: { name: '布景后', at: { kind: 'mark' }, enter: 'walk', look: 'paper', snapU: 5, weight: 3, perSec: 1, only: ['zombie', 'skeleton', 'knight', 'rat', 'raccoon', 'elf', 'gargoyle', 'mushroom'] },
+        print: { name: '地布下', at: { kind: 'ground' }, enter: 'rise', look: 'paper', weight: 1 },
+      },
+    },
+    finalWaveSub: '夜伯爵从台上的活门里升了上来——换幕的时候，别和它困在同一片布景后面！',
+    theater: {
+      size: { wU: 17, hU: 26 },
+      plazaU: 4.5,
+      margin: { tall: 2.6, low: 1.7, aisle: 1.2 },
+      gapU: { tall: 2.7, low: 1.7 },
+      lowM: 1,
+      pieces: [12, 17],
+      turn: { firstMs: 20000, intervalMs: 20000, jitterMs: 0, lightMs: 700, staggerMs: 900, flyMs: 900, slideMs: 1600 },
+      reflowMs: 300,
+    },
+    boss: 'eclipse',
+  },  warp: {
     emoji: '1f300',
     name: '跃迁',
     desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，立在朝向下一块的那条边上，四块连成单向的一圈。队长踏上传送台，台子充能、光圈扩满整间房，然后整支队伍连同召唤物一起被送到下一块平台的传送台上，不管队员在房间哪个角落；到的那座台子要冷却一阵。四间房同时在刷怪：队伍不在的房间，敌人往那间的传送台聚，传送台隔一阵发一趟车，台上站着谁就送谁，追兵就这样一批批从你身后的传送台涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去：哪间堆着多少敌人、往哪儿走，都写在地板上。四间房形状、颜色和出的敌人各不相同，选去哪间就是选和什么打',

@@ -18,6 +18,7 @@ import { MapleView } from '../maps/maple/view'
 import { ShipView } from '../maps/ship/view'
 import { VolcanoView } from '../maps/volcano/view'
 import { DeepView } from '../maps/deep/view'
+import { TheaterView } from '../maps/theater/view'
 
 export function viewFor(mapId: MapId): MapView {
   return MAKE[MAPS[mapId].kind]()
@@ -48,4 +49,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   petri: () => new PetriView(),
   warp: () => new WarpView(),
   dreamland: () => new DreamlandView(),
+  theater: () => new TheaterView(),
 }

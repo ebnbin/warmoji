@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
-import { Ability, Aim, Frozen, Held, Motion, MOTION, Mounted, Owner, Sector, Segment, Swing, Thrown, Transform, VisOff } from '../components'
+import { Ability, Aim, Frozen, Held, Motion, MOTION, Mounted, Owner, Sector, Segment, Swing, Thrown, Transform, TRANSIT, VisOff } from '../components'
 import { anchorX, anchorY } from '../utils/ability'
 import { muzzle } from '../utils/projectile'
 import { lungeT, sweepT } from '../utils/swing'
@@ -38,8 +38,8 @@ export function placeHeld(sim: Sim): void {
     const frozen = Frozen.v[e] === 1
     if (frozen) Swing.durMs[e] = 0
     const m = Owner.eid[e]!
-    // 腾空的身体画面位置归弧线管
-    if (Motion.kind[m] === MOTION.arc) continue
+    // 腾空的身体画面位置归弧线管，被吊起的归吊绳管
+    if (Motion.kind[m] === MOTION.arc || (Motion.kind[m] === MOTION.transit && Motion.look[m] === TRANSIT.hoist)) continue
     const t = frozen ? 0 : lungeT(sim, e, Segment.ms[e]!)
     VisOff.x[m] = Math.cos(Aim.rad[e]!) * t * Segment.lunge[e]!
     VisOff.y[m] = Math.sin(Aim.rad[e]!) * t * Segment.lunge[e]!

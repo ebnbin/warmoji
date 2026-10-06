@@ -38,6 +38,8 @@ export const OBSTACLES = {
     belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
     // 梦幻乐园四周的布景
     scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
+    // 舞台剧台上立着的布景片：厚纸板，挡视线，打不穿也打不坏
+    paper: { name: '卡纸', phase: true, opaque: true, pierce: null, strength: null },
     // 跃迁站平台四周的力场：墙沿、台沿与外面的虚空，谁也穿不过去，挡弹体也挡视线，别的平台上的事只看得见淡影
     field: { name: '力场', phase: false, opaque: true, pierce: null, strength: null },
   },

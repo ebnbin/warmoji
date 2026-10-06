@@ -46,6 +46,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
+import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
 import { roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
@@ -677,6 +678,68 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 舞台剧：台面连四周的台板放得进安全区，台中空得出出生点；换幕的各段时长为正；
+ * 矮布景挡得住标准身体、子弹从上面飞过、头目跨得过，高布景挡得住视线与平射；路宽过得去最大的小怪与头目，台边与布景之间也过得去；
+ * 抽一批种子把四章都摆一遍：件数在范围里，都落在半边台上、不压台中线，别组之间留够路，开局那一幕不压着出生的空地，换页的钟按段走
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'theater') === (m.theater !== undefined), `maps.${id} 是舞台剧当且仅当写了 theater`)
+  const c = m.theater
+  if (!c) continue
+  const at = `maps.${id}.theater`
+  const { size, margin, gapU, turn: t } = c
+  need(size.wU > 0 && size.hU > 0 && size.wU * 2 + 2 <= FRAME_U - SAFE_U * 2 && size.hU + 2 <= FRAME_U - SAFE_U * 2, `${at}.size 台面连四周的台板须放得进方框的安全区`)
+  need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < size.hU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
+  need(Number.isInteger(c.pieces[0]) && Number.isInteger(c.pieces[1]) && c.pieces[0] >= 1 && c.pieces[0] <= c.pieces[1], `${at}.pieces 须为不小于 1 的整数范围`)
+  need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一幕与每幕演着的时长须为正`)
+  need(t.lightMs > 0 && t.staggerMs >= 0 && t.flyMs > 0 && t.slideMs > 0 && t.lightMs <= t.staggerMs + t.flyMs, `${at}.turn 各段的时长须为正，聚光灯亮起来、收回去都放得进吊布景的那一段`)
+  need(c.reflowMs > 0, `${at}.reflowMs 须为正`)
+  const B = OBSTACLES.body
+  const layer = B.heightM / B.layers
+  const over = (span: Span): number => (span[0] + Math.floor((span[1] - span[0] + 1) * B.step)) * layer
+  const top = (h: number): number => Math.ceil(h / layer - 1e-9) * layer
+  const chest = (B.layers - 0.5) * layer
+  const boss = ENEMIES[m.boss]
+  const standard: Span = [0, B.layers - 1]
+  need(top(c.lowM) > over(standard) + 1e-9, `${at}.lowM 须高过标准身体跨得过的 ${+over(standard).toFixed(2)} 米：矮布景要挡得住人`)
+  need(top(c.lowM) < chest, `${at}.lowM 须低过平射的高度 ${+chest.toFixed(2)} 米：子弹要从矮布景上面飞过去`)
+  need(top(c.lowM) <= over(boss.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${m.boss} 跨得过去`)
+  const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]!.radius))
+  need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与台边之间须过得去最大的小怪（半径 ${small} 格）`)
+  need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与台边之间须过得去头目（半径 ${boss.radius} 格）`)
+  need(margin.aisle > 0, `${at}.margin.aisle 须为正：布景不压台中线上的活门`)
+  for (let s = 0; s < 6; s++) {
+    const stage = makeStage(c, s * 7919 + 13)
+    for (let i = 0; i < 4; i++) {
+      const where = `${at} 第 ${s} 个样本的第 ${i} 页`
+      let pg: ReturnType<typeof actOf>
+      try {
+        pg = actOf(c, stage, i)
+      } catch (e) {
+        need(false, `${where}：${(e as Error).message}`)
+        continue
+      }
+      need(pg.pieces.length >= c.pieces[0] && pg.pieces.length <= c.pieces[1], `${where} 摆了 ${pg.pieces.length} 件，不在范围里`)
+      for (const p of pg.pieces) {
+        need(p.low || top(p.h) > chest, `${where} 的 ${p.kind} 不比平射高，挡不住子弹`)
+        need(p.d >= CARD_U, `${where} 的 ${p.kind} 比卡纸还薄`)
+        if (i === 0) need(slabSd(slabOf(p), stage.start.x, stage.start.y) >= c.plazaU, `${where} 的 ${p.kind} 压着出生的空地`)
+        for (const q of pg.pieces) {
+          if (q === p || q.group === p.group) continue
+          need(slabGap(slabOf(p), slabOf(q)) >= (p.low || q.low ? gapU.low : gapU.tall) - 1e-6, `${where} 的 ${p.kind} 与 ${q.kind} 之间的路太窄`)
+        }
+      }
+    }
+    let last = -1
+    for (let ms = 0; ms < 400000; ms += 250) {
+      const k = clockAt(c, stage, ms)
+      need(k.act >= last && k.at >= 0 && k.at <= k.len + 1e-6, `${at} 第 ${s} 个样本的换幕钟在 ${ms} 毫秒处倒着走或越出了段`)
+      last = k.act
+    }
   }
 }
 
