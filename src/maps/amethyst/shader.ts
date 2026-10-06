@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import { UNIT } from '../../util/units'
+import { SHINE } from './ground'
 import { reliefAt, ROCK_KEEP } from './light'
 import type { Lighting } from './light'
 
@@ -96,8 +97,6 @@ const TONE_MAX = 1.9
 const TONE_K = 0.75
 /** 光柱里浮尘把多少直射光散向镜头，最多叠上多亮 */
 const SHAFT_MAX = 0.38
-/** 晶面的镜面有多尖：越大，晶面要越正对着反射方向才闪 */
-const SHINE = 56.0
 /** 直射查遮挡时沿光线取几个点 */
 const MARCH = 12
 /** 洞顶贴着洞壁往下弯成拱：离洞顶不到 VAULT_M 米的那截洞壁照不到斜射进来的直射光 */
@@ -122,6 +121,8 @@ varying vec2 outTexCoord;
 uniform sampler2D uGeo;
 uniform sampler2D uFace;
 uniform sampler2D uShade;
+uniform sampler2D uMask;
+uniform vec4 uMask0;
 uniform vec4 uRect;
 uniform vec4 uField;
 uniform vec2 uHeight;
@@ -163,6 +164,11 @@ vec3 normalOf(vec4 f) {
   vec2 xy = f.rg * 2.0 - 1.0;
   return normalize(vec3(xy, sqrt(max(0.02, 1.0 - dot(xy, xy)))));
 }
+float upright(vec2 w) {
+  vec2 uv = (w - uMask0.xy) / uMask0.zw;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
+  return texture2D(uMask, vec2(uv.x, 1.0 - uv.y)).a;
+}
 float through(vec2 p, float z, vec4 body, int steps) {
   float vault = 1.0 - smoothstep(uCeil - ${VAULT_M.toFixed(2)}, uCeil - ${(VAULT_M / 2).toFixed(2)}, z);
   if (vault <= 0.0) return 0.0;
@@ -196,18 +202,11 @@ float shadeOf(int k, vec2 d, float dist) {
  */
 export const LIGHT_FRAG = `${PRELUDE}
 uniform sampler2D uLux;
-uniform sampler2D uMask;
-uniform vec4 uMask0;
 uniform vec3 uSkyCol;
 uniform vec3 uBounceCol;
 uniform float uLogAdapt;
 uniform vec3 uFloor;
 uniform vec3 uTorchBounce;
-float upright(vec2 w) {
-  vec2 uv = (w - uMask0.xy) / uMask0.zw;
-  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
-  return texture2D(uMask, vec2(uv.x, 1.0 - uv.y)).a;
-}
 void main ()
 {
   vec2 world = worldOf(outTexCoord);
@@ -258,6 +257,7 @@ void main ()
 
 /**
  * 叠加在光上面会发亮的东西：晶面按镜面反射闪光——太阳、月亮从开口照下来时朝着反射方向的晶面一闪一闪，火把凑近时近处的晶壁一片片亮起来；
+ * 闪光由周围四个贴图像素各按自己的朝向与镜面算出再按远近混合（先混朝向会在晶体与地面、晶面与晶面之间混出朝上又反光的面，太阳高时亮成一圈白边），立着的东西（遮罩图里盖住的地方）身上不闪；
  * 开口射下来的光柱照亮半空里的浮尘与细小的晶尘，俯看时一根竖直的空气柱有多少段在光柱里就亮多少（取样点按像素错开，免得出条纹），到 SHAFT_MAX 就饱和；
  * 晶尘一闪一闪、浮尘慢慢飘；月光下的晶面闪得慢一些，像星星
  */
@@ -265,6 +265,12 @@ export const SHINE_FRAG = `${PRELUDE}
 uniform float uTime;
 uniform float uScatter;
 uniform float uMist;
+uniform vec2 uFaceSize;
+vec3 n0;
+vec3 n1;
+vec3 n2;
+vec3 n3;
+vec4 shiny;
 float shaft(vec2 p, float z, vec4 body, float jitter) {
   if (body.w <= 0.0) return 0.0;
   vec2 end = p + body.xy * (uCeil - z) * body.z * uUnit;
@@ -272,9 +278,26 @@ float shaft(vec2 p, float z, vec4 body, float jitter) {
   for (int i = 0; i < 10; i++) acc += skyAt(mix(p, end, (float(i) + jitter) / 10.0));
   return ${SHAFT_MAX.toFixed(2)} * (1.0 - exp(-acc / 10.0 * body.w * uScatter));
 }
-float glint(vec3 n, vec3 l) {
+float facets(vec2 uv) {
+  vec2 t = uv * uFaceSize - 0.5;
+  vec2 i = floor(t);
+  vec2 w = t - i;
+  vec4 f0 = texture2D(uFace, (i + vec2(0.5, 0.5)) / uFaceSize);
+  vec4 f1 = texture2D(uFace, (i + vec2(1.5, 0.5)) / uFaceSize);
+  vec4 f2 = texture2D(uFace, (i + vec2(0.5, 1.5)) / uFaceSize);
+  vec4 f3 = texture2D(uFace, (i + vec2(1.5, 1.5)) / uFaceSize);
+  shiny = vec4(f0.b, f1.b, f2.b, f3.b);
+  shiny *= step(0.05, shiny) * vec4((1.0 - w.x) * (1.0 - w.y), w.x * (1.0 - w.y), (1.0 - w.x) * w.y, w.x * w.y);
+  n0 = normalOf(f0);
+  n1 = normalOf(f1);
+  n2 = normalOf(f2);
+  n3 = normalOf(f3);
+  return shiny.x + shiny.y + shiny.z + shiny.w;
+}
+float glint(vec3 l) {
   vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
-  return pow(max(dot(n, h), 0.0), ${SHINE.toFixed(1)});
+  vec4 c = max(vec4(dot(n0, h), dot(n1, h), dot(n2, h), dot(n3, h)), 0.0);
+  return dot(shiny, pow(c, vec4(${SHINE.toFixed(1)})));
 }
 void main ()
 {
@@ -282,17 +305,15 @@ void main ()
   vec2 uv = fieldUv(world);
   vec2 g = world / uUnit;
   float z = heightAt(world);
-  vec4 f = texture2D(uFace, uv);
   vec3 col = vec3(0.0);
-  if (f.b > 0.05) {
-    vec3 n = normalOf(f);
+  if (facets(uv) > 0.0) {
     vec3 spark = vec3(0.0);
     if (uSun.w > 0.0) {
-      float s = glint(n, normalize(vec3(uSun.xy, 1.0 / max(uSun.z, 1e-4))));
+      float s = glint(normalize(vec3(uSun.xy, 1.0 / max(uSun.z, 1e-4))));
       if (s > 0.002) spark += uSunCol * uSun.w * s * through(world, z, uSun, 6);
     }
     if (uMoon.w > 0.0) {
-      float s = glint(n, normalize(vec3(uMoon.xy, 1.0 / max(uMoon.z, 1e-4))));
+      float s = glint(normalize(vec3(uMoon.xy, 1.0 / max(uMoon.z, 1e-4))));
       float twinkle = 0.55 + 0.45 * sin(uTime * 2.3 + vnoise(g * 2.0) * 12.566);
       if (s > 0.002) spark += uMoonCol * uMoon.w * s * twinkle * through(world, z, uMoon, 6);
     }
@@ -304,9 +325,9 @@ void main ()
       if (dist > ${SHADE_RANGE_U.toFixed(1)}) continue;
       vec3 l = vec3(d, t.w - z);
       float r2 = max(dot(l, l), 0.04);
-      spark += uTorchCol * t.z / r2 * glint(n, l * inversesqrt(r2)) * shadeOf(k, d, dist);
+      spark += uTorchCol * t.z / r2 * glint(l * inversesqrt(r2)) * shadeOf(k, d, dist);
     }
-    col += spark * f.b * 0.4;
+    col += spark * 0.4 * (1.0 - upright(world));
   }
   vec2 drift = vec2(uTime * 0.06, -uTime * 0.09);
   float mist = 0.55 + 0.45 * vnoise(g * 0.45 + drift) * (0.6 + 0.4 * vnoise(g * 1.3 - drift * 1.7));

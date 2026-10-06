@@ -253,6 +253,7 @@ export class AmethystView extends BoundedView {
     const u = this.u
     const fieldRect = [f.x, f.y, f.w, f.h]
     const frameRect = [FRAME.x, FRAME.y, FRAME.w, FRAME.h]
+    const faceSize = [W, H]
     const h = heightSpan(L)
     const common = (set: (name: string, value: unknown) => void): void => {
       set('uRect', frameRect)
@@ -307,17 +308,20 @@ export class AmethystView extends BoundedView {
               set('uGeo', 0)
               set('uFace', 1)
               set('uShade', 2)
+              set('uMask', 3)
               common(set)
               set('uTime', u.time)
               set('uScatter', SCATTER)
               set('uMist', u.mist)
+              set('uFaceSize', faceSize)
+              set('uMask0', mask?.rect ?? [0, 0, 1, 1])
             },
           },
           FRAME.x,
           FRAME.y,
           FRAME.w,
           FRAME.h,
-          [GEO_KEY, FACE_KEY, SHADE_KEY],
+          [GEO_KEY, FACE_KEY, SHADE_KEY, MASK_KEY],
         )
         .setOrigin(0, 0)
         .setDepth(SHINE_DEPTH)
