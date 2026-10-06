@@ -28,7 +28,7 @@ import { FRAME, FRAME_MID } from '../frame'
 import { BoundedView } from '../../ecs/views'
 import type { ViewCtx } from '../../ecs/views'
 
-const CAVE_BG = 0x0b0806
+const CAVE_BG = 0x050807
 const CAVE_ALBEDO_KEY = 'cave-albedo'
 const CAVE_GEO_KEY = 'cave-geo'
 const CAVE_NORM_KEY = 'cave-norm'
@@ -52,9 +52,13 @@ const CAVE_ADAPT_TAU = 900
 const CAVE_TORCH_COLOR = [1, 0.6, 0.28] as const
 const CAVE_MOON_COLOR = [0.8, 0.86, 1] as const
 /** 石灰岩把光反出来时染上的颜色 */
-const CAVE_LIMESTONE = [1, 0.86, 0.66] as const
-/** 最暗的地方也留一点暖褐 */
-const CAVE_FLOOR = [0.035, 0.026, 0.02] as const
+const CAVE_LIMESTONE = [0.96, 0.99, 1] as const
+/** 最暗的地方也留一点冷灰 */
+const CAVE_FLOOR = [0.018, 0.024, 0.022] as const
+/** 水里的浮游生物在暗处发出的光，叠加到画面上的最大亮度 */
+const CAVE_POOL_GLOW = [0.02, 0.2, 0.12] as const
+/** 荧光丛两种菌的光晕：薄荷与翡翠 */
+const CAVE_GLOW_TINTS = [0x7af5c8, 0x3fe89c] as const
 /** 光柱里水雾浮尘把多少直射光散向镜头 */
 const CAVE_SCATTER = 0.012
 /** 天窗口那圈植物的贴图每格多少像素 */
@@ -105,7 +109,7 @@ interface DripRing {
  * 溶洞：地面是后台线程画的固有色，光照由着色器按正片叠底压在整个画面上——天窗的直射光斑随太阳移动、被石柱石笋挡出影子，
  * 天光与反光从照度场来，火把按点光源照、被岩石挡住；光柱里水雾与浮尘发亮，天窗下的水潭倒映着天。
  * 镜头按洞里的平均照度推拉：亮时拉远看大半个洞，暗时推到火把那一圈；眼睛跟着适应，最暗只适应到 view.brightLux，再暗画面就跟着暗、镜头跟着收。
- * 火把点着、熄灭有火光与声音，冒烟和火星；黑暗里的敌人露出反光的眼睛；荧光丛在夜里发亮；黄昏蝙蝠出洞、黎明回洞；水滴落进水潭溅开涟漪
+ * 火把点着、熄灭有火光与声音，冒烟和火星；黑暗里的敌人露出反光的眼睛；荧光丛与水潭在夜里发出翡翠色的光；黄昏蝙蝠出洞、黎明回洞；水滴落进水潭溅开涟漪
  */
 export class CaveView extends BoundedView {
   private painter?: CavePainter
@@ -125,6 +129,8 @@ export class CaveView extends BoundedView {
     skyBright: 0,
     time: 0,
     mist: 0,
+    day: 1,
+    poolGlow: 0,
   }
   private viewU = 0
   private adapt = 1
@@ -312,6 +318,9 @@ export class CaveView extends BoundedView {
               set('uScatter', CAVE_SCATTER)
               set('uTime', u.time)
               set('uMist', u.mist)
+              set('uDay', u.day)
+              set('uPoolGlow', u.poolGlow)
+              set('uPoolCol', CAVE_POOL_GLOW)
             },
           },
           f.x0,
@@ -329,7 +338,7 @@ export class CaveView extends BoundedView {
         .image(g.x, g.y, CAVE_HALO_KEY)
         .setDepth(CAVE_FLAME_DEPTH - 0.1)
         .setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(g.hue < 0.5 ? 0x6fe8d0 : 0xb6f06a)
+        .setTint(CAVE_GLOW_TINTS[g.hue < 0.5 ? 0 : 1])
         .setScale((g.r * 3.2) / 64)
         .setAlpha(0)
       this.glows.push({ img, x: g.x, y: g.y, phase: g.hue * 17 })
@@ -355,13 +364,13 @@ export class CaveView extends BoundedView {
         scale: { start: 0.12, end: 0.55 },
         alpha: { start: 0.22, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0x3a3330, 0x4a423c, 0x2e2926],
+        tint: [0x33373a, 0x41464a, 0x292c2f],
         emitting: false,
       })
       .setDepth(28)
     this.rippleGfx = scene.add.graphics().setDepth(-0.4)
     this.visuals.push(this.embers, this.smoke, this.rippleGfx)
-    this.vignette = v.lens.screen.vignette(0.78, 0.18, 0x0a0604)
+    this.vignette = v.lens.screen.vignette(0.78, 0.18, 0x030605)
     this.sunDeg = s.sky.sun.elev / DEG_CAVE
     this.viewU = viewU(cfg.view, s.light.hallLux)
     this.adapt = Math.max(cfg.view.brightLux, s.light.hallLux)
@@ -418,6 +427,8 @@ export class CaveView extends BoundedView {
     this.viewU += (want - this.viewU) * (1 - Math.exp(-dt / CAVE_VIEW_TAU))
     const dark = 1 - visibility(cfg.view, s.light.hallLux)
     if (this.vignette) this.vignette.strength = 0.18 + 0.22 * dark
+    u.day = 1 - dark
+    u.poolGlow = dark
     const lights = { s, torch: cfg.torch, ...this.torchLights(sim, s) }
     this.lights = lights
     this.stepEyes(v.scene, sim, s, adapt, lights.spots, lights.lits)
@@ -425,7 +436,7 @@ export class CaveView extends BoundedView {
     this.mask?.paint(view.x - view.w * CAVE_MASK_PAD, view.y - view.h * CAVE_MASK_PAD, view.w * (1 + 2 * CAVE_MASK_PAD), view.h * (1 + 2 * CAVE_MASK_PAD), paintedEmojiOn())
     for (const g of this.glows) {
       const x = (diffuseLux(s.light, g.x, g.y) + directLux(L, sky, g.x, g.y, 0)) / adapt
-      g.img.setAlpha((0.5 + 0.12 * Math.sin(now / 900 + g.phase)) * (1 - smoothCave(0.04, 0.5, x)))
+      g.img.setAlpha((0.68 + 0.14 * Math.sin(now / 900 + g.phase)) * (1 - smoothCave(0.04, 0.5, x)))
     }
     this.stepBats(v, s, sunDeg, dt)
     this.stepDrips(v, s, now)
@@ -479,7 +490,7 @@ export class CaveView extends BoundedView {
         .setPosition(spot.x, spot.y)
         .setScale(((0.3 * UNIT) / 32) * t.lit * (0.9 + 0.12 * flicker) * boost, ((0.5 * UNIT) / 48) * t.lit * flicker * boost)
         .setRotation(Math.sin(now / 160 + m) * 0.08)
-      fx.halo.setPosition(spot.x, spot.y).setScale(((1.9 * UNIT) / 64) * t.lit * boost).setAlpha(0.32 * flicker)
+      fx.halo.setPosition(spot.x, spot.y).setScale(((1.6 * UNIT) / 64) * t.lit * boost).setAlpha(0.32 * flicker)
       if (Math.random() < dt * 0.004 * t.lit) this.embers?.emitParticleAt(spot.x + (Math.random() - 0.5) * 6, spot.y - 8, 1)
       if (Math.random() < dt * 0.003 * t.lit) this.smoke?.emitParticleAt(spot.x, spot.y - 10, 1)
       if (n < MAX_TORCHES) {
@@ -668,7 +679,7 @@ export class CaveView extends BoundedView {
       for (const lag of r.pool ? [0, 0.28] : [0]) {
         const t = k - lag
         if (t <= 0) continue
-        g.lineStyle(0.035 * UNIT, 0xe8f0ec, 0.5 * (1 - t) ** 2)
+        g.lineStyle(0.035 * UNIT, 0xd2f5e6, 0.5 * (1 - t) ** 2)
         g.strokeEllipse(r.x, r.y, r.r * 2 * t, r.r * 2 * t * 0.86)
       }
     }

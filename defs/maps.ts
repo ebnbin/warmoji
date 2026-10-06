@@ -975,18 +975,18 @@ export const MAPS = {
   cave: {
     emoji: '1f987',
     name: '溶洞',
-    desc: '一座部分露天的石灰岩溶洞。阳光从洞顶的天窗照进来，随太阳东升西落：白天整个洞厅亮堂，看得到大半个洞；黄昏光柱变红、爬上洞壁，洞里一点点暗下来；入夜后只看得清火把照亮的那一圈。怪物只从暗处出来：白天从深处的支洞里，夜里可能就在火光外不远处。石柱与大石笋挡人也挡子弹，被它们挡住的敌人只剩淡影，水潭里蹚水更慢',
+    desc: '一座部分露天的石灰岩溶洞，冷灰的岩石间是一潭潭翡翠色的水。阳光从洞顶的天窗照进来，随太阳东升西落：白天整个洞厅亮堂，看得到大半个洞；黄昏光柱变红、爬上洞壁，洞里一点点暗下来；入夜后只看得清火把照亮的那一圈，和水潭、荧光丛发出的翡翠色微光。怪物只从暗处出来：白天从深处的支洞里，夜里可能就在火光外不远处。石柱与大石笋挡人也挡子弹，被它们挡住的敌人只剩淡影，水潭里蹚水更慢',
     kind: 'cave',
     size: { w: 36, h: 36 },
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
-      bgFrom: 'hsl(30 28% 13%)',
-      bgTo: 'hsl(22 34% 5%)',
-      map: hslToInt(34, 0.24, 0.34),
+      bgFrom: 'hsl(156 34% 11%)',
+      bgTo: 'hsl(180 20% 4%)',
+      map: hslToInt(154, 0.56, 0.42),
       shadow: 0x000000,
     },
     // 洞里的明暗由光照层按天窗与火把画，精灵只按光从哪边来分出迎光面与背光面；光不从太阳来，不投影
-    light: { sun: 0xffffff, shade: 0x86827e },
+    light: { sun: 0xffffff, shade: 0x7f8486 },
     decor: {
       emojis: ['1f9b4', '1f578', '26cf'],
       sizeU: [0.35, 0.7],
@@ -1014,7 +1014,7 @@ export const MAPS = {
       skylights: { mainCount: [2, 2], mainU: [3.6, 4.4], mainOffsetU: [1, 3.5], minorCount: [2, 3], minorU: [1.4, 2.2], jitter: 0.22, gapU: 3, rubbleM: 1.4, rubbleSpread: 1.25 },
       alcoves: { count: [4, 4], widthU: 2.6, outU: 2.6, alongU: [3.5, 5.5], pocketU: 1.5 },
       formations: { columns: [7, 11], columnU: [0.55, 0.95], stalagmites: [48, 66], clusters: [7, 8], stalagmiteU: [0.16, 0.6], stalagmiteM: [1.8, 2.8], lowM: [0.2, 0.55], blockU: 0.32, clearU: 4.8 },
-      pools: { count: [5, 8], sizeU: [1.6, 3.2], viscosity: 1.35, exertion: 1.2 },
+      pools: { count: [5, 8], sizeU: [1.8, 3.5], viscosity: 1.35, exertion: 1.2 },
       sky: { latitudeDeg: 24, declinationDeg: 6, dayS: 108, startHour: 9.5, extinction: 0.21, dwell: 10, dwellCenterDeg: -2.5, dwellWidthDeg: 4 },
       light: { albedo: 0.42, bounceU: 5, glowCount: [8, 15], glowLux: 0.4 },
       torch: { candela: 110, heightM: 1.4, igniteLux: 15, douseLux: 40, staggerMs: 1400 },

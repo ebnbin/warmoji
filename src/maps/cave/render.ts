@@ -94,8 +94,8 @@ function pebble(c: Rgb, dx: number, dy: number, rad: number, r: number, g: numbe
 function rubble(c: Rgb, gx: number, gy: number, freq: number, seed: number, w: number): void {
   const q = cellNearest(gx * freq, gy * freq, seed)
   const tone = (0.42 + 0.72 * facetLit((frac(q.h * 71.31) - 0.5) * 1.3, (frac(q.h * 113.73) - 0.5) * 1.3)) * (0.86 + 0.26 * frac(q.h * 7.7))
-  mixTo(c, 108 * tone, 99 * tone, 86 * tone, w)
-  mixTo(c, 34, 29, 25, w * smooth(0.11, 0.03, cellEdge(gx * freq, gy * freq, seed)) * 0.9)
+  mixTo(c, 100 * tone, 104 * tone, 107 * tone, w)
+  mixTo(c, 22, 25, 28, w * smooth(0.11, 0.03, cellEdge(gx * freq, gy * freq, seed)) * 0.9)
 }
 
 /** 从上往下看的一丛蕨：几片羽状的叶从中心散开，叶尖收细；(dx, dy) 是离中心的偏移，rad 是叶长 */
@@ -107,13 +107,13 @@ function fern(c: Rgb, dx: number, dy: number, rad: number, h: number, w: number)
   const leaf = smooth(0.5 * (1 - d) + 0.06, 0.02, across) * smooth(1, 0.75, d)
   if (leaf <= 0) return
   const k = (0.75 + 0.35 * (0.5 + 0.5 * Math.sin(d * 46))) * (0.8 + 0.4 * (1 - d))
-  mixTo(c, 50 * k, 86 * k, 40 * k, w * leaf)
+  mixTo(c, 30 * k, 84 * k, 58 * k, w * leaf)
 }
 
 /**
  * 地面的固有色（不含方向光，光照在着色器里随太阳、月亮与火把实时算），ppu 是每格多少像素，只画第 r0 到 r1 行。
- * 洞底是灰黄的流石，流石上有一道道细小的边石坝，低处积着褐色的泥、干了裂成小块，散着几块圆石；洞壁脚下潮湿、堆着碎石；
- * 天窗下是塌落的石块，长着苔藓与蕨；水潭是钙华坝围着的清水，潭底发白、越深越青；石笋是一圈圈长高的钙华锥，尖上湿亮；
+ * 洞底是冷灰的流石，流石上有一道道细小的边石坝，低处积着深灰的泥、干了裂成小块，散着几块圆石；洞壁脚下潮湿、堆着碎石；
+ * 天窗下是塌落的石块，长着翡翠色的苔藓与蕨；水潭是钙华坝围着的翡翠色的水，潭边浅翠、越深越墨绿；石笋是一圈圈长高的钙华锥，尖上湿亮；
  * 石柱是一截粗壮的钙华柱，柱顶斑驳、边上一道道竖棱，脚下一圈流石裙；石笋与石柱朝天窗的一侧亮，背着天窗拖一条淡影；洞壁是垂下的石幔与一道道岩层，越往上越暗，再往外是岩体
  */
 export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, r0: number, r1: number): void {
@@ -137,29 +137,29 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
         const along = gx * -n.y + gy * n.x
         const drape = 0.5 + 0.5 * Math.sin(along * 7 + fbm(along * 0.9, t * 0.5, s + 71, 3) * 9)
         const bed = smooth(0.35, 0.65, fbm(along * 0.35, t * 3.2, s + 75, 2))
-        c[0] = 112
-        c[1] = 95
-        c[2] = 76
-        mixTo(c, 86, 70, 55, smooth(0.4, 0.7, fbm(along * 0.5, t * 1.8, s + 81, 2)))
+        c[0] = 89
+        c[1] = 92
+        c[2] = 94
+        mixTo(c, 67, 70, 73, smooth(0.4, 0.7, fbm(along * 0.5, t * 1.8, s + 81, 2)))
         scale(c, (0.8 + 0.2 * drape) * (0.92 + 0.12 * bed) * (1 - 0.72 * Math.min(1, t) ** 1.15))
         const mass = smooth(0.85, 1.15, t)
         if (mass > 0) {
           const k = (0.8 + 0.4 * fbm(gx / 2.5, gy / 2.5, s + 85, 2)) * (1 - 0.35 * smooth(0.06, 0.015, cellEdge(gx * 0.7, gy * 0.7, s + 87)))
-          mixTo(c, 31 * k, 27 * k, 24 * k, mass)
+          mixTo(c, 20 * k, 23 * k, 26 * k, mass)
         }
       } else {
-        // 流石：灰黄的石灰岩，大片的明暗起伏，一道道小坝的坝顶亮、坝下暗
+        // 流石：冷灰的石灰岩，大片的明暗起伏，一道道小坝的坝顶亮、坝下暗
         const big = fbm(gx / 6, gy / 6, s + 3, 2)
-        c[0] = 100 + 34 * big
-        c[1] = 87 + 28 * big
-        c[2] = 70 + 20 * big
+        c[0] = 97 + 30 * big
+        c[1] = 100 + 30 * big
+        c[2] = 100 + 30 * big
         const mud = smooth(0.6, 0.74, fbm(gx / 4.5, gy / 4.5, s + 21, 2))
         const step = frac(fbm(gx / 1.7 + 3, gy / 1.7, s + 31, 3) * 6.5)
         scale(c, 1 + (0.12 * smooth(0.8, 0.97, step) - 0.12 * smooth(0.1, 0, step)) * (1 - mud))
-        // 泥：低处的褐色黏土，干了裂成小块
+        // 泥：低处的深灰黏土，干了裂成小块
         if (mud > 0) {
           const k = 0.92 + 0.12 * grain
-          mixTo(c, 82 * k, 64 * k, 49 * k, mud * 0.9)
+          mixTo(c, 54 * k, 59 * k, 61 * k, mud * 0.9)
           scale(c, 1 - 0.3 * mud * smooth(0.07, 0.02, cellEdge(gx * 2.2, gy * 2.2, s + 23)))
         }
         // 洞壁脚下：潮湿发暗，堆着从壁上掉下的碎石，越贴着壁越多
@@ -171,7 +171,7 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
         if (q.h > 0.9 - 0.62 * (1 - smooth(0.1, 1.3, shellU))) {
           const rad = (0.16 + 0.12 * frac(q.h * 37.7)) * (1.15 - 0.4 * smooth(0.1, 1.3, shellU))
           const k = 1 - 0.26 * wet
-          pebble(c, q.dx, q.dy, rad, 112 * k, 100 * k, 84 * k, 1)
+          pebble(c, q.dx, q.dy, rad, 106 * k, 109 * k, 112 * k, 1)
         }
         scale(c, 1 - 0.24 * (1 - smooth(0, 0.9, shellU)))
         const { from, to } = nearAt(near, wx, wy)
@@ -187,14 +187,14 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
             if (wM > 0) {
               rubble(c, gx, gy, 1.25, s + 51, wM)
               const b = cellNearest(gx * 3.4, gy * 3.4, s + 57)
-              if (b.h > 0.5) pebble(c, b.dx, b.dy, 0.2 + 0.14 * b.h, 116, 106, 92, wM)
+              if (b.h > 0.5) pebble(c, b.dx, b.dy, 0.2 + 0.14 * b.h, 110, 113, 116, wM)
             }
             // 天窗下见得着天的地方长苔藓与蕨
             const rel = Math.hypot(wx - o.x, wy - o.y) / o.r
             const moss = smooth(1.25, 0.6, rel) * smooth(0.36, 0.58, fbm(gx * 0.8, gy * 0.8, s + 61, 2))
             if (moss > 0) {
               const tuft = 0.78 + 0.44 * grain
-              mixTo(c, 70 * tuft, 94 * tuft, 46 * tuft, moss * 0.85)
+              mixTo(c, 34 * tuft, 86 * tuft, 62 * tuft, moss * 0.85)
               const fq = cellNearest(gx * 1.6, gy * 1.6, s + 63)
               if (fq.h > 0.3) fern(c, fq.dx, fq.dy, 0.45 + 0.2 * fq.h, fq.h, smooth(0.2, 0.5, moss))
             }
@@ -204,16 +204,14 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
               // 潭边渗湿的一圈
               if (pf < 0) scale(c, 1 - 0.2 * smooth(-0.3, -0.04, pf))
               if (pf > 0) {
-                // 潭底是白一些的钙华，隔着清水偏青，越深越暗；潭里还有一级低一些的坝
-                const depth = Math.min(1, pf * 2.2)
-                mixTo(c, 146, 138, 118, 0.6)
-                c[0] *= 0.74 - 0.42 * depth
-                c[1] *= 0.88 - 0.3 * depth
-                c[2] *= 0.9 - 0.25 * depth
-                mixTo(c, 150, 158, 140, Math.exp(-(((pf - 0.34) / 0.03) ** 2)) * 0.22)
+                // 翡翠色的水：潭边浅翠，越深越近墨绿，透出一点潭底的起伏；潭里还有一级低一些的坝
+                const depth = Math.min(1, pf * 2.2) ** 0.7
+                const under = 0.85 + 0.3 * grain
+                mixTo(c, (88 - 78 * depth) * under, (208 - 150 * depth) * under, (146 - 108 * depth) * under, 0.92)
+                mixTo(c, 150, 228, 186, Math.exp(-(((pf - 0.34) / 0.03) ** 2)) * 0.3)
               }
-              // 坝顶：一圈奶白的钙华
-              mixTo(c, 204, 190, 158, Math.exp(-(((pf + 0.02) / 0.05) ** 2)) * 0.85)
+              // 坝顶：一圈白的钙华
+              mixTo(c, 196, 204, 202, Math.exp(-(((pf + 0.02) / 0.05) ** 2)) * 0.85)
             }
           } else if (kind === NEAR.column) {
             const col = L.columns[idx]!
@@ -229,12 +227,12 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
               const facing = (dx * light.x + dy * light.y) / (dd || 1)
               const slant = Math.min(1.6, Math.hypot(light.x, light.y) / Math.max(light.z, 0.3))
               const k = (0.9 + 0.16 * fbm(gx * 2.6, gy * 2.6, s + 95, 3) + bevel * (0.3 * facing * slant - 0.18)) * (1 - 0.16 * bevel * flute) * (1 - 0.35 * smooth(0.93, 1, u))
-              mixTo(c, 150 * k, 134 * k, 108 * k, smooth(col.r, col.r - 0.04 * UNIT, dd))
+              mixTo(c, 142 * k, 145 * k, 146 * k, smooth(col.r, col.r - 0.04 * UNIT, dd))
             } else {
               // 柱脚一圈流石裙，贴着柱子的地方暗；背着天窗拖一条淡影
               const apron = 1 - (dd - col.r) / (0.6 * UNIT)
               if (apron > 0) {
-                mixTo(c, 146, 130, 106, apron * 0.45)
+                mixTo(c, 136, 139, 141, apron * 0.45)
                 scale(c, 1 - 0.3 * smooth(0.5, 1, apron))
               }
               castShadow(c, dx, dy, col.r, Math.min(SHADOW_U.column * UNIT, (1.8 * UNIT * Math.hypot(light.x, light.y)) / Math.max(light.z, 0.3)), light, 0.38)
@@ -255,8 +253,8 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
               const ring = 0.5 + 0.5 * Math.sin((dd / UNIT) * 38 + st.h * 3)
               const tip = (1 - d) ** 1.6
               const tone = (0.78 + 0.45 * lit) * (0.95 + 0.05 * ring) * (1 - 0.3 * smooth(0.82, 1, d))
-              mixTo(c, (138 + 84 * tip) * tone, (120 + 86 * tip) * tone, (96 + 82 * tip) * tone, smooth(1, 0.9, d))
-              if (d < 0.24) mixTo(c, 240, 234, 216, smooth(0.24, 0.05, d) * 0.9)
+              mixTo(c, (130 + 90 * tip) * tone, (133 + 88 * tip) * tone, (135 + 82 * tip) * tone, smooth(1, 0.9, d))
+              if (d < 0.24) mixTo(c, 236, 234, 224, smooth(0.24, 0.05, d) * 0.9)
             } else {
               // 脚下一圈接触阴影，背着天窗拖一条淡影，越高拖得越长
               if (d < 1.45) scale(c, 1 - 0.3 * smooth(1.45, 1, d))
@@ -266,14 +264,14 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
             const g = L.glows[idx]!
             const d = Math.hypot(wx - g.x, wy - g.y) / g.r
             if (d < 1.3) {
-              // 荧光丛：一片潮湿的暗绿苔，上面一簇簇小菌盖
-              mixTo(c, 56, 62, 50, smooth(1.3, 0.55, d) * 0.5)
+              // 荧光丛：一片潮湿的墨绿苔，上面一簇簇翡翠与薄荷色的小菌盖
+              mixTo(c, 28, 58, 46, smooth(1.3, 0.55, d) * 0.5)
               const cap = cellNearest(gx * 7, gy * 7, s + 91 + idx)
               const cd = Math.hypot(cap.dx, cap.dy) / (0.12 + 0.12 * cap.h)
               if (cap.h > 0.35 && cd < 1 && d < 1) {
                 const k = 0.75 + 0.35 * Math.max(0, (cap.dy / (0.12 + 0.12 * cap.h)) * BAKE_Y + Math.sqrt(Math.max(0, 1 - cd * cd)) * BAKE_Z)
-                if (g.hue < 0.5) mixTo(c, 170 * k, 214 * k, 200 * k, smooth(1, 0.7, cd))
-                else mixTo(c, 196 * k, 220 * k, 150 * k, smooth(1, 0.7, cd))
+                if (g.hue < 0.5) mixTo(c, 140 * k, 232 * k, 196 * k, smooth(1, 0.7, cd))
+                else mixTo(c, 96 * k, 214 * k, 156 * k, smooth(1, 0.7, cd))
               }
             }
           }
@@ -461,7 +459,7 @@ const TONE_KNEE = 0.7
  * 天光与反光从照度场来；直射看这一点朝太阳（月亮）的那条线在洞顶的高度上是不是落在天窗里（按半影取几个点），再看半路有没有石柱、石笋挡着；
  * 火把按点光源 I·cosθ/d² 照（w 是火把的高度，米），沿影子图判断有没有被岩石挡住，坡面上的明暗只取一半，免得近处的火光把小坡照出一圈黑影；
  * 有方向的光按法线图照出起伏。立着的东西（遮罩图里盖住的地方）不随地面的起伏：直射与火把都按迎着光照，明暗交给精灵按光从哪边来画。
- * 照度除以眼睛适应的亮度后按色调曲线压成倍数，直射的光斑亮过原色；越暗越偏冷偏灰；最暗也留一点暖褐，不是纯黑；加一点抖动免得暗处出色带
+ * 照度除以眼睛适应的亮度后按色调曲线压成倍数，直射的光斑亮过原色；越暗越偏冷偏灰；最暗也留一点冷灰，不是纯黑；加一点抖动免得暗处出色带
  */
 export const LIGHT_FRAG = `${HEADER}
 uniform sampler2D uField;
@@ -557,7 +555,7 @@ void main ()
   float lux = log2(max(e, 1e-12)) * 0.30103 + uLogAdapt;
   float scot = 1.0 - smoothstep(-2.0, 0.6, lux);
   float grey = dot(col, vec3(0.3, 0.5, 0.2));
-  col = mix(col, vec3(0.62, 0.72, 0.95) * grey, scot * 0.8);
+  col = mix(col, vec3(0.62, 0.84, 0.8) * grey, scot * 0.8);
   col /= max(max(col.r, col.g), max(col.b, 0.0001));
   float tone = ${TONE_MAX.toFixed(2)} * e / (e + ${TONE_KNEE.toFixed(2)});
   float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
@@ -568,7 +566,7 @@ void main ()
 /**
  * 洞里会发光的空气与水面，按叠加画在光的上面：天窗射进来的光柱照亮半空里的水雾与浮尘，
  * 俯看时一根竖直的空气柱有多少段在光柱里，就亮多少（取样点按像素错开，免得出一道道条纹）；太阳低时光柱又长又斜，散射的光到 SHAFT_MAX 就饱和，
- * 免得一层白雾盖住整个洞；浮尘一闪一闪、水雾慢慢往上飘；天窗正下方的水潭倒映着天
+ * 免得一层白雾盖住整个洞；浮尘一闪一闪、水雾慢慢往上飘；天窗正下方的水潭倒映着天，亮时水面泛着细碎的反光，暗时水里的浮游生物发出翡翠色的微光
  */
 /** 光柱里的散射最多叠上多亮 */
 const SHAFT_MAX = 0.4
@@ -590,6 +588,9 @@ uniform float uSkyBright;
 uniform float uScatter;
 uniform float uTime;
 uniform float uMist;
+uniform float uDay;
+uniform float uPoolGlow;
+uniform vec3 uPoolCol;
 ${SAMPLE}
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -626,6 +627,10 @@ void main ()
   vec4 geo = texture2D(uGeo, fieldUv(world));
   float ripple = 0.75 + 0.5 * vnoise(g * 3.0 + vec2(uTime * 0.4, uTime * 0.25));
   col += uSkyCol * geo.b * skyAt(world) * uSkyBright * 0.035 * ripple;
+  float glint = smoothstep(0.8, 0.97, vnoise(g * 11.0 + vec2(uTime * 0.9, -uTime * 0.6))) * smoothstep(0.55, 0.9, vnoise(g * 2.3 - vec2(uTime * 0.3, uTime * 0.2)));
+  col += vec3(0.75, 1.0, 0.9) * geo.b * glint * 0.22 * uDay;
+  float bloom = 0.55 + 0.45 * vnoise(g * 1.7 + vec2(uTime * 0.12, uTime * 0.08)) + 0.6 * smoothstep(0.85, 0.98, vnoise(g * 7.0 - vec2(uTime * 0.18, uTime * 0.27)));
+  col += uPoolCol * geo.b * geo.b * bloom * uPoolGlow;
   gl_FragColor = vec4(min(col, vec3(0.7)), 0.0);
 }
 `
@@ -686,11 +691,11 @@ export function drawSmoke(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.putImageData(img, 0, 0)
 }
 
-/** 从上往下看的蝙蝠：深褐的身子，两片带骨的膜翼 */
+/** 从上往下看的蝙蝠：黑灰的身子，两片带骨的膜翼 */
 export function drawBat(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const cx = w / 2
   const cy = h * 0.5
-  ctx.fillStyle = '#2b2019'
+  ctx.fillStyle = '#1e2124'
   for (const side of [-1, 1]) {
     ctx.beginPath()
     ctx.moveTo(cx, cy - h * 0.12)
@@ -702,7 +707,7 @@ export function drawBat(ctx: CanvasRenderingContext2D, w: number, h: number): vo
     ctx.closePath()
     ctx.fill()
   }
-  ctx.fillStyle = '#1a130e'
+  ctx.fillStyle = '#121416'
   ctx.beginPath()
   ctx.ellipse(cx, cy, w * 0.05, h * 0.26, 0, 0, Math.PI * 2)
   ctx.fill()
@@ -729,7 +734,7 @@ export function drawRim(ctx: CanvasRenderingContext2D, o: Opening, ppu: number, 
     if (rng.next() < 0.55) {
       const len = (0.25 + rng.next() * 0.55) * ppu
       const bend = (rng.next() - 0.5) * 0.6
-      ctx.strokeStyle = rng.next() < 0.5 ? 'rgba(74,54,36,0.85)' : 'rgba(58,82,40,0.85)'
+      ctx.strokeStyle = rng.next() < 0.5 ? 'rgba(44,48,48,0.85)' : 'rgba(30,80,58,0.85)'
       ctx.lineWidth = (0.03 + rng.next() * 0.04) * ppu
       ctx.beginPath()
       ctx.moveTo(ex * rr, ey * rr)
@@ -743,7 +748,7 @@ export function drawRim(ctx: CanvasRenderingContext2D, o: Opening, ppu: number, 
       const ang = a + Math.PI + (rng.next() - 0.5) * 1.2
       const len = (0.35 + rng.next() * 0.5) * ppu
       const g = 70 + Math.floor(rng.next() * 50)
-      ctx.fillStyle = `rgba(${Math.floor(g * 0.55)},${g},${Math.floor(g * 0.45)},0.82)`
+      ctx.fillStyle = `rgba(${Math.floor(g * 0.36)},${g},${Math.floor(g * 0.7)},0.82)`
       ctx.save()
       ctx.translate(ex * base, ey * base)
       ctx.rotate(ang)

@@ -93,20 +93,20 @@ export function moonSkyLux(sky: Sky, elevDeg: number, phase: number): number {
   return 0.1 * moonDirectLux(sky, elevDeg, phase) * Math.sqrt(Math.max(0, Math.sin(elevDeg * DEG)))
 }
 
-/** 太阳高度 elevDeg 度时，地平线上的光是什么颜色（线性 RGB，最亮的分量为 1）：高处暖白，低处金黄，贴地发红 */
+/** 太阳高度 elevDeg 度时，地平线上的光是什么颜色（线性 RGB，最亮的分量为 1）：高处冷白，低处金黄，贴地发红 */
 export function sunColor(elevDeg: number): [number, number, number] {
   const t = smooth(-1, 22, elevDeg)
-  return [1, 0.48 + 0.47 * t, 0.22 + 0.66 * t]
+  return [1 - 0.04 * t, 0.48 + 0.5 * t, 0.22 + 0.78 * t]
 }
 
-/** 太阳高度 elevDeg 度时天光的颜色：白天偏蓝，日落时发橙，入夜后是深蓝 */
+/** 太阳高度 elevDeg 度时天光的颜色：白天冷白，日落时泛一点灰粉，入夜后是冷蓝 */
 export function skyColor(elevDeg: number): [number, number, number] {
   if (elevDeg >= 0) {
     const t = smooth(0, 15, elevDeg)
-    return [0.95 - 0.27 * t, 0.72 + 0.12 * t, 0.62 + 0.38 * t]
+    return [0.9 + 0.04 * t, 0.8 + 0.18 * t, 0.8 + 0.2 * t]
   }
   const t = smooth(-12, 0, elevDeg)
-  return [0.42 + 0.53 * t, 0.5 + 0.22 * t, 1 - 0.38 * t]
+  return [0.5 + 0.4 * t, 0.66 + 0.14 * t, 0.86 - 0.06 * t]
 }
 
 /** 时间流速的查表：一天里每个钟点对应开天以来过了多少真实秒 */
