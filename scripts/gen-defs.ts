@@ -47,6 +47,8 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { distances, flowGrid, nearestPass, outpostPlan, passNow } from '../src/maps/outpost/layout.ts'
+import { SEG_SLOTS } from '../src/maps/outpost/shader.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -707,6 +709,53 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(belt.speedU < slowest, `${at}.belt.speedU 须慢过最慢的队员（${slowest} 格/秒），逆着传送带也走得动`)
   need(f.body.static >= f.body.kinetic && f.body.kinetic > 0 && f.coin.static >= f.coin.kinetic && f.coin.kinetic > 0, `${at}.friction 的静摩擦须不小于动摩擦、动摩擦为正`)
   need(gait.flatResistance > 0 && gait.downhillMax >= 1 && gait.effortMin > 0 && gait.effortMin <= 1, `${at}.gait 的平地阻力须为正、下坡倍率不小于 1、最少的费力在 (0, 1] 内`)
+}
+
+/**
+ * 前哨：台地放得进安全区，外圈围栏外留得出荒野，站心的空场空得出出生点；组数、颜色、默认亮着的组数、围栏的高与计时说得通，光墙高过标准身体；
+ * 抽一批种子真的生成一遍：每组一台控制台、着陆平台与圆顶舱摆得下、裂缝至少有荒野那么多道；围栏全亮时每台控制台从站心都走得到，全熄时裂缝也走得到
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'outpost') === (m.outpost !== undefined), `maps.${id} 是前哨当且仅当写了 outpost`)
+  const o = m.outpost
+  if (!o) continue
+  const at = `maps.${id}.outpost`
+  const G = o.groups.length
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  need(G >= 2 && G * 6 <= SEG_SLOTS, `${at}.groups 须有 2 组以上，每组 6 段围栏，一共不超过着色器画得下的 ${SEG_SLOTS} 段`)
+  need(new Set(o.groups.map((g) => g.color)).size === G && new Set(o.groups.map((g) => g.name)).size === G, `${at}.groups 的颜色与名字不能重复`)
+  need(range(o.lit, true) && o.lit[0] >= 1 && o.lit[1] <= G - 1, `${at}.lit 须是 1 到组数减一之间的整数范围：开局有亮着的也有熄着的`)
+  need(o.site.radiusU + o.site.wobbleU <= (FRAME_U - SAFE_U * 2) / 2, `${at}.site 须放得进方框的安全区`)
+  need(range(o.site.lobes, true) && o.site.lobes[0] >= 2 && o.site.wobbleU >= 0, `${at}.site 的起伏道数须是 2 以上的整数范围，幅度不为负`)
+  need(range(o.frame.ringU, false) && o.frame.ringU[1] + 3.5 <= o.site.radiusU - o.site.wobbleU, `${at}.frame.ringU 外圈围栏外须留出至少 3.5 格的荒野`)
+  need(o.frame.hubU - o.fence.pylonU >= SPAWN_CLEAR_U && o.frame.hubU < o.frame.ringU[0] / 2, `${at}.frame.hubU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，辐条也不能太短`)
+  need(o.frame.turn >= 0 && o.frame.turn < 1, `${at}.frame.turn 须在 [0, 1) 内`)
+  need(o.fence.heightM > OBSTACLES.body.heightM && o.fence.heightM <= o.fence.pylonM && o.fence.thickU > 0 && o.fence.pylonU > o.fence.thickU / 2, `${at}.fence 光墙须高过标准身体、不高过立柱，立柱粗过光墙`)
+  need(o.console.radiusU > 0 && range(o.console.atU, false) && o.console.atU[0] > o.frame.hubU, `${at}.console 的台面半径须为正，摆在辐条起头以外`)
+  need(o.console.holdS > o.console.warnS && o.console.warnS > 0 && o.console.rearmS > 0, `${at}.console 的保持须长过预警，预警与再切的间隔须为正`)
+  need(o.overload.s > o.overload.warnS && o.overload.warnS > 0, `${at}.overload 熄的时间须长过预警，预警须为正`)
+  need(o.gear.panelM > 0 && o.gear.panelM < OBSTACLES.body.heightM && o.crystals.lowM > 0 && o.crystals.lowM < o.crystals.tallM, `${at} 的太阳能板与矮晶簇须矮过标准身体，矮晶簇矮过高的`)
+  need(range(o.crystals.clusters, true) && o.crystals.low >= 0 && o.crystals.low <= 1 && range(o.rifts.wild, true) && o.rifts.wild[0] >= 1 && range(o.rifts.yard, true), `${at} 的晶簇与裂缝的个数须是整数范围，荒野里至少一道裂缝`)
+  need(o.reflowMs > 0, `${at}.reflowMs 须为正`)
+  for (let s = 0; s < 16; s++) {
+    const plan = outpostPlan(o, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(plan.segments.length === G * 6, `${where} 的围栏段数不对`)
+    need(plan.defaults.some((d) => d) && plan.defaults.some((d) => !d), `${where} 开局须有亮着的组也有熄着的组`)
+    need(o.groups.every((_, g) => plan.consoles.filter((c) => c.group === g).length === 1), `${where} 须每组恰好一台控制台`)
+    need(plan.pad !== null && plan.domes.length >= 1, `${where} 的着陆平台或圆顶舱没摆下`)
+    need(plan.rifts.length >= o.rifts.wild[0], `${where} 的裂缝不够`)
+    need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的站心四周不够空`)
+    const grid = flowGrid(plan, o, 0.45)
+    const pass = new Uint8Array(grid.base.length)
+    const dist = new Float32Array(grid.base.length)
+    passNow(grid, () => true, pass)
+    distances(grid, pass, nearestPass(grid, pass, plan.cx, plan.cy), dist)
+    need(plan.consoles.every((c) => Number.isFinite(dist[nearestPass(grid, pass, c.x, c.y)] ?? Infinity)), `${where} 围栏全亮时有控制台从站心走不到`)
+    passNow(grid, () => false, pass)
+    distances(grid, pass, nearestPass(grid, pass, plan.cx, plan.cy), dist)
+    need(plan.rifts.every((r) => Number.isFinite(dist[nearestPass(grid, pass, r.x, r.y)] ?? Infinity)), `${where} 围栏全熄时有裂缝走不到`)
+  }
 }
 
 /**

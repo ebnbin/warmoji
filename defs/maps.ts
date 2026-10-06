@@ -212,6 +212,17 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const OUTPOST_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 34, max: 74 },
+  { kind: 'alien', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 30 },
+  { kind: 'slime', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'locust', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'ufo', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'blob', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'chameleon', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'crab', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1347,5 +1358,59 @@ export const MAPS = {
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
     },
     boss: 'eclipse',
+  },
+  outpost: {
+    emoji: '1fa90',
+    name: '前哨',
+    desc: '另一颗星球上一座露天的科研前哨站，靠一道道能量围栏挡住荒野里的东西。围栏分几组，每组一种颜色：亮着时挡人、挡子弹、挡视线，谁也穿不过；熄了只剩两根立柱，随便走。队伍里谁站上同色的控制台，就切换那一组的开关，怪不会操作；可站里的系统过一阵就把切过的组复位成默认，复位前先闪。怪从岩脊外翻进来、从地表的裂缝里钻出来；头目从着陆平台降下，冲起来能撞熄一段围栏',
+    kind: 'outpost',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(262 22% 30%)',
+      bgTo: 'hsl(248 30% 9%)',
+      map: hslToInt(276, 0.12, 0.42),
+      shadow: 0x000000,
+    },
+    // 橙白的恒星从左上方照下来；背光面受着头顶那颗气态巨行星的反光，偏青
+    light: { sun: 0xfff0dc, shade: 0x93a7c4, shadow: { color: 0x170d24, alpha: 0.34, length: 0.55 } },
+    decor: {
+      emojis: ['1faa8'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: OUTPOST_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'regolith',
+      boss: 'pad',
+      kinds: {
+        ridge: { name: '岩脊', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'regolith', weight: 3, perSec: 1.5 },
+        rift: { name: '裂缝', at: { kind: 'mark' }, enter: 'rise', look: 'regolith', weight: 2, perSec: 1.2 },
+        sky: { name: '空降', at: { kind: 'ground' }, enter: 'drop', look: 'glow', weight: 1, only: ['ufo'] },
+        pad: { name: '着陆平台', at: { kind: 'mark' }, enter: 'drop', look: 'sparks', weight: 1, only: ['rhino'] },
+      },
+    },
+    finalWaveSub: '暴龙从着陆平台上跳了下来——它一冲就能撞熄一段围栏，赶紧把它关进院子里！',
+    outpost: {
+      site: { radiusU: 17, wobbleU: 0.7, lobes: [3, 5] },
+      frame: { ringU: [11.2, 12.2], hubU: 4.4, turn: 0.3 },
+      fence: { heightM: 2.4, thickU: 0.16, pylonU: 0.28, pylonM: 2.9 },
+      groups: [
+        { name: '青', color: 0x3ee6ff },
+        { name: '洋红', color: 0xff52d4 },
+        { name: '琥珀', color: 0xffb13d },
+        { name: '黄绿', color: 0xa4ff52 },
+      ],
+      lit: [1, 3],
+      console: { radiusU: 0.62, atU: [6.2, 8.4], holdS: 20, warnS: 4, rearmS: 1.2 },
+      overload: { s: 9, warnS: 2 },
+      gear: { domeM: 3.4, mastM: 6, panelM: 0.95 },
+      crystals: { clusters: [7, 11], tallM: 2.8, lowM: 0.8, low: 0.4 },
+      rifts: { wild: [3, 4], yard: [1, 1] },
+      reflowMs: 300,
+    },
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

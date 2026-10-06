@@ -28,6 +28,8 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  /** 在前哨打的一局才有：各组围栏此刻亮不亮、还有多久复位 */
+  fences: FenceSnapshot | null
 }
 
 /**
@@ -58,6 +60,17 @@ export interface SubmarineSnapshot {
   readonly phase: 'down' | 'warn' | 'away'
   readonly ratio: number
   readonly inSec: number
+}
+
+/**
+ * 前哨的围栏：坐标是相对站心、按外圈最远的角归一的；每段归哪一组、此刻亮不亮、是不是在过载；控制台在哪；
+ * 每个院子两道辐条的方位（弧度）与外墙归哪一组；每组的颜色与名字、开着没有、在默认状态、切过了在计时还是快复位了，ratio 是计时还剩的比例，inSec 是还有几秒
+ */
+export interface FenceSnapshot {
+  readonly segments: readonly { readonly ax: number; readonly ay: number; readonly bx: number; readonly by: number; readonly group: number; readonly live: boolean; readonly down: boolean }[]
+  readonly consoles: readonly { readonly x: number; readonly y: number; readonly group: number }[]
+  readonly yards: readonly { readonly a0: number; readonly a1: number; readonly group: number }[]
+  readonly groups: readonly { readonly color: number; readonly name: string; readonly on: boolean; readonly phase: 'idle' | 'held' | 'warn'; readonly ratio: number; readonly inSec: number }[]
 }
 
 export interface WaveSummary {

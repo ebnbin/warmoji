@@ -38,6 +38,13 @@ export const BATTLEFIELD = {
       { id: 'circuit_brownout', emoji: '1faab', name: '电压骤降', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'circuit_jam', emoji: '1f4e1', name: '电磁干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    outpost: [
+      { id: 'outpost_solar', emoji: '1f50b', name: '电池满载', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'outpost_moons', emoji: '1f317', name: '双月当空', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'outpost_lowg', emoji: '1fa90', name: '低重力', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'outpost_dust', emoji: '1f32a', name: '尘暴过境', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'outpost_flare', emoji: '2600', name: '恒星耀斑', desc: '全队伤害 -22%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { damage: 0.78 } } } },
+    ],
     petri: [
       { id: 'petri_nutrient', emoji: '1f9eb', name: '营养充足', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'petri_penicillin', emoji: '1f48a', name: '青霉素', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },

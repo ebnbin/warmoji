@@ -33,6 +33,8 @@ const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
 const AEOLIAN = [0, 2, 3, 5, 7, 8, 10] as const
 const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const
+/** 利底亚属：升四、降七，明亮里带一点悬着的异样 */
+const LYDIAN_DOM = [0, 2, 4, 6, 7, 9, 10] as const
 /** 阳音阶：日本民谣里明亮的五声音阶 */
 const YO = [0, 2, 5, 7, 9] as const
 /** 平调子：筝最常用的定弦，幽幽的五声音阶 */
@@ -1209,6 +1211,57 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/**
+ * 前哨：利底亚属调式。锯齿波的低音按八分音符一下下地脉动，像站里的发电机；正弦波的琶音带着回声，像电台里的遥测信号；
+ * 三角波的长音铺底、两层稍稍错开，方波的旋律慢慢地走；隔一小节高处滴的一声，像雷达扫过；底鼓很轻，踩着拍子
+ */
+function buildOutpost(): BgmScore {
+  const chords = [0, 0, 5, 5, 3, 3, 4, 4, 0, 0, 5, 5, 2, 3, 4, 6]
+  return track(
+    {
+      bpm: 104,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 55,
+      scale: LYDIAN_DOM,
+      echo: { delaySec: (60 / 104) * 0.75, feedback: 0.38, level: 0.3 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sawtooth', vol: 0.07, attack: 0.01, release: 0.12, octave: -2 }
+      const ping: Voice = { wave: 'sine', vol: 0.045, attack: 0.002, release: 0.1, octave: 1, echo: true }
+      const pad: Voice = { wave: 'triangle', vol: 0.022, attack: 0.5, release: 0.8, octave: 0 }
+      const lead: Voice = { wave: 'square', vol: 0.04, attack: 0.04, release: 0.25, octave: 0 }
+      const radar: Voice = { wave: 'sine', vol: 0.028, attack: 0.002, release: 0.5, octave: 3, echo: true }
+      b.bass(bass, chords, 'r.r.o.rf')
+      b.arp(ping, chords, [0, 4, 2, 5, 1, 4, 2, 3])
+      b.pad(pad, chords, [0, 1, 2], 0.004)
+      b.line(lead, [
+        [0, 0, 4, 6], [0, 6, 3, 2],
+        [1, 0, 2, 8],
+        [2, 0, 5, 4], [2, 4, 6, 4],
+        [3, 0, 7, 6], [3, 6, 6, 2],
+        [4, 0, 5, 4], [4, 4, 3, 4],
+        [5, 0, 3, 8],
+        [6, 0, 4, 3], [6, 3, 5, 1], [6, 4, 6, 4],
+        [7, 0, 4, 8],
+        [8, 0, 7, 6], [8, 6, 8, 2],
+        [9, 0, 9, 8],
+        [10, 0, 8, 4], [10, 4, 7, 4],
+        [11, 0, 5, 8],
+        [12, 0, 4, 4], [12, 4, 3, 4],
+        [13, 0, 5, 6], [13, 6, 4, 2],
+        [14, 0, 6, 4], [14, 4, 5, 4],
+        [15, 0, 4, 8],
+      ])
+      for (let bar = 0; bar < chords.length; bar += 2) b.note(radar, bar, 3, chords[bar]! + 7, 1)
+      b.drums('kick', 'x...x...', 0, 16, 0.05)
+      b.drums('hat', '..o...o.', 4, 16, 0.016)
+      b.drums('snare', '....o...', 8, 16, 0.025)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1235,6 +1288,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  outpost: buildOutpost,
 }
 
 const cache = new Map<BgmId, BgmScore>()

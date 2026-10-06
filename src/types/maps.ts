@@ -1333,6 +1333,40 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/**
+ * 前哨：另一颗星球上一座露天的科研前哨站。能走的是岩脊围着的一块台地，岩脊是硬边界；站里立着几组能量围栏，是战场的骨架。
+ * 围栏亮着时是实体：挡身体、挡弹体、挡视线，谁也穿不过；熄了只剩立柱，随便走。队伍里谁站上同色的控制台就切换那一组，敌人不会操作；
+ * 切换过的组过一阵由站里的系统复位成默认状态，复位前先预警。破坏力打中亮着的一段，那段过载、熄一阵
+ */
+export interface OutpostConfig {
+  /** 台地：近似圆，站心在方框正中，半径 radiusU 格，边沿按 lobes 道起伏 ±wobbleU 格 */
+  readonly site: { readonly radiusU: number; readonly wobbleU: number; readonly lobes: readonly [number, number] }
+  /**
+   * 围栏的骨架：外圈是 2 × 组数 边形，每个角离站心在 ringU 格之间，方位各错开至多 turn 个半角，每边中点再立一根柱；
+   * 每隔一个角往里拉一道辐条，从离站心 hubU 格处起，中点也立一根柱。相邻两道辐条与外圈围出一个院子，院子的外墙归一组，两边的辐条随机归给左右两组之一
+   */
+  readonly frame: { readonly ringU: readonly [number, number]; readonly hubU: number; readonly turn: number }
+  /** 光墙高 heightM 米、厚 thickU 格；立柱半径 pylonU 格、高 pylonM 米 */
+  readonly fence: { readonly heightM: number; readonly thickU: number; readonly pylonU: number; readonly pylonM: number }
+  /** 几组围栏的名字与颜色，组数就是院子数；开局默认亮着的组数在 lit 之间，其余默认熄着 */
+  readonly groups: readonly { readonly name: string; readonly color: number }[]
+  readonly lit: readonly [number, number]
+  /**
+   * 控制台：台面半径 radiusU 格，摆在自己那组的院子里、离站心 atU 格之间；
+   * 切过的组保持 holdS 秒，最后 warnS 秒预警，到点复位；台面上的人走空 rearmS 秒后才能再切（跟在后面的队员踩上去不算）
+   */
+  readonly console: { readonly radiusU: number; readonly atU: readonly [number, number]; readonly holdS: number; readonly warnS: number; readonly rearmS: number }
+  /** 破坏力打中亮着的一段：那段过载，熄 overloadS 秒，最后 warnS 秒预警再亮 */
+  readonly overload: { readonly s: number; readonly warnS: number }
+  /** 院子里的设施：圆顶舱高 domeM、天线高 mastM、太阳能板高 panelM 米 */
+  readonly gear: { readonly domeM: number; readonly mastM: number; readonly panelM: number }
+  /** 荒野里的晶簇：几簇，高的那种高 tallM、矮的高 lowM 米，矮的占的比例 */
+  readonly crystals: { readonly clusters: readonly [number, number]; readonly tallM: number; readonly lowM: number; readonly low: number }
+  /** 地表的裂缝：荒野里几道、院子里几道 */
+  readonly rifts: { readonly wild: readonly [number, number]; readonly yard: readonly [number, number] }
+  /** 寻路最快多久重算一次，毫秒 */
+  readonly reflowMs: number
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1341,8 +1375,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，regolith 异星的土尘 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'regolith'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1407,7 +1441,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'outpost'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,6 +1475,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly outpost?: OutpostConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

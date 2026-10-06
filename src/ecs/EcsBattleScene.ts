@@ -80,7 +80,7 @@ import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { ClockSnapshot, FenceSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -103,6 +103,7 @@ import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 import { wallLoops } from '../maps/basin'
 import { gateLoad, gatesNow, gateStats } from './worlds/gates'
+import { groupPhase, live } from '../maps/outpost/model'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
@@ -534,6 +535,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
+      regolith: burstEmitter(this, [0x8c7e94, 0xa596a6, 0x6f6379, 0xb08a6a], 120, 800, { gravityY: 120, scale: { start: 0.6, end: 1.4 }, alpha: { start: 0.6, end: 0 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
@@ -610,6 +612,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      fences: sim ? fenceSnapshot(sim) : null,
     }
   }
 
@@ -1059,6 +1062,29 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 在前哨打的一局：各段围栏、控制台与院子按外圈最远的角归一，各组的开关与复位倒计时 */
+function fenceSnapshot(sim: Sim): FenceSnapshot | null {
+  const st = sim.worldState.outpost
+  const cfg = MAPS[sim.mapId].outpost
+  if (!st || !cfg) return null
+  const plan = st.plan
+  const f = st.fences
+  const now = sim.elapsedMs
+  let far = 0
+  for (const p of plan.ring) far = Math.max(far, Math.hypot(p.x - plan.cx, p.y - plan.cy))
+  const nx = (x: number): number => (x - plan.cx) / far
+  const ny = (y: number): number => (y - plan.cy) / far
+  return {
+    segments: plan.segments.map((g, k) => ({ ax: nx(g.ax), ay: ny(g.ay), bx: nx(g.bx), by: ny(g.by), group: g.group, live: live(f, plan, k, now), down: f.down[k]! > now })),
+    consoles: plan.consoles.map((c) => ({ x: nx(c.x), y: ny(c.y), group: c.group })),
+    yards: plan.yards.map((y) => ({ a0: y.a0, a1: y.a1, group: y.group })),
+    groups: cfg.groups.map((g, k) => {
+      const p = groupPhase(f, cfg, k, now)
+      return { color: g.color, name: g.name, on: f.on[k]!, phase: p.phase, ratio: p.phase === 'idle' ? 0 : p.left / (cfg.console.holdS * 1000), inSec: p.left / 1000 }
+    }),
+  }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {
