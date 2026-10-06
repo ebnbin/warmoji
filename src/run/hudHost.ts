@@ -24,7 +24,7 @@ export interface HudSnapshot {
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
   /** 在船上或梦幻乐园里打的一局才有：脚下那块会倾的面此刻往哪边倾、倾多少 */
   tilt: TiltSnapshot | null
-  /** 在溶洞里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
+  /** 在溶洞或紫水晶洞穴里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null

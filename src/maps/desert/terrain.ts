@@ -42,7 +42,7 @@ export interface Dune {
   readonly top: number
 }
 
-/** 一样标志物：种类、中心（格）与形状；一对里的两个形状一模一样 */
+/** 一样标志物或一棵仙人掌：种类、中心（格）与形状；一对里的两个形状一模一样；仙人掌排在标志物后面 */
 export interface Landmark {
   readonly kind: LandmarkKind
   readonly x: number
@@ -332,6 +332,32 @@ function placeLandmarks(cfg: DesertConfig, rng: Rng, windAngle: number, size: nu
   return out
 }
 
+/** 撒仙人掌：几对，摆在丘间平地上，离别的仙人掌至少 gapU 格，离标志物再多让出它伸出去的那么远 */
+function placeCacti(cfg: DesertConfig, rng: Rng, size: number, high: (x: number, y: number) => number, taken: readonly Landmark[]): Landmark[] {
+  const pairs = cfg.cacti.pairs[0] + Math.floor(rng.next() * (cfg.cacti.pairs[1] - cfg.cacti.pairs[0] + 1))
+  const out: Landmark[] = []
+  for (let k = 0; k < pairs; k++) {
+    const shape = landmarkShape('cactus', Math.floor(rng.next() * 0x7fffffff), 0)
+    let gap = cfg.cacti.gapU
+    let at: Point | null = null
+    for (let round = 0; round < 8 && !at; round++, gap *= 0.85) {
+      for (let i = 0; i < TRIES && !at; i++) {
+        const x = rng.next() * size
+        const y = rng.next() * size
+        if (high(x, y) > 0.08) continue
+        const ok = [...taken, ...out].every((l) => {
+          const need = gap + (l.kind === 'cactus' ? 0 : l.shape.reach)
+          return torusDist(size, x, y, l.x, l.y) >= need && torusDist(size, x + size / 2, y + size / 2, l.x, l.y) >= need
+        })
+        if (ok) at = { x, y }
+      }
+    }
+    if (!at) continue
+    out.push({ kind: 'cactus', x: at.x, y: at.y, shape }, { kind: 'cactus', x: (at.x + size / 2) % size, y: (at.y + size / 2) % size, shape })
+  }
+  return out
+}
+
 const SLOPE = { x: 0, y: 0 }
 
 /** 每个格子晒得到几成太阳：背着太阳的坡按斜射少受的光算，往太阳方向找比光线高的地面，再扣掉标志物的影子 */
@@ -440,7 +466,8 @@ export function makePlan(cfg: DesertConfig, decorSeed: number): DesertPlan {
     sun: new Float32Array(0),
     soft: new Float32Array(0),
   }
-  const placed = { ...base, landmarks: placeLandmarks(cfg, rng, windAngle, sizeU, (x, y) => duneAt(base, x, y)) }
+  const marks = placeLandmarks(cfg, rng, windAngle, sizeU, (x, y) => duneAt(base, x, y))
+  const placed = { ...base, landmarks: [...marks, ...placeCacti(cfg, rng, sizeU, (x, y) => duneAt(base, x, y), marks)] }
   const start = startOf(placed)
   const dx = sizeU / 2 - start.x
   const dy = sizeU / 2 - start.y

@@ -17,6 +17,7 @@ import type { VolcanoState } from '../../maps/volcano/model'
 import type { ShipState } from '../../maps/ship/model'
 import type { FloeState } from '../../maps/floe/model'
 import type { CaveState } from '../../maps/cave/model'
+import type { AmethystState } from '../../maps/amethyst/world'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from './oldRiver'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from './torus'
 import type { RiverRect } from './oldRiver'
@@ -101,6 +102,7 @@ export interface WorldState {
   nebula: NebulaState | null
   floe: FloeState | null
   cave: CaveState | null
+  amethyst: AmethystState | null
   desert: DesertState | null
   meadow: MeadowState | null
   sakura: SakuraState | null
@@ -116,7 +118,7 @@ export interface WorldState {
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, theater: null, warp: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, amethyst: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, theater: null, warp: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}

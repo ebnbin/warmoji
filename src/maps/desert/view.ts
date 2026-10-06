@@ -255,14 +255,14 @@ export class DesertView implements MapView {
     this.step(v, sim, 0)
   }
 
-  /** 标志物：枯树与路标杆在实体上面画出枝杈与杆头；一对标志物共用一张图 */
+  /** 标志物：枯树、路标杆与仙人掌在实体上面画出枝杈、杆头与顶；一对标志物共用一张图 */
   private landmarks(v: ViewCtx, plan: DesertPlan): void {
     const scene = v.scene
     const keys = new Map<object, string>()
     plan.landmarks.forEach((land, i) => {
       const sh = land.shape
       let img: Phaser.GameObjects.Image | null = null
-      if (sh.kind === 'tree' || sh.kind === 'post') {
+      if (sh.kind === 'tree' || sh.kind === 'post' || sh.kind === 'cactus') {
         let key = keys.get(sh)
         if (!key) {
           key = `${CANOPY_KEY}-${i}`
