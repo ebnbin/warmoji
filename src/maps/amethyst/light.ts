@@ -260,7 +260,7 @@ export function makeLighting(L: AmethystLayout, cfg: AmethystConfig): Lighting {
   const fadePx = cfg.light.tunnelFadeU * UNIT
   for (let i = 0; i < n; i++) {
     if (!tunnelZone[i]) continue
-    lt.fade[i] = Number.isFinite(dist[i]!) ? Math.exp(-dist[i]! / fadePx) : 0
+    lt.fade[i] = Number.isFinite(dist[i]!) ? Math.exp(-((dist[i]! / fadePx) ** 2)) : 0
   }
   // 岩体里：一圈圈往外排
   const fill: number[] = []

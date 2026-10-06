@@ -13,14 +13,41 @@ const LOG_SPAN = 12
 const LINING_RINGS = 4
 const LINING_KEEP = 0.75
 
-/** 照度场编码成数据图：R、G 是 16 位的对数照度（天光与反光），B 是反光占的比例；必须满 alpha（画布会按透明度预乘） */
-export function encodeLux(lt: Lighting, out: Uint8ClampedArray): void {
+/** 照度场在画面上的一个样子：每格的对数照度（天光与反光，洞壁那一圈提亮过）与反光占的比例 */
+export interface LuxShot {
+  readonly log: Float32Array
+  readonly share: Float32Array
+}
+
+export function luxShot(n: number): LuxShot {
+  return { log: new Float32Array(n), share: new Float32Array(n) }
+}
+
+/** 把此刻的照度场记成画面上的样子 */
+export function shootLux(lt: Lighting, out: LuxShot): void {
   for (let i = 0; i < lt.cols * lt.rows; i++) {
     const lift = (LINING_KEEP / ROCK_KEEP) ** Math.min(lt.rank[i]!, LINING_RINGS)
-    const v = Math.round(clamp01((Math.log10(lt.diffuse[i]! * lift + 1e-6) - LOG_MIN) / LOG_SPAN) * 65535)
+    out.log[i] = Math.log10(lt.diffuse[i]! * lift + 1e-6)
+    out.share[i] = lt.share[i]!
+  }
+}
+
+/** a 往 b 走 t 那么多，结果留在 a */
+export function blendLux(a: LuxShot, b: LuxShot, t: number): void {
+  for (let i = 0; i < a.log.length; i++) {
+    a.log[i] = a.log[i]! + (b.log[i]! - a.log[i]!) * t
+    a.share[i] = a.share[i]! + (b.share[i]! - a.share[i]!) * t
+  }
+}
+
+/** 照度场编码成数据图，从 a 过渡到 b 的 t 处：R、G 是 16 位的对数照度，B 是反光占的比例；必须满 alpha（画布会按透明度预乘） */
+export function encodeLux(a: LuxShot, b: LuxShot, t: number, out: Uint8ClampedArray): void {
+  for (let i = 0; i < a.log.length; i++) {
+    const log = a.log[i]! + (b.log[i]! - a.log[i]!) * t
+    const v = Math.round(clamp01((log - LOG_MIN) / LOG_SPAN) * 65535)
     out[i * 4] = v >> 8
     out[i * 4 + 1] = v & 255
-    out[i * 4 + 2] = lt.share[i]! * 255
+    out[i * 4 + 2] = (a.share[i]! + (b.share[i]! - a.share[i]!) * t) * 255
     out[i * 4 + 3] = 255
   }
 }
@@ -266,7 +293,7 @@ void main ()
     }
     if (uMoon.w > 0.0) {
       float s = glint(n, normalize(vec3(uMoon.xy, 1.0 / max(uMoon.z, 1e-4))));
-      float twinkle = 0.55 + 0.45 * sin(uTime * 2.3 + hash(floor(g * 6.0)) * 6.2832);
+      float twinkle = 0.55 + 0.45 * sin(uTime * 2.3 + vnoise(g * 2.0) * 12.566);
       if (s > 0.002) spark += uMoonCol * uMoon.w * s * twinkle * through(world, z, uMoon, 6);
     }
     for (int k = 0; k < ${MAX_TORCHES}; k++) {
@@ -283,7 +310,7 @@ void main ()
   }
   vec2 drift = vec2(uTime * 0.06, -uTime * 0.09);
   float mist = 0.55 + 0.45 * vnoise(g * 0.45 + drift) * (0.6 + 0.4 * vnoise(g * 1.3 - drift * 1.7));
-  float motes = smoothstep(0.92, 0.99, vnoise(g * 9.0 + vec2(uTime * 0.19, uTime * 0.11))) * (0.5 + 0.5 * sin(uTime * 3.0 + hash(floor(g * 9.0)) * 6.28));
+  float motes = smoothstep(0.92, 0.99, vnoise(g * 9.0 + vec2(uTime * 0.19, uTime * 0.11))) * (0.5 + 0.5 * sin(uTime * 3.0 + vnoise(g * 3.0) * 12.566));
   float density = mist * (0.7 + 0.3 * uMist) + motes * 1.8;
   float jitter = hash(gl_FragCoord.xy);
   vec3 dust = vec3(0.86, 0.76, 1.0);

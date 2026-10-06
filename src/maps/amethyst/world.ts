@@ -32,7 +32,7 @@ import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 /** 挡子弹与视线的实心按这么细的格子记，像素：矮晶丛也记得下 */
 const SOLID_CELL = 0.125 * UNIT
 /** 重算洞里的光、重算绕路的间隔，毫秒 */
-const LIGHT_MS = 200
+export const LIGHT_MS = 200
 const TRAIL_MS = 250
 /** 火把点起、熄灭要多久，毫秒 */
 const IGNITE_MS = 450

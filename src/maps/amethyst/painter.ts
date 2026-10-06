@@ -14,7 +14,7 @@ export type PaintPiece =
   | { readonly kind: 'relief'; readonly geo: Uint8ClampedArray<ArrayBuffer> }
 
 /** 每段地面多少行 */
-const BAND = 20
+const BAND = 32
 /** 退回主线程画时每画这么久让一次主线程，毫秒 */
 const SLICE_MS = 40
 

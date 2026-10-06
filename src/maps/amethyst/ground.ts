@@ -9,8 +9,12 @@ import type { AmethystLayout, Beam, Cluster, Geode, Nodule, Prism } from './layo
 export const FACE_PPU = 32
 /** 高度图（挡光的高度与开口）每格多少像素 */
 export const RELIEF_PPU = 16
+/** 开口的边在高度图上柔化的宽度，格：两个半像素，放大了看光斑边上也不起台阶，像阳光的半影 */
+const SKY_SOFT_U = 2.5 / RELIEF_PPU
 /** 画不到的地方的底色：比最暗的岩体还暗一点的紫黑 */
 export const ROCK_BG = [13, 8, 19] as const
+/** 从洞厅进暗道这么深，洞底与洞壁才全换成暗道里的样子，格 */
+const TUNNEL_BLEND_U = 2
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function ease(e0: number, e1: number, x: number): number {
@@ -68,6 +72,23 @@ function face(p: Px, x: number, y: number, z: number): void {
   p.nx = x / l
   p.ny = y / l
   p.nz = z / l
+}
+
+function copy(to: Px, from: Px): void {
+  to.r = from.r
+  to.g = from.g
+  to.b = from.b
+  to.nx = from.nx
+  to.ny = from.ny
+  to.nz = from.nz
+  to.gloss = from.gloss
+}
+
+/** p 按 t 换成 q 的样子：颜色、朝向与镜面一起过渡 */
+function mix(p: Px, q: Px, t: number): void {
+  blend(p, q.r, q.g, q.b, t)
+  face(p, p.nx + (q.nx - p.nx) * t, p.ny + (q.ny - p.ny) * t, p.nz + (q.nz - p.nz) * t)
+  p.gloss += (q.gloss - p.gloss) * t
 }
 
 const SUN_LEN = Math.hypot(SUN.x, SUN.y, SUN.z)
@@ -153,7 +174,7 @@ function agate(p: Px, u: number, gx: number, gy: number, seed: number): void {
   const c = tones[((band % tones.length) + tones.length) % tones.length]!
   paint(p, c[0], c[1], c[2])
   if (frac(v) < 0.1) dim(p, 0.88)
-  dim(p, 0.92 + 0.1 * valueNoise(gx * 18, gy * 18, seed + 73))
+  dim(p, 0.92 + 0.1 * valueNoise(gx * 8, gy * 8, seed + 73))
   p.gloss = 0.04
 }
 
@@ -161,7 +182,7 @@ function agate(p: Px, u: number, gx: number, gy: number, seed: number): void {
 function basalt(p: Px, gx: number, gy: number, seed: number): void {
   const n = fbm(gx * 0.8, gy * 0.8, seed + 77, 3)
   paint(p, 36 + 12 * n, 26 + 8 * n, 50 + 14 * n)
-  dim(p, 0.9 + 0.2 * valueNoise(gx * 11, gy * 11, seed + 79))
+  dim(p, 0.9 + 0.2 * valueNoise(gx * 7, gy * 7, seed + 79))
   p.gloss = 0.05
   const q = cellNearest(gx * 2.8, gy * 2.8, seed + 81)
   const r = 0.08 + 0.1 * q.h
@@ -215,29 +236,29 @@ function seam(p: Px, sm: Seam, wx: number, wy: number, seed: number): boolean {
 // ————————————————————————————— 洞底 —————————————————————————————
 
 /**
- * 洞底：淡紫灰的细晶砂，大片的明暗起伏，一块块玄武岩碎砾；砂里混着闪亮的晶粒；有几片长着一层细密的晶簇壳；
- * 洞壁脚下散着从壁上掉下的碎晶、湿暗；偶尔一颗磨圆的玉髓卵石；暗道里是暗沉的玄武岩碎砾
+ * 洞底：紫色的细晶砂，大片的明暗起伏，一块块玄武岩碎砾；砂里混着闪亮的晶粒；有几片长着一层细密的晶簇壳；
+ * 洞壁脚下散着从壁上掉下的碎晶、湿暗；偶尔一颗磨圆的玉髓卵石；暗道里是暗沉的玄武岩碎砾，tunnel 是进暗道有多深（0 是洞厅，1 是整个进了暗道）
  */
-function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: boolean, seed: number): void {
+function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: number, seed: number): void {
   const big = fbm(gx / 5, gy / 5, seed + 3, 3)
   paint(p, 100 + 30 * big, 58 + 18 * big, 126 + 34 * big)
   blend(p, 62, 42, 90, 0.8 * ease(0.56, 0.72, fbm(gx / 3.2, gy / 3.2, seed + 21, 2)))
-  dim(p, 0.92 + 0.08 * valueNoise(gx * 7, gy * 7, seed + 9) + 0.08 * valueNoise(gx * 19, gy * 19, seed + 11))
-  if (tunnel) blend(p, 50, 36, 70, 0.8)
+  dim(p, 0.92 + 0.08 * valueNoise(gx * 7, gy * 7, seed + 9) + 0.08 * valueNoise(gx * 9, gy * 9, seed + 11))
+  blend(p, 50, 36, 70, 0.8 * tunnel)
   p.gloss = 0.04
   // 晶粒
-  const g = cellNearest(gx * 14, gy * 14, seed + 61)
-  if (g.h > 0.955 && Math.hypot(g.dx, g.dy) < 0.22) {
+  const g = cellNearest(gx * 8, gy * 8, seed + 61)
+  if (g.h > 0.93 && Math.hypot(g.dx, g.dy) < 0.2) {
     blend(p, 196, 172, 236, 0.75)
     face(p, (frac(g.h * 37.1) - 0.5) * 1.6, (frac(g.h * 91.7) - 0.5) * 1.6, 1)
     p.gloss = 0.9
     return
   }
   const near = 1 - ease(0.2, 1.6, wallU)
-  if (!tunnel) {
+  if (tunnel < 1) {
     // 晶簇壳：一层细密的小晶尖，每颗的晶面朝向都不一样，光一扫满片闪；从洞壁往洞里长，越靠壁越多
     const lift = 0.08 * (1 - ease(0.4, 3, wallU))
-    const crust = ease(0.7 - lift, 0.78 - lift, fbm(gx / 2.4, gy / 2.4, seed + 41, 2))
+    const crust = ease(0.7 - lift, 0.78 - lift, fbm(gx / 2.4, gy / 2.4, seed + 41, 2)) * (1 - tunnel)
     if (crust > 0) {
       const q = cellNearest(gx * 7, gy * 7, seed + 43)
       if (q.h > 1 - 1.6 * crust) {
@@ -253,7 +274,7 @@ function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: boolean, se
   }
   // 洞壁脚下：碎晶，越贴着壁越多
   const s = cellNearest(gx * 3.4, gy * 3.4, seed + 47)
-  if (!tunnel && s.h > 1 - 0.55 * near - 0.04) {
+  if (s.h > 1 - (0.55 * near + 0.04) * (1 - tunnel)) {
     const ang = s.h * 17.3
     const c = Math.cos(ang)
     const sn = Math.sin(ang)
@@ -326,7 +347,7 @@ function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, seed:
   const side = q.dx * Math.cos(ridge) + q.dy * Math.sin(ridge) > 0 ? 0.75 : -0.75
   face(p, Math.cos(ridge) * side + q.dx * 0.6, Math.sin(ridge) * side + q.dy * 0.6, 1)
   keyed(p)
-  dim(p, 0.9 + 0.12 * valueNoise(gx * 14, gy * 14, seed + 103))
+  dim(p, 0.9 + 0.12 * valueNoise(gx * 7, gy * 7, seed + 103))
   p.gloss = kind < 0.86 ? 0.08 : 0.9
   return true
 }
@@ -495,57 +516,150 @@ function beam(p: Px, b: Beam, wx: number, wy: number): boolean {
 
 // ————————————————————————————— 整张图 —————————————————————————————
 
+/** 一个贴图像素和相邻的差过这些就算在边上：颜色（0 到 255）、法线的 x 与 y 之和、镜面 */
+const EDGE_RGB = 24
+const EDGE_NORMAL = 0.45
+const EDGE_GLOSS = 0.3
+/** 边上的像素在中心之外再画这几处（以像素为单位、相对像素中心），连中心一起取平均 */
+const AA = [
+  [0, -0.3],
+  [-0.26, 0.15],
+  [0.26, 0.15],
+] as const
+
+/** 地面上一点的样子：先放好按高度场求的朝向，再按这一点落在洞壁还是洞底画上去，画到边上淡进底色 */
+function sample(p: Px, L: AmethystLayout, seams: readonly Seam[], wx: number, wy: number, nx: number, ny: number, nz: number): void {
+  p.nx = nx
+  p.ny = ny
+  p.nz = nz
+  p.gloss = 0
+  const f = L.field
+  const gx = wx / UNIT
+  const gy = wy / UNIT
+  const wallPx = L.wallU * UNIT
+  const shell = roomAt(L.shell, wx, wy)
+  if (shell < 0) rock(p, L, wx, wy, gx, gy, -shell / wallPx, L.seed)
+  else ground(p, L, wx, wy, gx, gy, shell / UNIT, L.seed)
+  if (shell > -wallPx && shell < UNIT) for (const sm of seams) if (Math.abs(wx - sm.x) < 2 * UNIT && Math.abs(wy - sm.y) < 2 * UNIT && seam(p, sm, wx, wy, L.seed)) break
+  const edge = Math.min(wx - f.x, f.x + f.w - wx, wy - f.y, f.y + f.h - wy) / UNIT
+  if (edge < 1.5) blend(p, ROCK_BG[0], ROCK_BG[1], ROCK_BG[2], 1 - edge / 1.5)
+}
+
 /**
  * 画第 r0 到 r1 行（每格 ppu 像素）的地面固有色与表面朝向，洞壁上画出晶缝：albedo 是 RGBA 的颜色，face 的 R、G 是法线的 x、y（按 0.5 偏移）、B 是镜面的强弱，
- * 都要满 alpha（画布会按透明度预乘）。不含光，光照在着色器里随太阳、月亮与火把实时算；表面朝向先按高度场求，晶体、碎石与卵石换成它们自己的晶面
+ * 都要满 alpha（画布会按透明度预乘）。不含光，光照在着色器里随太阳、月亮与火把实时算；表面朝向先按高度场求，晶体、碎石与卵石换成它们自己的晶面。
+ * 每个像素先在中心画一次，和上下左右差得多的（东西的边上）再在 AA 的几处补画、连中心一起取平均，放大了看边上不起台阶
  */
 export function paintRows(L: AmethystLayout, seams: readonly Seam[], ppu: number, r0: number, r1: number, albedo: Uint8ClampedArray, normal: Uint8ClampedArray): void {
   const f = L.field
   const W = Math.round((f.w / UNIT) * ppu)
   const step = UNIT / ppu
-  const s = L.seed
-  const wallPx = L.wallU * UNIT
-  // 多算上下两行，好按高度差求法线
+  const meter = step / UNIT
+  // 先画的一遍多画上下各一行，好和相邻的比；高度再各多一行，好按高度差求法线
   const rows = r1 - r0 + 2
-  const hs = new Float32Array(rows * W)
-  for (let j = 0; j < rows; j++) {
-    const wy = f.y + (r0 - 1 + j + 0.5) * step
+  const hs = new Float32Array((rows + 2) * W)
+  for (let j = 0; j < rows + 2; j++) {
+    const wy = f.y + (r0 - 2 + j + 0.5) * step
     for (let i = 0; i < W; i++) hs[j * W + i] = heightM(L, f.x + (i + 0.5) * step, wy)
   }
+  const n = rows * W
+  const base = new Float32Array(n * 3)
+  const col = new Float32Array(n * 3)
+  const nor = new Float32Array(n * 3)
+  const gloss = new Float32Array(n)
   const p: Px = { r: 0, g: 0, b: 0, nx: 0, ny: 0, nz: 1, gloss: 0 }
-  const meter = step / UNIT
-  for (let py = r0; py < r1; py++) {
-    const wy = f.y + (py + 0.5) * step
-    const gy = wy / UNIT
-    const j = py - r0 + 1
-    for (let px = 0; px < W; px++) {
-      const wx = f.x + (px + 0.5) * step
-      const gx = wx / UNIT
-      const hx = (hs[j * W + Math.min(W - 1, px + 1)]! - hs[j * W + Math.max(0, px - 1)]!) / (2 * meter)
-      const hy = (hs[(j + 1) * W + px]! - hs[(j - 1) * W + px]!) / (2 * meter)
+  for (let j = 0; j < rows; j++) {
+    const wy = f.y + (r0 - 1 + j + 0.5) * step
+    const h = j + 1
+    for (let i = 0; i < W; i++) {
+      const k = j * W + i
+      const hx = (hs[h * W + Math.min(W - 1, i + 1)]! - hs[h * W + Math.max(0, i - 1)]!) / (2 * meter)
+      const hy = (hs[(h + 1) * W + i]! - hs[(h - 1) * W + i]!) / (2 * meter)
       face(p, -hx, -hy, 1)
-      p.gloss = 0
-      const shell = roomAt(L.shell, wx, wy)
-      if (shell < 0) rock(p, L, wx, wy, gx, gy, -shell / wallPx, s)
-      else ground(p, L, wx, wy, gx, gy, shell / UNIT, s)
-      if (shell > -wallPx && shell < UNIT) for (const sm of seams) if (Math.abs(wx - sm.x) < 2 * UNIT && Math.abs(wy - sm.y) < 2 * UNIT && seam(p, sm, wx, wy, s)) break
-      // 画到边上淡进底色
-      const edge = Math.min(wx - f.x, f.x + f.w - wx, wy - f.y, f.y + f.h - wy) / UNIT
-      if (edge < 1.5) blend(p, ROCK_BG[0], ROCK_BG[1], ROCK_BG[2], 1 - edge / 1.5)
-      const o = ((py - r0) * W + px) * 4
-      albedo[o] = p.r
-      albedo[o + 1] = p.g
-      albedo[o + 2] = p.b
+      base[k * 3] = p.nx
+      base[k * 3 + 1] = p.ny
+      base[k * 3 + 2] = p.nz
+      sample(p, L, seams, f.x + (i + 0.5) * step, wy, p.nx, p.ny, p.nz)
+      col[k * 3] = p.r
+      col[k * 3 + 1] = p.g
+      col[k * 3 + 2] = p.b
+      nor[k * 3] = p.nx
+      nor[k * 3 + 1] = p.ny
+      nor[k * 3 + 2] = p.nz
+      gloss[k] = p.gloss
+    }
+  }
+  const differs = (a: number, b: number): boolean =>
+    Math.max(Math.abs(col[a * 3]! - col[b * 3]!), Math.abs(col[a * 3 + 1]! - col[b * 3 + 1]!), Math.abs(col[a * 3 + 2]! - col[b * 3 + 2]!)) > EDGE_RGB ||
+    Math.abs(nor[a * 3]! - nor[b * 3]!) + Math.abs(nor[a * 3 + 1]! - nor[b * 3 + 1]!) > EDGE_NORMAL ||
+    Math.abs(gloss[a]! - gloss[b]!) > EDGE_GLOSS
+  for (let py = r0; py < r1; py++) {
+    const j = py - r0 + 1
+    const wy = f.y + (py + 0.5) * step
+    for (let i = 0; i < W; i++) {
+      const k = j * W + i
+      let r = col[k * 3]!
+      let g = col[k * 3 + 1]!
+      let b = col[k * 3 + 2]!
+      let nx = nor[k * 3]!
+      let ny = nor[k * 3 + 1]!
+      let nz = nor[k * 3 + 2]!
+      let gl = gloss[k]!
+      if ((i > 0 && differs(k, k - 1)) || (i < W - 1 && differs(k, k + 1)) || differs(k, k - W) || differs(k, k + W)) {
+        for (const [ox, oy] of AA) {
+          sample(p, L, seams, f.x + (i + 0.5 + ox) * step, wy + oy * step, base[k * 3]!, base[k * 3 + 1]!, base[k * 3 + 2]!)
+          r += p.r
+          g += p.g
+          b += p.b
+          nx += p.nx
+          ny += p.ny
+          nz += p.nz
+          gl += p.gloss
+        }
+        r /= AA.length + 1
+        g /= AA.length + 1
+        b /= AA.length + 1
+        gl /= AA.length + 1
+        const l = Math.hypot(nx, ny, nz) || 1
+        nx /= l
+        ny /= l
+      }
+      const o = ((py - r0) * W + i) * 4
+      albedo[o] = r
+      albedo[o + 1] = g
+      albedo[o + 2] = b
       albedo[o + 3] = 255
-      normal[o] = (p.nx * 0.5 + 0.5) * 255
-      normal[o + 1] = (p.ny * 0.5 + 0.5) * 255
-      normal[o + 2] = p.gloss * 255
+      normal[o] = (nx * 0.5 + 0.5) * 255
+      normal[o + 1] = (ny * 0.5 + 0.5) * 255
+      normal[o + 2] = gl * 255
       normal[o + 3] = 255
     }
   }
 }
 
 /** 洞壁与岩体：晶洞的洞壁上长满晶体（暗道的洞壁是在玄武岩里凿的，只在贴着洞底的地方长一溜小晶体）；根部埋进洞壁的巨晶 */
+/** 进暗道有多深：洞厅里为 0，进去 TUNNEL_BLEND_U 格以后为 1 */
+function intoTunnel(L: AmethystLayout, wx: number, wy: number, seed: number): number {
+  let tunnel = -Infinity
+  for (const t of L.tunnels) tunnel = Math.max(tunnel, tunnelDepth(t, seed, wx, wy))
+  return ease(0, TUNNEL_BLEND_U * UNIT, tunnel - hallDepth(L, wx, wy))
+}
+
+/** 暗道的壁：玄武岩，贴着洞底一溜小晶体 */
+function tunnelWall(p: Px, gx: number, gy: number, u: number, seed: number): void {
+  basalt(p, gx, gy, seed)
+  if (u >= 0.22) return
+  const g = cellNearest(gx * 6, gy * 6, seed + 151)
+  if (g.h > 0.45 && Math.hypot(g.dx, g.dy) < 0.4) {
+    amethyst(p, 0.6 + 0.4 * (1 - u / 0.22), g.h)
+    face(p, g.dx, g.dy, 0.5)
+    p.gloss = 0.9
+  }
+}
+
+/** 暗道的壁与洞厅的晶壁按比例混的时候，暗道那一边先画在这里 */
+const WALL: Px = { r: 0, g: 0, b: 0, nx: 0, ny: 0, nz: 1, gloss: 0 }
+
 function rock(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy: number, u: number, seed: number): void {
   let best = Infinity
   let geode: Geode | null = null
@@ -560,20 +674,16 @@ function rock(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy: 
     gi = i
     pocket = i >= L.chambers.length
   }
-  let tunnel = -Infinity
-  for (const t of L.tunnels) tunnel = Math.max(tunnel, tunnelDepth(t, seed, wx, wy))
-  const inTunnel = !pocket && tunnel > hallDepth(L, wx, wy)
-  if (geode && !inTunnel) lining(p, geode, gi, u, wx, wy, gx, gy, seed)
-  else if (u < 0.22) {
-    // 暗道贴着洞底的一溜小晶体
-    const g = cellNearest(gx * 6, gy * 6, seed + 151)
-    basalt(p, gx, gy, seed)
-    if (g.h > 0.45 && Math.hypot(g.dx, g.dy) < 0.4) {
-      amethyst(p, 0.6 + 0.4 * (1 - u / 0.22), g.h)
-      face(p, g.dx, g.dy, 0.5)
-      p.gloss = 0.9
-    }
-  } else basalt(p, gx, gy, seed)
+  // 从洞厅的晶壁进暗道，按进去多深换成玄武岩的壁
+  const into = pocket ? 0 : intoTunnel(L, wx, wy, seed)
+  if (!geode || into >= 1) tunnelWall(p, gx, gy, u, seed)
+  else if (into <= 0) lining(p, geode, gi, u, wx, wy, gx, gy, seed)
+  else {
+    copy(WALL, p)
+    lining(p, geode, gi, u, wx, wy, gx, gy, seed)
+    tunnelWall(WALL, gx, gy, u, seed)
+    mix(p, WALL, into)
+  }
   // 巨晶的根部埋进洞壁
   if (u < 0.45) {
     const { from, to } = binAt(L.bins, wx, wy)
@@ -587,9 +697,7 @@ function rock(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy: 
 
 /** 洞底：先画细晶砂，再按附近的东西盖上碎晶坡、地上的晶洞、矮晶丛、晶簇与巨晶，晶体脚下压一圈暗 */
 function ground(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy: number, wallU: number, seed: number): void {
-  let tunnel = -Infinity
-  for (const t of L.tunnels) tunnel = Math.max(tunnel, tunnelDepth(t, seed, wx, wy))
-  floor(p, gx, gy, wallU, tunnel > hallDepth(L, wx, wy), seed)
+  floor(p, gx, gy, wallU, intoTunnel(L, wx, wy, seed), seed)
   const { from, to } = binAt(L.bins, wx, wy)
   let ao = 0
   let debris = 0
@@ -661,7 +769,7 @@ export function paintRelief(L: AmethystLayout, out: Uint8ClampedArray): void {
       const o = (py * W + px) * 4
       out[o] = v >> 8
       out[o + 1] = v & 255
-      out[o + 2] = skyAbove(L, wx, wy, 0.08 * UNIT) * 255
+      out[o + 2] = skyAbove(L, wx, wy, SKY_SOFT_U * UNIT) * 255
       out[o + 3] = 255
     }
   }

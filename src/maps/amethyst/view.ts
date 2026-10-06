@@ -15,17 +15,19 @@ import { charSize } from '../../ecs/systems/shared/scale'
 import { playSfx } from '../../audio/sfx'
 import { Alive, ENEMY_SET, Telegraph, Transform, Uid } from '../../ecs/components'
 import { telegraphDef, telegraphEntry } from '../../ecs/store'
+import { clockSec } from '../../ecs/fight/clock'
 import { gatesNow } from '../../ecs/worlds/gates'
 import { debrisAt, lowAt } from './layout'
 import { diffuseAt, directAt, facingAt, reliefAt, torchesAt } from './light'
-import { clarity, skyTint, spanAt, sunTint } from './sky'
+import { blankSky, clarity, skyAt, skyTint, spanAt, sunTint } from './sky'
 import { AmethystPainter } from './painter'
 import { FACE_PPU, heightSpan, RELIEF_PPU, ROCK_BG } from './ground'
-import { castShade, doubleMultiply, encodeLux, LIGHT_FRAG, MAX_TORCHES, SHADE_BINS, SHADE_ROWS, SHINE_FRAG } from './shader'
+import { blendLux, castShade, doubleMultiply, encodeLux, LIGHT_FRAG, luxShot, MAX_TORCHES, SHADE_BINS, SHADE_ROWS, SHINE_FRAG, shootLux } from './shader'
 import { drawFlame, drawGlow, drawMoth, drawSmoke } from './sprites'
-import { torchLights, torchSpot } from './world'
+import { LIGHT_MS, torchLights, torchSpot } from './world'
 import type { AmethystLayout } from './layout'
 import type { Facing } from './light'
+import type { LuxShot } from './shader'
 import type { AmethystState } from './world'
 import type { EcsAtlas } from '../../ecs/atlas'
 import type { LocalLight } from '../../ecs/render/sprites'
@@ -116,7 +118,20 @@ const faint = (x: number): number => (x < 0.002 ? 0 : x)
  */
 export class AmethystView extends BoundedView {
   private painter?: AmethystPainter
-  private data?: { lux: Phaser.Textures.CanvasTexture; luxImg: ImageData; shade: Phaser.Textures.CanvasTexture; shadeImg: ImageData; version: number }
+  /** 照度图在两次算光之间从 from 过渡到 to，to 是 at 时刻（模拟的毫秒）算出来的；shown 是图上此刻过渡到哪了 */
+  private data?: {
+    lux: Phaser.Textures.CanvasTexture
+    luxImg: ImageData
+    from: LuxShot
+    to: LuxShot
+    at: number
+    shown: number
+    shade: Phaser.Textures.CanvasTexture
+    shadeImg: ImageData
+    version: number
+  }
+  /** 画面上的天：太阳与月亮每帧按此刻现算，光斑才跟得上；洞里的光每 LIGHT_MS 才算一次 */
+  private readonly sky = blankSky()
   private readonly u = {
     sun: [0, 0, 0, 0],
     sunCol: [1, 1, 1],
@@ -217,10 +232,22 @@ export class AmethystView extends BoundedView {
     const lt = s.light
     const lux = canvasTexture(scene, LUX_KEY, lt.cols, lt.rows)
     const shade = canvasTexture(scene, SHADE_KEY, SHADE_BINS, SHADE_ROWS)
-    this.data = { lux, luxImg: lux.getContext().createImageData(lt.cols, lt.rows), shade, shadeImg: shade.getContext().createImageData(SHADE_BINS, SHADE_ROWS), version: -1 }
+    this.data = {
+      lux,
+      luxImg: lux.getContext().createImageData(lt.cols, lt.rows),
+      from: luxShot(lt.cols * lt.rows),
+      to: luxShot(lt.cols * lt.rows),
+      at: 0,
+      shown: -1,
+      shade,
+      shadeImg: shade.getContext().createImageData(SHADE_BINS, SHADE_ROWS),
+      version: -1,
+    }
     this.visuals.push(scene.add.image(f.x, f.y, ALBEDO_KEY).setOrigin(0, 0).setDisplaySize(f.w, f.h).setDepth(-1))
     if (v.atlas) this.scatter(v, v.atlas, L)
     const maskTex = scene.textures.addDynamicTexture(MASK_KEY, MASK_PX, MASK_PX)
+    // 高分屏开了 pixelArt，缺省的最近点取样会让单位轮廓边上的明暗起一格格的锯齿
+    maskTex?.setFilter(Phaser.Textures.FilterMode.LINEAR)
     if (maskTex && v.atlas) this.mask = new UprightMask(scene, v.world, v.atlas, maskTex)
     const mask = this.mask
     const u = this.u
@@ -348,9 +375,19 @@ export class AmethystView extends BoundedView {
     const cfg = v.def.amethyst!
     const now = sim.elapsedMs
     const dt = Math.min(delta, 100)
+    // 洞里的光隔一阵才算一次：画面上从上一次的样子平滑过渡到新算的，上一段没走完就从走到的地方接着走
     if (d.version !== s.light.version) {
+      blendLux(d.from, d.to, d.version < 0 ? 1 : clamp01((now - d.at) / LIGHT_MS))
+      shootLux(s.light, d.to)
+      if (d.version < 0) blendLux(d.from, d.to, 1)
       d.version = s.light.version
-      encodeLux(s.light, d.luxImg.data)
+      d.at = now
+      d.shown = -1
+    }
+    const fade = clamp01((now - d.at) / LIGHT_MS)
+    if (fade !== d.shown) {
+      d.shown = fade
+      encodeLux(d.from, d.to, fade, d.luxImg.data)
       d.lux.getContext().putImageData(d.luxImg, 0, 0)
       upload(d.lux)
     }
@@ -358,7 +395,7 @@ export class AmethystView extends BoundedView {
     const target = Math.max(cfg.view.brightLux, s.light.hallLux)
     this.adapt = 10 ** (Math.log10(this.adapt) + (Math.log10(target) - Math.log10(this.adapt)) * (1 - Math.exp(-dt / ADAPT_TAU)))
     const adapt = this.adapt
-    const sky = s.sky
+    const sky = skyAt(cfg.sky, clockSec(sim), s.age0, this.sky)
     const sunDeg = sky.sun.elev / RAD
     const u = this.u
     u.time = now / 1000
@@ -503,7 +540,7 @@ export class AmethystView extends BoundedView {
     const c = this.lights
     if (!c) return
     const t = this.facing
-    facingAt(c.s.light, c.s.layout.ceilingM, c.s.sky, c.cfg.torch, c.spots, c.lits, x, y, t)
+    facingAt(c.s.light, c.s.layout.ceilingM, this.sky, c.cfg.torch, c.spots, c.lits, x, y, t)
     out.kx = t.e > 0 ? t.x / t.e : 0
     out.ky = t.e > 0 ? t.y / t.e : 0
   }
@@ -521,7 +558,7 @@ export class AmethystView extends BoundedView {
       for (const { eid, x, y, h } of [...bodies, ...lurking]) {
         if (x < view.x || x > view.right || y < view.y || y > view.bottom) continue
         const torch = torchesAt(cfg.torch, spots, lits, x, y)
-        const e = (diffuseAt(s.light, x, y) + directAt(s.light, s.layout.ceilingM, s.sky, x, y) + torch) / adapt
+        const e = (diffuseAt(s.light, x, y) + directAt(s.light, s.layout.ceilingM, this.sky, x, y) + torch) / adapt
         const shown = (1 - ease(0.06, 0.25, e)) * ease(0.004, 0.05, torch)
         if (shown <= 0.02) continue
         const blink = Math.sin(sim.elapsedMs / 1700 + eid * 1.7) > 0.96 ? 0 : 1

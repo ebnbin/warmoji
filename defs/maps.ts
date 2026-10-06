@@ -1077,7 +1077,7 @@ export const MAPS = {
       crystals: { clusters: [9, 12], clusterU: [0.65, 1.15], clusterM: [1.9, 2.9], beams: [2, 3], beamU: [1, 1.2], beamLenU: [3.5, 5.5], geodes: [4, 6], geodeU: [0.5, 0.75], geodeM: 0.42, druse: [26, 36], druseU: [0.14, 0.3], druseM: [0.22, 0.5], clearU: 4.8 },
       debris: { viscosity: 1.3, exertion: 1.15 },
       sky: { latitudeDeg: 22, declinationDeg: 8, startHour: 9.5, twilightDeg: 7, dayS: 62, duskS: 26, nightS: 48, dawnS: 16, extinction: 0.21 },
-      light: { albedo: 0.46, bounceU: 4.5, tunnelFadeU: 0.7 },
+      light: { albedo: 0.46, bounceU: 4.5, tunnelFadeU: 1.9 },
       torch: { candela: 110, heightM: 1.4, igniteLux: 15, douseLux: 40, staggerMs: 1400 },
       view: { dayU: 18, nightU: 7, darkLux: 0.5, brightLux: 30, clearLux: 2 },
       spawnLux: 1,

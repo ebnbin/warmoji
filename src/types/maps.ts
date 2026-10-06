@@ -699,7 +699,7 @@ export interface AmethystConfig {
     readonly dawnS: number
     readonly extinction: number
   }
-  /** 光：洞底与晶壁的反照率，反光在洞厅里铺开多远（格）；暗道里每往深处走 tunnelFadeU 格，反光暗到 1/e */
+  /** 光：洞底与晶壁的反照率，反光在洞厅里铺开多远（格）；暗道里离洞口 d 格处的反光剩洞口的 exp(−(d / tunnelFadeU)²)：头几格慢慢暗，再往里很快黑下去 */
   readonly light: {
     readonly albedo: number
     readonly bounceU: number
