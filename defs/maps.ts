@@ -1402,7 +1402,7 @@ export const MAPS = {
       gapU: { tall: 2.7, low: 1.7 },
       lowM: 1,
       pieces: [12, 17],
-      turn: { firstMs: 10000, intervalMs: 10000, jitterMs: 0, lightMs: 700, staggerMs: 900, flyMs: 900, slideMs: 1600 },
+      turn: { firstMs: 20000, intervalMs: 20000, jitterMs: 0, lightMs: 700, staggerMs: 900, flyMs: 900, slideMs: 1600 },
       reflowMs: 300,
     },
     boss: 'eclipse',

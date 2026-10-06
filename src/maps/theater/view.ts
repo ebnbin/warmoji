@@ -68,7 +68,7 @@ const LANDED = 0.02
  * 光圈外最暗时多暗（不全黑）；光圈里白得发亮，压一层多浓的白：推景时光圈里看得出在换，但白花花的不显眼。
  * 暗处每帧画在一张小画布上，每格多少像素
  */
-const SPOT = { leader: { r: 1.3, soft: 0.7 }, member: { r: 0.85, soft: 0.5 } } as const
+const SPOT = { leader: { r: 1.9, soft: 0.9 }, member: { r: 1.3, soft: 0.7 } } as const
 const DARK_MAX = 0.78
 const WASH_MAX = 0.6
 const DARK_PPU = 8
