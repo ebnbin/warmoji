@@ -11,11 +11,13 @@ import { decorSprite } from '../../ecs/decor'
 import { Alive, Transform } from '../../ecs/components'
 import { devFlag } from '../../devtools'
 import { roomAt } from '../basin'
-import { CANOPY_PPU, textureSize } from './ground'
+import { CANOPY_PPU } from '../foliage'
+import { ensureLeaves, FallingLeaves } from '../leaves'
+import { textureSize } from './ground'
 import { toLocal, toWorld } from './layout'
 import { cellAt, GRAVITY } from './masonry'
 import { RuinsPainter } from './painter'
-import { drawChip, drawDust, drawPigeon, drawSplinter } from './sprites'
+import { drawChip, drawCrow, drawDust, drawSplinter } from './sprites'
 import { fieldOf, ruinsOf, ruinsPlanFor, walkLevel } from './world'
 import type { PaintPiece, PaintScene, PaintState } from './ground'
 import type { RuinsPlan } from './layout'
@@ -28,14 +30,14 @@ import type { Framing } from '../../ecs/lens'
 import type { Sim } from '../../ecs/sim'
 import type { Point } from '../../util/vec'
 
-const BG = 0x15120d
+const BG = 0x1c110b
 const GROUND_KEY = 'ruins-ground'
 const CANOPY_KEY = 'ruins-canopy'
 const DUST_KEY = 'ruins-dust'
 const CHIP_KEY = 'ruins-chip'
 const SPLINTER_KEY = 'ruins-splinter'
-const PIGEON_KEY = 'ruins-pigeon'
-const PIGEON_PX = 48
+const CROW_KEY = 'ruins-crow'
+const CROW_PX = 48
 /** 开局最多几个线程分着画地面 */
 const PAINT_THREADS = 4
 /** 开局地面按这么多像素高的条分块交给线程 */
@@ -48,10 +50,12 @@ const REPAINT_MS = 200
 const WIND = { x: 10, y: -4 }
 /** 开发者工具里「显示碰撞边界」的开关 */
 const DEV_WALLS = 'battle.walls'
-/** 鸽子停在多高（米）以上的墙头 */
+/** 乌鸦停在多高（米）以上的墙头 */
 const PERCH_M = 2
-const PIGEONS = 9
-/** 有身体走到这么近（格），或这么近（格）处塌了墙，鸽子就飞走 */
+const CROWS = 7
+/** 飘落的枫叶最高从多高（米）落下：树再高也从这里算，不然一片叶子要飘十几秒 */
+const SHED_M = 7
+/** 有身体走到这么近（格），或这么近（格）处塌了墙，乌鸦就飞走 */
 const SCARE_U = 1.6
 const SCARE_COLLAPSE_U = 9
 
@@ -68,8 +72,8 @@ interface Stone {
   readonly spin: number
 }
 
-/** 一只鸽子：停在墙头，被惊动就飞起来兜几圈，再落到别的墙头 */
-interface Pigeon {
+/** 一只乌鸦：停在墙头，被惊动就飞起来兜几圈，再落到别的墙头 */
+interface Crow {
   readonly img: Phaser.GameObjects.Image
   x: number
   y: number
@@ -115,7 +119,7 @@ function snapshot(s: RuinsState): PaintState {
 
 /**
  * 残垣：地面、墙顶、立面与碎石是线程里按砌体画好的贴图，按太阳投下影子；墙一塌，受影响的那几块按新的砌体补画。
- * 塌墙时石块从墙上落下、尘土翻滚、墙头的鸽子惊飞；子弹打在墙上崩出碎石，打在木板上溅起木屑。台地边外是林子，树冠盖在一切之上
+ * 塌墙时石块从墙上落下、尘土翻滚、墙头的乌鸦惊飞；子弹打在墙上崩出碎石，打在木板上溅起木屑。台地边外是枫林，树冠盖在一切之上，枫叶不住地飘下来
  */
 export class RuinsView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -128,8 +132,9 @@ export class RuinsView implements MapView {
   private splinters?: Phaser.GameObjects.Particles.ParticleEmitter
   private stoneGfx?: Phaser.GameObjects.Graphics
   private stones: Stone[] = []
-  private pigeons: Pigeon[] = []
+  private crows: Crow[] = []
   private perches: Point[] = []
+  private leaves?: FallingLeaves
   private shake = true
   private devWalls?: Phaser.GameObjects.Graphics
   private devVersion = -1
@@ -150,10 +155,11 @@ export class RuinsView implements MapView {
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
     if (!scene.textures.exists(CHIP_KEY)) canvasTexture(scene, CHIP_KEY, 24, 24, (ctx) => drawChip(ctx, 24))
     if (!scene.textures.exists(SPLINTER_KEY)) canvasTexture(scene, SPLINTER_KEY, 32, 12, (ctx) => drawSplinter(ctx, 32, 12))
-    if (!scene.textures.exists(PIGEON_KEY)) {
-      const tex = canvasTexture(scene, PIGEON_KEY, PIGEON_PX * 3, PIGEON_PX, (ctx) => drawPigeon(ctx, PIGEON_PX, PIGEON_PX))
-      for (let k = 0; k < 3; k++) tex.add(k, 0, k * PIGEON_PX, 0, PIGEON_PX, PIGEON_PX)
+    if (!scene.textures.exists(CROW_KEY)) {
+      const tex = canvasTexture(scene, CROW_KEY, CROW_PX * 3, CROW_PX, (ctx) => drawCrow(ctx, CROW_PX, CROW_PX))
+      for (let k = 0; k < 3; k++) tex.add(k, 0, k * CROW_PX, 0, CROW_PX, CROW_PX)
     }
+    ensureLeaves(scene)
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
@@ -161,7 +167,7 @@ export class RuinsView implements MapView {
     return { map: FRAME, edge: 'frame' }
   }
 
-  /** 野花与蘑菇只撒在台地上空着的地面：不压墙、不压木板与厚碎石 */
+  /** 落叶与蘑菇只撒在台地上空着的地面：不压墙、不压木板与厚碎石 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const plan = this.planOf(v)
     const rng = new Rng(v.run.decorSeed)
@@ -210,7 +216,8 @@ export class RuinsView implements MapView {
     this.ground = { tex: ground, seen: state.n, seenT: state.timber, dirty: new Uint8Array(cols * rows), cols, rows, busy: false }
     this.effects(v)
     this.roost(v, s)
-    v.lens.screen.vignette(0.74, 0.22, 0x000000)
+    this.leaves = new FallingLeaves(scene)
+    v.lens.screen.vignette(0.74, 0.22, 0x2a1008)
   }
 
   /** 扬尘、碎石与木屑的粒子，落石的影子 */
@@ -224,7 +231,7 @@ export class RuinsView implements MapView {
         scale: { start: 1, end: 3.4 },
         alpha: { start: 0.46, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0xd6c8ac, 0xc8b99c, 0xe2d6bf, 0xbcae92],
+        tint: [0xcfccc4, 0xbdb9b0, 0xdcd9d2, 0xaaa69e],
         emitting: false,
       })
       .setDepth(33)
@@ -254,19 +261,19 @@ export class RuinsView implements MapView {
     this.visuals.push(this.dust, this.chips, this.splinters, this.stoneGfx)
   }
 
-  /** 鸽子：停在够高的墙头上 */
+  /** 乌鸦：停在够高的墙头上 */
   private roost(v: ViewCtx, s: RuinsState): void {
     this.perches = this.perchesOf(s)
     const rng = new Rng(v.run.decorSeed ^ 0xb1d)
-    for (let k = 0; k < PIGEONS && this.perches.length > 0; k++) {
+    for (let k = 0; k < CROWS && this.perches.length > 0; k++) {
       const p = this.perches[Math.floor(rng.next() * this.perches.length)]!
-      const img = v.scene.add.image(p.x, p.y, PIGEON_KEY, 0).setScale((0.62 * UNIT) / PIGEON_PX).setRotation(rng.next() * Math.PI * 2).setDepth(12)
-      this.pigeons.push({ img, x: p.x, y: p.y, z: 0, vx: 0, vy: 0, to: null, left: 0, flap: rng.next(), scared: 0 })
+      const img = v.scene.add.image(p.x, p.y, CROW_KEY, 0).setScale((0.72 * UNIT) / CROW_PX).setRotation(rng.next() * Math.PI * 2).setDepth(12)
+      this.crows.push({ img, x: p.x, y: p.y, z: 0, vx: 0, vy: 0, to: null, left: 0, flap: rng.next(), scared: 0 })
       this.visuals.push(img)
     }
   }
 
-  /** 墙头上能停鸽子的地方：高过 PERCH_M 的砌体格，隔开挑 */
+  /** 墙头上能停乌鸦的地方：高过 PERCH_M 的砌体格，隔开挑 */
   private perchesOf(s: RuinsState): Point[] {
     const m = s.m
     const g = m.grid
@@ -302,8 +309,19 @@ export class RuinsView implements MapView {
     }
     s.impacts.length = 0
     this.stepStones(v, dt)
-    this.stepPigeons(sim, s, dt)
+    this.stepCrows(sim, s, dt)
+    this.leaves?.step(dt, () => this.shedFrom(v, s.plan))
     this.stepDevWalls(v, s)
+  }
+
+  /** 镜头里的枫树上飘下一片叶子：从树冠底下随便一处、半截树高上落下来 */
+  private shedFrom(v: ViewCtx, plan: RuinsPlan): { x: number; y: number; z: number } | undefined {
+    const seen = plan.trees.filter((t) => v.lens.screen.sees(t.x * UNIT, t.y * UNIT))
+    const t = seen[Math.floor(Math.random() * seen.length)]
+    if (!t) return undefined
+    const a = Math.random() * Math.PI * 2
+    const d = Math.sqrt(Math.random()) * t.r * 0.9
+    return { x: t.x + Math.cos(a) * d, y: t.y + Math.sin(a) * d, z: Math.min(t.h, SHED_M) * (0.55 + 0.35 * Math.random()) }
   }
 
   /** 开发者工具的碰撞边界：标准身高的身体跨不过的墙，墙塌了就重画；盖在一切之上 */
@@ -409,7 +427,7 @@ export class RuinsView implements MapView {
       })
   }
 
-  /** 塌墙：轰隆一声，大的震一下；尘土翻滚，石块从墙上落下，附近墙头的鸽子惊飞 */
+  /** 塌墙：轰隆一声，大的震一下；尘土翻滚，石块从墙上落下，附近墙头的乌鸦惊飞 */
   private collapse(v: ViewCtx, c: Collapse): void {
     const scene = v.scene
     if (c.volume > 0.02) playSfx('crumble')
@@ -430,7 +448,7 @@ export class RuinsView implements MapView {
       const img = scene.add.image(st.x0, st.y0, CHIP_KEY).setScale(size).setDepth(34).setRotation(Math.random() * Math.PI * 2)
       this.stones.push({ img, x0: st.x0, y0: st.y0, x1: st.x, y1: st.y, drop: st.drop, ms: Math.sqrt((2 * Math.max(0.2, st.drop)) / GRAVITY) * 1000, t: 0, spin: (Math.random() * 2 - 1) * 9 })
     }
-    for (const p of this.pigeons) if (Math.hypot(p.x - c.x, p.y - c.y) < SCARE_COLLAPSE_U * UNIT) p.scared = 1
+    for (const p of this.crows) if (Math.hypot(p.x - c.x, p.y - c.y) < SCARE_COLLAPSE_U * UNIT) p.scared = 1
   }
 
   /** 落石：按自由落体从墙上的高度落下，横着飞到落点；地上的影子随高度变淡、背着太阳挪开；落地崩起碎石和一小团土 */
@@ -464,16 +482,16 @@ export class RuinsView implements MapView {
   }
 
   /**
-   * 鸽子：停着时偶尔转转身；有身体走近、附近塌了墙或脚下的墙头没了就扑棱棱飞起来，往高处兜几圈再落到别的墙头。
+   * 乌鸦：停着时偶尔转转身；有身体走近、附近塌了墙或脚下的墙头没了就扑棱棱飞起来，往高处兜几圈再落到别的墙头。
    * 飞着的画在树冠之上，地上跟着一个影子
    */
-  private stepPigeons(sim: Sim, s: RuinsState, dt: number): void {
-    if (this.pigeons.length === 0) return
+  private stepCrows(sim: Sim, s: RuinsState, dt: number): void {
+    if (this.crows.length === 0) return
     const m = s.m
     const hc = m.courseM
     const lift = LIFT_PER_M
     let scaredAny = false
-    for (const p of this.pigeons) {
+    for (const p of this.crows) {
       if (!p.to) {
         const l = toLocal(s.plan.frame, p.x / UNIT, p.y / UNIT)
         const i = cellAt(m.grid, l.u, l.v)
@@ -541,12 +559,12 @@ export class RuinsView implements MapView {
     if (scaredAny) playSfx('flutter')
     const g = this.stoneGfx
     if (!g) return
-    for (const p of this.pigeons) {
+    for (const p of this.crows) {
       if (!p.to || p.z <= 0.05) continue
       const sx = p.x - (SUN.x / SUN.z) * p.z * lift * 0.6
       const sy = p.y - (SUN.y / SUN.z) * p.z * lift * 0.6
-      g.fillStyle(0x000000, 0.18)
-      g.fillEllipse(sx, sy, 0.4 * UNIT, 0.2 * UNIT)
+      g.fillStyle(0x000000, 0.2)
+      g.fillEllipse(sx, sy, 0.46 * UNIT, 0.22 * UNIT)
     }
   }
 
@@ -563,8 +581,10 @@ export class RuinsView implements MapView {
     this.visuals = []
     v.decor.length = 0
     this.stones = []
-    this.pigeons = []
+    this.crows = []
     this.perches = []
+    this.leaves?.destroy()
+    this.leaves = undefined
     this.ground = undefined
     for (const key of [GROUND_KEY, CANOPY_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }

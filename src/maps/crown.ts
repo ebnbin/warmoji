@@ -1,7 +1,14 @@
-import { SUN } from '../../data/light'
-import { Rng } from '../../util/rng'
+import { SUN } from '../data/light'
+import { Rng } from '../util/rng'
 import { BLADE_REACH } from './blade'
-import type { Tree } from './layout'
+
+/** 一棵树：树冠的圆心、半径（格）与树高（米） */
+export interface Tree {
+  readonly x: number
+  readonly y: number
+  readonly r: number
+  readonly h: number
+}
 
 /** 叶子与枝条按这么大（格）的格子分桶，画一个像素只看它那一桶 */
 const CROWN_BUCKET_U = 0.25
@@ -104,7 +111,7 @@ export interface Crowns {
   readonly twigStart: Int32Array
   readonly twigItems: Int32Array
   /** 树冠的高度图：每个格点上最高那片叶子离地多高（按 1/HEIGHT_STEPS_PER_M 米一档），没有叶子是 0；格点 (i, j) 在 (x0 + i·HEIGHT_CELL_U, y0 + j·HEIGHT_CELL_U) */
-  readonly heights: Uint8ClampedArray
+  readonly heights: Uint16Array
   readonly hCols: number
   readonly hRows: number
 }
@@ -373,7 +380,7 @@ export function growCrowns(trees: readonly Tree[], seed: number, mpu: number, ar
   // 高度图：每片叶子按叶心那一圈（大半是实的）记进去
   const hCols = Math.ceil((area.w + 2) / HEIGHT_CELL_U)
   const hRows = Math.ceil((area.h + 2) / HEIGHT_CELL_U)
-  const heights = new Uint8ClampedArray(hCols * hRows)
+  const heights = new Uint16Array(hCols * hRows)
   for (let i = 0; i < n; i++) {
     const r = size[i]! * 0.5
     const i0 = Math.max(0, Math.floor((x[i]! - r - x0) / HEIGHT_CELL_U))
