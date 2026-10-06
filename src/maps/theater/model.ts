@@ -2,7 +2,7 @@ import { FRAME_U, UNIT } from '../../util/units.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin } from '../basin.ts'
 import type { Basin } from '../basin'
-import type { StorybookConfig } from '../../types/maps'
+import type { TheaterConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
 /** 台边的距离场按这么细的格子算，格；台上的布景也叠在同一套格子上 */
@@ -22,7 +22,7 @@ const BIG_U = 1.15
 const MID_U = 2.6
 /** 台中线上的活门离台中心多远，格 */
 const TRAP_DY = [-11, -6.5, 6.5, 11] as const
-/** 一页最多换几次种子重摆 */
+/** 一幕最多换几次种子重摆 */
 const PAGE_TRIES = 12
 /** 一件布景最多换几个地方试 */
 const PIECE_TRIES = 40
@@ -85,7 +85,7 @@ export interface Piece {
 }
 
 /**
- * 一页上两个景过渡的那条界：line 是一条弯弯曲曲的线，过 (cx, cy)、法线 (nx, ny) 朝第二个景；ring 是围着 (cx, cy)、半径 r 的一圈，圈里是第一个景。
+ * 一幕上两个景过渡的那条界：line 是一条弯弯曲曲的线，过 (cx, cy)、法线 (nx, ny) 朝第二个景；ring 是围着 (cx, cy)、半径 r 的一圈，圈里是第一个景。
  * 界线按波长 waveU、幅度 amp 起伏，phase 定起伏的相位；离界线 band 格以内是两个景渐变过去的那一带
  */
 export interface Blend {
@@ -119,8 +119,8 @@ export function blendAt(b: Blend, x: number, y: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** 一幕（代码里叫一页）：第几幕（从开局那一幕起数），哪一章，这一幕的种子、两个景的分界与台上的布景 */
-export interface Page {
+/** 一幕：第几幕（从开局那一幕起数），哪一章，这一幕的种子、两个景的分界与台上的布景 */
+export interface Act {
   readonly index: number
   readonly chapter: number
   readonly seed: number
@@ -129,12 +129,12 @@ export interface Page {
 }
 
 /** 台面（代码里叫书），格：台面的范围，台中线的横坐标，台边的距离场（像素），开局站位，开局演到哪一章 */
-export interface Book {
+export interface Stage {
   readonly x0: number
   readonly x1: number
   readonly y0: number
   readonly y1: number
-  readonly gx: number
+  readonly cx: number
   readonly cy: number
   readonly basin: Basin
   readonly start: Point
@@ -143,26 +143,26 @@ export interface Book {
 }
 
 /** 台面摆在方框正中，台中线竖着；开局演到哪一章按种子定 */
-export function makeBook(cfg: StorybookConfig, seed: number): Book {
+export function makeStage(cfg: TheaterConfig, seed: number): Stage {
   const c = FRAME_U / 2
-  const x0 = c - cfg.page.wU
-  const x1 = c + cfg.page.wU
-  const y0 = c - cfg.page.hU / 2
-  const y1 = c + cfg.page.hU / 2
+  const x0 = c - cfg.size.wU
+  const x1 = c + cfg.size.wU
+  const y0 = c - cfg.size.hU / 2
+  const y1 = c + cfg.size.hU / 2
   const pad = BASIN_PAD_U
   const cell = BASIN_CELL_U * UNIT
   const bx0 = (x0 - pad) * UNIT
   const by0 = (y0 - pad) * UNIT
   const cols = Math.round((x1 - x0 + pad * 2) / BASIN_CELL_U)
   const rows = Math.round((y1 - y0 + pad * 2) / BASIN_CELL_U)
-  const open = (px: number, py: number): boolean => pageRoom(x0, x1, y0, y1, px / UNIT, py / UNIT) > 0
+  const open = (px: number, py: number): boolean => stageRoom(x0, x1, y0, y1, px / UNIT, py / UNIT) > 0
   const basin = makeBasin(open, bx0, by0, cols, rows, cell, { x: c * UNIT, y: c * UNIT }, 0.05 * UNIT)
   const rng = new Rng(seed ^ 0x5b00c)
-  return { x0, x1, y0, y1, gx: c, cy: c, basin, start: { x: c, y: c }, chapter0: rng.int(0, CHAPTERS.length - 1), seed }
+  return { x0, x1, y0, y1, cx: c, cy: c, basin, start: { x: c, y: c }, chapter0: rng.int(0, CHAPTERS.length - 1), seed }
 }
 
 /** (x, y) 格离台边多远，格：台上为正，四角磨圆 */
-export function pageRoom(x0: number, x1: number, y0: number, y1: number, x: number, y: number): number {
+export function stageRoom(x0: number, x1: number, y0: number, y1: number, x: number, y: number): number {
   const hx = (x1 - x0) / 2 - CORNER_U
   const hy = (y1 - y0) / 2 - CORNER_U
   const qx = Math.abs(x - (x0 + x1) / 2) - hx
@@ -320,16 +320,16 @@ const LAYOUTS: Record<ChapterKey, readonly Item[]> = {
 const FILLER: Record<ChapterKey, Spec> = { spring: BUSH, summer: CORAL, autumn: LEAVES, winter: DRIFT }
 
 /** 这一章的两个景怎么分：春、夏是一道弯弯的线（小溪、海岸线）斜着穿过两页，秋、冬是围着页边一处的一圈（洞里、火山脚下） */
-function blendOf(book: Book, chapter: number, rng: Rng): Blend {
+function blendOf(stage: Stage, chapter: number, rng: Rng): Blend {
   const key = CHAPTERS[chapter]!.key
-  const w = book.x1 - book.x0
-  const h = book.y1 - book.y0
+  const w = stage.x1 - stage.x0
+  const h = stage.y1 - stage.y0
   if (key === 'spring' || key === 'summer') {
     const a = rng.next() * Math.PI * 2
     return {
       kind: 'line',
-      cx: book.gx + (rng.next() - 0.5) * w * 0.3,
-      cy: book.cy + (rng.next() - 0.5) * h * 0.3,
+      cx: stage.cx + (rng.next() - 0.5) * w * 0.3,
+      cy: stage.cy + (rng.next() - 0.5) * h * 0.3,
       nx: Math.cos(a),
       ny: Math.sin(a),
       r: 0,
@@ -341,8 +341,8 @@ function blendOf(book: Book, chapter: number, rng: Rng): Blend {
   }
   // 圈心落在四个角或四条边的中段附近，圈不碰出生的地方
   const spots: Point[] = [
-    { x: book.x0 + 2, y: book.y0 + 2 }, { x: book.x1 - 2, y: book.y0 + 2 }, { x: book.x0 + 2, y: book.y1 - 2 }, { x: book.x1 - 2, y: book.y1 - 2 },
-    { x: book.x0 + 1, y: book.cy }, { x: book.x1 - 1, y: book.cy }, { x: book.gx + w * 0.22, y: book.y0 }, { x: book.gx - w * 0.22, y: book.y1 },
+    { x: stage.x0 + 2, y: stage.y0 + 2 }, { x: stage.x1 - 2, y: stage.y0 + 2 }, { x: stage.x0 + 2, y: stage.y1 - 2 }, { x: stage.x1 - 2, y: stage.y1 - 2 },
+    { x: stage.x0 + 1, y: stage.cy }, { x: stage.x1 - 1, y: stage.cy }, { x: stage.cx + w * 0.22, y: stage.y0 }, { x: stage.cx - w * 0.22, y: stage.y1 },
   ]
   const at = spots[Math.floor(rng.next() * spots.length)]!
   return { kind: 'ring', cx: at.x, cy: at.y, nx: 0, ny: 0, r: key === 'winter' ? 10 + rng.next() * 2.5 : 11 + rng.next() * 3, amp: 1, waveU: 6, phase: rng.next() * Math.PI * 2, band: key === 'winter' ? 1.8 : 3 }
@@ -357,12 +357,12 @@ function inWhere(b: Blend, where: Where, x: number, y: number): boolean {
 }
 
 /** 第几页是哪一章、种子是多少 */
-export function chapterOf(book: Book, index: number): number {
-  return (book.chapter0 + index) % CHAPTERS.length
+export function chapterOf(stage: Stage, index: number): number {
+  return (stage.chapter0 + index) % CHAPTERS.length
 }
 
-function pageSeed(book: Book, index: number): number {
-  return (Math.imul(book.seed ^ 0x2c1b3c6d, 0x9e3779b1) + Math.imul(index + 1, 0x85ebca6b)) >>> 0
+function actSeed(stage: Stage, index: number): number {
+  return (Math.imul(stage.seed ^ 0x2c1b3c6d, 0x9e3779b1) + Math.imul(index + 1, 0x85ebca6b)) >>> 0
 }
 
 /** 查连通用的格子：页里每格能不能站下一个小个子、一个头目 */
@@ -371,16 +371,16 @@ class Reach {
   readonly rows: number
   readonly small: Uint8Array
   readonly big: Uint8Array
-  private readonly book: Book
-  constructor(book: Book) {
-    this.book = book
-    this.cols = Math.ceil((book.x1 - book.x0) / REACH_CELL_U)
-    this.rows = Math.ceil((book.y1 - book.y0) / REACH_CELL_U)
+  private readonly stage: Stage
+  constructor(stage: Stage) {
+    this.stage = stage
+    this.cols = Math.ceil((stage.x1 - stage.x0) / REACH_CELL_U)
+    this.rows = Math.ceil((stage.y1 - stage.y0) / REACH_CELL_U)
     this.small = new Uint8Array(this.cols * this.rows)
     this.big = new Uint8Array(this.cols * this.rows)
     for (let j = 0; j < this.rows; j++) {
       for (let i = 0; i < this.cols; i++) {
-        const r = pageRoom(book.x0, book.x1, book.y0, book.y1, book.x0 + (i + 0.5) * REACH_CELL_U, book.y0 + (j + 0.5) * REACH_CELL_U)
+        const r = stageRoom(stage.x0, stage.x1, stage.y0, stage.y1, stage.x0 + (i + 0.5) * REACH_CELL_U, stage.y0 + (j + 0.5) * REACH_CELL_U)
         const k = j * this.cols + i
         this.small[k] = r < SMALL_U ? 1 : 0
         this.big[k] = r < BIG_U ? 1 : 0
@@ -401,7 +401,7 @@ class Reach {
   add(p: Piece): void {
     const s = slabOf(p)
     const reach = Math.hypot(s.hw, s.hd) + BIG_U + REACH_CELL_U
-    const b = this.book
+    const b = this.stage
     const i0 = Math.max(0, Math.floor((s.cx - reach - b.x0) / REACH_CELL_U))
     const i1 = Math.min(this.cols - 1, Math.ceil((s.cx + reach - b.x0) / REACH_CELL_U))
     const j0 = Math.max(0, Math.floor((s.cy - reach - b.y0) / REACH_CELL_U))
@@ -451,16 +451,16 @@ class Reach {
 }
 
 /** 一幕能不能放下这件：落在自己那半边台上、离台边与台中线（一溜活门）够远，离别组的布景留得出路，开局那一幕不压着出生的空地 */
-function fits(cfg: StorybookConfig, book: Book, p: Piece, placed: readonly Piece[], plaza: boolean): boolean {
+function fits(cfg: TheaterConfig, stage: Stage, p: Piece, placed: readonly Piece[], plaza: boolean): boolean {
   const s = slabOf(p)
   const m = p.low ? cfg.margin.low : cfg.margin.tall
   const cs = corners(s)
-  const right = p.x > book.gx
+  const right = p.x > stage.cx
   for (const c of cs) {
-    if (c.x < book.x0 + m || c.x > book.x1 - m || c.y < book.y0 + m || c.y > book.y1 - m) return false
-    if ((c.x > book.gx) !== right || Math.abs(c.x - book.gx) < cfg.margin.aisle) return false
+    if (c.x < stage.x0 + m || c.x > stage.x1 - m || c.y < stage.y0 + m || c.y > stage.y1 - m) return false
+    if ((c.x > stage.cx) !== right || Math.abs(c.x - stage.cx) < cfg.margin.aisle) return false
   }
-  if (plaza && slabSd(s, book.start.x, book.start.y) < cfg.plazaU) return false
+  if (plaza && slabSd(s, stage.start.x, stage.start.y) < cfg.plazaU) return false
   for (const q of placed) {
     if (q.group === p.group) continue
     const gap = p.low || q.low ? cfg.gapU.low : cfg.gapU.tall
@@ -469,38 +469,38 @@ function fits(cfg: StorybookConfig, book: Book, p: Piece, placed: readonly Piece
   return true
 }
 
-function piece(spec: Spec, cfg: StorybookConfig, rng: Rng, x: number, y: number, a: number, group: number, w?: number): Piece {
+function piece(spec: Spec, cfg: TheaterConfig, rng: Rng, x: number, y: number, a: number, group: number, w?: number): Piece {
   const pw = w ?? spec.w[0] + (spec.w[1] - spec.w[0]) * rng.next()
   const h = spec.h === 'low' ? cfg.lowM : spec.h[0] + (spec.h[1] - spec.h[0]) * rng.next()
   return { kind: spec.kind, x, y, a, w: pw, d: spec.d > 0 ? spec.d : CARD_U, h, low: spec.h === 'low', box: spec.d > 0, group, seed: Math.floor(rng.next() * 0x7fffffff) }
 }
 
 /** 半页里随机的一点：side 为 -1 是左页、1 是右页 */
-function spot(cfg: StorybookConfig, book: Book, rng: Rng, side: number): Point {
+function spot(cfg: TheaterConfig, stage: Stage, rng: Rng, side: number): Point {
   const m = cfg.margin.low
-  const lo = side < 0 ? book.x0 + m : book.gx + cfg.margin.aisle
-  const hi = side < 0 ? book.gx - cfg.margin.aisle : book.x1 - m
-  return { x: lo + (hi - lo) * rng.next(), y: book.y0 + m + (book.y1 - book.y0 - 2 * m) * rng.next() }
+  const lo = side < 0 ? stage.x0 + m : stage.cx + cfg.margin.aisle
+  const hi = side < 0 ? stage.cx - cfg.margin.aisle : stage.x1 - m
+  return { x: lo + (hi - lo) * rng.next(), y: stage.y0 + m + (stage.y1 - stage.y0 - 2 * m) * rng.next() }
 }
 
-/** 按一章的摆法摆一页：一件一件试，摆在它自己的景里，每摆下一件各种个子能站的地方都还连成一片；摆不到下限就换种子重来 */
-function arrange(cfg: StorybookConfig, book: Book, chapter: number, blend: Blend, seed: number, plaza: boolean): Piece[] | null {
+/** 按一章的摆法摆一幕：一件一件试，摆在它自己的景里，每摆下一件各种个子能站的地方都还连成一片；摆不到下限就换种子重来 */
+function arrange(cfg: TheaterConfig, stage: Stage, chapter: number, blend: Blend, seed: number, plaza: boolean): Piece[] | null {
   const key = CHAPTERS[chapter]!.key
   const rng = new Rng(seed)
-  const reach = new Reach(book)
+  const reach = new Reach(stage)
   const placed: Piece[] = []
   let group = 0
   let side = rng.next() < 0.5 ? -1 : 1
   const tryOne = (spec: Spec, where: Where): boolean => {
     for (let t = 0; t < PIECE_TRIES; t++) {
       if (placed.length >= cfg.pieces[1]) return false
-      const at = spot(cfg, book, rng, side)
+      const at = spot(cfg, stage, rng, side)
       if (!inWhere(blend, where, at.x, at.y)) {
         side = -side
         continue
       }
       const p = piece(spec, cfg, rng, at.x, at.y, (rng.next() * 2 - 1) * spec.tilt, group)
-      if (!fits(cfg, book, p, placed, plaza)) continue
+      if (!fits(cfg, stage, p, placed, plaza)) continue
       const keep = reach.copy()
       reach.add(p)
       if (!reach.connected()) {
@@ -522,25 +522,25 @@ function arrange(cfg: StorybookConfig, book: Book, chapter: number, blend: Blend
   return placed.length >= cfg.pieces[0] ? placed : null
 }
 
-/** 第几页：按种子摆好布景，排好弹起与折平的先后；开局那一页（index 0）不压着出生的空地 */
-export function pageOf(cfg: StorybookConfig, book: Book, index: number): Page {
-  const chapter = chapterOf(book, index)
-  const base = pageSeed(book, index)
-  const blend = blendOf(book, chapter, new Rng(base ^ 0x3b1e9d))
+/** 第几幕：按种子摆好布景；开局那一幕（index 0）不压着出生的空地 */
+export function actOf(cfg: TheaterConfig, stage: Stage, index: number): Act {
+  const chapter = chapterOf(stage, index)
+  const base = actSeed(stage, index)
+  const blend = blendOf(stage, chapter, new Rng(base ^ 0x3b1e9d))
   let pieces: Piece[] | null = null
-  for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, book, chapter, blend, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
-  if (!pieces) throw new Error(`纸剧场第 ${index} 幕摆不下 ${cfg.pieces[0]} 件布景`)
+  for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, stage, chapter, blend, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
+  if (!pieces) throw new Error(`舞台剧第 ${index} 幕摆不下 ${cfg.pieces[0]} 件布景`)
   // 远的先摆在后面：画的时候按底边从屏幕里往外排
   const ordered = [...pieces].sort((p, q) => p.y - q.y)
   return { index, chapter, seed: base, blend, pieces: ordered }
 }
 
-/** 换幕的一段：stand 演着，change 换幕——灯暗下去，旧布景依次吊上去，暗转里换地布与天幕，新布景依次吊下来，灯亮起来 */
+/** 换幕的一段：stand 演着，change 换幕——白色的聚光灯亮起来，旧布景依次吊上去，地布与天幕从右往左推过去换成新的，新布景依次吊下来，灯收回去 */
 export type Phase = 'stand' | 'change'
 
-/** 此刻演到哪：page 是正演着或正换上的那一幕（change 时旧的是 page - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换幕在几时（毫秒） */
-export interface BookClock {
-  readonly page: number
+/** 此刻演到哪：act 是正演着或正换上的那一幕（change 时旧的是 act - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换幕在几时（毫秒） */
+export interface StageClock {
+  readonly act: number
   readonly phase: Phase
   readonly at: number
   readonly len: number
@@ -553,35 +553,35 @@ function hash01(seed: number, k: number, salt: number): number {
   return ((h ^ (h >>> 13)) >>> 0) / 4294967296
 }
 
-function jitter(book: Book, k: number): number {
-  return hash01(book.seed, k, 0x1f2e3d) * 2 - 1
+function jitter(stage: Stage, k: number): number {
+  return hash01(stage.seed, k, 0x1f2e3d) * 2 - 1
 }
 
 /** 布景依次吊上去（或吊下来）那一段多长，毫秒 */
-export function flyLen(cfg: StorybookConfig): number {
+export function flyLen(cfg: TheaterConfig): number {
   return cfg.turn.staggerMs + cfg.turn.flyMs
 }
 
-/** 一次换幕多长，毫秒：吊上去、暗转、吊下来 */
-export function turnLen(cfg: StorybookConfig): number {
-  return flyLen(cfg) * 2 + cfg.turn.darkMs
+/** 一次换幕多长，毫秒：吊上去、推景、吊下来 */
+export function turnLen(cfg: TheaterConfig): number {
+  return flyLen(cfg) * 2 + cfg.turn.slideMs
 }
 
 /** 难度时钟走到 ms 毫秒时演到哪 */
-export function clockAt(cfg: StorybookConfig, book: Book, ms: number): BookClock {
+export function clockAt(cfg: TheaterConfig, stage: Stage, ms: number): StageClock {
   const t = cfg.turn
   let k = 0
   let w = t.firstMs
   for (;;) {
     const end = w + turnLen(cfg)
     if (ms < end) break
-    const nw = end + t.intervalMs + jitter(book, k) * t.jitterMs
-    if (ms < nw) return { page: k + 1, phase: 'stand', at: ms - end, len: nw - end, next: nw }
+    const nw = end + t.intervalMs + jitter(stage, k) * t.jitterMs
+    if (ms < nw) return { act: k + 1, phase: 'stand', at: ms - end, len: nw - end, next: nw }
     w = nw
     k++
   }
-  if (ms < w) return { page: 0, phase: 'stand', at: ms, len: w, next: w }
-  return { page: k + 1, phase: 'change', at: ms - w, len: turnLen(cfg), next: w }
+  if (ms < w) return { act: 0, phase: 'stand', at: ms, len: w, next: w }
+  return { act: k + 1, phase: 'change', at: ms - w, len: turnLen(cfg), next: w }
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
@@ -589,15 +589,15 @@ const easeInOut = (v: number): number => v * v * (3 - 2 * v)
 
 /**
  * 一件布景此刻吊起来多高：0 是落在台上，1 是吊出了视线。旧幕的按各自的先后吊上去，
- * 新幕的在暗转以后按各自的先后吊下来，快落地时放慢
+ * 新幕的等推景推完再按各自的先后吊下来，快落地时放慢
  */
-export function lifted(cfg: StorybookConfig, c: BookClock, page: number, p: Piece): number {
-  if (c.phase === 'stand') return page === c.page ? 0 : 1
+export function lifted(cfg: TheaterConfig, c: StageClock, act: number, p: Piece): number {
+  if (c.phase === 'stand') return act === c.act ? 0 : 1
   const t = cfg.turn
-  const start = hash01(p.seed, page, 0x3f1) * t.staggerMs
-  if (page === c.page - 1) return easeInOut(clamp01((c.at - start) / t.flyMs))
-  if (page !== c.page) return 1
-  const u = clamp01((c.at - flyLen(cfg) - t.darkMs - start) / t.flyMs)
+  const start = hash01(p.seed, act, 0x3f1) * t.staggerMs
+  if (act === c.act - 1) return easeInOut(clamp01((c.at - start) / t.flyMs))
+  if (act !== c.act) return 1
+  const u = clamp01((c.at - flyLen(cfg) - t.slideMs - start) / t.flyMs)
   return (1 - u) ** 3
 }
 
@@ -609,30 +609,21 @@ export function standing(lift: number): boolean {
   return lift < LIFT_BLOCK
 }
 
-/** 暗转里地布、天幕与幕牌换过去了多少：0 是旧幕，1 是新幕 */
-export function swapped(cfg: StorybookConfig, c: BookClock): number {
+/** 地布与天幕从右往左推过去了多少：0 是旧幕整幅还在台上，1 是新幕整幅推进来了 */
+export function slid(cfg: TheaterConfig, c: StageClock): number {
   if (c.phase === 'stand') return 1
-  return easeInOut(clamp01((c.at - flyLen(cfg)) / cfg.turn.darkMs))
+  return easeInOut(clamp01((c.at - flyLen(cfg)) / cfg.turn.slideMs))
 }
 
-/** 台上此刻多暗：0 是灯全亮，1 是全黑；换幕开头暗下去一半，暗转时全黑，新布景落完再亮回来 */
-export function darkness(cfg: StorybookConfig, c: BookClock): number {
+/** 白色聚光灯此刻多亮：0 是没开，1 是最亮；换幕一开头亮起来，新布景落完前收回去 */
+export function glare(cfg: TheaterConfig, c: StageClock): number {
   if (c.phase === 'stand') return 0
   const t = cfg.turn
-  const up = flyLen(cfg)
-  const half = 0.55
-  if (c.at < t.dimMs) return half * easeInOut(c.at / t.dimMs)
-  if (c.at < up - t.dimMs) return half
-  if (c.at < up) return half + (1 - half) * easeInOut((c.at - (up - t.dimMs)) / t.dimMs)
-  if (c.at < up + t.darkMs) return 1
-  const back = up + t.darkMs
-  if (c.at < back + t.dimMs) return 1 - (1 - half) * easeInOut((c.at - back) / t.dimMs)
   const end = turnLen(cfg)
-  if (c.at < end - t.dimMs) return half
-  return half * (1 - easeInOut((c.at - (end - t.dimMs)) / t.dimMs))
+  return easeInOut(clamp01(Math.min(c.at, end - c.at) / t.lightMs))
 }
 
 /** 台中线上的几扇活门，格：怪从这里升上台 */
-export function trapsOf(book: Book): Point[] {
-  return TRAP_DY.map((dy) => ({ x: book.gx, y: book.cy + dy }))
+export function trapsOf(stage: Stage): Point[] {
+  return TRAP_DY.map((dy) => ({ x: stage.cx, y: stage.cy + dy }))
 }

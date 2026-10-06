@@ -11,7 +11,7 @@ self.onmessage = (e: MessageEvent<PaintJob>) => {
     prep = prepare()
     return
   }
-  if (!scene || prep === undefined) throw new Error('画纸剧场的线程还没收到 setup')
+  if (!scene || prep === undefined) throw new Error('画舞台剧的线程还没收到 setup')
   const pixels = pixelBuffer(job.rect)
   paintBackdrop(scene, prep, pixels, job.rect)
   const piece: PaintPiece = { index: job.index, rect: job.rect, pixels }

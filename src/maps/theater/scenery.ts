@@ -2,10 +2,10 @@ import { cellEdge, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import { INK, smoothPath } from './art'
 import { blendSd, CHAPTERS } from './model'
-import type { Blend, Book, ChapterKey, Page } from './model'
+import type { Blend, Stage, ChapterKey, Act } from './model'
 
-/** 页面上的印刷每格多少像素 */
-export const PRINT_PPU = 32
+/** 地布、天幕与幕牌上的画每格多少像素 */
+export const PAINT_PPU = 32
 /** 网点的格距，像素 */
 const DOT_PX = 4.5
 /** 印字用的字体：宋体一类有衬线的 */
@@ -18,7 +18,7 @@ type Pt = readonly [number, number]
 const LINE: Record<ChapterKey, string> = { spring: '#2f3a26', summer: '#4a3420', autumn: '#3a2a20', winter: '#2a3040' }
 
 const TILES = new Map<string, HTMLCanvasElement>()
-/** 网点纹样：按页面的比例缩回像素大小，转 45° */
+/** 网点纹样：按画布的比例缩回像素大小，转 45° */
 function dots(ctx: Ctx, color: string, cover: number, angle = 45): CanvasPattern {
   const key = `${color}|${cover.toFixed(2)}`
   let t = TILES.get(key)
@@ -36,7 +36,7 @@ function dots(ctx: Ctx, color: string, cover: number, angle = 45): CanvasPattern
     TILES.set(key, t)
   }
   const p = ctx.createPattern(t, 'repeat')!
-  p.setTransform(new DOMMatrix().scale(1 / PRINT_PPU).rotate(angle))
+  p.setTransform(new DOMMatrix().scale(1 / PAINT_PPU).rotate(angle))
   return p
 }
 
@@ -174,7 +174,7 @@ function scatter(rng: Rng, n: number, w: number, h: number, each: (x: number, y:
 }
 
 type Rgba = readonly [number, number, number, number]
-/** 一页上的一处离两个景的分界多远，格：第一个景那边为负 */
+/** 一幕地布上的一处离两个景的分界多远，格：第一个景那边为负 */
 type Sd = (x: number, y: number) => number
 type Painter = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd) => void
 
@@ -190,15 +190,15 @@ const pick = <T>(rng: Rng, xs: readonly T[]): T => xs[Math.floor(rng.next() * xs
 
 /** 逐像素算出来的一层（每 step 个像素算一次），平铺着叠上去 */
 function field(ctx: Ctx, w: number, h: number, step: number, fn: (x: number, y: number) => Rgba | null): void {
-  const cw = Math.ceil((w * PRINT_PPU) / step)
-  const ch = Math.ceil((h * PRINT_PPU) / step)
+  const cw = Math.ceil((w * PAINT_PPU) / step)
+  const ch = Math.ceil((h * PAINT_PPU) / step)
   const c = Object.assign(document.createElement('canvas'), { width: cw, height: ch })
   const g = c.getContext('2d')!
   const img = g.createImageData(cw, ch)
   const d = img.data
   for (let j = 0; j < ch; j++) {
     for (let i = 0; i < cw; i++) {
-      const v = fn(((i + 0.5) * step) / PRINT_PPU, ((j + 0.5) * step) / PRINT_PPU)
+      const v = fn(((i + 0.5) * step) / PAINT_PPU, ((j + 0.5) * step) / PAINT_PPU)
       if (!v) continue
       const o = (j * cw + i) * 4
       d[o] = v[0]
@@ -215,7 +215,7 @@ function field(ctx: Ctx, w: number, h: number, step: number, fn: (x: number, y: 
   ctx.restore()
 }
 
-/** 分界上离界线 off 格的一圈点，按页面切成几段（页外的点丢掉） */
+/** 分界上离界线 off 格的一圈点，按地布切成几段（布外的点丢掉） */
 function contour(b: Blend, ox: number, oy: number, w: number, h: number, off: number): Pt[][] {
   const pts: Pt[] = []
   if (b.kind === 'line') {
@@ -264,7 +264,7 @@ function along(runs: readonly Pt[][], gap: number, each: (x: number, y: number, 
   }
 }
 
-/** 在页面上撒点，只留 keep 说留的（keep 给出留下的概率） */
+/** 在地布上撒点，只留 keep 说留的（keep 给出留下的概率） */
 function sow(rng: Rng, n: number, w: number, h: number, keep: (x: number, y: number) => number, each: (x: number, y: number) => void): void {
   for (let i = 0; i < n; i++) {
     const x = 0.6 + rng.next() * (w - 1.2)
@@ -946,7 +946,7 @@ const SEASONS: Record<ChapterKey, Season> = {
   winter: { a: volcano, b: tundra, mask: (d) => smooth(-0.8, 0.8, d), wob: 0.6, seam: thaw },
 }
 
-/** 页面四周印的一道双线框，四角卷一个小涡 */
+/** 地布四周画的一道双线框，四角卷一个小涡 */
 function frame(ctx: Ctx, x0: number, x1: number, h: number, color: string): void {
   for (const inset of [0.55, 0.72]) {
     ctx.strokeStyle = color
@@ -972,7 +972,7 @@ function frame(ctx: Ctx, x0: number, x1: number, h: number, color: string): void
 export function paintCard(chapter: number, canvas: HTMLCanvasElement): void {
   const ch = CHAPTERS[chapter]!
   const color = LINE[ch.key]
-  const k = PRINT_PPU
+  const k = PAINT_PPU
   canvas.width = Math.round(CARD_W_U * k)
   canvas.height = Math.round(CARD_H_U * k)
   const ctx = canvas.getContext('2d')!
@@ -1046,7 +1046,7 @@ export function paintDrop(chapter: number, seed: number, w: number, h: number, c
   const key = ch.key
   const S = SKY[key]
   const L = LINE[key]
-  const k = PRINT_PPU / 2
+  const k = PAINT_PPU / 2
   canvas.width = Math.round(w * k)
   canvas.height = Math.round(h * k)
   const ctx = canvas.getContext('2d')!
@@ -1151,41 +1151,133 @@ export function paintDrop(chapter: number, seed: number, w: number, h: number, c
   ctx.fillRect(0, h - 0.25, w, 0.25)
 }
 
+/** 台框上挂的帷幔多高、一个弧多宽，格；侧幕从台边往里盖住多少、往外多宽，格 */
+const VALANCE_U = 2.4
+const SWAG_U = 4.2
+const LEG_IN_U = 0.45
+const LEG_OUT_U = 1.1
+
+/**
+ * 台框前挂着的东西，盖在地布、天幕上面：legs 是台两边各一道黑丝绒侧幕，压住地布与天幕的两边，往台上投一道影子——
+ * 推景时新景从右边侧幕后面推出来，旧景推进左边侧幕后面；valance 是顶上一道红丝绒帷幔，一个个弧垂下来，镶金穗子，吊上去的布景收进它后面
+ */
+export function paintMasking(stage: Stage, size: number, part: 'legs' | 'valance', canvas: HTMLCanvasElement): void {
+  const k = PAINT_PPU / 2
+  canvas.width = Math.round(size * k)
+  canvas.height = Math.round(size * k)
+  const ctx = canvas.getContext('2d')!
+  ctx.setTransform(k, 0, 0, k, 0, 0)
+  // 侧幕：竖着的褶，靠台的一边往台上投影子
+  for (const side of part === 'legs' ? [-1, 1] : []) {
+    const edge = side < 0 ? stage.x0 : stage.x1
+    const x0 = side < 0 ? edge - LEG_OUT_U : edge - LEG_IN_U
+    const w = LEG_OUT_U + LEG_IN_U
+    const sh = ctx.createLinearGradient(edge - side * LEG_IN_U, 0, edge - side * (LEG_IN_U + 1.2), 0)
+    sh.addColorStop(0, 'rgba(10,6,8,0.45)')
+    sh.addColorStop(1, 'rgba(10,6,8,0)')
+    ctx.fillStyle = sh
+    ctx.fillRect(side < 0 ? edge + LEG_IN_U : edge - LEG_IN_U - 1.2, VALANCE_U * 0.6, 1.2, stage.y1 + 0.6 - VALANCE_U * 0.6)
+    const g = ctx.createLinearGradient(x0, 0, x0 + w, 0)
+    for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, i % 2 === 0 ? '#121016' : '#2c2832')
+    ctx.fillStyle = g
+    ctx.fillRect(x0, 0, w, stage.y1 + 0.6)
+  }
+  if (part === 'legs') return
+  // 帷幔：一道底边，下面一个个弧，金穗子
+  const left = 1.3
+  const right = size - 1.3
+  ctx.fillStyle = '#7a0e18'
+  ctx.fillRect(left, 0, right - left, VALANCE_U * 0.45)
+  const n = Math.max(3, Math.round((right - left) / SWAG_U))
+  const sw = (right - left) / n
+  for (let i = 0; i < n; i++) {
+    const a = left + i * sw
+    const gr = ctx.createLinearGradient(0, 0, 0, VALANCE_U)
+    gr.addColorStop(0, '#a3182a')
+    gr.addColorStop(0.7, '#c4283a')
+    gr.addColorStop(1, '#6e0c16')
+    ctx.beginPath()
+    ctx.moveTo(a, 0)
+    ctx.lineTo(a + sw, 0)
+    ctx.lineTo(a + sw, VALANCE_U * 0.45)
+    ctx.quadraticCurveTo(a + sw / 2, VALANCE_U * 1.25, a, VALANCE_U * 0.45)
+    ctx.closePath()
+    ctx.fillStyle = gr
+    ctx.fill()
+    for (let f = 1; f < 4; f++) {
+      ctx.beginPath()
+      ctx.moveTo(a + sw * 0.08 * f, VALANCE_U * 0.45)
+      ctx.quadraticCurveTo(a + sw / 2, VALANCE_U * (0.5 + 0.17 * f), a + sw * (1 - 0.08 * f), VALANCE_U * 0.45)
+      ctx.lineWidth = 0.06
+      ctx.strokeStyle = 'rgba(60,4,10,0.5)'
+      ctx.stroke()
+    }
+    ctx.beginPath()
+    ctx.moveTo(a, VALANCE_U * 0.45)
+    ctx.quadraticCurveTo(a + sw / 2, VALANCE_U * 1.25, a + sw, VALANCE_U * 0.45)
+    ctx.lineWidth = 0.16
+    ctx.setLineDash([0.08, 0.06])
+    ctx.strokeStyle = '#e2b25a'
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.ellipse(a, VALANCE_U * 0.55, 0.16, 0.42, 0, 0, 6.28)
+    ctx.fillStyle = '#e2b25a'
+    ctx.fill()
+  }
+  ctx.fillStyle = '#e2b25a'
+  ctx.fillRect(left, 0, right - left, 0.18)
+}
+
+/** 白色聚光灯的光斑：中间发白，往外软软地淡掉 */
+export function paintSpot(n: number, canvas: HTMLCanvasElement): void {
+  canvas.width = n
+  canvas.height = n
+  const ctx = canvas.getContext('2d')!
+  const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2)
+  g.addColorStop(0, 'rgba(255,255,250,1)')
+  g.addColorStop(0.45, 'rgba(255,254,244,0.92)')
+  g.addColorStop(0.8, 'rgba(255,250,232,0.35)')
+  g.addColorStop(1, 'rgba(255,250,232,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, n, n)
+}
+
 /**
  * 一幕的地布：白底上的颜料，乘到粗布上就是画上去的样子。插画平涂、偏一点套版、网点压暗、描墨线；
  * 两个景各画一张，第二个景按界线淡进来，再画上连着两个景的东西；四周一道双线框
  */
-export function paintPrint(page: Page, book: Book, canvas: HTMLCanvasElement): void {
-  const w = book.x1 - book.x0
-  const h = book.y1 - book.y0
-  const W = Math.round(w * PRINT_PPU)
-  const H = Math.round(h * PRINT_PPU)
+export function paintFloor(act: Act, stage: Stage, canvas: HTMLCanvasElement): void {
+  const w = stage.x1 - stage.x0
+  const h = stage.y1 - stage.y0
+  const W = Math.round(w * PAINT_PPU)
+  const H = Math.round(h * PAINT_PPU)
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')!
-  const key = CHAPTERS[page.chapter]!.key
+  const key = CHAPTERS[act.chapter]!.key
   const S = SEASONS[key]
-  const sd: Sd = (x, y) => blendSd(page.blend, x + book.x0, y + book.y0)
-  const seed = page.seed ^ 0x9a1e7
-  ctx.setTransform(PRINT_PPU, 0, 0, PRINT_PPU, 0, 0)
+  const sd: Sd = (x, y) => blendSd(act.blend, x + stage.x0, y + stage.y0)
+  const seed = act.seed ^ 0x9a1e7
+  ctx.setTransform(PAINT_PPU, 0, 0, PAINT_PPU, 0, 0)
   S.a(ctx, w, h, new Rng(seed), sd)
   const top = Object.assign(document.createElement('canvas'), { width: W, height: H })
   const tc = top.getContext('2d')!
-  tc.setTransform(PRINT_PPU, 0, 0, PRINT_PPU, 0, 0)
+  tc.setTransform(PAINT_PPU, 0, 0, PAINT_PPU, 0, 0)
   S.b(tc, w, h, new Rng(seed ^ 0x51a7), sd)
   // 第二个景只留界线这边的：按离界线的远近淡出，界线随噪声抖一抖
   const m = document.createElement('canvas')
   const mc = m.getContext('2d')!
   m.width = W
   m.height = H
-  const ms = (page.seed >>> 3) & 0xffff
+  const ms = (act.seed >>> 3) & 0xffff
   field(mc, w, h, 2, (x, y) => [0, 0, 0, S.mask(sd(x, y) + (fbm(x * 0.35, y * 0.35, ms, 2) - 0.5) * 2 * S.wob)])
   tc.setTransform(1, 0, 0, 1, 0, 0)
   tc.globalCompositeOperation = 'destination-in'
   tc.drawImage(m, 0, 0, W, H)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.drawImage(top, 0, 0)
-  ctx.setTransform(PRINT_PPU, 0, 0, PRINT_PPU, 0, 0)
-  S.seam(ctx, w, h, new Rng(seed ^ 0x2c3), sd, page.blend, book.x0, book.y0)
+  ctx.setTransform(PAINT_PPU, 0, 0, PAINT_PPU, 0, 0)
+  S.seam(ctx, w, h, new Rng(seed ^ 0x2c3), sd, act.blend, stage.x0, stage.y0)
   frame(ctx, 0, w, h, LINE[key])
 }

@@ -212,7 +212,7 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
-const STORYBOOK_MIX: readonly EnemyMixRow[] = [
+const THEATER_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
   { kind: 'rat', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
   { kind: 'mushroom', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
@@ -1360,11 +1360,11 @@ export const MAPS = {
     },
     boss: 'eclipse',
   },
-  storybook: {
+  theater: {
     emoji: '1f3ad',
-    name: '纸剧场',
-    desc: '桌上一座纸做的小剧场，小小的旅人们就是台上演戏的角色，台面就是战场：台口一排脚灯，台下一排排空椅子，两边垂着红丝绒大幕，台后挂着画好的天幕。台上铺着画好的地布：草地、小溪、沙滩、海水、落叶、岩浆、冰面都只是画，哪里都能走。台上立着剪纸布景：花篱、栅栏、石灯笼、珊瑚、蘑菇、雪堆齐腰，挡人不挡子弹，头目跨得过；樱花树、寺院、仙人掌、潜艇、残墙、枫树、火山、冰山比人高，挡人也挡子弹和视线。隔一阵就换一幕：灯暗下去，一束追光跟着队长，旧布景挂着吊绳一件件吊上去，全暗的那一下换上新的地布与天幕，新布景再一件件吊下来，落点先投下影子，落地时压着谁就把谁挤开，灯再亮起来。一幕是故事的一章，春夏秋冬轮着来，每一幕是两处风景连在一起：春天小溪流过草甸进了樱花院子，夏天沙漠走到海滩、再到深海，秋天红叶落满的残垣边上是一口溶洞，冬天火山脚下的岩浆烧到冰原。怪物从台上的活门里升上来，从台边爬上来，也从布景后面走出来',
-    kind: 'storybook',
+    name: '舞台剧',
+    desc: '一座剧场的舞台，小小的旅人们就是台上演戏的角色，台面就是战场：顶上挂着红丝绒帷幔，两边是黑色侧幕和收拢的红色大幕，台口一排脚灯，台下是乐池和一排排空椅子，台后挂着画好的天幕。台上铺着画好的地布：草地、小溪、沙滩、海水、落叶、岩浆、冰面都只是画，哪里都能走。台上立着布景片：花篱、栅栏、石灯笼、珊瑚、蘑菇、雪堆齐腰，挡人不挡子弹，头目跨得过；樱花树、寺院、仙人掌、潜艇、残墙、枫树、火山、冰山比人高，挡人也挡子弹和视线。隔一阵就换一幕：几束白色聚光灯打在台上，一束跟着队长，照到的地方白花花一片；旧布景挂着吊绳一件件吊上去，地布与天幕从右边侧幕后面推出新的一幅、把旧的推进左边侧幕，新布景再一件件吊下来，落点先投下影子，落地时压着谁就把谁挤开，聚光灯收回去。一幕是故事的一章，春夏秋冬轮着来，每一幕是两处风景连在一起：春天小溪流过草甸进了樱花院子，夏天沙漠走到海滩、再到深海，秋天红叶落满的残垣边上是一口溶洞，冬天火山脚下的岩浆烧到冰原。怪物从台上的活门里升上来，从台边爬上来，也从布景后面走出来',
+    kind: 'theater',
     stamina: { exertion: 0.45, regen: 1 },
     palette: {
       bgFrom: 'hsl(356 40% 26%)',
@@ -1380,7 +1380,7 @@ export const MAPS = {
       alpha: [0, 0],
       density: [0, 0],
     },
-    mix: STORYBOOK_MIX,
+    mix: THEATER_MIX,
     // 从台上的活门里升上来、从台边爬上来、从布景后面走出来、从地布底下钻出来；夜伯爵从活门里升上来
     gates: {
       snapU: 3,
@@ -1395,14 +1395,14 @@ export const MAPS = {
       },
     },
     finalWaveSub: '夜伯爵从台上的活门里升了上来——换幕的时候，别和它困在同一片布景后面！',
-    storybook: {
-      page: { wU: 17, hU: 26 },
+    theater: {
+      size: { wU: 17, hU: 26 },
       plazaU: 4.5,
       margin: { tall: 2.6, low: 1.7, aisle: 1.2 },
       gapU: { tall: 2.7, low: 1.7 },
       lowM: 1,
       pieces: [12, 17],
-      turn: { firstMs: 10000, intervalMs: 10000, jitterMs: 0, dimMs: 600, staggerMs: 900, flyMs: 900, darkMs: 700 },
+      turn: { firstMs: 10000, intervalMs: 10000, jitterMs: 0, lightMs: 700, staggerMs: 900, flyMs: 900, slideMs: 1600 },
       reflowMs: 300,
     },
     boss: 'eclipse',

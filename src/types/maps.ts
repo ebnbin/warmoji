@@ -1334,13 +1334,13 @@ export interface PetriConfig {
   }
 }
 /**
- * 纸剧场：桌上一座纸做的小剧场，台面就是战场：台口一排脚灯，两边红幕与侧幕，台后挂着画好的天幕。台上铺着画好的地布，铺的都能走；
- * 台上立着剪纸布景，挡人，高的也挡子弹和视线。隔一阵换一幕：灯暗下去，旧布景依次吊上去，暗转里换地布与天幕，新布景依次吊下来，
- * 落地时压着谁就把谁挤开，灯再亮起来。一幕是故事的一章，按故事的次序轮下去
+ * 舞台剧：一座剧场的舞台，台面就是战场：台口一排脚灯，台下是乐池与观众席，两边侧幕与红丝绒大幕，顶上帷幔，台后挂着画好的天幕。
+ * 台上铺着画好的地布，画的都能走；台上立着布景片，挡人，高的也挡子弹和视线。隔一阵换一幕：白色聚光灯打在台上，旧布景依次吊上去，
+ * 地布与天幕从右往左推成新的一幅，新布景依次吊下来，落地时压着谁就把谁挤开。一幕是故事的一章，按故事的次序轮下去
  */
-export interface StorybookConfig {
+export interface TheaterConfig {
   /** 台面多宽多高，格：宽是半个台面宽（台中线两边各这么宽），台面在方框正中 */
-  readonly page: { readonly wU: number; readonly hU: number }
+  readonly size: { readonly wU: number; readonly hU: number }
   /** 开局站的那片空地的半径，格：开局那一幕的布景不落在里面 */
   readonly plazaU: number
   /** 布景离台边、离台中线（一溜活门）至少多远，格：离台边高的按 tall，矮的按 low */
@@ -1352,17 +1352,17 @@ export interface StorybookConfig {
   /** 一幕立几件布景 */
   readonly pieces: readonly [number, number]
   /**
-   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；灯用 dimMs 暗下去（亮起来也是），
-   * 旧布景在 staggerMs 里先后起吊、每件 flyMs 吊出视线，暗转 darkMs 里换地布与天幕，新布景再照样先后吊下来
+   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；白色聚光灯用 lightMs 亮起来（收回去也是），
+   * 旧布景在 staggerMs 里先后起吊、每件 flyMs 吊出视线，地布与天幕用 slideMs 从右往左推成新的，新布景再照样先后吊下来
    */
   readonly turn: {
     readonly firstMs: number
     readonly intervalMs: number
     readonly jitterMs: number
-    readonly dimMs: number
+    readonly lightMs: number
     readonly staggerMs: number
     readonly flyMs: number
-    readonly darkMs: number
+    readonly slideMs: number
   }
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
@@ -1441,7 +1441,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'storybook'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'theater'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1475,7 +1475,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
-  readonly storybook?: StorybookConfig
+  readonly theater?: TheaterConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

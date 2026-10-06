@@ -1209,8 +1209,8 @@ function buildDreamland(): BgmScore {
   )
 }
 
-/** 纸剧场：八音盒似的六八拍摇篮曲，大调；竖琴分解和弦一路拨着，钢片琴领奏、带着回声，低音管只踩每小节头，长笛在乐句里垫一口气，一小节换一个和弦 */
-function buildStorybook(): BgmScore {
+/** 舞台剧：八音盒似的六八拍摇篮曲，大调；竖琴分解和弦一路拨着，钢片琴领奏、带着回声，低音管只踩每小节头，长笛在乐句里垫一口气，一小节换一个和弦 */
+function buildTheater(): BgmScore {
   const chords = [0, 0, 5, 3, 0, 4, 1, 4, 5, 5, 3, 0, 1, 4, 0, 0]
   return track(
     {
@@ -1280,7 +1280,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
-  storybook: buildStorybook,
+  theater: buildTheater,
 }
 
 const cache = new Map<BgmId, BgmScore>()

@@ -5,7 +5,7 @@ import type { Piece, PieceKind } from './model'
 export const FACE_PPU = 80
 /** 立起来时每米高在画面上占几格：和身体抬起的一样 */
 export const STAND_U_PER_M = 0.5
-/** 平躺在页面上时每米高铺多长，格 */
+/** 平躺在台上时每米高铺多长，格 */
 export const FLAT_U_PER_M = 0.8
 /** 刀模在剪影外留的那一圈白边，像素 */
 const CUT_PX = 3
@@ -15,7 +15,7 @@ const DOT_PX = 5
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 type Pt = readonly [number, number]
 
-/** 印刷的油墨：同一套颜色画布景也画页面 */
+/** 颜料：同一套颜色画布景也画地布 */
 export const INK = {
   line: '#2b2320',
   cream: '#fbf3df',

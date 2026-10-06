@@ -1,7 +1,7 @@
 import { GROUND_PPU } from '../../data/texel'
 import { fbm, valueNoise } from '../../util/noise'
 import { FRAME_U } from '../../util/units'
-import { pageRoom } from './model'
+import { stageRoom } from './model'
 
 /** 台面在方框里的位置，格：画背景只要这些数，能整个发给画画的线程 */
 export interface PaintScene {
@@ -46,6 +46,8 @@ const APRON_U = 0.9
 const FOOTLIGHT_STEP_U = 1.7
 /** 观众席一排排座椅：排距、座宽，格 */
 const ROW_U = 1.35
+/** 台口前的乐池多宽，格 */
+const PIT_U = 1.6
 const SEAT_U = 1.1
 
 type Rgb = [number, number, number]
@@ -70,10 +72,16 @@ const APRON = [74, 40, 26] as const
 const HALL = [30, 14, 12] as const
 const SEAT = [120, 26, 32] as const
 const SEAT_HI = [168, 46, 50] as const
-/** 两边的红丝绒大幕、金边 */
+/** 两边的侧幕（黑丝绒）、再往外的红丝绒大幕、台框两边的金柱 */
+const LEG_LO = [10, 8, 12] as const
+const LEG_HI = [46, 40, 50] as const
 const VELVET_LO = [92, 10, 18] as const
 const VELVET_HI = [190, 34, 42] as const
 const GILT = [222, 178, 92] as const
+const GILT_LO = [120, 84, 34] as const
+/** 侧幕多宽、台框的金柱多宽，格 */
+const LEGS_U = 2.2
+const PILLAR_U = 1.3
 /** 台后的墙 */
 const WALL = [34, 24, 22] as const
 /** 脚灯的暖光 */
@@ -111,12 +119,14 @@ function cloth(sc: PaintScene, x: number, y: number, r: number): Rgb {
   return c
 }
 
-/** 台口：前沿一道深色立面，一排脚灯；再往外是黑乎乎的观众席，一排排空着的红椅子 */
+/** 台口：前沿一道深色立面，一排脚灯；台下一道黑黑的乐池，再往外是暗着的观众席，一排排空着的红椅子 */
 function front(sc: PaintScene, x: number, y: number): Rgb {
   const d = y - sc.y1 - BOARD_U
   if (d < APRON_U) return lerp3(APRON, [40, 22, 14], d / APRON_U)
-  const row = Math.floor((d - APRON_U - 0.6) / ROW_U)
-  const v = (d - APRON_U - 0.6 - row * ROW_U) / ROW_U
+  if (d < APRON_U + PIT_U) return lerp3([12, 8, 8], [22, 12, 10], valueNoise(x * 0.5, y, sc.seed + 43))
+  const r0 = d - APRON_U - PIT_U - 0.4
+  const row = Math.floor(r0 / ROW_U)
+  const v = (r0 - row * ROW_U) / ROW_U
   let c: Rgb = [...HALL]
   if (row >= 0 && v > 0.15 && v < 0.6) {
     const seat = (x - (row % 2) * SEAT_U * 0.5) / SEAT_U
@@ -130,13 +140,23 @@ function front(sc: PaintScene, x: number, y: number): Rgb {
   return lerp3(HALL, c, 0.35 + 0.65 * fade)
 }
 
-/** 两边的大幕：红丝绒一道道竖着的褶，靠台的那一边镶金边 */
-function curtain(sc: PaintScene, x: number, y: number): Rgb {
+/** 台两边：紧挨着台板是黑丝绒的侧幕，再往外是收拢的红丝绒大幕，最外是台框的金柱 */
+function sides(sc: PaintScene, x: number, y: number): Rgb {
   const left = x < sc.x0
   const inner = left ? sc.x0 - BOARD_U - x : x - sc.x1 - BOARD_U
+  const outer = left ? x : FRAME_U - x
+  if (outer < PILLAR_U) {
+    const u = outer / PILLAR_U
+    const flute = 0.5 + 0.5 * Math.cos(u * Math.PI * 6)
+    return lerp3(GILT_LO, GILT, 0.35 + 0.5 * flute * Math.sin(u * Math.PI))
+  }
+  if (inner < LEGS_U) {
+    const fold = 0.5 + 0.5 * Math.sin(inner * 5 + fbm(inner, y * 0.08, sc.seed + 35, 2) * 2)
+    return lerp3(LEG_LO, LEG_HI, fold * 0.8)
+  }
   const fold = 0.5 + 0.5 * Math.sin(inner * 3.4 + fbm(inner * 0.5, y * 0.05, sc.seed + 31, 2) * 3)
   let c = lerp3(VELVET_LO, VELVET_HI, Math.pow(fold, 1.6) * (0.75 + 0.25 * valueNoise(x * 0.4, y * 0.2, sc.seed + 33)))
-  c = lerp3(c, GILT, (1 - smooth(0.05, 0.22, inner)) * 0.9)
+  c = lerp3(c, GILT, (1 - smooth(0.05, 0.22, outer - PILLAR_U)) * 0.9)
   return c
 }
 
@@ -150,11 +170,11 @@ export function paintBackdrop(sc: PaintScene, _prep: Prepared, out: Uint8Clamped
     for (let px = rect.x0; px < rect.x1; px++) {
       const x = (px + 0.5) / GROUND_PPU
       const y = (py + 0.5) / GROUND_PPU
-      const r = pageRoom(sc.x0, sc.x1, sc.y0, sc.y1, x, y)
+      const r = stageRoom(sc.x0, sc.x1, sc.y0, sc.y1, x, y)
       let c: Rgb
       const side = x < sc.x0 - BOARD_U || x > sc.x1 + BOARD_U
       if (r >= 0) c = cloth(sc, x, y, r)
-      else if (side) c = curtain(sc, x, y)
+      else if (side) c = sides(sc, x, y)
       else if (r > -BOARD_U) c = boards(sc, x, y)
       else if (y > sc.y1) c = front(sc, x, y)
       else c = lerp3(WALL, [20, 14, 12], valueNoise(x * 0.3, y * 0.3, sc.seed + 41) * 0.5)

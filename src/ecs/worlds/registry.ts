@@ -18,7 +18,7 @@ import { maple } from '../../maps/maple/world'
 import { ship } from '../../maps/ship/world'
 import { volcano } from '../../maps/volcano/world'
 import { deep } from '../../maps/deep/world'
-import { storybook } from '../../maps/storybook/world'
+import { theater } from '../../maps/theater/world'
 
 const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   bounded,
@@ -44,7 +44,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   nexus,
   petri,
   dreamland,
-  storybook,
+  theater,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

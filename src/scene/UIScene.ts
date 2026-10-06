@@ -6,7 +6,7 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, BookDial, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TiltDial } from '../ui'
+import { AimGuide, Announcer, StageDial, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TiltDial } from '../ui'
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
@@ -58,7 +58,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private tiltDial?: TiltDial
   private submarineDial?: SubmarineDial
   private sundial?: Sundial
-  private bookDial?: BookDial
+  private stageDial?: StageDial
   private squad: SquadIcon[] = []
   private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
@@ -105,7 +105,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       tilt: null,
       clock: null,
       submarine: null,
-      book: null,
+      stage: null,
     }
 
     const stick = EDGE + Joystick.RADIUS
@@ -135,7 +135,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.tiltDial = undefined
     this.sundial = undefined
     this.submarineDial = undefined
-    this.bookDial = undefined
+    this.stageDial = undefined
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
@@ -196,7 +196,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.updateTilt(s.tilt)
     this.updateClock(s.clock)
     this.updateSubmarine(s.submarine)
-    this.updateBook(s.book)
+    this.updateStage(s.stage)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
     if (s.level !== this.last.level || s.levelUps !== this.last.levelUps) this.updateLevel(s.level, s.levelUps)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
@@ -456,11 +456,11 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.submarineDial.setSubmarine(b.phase, b.ratio, b.inSec, this.time.now)
   }
 
-  /** 在纸剧场里打的一局：离下一次换幕还有多久、正在换还是快要换了，随时看得见 */
-  private updateBook(b: HudSnapshot['book']): void {
+  /** 在舞台剧里打的一局：离下一次换幕还有多久、正在换还是快要换了，随时看得见 */
+  private updateStage(b: HudSnapshot['stage']): void {
     if (!b) return
-    this.bookDial ??= new BookDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
-    this.bookDial.setBook(b.phase, b.ratio, b.inSec, b.title, this.time.now)
+    this.stageDial ??= new StageDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
+    this.stageDial.setStage(b.phase, b.ratio, b.inSec, b.title, this.time.now)
   }
 
   private updateGoals(goals: HudSnapshot['goals']): void {

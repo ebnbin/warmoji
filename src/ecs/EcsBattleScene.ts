@@ -80,8 +80,8 @@ import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { BookSnapshot, ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
-import { CHAPTERS, chapterOf } from '../maps/storybook/model'
+import type { StageSnapshot, ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import { CHAPTERS, chapterOf } from '../maps/theater/model'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -612,7 +612,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
-      book: sim ? bookSnapshot(sim) : null,
+      stage: sim ? stageSnapshot(sim) : null,
     }
   }
 
@@ -1065,21 +1065,21 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
 }
 
 /** 新一幕开演以后，幕名在换幕盘下面写这么久，毫秒 */
-const BOOK_TITLE_MS = 4500
+const STAGE_TITLE_MS = 4500
 /** 离换幕不到这么久，换幕盘闪着催人，毫秒 */
-const BOOK_WARN_MS = 3000
+const STAGE_WARN_MS = 3000
 
-/** 在纸剧场里打的一局：换幕的倒计时 */
-function bookSnapshot(sim: Sim): BookSnapshot | null {
-  const s = sim.worldState.storybook
+/** 在舞台剧里打的一局：换幕的倒计时 */
+function stageSnapshot(sim: Sim): StageSnapshot | null {
+  const s = sim.worldState.theater
   if (!s) return null
   const c = s.clock
-  const fresh = c.phase === 'stand' && c.at < BOOK_TITLE_MS && c.page > 0
-  const ch = CHAPTERS[chapterOf(s.book, c.page)]!
+  const fresh = c.phase === 'stand' && c.at < STAGE_TITLE_MS && c.act > 0
+  const ch = CHAPTERS[chapterOf(s.stage, c.act)]!
   const title = fresh || c.phase === 'change' ? `第${ch.num}幕 · ${ch.name}` : null
   if (c.phase === 'change') return { phase: 'turn', ratio: 0, inSec: 0, title }
   const left = c.len - c.at
-  return { phase: left < BOOK_WARN_MS ? 'warn' : 'stand', ratio: 1 - c.at / c.len, inSec: left / 1000, title }
+  return { phase: left < STAGE_WARN_MS ? 'warn' : 'stand', ratio: 1 - c.at / c.len, inSec: left / 1000, title }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {

@@ -10,18 +10,18 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { BASIN_CELL_U, clockAt, lifted, makeBook, pageOf, slabOf, slabSd, standing, trapsOf } from './model'
+import { BASIN_CELL_U, clockAt, lifted, makeStage, actOf, slabOf, slabSd, standing, trapsOf } from './model'
 import type { Basin } from '../basin'
 import type { Landmark } from '../landmark'
-import type { Book, BookClock, Page, Piece, Slab } from './model'
-import type { StorybookConfig } from '../../types/maps'
+import type { Stage, StageClock, Act, Piece, Slab } from './model'
+import type { TheaterConfig } from '../../types/maps'
 import type { Crossing } from '../../ecs/utils/pass'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
 
-/** 纸剧场按布景种子打散出自己的种子 */
-const BOOK_SEED = 0x5707b0
+/** 舞台剧按布景种子打散出自己的种子 */
+const STAGE_SEED = 0x5707b0
 /** 布景的距离场往外只算这么远，格：再远的地方按台边算 */
 const FIELD_REACH_U = 4
 /** 寻路的粗格子边长，格；离挡路处至少这么远才算走得过 */
@@ -49,13 +49,13 @@ interface Stand {
 }
 
 /**
- * 纸剧场此刻：台面，按幕缓存的布景，演到哪；落在台上的布景（哪一幕、哪几件）与它们挡人的块；
+ * 舞台剧此刻：台面，按幕缓存的布景，演到哪；落在台上的布景（哪一幕、哪几件）与它们挡人的块；
  * 小个子与跨得过矮布景的大个子各按一张距离场与一张寻路走；布景后面的出怪口
  */
-export interface StorybookState {
-  readonly book: Book
-  readonly pages: Map<number, Page>
-  clock: BookClock
+export interface TheaterState {
+  readonly stage: Stage
+  readonly acts: Map<number, Act>
+  clock: StageClock
   key: string
   version: number
   stands: Stand[]
@@ -67,56 +67,56 @@ export interface StorybookState {
   wingsKey: string
 }
 
-function cfgOf(sim: Sim): StorybookConfig {
-  return MAPS[sim.mapId].storybook!
+function cfgOf(sim: Sim): TheaterConfig {
+  return MAPS[sim.mapId].theater!
 }
 
 /** 这一局的书：视图与规则按同一个种子各要一次 */
-export function bookFor(cfg: StorybookConfig, decorSeed: number): Book {
-  return makeBook(cfg, (decorSeed ^ BOOK_SEED) >>> 0)
+export function stageFor(cfg: TheaterConfig, decorSeed: number): Stage {
+  return makeStage(cfg, (decorSeed ^ STAGE_SEED) >>> 0)
 }
 
 /** 第几页：摆过的留着 */
-export function pageAt(s: Pick<StorybookState, 'pages' | 'book'>, cfg: StorybookConfig, index: number): Page {
-  let p = s.pages.get(index)
+export function actAt(s: Pick<TheaterState, 'acts' | 'stage'>, cfg: TheaterConfig, index: number): Act {
+  let p = s.acts.get(index)
   if (!p) {
-    p = pageOf(cfg, s.book, index)
-    s.pages.set(index, p)
-    for (const k of s.pages.keys()) if (k < index - 2) s.pages.delete(k)
+    p = actOf(cfg, s.stage, index)
+    s.acts.set(index, p)
+    for (const k of s.acts.keys()) if (k < index - 2) s.acts.delete(k)
   }
   return p
 }
 
 /** 书此刻换到哪：按难度时钟走，同一局里接着上一场 */
-export function bookClock(sim: Sim, cfg: StorybookConfig, book: Book): BookClock {
-  return clockAt(cfg, book, clockSec(sim) * 1000)
+export function stageClock(sim: Sim, cfg: TheaterConfig, stage: Stage): StageClock {
+  return clockAt(cfg, stage, clockSec(sim) * 1000)
 }
 
 function copyBasin(b: Basin): Basin {
   return { cols: b.cols, rows: b.rows, cell: b.cell, x0: b.x0, y0: b.y0, room: b.room.slice() }
 }
 
-export function storybookOf(sim: Sim): StorybookState {
-  let s = sim.worldState.storybook
+export function theaterOf(sim: Sim): TheaterState {
+  let s = sim.worldState.theater
   if (!s) {
     const cfg = cfgOf(sim)
-    const book = bookFor(cfg, sim.run.decorSeed)
-    const traps = trapsOf(book).map((t): Landmark => ({ x: t.x * UNIT, y: t.y * UNIT, r: 0.6 * UNIT, nx: 0, ny: 0 }))
+    const stage = stageFor(cfg, sim.run.decorSeed)
+    const traps = trapsOf(stage).map((t): Landmark => ({ x: t.x * UNIT, y: t.y * UNIT, r: 0.6 * UNIT, nx: 0, ny: 0 }))
     s = {
-      book,
-      pages: new Map(),
-      clock: bookClock(sim, cfg, book),
+      stage,
+      acts: new Map(),
+      clock: stageClock(sim, cfg, stage),
       key: '',
       version: 0,
       stands: [],
-      low: copyBasin(book.basin),
-      high: copyBasin(book.basin),
+      low: copyBasin(stage.basin),
+      high: copyBasin(stage.basin),
       flows: [null, null],
       traps,
       wings: [],
       wingsKey: '',
     }
-    sim.worldState.storybook = s
+    sim.worldState.theater = s
     refresh(s, cfg)
   }
   return s
@@ -142,34 +142,34 @@ function stamp(b: Basin, slab: Slab): void {
 }
 
 /** 此刻落在台上的是哪几件：换幕时旧幕还没吊起来的与新幕已经落下来的都算；变了就重铺距离场、作废寻路、重摆布景后的出怪口；返回刚落下来的 */
-function refresh(s: StorybookState, cfg: StorybookConfig): Piece[] {
+function refresh(s: TheaterState, cfg: TheaterConfig): Piece[] {
   const c = s.clock
-  const pages = c.phase === 'change' ? [c.page - 1, c.page] : [c.page]
-  const up: { page: number; i: number; p: Piece }[] = []
-  for (const k of pages) {
-    pageAt(s, cfg, k).pieces.forEach((p, i) => {
-      if (standing(lifted(cfg, c, k, p))) up.push({ page: k, i, p })
+  const acts = c.phase === 'change' ? [c.act - 1, c.act] : [c.act]
+  const up: { act: number; i: number; p: Piece }[] = []
+  for (const k of acts) {
+    actAt(s, cfg, k).pieces.forEach((p, i) => {
+      if (standing(lifted(cfg, c, k, p))) up.push({ act: k, i, p })
     })
   }
-  const key = up.map((u) => `${u.page}:${u.i}`).join(',')
+  const key = up.map((u) => `${u.act}:${u.i}`).join(',')
   if (key === s.key) return []
   const before = new Set(s.key.split(','))
   s.key = key
   s.version++
   s.stands = up.map((u) => ({ slab: slabOf(u.p), top: topOf(u.p.h), piece: u.p }))
-  s.low.room.set(s.book.basin.room)
-  s.high.room.set(s.book.basin.room)
+  s.low.room.set(s.stage.basin.room)
+  s.high.room.set(s.stage.basin.room)
   for (const st of s.stands) {
     stamp(s.low, st.slab)
     if (!st.piece.low) stamp(s.high, st.slab)
   }
   s.flows[0] = null
   s.flows[1] = null
-  return up.filter((u) => !before.has(`${u.page}:${u.i}`)).map((u) => u.p)
+  return up.filter((u) => !before.has(`${u.act}:${u.i}`)).map((u) => u.p)
 }
 
 /** 每件高的布景背后、靠一头的地方一处出怪口：从那里往那一头外面走出来 */
-function wingsOf(s: StorybookState): Landmark[] {
+function wingsOf(s: TheaterState): Landmark[] {
   const out: Landmark[] = []
   for (const st of s.stands) {
     const p = st.piece
@@ -195,7 +195,7 @@ function bigOf(sim: Sim, eid: number): boolean {
   return clearM(eid) >= topOf(cfgOf(sim).lowM)
 }
 
-function basinOf(sim: Sim, s: StorybookState, eid: number): Basin {
+function basinOf(sim: Sim, s: TheaterState, eid: number): Basin {
   return bigOf(sim, eid) ? s.high : s.low
 }
 
@@ -259,23 +259,23 @@ const DIRS = [
 ] as const
 
 /** 寻路的粗格子铺满台面 */
-function flowGrid(book: Book): { cols: number; rows: number } {
-  return { cols: Math.ceil((book.x1 - book.x0) / FLOW_CELL_U), rows: Math.ceil((book.y1 - book.y0) / FLOW_CELL_U) }
+function flowGrid(stage: Stage): { cols: number; rows: number } {
+  return { cols: Math.ceil((stage.x1 - stage.x0) / FLOW_CELL_U), rows: Math.ceil((stage.y1 - stage.y0) / FLOW_CELL_U) }
 }
 
-function flowCell(book: Book, x: number, y: number): number {
-  const { cols, rows } = flowGrid(book)
-  const i = Math.min(cols - 1, Math.max(0, Math.floor((x / UNIT - book.x0) / FLOW_CELL_U)))
-  const j = Math.min(rows - 1, Math.max(0, Math.floor((y / UNIT - book.y0) / FLOW_CELL_U)))
+function flowCell(stage: Stage, x: number, y: number): number {
+  const { cols, rows } = flowGrid(stage)
+  const i = Math.min(cols - 1, Math.max(0, Math.floor((x / UNIT - stage.x0) / FLOW_CELL_U)))
+  const j = Math.min(rows - 1, Math.max(0, Math.floor((y / UNIT - stage.y0) / FLOW_CELL_U)))
   return j * cols + i
 }
 
 /** 一档个子到队长的寻路：队长换了粗格子或布景变了，过了 reflowMs 才重算 */
-function flowOf(sim: Sim, s: StorybookState, level: number): Flow {
-  const book = s.book
-  const { cols, rows } = flowGrid(book)
+function flowOf(sim: Sim, s: TheaterState, level: number): Flow {
+  const stage = s.stage
+  const { cols, rows } = flowGrid(stage)
   const lead = leaderPoint(sim)
-  const cell = flowCell(book, lead.x, lead.y)
+  const cell = flowCell(stage, lead.x, lead.y)
   let f = s.flows[level]
   if (f && ((f.cell === cell && f.version === s.version) || (f.version === s.version && sim.elapsedMs - f.at < cfgOf(sim).reflowMs))) return f
   if (!f) {
@@ -285,7 +285,7 @@ function flowOf(sim: Sim, s: StorybookState, level: number): Flow {
   const b = level === 1 ? s.high : s.low
   const ok = new Uint8Array(cols * rows)
   for (let j = 0; j < rows; j++) {
-    for (let i = 0; i < cols; i++) ok[j * cols + i] = roomAt(b, (book.x0 + (i + 0.5) * FLOW_CELL_U) * UNIT, (book.y0 + (j + 0.5) * FLOW_CELL_U) * UNIT) >= FLOW_CLEAR_U * UNIT ? 1 : 0
+    for (let i = 0; i < cols; i++) ok[j * cols + i] = roomAt(b, (stage.x0 + (i + 0.5) * FLOW_CELL_U) * UNIT, (stage.y0 + (j + 0.5) * FLOW_CELL_U) * UNIT) >= FLOW_CLEAR_U * UNIT ? 1 : 0
   }
   const dist = f.dist
   dist.fill(Infinity)
@@ -318,10 +318,10 @@ function flowOf(sim: Sim, s: StorybookState, level: number): Flow {
 }
 
 /** 寻路在 (x, y) 像素处往下走的方向；到不了队长的地方往最近一格到得了的走；都不行返回 null */
-function descend(book: Book, f: Flow, x: number, y: number): Point | null {
-  const { cols, rows } = flowGrid(book)
-  const fx = (x / UNIT - book.x0) / FLOW_CELL_U
-  const fy = (y / UNIT - book.y0) / FLOW_CELL_U
+function descend(stage: Stage, f: Flow, x: number, y: number): Point | null {
+  const { cols, rows } = flowGrid(stage)
+  const fx = (x / UNIT - stage.x0) / FLOW_CELL_U
+  const fy = (y / UNIT - stage.y0) / FLOW_CELL_U
   const ci = Math.floor(fx)
   const cj = Math.floor(fy)
   if (ci < 0 || cj < 0 || ci >= cols || cj >= rows) return null
@@ -395,7 +395,7 @@ function slabSpan(sl: Slab, ax: number, ay: number, bx: number, by: number): [nu
 }
 
 /** 台上离布景与台边至少 room 像素的一点：从 p 往外一圈圈找，近处找不到就退回开局站位 */
-function openNear(s: StorybookState, p: Point, room: number): Point {
+function openNear(s: TheaterState, p: Point, room: number): Point {
   for (let r = 0; r <= 10 * UNIT; r += 0.5 * UNIT) {
     const n = r === 0 ? 1 : Math.ceil((r * Math.PI * 2) / (0.5 * UNIT))
     for (let k = 0; k < n; k++) {
@@ -404,40 +404,40 @@ function openNear(s: StorybookState, p: Point, room: number): Point {
       if (roomAt(s.low, q.x, q.y) >= room) return q
     }
   }
-  return { x: s.book.start.x * UNIT, y: s.book.start.y * UNIT }
+  return { x: s.stage.start.x * UNIT, y: s.stage.start.y * UNIT }
 }
 
 /**
- * 纸剧场：能走的是台面，台边是硬边界；地布上画的都能走。台上立着的剪纸布景挡人：齐腰的矮布景跨得过的大个子照走、小个子绕着走，
+ * 舞台剧：能走的是台面，台边是硬边界；地布上画的都能走。台上立着的布景片挡人：齐腰的矮布景跨得过的大个子照走、小个子绕着走，
  * 高的谁都绕着走，也挡子弹和视线（矮的只挡低处飞的）；穿墙的身体穿得过卡纸。按难度时钟换幕：旧布景吊离台面就不再挡路，
  * 新布景落到台上，压着的身体按距离场挤到最近的空处
  */
-export const storybook: WorldHooks = {
+export const theater: WorldHooks = {
   ...bounded,
   constrainBody(sim, eid, _from, next) {
-    const s = storybookOf(sim)
+    const s = theaterOf(sim)
     const r = Radius.v[eid]!
-    if (phases(sim.world, eid, 'paper')) return keepOut(s.book.basin, next.x, next.y, r)
+    if (phases(sim.world, eid, 'paper')) return keepOut(s.stage.basin, next.x, next.y, r)
     return keepOut(basinOf(sim, s, eid), next.x, next.y, r)
   },
   basin(sim) {
-    return storybookOf(sim).book.basin
+    return theaterOf(sim).stage.basin
   },
   ground(sim) {
-    return storybookOf(sim).book.basin
+    return theaterOf(sim).stage.basin
   },
   chaseDir(sim, eid, tx, ty) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = norm(tx - x, ty - y)
-    const s = storybookOf(sim)
-    if (phases(sim.world, eid, 'paper')) return alongWall(s.book.basin, x, y, d.x, d.y, Radius.v[eid]! + 0.3 * UNIT)
+    const s = theaterOf(sim)
+    if (phases(sim.world, eid, 'paper')) return alongWall(s.stage.basin, x, y, d.x, d.y, Radius.v[eid]! + 0.3 * UNIT)
     const big = bigOf(sim, eid)
     const b = big ? s.high : s.low
     const rad = Radius.v[eid]!
     const lead = leaderPoint(sim)
     if ((tx - lead.x) ** 2 + (ty - lead.y) ** 2 < (3 * UNIT) ** 2 && !clearPath(b, x, y, tx, ty, rad * 0.9)) {
-      const dir = descend(s.book, flowOf(sim, s, big ? 1 : 0), x, y)
+      const dir = descend(s.stage, flowOf(sim, s, big ? 1 : 0), x, y)
       if (dir) return alongWall(b, x, y, dir.x, dir.y, rad + 0.2 * UNIT)
     }
     return alongWall(b, x, y, d.x, d.y, rad + 0.3 * UNIT)
@@ -446,7 +446,7 @@ export const storybook: WorldHooks = {
   trace(sim, probe, ax, ay, bx, by) {
     if (passCost(probe, 'paper') <= 0) return null
     let best: Crossing | null = null
-    for (const st of storybookOf(sim).stands) {
+    for (const st of theaterOf(sim).stands) {
       const span = slabSpan(st.slab, ax, ay, bx, by)
       if (!span || (best && span[0] >= best.t0)) continue
       if (Math.min(probeZ(probe, span[0]), probeZ(probe, span[1])) >= st.top) continue
@@ -455,57 +455,57 @@ export const storybook: WorldHooks = {
     return best
   },
   solidAt(sim, x, y) {
-    for (const st of storybookOf(sim).stands) if (slabSd(st.slab, x / UNIT, y / UNIT) < 0) return { topM: st.piece.h, material: 'paper' }
+    for (const st of theaterOf(sim).stands) if (slabSd(st.slab, x / UNIT, y / UNIT) < 0) return { topM: st.piece.h, material: 'paper' }
     return null
   },
   impact(sim, x, y, material) {
     if (material === 'paper') sim.out.bursts.push({ x, y, count: 2, kind: 'paper' })
   },
   wanderDir(sim, eid, dx, dy) {
-    return wanderIn(basinOf(sim, storybookOf(sim), eid), eid, dx, dy)
+    return wanderIn(basinOf(sim, theaterOf(sim), eid), eid, dx, dy)
   },
   fleeDir(sim, eid, awayX, awayY) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = fleeSteer(x, y, awayX, awayY, sim.mapW, sim.mapH, 1.5 * UNIT)
-    return alongWall(basinOf(sim, storybookOf(sim), eid), x, y, d.x, d.y, Radius.v[eid]! + 1.5 * UNIT)
+    return alongWall(basinOf(sim, theaterOf(sim), eid), x, y, d.x, d.y, Radius.v[eid]! + 1.5 * UNIT)
   },
   /** 刷怪点落在台上、离布景与台边至少一格，离队长够远；头目更远 */
   spawnPoint(sim, boss) {
-    const s = storybookOf(sim)
-    const book = s.book
+    const s = theaterOf(sim)
+    const stage = s.stage
     const lead = leaderPoint(sim)
     const far = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
-    let p: Point = { x: book.start.x * UNIT, y: book.start.y * UNIT }
+    let p: Point = { x: stage.start.x * UNIT, y: stage.start.y * UNIT }
     for (let i = 0; i < 48; i++) {
-      p = { x: (book.x0 + (book.x1 - book.x0) * sim.rng.next()) * UNIT, y: (book.y0 + (book.y1 - book.y0) * sim.rng.next()) * UNIT }
+      p = { x: (stage.x0 + (stage.x1 - stage.x0) * sim.rng.next()) * UNIT, y: (stage.y0 + (stage.y1 - stage.y0) * sim.rng.next()) * UNIT }
       if (roomAt(s.low, p.x, p.y) < UNIT) continue
       if ((p.x - lead.x) ** 2 + (p.y - lead.y) ** 2 >= far * far) return p
     }
     return openNear(s, p, UNIT)
   },
   center(sim) {
-    const st = storybookOf(sim).book.start
+    const st = theaterOf(sim).stage.start
     return { x: st.x * UNIT, y: st.y * UNIT }
   },
   settle(sim, p) {
-    return openNear(storybookOf(sim), p, SPAWN.edgeInset * UNIT)
+    return openNear(theaterOf(sim), p, SPAWN.edgeInset * UNIT)
   },
   canSpawn(sim, x, y, radius) {
-    return roomFor(storybookOf(sim).low, x, y, radius)
+    return roomFor(theaterOf(sim).low, x, y, radius)
   },
   landmarks(sim) {
-    const s = storybookOf(sim)
+    const s = theaterOf(sim)
     return { trap: s.traps, wings: s.wings }
   },
   onStart(sim) {
-    storybookOf(sim)
+    theaterOf(sim)
   },
   /** 按难度时钟换幕；台上的布景一变就重铺距离场，换幕时刚落下来的沿底边扬灰 */
   tick(sim) {
     const cfg = cfgOf(sim)
-    const s = storybookOf(sim)
-    s.clock = bookClock(sim, cfg, s.book)
+    const s = theaterOf(sim)
+    s.clock = stageClock(sim, cfg, s.stage)
     const popped = refresh(s, cfg)
     const wings = s.clock.phase === 'stand' ? s.key : ''
     if (wings !== s.wingsKey) {

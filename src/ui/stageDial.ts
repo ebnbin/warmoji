@@ -16,10 +16,10 @@ function fill4(g: Phaser.GameObjects.Graphics, pts: readonly { x: number; y: num
 }
 
 /**
- * 换幕盘：盘心一座小剧场，外圈一道倒计时——演着时是离下一次换幕还有多久，快换幕时整圈闪着橙光、红幕往里收，
- * 换幕时台上暗下来、布景吊在半空。盘下右对齐写着还有几秒；新一幕刚开演的那几秒写着这一幕叫什么
+ * 换幕盘：盘心一座小舞台，外圈一道倒计时——演着时是离下一次换幕还有多久，快换幕时整圈闪着橙光、红幕往里收，
+ * 换幕时白光打在台上、布景吊在半空。盘下右对齐写着还有几秒；新一幕刚开演的那几秒写着这一幕叫什么
  */
-export class BookDial extends Widget {
+export class StageDial extends Widget {
   private readonly ring: Phaser.GameObjects.Graphics
   private readonly glyph: Phaser.GameObjects.Graphics
   private readonly reading: Pill
@@ -40,7 +40,7 @@ export class BookDial extends Widget {
   }
 
   /** phase 是演着（stand）、快换幕（warn）还是正在换（turn）；ratio 是离下一次换幕还剩多少；title 不为空时写幕名 */
-  setBook(phase: 'stand' | 'warn' | 'turn', ratio: number, inSec: number, title: string | null, now: number): this {
+  setStage(phase: 'stand' | 'warn' | 'turn', ratio: number, inSec: number, title: string | null, now: number): this {
     const s = this.shown
     const blink = phase === 'warn' && Math.floor(now / 250) % 2 === 0
     if (phase !== s.phase || Math.abs(ratio - s.ratio) > 0.004 || blink !== s.blink) {
@@ -75,28 +75,28 @@ export class BookDial extends Widget {
   }
 
   /**
-   * 一座小剧场：台面、两边红幕，台上立着一棵剪纸小树、一座小塔；快换幕时红幕一闪一闪地往里收，
-   * 换幕时台上暗下来、一束追光照着，小塔挂着两根吊绳升在半空
+   * 一座小舞台：台面、两边红幕，台上立着一棵小树、一座小塔；快换幕时红幕一闪一闪地往里收，
+   * 换幕时一束白光打在台上，小塔挂着两根吊绳升在半空
    */
   private drawGlyph(phase: string, now: number): void {
     const g = this.glyph.clear()
     const r = this.radius * 0.62
-    const dark = phase === 'turn'
+    const lit = phase === 'turn'
     // 台后的墙与台面
     g.fillStyle(SURFACE.outline, 1).fillRoundedRect(-r * 1.08, -r * 0.72, r * 2.16, r * 1.44, r * 0.1)
-    g.fillStyle(dark ? 0x1a1018 : 0x3a2a40, 1).fillRect(-r * 1.0, -r * 0.64, r * 2.0, r * 0.7)
-    g.fillStyle(dark ? 0x4a3020 : 0xc9925a, 1)
+    g.fillStyle(0x3a2a40, 1).fillRect(-r * 1.0, -r * 0.64, r * 2.0, r * 0.7)
+    g.fillStyle(0xc9925a, 1)
     fill4(g, [{ x: -r * 1.0, y: r * 0.06 }, { x: r * 1.0, y: r * 0.06 }, { x: r * 1.0, y: r * 0.64 }, { x: -r * 1.0, y: r * 0.64 }])
-    if (dark) {
-      g.fillStyle(0xfff3c4, 0.35)
+    if (lit) {
+      g.fillStyle(0xffffff, 0.45)
       fill4(g, [{ x: -r * 0.12, y: -r * 0.64 }, { x: r * 0.12, y: -r * 0.64 }, { x: r * 0.36, y: r * 0.5 }, { x: -r * 0.36, y: r * 0.5 }])
-      g.fillStyle(0xfff3c4, 0.5).fillEllipse(0, r * 0.42, r * 0.8, r * 0.22)
+      g.fillStyle(0xffffff, 0.6).fillEllipse(0, r * 0.42, r * 0.9, r * 0.26)
     }
-    // 台上的剪纸：小树一直立着；小塔换幕时吊在半空
+    // 台上的布景：小树一直立着；小塔换幕时吊在半空
     g.fillStyle(SURFACE.outline, 1).fillTriangle(-r * 0.62, r * 0.32, -r * 0.4, -r * 0.36, -r * 0.18, r * 0.32)
-    g.fillStyle(dark ? 0x2f4a2a : TONE.good.face, 1).fillTriangle(-r * 0.57, r * 0.28, -r * 0.4, -r * 0.26, -r * 0.23, r * 0.28)
-    const up = dark ? r * (0.32 + 0.06 * Math.sin(now / 200)) : 0
-    if (dark) {
+    g.fillStyle(TONE.good.face, 1).fillTriangle(-r * 0.57, r * 0.28, -r * 0.4, -r * 0.26, -r * 0.23, r * 0.28)
+    const up = lit ? r * (0.32 + 0.06 * Math.sin(now / 200)) : 0
+    if (lit) {
       g.lineStyle(1.5, INK.faint, 1)
       g.lineBetween(r * 0.26, -r * 0.26 - up, r * 0.26, -r * 0.72)
       g.lineBetween(r * 0.56, -r * 0.26 - up, r * 0.56, -r * 0.72)
