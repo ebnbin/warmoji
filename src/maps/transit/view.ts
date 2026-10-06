@@ -8,10 +8,13 @@ import { loadSettings } from '../../save/settings'
 import { FONT_FAMILY } from '../../ui/theme'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
-import { EXPRESS_COLOR, doorOffsets, toWorld } from './layout'
+import { EXPRESS_COLOR, doorOffsets, toLocal, toWorld } from './layout'
+import { roomAt } from '../basin'
+import { query } from 'bitecs'
+import { ENEMY_SET, Transform } from '../../ecs/components'
 import { textureSize } from './ground'
 import { TransitPainter } from './painter'
-import { drawBeam, drawCabin, drawGlow, drawRoof, drawTrainShadow, trainFrame } from './sprites'
+import { drawBeam, drawBrush, drawCabin, drawGlow, drawRobot, drawRoof, drawTrainShadow, trainFrame } from './sprites'
 import { scheduleOf, transitOf, transitPlanFor } from './world'
 import type { PaintTask } from './painter'
 import type { PaintScene } from './ground'
@@ -31,6 +34,11 @@ const GROUND_KEY = 'transit-ground'
 const COVER_KEY = 'transit-cover'
 const GLOW_KEY = 'transit-glow'
 const BEAM_KEY = 'transit-beam'
+const ROBOT_KEY = 'transit-robot'
+const BRUSH_KEY = 'transit-brush'
+/** 清洁机器人：多大、走多快、躲人时多快（格、格/秒），离人多近就躲（格） */
+const ROBOT = { sizeU: 0.56, speedU: 0.7, fleeU: 1.7, shyU: 1.4 } as const
+const ROBOT_DEPTH = 0.9
 /** 开局最多几个线程分着画；贴图按这么多像素高的条分块交给线程 */
 const PAINT_THREADS = 4
 const STRIP_PX = 64
@@ -51,6 +59,8 @@ const LAMP_LEN_U = 0.42
 const LAMP_W_U = 0.09
 /** 灯光晕在站台面上往外铺多宽（格） */
 const HALO_U = 0.34
+/** 道床中线上的嵌灯隔多远（格），与地面上画的伸缩缝之间的嵌灯对齐 */
+const BED_LAMP_U = 3
 /** 灯槽中线离道床边多远（格），与地面上画的灯槽对齐 */
 const SLOT_AT_U = 0.12
 /** 预警时流过站台边的光：一串隔多远（格），起头与最后流得多快（格/秒） */
@@ -91,6 +101,20 @@ interface TrainArt {
   closing: boolean
 }
 
+/** 一台清洁机器人：在哪块站台上来回拖地，朝哪走，转到哪个方向，停多久，机身与边刷 */
+interface Robot {
+  readonly v0: number
+  readonly v1: number
+  x: number
+  y: number
+  heading: number
+  turn: number
+  rest: number
+  spin: number
+  readonly body: Phaser.GameObjects.Image
+  readonly brushes: Phaser.GameObjects.Image[]
+}
+
 /** 岛式站台上的全息时刻表：浮在底座上方的一块青色的牌子，写着两边轨道的下一班 */
 interface Holo {
   readonly f: Extract<Fixture, { kind: 'kiosk' }>
@@ -111,7 +135,9 @@ export class TransitView implements MapView {
   private painter?: TransitPainter
   private trains: TrainArt[] = []
   private holos: Holo[] = []
+  private robots: Robot[] = []
   private lights?: Phaser.GameObjects.Graphics
+  private beacons?: Phaser.GameObjects.Graphics
   private shake = true
   private ready = false
 
@@ -143,6 +169,8 @@ export class TransitView implements MapView {
     art('transit-shadow', cfg.train, (ctx) => drawTrainShadow(ctx, cfg.train, TRAIN_PPU))
     art('transit-shadow-express', cfg.express, (ctx) => drawTrainShadow(ctx, cfg.express, TRAIN_PPU))
     if (!scene.textures.exists(GLOW_KEY)) canvasTexture(scene, GLOW_KEY, 64, 64, (ctx) => drawGlow(ctx, 64))
+    if (!scene.textures.exists(ROBOT_KEY)) canvasTexture(scene, ROBOT_KEY, 64, 64, (ctx) => drawRobot(ctx, 64))
+    if (!scene.textures.exists(BRUSH_KEY)) canvasTexture(scene, BRUSH_KEY, 32, 32, (ctx) => drawBrush(ctx, 32))
     if (!scene.textures.exists(BEAM_KEY)) canvasTexture(scene, BEAM_KEY, 128, 64, (ctx) => drawBeam(ctx, 128, 64))
     this.shake = loadSettings(browserStorage()).hitShake
   }
@@ -179,9 +207,11 @@ export class TransitView implements MapView {
     this.visuals.push(scene.add.image(0, 0, GROUND_KEY).setOrigin(0, 0).setDisplaySize(span, span).setDepth(-1))
     this.visuals.push(scene.add.image(0, 0, COVER_KEY).setOrigin(0, 0).setDisplaySize(span, span).setDepth(COVER_DEPTH))
     this.lights = scene.add.graphics().setDepth(LIGHTS_DEPTH)
-    this.visuals.push(this.lights)
+    this.beacons = scene.add.graphics().setDepth(GLOW_DEPTH)
+    this.visuals.push(this.lights, this.beacons)
     for (const t of st.plan.tracks) this.trains.push(this.trainArt(v, t))
     for (const f of st.plan.fixtures) if (f.kind === 'kiosk') this.holos.push(this.holo(v, st.plan, f))
+    this.seedRobots(v, st.plan)
     v.lens.screen.vignette(0.82, 0.14, 0x3a4654)
     this.ready = true
   }
@@ -229,14 +259,17 @@ export class TransitView implements MapView {
     const now = sim.elapsedMs
     const sched = scheduleOf(sim)
     this.lights!.clear()
+    this.beacons!.clear()
     this.trains.forEach((a, i) => {
       const tr = sched[i] ?? null
       this.drawTrain(st.plan, cfg, a, tr, now)
       this.drawEdge(st.plan, cfg, a.track, tr, now)
+      this.drawBeacons(st.plan, cfg, a.track, tr, now)
       this.sounds(v, st.plan, cfg, a, tr)
     })
     this.drawHolos(st, cfg, sched, now)
     this.knocks(v, transitOf(sim))
+    this.stepRobots(sim, st.plan, Math.min(_delta, 100) / 1000)
   }
 
   /** 列车的车影、车厢与车顶：门开到几成车顶就淡下去几成；车头的灯往前打，进站、出站时亮，停着时暗一点；预警时隧道口透出越来越亮的光 */
@@ -311,33 +344,63 @@ export class TransitView implements MapView {
     const k = tr && phase === 'warn' ? clamp01(tr.into / tr.shape.ms.warn) : 0
     const speed = CHASE_SPEED[0] + (CHASE_SPEED[1] - CHASE_SPEED[0]) * k
     const run = (now / 1000) * speed
-    for (let u = plan.u0 + LAMP_STEP_U / 2; u < plan.u1; u += LAMP_STEP_U) {
-      let color = IDLE
-      let alpha = 0.22
+    const shade = (u: number): readonly [number, number] => {
       if (phase === 'warn' && tr) {
         const along = u * t.dir - run
         const f = ((along % CHASE_GAP_U) + CHASE_GAP_U) % CHASE_GAP_U
         const pulse = Math.exp(-(((f - CHASE_GAP_U / 2) / 0.45) ** 2))
-        color = AMBER
-        alpha = tr.left < 600 ? 1 : 0.16 + 0.3 * k + 0.75 * pulse
-      } else if (phase === 'arrive' || phase === 'depart') {
-        color = AMBER
-        alpha = 0.85 + 0.15 * Math.sin(now / 60 + u)
-      } else if (tr && (phase === 'open' || phase === 'dwell' || phase === 'close')) {
-        const atDoor = doors.some((dd) => Math.abs(u - dd) < doorHalf)
-        if (atDoor && tr.doors > 0.3) {
-          color = closing ? RED : GREEN
-          alpha = closing ? (blink ? 1 : 0.15) : 0.9
-        } else {
-          color = closing ? AMBER : IDLE
-          alpha = closing ? 0.45 : 0.4
-        }
+        return [AMBER, tr.left < 600 ? 1 : 0.16 + 0.3 * k + 0.75 * pulse]
       }
+      if (phase === 'arrive' || phase === 'depart') return [AMBER, 0.85 + 0.15 * Math.sin(now / 60 + u)]
+      if (tr && (phase === 'open' || phase === 'dwell' || phase === 'close')) {
+        const atDoor = doors.some((dd) => Math.abs(u - dd) < doorHalf)
+        if (atDoor && tr.doors > 0.3) return closing ? [RED, blink ? 1 : 0.15] : [GREEN, 0.9]
+        return closing ? [AMBER, 0.45] : [IDLE, 0.4]
+      }
+      return [IDLE, 0.22]
+    }
+    for (let u = plan.u0 + LAMP_STEP_U / 2; u < plan.u1; u += LAMP_STEP_U) {
+      const [color, alpha] = shade(u)
       for (const side of [-1, 1]) {
         g.fillStyle(color, alpha * 0.22)
         this.lamp(plan, u, t.v + side * (half + HALO_U / 2), LAMP_STEP_U, HALO_U)
         g.fillStyle(color, Math.min(1, 0.35 + alpha))
         this.lamp(plan, u, t.v + side * half, LAMP_LEN_U, LAMP_W_U)
+      }
+    }
+    if (phase !== 'warn' && phase !== 'arrive' && phase !== 'depart') return
+    for (let u = Math.ceil((plan.u0 - BED_LAMP_U / 2) / BED_LAMP_U) * BED_LAMP_U + BED_LAMP_U / 2; u < plan.u1; u += BED_LAMP_U) {
+      const alpha = shade(u)[1]
+      const c = toWorld(plan, u, t.v)
+      g.fillStyle(AMBER, alpha * 0.3).fillCircle(c.x * UNIT, c.y * UNIT, 0.26 * UNIT)
+      g.fillStyle(AMBER, Math.min(1, 0.2 + alpha)).fillCircle(c.x * UNIT, c.y * UNIT, 0.08 * UNIT)
+    }
+  }
+
+  /**
+   * 隧道口两边的信号灯：预警时琥珀色左右交替闪，越近进站闪得越急；列车进站、出站时常亮，平时只亮一点绿
+   */
+  private drawBeacons(plan: TransitPlan, cfg: TransitConfig, t: Track, tr: TrainNow | null, now: number): void {
+    const g = this.beacons!
+    const phase = tr?.phase ?? 'none'
+    const k = tr && phase === 'warn' ? clamp01(tr.into / tr.shape.ms.warn) : 0
+    const period = 520 - 300 * k
+    const flip = Math.floor(now / period) % 2
+    const half = cfg.tracks.bedU / 2 + 0.32
+    for (const end of [plan.u0 - 0.3, plan.u1 + 0.3]) {
+      const coming = phase === 'warn' && (t.dir > 0 ? end < plan.u0 : end > plan.u1)
+      const running = phase === 'arrive' || phase === 'depart'
+      for (const [i, side] of [-1, 1].entries()) {
+        const on = coming ? flip === i : running
+        const c = toWorld(plan, end, t.v + side * half)
+        const x = c.x * UNIT
+        const y = c.y * UNIT
+        g.fillStyle(0x20262e, 1).fillCircle(x, y, 0.17 * UNIT)
+        if (on) {
+          g.fillStyle(AMBER, 0.28).fillCircle(x, y, 0.42 * UNIT)
+          g.fillStyle(AMBER, 1).fillCircle(x, y, 0.12 * UNIT)
+          g.fillStyle(0xfff4d6, 1).fillCircle(x - 0.03 * UNIT, y - 0.03 * UNIT, 0.05 * UNIT)
+        } else g.fillStyle(coming || running ? 0x5a4020 : 0x2f8f5a, 1).fillCircle(x, y, 0.1 * UNIT)
       }
     }
   }
@@ -406,6 +469,79 @@ export class TransitView implements MapView {
     }
   }
 
+  /** 每块站台放一台清洁机器人，摆在站台中间一处空地上 */
+  private seedRobots(v: ViewCtx, plan: TransitPlan): void {
+    const edge = v.def.transit!.tracks.edgeU + 0.45
+    for (const p of plan.platforms) {
+      const v0 = p.v0 + (p.outer === 0 ? 0.45 : edge)
+      const v1 = p.v1 - (p.outer === 1 ? 0.45 : edge)
+      if (v1 - v0 < 0.8) continue
+      for (let tries = 0; tries < 20; tries++) {
+        const u = plan.u0 + 2 + Math.random() * (plan.u1 - plan.u0 - 4)
+        const lv = v0 + Math.random() * (v1 - v0)
+        const w = toWorld(plan, u, lv)
+        if (roomAt(plan.basin, w.x * UNIT, w.y * UNIT) < 0.5 * UNIT) continue
+        const body = v.scene.add.image(0, 0, ROBOT_KEY).setDepth(ROBOT_DEPTH + 0.01).setDisplaySize(ROBOT.sizeU * UNIT, ROBOT.sizeU * UNIT)
+        const brushes = [0, 1].map(() => v.scene.add.image(0, 0, BRUSH_KEY).setDepth(ROBOT_DEPTH).setDisplaySize(ROBOT.sizeU * 0.42 * UNIT, ROBOT.sizeU * 0.42 * UNIT))
+        this.visuals.push(body, ...brushes)
+        const heading = Math.random() * Math.PI * 2
+        this.robots.push({ v0, v1, x: w.x, y: w.y, heading, turn: heading, rest: Math.random() * 3, spin: 0, body, brushes })
+        break
+      }
+    }
+  }
+
+  /** 清洁机器人沿着站台慢慢拖地，碰到设施、站台边就掉头，隔一阵停下来转个方向；有人走近就加快躲开 */
+  private stepRobots(sim: Sim, plan: TransitPlan, dt: number): void {
+    const near: Point[] = []
+    for (const m of sim.characters) near.push({ x: Transform.x[m]! / UNIT, y: Transform.y[m]! / UNIT })
+    for (const e of query(sim.world, ENEMY_SET)) near.push({ x: Transform.x[e]! / UNIT, y: Transform.y[e]! / UNIT })
+    const l = { u: 0, v: 0 }
+    for (const r of this.robots) {
+      let speed: number = ROBOT.speedU
+      let closest = Infinity
+      let away = 0
+      for (const p of near) {
+        const d = Math.hypot(p.x - r.x, p.y - r.y)
+        if (d < closest) {
+          closest = d
+          away = Math.atan2(r.y - p.y, r.x - p.x)
+        }
+      }
+      if (closest < ROBOT.shyU) {
+        r.turn = away
+        r.rest = 0
+        speed = ROBOT.fleeU
+      } else if (r.rest > 0) {
+        r.rest -= dt
+        speed = 0
+      } else if (Math.random() < dt * 0.15) {
+        r.rest = 0.6 + Math.random() * 1.6
+        r.turn = r.heading + (Math.random() - 0.5) * Math.PI
+      }
+      const diff = Math.atan2(Math.sin(r.turn - r.heading), Math.cos(r.turn - r.heading))
+      r.heading += Math.sign(diff) * Math.min(Math.abs(diff), dt * 3)
+      const nx = r.x + Math.cos(r.heading) * speed * dt
+      const ny = r.y + Math.sin(r.heading) * speed * dt
+      toLocal(plan, nx, ny, l)
+      const blocked = l.v < r.v0 || l.v > r.v1 || l.u < plan.u0 + 0.6 || l.u > plan.u1 - 0.6 || roomAt(plan.basin, nx * UNIT, ny * UNIT) < 0.32 * UNIT
+      if (blocked) r.turn = r.heading + Math.PI * (0.6 + Math.random() * 0.8)
+      else {
+        r.x = nx
+        r.y = ny
+      }
+      r.spin += dt * (speed > 0 ? 14 : 4)
+      r.body.setPosition(r.x * UNIT, r.y * UNIT).setRotation(r.heading)
+      r.brushes.forEach((b, k) => {
+        const side = k === 0 ? -1 : 1
+        const fx = Math.cos(r.heading)
+        const fy = Math.sin(r.heading)
+        const off = ROBOT.sizeU * 0.34
+        b.setPosition((r.x + fx * off - fy * side * off * 0.8) * UNIT, (r.y + fy * off + fx * side * off * 0.8) * UNIT).setRotation(r.spin * side)
+      })
+    }
+  }
+
   /** 撞车：看得见就砰的一声；撞到队员时镜头震一下 */
   private knocks(v: ViewCtx, st: TransitState): void {
     for (const k of st.knocks) {
@@ -428,6 +564,7 @@ export class TransitView implements MapView {
     this.visuals = []
     this.trains = []
     this.holos = []
+    this.robots = []
     this.lights = undefined
     this.ready = false
     for (const key of [GROUND_KEY, COVER_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)

@@ -122,16 +122,29 @@ interface Numeral {
   readonly y1: number
 }
 
-/** 七段式的数字：字高 2、字宽 1，原点在字心 */
-const DIGIT: Readonly<Record<number, readonly (readonly [number, number, number, number])[]>> = {
-  1: [[0.1, -1, 0.1, 1], [-0.4, -0.55, 0.1, -1]],
-  2: [[-0.5, -1, 0.5, -1], [0.5, -1, 0.5, 0], [0.5, 0, -0.5, 0], [-0.5, 0, -0.5, 1], [-0.5, 1, 0.5, 1]],
-  3: [[-0.5, -1, 0.5, -1], [0.5, -1, 0.5, 1], [-0.3, 0, 0.5, 0], [-0.5, 1, 0.5, 1]],
+/** 一段圆弧上的点：圆心 (cx, cy)、半径 r，从 a0 转到 a1（弧度，y 朝下），取 n 段 */
+function arc(cx: number, cy: number, r: number, a0: number, a1: number, n: number): [number, number][] {
+  const out: [number, number][] = []
+  for (let i = 0; i <= n; i++) {
+    const a = a0 + ((a1 - a0) * i) / n
+    out.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r])
+  }
+  return out
+}
+
+/** 线路号的笔画：字高 2、字宽约 1，原点在字心，y 朝下；每个字几条折线 */
+const GLYPH: Readonly<Record<number, readonly (readonly [number, number])[][]>> = {
+  1: [[[-0.38, -0.62], [0.08, -1], [0.08, 1]], [[-0.38, 1], [0.52, 1]]],
+  2: [[...arc(0, -0.48, 0.5, Math.PI * 1.08, Math.PI * 2.22, 10), [-0.52, 1], [0.56, 1]]],
+  3: [arc(-0.02, -0.5, 0.47, Math.PI * 1.1, Math.PI * 2.5, 12), arc(-0.02, 0.48, 0.52, Math.PI * 1.5, Math.PI * 2.9, 12)],
 }
 
 function numeral(n: number, x: number, y: number, size: number, w: number, color: number): Numeral {
   const k = size / 2
-  const segs = (DIGIT[n] ?? []).map(([ax, ay, bx, by]) => ({ ax: x + ax * k, ay: y + ay * k, bx: x + bx * k, by: y + by * k }))
+  const segs: Seg[] = []
+  for (const line of GLYPH[n] ?? []) {
+    for (let i = 1; i < line.length; i++) segs.push({ ax: x + line[i - 1]![0] * k, ay: y + line[i - 1]![1] * k, bx: x + line[i]![0] * k, by: y + line[i]![1] * k })
+  }
   return { segs, w, color: rgbOf(color), x0: x - k - w, y0: y - k - w, x1: x + k + w, y1: y + k + w }
 }
 

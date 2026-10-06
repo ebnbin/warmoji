@@ -262,3 +262,50 @@ export function drawBeam(ctx: CanvasRenderingContext2D, w: number, h: number): v
   ctx.fill()
 }
 
+
+/** 清洁机器人的机身：从上往下看一只白色的扁圆，前面一道深色的防撞条，顶上一圈亮着的状态灯，头朝贴图的右边 */
+export function drawRobot(ctx: CanvasRenderingContext2D, size: number): void {
+  const c = size / 2
+  const r = size * 0.44
+  ctx.fillStyle = 'rgba(20, 30, 44, 0.28)'
+  ctx.beginPath()
+  ctx.arc(c + size * 0.03, c + size * 0.04, r, 0, Math.PI * 2)
+  ctx.fill()
+  const g = ctx.createRadialGradient(c - r * 0.3, c - r * 0.3, r * 0.1, c, c, r)
+  g.addColorStop(0, '#ffffff')
+  g.addColorStop(0.7, '#e9eef3')
+  g.addColorStop(1, '#b9c3cf')
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(c, c, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#3a4350'
+  ctx.lineWidth = size * 0.07
+  ctx.beginPath()
+  ctx.arc(c, c, r - size * 0.03, -Math.PI * 0.42, Math.PI * 0.42)
+  ctx.stroke()
+  ctx.strokeStyle = '#4fe3ef'
+  ctx.lineWidth = size * 0.045
+  ctx.beginPath()
+  ctx.arc(c, c, r * 0.45, Math.PI * 0.6, Math.PI * 1.4)
+  ctx.stroke()
+  ctx.fillStyle = '#4fe3ef'
+  ctx.beginPath()
+  ctx.arc(c + r * 0.25, c, size * 0.04, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+/** 清洁机器人前面两把转着的边刷：三根细刷毛 */
+export function drawBrush(ctx: CanvasRenderingContext2D, size: number): void {
+  const c = size / 2
+  ctx.strokeStyle = 'rgba(70, 80, 92, 0.85)'
+  ctx.lineWidth = size * 0.06
+  ctx.lineCap = 'round'
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2
+    ctx.beginPath()
+    ctx.moveTo(c, c)
+    ctx.lineTo(c + Math.cos(a) * c * 0.9, c + Math.sin(a) * c * 0.9)
+    ctx.stroke()
+  }
+}

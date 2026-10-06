@@ -29,6 +29,7 @@ export interface BoardRow {
 export class ArrivalBoard extends Widget {
   private readonly g: Phaser.GameObjects.Graphics
   private readonly texts: Label[] = []
+  private readonly badges: Label[] = []
   private shown: string[] = []
 
   constructor(scene: Phaser.Scene, right: number, top: number, rows: number) {
@@ -42,7 +43,9 @@ export class ArrivalBoard extends Widget {
     for (let i = 0; i < rows; i++) {
       const t = new Label(scene, PAD + BADGE_R * 2 + 26, PAD + i * ROW_H + ROW_H / 2 - 3, '', { kind: 'label', bold: true }).setOrigin(0, 0.5)
       this.texts.push(t)
-      this.add(t)
+      const n = new Label(scene, PAD + BADGE_R, PAD + i * ROW_H + ROW_H / 2 - 3, '', { kind: 'caption', bold: true, color: 'dark' }).setOrigin(0.5, 0.52)
+      this.badges.push(n)
+      this.add([t, n])
     }
   }
 
@@ -58,7 +61,6 @@ export class ArrivalBoard extends Widget {
       g.fillStyle(SURFACE.outline, 1).fillCircle(bx, mid + 2, BADGE_R)
       g.fillStyle(r.express ? TONE.accent.face : r.color, 1).fillCircle(bx, mid, BADGE_R)
       g.fillStyle(0xffffff, 0.22).fillEllipse(bx, mid - BADGE_R * 0.5, BADGE_R * 1.2, BADGE_R * 0.5)
-      this.digit(g, r.label, bx, mid)
       this.arrow(g, r.arrow, bx + BADGE_R + 13, mid, r.state === 'wait' ? INK.faint : INK.soft)
       const x0 = PAD + BADGE_R * 2 + 26
       const bw = W - x0 - PAD - 4
@@ -67,7 +69,7 @@ export class ArrivalBoard extends Widget {
       const left = Math.max(0, Math.min(1, r.ratio))
       if (left > 0) g.fillStyle(tone, 1).fillRoundedRect(x0, y + ROW_H - 9, Math.max(BAR_H, bw * left), BAR_H, 2)
       const sec = Math.max(0, Math.ceil(r.inSec))
-      const head = r.express ? '专列' : ''
+      const head = r.express ? '专列 ' : ''
       const text =
         r.state === 'wait' || r.state === 'warn'
           ? `${head}${sec} 秒后进站`
@@ -80,6 +82,8 @@ export class ArrivalBoard extends Widget {
                 : `${head}出站中`
       const ink: TextColor = r.state === 'wait' ? 'soft' : r.state === 'open' ? 'good' : r.state === 'closing' ? 'bad' : 'warn'
       const key = `${text}|${ink}`
+      const badge = this.badges[i]
+      if (badge && badge.text !== String(r.label)) badge.setText(String(r.label))
       const label = this.texts[i]
       if (label && this.shown[i] !== key) {
         label.setText(text).setInk(ink).fit(bw)
@@ -87,18 +91,6 @@ export class ArrivalBoard extends Widget {
       }
     })
     return this
-  }
-
-  /** 圆牌上的线路号：几段粗线拼的数字，不随字体变 */
-  private digit(g: Phaser.GameObjects.Graphics, n: number, x: number, y: number): void {
-    const s = BADGE_R * 0.5
-    const segs: Record<number, readonly (readonly [number, number, number, number])[]> = {
-      1: [[0.15, -1, 0.15, 1], [-0.35, -0.6, 0.15, -1]],
-      2: [[-0.6, -1, 0.6, -1], [0.6, -1, 0.6, 0], [0.6, 0, -0.6, 0], [-0.6, 0, -0.6, 1], [-0.6, 1, 0.6, 1]],
-      3: [[-0.6, -1, 0.6, -1], [0.6, -1, 0.6, 1], [-0.4, 0, 0.6, 0], [-0.6, 1, 0.6, 1]],
-    }
-    g.lineStyle(3.4, SURFACE.outline, 1)
-    for (const [ax, ay, bx, by] of segs[n] ?? []) g.lineBetween(x + ax * s, y + ay * s * 1.1, x + bx * s, y + by * s * 1.1)
   }
 
   private arrow(g: Phaser.GameObjects.Graphics, dir: BoardRow['arrow'], x: number, y: number, color: number): void {
