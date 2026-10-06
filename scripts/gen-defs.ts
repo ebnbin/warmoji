@@ -126,7 +126,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebulaOld.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
 }
 
-/** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束 */
+/** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束；整座山都积满雪 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'volcano') === (m.volcano !== undefined), `maps.${id} 是火山当且仅当写了 volcano`)
   const v = m.volcano
@@ -135,6 +135,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const e = v.eruption
   const l = v.lava
   const r = v.rim
+  const s = v.snow
   const side = Math.min(m.size?.w ?? MAP_DEFAULTS.width, m.size?.h ?? MAP_DEFAULTS.height)
   need(r.insetU[0] > 0 && r.insetU[0] <= r.insetU[1] && r.insetU[1] < side / 4, `maps.${id}.volcano.rim.insetU 须让盆地的边落在地图边以内、离中线足够远`)
   need(r.waveU > 0 && r.cornerU >= 0 && r.neckU > 0, `maps.${id}.volcano.rim 的波长、窄缝须为正，磨角不为负`)
@@ -147,17 +148,20 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(c.insetU[1] < c.blockU * (1 - c.blockJitter), `maps.${id}.volcano.cone 须让山体压过地图边：山后没有路，绕山总从朝地图里的那一侧`)
   need(c.craterU + v.cellU * 2 <= c.blockU && c.blockU < c.radiusU, `maps.${id}.volcano.cone 须火山口、熔岩漫出的那圈都在挡路圈里，缓坡铺到挡路圈外`)
   need(c.footHeight > 0 && c.footHeight < c.height, `maps.${id}.volcano.cone 的山脚须高于平地、低于口沿`)
-  need(c.craterDepth > 0 && c.lakeDepth > 0 && c.lakeDepth < c.craterDepth && c.gullyDepth >= 0, `maps.${id}.volcano.cone 的熔岩湖须低于火山口沿`)
+  need(c.craterDepth > 0 && c.gullyDepth >= 0, `maps.${id}.volcano.cone 的火山口须有深度、冲沟深度不为负`)
   need(v.terrain.tilt >= 0 && v.terrain.relief >= 0 && v.terrain.waveU > 0, `maps.${id}.volcano.terrain 的坡度、起伏不为负，波长为正`)
   need(e.firstMs >= 0 && e.warnMs > 0 && e.rate > 0 && e.waneMs > 0 && e.peakMs > 0 && e.peakMs < e.effuseMs, `maps.${id}.volcano.eruption 的时长与流量须为正，流量在停之前涨到顶`)
   need(e.intervalJitterMs >= 0 && e.intervalMs - e.intervalJitterMs > e.warnMs + e.effuseMs, `maps.${id}.volcano.eruption 的间隔减去抖动须长过预兆加出熔岩`)
   need(Number.isInteger(e.lobes[0]) && Number.isInteger(e.lobes[1]) && e.lobes[0] >= 1 && e.lobes[0] <= e.lobes[1], `maps.${id}.volcano.eruption.lobes 须为不小于 1 的整数范围`)
-  need(e.lobeDeg > 0 && e.lobeFloor >= 0 && e.lobeSpreadDeg >= 0 && e.lobeSpreadDeg <= 180, `maps.${id}.volcano.eruption 的股宽须为正、股外的比例不为负、股心的范围在 0 到 180 度之间`)
+  need(e.lobeDeg > 0 && e.lobeFloor >= 0 && e.lobeJitter >= 0 && e.lobeJitter < 0.5, `maps.${id}.volcano.eruption 的股宽须为正、股外的比例不为负、股心抖动不到半个间距`)
   need(Number.isInteger(e.history) && e.history >= 0, `maps.${id}.volcano.eruption.history 须为非负整数`)
   need(l.stepMs > 0 && l.mobility > 0 && l.mobilityPow >= 0 && l.cooling > 0 && l.coolRadiusU > 0, `maps.${id}.volcano.lava 的步长、流动与冷却须为正`)
   need(l.yieldHot >= 0 && l.yieldHot <= l.yieldCold, `maps.${id}.volcano.lava 的屈服强度须不为负且冷时不小于热时`)
   need(l.solidus > 0 && l.solidus < 1, `maps.${id}.volcano.lava.solidus 须在 0 到 1 之间`)
   need(l.teamDps >= 0 && l.enemyDps >= 0 && l.tickMs > 0, `maps.${id}.volcano.lava 的伤害不为负、结算间隔为正`)
+  need(s.edgeU > 0 && s.shiftU >= 0 && s.wobble >= 0 && s.wobble < 0.5, `maps.${id}.volcano.snow 的雪区边须有宽度、中心往地图里挪的距离不为负、半径起伏在 0 到 0.5 倍之间`)
+  need(s.radiusU * (1 - s.wobble) - s.edgeU > c.blockU * (1 + c.blockJitter) + s.shiftU, `maps.${id}.volcano.snow 须让整座山都落在积满雪的那片里`)
+  need(s.warmMs >= 0 && s.coverMs > 0 && s.buryMs > 0, `maps.${id}.volcano.snow 的回凉时间不为负，积满与盖灰的时间为正`)
 }
 
 /**

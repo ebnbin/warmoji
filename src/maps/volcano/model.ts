@@ -26,9 +26,8 @@ export interface LavaField {
   readonly heat: Float32Array
   /** 凝固成岩的时刻，毫秒；从没凝固过是 -Infinity */
   readonly rockAt: Float32Array
-  /** 火山口里常年不凝的熔岩湖：液面由岩浆通道撑着，流进来的熔岩也从通道里回落 */
-  readonly lake: Uint8Array
-  readonly lakeFloor: Float32Array
+  /** 火山口底的岩浆通道：流进来的熔岩从这里回落，口里不存熔岩 */
+  readonly conduit: Uint8Array
   /** 每格每秒降多少温度：离火山口越远冷得越快 */
   readonly cool: Float32Array
   readonly craterX: number
@@ -78,16 +77,16 @@ export const NO_SPILL: Spill = { cells: [], share: [] }
 /** 熔岩从口沿往外这么多格宽的一圈里漫出 */
 const SPILL_CELLS = 1.5
 
-/** 火山口：随机挑一条地图边，落在这条边的中段、离边 insetU；朝地图里的方向垂直于这条边 */
-function craterOf(rng: Rng, cfg: VolcanoConfig, map: Rect): { x: number; y: number; inX: number; inY: number } {
+/** 火山口：随机挑一条地图边，落在这条边的中段、离边 inset 像素；朝地图里的方向垂直于这条边 */
+function craterOf(rng: Rng, cfg: VolcanoConfig, map: Rect): { x: number; y: number; inX: number; inY: number; inset: number } {
   const side = Math.floor(rng.next() * 4)
   const along = 0.25 + rng.next() * 0.5
   const [near, far] = cfg.cone.insetU
   const inset = (near + rng.next() * (far - near)) * UNIT
-  if (side === 0) return { x: map.x + along * map.w, y: map.y + inset, inX: 0, inY: 1 }
-  if (side === 1) return { x: map.x + map.w - inset, y: map.y + along * map.h, inX: -1, inY: 0 }
-  if (side === 2) return { x: map.x + along * map.w, y: map.y + map.h - inset, inX: 0, inY: -1 }
-  return { x: map.x + inset, y: map.y + along * map.h, inX: 1, inY: 0 }
+  if (side === 0) return { x: map.x + along * map.w, y: map.y + inset, inX: 0, inY: 1, inset }
+  if (side === 1) return { x: map.x + map.w - inset, y: map.y + along * map.h, inX: -1, inY: 0, inset }
+  if (side === 2) return { x: map.x + along * map.w, y: map.y + map.h - inset, inX: 0, inY: -1, inset }
+  return { x: map.x + inset, y: map.y + along * map.h, inX: 1, inY: 0, inset }
 }
 
 /**
@@ -125,7 +124,7 @@ function edgeDepthU(x: number, y: number, map: Rect, cornerU: number): number {
 }
 
 /** 噪声拉开对比度落到 [0, 1]：分形噪声大多挤在中间 */
-function spread01(n: number): number {
+export function spread01(n: number): number {
   return Math.min(1, Math.max(0, (n - 0.5) * 2.4 + 0.5))
 }
 
@@ -150,8 +149,8 @@ function rimRise(cfg: VolcanoConfig, depthU: number, tall: number): number {
 }
 
 /**
- * 按种子生成地形：先定下能走的盆地（地图矩形里起伏的边，扣掉山体，出生点四周总空着），再铺高度：火山加上朝地图里的整体下倾与起伏，
- * 盆地边外立起崖壁与高地（靠近火山处让给山体）；火山口里灌上熔岩湖，再补上开局前那几次喷发留下的岩石。格子铺满方框
+ * 按种子生成地形：先定下能走的盆地（地图矩形里起伏的边，扣掉山体，出生点四周总空着），再铺高度：火山加上以它为心往四周的整体下倾与起伏，
+ * 盆地边外立起崖壁与高地（靠近火山处让给山体；火山背后、地图边外那一片不立高地，顺着山背往外下倾，熔岩从那边也流得走）；再补上开局前那几次喷发留下的岩石。格子铺满方框
  */
 export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point): LavaField {
   const cell = cfg.cellU * UNIT
@@ -176,8 +175,7 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
     lava: new Float32Array(n),
     heat: new Float32Array(n),
     rockAt: new Float32Array(n).fill(-Infinity),
-    lake: new Uint8Array(n),
-    lakeFloor: new Float32Array(n),
+    conduit: new Uint8Array(n),
     cool: new Float32Array(n),
     craterX: c.x,
     craterY: c.y,
@@ -188,7 +186,6 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
     nextHeat: new Float32Array(n),
   }
   const t = cfg.terrain
-  const lakeLevel = cone.height - cone.craterDepth + cone.lakeDepth
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       const i = cy * cols + cx
@@ -202,17 +199,12 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
       const relief = (fbm(x / UNIT / t.waveU, y / UNIT / t.waveU, seed, 3) - 0.5) * 2 * t.relief
       const outside = Math.min(1, Math.max(0, dU / cone.craterU - 1))
       const tall = spread01(fbm(x / UNIT / 4, y / UNIT / 4, seed + 127, 2))
-      const bank = rimRise(cfg, -roomAt(basin, x, y) / UNIT, tall) * Math.min(1, Math.max(0, (dU - foot - 0.5) / 2))
-      const g =
-        coneHeight(cfg, dCone) - gully(cfg, seed, dx, dy, dCone) + (relief * Math.min(1, dU / cone.radiusU) - t.tilt * (dx * c.inX + dy * c.inY)) * outside + bank
+      const behind = Math.min(1, Math.max(0, (-(dx * c.inX + dy * c.inY) - c.inset / UNIT) / 1.5)) * Math.min(1, Math.max(0, (cone.radiusU + 4 - dU) / 4))
+      const bank = rimRise(cfg, -roomAt(basin, x, y) / UNIT, tall) * Math.min(1, Math.max(0, (dU - foot - 0.5) / 2)) * (1 - behind)
+      const g = coneHeight(cfg, dCone) - gully(cfg, seed, dx, dy, dCone) + (relief * Math.min(1, dU / cone.radiusU) - t.tilt * dU) * outside + bank
       f.ground[i] = g
       f.cool[i] = cfg.lava.cooling * (1 + (dU / cfg.lava.coolRadiusU) ** 2)
-      if (dU < cone.craterU * 0.8) {
-        f.lake[i] = 1
-        f.lakeFloor[i] = Math.max(EPS * 2, lakeLevel - g)
-        f.lava[i] = f.lakeFloor[i]!
-        f.heat[i] = 1
-      }
+      if (dU < cone.craterU * 0.8) f.conduit[i] = 1
     }
   }
   for (let k = 0; k < cfg.eruption.history; k++) runEruption(f, cfg, spillOf(f, cfg, rng), -1e9)
@@ -256,13 +248,14 @@ export function volcanoMarks(f: LavaField, cfg: VolcanoConfig, vents: readonly P
   return { calm, erupt: { ...calm, crater: [crater] } }
 }
 
-/** 这次喷发熔岩从口沿外那一圈格子漫出：随机几股集中、大多朝着盆地，其余方向只漫出一点 */
+/** 这次喷发熔岩从口沿外那一圈格子漫出：集中成几股，股心绕口沿一圈大致均分（整体随机转一个角度，各股在自己的位置附近抖一抖），其余方向只漫出一点 */
 export function spillOf(f: LavaField, cfg: VolcanoConfig, rng: Rng): Spill {
   const e = cfg.eruption
   const count = e.lobes[0] + Math.floor(rng.next() * (e.lobes[1] - e.lobes[0] + 1))
+  const turn = rng.next() * Math.PI * 2
+  const gap = (Math.PI * 2) / count
   const lobes: number[] = []
-  const toward = Math.atan2(f.inY, f.inX)
-  for (let k = 0; k < count; k++) lobes.push(toward + (rng.next() * 2 - 1) * ((e.lobeSpreadDeg * Math.PI) / 180))
+  for (let k = 0; k < count; k++) lobes.push(turn + (k + (rng.next() * 2 - 1) * e.lobeJitter) * gap)
   const width = (e.lobeDeg * Math.PI) / 180
   const r0 = cfg.cone.craterU * UNIT
   const r1 = r0 + SPILL_CELLS * f.cell
@@ -309,7 +302,7 @@ function runEruption(f: LavaField, cfg: VolcanoConfig, spill: Spill, at: number)
 }
 
 function hasFlow(f: LavaField): boolean {
-  for (let i = 0; i < f.lava.length; i++) if (f.lava[i]! > 0 && !f.lake[i]) return true
+  for (let i = 0; i < f.lava.length; i++) if (f.lava[i]! > 0) return true
   return false
 }
 
@@ -317,10 +310,10 @@ function hasFlow(f: LavaField): boolean {
  * 积分一步。熔岩按宾汉流体流动：朝一个邻格流，厚度要超过屈服强度除以那个方向的坡度，坡越缓要堆得越厚；
  * 超出的部分乘坡度作为分量，按分量分给更低的邻格，一步最多流走一半高差。越冷屈服强度越大、流得越慢，
  * 离火山口越远冷得越快，低于凝固温度就把厚度加进地面变成岩石；陡坡上流干的地方也留下一层岩壳。
- * 熔岩湖一直是热的，液面不变。
+ * 流进火山口底通道的熔岩回落下去。
  */
 export function stepLava(f: LavaField, c: VolcanoConfig['lava'], dt: number, now: number, spill: Spill, volume: number): void {
-  const { cols, rows, ground, lava, heat, nextLava, nextHeat, lake } = f
+  const { cols, rows, ground, lava, heat, nextLava, nextHeat, conduit } = f
   const cellU = f.cell / UNIT
   for (let i = 0; i < lava.length; i++) {
     nextLava[i] = lava[i]!
@@ -379,9 +372,9 @@ export function stepLava(f: LavaField, c: VolcanoConfig['lava'], dt: number, now
     }
   }
   for (let i = 0; i < lava.length; i++) {
-    if (lake[i]) {
-      lava[i] = f.lakeFloor[i]!
-      heat[i] = 1
+    if (conduit[i]) {
+      lava[i] = 0
+      heat[i] = 0
       continue
     }
     const l = nextLava[i]!
@@ -405,12 +398,17 @@ export function stepLava(f: LavaField, c: VolcanoConfig['lava'], dt: number, now
   }
 }
 
-/** 这一点脚下是不是还没凝固的熔岩 */
-export function moltenAt(f: LavaField, x: number, y: number): boolean {
+/** (x, y) 像素落在哪一格，场外是 -1 */
+export function cellAt(f: Pick<LavaField, 'cols' | 'rows' | 'cell' | 'x0' | 'y0'>, x: number, y: number): number {
   const cx = Math.floor((x - f.x0) / f.cell)
   const cy = Math.floor((y - f.y0) / f.cell)
-  if (cx < 0 || cy < 0 || cx >= f.cols || cy >= f.rows) return false
-  return f.lava[cy * f.cols + cx]! > 0
+  return cx < 0 || cy < 0 || cx >= f.cols || cy >= f.rows ? -1 : cy * f.cols + cx
+}
+
+/** 这一点脚下是不是还没凝固的熔岩 */
+export function moltenAt(f: LavaField, x: number, y: number): boolean {
+  const i = cellAt(f, x, y)
+  return i >= 0 && f.lava[i]! > 0
 }
 
 /**
