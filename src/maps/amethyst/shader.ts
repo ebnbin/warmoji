@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import { UNIT } from '../../util/units'
-import { reliefAt } from './light'
+import { reliefAt, ROCK_KEEP } from './light'
 import type { Lighting } from './light'
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -9,10 +9,15 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const LOG_MIN = -6
 const LOG_SPAN = 12
 
+/** 画面上洞壁那一圈（岩体里往外 LINING_RINGS 圈，每圈半格）每往里一圈只暗到 LINING_KEEP：长满晶体的洞壁朝着洞里，比照度场按岩体算的亮 */
+const LINING_RINGS = 4
+const LINING_KEEP = 0.75
+
 /** 照度场编码成数据图：R、G 是 16 位的对数照度（天光与反光），B 是反光占的比例；必须满 alpha（画布会按透明度预乘） */
 export function encodeLux(lt: Lighting, out: Uint8ClampedArray): void {
   for (let i = 0; i < lt.cols * lt.rows; i++) {
-    const v = Math.round(clamp01((Math.log10(lt.diffuse[i]! + 1e-6) - LOG_MIN) / LOG_SPAN) * 65535)
+    const lift = (LINING_KEEP / ROCK_KEEP) ** Math.min(lt.rank[i]!, LINING_RINGS)
+    const v = Math.round(clamp01((Math.log10(lt.diffuse[i]! * lift + 1e-6) - LOG_MIN) / LOG_SPAN) * 65535)
     out[i * 4] = v >> 8
     out[i * 4 + 1] = v & 255
     out[i * 4 + 2] = lt.share[i]! * 255

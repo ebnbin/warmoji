@@ -62,7 +62,7 @@ const TORCH_COLOR = [1, 0.9, 0.82] as const
 const MOON_COLOR = [0.78, 0.84, 1] as const
 /** 晶壁把光反出来时染上的紫 */
 const CRYSTAL_TINT = [0.84, 0.6, 1] as const
-/** 火光在晶壁之间来回反射几次以后的颜色：反一次染一次紫 */
+/** 火光在晶壁之间来回反射三次以后的颜色：反一次染一次紫 */
 const TORCH_BOUNCE_COLOR = (() => {
   const c = TORCH_COLOR.map((v, k) => v * CRYSTAL_TINT[k]! ** 3)
   const m = Math.max(...c)

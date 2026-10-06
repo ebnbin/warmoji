@@ -143,18 +143,18 @@ function agate(p: Px, u: number, gx: number, gy: number, seed: number): void {
   const v = ((u - 0.8) / 0.26 + 0.1 * (fbm(gx * 1.4, gy * 1.4, seed + 71, 2) - 0.5)) * 5
   const band = Math.floor(v)
   const tones = [
-    [182, 170, 206],
-    [128, 110, 162],
-    [164, 152, 194],
-    [102, 84, 136],
-    [118, 102, 158],
-    [152, 140, 186],
+    [160, 148, 186],
+    [134, 118, 166],
+    [150, 138, 180],
+    [122, 104, 154],
+    [140, 124, 172],
+    [154, 142, 184],
   ] as const
   const c = tones[((band % tones.length) + tones.length) % tones.length]!
   paint(p, c[0], c[1], c[2])
-  if (frac(v) < 0.1) dim(p, 0.72)
+  if (frac(v) < 0.1) dim(p, 0.88)
   dim(p, 0.92 + 0.1 * valueNoise(gx * 18, gy * 18, seed + 73))
-  p.gloss = 0.25
+  p.gloss = 0.04
 }
 
 /** 玄武岩：暗得发紫的黑，一个个气孔；少数气孔里长着一点白的沸石或细小的紫晶 */

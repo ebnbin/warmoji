@@ -17,6 +17,8 @@ const BOUNCE_CELL = UNIT
 const PROBES = 7
 /** 直射查遮挡时沿光线取几个点：越靠近受光处越密 */
 const MARCH = 14
+/** 岩体里每往里一圈（半格）照度剩下多少 */
+export const ROCK_KEEP = 0.5
 
 /** 一处开口：天空按小块取的样点（像素，成对排）与每块的面积（格²），查遮挡的探点 */
 interface Patch {
@@ -411,7 +413,7 @@ export function stepLighting(lt: Lighting, L: AmethystLayout, cfg: AmethystConfi
       best = lt.diffuse[j]!
       share = lt.share[j]!
     }
-    lt.diffuse[i] = best * 0.5
+    lt.diffuse[i] = best * ROCK_KEEP
     lt.share[i] = share
   }
   lt.hallLux = num > 0 ? sum / num : 0
