@@ -7,7 +7,7 @@ import type { Point } from '../../util/vec'
 
 /** 能走的地面按这么细的格子算距离场，格 */
 const BASIN_CELL_U = 0.25
-/** 方框正中，格：四间房绕着它，核心柱立在这里 */
+/** 方框正中，格：四间房绕着它，真正的出口浮在这里 */
 const MID = FRAME_U / 2
 
 export const SHAPES: readonly WarpShape[] = ['hall', 'pillars', 'cloister', 'narrow']
@@ -28,8 +28,21 @@ export interface Plate {
 }
 
 /**
+ * 一扇门，格：门洞的中点 (x, y) 落在能走的方块的边上，in 是朝房里的单位方向；门槛是门前踩上去就走的那一块；
+ * 送到的身体落在 land 四周；style 是门的样子（隔着缝对开的两扇是同一扇门的两面，按出口那间的签名）
+ */
+export interface Door {
+  readonly x: number
+  readonly y: number
+  readonly in: Point
+  readonly zone: Box
+  readonly land: Point
+  readonly style: number
+}
+
+/**
  * 一间房，格：在环上排第 index，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状、签名（主色与地板的待机律动）、敌人配方（cfg.recipes 的第几种）；
- * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；toward 是传送台朝下一间的方向
+ * 平台与能走的方块；中心；出口（通往下一间）与入口（从上一间来）；出怪板；立柱、凹槽与机柜台
  */
 export interface WarpRoom {
   readonly index: number
@@ -40,17 +53,17 @@ export interface WarpRoom {
   readonly slab: Box
   readonly floor: Box
   readonly center: Point
-  readonly pad: Point
+  readonly exit: Door
+  readonly entry: Door
   readonly plates: readonly Plate[]
   readonly pillars: readonly Box[]
   readonly pit: Box | null
   readonly deck: Box | null
-  readonly toward: Point
 }
 
 /**
- * 这一局的跃迁站，格：四间房按环排（第 i 间的传送台送到第 i + 1 间），mirror 为真时环逆时针；队伍从开局那间的中心出发；
- * 能走的地面；每块瓷砖属于哪间房（不会亮的为 −1）；核心柱在正中
+ * 这一局的跃迁站，格：四间房按环排（第 i 间的出口通到第 i + 1 间的入口），mirror 为真时环逆时针；队伍从开局那间的中心出发；
+ * 能走的地面；每块瓷砖属于哪间房（不会亮的为 −1）；真正的出口在正中
  */
 export interface WarpPlan {
   readonly mirror: boolean
@@ -92,6 +105,11 @@ export function inBox(b: Box, x: number, y: number): boolean {
   return x >= b.x0 && x < b.x1 && y >= b.y0 && y < b.y1
 }
 
+/** 两块方形之间隔多远，格：挨着或交叠为 0 */
+function boxGap(a: Box, b: Box): number {
+  return Math.hypot(Math.max(0, a.x0 - b.x1, b.x0 - a.x1), Math.max(0, a.y0 - b.y1, b.y0 - a.y1))
+}
+
 /** 点到方形的距离，格：里面为 0 */
 export function boxDist(b: Box, x: number, y: number): number {
   return Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1))
@@ -106,18 +124,32 @@ function shuffled<T>(rng: Rng, list: readonly T[]): T[] {
   return out
 }
 
-/** 一间房局部的尺寸：平台、能走的方块的两条边、传送台的圆心，格 */
-export function roomFrame(cfg: WarpConfig): { readonly slab0: number; readonly slab1: number; readonly f0: number; readonly f1: number; readonly pad: Point } {
+/** 一间房局部的尺寸：平台、能走的方块的两条边，格 */
+export function roomFrame(cfg: WarpConfig): { readonly slab0: number; readonly slab1: number; readonly f0: number; readonly f1: number } {
   const r = cfg.room
   const slab1 = MID - r.gapU
-  const f1 = slab1 - r.lipU
-  return {
-    slab0: r.gapU,
-    slab1,
-    f0: r.gapU + r.lipU,
-    f1,
-    pad: { x: f1 - cfg.pad.edgeU - cfg.pad.radiusU, y: f1 - cfg.pad.cornerU },
-  }
+  return { slab0: r.gapU, slab1, f0: r.gapU + r.lipU, f1: slab1 - r.lipU }
+}
+
+/** 送到的身体离门洞多远（格）落下：排成几圈也碰不到墙 */
+export const LAND_U = 2.2
+
+/**
+ * 一间房局部的一扇门：出口开在朝下一间的那面墙（x = f1）上、离外角 v 格，入口开在朝上一间的那面墙（y = f1）上；
+ * 转到方框里以后，这一间的出口正对着下一间的入口
+ */
+function localDoor(cfg: WarpConfig, exit: boolean, v: number, style: number): Door {
+  const { f1 } = roomFrame(cfg)
+  const h = cfg.exit.widthU / 2
+  const z = cfg.exit.zoneU
+  if (exit) return { x: f1, y: v, in: { x: -1, y: 0 }, zone: { x0: f1 - z, y0: v - h, x1: f1, y1: v + h }, land: { x: f1 - LAND_U, y: v }, style }
+  return { x: v, y: f1, in: { x: 0, y: -1 }, zone: { x0: v - h, y0: f1 - z, x1: v + h, y1: f1 }, land: { x: v, y: f1 - LAND_U }, style }
+}
+
+function placeDoor(turn: number, mirror: boolean, d: Door): Door {
+  const at = place(turn, mirror, d.x, d.y)
+  const land = place(turn, mirror, d.land.x, d.land.y)
+  return { x: at.x, y: at.y, in: placeDir(turn, mirror, d.in.x, d.in.y), zone: placeBox(turn, mirror, d.zone), land, style: d.style }
 }
 
 /** 一块沿墙的出怪板：板心在 (u, v)，沿 u（along 为 0）或沿 v 摆，局部坐标 */
@@ -126,9 +158,9 @@ function plate(cfg: WarpConfig, u: number, v: number, along: 0 | 1): Box {
   return along === 0 ? { x0: u - h, y0: v - 0.5, x1: u + h, y1: v + 0.5 } : { x0: u - 0.5, y0: v - h, x1: u + 0.5, y1: v + h }
 }
 
-/** 一间房局部的布置：能走的方块，立柱、凹槽、机柜台与出怪板 */
-function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: Box; pillars: Box[]; pit: Box | null; deck: Box | null; plates: Box[] } {
-  const { f0, f1, pad } = roomFrame(cfg)
+/** 一间房局部的布置：能走的方块，立柱、凹槽、机柜台与出怪板；doors 是两扇门的门槛，立柱让开它们 */
+function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean, doors: readonly Box[]): { floor: Box; pillars: Box[]; pit: Box | null; deck: Box | null; plates: Box[] } {
+  const { f0, f1 } = roomFrame(cfg)
   const full: Box = { x0: f0, y0: f0, x1: f1, y1: f1 }
   const mid = (f0 + f1) / 2
   const near = cfg.emitters.plateU / 2 + 2
@@ -164,7 +196,7 @@ function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: B
     for (let i = 0; i < p.count; i++) {
       for (let j = 0; j < p.count; j++) {
         const b: Box = { x0: f0 + p.firstU + i * p.stepU, y0: f0 + p.firstU + j * p.stepU, x1: f0 + p.firstU + i * p.stepU + p.sizeU, y1: f0 + p.firstU + j * p.stepU + p.sizeU }
-        if (boxDist(b, pad.x, pad.y) < cfg.pad.radiusU + p.padClearU) continue
+        if (doors.some((d) => boxGap(b, d) < p.clearU)) continue
         list.push(b)
       }
     }
@@ -182,7 +214,7 @@ function openIn(room: Pick<WarpRoom, 'floor' | 'pillars' | 'pit'>, x: number, y:
 
 /**
  * 按种子摆一座跃迁站：环的方向；四种形状、四种签名、四种配方各自打乱分给四间房（狭长那间横竖也按种子）；
- * 队伍从大厅出发。能走的地面四间各算一遍距离场，取最大合成一张
+ * 每对门离外角多远也按种子，狭长那间那面窄墙放不下就挪到窄墙正中。队伍从大厅出发。能走的地面四间各算一遍距离场，取最大合成一张
  */
 export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
   const rng = new Rng(seed)
@@ -192,12 +224,21 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
   const recipes = shuffled(rng, [0, 1, 2, 3])
   const tall = rng.next() < 0.5
   const frame = roomFrame(cfg)
+  // 第 i 对门：第 i 间的出口（狭长又横着时那面墙窄）对着第 i + 1 间的入口（狭长又竖着时那面墙窄）
+  const gaps = shapes.map((shape, i) => {
+    const narrow = (shape === 'narrow' && !tall) || (shapes[(i + 1) % shapes.length] === 'narrow' && tall)
+    const jitter = Math.round(rng.next() * 4) / 2
+    return narrow ? frame.f1 - cfg.room.narrowU / 2 : frame.f0 + cfg.exit.outerU + jitter
+  })
   const quads = [0, 1, 2, 3].map((i) => {
     const p = place(i, mirror, MID / 2, MID / 2)
     return (p.x < MID ? 0 : 1) + (p.y < MID ? 0 : 1) * 2
   })
   const rooms: WarpRoom[] = shapes.map((shape, i) => {
-    const l = localRoom(cfg, shape, tall)
+    const before = (i + shapes.length - 1) % shapes.length
+    const exit = localDoor(cfg, true, gaps[i]!, signs[i]!)
+    const entry = localDoor(cfg, false, gaps[before]!, signs[before]!)
+    const l = localRoom(cfg, shape, tall, [exit.zone, entry.zone])
     const at = (b: Box): Box => placeBox(i, mirror, b)
     const floor = at(l.floor)
     const plates = l.plates.map((b) => {
@@ -213,12 +254,12 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
       slab: at({ x0: frame.slab0, y0: frame.slab0, x1: frame.slab1, y1: frame.slab1 }),
       floor,
       center: { x: (floor.x0 + floor.x1) / 2, y: (floor.y0 + floor.y1) / 2 },
-      pad: place(i, mirror, frame.pad.x, frame.pad.y),
+      exit: placeDoor(i, mirror, exit),
+      entry: placeDoor(i, mirror, entry),
       plates,
       pillars: l.pillars.map(at),
       pit: l.pit && at(l.pit),
       deck: l.deck && at(l.deck),
-      toward: placeDir(i, mirror, 1, 0),
     }
   })
   const hall = rooms.find((r) => r.shape === 'hall')!
@@ -238,7 +279,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
         const x = i + 0.5
         const y = j + 0.5
         if (!openIn(r, x, y) || r.plates.some((p) => inBox(p.box, x, y))) continue
-        if (Math.hypot(x - r.pad.x, y - r.pad.y) < cfg.pad.radiusU + 0.25) continue
+        if (inBox(r.exit.zone, x, y) || inBox(r.entry.zone, x, y)) continue
         tiles[j * FRAME_U + i] = r.index
       }
     }
@@ -253,7 +294,7 @@ export function roomIndexAt(plan: WarpPlan, x: number, y: number): number {
   return plan.rooms.find((r) => r.quad === q)!.index
 }
 
-/** 第 i 间的下一间：它的传送台送到那里 */
+/** 第 i 间的下一间：它的出口通到那里 */
 export function nextRoom(plan: WarpPlan, i: number): WarpRoom {
   return plan.rooms[(i + 1) % plan.rooms.length]!
 }

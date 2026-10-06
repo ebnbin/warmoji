@@ -23,8 +23,8 @@ float hash1(vec2 p) {
 
 /**
  * 虚空：平台底下望得见底的深处。深蓝的底上铺着一张淡淡的网格，每隔几格一道粗一点的线；
- * 有的线上一节节数据光流缓缓流过去；正中的核心柱往深处一路照下去，越深越暗，四周罩着它的一团光。
- * 只铺满方框，画面上和地图一起往四周平铺，所以网格、光流与核心柱的光都按方框的周期接得上；线多细按屏幕上的像素定（uPx 是一个设备像素合几格）；uRect 是铺的范围（格）
+ * 有的线上一节节数据光流缓缓流过去；正中那扇真正的出口透出的日光往深处一路照下去，越深越暗，四周罩着它的一团暖光，又顺着房与房之间十字形的缝往四面漏出去。
+ * 只铺满方框，画面上和地图一起往四周平铺，所以网格、光流与出口的光都按方框的周期接得上；线多细按屏幕上的像素定（uPx 是一个设备像素合几格）；uRect 是铺的范围（格）
  */
 export const VOID_FRAG = `${HEADER}
 uniform vec4 uRect;
@@ -38,7 +38,7 @@ const vec3 DEEP = vec3(0.0, 0.012, 0.035);
 const vec3 HAZE = vec3(0.0, 0.06, 0.12);
 const vec3 LINE = vec3(0.0, 1.0, 1.0);
 const vec3 DATA = vec3(0.35, 1.0, 1.0);
-const vec3 CORE = vec3(0.6, 1.0, 1.0);
+const vec3 CORE = vec3(1.0, 0.86, 0.55);
 
 /** 离最近一条间距 g 的网格线多远，格 */
 float lineDist(float v, float g) {
@@ -64,7 +64,7 @@ void main ()
 {
   vec2 tc = outTexCoord;
   vec2 p = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
-  // 画面四周平铺：离核心柱按最近的那一份算，方框边上接得上
+  // 画面四周平铺：离正中的出口按最近的那一份算，方框边上接得上
   vec2 c = p - uCore;
   c -= N * floor((c + N * 0.5) / N);
   float r = length(c);
@@ -76,10 +76,13 @@ void main ()
   col += LINE * 0.38 * (1.0 - smoothstep(0.0, aa * 1.4, major));
   float pulse = stream(p.x, p.y, 2.0, 1.0) + stream(p.y, p.x, 2.0, 2.0);
   col += DATA * pulse * 0.9;
-  // 核心柱往深处照下去：一根直立的光柱，越往下越暗
+  // 出口的日光往深处照下去：一根直立的光柱，越往下越暗
   float down = max(0.0, c.y);
   float shaft = exp(-pow(c.x / 1.1, 2.0)) * exp(-down / 13.0) * step(0.0, c.y) * (1.0 - smoothstep(16.0, 23.0, c.y));
   col += CORE * shaft * 0.5;
+  // 日光顺着十字形的缝往四面漏出去：哪间房贴着缝的那两面墙外都望得见，离正中越远越淡
+  float arm = exp(-abs(c.x) / 0.8) + exp(-abs(c.y) / 0.8);
+  col += CORE * 0.3 * arm * exp(-r / 15.0);
   col += CORE * 0.55 * exp(-r * r / 9.0);
   col += vec3(0.0, 1.0, 1.0) * 0.22 * exp(-r / 7.0);
   col = vec3(1.0) - exp(-col * 1.6);
@@ -91,7 +94,7 @@ void main ()
  * 地砖：每块瓷砖按掩码知道自己是不是会亮的瓷砖、属于哪间房、那间房的待机律动与它在律动里的相位，按着色图知道那间房的主色。
  * 闲着时缝里透着房间的主色，按律动明灭：从中心一圈圈往外的脉冲、顺着一个方向扫过的光波、棋盘式明灭、几乎不动的微光。
  * 被队伍踩过亮信号蓝、被敌人踩过亮信号红：四边一道亮线、往里一道细线、块面淡淡染一层，光渗到隔壁；刚踩上的一脚从中心扩一圈方框。
- * 队长在传送台上充能时，一圈光从台心扩到整间房，扫过的瓷砖亮起来，圈里的都染上一层。输出按预乘透明度
+ * 出口开的那一刻，一圈出口的绿从门槛扩到整间房，扫过的瓷砖亮起来，圈里的都染上一层。输出按预乘透明度
  */
 export const TILES_FRAG = `${HEADER}
 uniform sampler2D uData;
@@ -100,8 +103,9 @@ uniform sampler2D uTint;
 uniform float uTime;
 uniform vec3 uTeam;
 uniform vec3 uFoe;
-uniform vec4 uCharge;
-uniform float uChargeRoom;
+uniform vec4 uSweep;
+uniform float uSweepRoom;
+uniform vec3 uSweepColor;
 uniform float uPx;
 const float N = ${FRAME_U.toFixed(1)};
 
@@ -171,14 +175,14 @@ void main ()
   float ring = exp(-abs(cheb - (1.0 - d.b) * 0.5) / 0.035) * d.b;
   add += mix(lit, vec3(1.0), 0.4) * ring * 0.9;
   a += ring * 0.3;
-  // 充能：一圈光从台心扩到整间房
-  if (uCharge.w > 0.0 && abs(room - uChargeRoom) < 0.5) {
-    float dc = length(cell + 0.5 - uCharge.xy);
-    float front = exp(-pow((dc - uCharge.z) / 0.9, 2.0));
-    float inside = 1.0 - smoothstep(uCharge.z - 0.5, uCharge.z + 0.5, dc);
-    float k = uCharge.w * (front * (0.35 + 0.65 * seam + 0.4 * inset) + inside * (0.1 + 0.35 * seam));
-    col += uTeam * k;
-    add += vec3(0.8, 0.92, 1.0) * front * seam * uCharge.w * 0.5;
+  // 出口开了：一圈绿从门槛扩到整间房
+  if (uSweep.w > 0.0 && abs(room - uSweepRoom) < 0.5) {
+    float dc = length(cell + 0.5 - uSweep.xy);
+    float front = exp(-pow((dc - uSweep.z) / 0.9, 2.0));
+    float inside = 1.0 - smoothstep(uSweep.z - 0.5, uSweep.z + 0.5, dc);
+    float k = uSweep.w * (front * (0.35 + 0.65 * seam + 0.4 * inset) + inside * (0.06 + 0.2 * seam));
+    col += uSweepColor * k;
+    add += vec3(0.85, 1.0, 0.9) * front * seam * uSweep.w * 0.5;
     a += k * 0.8;
   }
   a = clamp(a, 0.0, 0.92);

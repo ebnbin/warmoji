@@ -15,6 +15,7 @@ import { bounded, wanderIn, ZERO } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
 import { inBox, nextRoom, roomIndexAt, warpPlan } from './layout'
+import type { Box, Door } from './layout'
 import { clearWalk, flowDir, flowTo, navDist, navGrid } from './nav'
 import type { NavField, NavGrid } from './nav'
 import type { WarpPlan } from './layout'
@@ -37,12 +38,15 @@ const DIRECT_U = 6
 /** 画面要的记录各留多少条 */
 const HOP_CAP = 256
 const IMPACT_CAP = 48
-/** 送到的队员在台上排成几圈：每圈离台心多远（格）、排几个 */
+/** 送到的身体在入口里排成几圈：每圈离落点多远（格）、排几个 */
 const RINGS = [
   [0, 1],
   [0.75, 6],
   [1.3, 10],
 ] as const
+
+/** 敌人的门槛比队长的宽这么多格：挤在门前的都算 */
+const FOE_SLACK_U = 0.6
 
 /** 传送是被摆布：锚定的、霸体的、头目也照送 */
 const SHIPPED: Mover = { self: false, free: true }
@@ -50,16 +54,19 @@ const SHIPPED: Mover = { self: false, free: true }
 const FIELD: Solid = { topM: Infinity, material: 'field' }
 
 /**
- * 一座传送台此刻：队长站在上面攒下的充能（毫秒），队伍到这里以后冷却到哪一刻，下一趟发车的时刻；
- * 上一次队伍从这里出发、上一趟发车的时刻与那一趟送走了几只（画面用）
+ * 一扇出口此刻：队伍在这间时它哪一刻开、哪一刻关（之前是倒数）；下一次给敌人开门的时刻，上一次开门的时刻与送走了几只；
+ * 上一次队伍从这里走、从这间的入口进来、没赶上眼看着它关上的时刻；队伍从这里走过几次（门边地上记着）
  */
-export interface PadState {
-  charge: number
-  coolUntil: number
+export interface ExitState {
+  opensAt: number
+  closesAt: number
   shuttleAt: number
-  jumpedAt: number
   shuttledAt: number
   shuttled: number
+  jumpedAt: number
+  arrivedAt: number
+  missedAt: number
+  passes: number
 }
 
 /** 一个身体被送走：从哪到哪（像素）、哪一刻出发（对局时钟）、多大、是不是敌人 */
@@ -85,7 +92,7 @@ interface Arrival {
   readonly eid: number
   readonly uid: number
   readonly at: number
-  readonly pad: number
+  readonly room: number
 }
 
 /** 每块瓷砖最近一次被队伍、敌人踩着的时刻，与这一脚踩上来的时刻 */
@@ -97,17 +104,17 @@ export interface Tiles {
 }
 
 /**
- * 跃迁站此刻：按种子定下的站，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间；四座传送台；
- * 寻路的底子、各间到传送台的步数场与到队长的步数场；地砖；画面要的送人、发车与力场受击的记录
+ * 跃迁站此刻：按种子定下的站，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间；四扇出口；
+ * 寻路的底子、各间到出口的步数场与到队长的步数场；地砖；画面要的送人、开门与力场受击的记录
  */
 export interface WarpState {
   readonly plan: WarpPlan
   readonly solids: Solids
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
   teamRoom: number
-  readonly pads: PadState[]
+  readonly exits: ExitState[]
   readonly grids: readonly NavGrid[]
-  readonly toPad: readonly NavField[]
+  readonly toExit: readonly NavField[]
   toLeader: NavField | null
   navAt: number
   navCell: number
@@ -126,12 +133,12 @@ function cfgOf(sim: Sim): WarpConfig {
   return MAPS[sim.mapId].warp!
 }
 
-/** 这一局的跃迁站：视图要它画，规则要它定边界与传送台，两边按同一个种子各要一次 */
+/** 这一局的跃迁站：视图要它画，规则要它定边界与出口，两边按同一个种子各要一次 */
 export function warpPlanFor(cfg: WarpConfig, decorSeed: number): WarpPlan {
   return warpPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
-/** 出怪的地标：每间房的出怪板归到那间配方的名下；核心柱单独一组 */
+/** 出怪的地标：每间房的出怪板归到那间配方的名下；正中那扇真正的出口单独一组 */
 function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
   const out: Record<string, Landmark[]> = {}
   for (const name of cfg.recipes) out[name] = []
@@ -156,16 +163,22 @@ export function warpOf(sim: Sim): WarpState {
       solids: makeSolids((x, y) => (plan.rooms.some((r) => inBox(r.floor, x / UNIT, y / UNIT)) ? null : FIELD), b.x0, b.y0, b.cols, b.rows, b.cell),
       marks: marksOf(cfg, plan),
       teamRoom: roomIndexAt(plan, plan.start.x, plan.start.y),
-      pads: plan.rooms.map((_, i) => ({
-        charge: 0,
-        coolUntil: 0,
-        shuttleAt: cfg.pad.shuttleMs * (0.7 + i * 0.25),
-        jumpedAt: -1e9,
+      exits: plan.rooms.map((_, i) => ({
+        opensAt: cfg.exit.countdownMs,
+        closesAt: cfg.exit.countdownMs + cfg.exit.openMs,
+        shuttleAt: cfg.exit.shuttleMs * (0.7 + i * 0.25),
         shuttledAt: -1e9,
         shuttled: 0,
+        jumpedAt: -1e9,
+        arrivedAt: -1e9,
+        missedAt: -1e9,
+        passes: 0,
       })),
       grids,
-      toPad: plan.rooms.map((r, i) => flowTo(grids[i]!, r.pad.x * UNIT, r.pad.y * UNIT)),
+      toExit: plan.rooms.map((r, i) => {
+        const c = zoneMid(r.exit)
+        return flowTo(grids[i]!, c.x * UNIT, c.y * UNIT)
+      }),
       toLeader: null,
       navAt: -1e9,
       navCell: -1,
@@ -187,14 +200,28 @@ function roomOf(s: WarpState, x: number, y: number): number {
   return roomIndexAt(s.plan, x / UNIT, y / UNIT)
 }
 
-/** 半径 r 的身体站在第 i 座传送台上：身体中心落在台面里 */
-function onPad(s: WarpState, cfg: WarpConfig, i: number, x: number, y: number): boolean {
-  const p = s.plan.rooms[i]!.pad
-  return Math.hypot(x / UNIT - p.x, y / UNIT - p.y) <= cfg.pad.radiusU
+/** 门槛的正中，格 */
+export function zoneMid(d: Door): Point {
+  return { x: (d.zone.x0 + d.zone.x1) / 2, y: (d.zone.y0 + d.zone.y1) / 2 }
 }
 
-/** 第 k 个送到的身体落在台上哪（相对台心，格）：先排满台心与两圈，再往外随手撒 */
-function slot(sim: Sim, cfg: WarpConfig, k: number): Point {
+function grown(b: Box, d: number): Box {
+  return { x0: b.x0 - d, y0: b.y0 - d, x1: b.x1 + d, y1: b.y1 + d }
+}
+
+/** 第 i 间的出口此刻开着：只有队伍那间按倒数开 */
+export function exitOpen(s: WarpState, i: number, now: number): boolean {
+  const e = s.exits[i]!
+  return i === s.teamRoom && now >= e.opensAt && now < e.closesAt
+}
+
+/** 身体中心 (x, y)（像素）踩在第 i 间出口的门槛上；敌人的门槛宽出 slack 格 */
+function onSill(s: WarpState, i: number, x: number, y: number, slack: number): boolean {
+  return inBox(grown(s.plan.rooms[i]!.exit.zone, slack), x / UNIT, y / UNIT)
+}
+
+/** 第 k 个送到的身体落在入口里哪（相对落点，格）：先排满落点与两圈，再往外随手撒 */
+function slot(sim: Sim, k: number): Point {
   let i = k
   for (const [r, n] of RINGS) {
     if (i < n) {
@@ -204,7 +231,7 @@ function slot(sim: Sim, cfg: WarpConfig, k: number): Point {
     i -= n
   }
   const a = sim.rng.next() * Math.PI * 2
-  const r = cfg.pad.radiusU * (0.4 + 0.5 * Math.sqrt(sim.rng.next()))
+  const r = (RINGS[RINGS.length - 1]![0] + 0.4) * Math.sqrt(sim.rng.next())
   return { x: Math.cos(a) * r, y: Math.sin(a) * r }
 }
 
@@ -238,26 +265,26 @@ function logHop(s: WarpState, h: Hop): void {
 }
 
 /**
- * 第 i 座传送台发车：台上的敌人都送到下一间的传送台上；team 为真时是队长充满了能，整支队伍连同召唤物不论在房间哪里一起走。
- * 身体没有实体地穿过虚空，落地时散在对面的台上；敌人落地后往台外涌
+ * 第 i 间的出口开一下：门槛上的敌人都送到下一间的入口；team 为真时是队长踏上了开着的出口，整支队伍连同召唤物不论在房间哪里一起走，
+ * 下一间的出口从队伍到的那一刻起倒数。身体没有实体地穿过虚空，落地时散在对面的入口里；敌人落地后往房里涌
  */
 function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolean): number {
   const from = s.plan.rooms[i]!
   const to = nextRoom(s.plan, i)
   const now = sim.elapsedMs
-  const ms = cfg.pad.transitMs
+  const ms = cfg.exit.transitMs
   let k = 0
   s.crossing = true
   const send = (eid: number, foe: boolean): void => {
-    const o = slot(sim, cfg, k++)
-    const tx = (to.pad.x + o.x) * UNIT
-    const ty = (to.pad.y + o.y) * UNIT
+    const o = slot(sim, k++)
+    const tx = (to.entry.land.x + o.x) * UNIT
+    const ty = (to.entry.land.y + o.y) * UNIT
     const fx = Transform.x[eid]!
     const fy = Transform.y[eid]!
     const r = Radius.v[eid]!
     if (Alive.v[eid] && hasComponent(sim.world, eid, Phys) && displace(sim, eid, { kind: 'transit', x: tx, y: ty, ms, look: 'hidden', color: foe ? 0xff4058 : 0x4c8dff }, SHIPPED)) {
       logHop(s, { fx, fy, tx, ty, at: now, r, foe })
-      if (foe) s.arrivals.push({ eid, uid: Uid.v[eid]!, at: now + ms, pad: to.index })
+      if (foe) s.arrivals.push({ eid, uid: Uid.v[eid]!, at: now + ms, room: to.index })
       return
     }
     Transform.x[eid] = tx
@@ -268,20 +295,27 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolea
     const lead = sim.leader
     send(lead, false)
     for (const e of cargo.bodies) if (e !== lead) send(e, false)
-    const dx = (to.pad.x - from.pad.x) * UNIT
-    const dy = (to.pad.y - from.pad.y) * UNIT
+    const a = zoneMid(from.exit)
+    const dx = (to.entry.land.x - a.x) * UNIT
+    const dy = (to.entry.land.y - a.y) * UNIT
     for (const e of cargo.things) {
       Transform.x[e] = Transform.x[e]! + dx
       Transform.y[e] = Transform.y[e]! + dy
     }
     s.teamRoom = to.index
-    s.pads[to.index]!.coolUntil = now + ms + cfg.pad.cooldownMs
-    s.pads[i]!.jumpedAt = now
+    const here = s.exits[i]!
+    here.jumpedAt = now
+    here.closesAt = now
+    here.passes++
+    const next = s.exits[to.index]!
+    next.arrivedAt = now
+    next.opensAt = now + ms + cfg.exit.countdownMs
+    next.closesAt = next.opensAt + cfg.exit.openMs
     s.jumps++
   }
   let foes = 0
   for (const e of query(sim.world, ENEMY_SET)) {
-    if (!Alive.v[e] || inTransit(e) || !onPad(s, cfg, i, Transform.x[e]!, Transform.y[e]!)) continue
+    if (!Alive.v[e] || inTransit(e) || !onSill(s, i, Transform.x[e]!, Transform.y[e]!, FOE_SLACK_U)) continue
     send(e, true)
     foes++
   }
@@ -289,7 +323,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolea
   return foes
 }
 
-/** 送到的敌人到点往台外涌：从台心往外推，锚定的不推 */
+/** 送到的敌人到点往房里涌：从入口往里推，锚定的不推 */
 function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
   const now = sim.elapsedMs
   for (let k = s.arrivals.length - 1; k >= 0; k--) {
@@ -297,38 +331,39 @@ function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
     if (now < a.at) continue
     s.arrivals.splice(k, 1)
     if (Uid.v[a.eid] !== a.uid || !Alive.v[a.eid] || inTransit(a.eid)) continue
-    const p = s.plan.rooms[a.pad]!.pad
-    let dx = Transform.x[a.eid]! - p.x * UNIT
-    let dy = Transform.y[a.eid]! - p.y * UNIT
-    if (Math.hypot(dx, dy) < 0.1 * UNIT) {
-      const ang = sim.rng.next() * Math.PI * 2
-      dx = Math.cos(ang)
-      dy = Math.sin(ang)
-    }
-    const d = norm(dx, dy)
-    displace(sim, a.eid, { kind: 'push', x: d.x * cfg.pad.spillU * UNIT * Phys.mass[a.eid]!, y: d.y * cfg.pad.spillU * UNIT * Phys.mass[a.eid]! }, SHIPPED)
+    const door = s.plan.rooms[a.room]!.entry
+    const side = (sim.rng.next() - 0.5) * 1.2
+    const d = norm(door.in.x - door.in.y * side, door.in.y + door.in.x * side)
+    const push = cfg.exit.spillU * UNIT * Phys.mass[a.eid]!
+    displace(sim, a.eid, { kind: 'push', x: d.x * push, y: d.y * push }, SHIPPED)
   }
 }
 
-/** 四座传送台：队长站在队伍所在那间的台上攒能、走开就漏，满了整队出发；每座台到点发一趟车 */
-function stepPads(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
+/**
+ * 四扇出口：队伍那间的出口倒数到点开，开着时队长踏上门槛就整队出发；没赶上就关上、重新倒数。
+ * 别的几间的出口到点开一下，门槛上的敌人一起送走
+ */
+function stepExits(sim: Sim, s: WarpState, cfg: WarpConfig): void {
   const now = sim.elapsedMs
   const lead = sim.leader
   const lx = Transform.x[lead]!
   const ly = Transform.y[lead]!
   const ready = Alive.v[lead] === 1 && !inTransit(lead)
   if (ready) s.teamRoom = roomOf(s, lx, ly)
-  s.pads.forEach((p, i) => {
-    const standing = ready && i === s.teamRoom && now >= p.coolUntil && onPad(s, cfg, i, lx, ly)
-    p.charge = standing ? p.charge + delta : Math.max(0, p.charge - (delta * cfg.pad.chargeMs) / cfg.pad.drainMs)
-    if (p.charge >= cfg.pad.chargeMs) {
-      p.charge = 0
-      depart(sim, s, cfg, i, true)
+  s.exits.forEach((e, i) => {
+    if (i === s.teamRoom) {
+      if (now >= e.closesAt && now >= e.opensAt) {
+        e.missedAt = now
+        e.opensAt = now + cfg.exit.countdownMs
+        e.closesAt = e.opensAt + cfg.exit.openMs
+      }
+      if (ready && exitOpen(s, i, now) && onSill(s, i, lx, ly, 0)) depart(sim, s, cfg, i, true)
     }
-    if (now >= p.shuttleAt) {
-      p.shuttleAt += cfg.pad.shuttleMs
-      p.shuttled = depart(sim, s, cfg, i, false)
-      p.shuttledAt = now
+    if (now >= e.shuttleAt) {
+      e.shuttleAt += cfg.exit.shuttleMs
+      if (i === s.teamRoom) return
+      e.shuttled = depart(sim, s, cfg, i, false)
+      e.shuttledAt = now
     }
   })
 }
@@ -376,22 +411,20 @@ function steer(s: WarpState, room: number, field: NavField | null, x: number, y:
   return alongWall(b, x, y, w.x, w.y, r + 0.3 * UNIT)
 }
 
-/** 第 room 间的身体往那间的传送台去：到了台上就在台面里打转 */
-function towardPad(s: WarpState, cfg: WarpConfig, room: number, eid: number, dx: number, dy: number): Point {
+/** 第 room 间的身体往那间的出口去：到了门槛上就在门前挤着 */
+function towardExit(s: WarpState, room: number, eid: number, dx: number, dy: number): Point {
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
-  const p = s.plan.rooms[room]!.pad
-  const px = p.x * UNIT
-  const py = p.y * UNIT
-  if (Math.hypot(px - x, py - y) < cfg.pad.radiusU * 0.75 * UNIT) return { x: dx, y: dy }
-  return steer(s, room, s.toPad[room]!, x, y, px, py, Radius.v[eid]!)
+  if (onSill(s, room, x, y, 0)) return { x: dx * 0.3, y: dy * 0.3 }
+  const p = zoneMid(s.plan.rooms[room]!.exit)
+  return steer(s, room, s.toExit[room]!, x, y, p.x * UNIT, p.y * UNIT, Radius.v[eid]!)
 }
 
 /** 第 i 间里随手挑一处离壁至少 clear 像素的地方 */
 function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
   const r = s.plan.rooms[i]!
   const b = s.plan.basins[i]!
-  let p: Point = { x: r.pad.x * UNIT, y: r.pad.y * UNIT }
+  let p: Point = { x: r.center.x * UNIT, y: r.center.y * UNIT }
   for (let k = 0; k < 32; k++) {
     p = { x: (r.floor.x0 + sim.rng.next() * (r.floor.x1 - r.floor.x0)) * UNIT, y: (r.floor.y0 + sim.rng.next() * (r.floor.y1 - r.floor.y0)) * UNIT }
     if (roomAt(b, p.x, p.y) >= clear) return p
@@ -401,8 +434,8 @@ function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
 
 /**
  * 跃迁站：四块悬空的平台，平台之间是虚空，身体只能在自己那块上走；平台四周的力场挡弹体也挡视线。
- * 每块一座传送台：队长站上去充满能，整支队伍连同召唤物穿过虚空到下一块的传送台；每座台定期发车，台上的敌人一起送走。
- * 队伍不在的那几间，敌人一边刷一边往传送台聚
+ * 每块一扇出口：倒数到点开，队长踏上门槛，整支队伍连同召唤物穿过虚空从下一块的入口出来，可那只是又一间房；别的几间的出口定期开一下，门槛上的敌人一起送走。
+ * 队伍不在的那几间，敌人一边刷一边往出口聚
  */
 export const warp: WorldHooks = {
   ...bounded,
@@ -417,13 +450,13 @@ export const warp: WorldHooks = {
   ground(sim) {
     return warpOf(sim).plan.basin
   },
-  /** 目标在别的房间就先去这间的传送台；同一间里追向队伍按到队长的步数场绕开立柱与凹槽 */
+  /** 目标在别的房间就先去这间的出口；同一间里追向队伍按到队长的步数场绕开立柱与凹槽 */
   chaseDir(sim, eid, tx, ty) {
     const s = warpOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const room = roomOf(s, x, y)
-    if (room !== roomOf(s, tx, ty)) return towardPad(s, cfgOf(sim), room, eid, 0, 0)
+    if (room !== roomOf(s, tx, ty)) return towardExit(s, room, eid, 0, 0)
     return steer(s, room, room === s.navRoom ? s.toLeader : null, x, y, tx, ty, Radius.v[eid]!)
   },
   trace(sim, probe, ax, ay, bx, by) {
@@ -432,11 +465,11 @@ export const warp: WorldHooks = {
   solidAt(sim, x, y) {
     return solidOf(warpOf(sim).solids, x, y)
   },
-  /** 队伍不在的房间里，没事做的敌人往传送台聚 */
+  /** 队伍不在的房间里，没事做的敌人往出口聚 */
   wanderDir(sim, eid, dx, dy) {
     const s = warpOf(sim)
     const room = roomOf(s, Transform.x[eid]!, Transform.y[eid]!)
-    if (Faction.v[eid] === FACTION.enemy && room !== s.teamRoom) return towardPad(s, cfgOf(sim), room, eid, dx, dy)
+    if (Faction.v[eid] === FACTION.enemy && room !== s.teamRoom) return towardExit(s, room, eid, dx, dy)
     return wanderIn(s.plan.basins[room]!, eid, dx, dy)
   },
   fleeDir(sim, eid, awayX, awayY) {
@@ -451,16 +484,18 @@ export const warp: WorldHooks = {
     const w = FRAME_U * UNIT
     return x < -m || x > w + m || y < -m || y > w + m
   },
-  /** 平常的敌人随手落在四间房里，出怪口再按种类把它送到配方接它的那间；头目落在队伍所在那间、离队长远、也不落在传送台上的地方 */
+  /** 平常的敌人随手落在四间房里，出怪口再按种类把它送到配方接它的那间；头目落在队伍所在那间、离队长远、也不堵在两扇门前的地方 */
   spawnPoint(sim, boss) {
     const s = warpOf(sim)
     if (!boss) return randomIn(sim, s, Math.floor(sim.rng.next() * s.plan.rooms.length), UNIT)
     const lead = leaderPoint(sim)
     const far = SPAWN.minPlayerDist * UNIT * 1.6
-    const pad = s.plan.rooms[s.teamRoom]!.pad
-    const clear = (cfgOf(sim).pad.radiusU + 2.5) * UNIT
+    const room = s.plan.rooms[s.teamRoom]!
+    const doors = [zoneMid(room.exit), room.entry.land]
+    const clear = 4 * UNIT
+    const blocked = (p: Point): boolean => Math.hypot(p.x - lead.x, p.y - lead.y) < far || doors.some((d) => Math.hypot(p.x - d.x * UNIT, p.y - d.y * UNIT) < clear)
     let p = randomIn(sim, s, s.teamRoom, 1.5 * UNIT)
-    for (let k = 0; k < 32 && (Math.hypot(p.x - lead.x, p.y - lead.y) < far || Math.hypot(p.x - pad.x * UNIT, p.y - pad.y * UNIT) < clear); k++) p = randomIn(sim, s, s.teamRoom, 1.5 * UNIT)
+    for (let k = 0; k < 32 && blocked(p); k++) p = randomIn(sim, s, s.teamRoom, 1.5 * UNIT)
     return p
   },
   center(sim) {
@@ -484,16 +519,16 @@ export const warp: WorldHooks = {
     return ZERO
   },
   /**
-   * 走到队长的路：传送台一下就到，下一间的台子又正是那一间的出口，所以别的房间里只算走到自己那间传送台的路，再加上队伍那间从传送台走到队长的路
+   * 走到队长的路：出口一下就到下一间的入口，所以别的房间里只算走到自己那间出口的路，再加上队伍那间从入口走到队长的路
    */
   toLeader(sim, x, y) {
     const s = warpOf(sim)
     const lead = leaderPoint(sim)
     const room = roomOf(s, x, y)
     if (room === s.teamRoom) return Math.hypot(lead.x - x, lead.y - y)
-    const pad = s.plan.rooms[s.teamRoom]!.pad
-    const there = s.toLeader && s.navRoom === s.teamRoom ? navDist(s.grids[s.teamRoom]!, s.toLeader, pad.x * UNIT, pad.y * UNIT) : Infinity
-    return (navDist(s.grids[room]!, s.toPad[room]!, x, y) + there) * UNIT
+    const land = s.plan.rooms[s.teamRoom]!.entry.land
+    const there = s.toLeader && s.navRoom === s.teamRoom ? navDist(s.grids[s.teamRoom]!, s.toLeader, land.x * UNIT, land.y * UNIT) : Infinity
+    return (navDist(s.grids[room]!, s.toExit[room]!, x, y) + there) * UNIT
   },
   /** 打在力场上的弹体：力场在那里泛一圈涟漪 */
   impact(sim, x, y, material) {
@@ -505,10 +540,10 @@ export const warp: WorldHooks = {
   onStart(sim) {
     warpOf(sim)
   },
-  tick(sim, delta) {
+  tick(sim) {
     const cfg = cfgOf(sim)
     const s = warpOf(sim)
-    stepPads(sim, s, cfg, delta)
+    stepExits(sim, s, cfg)
     spill(sim, s, cfg)
     stepTiles(sim, s)
     stepNav(sim, s)

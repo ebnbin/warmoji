@@ -47,7 +47,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
-import { roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
+import { LAND_U, roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -594,42 +594,48 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 跃迁：四间房的平台、台沿与能走的方块都落在整格上，能走的方块放得下开局的空地，狭长的那间横竖都装得下传送台；
- * 传送台站得下队长和跟在身后的队员，充能、冷却、发车的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与核心柱；
- * 抽一批种子真的生成一遍：开局站位四周空着，每间房的传送台与出怪板都落在那间能走的地方上，四间各有会亮的瓷砖
+ * 跃迁：四间房的平台、台沿与能走的方块都落在整格上，能走的方块放得下开局的空地，狭长那间的窄墙上开得下一扇门；
+ * 门洞站得下队长，门前站得下送到的队伍，倒数、开着与穿行的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与正中的出口；
+ * 抽一批种子真的生成一遍：开局站位四周空着，每间房的两扇门的门槛与落点、出怪板都落在那间能走的地方上，这一间的出口正对着下一间的入口，四间各有会亮的瓷砖
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'warp') === (m.warp !== undefined), `maps.${id} 是跃迁当且仅当写了 warp`)
   const c = m.warp
   if (!c) continue
   const at = `maps.${id}.warp`
-  const { room: r, pad, pillars: pl, emitters: em } = c
+  const { room: r, exit: ex, pillars: pl, emitters: em } = c
   const f = roomFrame(c)
   const whole = (v: number): boolean => Math.abs(v - Math.round(v)) < 1e-9
   need(r.lipU > 0 && r.gapU > 0 && c.neckU > 0, `${at}.room 的台沿、缝宽与窄缝须为正`)
   need(whole(f.f0) && whole(f.f1) && whole(r.narrowU), `${at}.room 的能走的方块与狭长那间的宽须落在整格上`)
-  need(f.f1 - f.f0 >= SPAWN_CLEAR_U * 2 + 2 && r.narrowU >= 2 * pad.radiusU + 2 && r.narrowU < f.f1 - f.f0, `${at}.room 的能走的方块放不下开局的空地，或狭长那间放不下传送台`)
+  need(f.f1 - f.f0 >= SPAWN_CLEAR_U * 2 + 2 && r.narrowU >= ex.widthU + 4 && r.narrowU < f.f1 - f.f0, `${at}.room 的能走的方块放不下开局的空地，或狭长那间的窄墙开不下一扇门`)
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
-  need(pad.radiusU >= squad * 0.75 && pad.edgeU >= 0 && pad.cornerU - pad.radiusU >= 0.5 && f.f1 - f.pad.y - pad.radiusU >= 0.5, `${at}.pad 的台面太小或贴到了内角`)
-  need(f.pad.x - pad.radiusU >= f.f1 - r.narrowU && f.pad.y - pad.radiusU >= f.f1 - r.narrowU, `${at}.pad 落出了狭长那间`)
-  need(pad.chargeMs > 0 && pad.drainMs > 0 && pad.transitMs > 0 && pad.cooldownMs > pad.chargeMs && pad.spillU >= 0, `${at}.pad 的充能、漏能与穿行的时长须为正，冷却比充能长`)
-  need(pad.shuttleMs > pad.warnMs + pad.transitMs && pad.warnMs > 0, `${at}.pad 发车的间隔须放得下预警与穿行`)
-  need(Number.isInteger(pl.count) && pl.count >= 1 && pl.sizeU > 0 && pl.stepU > pl.sizeU + 2 * c.neckU && pl.firstU + (pl.count - 1) * pl.stepU + pl.sizeU < f.f1 - f.f0 && pl.heightM > 0, `${at}.pillars 的根数、边长与间距说不通，或立出了能走的方块`)
+  need(ex.widthU >= squad && ex.zoneU >= 1 && ex.zoneU < LAND_U - 0.5, `${at}.exit 的门洞站不下队长，或门槛深到了送到的队伍身上`)
+  need(ex.outerU - ex.widthU / 2 >= 1 && f.f0 + ex.outerU + 2 + ex.widthU / 2 <= f.f1 - 2, `${at}.exit 离外角太近或太远`)
+  need(ex.countdownMs > 3000 && ex.openMs > 0 && ex.transitMs > 0 && ex.spillU >= 0, `${at}.exit 的倒数、开着与穿行的时长须为正，倒数长过三秒`)
+  need(ex.shuttleMs > ex.warnMs + ex.transitMs && ex.warnMs > 0, `${at}.exit 给敌人开门的间隔须放得下预警与穿行`)
+  need(Number.isInteger(pl.count) && pl.count >= 1 && pl.sizeU > 0 && pl.stepU > pl.sizeU + 2 * c.neckU && pl.firstU + (pl.count - 1) * pl.stepU + pl.sizeU < f.f1 - f.f0 && pl.heightM > 0 && pl.clearU >= 0, `${at}.pillars 的根数、边长与间距说不通，或立出了能走的方块`)
   need(c.pitU > 0 && c.pitU < f.f1 - f.f0 - 4, `${at}.pitU 的凹槽须为正，四周还留得下回廊`)
   need(Number.isInteger(em.plateU) && em.plateU >= 1 && em.markU > 0 && em.clearU >= 0, `${at}.emitters 的板长须是正整数，凝成形的半径为正`)
-  need(c.core.radiusU > 0 && c.core.radiusU < r.gapU + r.lipU, `${at}.core 的核心柱须为正、立得进十字缝`)
+  need(c.core.radiusU > 0 && c.core.radiusU < r.gapU + r.lipU, `${at}.core 的真正的出口须为正、立得进十字缝`)
   need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
   const g = m.gates
   need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
-  need(g?.boss === 'core' && g.kinds.core?.at.kind === 'mark', `${at} 的头目须从核心柱（地标上的出怪口 core）出来`)
-  for (const [k, d] of Object.entries(g?.kinds ?? {})) need(d.at.kind !== 'mark' || k === 'core' || c.recipes.includes(k), `${at} 地标上的出怪口 ${k} 既不是配方也不是核心柱`)
+  need(g?.boss === 'core' && g.kinds.core?.at.kind === 'mark', `${at} 的头目须从正中的出口（地标上的出怪口 core）出来`)
+  for (const [k, d] of Object.entries(g?.kinds ?? {})) need(d.at.kind !== 'mark' || k === 'core' || c.recipes.includes(k), `${at} 地标上的出怪口 ${k} 既不是配方也不是正中的出口`)
   for (let s = 0; s < 24; s++) {
     const plan = warpPlan(c, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
     need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     plan.rooms.forEach((room, i) => {
       const b = plan.basins[i]!
-      need(roomAt(b, room.pad.x * UNIT, room.pad.y * UNIT) >= pad.radiusU * UNIT * 0.9, `${where} 第 ${i} 间的传送台没落在能走的地方`)
+      for (const d of [room.exit, room.entry]) {
+        const zx = (d.zone.x0 + d.zone.x1) / 2
+        const zy = (d.zone.y0 + d.zone.y1) / 2
+        need(roomAt(b, zx * UNIT, zy * UNIT) >= 0.5 * UNIT && roomAt(b, d.land.x * UNIT, d.land.y * UNIT) >= 1.5 * UNIT, `${where} 第 ${i} 间的门槛或落点没落在能走的地方`)
+      }
+      const to = plan.rooms[(i + 1) % plan.rooms.length]!
+      need(Math.abs(room.exit.x - to.entry.x) + Math.abs(room.exit.y - to.entry.y) <= 2 * (r.gapU + r.lipU) + 1e-6 && room.exit.style === to.entry.style, `${where} 第 ${i} 间的出口没正对着下一间的入口`)
       need(room.plates.length > 0 && room.plates.every((p) => roomAt(b, p.x * UNIT, p.y * UNIT) >= em.markU * UNIT * 0.5), `${where} 第 ${i} 间的出怪板没落在能走的地方`)
       need(plan.tiles.some((t) => t === i), `${where} 第 ${i} 间没有会亮的瓷砖`)
     })

@@ -748,7 +748,7 @@ export const MAPS = {
   warp: {
     emoji: '1f300',
     name: '跃迁',
-    desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，立在朝向下一块的那条边上，四块连成单向的一圈。队长踏上传送台，台子充能、光圈扩满整间房，然后整支队伍连同召唤物一起被送到下一块平台的传送台上，不管队员在房间哪个角落；到的那座台子要冷却一阵。四间房同时在刷怪：队伍不在的房间，敌人往那间的传送台聚，传送台隔一阵发一趟车，台上站着谁就送谁，追兵就这样一批批从你身后的传送台涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去：哪间堆着多少敌人、往哪儿走，都写在地板上。四间房形状、颜色和出的敌人各不相同，选去哪间就是选和什么打',
+    desc: '悬在虚空里的一座跃迁站，四间房各是一块悬空的平台，平台之间隔着望得见底的虚空。每间房挂着一盏绿色的安全出口指示牌，牌子下面是一扇门——寺院的木门、潜艇的舱门、晶洞的石拱、冰砌的门，像是从别处搬来的。出口按牌子上的倒计时开启，开着时队长踏上门槛，整支队伍连同召唤物一起穿过去，不管队员在房间哪个角落；可门后只是隔壁的另一间房，身后的门随即关上，这一间的出口又开始倒数。没赶上，门就关上重新倒数。四扇出口连成一圈，走完一圈又回到原来那间，门边地上的记号笔道记着你来过几次。正中的虚空里立着一扇真正的出口，门缝里透着日光，从哪间都望得见，从哪间都走不到。四间房同时在刷怪：队伍不在的房间，敌人往那间的出口聚，出口隔一阵开一下，追兵就这样一批批从你身后那扇关上的门里涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去。四间房形状、颜色和出的敌人各不相同',
     kind: 'warp',
     stamina: { exertion: 0.4, regen: 1.1 },
     palette: {
@@ -757,7 +757,7 @@ export const MAPS = {
       map: hslToInt(192, 0.36, 0.86),
       shadow: 0x000000,
     },
-    // 光从左上方的顶灯照下来，地砖与核心柱又从下面、从中间把身体照亮，背光面泛着冷蓝；影子淡
+    // 光从左上方的顶灯照下来，地砖与正中那扇出口的日光又从下面、从中间把身体照亮，背光面泛着冷蓝；影子淡
     light: { sun: 0xf6fbff, shade: 0x7e93b8, shadow: { color: 0x07142a, alpha: 0.28, length: 0.55 } },
     decor: {
       emojis: ['1f300'],
@@ -766,7 +766,7 @@ export const MAPS = {
       density: [0, 0],
     },
     mix: WARP_MIX,
-    // 每间房的出怪板按那间的配方只放出那几种：一间幽灵、一间肉盾、一间成群的小东西、一间什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那间。头目从核心柱里被抛出来
+    // 每间房的出怪板按那间的配方只放出那几种：一间幽灵、一间肉盾、一间成群的小东西、一间什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那间。头目从正中那扇真正的出口里被抛出来
     gates: {
       snapU: 60,
       fallback: 'rise',
@@ -777,16 +777,16 @@ export const MAPS = {
         tanks: { name: '重甲间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
         swarm: { name: '虫群间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
         mixed: { name: '混编间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
-        core: { name: '核心柱', at: { kind: 'mark' }, enter: 'lob', look: 'glow', weight: 1, reachU: 40, only: ['mecha'] },
+        core: { name: '真正的出口', at: { kind: 'mark' }, enter: 'lob', look: 'glow', weight: 1, reachU: 40, only: ['mecha'] },
       },
     },
-    finalWaveSub: '失控核心从核心柱里冲了出来——它落在哪间，就把哪间变成战场！',
+    finalWaveSub: '真正的出口终于开了——走出来的是失控核心，它落在哪间，就把哪间变成战场！',
     warp: {
       room: { lipU: 1, gapU: 2, narrowU: 8 },
       neckU: 0.4,
-      pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
+      pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, clearU: 1.5 },
       pitU: 8,
-      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
+      exit: { widthU: 2, zoneU: 1.5, outerU: 3.5, countdownMs: 15000, openMs: 9000, transitMs: 650, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
       emitters: { plateU: 2, markU: 0.6, clearU: 3 },
       recipes: ['ghosts', 'tanks', 'swarm', 'mixed'],
       core: { radiusU: 1.5 },

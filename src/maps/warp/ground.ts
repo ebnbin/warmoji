@@ -3,7 +3,7 @@ import { GROUND_PPU } from '../../data/texel'
 import { valueNoise } from '../../util/noise'
 import { FRAME_U } from '../../util/units'
 import { SIGNS } from './palette'
-import type { Box, WarpPlan, WarpRoom } from './layout'
+import type { Box, Door, WarpPlan, WarpRoom } from './layout'
 import type { WarpConfig } from '../../types/maps'
 
 /** 平台朝屏幕下方露出的那一截侧面多高，格 */
@@ -18,7 +18,7 @@ const PIT_FACE_U = 1.5
 const TILE = [236, 252, 255] as const
 const SEAM = [40, 215, 235] as const
 const SEAM_U = 0.045
-/** 台沿、机柜与传送台的金属 */
+/** 台沿、机柜与门槛的金属 */
 const GRAPHITE = [10, 24, 38] as const
 const STEEL = [56, 106, 130] as const
 const DEEP = [0, 10, 22] as const
@@ -203,24 +203,44 @@ function plate(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
   addGlow(out, [255, 70, 90], 0.12 * smooth(0.1, 0.4, d))
 }
 
-/** 传送台的台座：钢的外圈与斜面，暗色的台面上两道刻槽、一圈刻度，正中一块镜面 */
-function padBase(out: Rgb, r: number, R: number, ang: number, aa: number): void {
-  const t = r / R
-  set(out, [16, 24, 38])
-  if (t > 0.86) {
-    set(out, STEEL, 0.8)
-    const bev = (t - 0.86) / 0.14
-    mixIn(out, [220, 232, 245], 0.4 * Math.exp(-(((bev - 0.15) / 0.15) ** 2)))
+/** 应急指示的绿：门槛边上的蓄光条与箭头 */
+const EXIT_GREEN = [40, 255, 140] as const
+/** 入口门槛的警示条：黄黑相间 */
+const HAZARD = [255, 196, 40] as const
+
+/** 门洞底下那一截台沿的方形：护栏在门洞处断开，格 */
+export function doorStep(d: Door, lipU: number, widthU: number): Box {
+  const h = widthU / 2
+  const ox = d.x - d.in.x * lipU
+  const oy = d.y - d.in.y * lipU
+  return { x0: Math.min(d.x, ox) - (d.in.x === 0 ? h : 0), y0: Math.min(d.y, oy) - (d.in.y === 0 ? h : 0), x1: Math.max(d.x, ox) + (d.in.x === 0 ? h : 0), y1: Math.max(d.y, oy) + (d.in.y === 0 ? h : 0) }
+}
+
+/**
+ * 门槛：嵌进地面的钢格栅，四边一圈蓄光的绿条。出口的门槛上三道绿箭头朝门里指；入口的门槛刷着黄黑的警示斜纹，只进不出
+ */
+function sill(out: Rgb, d: Door, exit: boolean, x: number, y: number, aa: number): void {
+  const b = d.zone
+  const e = -sdBox(b, x, y)
+  set(out, GRAPHITE, 1.5)
+  // 沿着门的方向 s（往门里为正）与横过门的方向 t
+  const s = -((x - (b.x0 + b.x1) / 2) * d.in.x + (y - (b.y0 + b.y1) / 2) * d.in.y)
+  const t = (x - (b.x0 + b.x1) / 2) * d.in.y - (y - (b.y0 + b.y1) / 2) * d.in.x
+  const grate = Math.abs(((t + 0.09) % 0.18) - 0.09) < 0.03
+  if (grate) set(out, STEEL, 0.5)
+  if (exit) {
+    for (let k = 0; k < 3; k++) {
+      const c = -0.45 + k * 0.42
+      const v = Math.abs(t) * 0.75 - (s - c)
+      const on = Math.abs(v) < 0.08 && Math.abs(t) < 0.55
+      if (on) mixIn(out, EXIT_GREEN, 0.75)
+    }
+  } else {
+    const stripe = (((s + t) % 0.5) + 0.5) % 0.5 < 0.25
+    if (e < 0.22) set(out, stripe ? HAZARD : [20, 18, 12], stripe ? 0.85 : 1)
   }
-  for (const g of [0.36, 0.62]) {
-    const groove = Math.exp(-(((t - g) / (0.02 + aa / R)) ** 2))
-    for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.6 * groove) + 40 * groove * 0.2
-  }
-  if (t > 0.7 && t < 0.82) {
-    const tick = Math.abs(((ang / (Math.PI * 2)) * 24) % 1 - 0.5) > 0.42
-    if (tick) mixIn(out, [120, 140, 165], 0.5)
-  }
-  if (t < 0.2) mixIn(out, [60, 78, 102], 0.6 * (1 - t / 0.2))
+  const rim = 1 - smooth(0.04, 0.04 + aa * 2, Math.abs(e - 0.06))
+  if (exit) addGlow(out, EXIT_GREEN, 0.9 * rim)
 }
 
 /** 地砖：一格一块，冷白偏青，块与块之间一道缝，迎光的两边一线亮、背光的两边一线暗，块面有一点不匀；离墙、立柱与凹槽近的地方暗一点 */
@@ -270,12 +290,12 @@ function faceAt(plan: WarpPlan, x: number, y: number): { room: WarpRoom; t: numb
 function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: number, aa: number, out: Rgb): void {
   const color = prep.colors[room.index]!
   const f = room.floor
-  const pad = room.pad
-  const pr = sc.cfg.pad.radiusU
-  const pd = Math.hypot(x - pad.x, y - pad.y)
-  if (pd < pr) {
-    padBase(out, pd, pr, Math.atan2(y - pad.y, x - pad.x), aa)
-    return
+  for (const [d, exit] of [
+    [room.exit, true],
+    [room.entry, false],
+  ] as const) {
+    if (sdBox(d.zone, x, y) < 0) return sill(out, d, exit, x, y, aa)
+    if (sdBox(doorStep(d, sc.cfg.room.lipU, sc.cfg.exit.widthU), x, y) < 0) return set(out, GRAPHITE, 1.2)
   }
   const inFloor = x >= f.x0 && x < f.x1 && y >= f.y0 && y < f.y1
   if (inFloor) {
@@ -290,7 +310,6 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
       const sy = y - 0.35
       ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(grow(b, 0.12), sx, sy)) / 0.25) * 0.55)
     }
-    ao = Math.max(ao, Math.exp(-Math.max(0, pd - pr) / 0.18) * 0.4)
     tile(out, x, y, ao, aa)
     if (room.shape === 'hall') emblem(out, color, room, x, y)
     return
@@ -310,7 +329,7 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
 
 /**
  * 跃迁站的地面：虚空透明，留给底下的着色器；四块平台的顶面是一格一块的冷白地砖，四边一圈护栏台沿，
- * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与传送台的台座也画在这里
+ * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与两扇门的门槛也画在这里
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const plan = sc.plan

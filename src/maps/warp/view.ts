@@ -3,17 +3,19 @@ import { query } from 'bitecs'
 import { FRAME_U, LIFT_PER_M, UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Due, ENEMY_SET, Telegraph, Transform } from '../../ecs/components'
+import { Alive, Due, Telegraph, Transform } from '../../ecs/components'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
-import { nextRoom } from './layout'
 import { WarpPainter } from './painter'
-import { CORE_GLOW, FOE_GLOW, lift, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
+import { CORE_GLOW, EXIT_GLOW, FOE_GLOW, lift, rgb, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
 import { encodeTiles, TILES_FRAG, VOID_FRAG } from './shader'
 import { textureSize } from './ground'
-import { warpPlanFor } from './world'
+import { DAYLIGHT, drawDoor, drawSign, EXIT_LIGHT, PLAIN_DOOR } from './doors'
+import { flowDir } from './nav'
+import { exitOpen, warpPlanFor, zoneMid } from './world'
 import type { Hop, WarpState } from './world'
-import type { WarpPlan, WarpRoom } from './layout'
+import { inBox } from './layout'
+import type { Door, WarpPlan, WarpRoom } from './layout'
 import type { PaintScene, PixelRect } from './ground'
 import type { WarpConfig } from '../../types/maps'
 import type { EcsAtlas } from '../../ecs/atlas'
@@ -37,16 +39,31 @@ const VOXELS_PER_U = 14
 /** 光块散开、聚拢各占穿行前后多久，毫秒 */
 const SCATTER_MS = 220
 const GATHER_MS = 320
-/** 台子发车、到站时亮的那一下多久，毫秒 */
-const BURST_MS = 520
 /** 力场受击的涟漪多久、多大（格） */
 const RIPPLE_MS = 420
 const RIPPLE_U = 0.7
-/** 传送台给身边的身体打的补光：多远（格）以内，最浓多少 */
-const PAD_LIGHT_U = 2.6
-const PAD_FILL = 0.45
-/** 核心柱照亮四周的身体：多远（格）以内 */
+/** 门有多高、指示牌多宽，格；开在朝屏幕下方那面墙上的门挡着房里，画矮一截、淡一点 */
+const DOOR_H_U = 2.5
+const SIGN_W_U = 1.7
+const LOW_DOOR = 0.55
+/** 门开、门关各要多久，毫秒：关得快，是摔上的 */
+const OPEN_MS = 260
+const SLAM_MS = 110
+/** 送到的身体落地以后，身后的门再开着多久才摔上，毫秒 */
+const HOLD_MS = 380
+/** 摔上的门牌子闪几下才熄，毫秒 */
+const DIE_MS = 700
+/** 出口开的那一刻，一圈绿从门槛扩满整间房要多久，毫秒 */
+const SWEEP_MS = 1300
+/** 开着的出口给身边的身体打的补光：多远（格）以内，最浓多少 */
+const EXIT_LIGHT_U = 3.2
+const EXIT_FILL = 0.5
+/** 真正的出口照亮四周的身体：多远（格）以内 */
 const CORE_LIGHT_U = 6
+/** 门边的记号：一道多长、隔多宽，五道一组，一行几组，格 */
+const TALLY_U = 0.55
+const TALLY_GAP_U = 0.16
+const TALLY_ROW = 3
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const ease = (t: number): number => t * t * (3 - 2 * t)
@@ -57,6 +74,12 @@ function noise(a: number, b: number): number {
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
+}
+
+/** 填一块四边形（按顺序的四个角，像素） */
+function fillQuad(g: Phaser.GameObjects.Graphics, p: readonly Point[]): void {
+  g.fillTriangle(p[0]!.x, p[0]!.y, p[1]!.x, p[1]!.y, p[2]!.x, p[2]!.y)
+  g.fillTriangle(p[0]!.x, p[0]!.y, p[2]!.x, p[2]!.y, p[3]!.x, p[3]!.y)
 }
 
 function upload(tex: Phaser.Textures.CanvasTexture, filter: Phaser.Textures.FilterMode): void {
@@ -80,14 +103,15 @@ function push(d: DataTex): void {
   upload(d.tex, Phaser.Textures.FilterMode.NEAREST)
 }
 
-/** 第 i 间房的待机律动里，(x, y)（格）这块瓷砖排在哪：脉冲按离中心多远，光波按顺着扫的方向走到哪 */
+/** 第 i 间房的待机律动里，(x, y)（格）这块瓷砖排在哪：脉冲按离中心多远，光波按往出口扫的方向走到哪 */
 function phaseOf(room: WarpRoom, pattern: number, x: number, y: number): number {
   const f = room.floor
   if (pattern === 0) return clamp01(Math.hypot(x - room.center.x, y - room.center.y) / 13)
   if (pattern === 1) {
-    const far = { x: room.pad.x < room.center.x ? f.x1 : f.x0, y: room.pad.y < room.center.y ? f.y1 : f.y0 }
-    const dx = room.pad.x - far.x
-    const dy = room.pad.y - far.y
+    const to = zoneMid(room.exit)
+    const far = { x: to.x < room.center.x ? f.x1 : f.x0, y: to.y < room.center.y ? f.y1 : f.y0 }
+    const dx = to.x - far.x
+    const dy = to.y - far.y
     const len = Math.hypot(dx, dy)
     return clamp01(((x - far.x) * dx + (y - far.y) * dy) / (len * len))
   }
@@ -125,14 +149,20 @@ function maskImages(plan: WarpPlan): { mask: Uint8ClampedArray<ArrayBuffer>; tin
 interface Uniforms {
   time: number
   px: number
-  charge: [number, number, number, number]
-  chargeRoom: number
+  sweep: [number, number, number, number]
+  sweepRoom: number
+}
+
+/** 一扇门此刻开了几成、门里透着什么光 */
+interface DoorLook {
+  open: number
+  light: number
 }
 
 /**
- * 跃迁：底下是望得见底的虚空，网格上流着数据光流，正中的核心柱一路照进深处；镜头跟着队长走，整块方框在画面上往四周平铺。四块平台的地面、台沿与平台的影子是开局在后台线程画好的贴图。
- * 地砖按谁踩过亮起信号蓝或信号红、慢慢暗下去，闲着时按各间的律动透出房间的主色；传送台、光桥、核心柱、出怪板上凝成形的敌人、
- * 被送过虚空的身体散成的光块都每帧现画
+ * 跃迁：底下是望得见底的虚空，网格上流着数据光流，正中那扇真正的出口透着日光一路照进深处；镜头跟着队长走，整块方框在画面上往四周平铺。
+ * 四块平台的地面、台沿、门槛与平台的影子是开局在后台线程画好的贴图。地砖按谁踩过亮起信号蓝或信号红、慢慢暗下去，闲着时按各间的律动透出房间的主色；
+ * 门、安全出口指示牌、门边的记号、盯着队伍的监控探头、立柱、出怪板上凝成形的敌人、被送过虚空的身体散成的光块都每帧现画
  */
 export class WarpView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -143,11 +173,11 @@ export class WarpView implements MapView {
   private tiles?: DataTex
   private floorFx?: Phaser.GameObjects.Graphics
   private glowFx?: Phaser.GameObjects.Graphics
+  private doorFx?: Phaser.GameObjects.Graphics
   private airFx?: Phaser.GameObjects.Graphics
-  private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1 }
+  private readonly u: Uniforms = { time: 0, px: 0.05, sweep: [0, 0, 0, 0], sweepRoom: -1 }
   private jumpsSeen = 0
-  private shuttleSeen: number[] = []
-  private charging = false
+  private lastMs = 0
 
   private planOf(v: ViewCtx): WarpPlan {
     if (!this.plan) this.plan = warpPlanFor(v.def.warp!, v.run.decorSeed)
@@ -219,11 +249,11 @@ export class WarpView implements MapView {
     this.floor(v, plan)
     this.floorFx = scene.add.graphics().setDepth(-0.8)
     this.glowFx = scene.add.graphics().setDepth(-0.75).setBlendMode(Phaser.BlendModes.ADD)
+    this.doorFx = scene.add.graphics().setDepth(2.5)
     this.airFx = scene.add.graphics().setDepth(9.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.visuals.push(this.floorFx, this.glowFx, this.airFx)
-    const st = sim.worldState.warp
-    this.jumpsSeen = st?.jumps ?? 0
-    this.shuttleSeen = st ? st.pads.map((p) => p.shuttledAt) : []
+    this.visuals.push(this.floorFx, this.glowFx, this.doorFx, this.airFx)
+    this.jumpsSeen = sim.worldState.warp?.jumps ?? 0
+    this.lastMs = sim.elapsedMs
     v.lens.screen.vignette(0.9, 0.12, 0x020610)
   }
 
@@ -255,8 +285,9 @@ export class WarpView implements MapView {
               set('uTime', u.time)
               set('uTeam', rgb(TEAM_GLOW))
               set('uFoe', rgb(FOE_GLOW))
-              set('uCharge', u.charge)
-              set('uChargeRoom', u.chargeRoom)
+              set('uSweep', u.sweep)
+              set('uSweepRoom', u.sweepRoom)
+              set('uSweepColor', rgb(EXIT_GLOW))
               set('uPx', u.px)
             },
           },
@@ -274,7 +305,7 @@ export class WarpView implements MapView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const st = sim.worldState.warp
     const cfg = this.cfg
-    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx) return
+    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.doorFx || !this.airFx) return
     this.state = st
     const now = sim.elapsedMs
     const t = sim.fxMs / 1000
@@ -285,310 +316,351 @@ export class WarpView implements MapView {
     push(this.tiles)
     this.floorFx.clear()
     this.glowFx.clear()
+    this.doorFx.clear()
     this.airFx.clear()
-    this.chargeRing(st, cfg)
-    this.sounds(v, st, cfg)
-    st.plan.rooms.forEach((room) => this.bridge(st, cfg, room, now, t))
-    st.plan.rooms.forEach((room) => this.pad(sim, st, cfg, room, now, t))
-    this.core(sim, st, t)
+    this.sweep(st, now)
+    this.sounds(v, st, cfg, now)
+    this.trueExit(sim, st, cfg, t)
+    for (const room of st.plan.rooms) {
+      this.tallies(st, cfg, room)
+      this.camera(sim, st, room, t)
+    }
+    // 靠上的门先画，靠下的盖在上面
+    const doors = st.plan.rooms.flatMap((room) => [
+      { room, exit: true, d: room.exit },
+      { room, exit: false, d: room.entry },
+    ])
+    doors.sort((a, b) => a.d.y - b.d.y)
+    for (const d of doors) this.door(st, cfg, d.room, d.exit, now, t)
+    this.route(sim, st, now, t)
     this.pillars(st, cfg, t)
     this.forming(sim, st, cfg, now)
     for (const h of st.hops) this.voxels(h, cfg, now)
     this.ripples(st, now)
+    this.lastMs = now
   }
 
-  /** 着色器里那圈扩满整间房的充能光：半径随充能从台边扩到房间最远的角 */
-  private chargeRing(st: WarpState, cfg: WarpConfig): void {
+  /** 着色器里出口开的那一刻扩满整间房的那圈绿：半径从门槛扩到房间最远的角 */
+  private sweep(st: WarpState, now: number): void {
     const i = st.teamRoom
-    const p = st.pads[i]
-    const room = st.plan.rooms[i]!
-    const k = p ? p.charge / cfg.pad.chargeMs : 0
-    if (k <= 0) {
-      this.u.charge = [0, 0, 0, 0]
-      this.u.chargeRoom = -1
+    const e = st.exits[i]!
+    const k = (now - e.opensAt) / SWEEP_MS
+    if (!exitOpen(st, i, now) || k >= 1) {
+      this.u.sweep = [0, 0, 0, 0]
+      this.u.sweepRoom = -1
       return
     }
+    const room = st.plan.rooms[i]!
+    const m = zoneMid(room.exit)
     const f = room.floor
-    const reach = Math.max(...[f.x0, f.x1].flatMap((x) => [f.y0, f.y1].map((y) => Math.hypot(x - room.pad.x, y - room.pad.y))))
-    const r = cfg.pad.radiusU + (reach + 1 - cfg.pad.radiusU) * ease(k)
-    this.u.charge = [room.pad.x, room.pad.y, r, 0.4 + 0.6 * k]
-    this.u.chargeRoom = i
+    const reach = Math.max(...[f.x0, f.x1].flatMap((x) => [f.y0, f.y1].map((y) => Math.hypot(x - m.x, y - m.y))))
+    this.u.sweep = [m.x, m.y, (reach + 1) * ease(k), 1 - 0.7 * k]
+    this.u.sweepRoom = i
   }
 
-  /** 开始充能、整队出发、送来一批敌人：在镜头里才响 */
-  private sounds(v: ViewCtx, st: WarpState, cfg: WarpConfig): void {
-    const p = st.pads[st.teamRoom]
-    const charging = !!p && p.charge > 0 && p.charge < cfg.pad.chargeMs
-    if (charging && !this.charging && p.charge < 200) playSfx('charge')
-    this.charging = charging
+  /** 倒数的最后三秒、出口开、没赶上它关上、整队出发、身后的门摔上、送来一批敌人：在镜头里才响 */
+  private sounds(v: ViewCtx, st: WarpState, cfg: WarpConfig, now: number): void {
+    const was = this.lastMs
+    const crossed = (at: number): boolean => at > was && at <= now
+    const e = st.exits[st.teamRoom]!
+    if (crossed(e.opensAt)) playSfx('chime')
+    for (const k of [1, 2, 3]) if (crossed(e.opensAt - k * 1000)) playSfx('tink')
+    if (crossed(e.missedAt)) playSfx('thud')
+    if (crossed(e.arrivedAt + cfg.exit.transitMs + HOLD_MS)) playSfx('thud')
     if (st.jumps !== this.jumpsSeen) {
       this.jumpsSeen = st.jumps
       playSfx('jump')
     }
-    st.pads.forEach((pad, i) => {
-      if (pad.shuttledAt === this.shuttleSeen[i]) return
-      this.shuttleSeen[i] = pad.shuttledAt
-      const to = nextRoom(st.plan, i)
-      if (pad.shuttled > 0 && v.lens.screen.sees(to.pad.x * UNIT, to.pad.y * UNIT, 2 * UNIT)) playSfx('warp')
+    st.exits.forEach((x, i) => {
+      const to = st.plan.rooms[(i + 1) % st.plan.rooms.length]!
+      if (x.shuttled > 0 && crossed(x.shuttledAt) && v.lens.screen.sees(to.entry.land.x * UNIT, to.entry.land.y * UNIT, 2 * UNIT)) playSfx('warp')
     })
   }
 
   /**
-   * 光桥：第 i 间的传送台与下一间的传送台之间一道光。平时只是一串淡淡的人字纹往下一间流；队长充能时越来越亮，
-   * 整队出发、一趟车送人过去的那一阵整条桥亮起来，队伍是信号蓝、敌人是信号红
+   * 一扇门此刻开了几成、透着什么光。出口：队伍那间倒数到点开、到点关，队伍走的时候开着、走完摔上，没赶上的那一下摔上；
+   * 别的间给敌人开一下。入口：队伍或敌人从这里出来的那一阵开着，落地后摔上
    */
-  private bridge(st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number, t: number): void {
-    const to = nextRoom(st.plan, room.index)
-    const color = SIGNS[to.sign]!.color
-    const R = cfg.pad.radiusU
-    const ax = room.pad.x
-    const ay = room.pad.y
-    const dx = to.pad.x - ax
-    const dy = to.pad.y - ay
-    const len = Math.hypot(dx, dy)
-    const ux = dx / len
-    const uy = dy / len
-    const a = { x: (ax + ux * R) * UNIT, y: (ay + uy * R) * UNIT }
-    const b = { x: (to.pad.x - ux * R) * UNIT, y: (to.pad.y - uy * R) * UNIT }
-    const span = Math.hypot(b.x - a.x, b.y - a.y)
-    const pad = st.pads[room.index]!
-    const charge = pad.charge / cfg.pad.chargeMs
-    const sinceJump = now - pad.jumpedAt
-    const sinceShuttle = now - pad.shuttledAt
-    const live = cfg.pad.transitMs + 250
-    const teamHot = sinceJump >= 0 && sinceJump < live ? 1 - sinceJump / live : 0
-    const foeHot = pad.shuttled > 0 && sinceShuttle >= 0 && sinceShuttle < live ? 1 - sinceShuttle / live : 0
-    const g = this.glowFx!
-    const f = this.floorFx!
-    // 桥身：一道暗的底，上面同色的细线
-    f.lineStyle(0.22 * UNIT, shade(color, 0.22), 0.55)
-    f.lineBetween(a.x, a.y, b.x, b.y)
-    g.lineStyle(0.07 * UNIT, color, 0.35 + 0.5 * charge)
-    g.lineBetween(a.x, a.y, b.x, b.y)
-    // 人字纹往下一间流，充能时流得快、亮得多
-    const step = 0.9 * UNIT
-    const speed = (0.7 + 3.5 * charge) * UNIT
-    const nx = -uy
-    const ny = ux
-    for (let s = ((t * speed) % step) - step; s < span; s += step) {
-      if (s < 0) continue
-      const fade = Math.sin((Math.PI * s) / span)
-      const c = { x: a.x + ux * s, y: a.y + uy * s }
-      const w = 0.24 * UNIT
-      const back = 0.22 * UNIT
-      g.lineStyle(0.09 * UNIT, color, (0.45 + 0.55 * charge) * fade)
-      g.lineBetween(c.x - ux * back + nx * w, c.y - uy * back + ny * w, c.x, c.y)
-      g.lineBetween(c.x - ux * back - nx * w, c.y - uy * back - ny * w, c.x, c.y)
+  private look(st: WarpState, cfg: WarpConfig, room: WarpRoom, exit: boolean, now: number): DoorLook {
+    const T = cfg.exit.transitMs
+    let best: DoorLook = { open: 0, light: EXIT_LIGHT }
+    const span = (from: number, to: number, light: number): void => {
+      if (now < from || now > to + SLAM_MS) return
+      const k = Math.min(ease(clamp01((now - from) / OPEN_MS)), now > to ? 1 - (now - to) / SLAM_MS : 1)
+      if (k > best.open) best = { open: k, light }
     }
-    for (const [hot, glow] of [
-      [teamHot, TEAM_GLOW],
-      [foeHot, FOE_GLOW],
-    ] as const) {
-      if (hot <= 0) continue
-      for (const [w, al] of [
-        [1.6, 0.1],
-        [0.9, 0.22],
-        [0.4, 0.5],
-        [0.18, 0.9],
-      ] as const) {
-        g.lineStyle(w * UNIT * (0.6 + 0.4 * hot), glow, al * hot)
-        g.lineBetween(a.x, a.y, b.x, b.y)
+    const i = room.index
+    if (exit) {
+      const e = st.exits[i]!
+      if (i === st.teamRoom) span(e.opensAt, e.closesAt, EXIT_LIGHT)
+      span(e.jumpedAt - OPEN_MS, e.jumpedAt + T, EXIT_LIGHT)
+      span(e.missedAt - OPEN_MS, e.missedAt, EXIT_LIGHT)
+      if (e.shuttled > 0) span(e.shuttledAt, e.shuttledAt + T, FOE_GLOW)
+      return best
+    }
+    const e = st.exits[i]!
+    const prev = st.exits[(i + st.exits.length - 1) % st.exits.length]!
+    span(e.arrivedAt, e.arrivedAt + T + HOLD_MS, EXIT_LIGHT)
+    if (prev.shuttled > 0) span(prev.shuttledAt, prev.shuttledAt + T + HOLD_MS, FOE_GLOW)
+    return best
+  }
+
+  /** 门立在门洞那截台沿上，门脚的位置（像素）与是不是开在朝屏幕下方那面墙上：开在左右两面墙上的，门脚落在门洞靠下的那头 */
+  private doorBase(cfg: WarpConfig, d: Door): { x: number; y: number; low: boolean } {
+    const lip = cfg.room.lipU / 2
+    const drop = d.in.x !== 0 ? cfg.exit.widthU / 2 : 0
+    return { x: (d.x - d.in.x * lip) * UNIT, y: (d.y - d.in.y * lip + drop) * UNIT, low: d.in.y < 0 }
+  }
+
+  /**
+   * 一扇门和它顶上的安全出口指示牌。出口的牌子亮着：队伍那间屏上倒数秒数，最后三秒闪，开了以后小人跑起来、屏上箭头往门里走；
+   * 别的间屏上是两道杠。入口的牌子是熄的，只在有人从这里出来时亮一下，门摔上以后闪几下又熄了。门开着时门里的光洒到门前的地上
+   */
+  private door(st: WarpState, cfg: WarpConfig, room: WarpRoom, exit: boolean, now: number, t: number): void {
+    const d = exit ? room.exit : room.entry
+    const look = this.look(st, cfg, room, exit, now)
+    const base = this.doorBase(cfg, d)
+    const w = cfg.exit.widthU * UNIT
+    const h = DOOR_H_U * UNIT * (base.low ? LOW_DOOR : 1)
+    const alpha = base.low ? 0.88 : 1
+    drawDoor(this.doorFx!, d.style, { x: base.x, y: base.y, w, h, open: look.open, light: look.light, lightK: look.open > 0 ? 1 : 0, alpha }, t)
+    // 门里的光洒到门前
+    if (look.open > 0) {
+      const g = this.glowFx!
+      const nx = -d.in.y
+      const ny = d.in.x
+      const half = w * 0.36
+      const far = 2.6 * UNIT * look.open
+      const x0 = d.x * UNIT
+      const y0 = d.y * UNIT
+      g.fillStyle(look.light, 0.28 * look.open)
+      fillQuad(g, [{ x: x0 + nx * half, y: y0 + ny * half },
+          { x: x0 - nx * half, y: y0 - ny * half },
+          { x: x0 - nx * half * 1.8 + d.in.x * far, y: y0 - ny * half * 1.8 + d.in.y * far },
+          { x: x0 + nx * half * 1.8 + d.in.x * far, y: y0 + ny * half * 1.8 + d.in.y * far }])
+      this.airFx!.fillStyle(look.light, 0.18 * look.open)
+      this.airFx!.fillRect(base.x - w * 0.36, base.y - h * 0.86, w * 0.72, h * 0.86)
+    }
+    // 指示牌
+    const sw = SIGN_W_U * UNIT
+    const sy = base.y - h - sw * 0.24
+    let text = '--'
+    let lit = 0.55
+    let run = false
+    if (exit && room.index === st.teamRoom) {
+      const e = st.exits[room.index]!
+      if (now < e.opensAt) {
+        const left = Math.ceil((e.opensAt - now) / 1000)
+        text = String(Math.min(99, left)).padStart(2, '0')
+        lit = left <= 3 && Math.floor((e.opensAt - now) / 250) % 2 === 0 ? 0.55 : 1
+      } else if (now < e.closesAt) {
+        text = ''
+        run = true
+        lit = 0.8 + 0.2 * Math.sin(t * 12)
       }
-      g.lineStyle(0.06 * UNIT, 0xffffff, hot)
-      g.lineBetween(a.x, a.y, b.x, b.y)
+    } else if (!exit) {
+      const e = st.exits[room.index]!
+      const dead = now - (e.arrivedAt + cfg.exit.transitMs + HOLD_MS + SLAM_MS)
+      text = ''
+      lit = look.open > 0 ? 1 : dead >= 0 && dead < DIE_MS && noise(Math.floor(dead / 60), room.index) > 0.45 ? 0.8 : 0
     }
-    // 一团光沿桥从这头冲到那头，和穿行的身体一起到
-    for (const [since, glow, on] of [
-      [sinceJump, TEAM_GLOW, true],
-      [sinceShuttle, FOE_GLOW, pad.shuttled > 0],
-    ] as const) {
-      if (!on || since < 0 || since > cfg.pad.transitMs) continue
-      const k = ease(since / cfg.pad.transitMs)
-      const q = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }
-      g.lineStyle(0.3 * UNIT, glow, 0.5)
-      g.lineBetween(a.x, a.y, q.x, q.y)
-      for (const [r, al, c] of [
-        [0.9, 0.2, glow],
-        [0.55, 0.45, glow],
-        [0.25, 1, 0xffffff],
-      ] as const) {
-        g.fillStyle(c, al)
-        g.fillCircle(q.x, q.y, r * UNIT)
+    drawSign(this.doorFx!, base.x, sy, sw, text, lit, run, t, alpha)
+    if (lit > 0) {
+      this.airFx!.fillStyle(0x30ff80, 0.07 * lit)
+      this.airFx!.fillRect(base.x - sw * 0.62, sy - sw * 0.3, sw * 1.24, sw * 0.6)
+    }
+  }
+
+  /** 出口开着时：队长脚下一串绿箭头顺着步数场一路指到门槛，一节节往门里闪过去 */
+  private route(sim: Sim, st: WarpState, now: number, t: number): void {
+    const i = st.teamRoom
+    if (!exitOpen(st, i, now)) return
+    if (Alive.v[sim.leader] !== 1) return
+    const room = st.plan.rooms[i]!
+    const g = this.glowFx!
+    let x = Transform.x[sim.leader]!
+    let y = Transform.y[sim.leader]!
+    const step = 0.5 * UNIT
+    for (let k = 0; k < 90; k++) {
+      if (inBox(room.exit.zone, x / UNIT, y / UNIT)) return
+      const dir = flowDir(st.grids[i]!, st.toExit[i]!, x, y)
+      if (!dir) return
+      x += dir.x * step
+      y += dir.y * step
+      if (k < 2 || k % 2 === 1) continue
+      const al = 0.25 + 0.65 * Math.max(0, Math.cos(k * 0.35 - t * 6)) ** 4
+      const w = 0.22 * UNIT
+      const back = 0.2 * UNIT
+      g.lineStyle(0.08 * UNIT, EXIT_GLOW, al)
+      g.lineBetween(x - dir.x * back - dir.y * w, y - dir.y * back + dir.x * w, x, y)
+      g.lineBetween(x - dir.x * back + dir.y * w, y - dir.y * back - dir.x * w, x, y)
+    }
+  }
+
+  /** 门边地上记号笔画的道：队伍每从这扇出口走一次就多画一道，五道一组 */
+  private tallies(st: WarpState, cfg: WarpConfig, room: WarpRoom): void {
+    const n = Math.min(st.exits[room.index]!.passes, TALLY_ROW * 5 * 4)
+    if (n === 0) return
+    const d = room.exit
+    let px = d.in.y
+    let py = -d.in.x
+    if ((room.center.x - d.x) * px + (room.center.y - d.y) * py < 0) {
+      px = -px
+      py = -py
+    }
+    const ox = d.x + d.in.x * 0.35 + px * (cfg.exit.widthU / 2 + 0.5)
+    const oy = d.y + d.in.y * 0.35 + py * (cfg.exit.widthU / 2 + 0.5)
+    const at = (a: number, b: number): { x: number; y: number } => ({ x: (ox + px * a + d.in.x * b) * UNIT, y: (oy + py * a + d.in.y * b) * UNIT })
+    const g = this.floorFx!
+    g.lineStyle(0.07 * UNIT, 0x1a2430, 0.8)
+    for (let k = 0; k < n; k++) {
+      const group = Math.floor(k / 5)
+      const r = k % 5
+      const col = group % TALLY_ROW
+      const row = Math.floor(group / TALLY_ROW)
+      const a0 = col * (4 * TALLY_GAP_U + 0.4)
+      const b0 = row * (TALLY_U + 0.22)
+      const wob = (noise(room.index * 97 + k, 3) - 0.5) * 0.06
+      if (r < 4) {
+        const p = at(a0 + r * TALLY_GAP_U + wob, b0)
+        const q = at(a0 + r * TALLY_GAP_U - wob, b0 + TALLY_U)
+        g.lineBetween(p.x, p.y, q.x, q.y)
+      } else {
+        const p = at(a0 - 0.06, b0 + TALLY_U * 0.15)
+        const q = at(a0 + 3 * TALLY_GAP_U + 0.06, b0 + TALLY_U * 0.85)
+        g.lineBetween(p.x, p.y, q.x, q.y)
       }
     }
   }
 
   /**
-   * 一座传送台：外圈是下一间房的颜色。能用时台面上三道人字纹朝下一间滑过去；刚到站、还在冷却时外圈发灰，一段弧随冷却走满；
-   * 队长站上来充能，台面一层层亮成信号蓝、往里收的圈越收越快；发车前台面上亮起一圈圈往里收的红；出发、到站时亮一下
+   * 监控探头：每间房离正中最远的那个角上架着一只，队伍在这间时一直转着对准队长，脚下框着一个取景框；队伍不在时来回扫。红灯一闪一闪
    */
-  private pad(sim: Sim, st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number, t: number): void {
-    const to = nextRoom(st.plan, room.index)
-    const color = SIGNS[to.sign]!.color
-    const p = st.pads[room.index]!
-    const R = cfg.pad.radiusU * UNIT
-    const x = room.pad.x * UNIT
-    const y = room.pad.y * UNIT
-    const f = this.floorFx!
-    const g = this.glowFx!
-    const cooling = now < p.coolUntil
-    const charge = p.charge / cfg.pad.chargeMs
-    const rimColor = cooling ? 0x5d6878 : color
-    f.lineStyle(0.1 * UNIT, shade(rimColor, 0.5), 1)
-    f.strokeCircle(x, y, R * 0.93)
-    g.lineStyle(0.06 * UNIT, rimColor, cooling ? 0.5 : 0.85 + 0.15 * Math.sin(t * 3))
-    g.strokeCircle(x, y, R * 0.93)
-    if (cooling) {
-      const k = clamp01(1 - (p.coolUntil - now) / cfg.pad.cooldownMs)
-      const a0 = -Math.PI / 2
-      g.lineStyle(0.1 * UNIT, color, 0.9)
-      g.beginPath()
-      g.arc(x, y, R * 0.93, a0, a0 + k * Math.PI * 2, false)
-      g.strokePath()
-    } else {
-      // 朝下一间滑过去的人字纹
-      const ux = room.toward.x
-      const uy = room.toward.y
-      const nx = -uy
-      const ny = ux
-      for (let k = 0; k < 3; k++) {
-        const s = ((t * 0.8 + k / 3) % 1) * 1.4 - 0.7
-        const al = Math.sin(((s + 0.7) / 1.4) * Math.PI) * (0.55 + 0.45 * charge)
-        const cx = x + ux * s * R
-        const cy = y + uy * s * R
-        const w = 0.42 * R
-        const back = 0.32 * R
-        g.lineStyle(0.08 * UNIT, color, al)
-        g.lineBetween(cx - ux * back + nx * w, cy - uy * back + ny * w, cx, cy)
-        g.lineBetween(cx - ux * back - nx * w, cy - uy * back - ny * w, cx, cy)
-      }
-    }
-    if (charge > 0) {
-      g.fillStyle(TEAM_GLOW, 0.18 + 0.4 * charge)
-      g.fillCircle(x, y, R * 0.86)
-      for (let k = 0; k < 3; k++) {
-        const s = 1 - ((t * (1 + 3 * charge) + k / 3) % 1)
-        g.lineStyle(0.07 * UNIT, lift(TEAM_GLOW, 0.4), 0.8 * charge * (1 - s * 0.5))
-        g.strokeCircle(x, y, R * (0.15 + 0.75 * s))
-      }
-      // 队伍里每个人头上一道光柱：整队都锁上了
-      for (const m of sim.characters) {
-        if (!Alive.v[m]) continue
-        const mx = Transform.x[m]!
-        const my = Transform.y[m]!
-        const h = (0.6 + 1.6 * charge) * UNIT
-        this.airFx!.fillStyle(TEAM_GLOW, 0.1 + 0.25 * charge)
-        this.airFx!.fillRect(mx - 0.12 * UNIT, my - h, 0.24 * UNIT, h)
-        this.airFx!.fillStyle(0xffffff, 0.25 * charge)
-        this.airFx!.fillRect(mx - 0.035 * UNIT, my - h, 0.07 * UNIT, h)
-      }
-    }
-    // 发车前：台面上一圈圈往里收的红
-    const warn = p.shuttleAt - now
-    if (warn > 0 && warn < cfg.pad.warnMs) {
-      const k = 1 - warn / cfg.pad.warnMs
-      const al = this.crowd(sim, cfg, room) ? 0.7 : 0.18
-      for (let j = 0; j < 2; j++) {
-        const s = 1 - ((k * 2 + j / 2) % 1)
-        g.lineStyle(0.06 * UNIT, FOE_GLOW, al * k)
-        g.strokeCircle(x, y, R * (0.2 + 0.7 * s))
-      }
-    }
-    // 出发与到站
-    const flash = (at: number, c: number, strength: number, px: number, py: number): void => {
-      const d = now - at
-      if (d < 0 || d > BURST_MS || strength <= 0) return
-      const k = d / BURST_MS
-      g.fillStyle(c, 0.5 * (1 - k) * strength)
-      g.fillCircle(px, py, R * (0.7 + 0.5 * k))
-      g.lineStyle(0.08 * UNIT, lift(c, 0.5), (1 - k) * strength)
-      g.strokeCircle(px, py, R * (0.9 + 1.4 * k))
-    }
-    const column = (at: number, c: number, strength: number, px: number, py: number, rising: boolean): void => {
-      const d = now - at
-      if (d < 0 || d > BURST_MS || strength <= 0) return
-      const k = d / BURST_MS
-      const h = 3.2 * UNIT * (rising ? 0.4 + 0.6 * ease(k) : 1 - 0.6 * ease(k))
-      for (const [w, al] of [
-        [1, 0.16],
-        [0.6, 0.3],
-        [0.22, 0.7],
+  private camera(sim: Sim, st: WarpState, room: WarpRoom, t: number): void {
+    const s = room.slab
+    const c = st.plan.core
+    const cx = (Math.abs(s.x0 - c.x) > Math.abs(s.x1 - c.x) ? s.x0 + 0.5 : s.x1 - 0.5) * UNIT
+    const cy = (Math.abs(s.y0 - c.y) > Math.abs(s.y1 - c.y) ? s.y0 + 0.5 : s.y1 - 0.5) * UNIT
+    const watching = room.index === st.teamRoom && Alive.v[sim.leader] === 1
+    const lx = Transform.x[sim.leader]!
+    const ly = Transform.y[sim.leader]!
+    const home = Math.atan2(room.center.y * UNIT - cy, room.center.x * UNIT - cx)
+    const ang = watching ? Math.atan2(ly - cy, lx - cx) : home + 0.55 * Math.sin(t * 0.5 + room.index * 1.7)
+    const ux = Math.cos(ang)
+    const uy = Math.sin(ang)
+    const lift = 0.7 * UNIT
+    // 地上的视野：一道淡淡的扇面
+    const reach = watching ? Math.min(Math.hypot(lx - cx, ly - cy), 30 * UNIT) : 7 * UNIT
+    const spread = 0.2
+    const gl = this.glowFx!
+    gl.fillStyle(0x9fe8ff, watching ? 0.045 : 0.03)
+    gl.fillTriangle(cx, cy, cx + Math.cos(ang - spread) * reach, cy + Math.sin(ang - spread) * reach, cx + Math.cos(ang + spread) * reach, cy + Math.sin(ang + spread) * reach)
+    if (watching) {
+      const b = 0.55 * UNIT
+      const k = 0.18 * UNIT
+      gl.lineStyle(0.04 * UNIT, 0x9fe8ff, 0.4)
+      for (const [sx, sy] of [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
       ] as const) {
-        this.airFx!.fillStyle(w < 0.3 ? 0xffffff : c, al * (1 - k) * strength)
-        this.airFx!.fillRect(px - R * w, py - h, R * w * 2, h)
+        gl.lineBetween(lx + sx * b, ly + sy * b, lx + sx * (b - k), ly + sy * b)
+        gl.lineBetween(lx + sx * b, ly + sy * b, lx + sx * b, ly + sy * (b - k))
       }
     }
-    column(p.jumpedAt, TEAM_GLOW, 1, x, y, true)
-    column(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0, x, y, true)
-    column(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, to.pad.x * UNIT, to.pad.y * UNIT, false)
-    column(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, to.pad.x * UNIT, to.pad.y * UNIT, false)
-    flash(p.jumpedAt, TEAM_GLOW, 1, x, y)
-    flash(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0.25, x, y)
-    const tx = to.pad.x * UNIT
-    const ty = to.pad.y * UNIT
-    flash(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, tx, ty)
-    flash(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, tx, ty)
-  }
-
-  /** 此刻有没有敌人站在这座台上 */
-  private crowd(sim: Sim, cfg: WarpConfig, room: WarpRoom): boolean {
-    const r = cfg.pad.radiusU * UNIT
-    for (const e of query(sim.world, ENEMY_SET)) if (Alive.v[e] && Math.hypot(Transform.x[e]! - room.pad.x * UNIT, Transform.y[e]! - room.pad.y * UNIT) <= r) return true
-    return false
+    // 支架与机身
+    const g = this.doorFx!
+    g.lineStyle(0.06 * UNIT, 0x3a4652, 1)
+    g.lineBetween(cx, cy, cx, cy - lift)
+    const body = (a: number, b: number): { x: number; y: number } => ({ x: cx + ux * a - uy * b, y: cy - lift + uy * a * 0.6 + ux * b })
+    g.fillStyle(0xd8e0e6, 1)
+    fillQuad(g, [body(-0.1 * UNIT, -0.12 * UNIT), body(0.42 * UNIT, -0.1 * UNIT), body(0.42 * UNIT, 0.1 * UNIT), body(-0.1 * UNIT, 0.12 * UNIT)])
+    const lens = body(0.44 * UNIT, 0)
+    g.fillStyle(0x10161c, 1)
+    g.fillCircle(lens.x, lens.y, 0.08 * UNIT)
+    g.fillStyle(0x7fdcff, 0.8)
+    g.fillCircle(lens.x - 0.02 * UNIT, lens.y - 0.02 * UNIT, 0.025 * UNIT)
+    if (Math.floor(t * 1.2) % 2 === 0) {
+      const led = body(0.05 * UNIT, 0)
+      this.airFx!.fillStyle(0xff3040, 0.9)
+      this.airFx!.fillCircle(led.x, led.y - 0.1 * UNIT, 0.04 * UNIT)
+      this.airFx!.fillStyle(0xff3040, 0.2)
+      this.airFx!.fillCircle(led.x, led.y - 0.1 * UNIT, 0.12 * UNIT)
+    }
   }
 
   /**
-   * 核心柱：方框正中一根发光的柱子，是全图唯一的高光——白亮的柱顶、外面几圈转着的光环，一道光往上冲出平台的高度；
-   * 头目要从核心里出来时，柱子先烧成红白色
+   * 真正的出口：正中虚空里一小块浮着的台子，上面立着一扇普普通通的白门，开着一道缝，门里是日光，牌子一直亮着、箭头一直往门里指；
+   * 日光从门缝洒到台上、洒进虚空里，门顶上一道光往上冲。四面都是虚空，哪间都走不到。头目要从门里出来时，门里的光烧成红色、门跟着抖
    */
-  private core(sim: Sim, st: WarpState, t: number): void {
-    const g = this.glowFx!
-    const cx = st.plan.core.x * UNIT
-    const cy = st.plan.core.y * UNIT
+  private trueExit(sim: Sim, st: WarpState, cfg: WarpConfig, t: number): void {
     let boss = 0
     for (const e of query(sim.world, [Telegraph, Due])) {
       if (!Telegraph.boss[e]) continue
       const span = Math.max(1, Due.at[e]! - Telegraph.bornMs[e]!)
       boss = Math.max(boss, clamp01((sim.elapsedMs - Telegraph.bornMs[e]!) / span))
     }
-    const hot = boss > 0 ? 0.5 + 0.5 * Math.sin(t * (8 + 20 * boss)) : 0
-    const tint = boss > 0 ? 0xff7a8a : CORE_GLOW
-    const r = (this.cfg?.core.radiusU ?? 1.5) * UNIT
-    const rise = 3.2 * LIFT_PER_M * 2
-    // 往上冲出平台的那一截光
-    const slices = 14
-    for (let j = 0; j < slices; j++) {
-      const s0 = j / slices
-      const fade = (1 - s0) ** 1.6
-      for (const [w, al] of [
-        [0.95, 0.07],
-        [0.5, 0.14],
-        [0.2, 0.35],
+    const light = boss > 0 ? 0xff5a6a : DAYLIGHT
+    const shake = boss > 0 ? Math.sin(t * (30 + 40 * boss)) * 0.04 * UNIT * boss : 0
+    const cx = st.plan.core.x * UNIT + shake
+    const cy = st.plan.core.y * UNIT
+    const r = cfg.core.radiusU * UNIT
+    const g = this.doorFx!
+    const gl = this.glowFx!
+    // 浮着的台子：顶面、朝下的一截侧面、一圈青色的边
+    const iw = r * 1.8
+    const ih = r * 0.9
+    const top = cy - ih * 0.2
+    g.fillStyle(0x0c141c, 1)
+    g.fillRect(cx - iw / 2, top + ih, iw, 0.3 * UNIT)
+    g.fillStyle(0x1c2a36, 1)
+    g.fillRect(cx - iw / 2, top, iw, ih)
+    g.lineStyle(0.04 * UNIT, 0x40ffff, 0.8)
+    g.strokeRect(cx - iw / 2, top, iw, ih)
+    // 日光洒到台上、洒进虚空
+    const baseY = top + ih * 0.35
+    const dw = r * 1.05
+    gl.fillStyle(light, 0.22)
+    fillQuad(gl, [{ x: cx - dw * 0.25, y: baseY },
+        { x: cx + dw * 0.1, y: baseY },
+        { x: cx + dw * 0.9, y: baseY + 3.5 * UNIT },
+        { x: cx - dw * 0.6, y: baseY + 3.5 * UNIT }])
+    const dh = r * 1.9
+    drawDoor(g, PLAIN_DOOR, { x: cx, y: baseY, w: dw, h: dh, open: 0.3 + 0.04 * Math.sin(t * 0.7), light, lightK: 1, alpha: 1 }, t)
+    const a = this.airFx!
+    // 门顶上一道往上冲的光，隔着几间房也望得见
+    const rise = 7 * UNIT
+    for (let j = 0; j < 12; j++) {
+      const s0 = j / 12
+      const fade = (1 - s0) ** 1.5
+      for (const [k, al] of [
+        [0.6, 0.06],
+        [0.3, 0.12],
+        [0.1, 0.3],
       ] as const) {
-        const ww = r * w * (1 - 0.35 * s0)
-        g.fillStyle(tint, al * fade * (1 + hot))
-        g.fillRect(cx - ww, cy - rise * (s0 + 1 / slices), ww * 2, rise / slices)
+        const ww = dw * k * (1 - 0.4 * s0)
+        a.fillStyle(light, al * fade)
+        a.fillRect(cx - ww, baseY - dh - rise * (s0 + 1 / 12), ww * 2, rise / 12)
       }
     }
     for (const [k, al] of [
-      [2.6, 0.05],
-      [1.8, 0.1],
-      [1.25, 0.2],
-      [0.9, 0.45],
-      [0.55, 0.9],
+      [2.4, 0.05],
+      [1.5, 0.08],
+      [0.9, 0.14],
     ] as const) {
-      g.fillStyle(k < 0.6 ? 0xffffff : tint, al * (1 + 0.6 * hot))
-      g.fillCircle(cx, cy, r * k)
+      a.fillStyle(light, al * (1 + 0.15 * Math.sin(t * 1.3)))
+      a.fillCircle(cx - dw * 0.1, baseY - dh * 0.45, r * k * 0.6)
     }
-    for (let k = 0; k < 3; k++) {
-      const a0 = t * (0.6 + k * 0.35) * (k % 2 ? -1 : 1) + (k * Math.PI * 2) / 3
-      g.lineStyle(0.06 * UNIT, tint, 0.7)
-      for (let s = 0; s < 3; s++) {
-        g.beginPath()
-        g.arc(cx, cy, r * (1.15 + k * 0.28), a0 + (s * Math.PI * 2) / 3, a0 + (s * Math.PI * 2) / 3 + 1.2, false)
-        g.strokePath()
-      }
+    // 光里飘着的尘
+    for (let k = 0; k < 8; k++) {
+      const s = (t * 0.08 + noise(k, 5)) % 1
+      a.fillStyle(light, 0.5 * Math.sin(s * Math.PI))
+      a.fillRect(cx - dw * 0.4 + noise(k, 9) * dw * 1.1 + s * dw * 0.4, baseY + s * 3 * UNIT - 0.6 * UNIT, 0.05 * UNIT, 0.05 * UNIT)
     }
+    drawSign(g, cx, baseY - dh - SIGN_W_U * UNIT * 0.24, SIGN_W_U * UNIT * 0.85, '', 1, false, t, 1)
+    a.fillStyle(0x30ff80, 0.1)
+    a.fillRect(cx - SIGN_W_U * UNIT * 0.55, baseY - dh - SIGN_W_U * UNIT * 0.5, SIGN_W_U * UNIT * 1.1, SIGN_W_U * UNIT * 0.52)
   }
 
   /** 立柱：墩子上立着一根半透明的光柱，一圈圈光往上走 */
@@ -662,7 +734,7 @@ export class WarpView implements MapView {
    * 一个被送过虚空的身体：出发时散成一格格光块往上飘开，沿着桥飞过去，在对面的落点聚拢；队伍是信号蓝，敌人是信号红，夹着几块白
    */
   private voxels(h: Hop, cfg: WarpConfig, now: number): void {
-    const ms = cfg.pad.transitMs
+    const ms = cfg.exit.transitMs
     const d = now - h.at
     if (d < 0 || d > ms + GATHER_MS) return
     const g = this.airFx!
@@ -733,30 +805,29 @@ export class WarpView implements MapView {
     }
   }
 
-  /** 传送台给身边的身体打一层下一间颜色的补光；核心柱四周的身体迎着柱子那一面亮一点 */
+  /** 开着的出口给身边的身体打一层绿；正中那扇真正的出口四周的身体迎着它那一面泛着日光 */
   lightAt(x: number, y: number, out: LocalLight): void {
     const st = this.state
-    const cfg = this.cfg
-    if (!st || !cfg) return
-    let best = PAD_LIGHT_U
-    for (const room of st.plan.rooms) {
-      const px = x / UNIT
-      const py = y / UNIT
-      const d = Math.hypot(px - room.pad.x, py - room.pad.y)
-      if (d >= best) continue
-      best = d
-      const l = d || 1
-      const p = st.pads[room.index]!
-      out.fx = (room.pad.x - px) / l
-      out.fy = (room.pad.y - py) / l
-      out.color = p.charge > 0 ? TEAM_GLOW : SIGNS[nextRoom(st.plan, room.index).sign]!.color
-      out.fill = PAD_FILL * (1 - d / PAD_LIGHT_U)
+    if (!st) return
+    const px = x / UNIT
+    const py = y / UNIT
+    const i = st.teamRoom
+    if (exitOpen(st, i, this.lastMs)) {
+      const m = zoneMid(st.plan.rooms[i]!.exit)
+      const d = Math.hypot(px - m.x, py - m.y)
+      if (d < EXIT_LIGHT_U) {
+        const l = d || 1
+        out.fx = (m.x - px) / l
+        out.fy = (m.y - py) / l
+        out.color = EXIT_GLOW
+        out.fill = EXIT_FILL * (1 - d / EXIT_LIGHT_U)
+        return
+      }
     }
-    if (best < PAD_LIGHT_U) return
-    const d = Math.hypot(x / UNIT - st.plan.core.x, y / UNIT - st.plan.core.y)
+    const d = Math.hypot(px - st.plan.core.x, py - st.plan.core.y)
     if (d >= CORE_LIGHT_U) return
-    out.fx = (st.plan.core.x - x / UNIT) / d
-    out.fy = (st.plan.core.y - y / UNIT) / d
+    out.fx = (st.plan.core.x - px) / d
+    out.fy = (st.plan.core.y - py) / d
     out.color = CORE_GLOW
     out.fill = 0.35 * (1 - d / CORE_LIGHT_U)
   }
@@ -771,6 +842,7 @@ export class WarpView implements MapView {
     this.tiles = undefined
     this.floorFx = undefined
     this.glowFx = undefined
+    this.doorFx = undefined
     this.airFx = undefined
     this.state = undefined
     for (const key of [GROUND_KEY, TILES_KEY, MASK_KEY, TINT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)

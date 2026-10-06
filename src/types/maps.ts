@@ -1038,23 +1038,23 @@ export interface WarpConfig {
   readonly room: { readonly lipU: number; readonly gapU: number; readonly narrowU: number }
   /** 窄过两倍 neckU 的缝不能走 */
   readonly neckU: number
-  /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着传送台 padClearU 格以内的不立 */
-  readonly pillars: { readonly firstU: number; readonly stepU: number; readonly count: number; readonly sizeU: number; readonly heightM: number; readonly padClearU: number }
+  /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着门前 clearU 格以内的不立 */
+  readonly pillars: { readonly firstU: number; readonly stepU: number; readonly count: number; readonly sizeU: number; readonly heightM: number; readonly clearU: number }
   /** 回廊正中凹槽的边长，格 */
   readonly pitU: number
   /**
-   * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
-   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
-   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   * 出口：每两间相邻的房之间隔着缝对开一对门，这一间的出口正对着下一间的入口。门洞宽 widthU 格，门前 zoneU 格深的一块是门槛，
+   * 门离房间外角 outerU 格（狭长那间放不下的就挪到那条窄边的正中）。队伍到了一间，那间的出口倒数 countdownMs 后开 openMs，
+   * 开着时队长踏上门槛，整支队伍连同召唤物一起穿行 transitMs 到下一间的入口，身后的门随即关上；没赶上就关上重新倒数。
+   * 队伍不在的那几间，出口每隔 shuttleMs（各间错开）开一下，门槛上的敌人一起送走，开之前 warnMs 亮起来；送到的敌人以 spillU 格/秒往房里涌
    */
-  readonly pad: {
-    readonly radiusU: number
-    readonly edgeU: number
-    readonly cornerU: number
-    readonly chargeMs: number
-    readonly drainMs: number
+  readonly exit: {
+    readonly widthU: number
+    readonly zoneU: number
+    readonly outerU: number
+    readonly countdownMs: number
+    readonly openMs: number
     readonly transitMs: number
-    readonly cooldownMs: number
     readonly shuttleMs: number
     readonly warnMs: number
     readonly spillU: number
@@ -1063,7 +1063,7 @@ export interface WarpConfig {
   readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
   /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
   readonly recipes: readonly [string, string, string, string]
-  /** 核心柱：半径（格），头目从这里被抛进队长所在的那间 */
+  /** 真正的出口：方框正中虚空里的一扇门，半径（格）；哪间都望得见、走不到，头目从这里被抛进队长所在的那间 */
   readonly core: { readonly radiusU: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
