@@ -314,9 +314,9 @@ class Hedge extends Thing {
     o.b *= 1 - 0.2 * low
     // 零星几朵比人还大的玫瑰从树篱里探出来
     const g = cellNearest(h.x * 0.32, vy * 0.32, 151)
-    if (g.h < 0.22) {
+    if (g.h < 0.12 && sampleGrid(this.g, this.g.lawn, h.x, h.y) < 2.4) {
       const kh = (g.h * 31.7) % 1
-      if (rose(o, g.dx, g.dy, 0.34 + 0.08 * kh, kh < 0.55 ? 0 : kh < 0.8 ? 2 : 1, g.h * 11.3)) {
+      if (rose(o, g.dx, g.dy, 0.32 + 0.08 * kh, kh < 0.62 ? 0 : 2, g.h * 11.3)) {
         o.spec = 0.3
         return
       }

@@ -11,11 +11,11 @@ import { clearM } from '../../ecs/utils/pass'
 import { UNDER_Z } from '../../ecs/render/bands'
 import { WonderPainter } from './painter'
 import { textureSize } from './ground'
-import { LIFT_U, makeGrids, sightZ, thingsOf } from './things'
+import { LIFT_U, makeGrids, sampleGrid, sightZ, thingsOf } from './things'
 import { drawBottle, drawCake, drawGlow, drawGrin } from './sprites'
 import { wonderPlanFor } from './world'
 import type { PaintPiece, PaintScene, PixelRect } from './ground'
-import type { Thing } from './things'
+import type { Grids, Thing } from './things'
 import type { WonderPlan } from './layout'
 import type { Treat, WonderState } from './world'
 import type { LocalLight } from '../../ecs/render/sprites'
@@ -147,6 +147,7 @@ export class WonderlandView implements MapView {
   private plan?: WonderPlan
   private painter?: WonderPainter
   private things: Thing[] = []
+  private grids?: Grids
   private occBuckets: number[][] = []
   private readonly treats = new Map<number, TreatFx>()
   private readonly lowered = new Map<number, Lowered>()
@@ -194,6 +195,7 @@ export class WonderlandView implements MapView {
     for (let y = 0; y < size.h; y += STRIP_PX) rects.push({ x0: 0, y0: y, x1: size.w, y1: Math.min(size.h, y + STRIP_PX) })
     // 主线程趁线程画的时候备好挡人的那几样，按列分桶，判断身体被挡住时用
     const grids = makeGrids(plan, cfg)
+    this.grids = grids
     this.things = thingsOf(plan, cfg, grids)
     this.bucketThings()
     await painter.paint(rects, (p: PaintPiece) => {
@@ -265,6 +267,7 @@ export class WonderlandView implements MapView {
     for (const k of col) {
       const t = this.things[k]!
       if (t.over <= clear + 1e-6) continue
+      if (t.wide && sampleGrid(this.grids!, this.grids!.lawn, xu, sy) < -t.hmax * LIFT_U - 0.5) continue
       if (sy < t.y0 - t.hmax * LIFT_U || sy > t.y1) continue
       const z = sightZ(t, xu, sy)
       if (z >= 0 && sy + z * LIFT_U > gy / UNIT + 0.02) return true
