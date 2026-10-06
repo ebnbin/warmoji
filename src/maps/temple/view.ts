@@ -278,7 +278,7 @@ export class TempleView implements MapView {
     this.macawAt = 12000 + Math.random() * 10000
     this.howlAt = HOWL_MS.min
     this.falls = s.falls.length
-    v.lens.screen.vignette(0.74, 0.24, 0x020804)
+    v.lens.screen.vignette(0.76, 0.2, 0x020804)
   }
 
   /** 一处机关的贴图：压板两张、符号的光，刺阵或陷坑，滚石，兽头的眼睛 */

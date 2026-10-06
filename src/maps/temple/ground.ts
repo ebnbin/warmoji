@@ -226,7 +226,7 @@ function leafCell(x: number, y: number): number {
 }
 
 /** 把每个叶簇铺满一团团小叶簇：越往叶簇边上越低，团与团之间留出暗缝 */
-function leavesOf(trees: readonly { x: number; y: number }[], kinds: Uint8Array, crowns: readonly (readonly Clump[])[]): Leaves {
+function leavesOf(kinds: Uint8Array, crowns: readonly (readonly Clump[])[]): Leaves {
   const xs: number[] = []
   const ys: number[] = []
   const zs: number[] = []
@@ -272,7 +272,6 @@ function leavesOf(trees: readonly { x: number; y: number }[], kinds: Uint8Array,
   const fill = Int32Array.from(counts)
   const items = new Int32Array(counts[LEAF_COLS * LEAF_COLS]!)
   for (let i = 0; i < n; i++) cellsOf(i, (c) => (items[fill[c]!++] = i))
-  void trees
   return { x: Float32Array.from(xs), y: Float32Array.from(ys), z: Float32Array.from(zs), r: Float32Array.from(rs), tree: Int32Array.from(ts), cx: Float32Array.from(cxs), cy: Float32Array.from(cys), cr: Float32Array.from(crs), start, items }
 }
 
@@ -694,7 +693,7 @@ export function prepare(sc: PaintScene): Prepared {
     kinds: new Uint8Array(plan.trees.length),
     crowns: [],
     buckets: new Map(),
-    leaves: leavesOf([], new Uint8Array(0), []),
+    leaves: leavesOf(new Uint8Array(0), []),
   }
   const g: Geo = { h: 0, mat: 0, u: 0, v: 0, id: 0, solid: false, e: 9 }
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) P.height[j * n + i] = geoMap(sc, P, (i + 0.5) * GRID_U, (j + 0.5) * GRID_U, g).h
@@ -750,7 +749,7 @@ export function prepare(sc: PaintScene): Prepared {
     }
   })
   ;(P as { crowns: readonly (readonly Clump[])[] }).crowns = crowns
-  ;(P as { leaves: Leaves }).leaves = leavesOf(plan.trees, P.kinds, crowns)
+  ;(P as { leaves: Leaves }).leaves = leavesOf(P.kinds, crowns)
   // 树冠投在地上的影子：顺着背光的方向挪开，边是软的
   const sh = { x: -TO_SUN.x, y: -TO_SUN.y }
   const shadows = plan.trees.map((t, k) => {
@@ -865,7 +864,6 @@ export function glyphInk(kind: Trap['kind'], u: number, v: number): number {
  */
 function albedo(sc: PaintScene, P: Prepared, g: Geo, x: number, y: number, a: number, b: number, C: Rgb): void {
   const seed = sc.plan.seed
-  const cfg = sc.cfg
   const c = sc.plan.court
   const grain = 0.9 + 0.2 * valueNoise(x * 13, y * 13, seed + 5)
   const blot = fbm(x * 0.6, y * 0.6, seed + 7, 3)
@@ -1039,7 +1037,6 @@ function albedo(sc: PaintScene, P: Prepared, g: Geo, x: number, y: number, a: nu
       const nose = Math.hypot(u - 0.62, v * 0.8)
       if (nose < 0.14) mixInto(C, 100, 90, 78, 0.6)
       moss(C, x, y, seed + 12, 0.3)
-      void cfg
       return
     }
     case MAT.root: {
@@ -1088,7 +1085,7 @@ function albedo(sc: PaintScene, P: Prepared, g: Geo, x: number, y: number, a: nu
 }
 
 /** 立面的颜色：砌石一层层的横缝，墙面上雕着一格格回纹，台阶的立面暗一些 */
-function faceAlbedo(sc: PaintScene, mat: number, x: number, z: number, seed: number, C: Rgb): void {
+function faceAlbedo(mat: number, x: number, z: number, seed: number, C: Rgb): void {
   const course = blockJoint(z, x, 0.42, 1.2, seed + 91)
   const hs = hash(course.id, seed + 93)
   set(C, 150 + 18 * (hs - 0.5), 140 + 14 * (hs - 0.5), 124 + 10 * (hs - 0.5))
@@ -1100,7 +1097,6 @@ function faceAlbedo(sc: PaintScene, mat: number, x: number, z: number, seed: num
   }
   if (mat === MAT.stair || mat === MAT.door) scale(C, 0.8)
   moss(C, x, z * 2, seed + 95, 0.35)
-  void sc
 }
 
 const SCRATCH_G: Geo = { h: 0, mat: 0, u: 0, v: 0, id: 0, solid: false, e: 9 }
@@ -1163,7 +1159,7 @@ export function paintGround(sc: PaintScene, P: Prepared, out: Uint8ClampedArray,
         break
       }
       if (faceZ >= 0) {
-        faceAlbedo(sc, faceMat, x, faceZ, seed, C)
+        faceAlbedo(faceMat, x, faceZ, seed, C)
         // 立面朝屏幕下方，背着太阳：只吃天光，越往下越暗，脚下被地面映亮一点
         const lit = AMBIENT * (0.72 + 0.28 * (faceZ / Math.max(0.1, faceTop))) * (1 - 0.5 * gridAt(P, P.canopy, x, y))
         out[o] = C.r * lit * SKY.r * 1.15

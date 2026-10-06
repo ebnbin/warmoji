@@ -154,14 +154,19 @@ function within(plan: TemplePlan, eid: number, r: Rect, grow: number): boolean {
   return rectSd(r, L.a, L.b) <= grow
 }
 
-/** 一处机关打中一具身体：队员挨固定的点数，头目挨固定的点数，其余按最大生命的比例；同一次发动只伤一回 */
+/** 一处机关打中一具身体：队员挨固定的点数，头目挨固定的点数，其余按最大生命的比例 */
+function strike(sim: Sim, t: Trap, eid: number, h: TrapHarm): boolean {
+  const dmg = hasComponent(sim.world, eid, Slot) ? h.team : Boss.v[eid] === 1 ? h.boss : Hp.max[eid]! * h.enemy
+  if (dmg <= 0) return false
+  return hit(sim, hazardSource(HAZARD[t.kind], TINT[t.kind]), eid, dmg, { tick: true })
+}
+
+/** 同一次发动只伤一具身体一回 */
 function harm(sim: Sim, run: TrapRun, t: Trap, eid: number, h: TrapHarm): boolean {
   const uid = Uid.v[eid]!
   if (run.struck.has(uid)) return false
   run.struck.add(uid)
-  const dmg = hasComponent(sim.world, eid, Slot) ? h.team : Boss.v[eid] === 1 ? h.boss : Hp.max[eid]! * h.enemy
-  if (dmg <= 0) return false
-  return hit(sim, hazardSource(HAZARD[t.kind], TINT[t.kind]), eid, dmg, { tick: true })
+  return strike(sim, t, eid, h)
 }
 
 /** 压板上有没有压得下去的身体：脚沾着地、够分量 */
@@ -216,7 +221,6 @@ function flyDarts(sim: Sim, cfg: TempleConfig, s: TempleState, list: readonly nu
     const far = dart.dir > 0 ? c.half : -c.half
     if ((b1 - far) * dart.dir >= 0) b1 = far
     const trap = plan.traps[dart.trap]!
-    const run = s.runs[dart.trap]!
     let struck = -1
     let best = Infinity
     for (const eid of list) {
@@ -236,8 +240,7 @@ function flyDarts(sim: Sim, cfg: TempleConfig, s: TempleState, list: readonly nu
     }
     if (struck >= 0) {
       const p = toMap(plan.frame, dart.a, b0 + dart.dir * Math.max(0, best))
-      run.struck.delete(Uid.v[struck]!)
-      harm(sim, run, trap, struck, cfg.darts.harm)
+      strike(sim, trap, struck, cfg.darts.harm)
       sim.out.bursts.push({ x: p.x * UNIT, y: p.y * UNIT, count: 2, kind: 'puff' })
       continue
     }
@@ -297,7 +300,6 @@ function crush(sim: Sim, cfg: TempleConfig, s: TempleState, k: number, list: rea
 function swallow(sim: Sim, cfg: TempleConfig, s: TempleState, k: number, list: readonly number[]): void {
   const t = s.plan.traps[k]!
   if (t.kind !== 'pit') return
-  const run = s.runs[k]!
   const f = s.plan.frame
   const r0 = t.rect
   for (const eid of list) {
@@ -307,8 +309,7 @@ function swallow(sim: Sim, cfg: TempleConfig, s: TempleState, k: number, list: r
     if (rectSd(r0, L.a, L.b) > -0.05) continue
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    run.struck.delete(Uid.v[eid]!)
-    harm(sim, run, t, eid, cfg.pit.harm)
+    strike(sim, t, eid, cfg.pit.harm)
     s.falls.push({ x, y, r, at: sim.elapsedMs, trap: k })
     if (!Alive.v[eid]) continue
     const out = rimOut(s.plan, r0, L.a, L.b, r / UNIT + CLIMB_OUT_U)
