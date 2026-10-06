@@ -183,9 +183,16 @@ function stepFeet(sim: Sim, s: CanyonState): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, [Faction, Phys, Radius, Alive, Transform])) {
     if (!Alive.v[eid] || hasComponent(sim.world, eid, Pickup)) continue
+    const known = s.feet.get(eid)?.uid === Uid.v[eid]
     const f = footOf(s, eid)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
+    // 刚出现就站在空处的（在谷底倒下又原地起来的队长）本来就在谷底，不算再摔一次
+    if (!known && standing(sim, eid) && !supported(s, x, y)) {
+      f.mode = DOWN
+      enterGorge(eid)
+      continue
+    }
     if (f.mode === TOP) {
       if (standing(sim, eid) && !supported(s, x, y)) startFall(sim, s, f, eid)
     } else if (f.mode === FALLING) {
