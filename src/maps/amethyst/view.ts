@@ -96,8 +96,8 @@ const BAT_GAP_MS = 110
 const BAT_SPEED_U = 5.5
 const BAT_REACH_U = 0.7
 /** 贴着洞底与飞到洞顶时翼展多宽，格：越高离镜头越近、看着越大 */
-const BAT_LOW_U = 0.55
-const BAT_HIGH_U = 1.5
+const BAT_LOW_U = 0.9
+const BAT_HIGH_U = 2
 const RAD = Math.PI / 180
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -695,7 +695,7 @@ export class AmethystView extends BoundedView {
         .setVisible(true)
         .setPosition(b.x, b.y)
         .setRotation(Math.atan2(b.vy, b.vx) + Math.PI / 2)
-        .setScale(span * (0.45 + 0.55 * Math.abs(Math.sin(this.u.time * 15 + b.phase))), span)
+        .setScale(span * (0.55 + 0.45 * Math.abs(Math.sin(this.u.time * 15 + b.phase))), span)
         .setAlpha(1 - ease(0.7, 1, b.alt))
       kept.push(b)
     }
