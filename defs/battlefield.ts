@@ -31,6 +31,13 @@ export const BATTLEFIELD = {
       { id: 'nexus_lag', emoji: '1f4f6', name: '信号延迟', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
       { id: 'nexus_noise', emoji: '1f4fa', name: '信号干扰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
     ],
+    warp: [
+      { id: 'warp_sync', emoji: '1f6f0', name: '跃迁同步', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'warp_lock', emoji: '1f3af', name: '坐标锁定', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'warp_stasis', emoji: '1f9ca', name: '相位凝滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'warp_drift', emoji: '1f4ab', name: '跃迁眩晕', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'warp_lag', emoji: '1f50c', name: '能量回流', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
     circuit: [
       { id: 'circuit_overclock', emoji: '26a1', name: '超频运行', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
       { id: 'circuit_boost', emoji: '1f50b', name: '升压供电', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
