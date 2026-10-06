@@ -72,6 +72,7 @@ varying vec2 outTexCoord;
 #pragma phaserTemplate(outVariables)
 #pragma phaserTemplate(fragmentHeader)
 uniform sampler2D uTex;
+uniform vec2 uSize;
 uniform vec4 uH0;
 uniform vec4 uH1;
 uniform vec4 uH2;
@@ -89,7 +90,12 @@ float keepFor(vec2 w, vec4 h) {
 void main ()
 {
   vec2 tc = outTexCoord;
-  vec4 c = texture2D(uTex, tc);
+  // 贴图被放大两倍画：自己在四个像素间插值，免得按最近点取出锯齿
+  vec2 p = tc * uSize - 0.5;
+  vec2 f = fract(p);
+  vec2 b = (floor(p) + 0.5) / uSize;
+  vec2 d = 1.0 / uSize;
+  vec4 c = mix(mix(texture2D(uTex, b), texture2D(uTex, b + vec2(d.x, 0.0)), f.x), mix(texture2D(uTex, b + vec2(0.0, d.y)), texture2D(uTex, b + d), f.x), f.y);
   vec2 w = vec2(tc.x, 1.0 - tc.y);
   float k = keepFor(w, uH0);
   k = min(k, keepFor(w, uH1));
@@ -213,6 +219,7 @@ export class WonderlandView implements MapView {
             fragmentSource: OCC_FRAG,
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               set('uTex', 0)
+              set('uSize', [size.w, size.h])
               for (let k = 0; k < HOLES; k++) set(`uH${k}`, holes[k])
             },
           },
@@ -412,10 +419,14 @@ export class WonderlandView implements MapView {
       const left = z.want === z.now ? z.until - now : 0
       const blink = z.squeeze || (left < warnMs && Math.floor(now / 140) % 2 === 0)
       const tint = z.squeeze ? 0xffffff : z.now > 0 ? CAKE_TINT : BOTTLE_TINT
-      g.lineStyle(0.07 * UNIT, tint, blink ? 0.3 : 0.85)
-      g.strokeEllipse(x, y + r * 0.35, r * 2, r * 0.9)
-      g.fillStyle(tint, blink ? 0.06 : 0.16)
-      g.fillEllipse(x, y + r * 0.35, r * 2, r * 0.9)
+      const a = blink ? 0.35 : 1
+      const cy = y + r * 0.35
+      g.fillStyle(tint, 0.22 * a)
+      g.fillEllipse(x, cy, r * 2.3, r * 1.05)
+      g.lineStyle(0.1 * UNIT, 0x1b1430, 0.5 * a)
+      g.strokeEllipse(x, cy, r * 2.3, r * 1.05)
+      g.lineStyle(0.06 * UNIT, tint, 0.95 * a)
+      g.strokeEllipse(x, cy, r * 2.3, r * 1.05)
     }
   }
 
