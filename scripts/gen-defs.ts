@@ -29,14 +29,12 @@ import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/maps/nebula/physics.ts'
-import { bulgeU, deckEdgeAngle, halfBeamAt, hydrostatics, spawnS, spritOf, stability, staticHeel } from '../src/maps/ship/physics.ts'
 import { depth, floeOutline, GRAVITY, simple } from '../src/maps/floe/model.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/maps/ruins/layout.ts'
 import { bodyField } from '../src/maps/ruins/masonry.ts'
 import { roomAt } from '../src/maps/basin.ts'
 import { FRAME_U, SAFE_U, SPAWN_CLEAR_U, UNIT, VIEW } from '../src/util/units.ts'
 import { WindSea } from '../src/maps/floe/sea.ts'
-import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/maps/cave/sky.ts'
 import { makeAmethyst } from '../src/maps/amethyst/layout.ts'
 import { diffuseAt, directAt, makeLighting, stepLighting } from '../src/maps/amethyst/light.ts'
 import { blankSky, crossing as amethystCrossing, secsUntil, skyAt as amethystSky, skyLux as amethystSkyLux, torchReach } from '../src/maps/amethyst/sky.ts'
@@ -45,14 +43,10 @@ import { Rng } from '../src/util/rng.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
-import { bridgeLocal as mapleBridgeLocal, CREST_U as MAPLE_CREST_U, maplePlan, SINK_M as MAPLE_SINK_M, weirLocal as mapleWeirLocal } from '../src/maps/maple/layout.ts'
-import { circuitPlan, COPPER_CELL_U, NET_SLOTS } from '../src/maps/circuit/layout.ts'
 import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
-import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
-import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
 import { roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
@@ -172,52 +166,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 船：连舷墙放得进安全区，首斜桅伸出船头也还在方框里；甲板收得拢、桅杆两边走得过去，出发的地方前后都有桅杆、四周空得开；空船正浮稳定。
- * 身体之间不互相挤开，最坏是最多的怪全叠在最宽处的舷墙边：那时也不翻、甲板边不入水（直舷公式还成立），倾角还得超过身体脚下的摩擦角，闲着的身体才滑得起来
- */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'ship') === (m.ship !== undefined), `maps.${id} 是船当且仅当写了 ship`)
-  const c = m.ship
-  if (!c) continue
-  const h = c.hull
-  const d = c.hydro
-  const w = c.weight
-  const f = c.friction
-  need(c.meterPerU > 0, `maps.${id}.ship.meterPerU 须为正`)
-  need(h.beamU > 0 && h.lengthU > h.beamU, `maps.${id}.ship.hull 的船宽须为正、船长大于船宽`)
-  need(h.bow > 0 && h.stern > 0 && h.bow + h.stern < 1 && h.bowPow > 0 && h.sternPow >= 1, `maps.${id}.ship.hull 船头与船尾收拢的两段不重叠，收拢的指数为正、船尾的不小于 1`)
-  need(h.transom > 0 && h.transom < 1 && h.transomBulge >= 0, `maps.${id}.ship.hull.transom 须在 0 到 1 之间、横板不往里凹`)
-  need(h.bulwarkU > 0 && h.bulwarkM > 0 && h.neckU > 0 && h.mastU > 0, `maps.${id}.ship.hull 的舷墙、窄缝与桅杆须为正`)
-  const outU = h.lengthU + bulgeU(h) + h.bulwarkU * 2
-  need(outU <= FRAME_U - SAFE_U * 2 && h.beamU + h.bulwarkU * 2 <= FRAME_U - SAFE_U * 2, `maps.${id}.ship.hull 连舷墙 ${+outU.toFixed(2)}×${h.beamU + h.bulwarkU * 2} 格，放不进安全区`)
-  need(outU / 2 - h.bulwarkU + (spritOf(h).boom.s - h.lengthU) + 1 <= FRAME_U / 2, `maps.${id}.ship 的第一斜桅伸出船头后离方框边不到一格：船一纵摇端头就甩出方框`)
-  const start = spawnS(h)
-  need(h.masts.some((at) => at * h.lengthU < start) && h.masts.some((at) => at * h.lengthU > start), `maps.${id}.ship.hull.masts 须在出发的地方前后都有：队伍从两根桅杆之间出发`)
-  need(halfBeamAt(h, start) >= SPAWN_CLEAR_U, `maps.${id}.ship 出发的地方离舷墙不到 ${SPAWN_CLEAR_U} 格`)
-  for (const at of h.masts) {
-    need(at > 0 && at < 1 && halfBeamAt(h, at * h.lengthU) >= h.mastU + 2, `maps.${id}.ship.hull.masts 的 ${at} 须立在甲板上、两边各留得出两格的路`)
-    need(Math.abs(at * h.lengthU - start) >= SPAWN_CLEAR_U + h.mastU, `maps.${id}.ship.hull.masts 的 ${at} 离出发的地方不到 ${SPAWN_CLEAR_U} 格`)
-  }
-  need(d.draftM > 0 && d.depthM > d.draftM && d.midship > 0 && d.midship <= 1 && d.kgM > 0 && d.rho > 0, `maps.${id}.ship.hydro 的吃水、型深、舯剖面系数、重心与密度须合理：型深大于吃水，系数在 (0, 1] 内`)
-  need(d.rollGyration > 0 && d.pitchGyration > 0 && d.rollAdded >= 0 && d.pitchAdded >= 0, `maps.${id}.ship.hydro 的惯性半径须为正、附加质量不为负`)
-  need(d.rollDamping > 0 && d.rollDamping < 1 && d.pitchDamping > 0 && d.pitchDamping < 1, `maps.${id}.ship.hydro 的阻尼比须在 0 到 1 之间`)
-  need(w.bodyKg > 0 && w.bodyRadiusU > 0 && w.bodyHeightM >= 0 && w.pickupKg >= 0 && w.ballKg >= 0, `maps.${id}.ship.weight 的重量与尺寸不为负、身体的须为正`)
-  need(c.sea.speedMs >= 0 && c.sea.swells.every((s) => s.heightM > 0 && s.periodS > 0), `maps.${id}.ship.sea 的船速不为负、涌浪的波高与周期须为正`)
-  need(f.body.static >= f.body.kinetic && f.body.kinetic > 0 && f.coin.static >= f.coin.kinetic && f.coin.kinetic > 0 && f.ballRolling >= 0, `maps.${id}.ship.friction 的静摩擦须不小于动摩擦、动摩擦为正、滚动摩擦不为负`)
-  need(c.gait.flatResistance > 0 && c.gait.downhillMax >= 1 && c.gait.effortMin > 0 && c.gait.effortMin <= 1, `maps.${id}.ship.gait 的平地阻力须为正、下坡倍率不小于 1、最少的费力在 (0, 1] 内`)
-  need(Number.isInteger(c.balls.count) && c.balls.count >= 0 && c.balls.radiusU > 0 && c.balls.restitution >= 0 && c.balls.restitution <= 1, `maps.${id}.ship.balls 的个数为非负整数、半径为正、恢复系数在 [0, 1] 内`)
-  const hs = hydrostatics(c)
-  need(stability(c, hs, 0).gmT > 0, `maps.${id}.ship 空船的初稳性高须为正`)
-  const crowd = DIFFICULTY.spawn.maxAlive * w.bodyKg
-  const st = stability(c, hs, crowd)
-  const heel = staticHeel(st, crowd * (h.beamU / 2 - w.bodyRadiusU) * c.meterPerU)
-  const deg = (r: number): string => `${+((r * 180) / Math.PI).toFixed(1)}°`
-  need(st.gmT > 0, `maps.${id}.ship 压上 ${DIFFICULTY.spawn.maxAlive} 个身体后初稳性高须仍为正`)
-  need(heel < deckEdgeAngle(c, st), `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时倾 ${deg(heel)}，超过甲板边入水的 ${deg(deckEdgeAngle(c, st))}`)
-  need(Math.tan(heel) > f.body.static, `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时只倾 ${deg(heel)}，闲着的身体滑不起来`)
-}
-
-/**
  * 出怪口：吸附半径为正；每种的权重为正、限速为正、只出的敌人都存在；抛入的才写抛得到多远、只能摆在地标上，整片地面上的只能钻出或落下；
  * 头目出怪口接得住这张图的头目；配比里的每种敌人都有出怪口接
  */
@@ -300,63 +248,11 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 溶洞：地图放得进方框的安全区；洞厅、支洞与天窗都落得进地图；太阳每天升起又落下，时间放慢的窗口罩住天黑那段；正午天窗下的天光亮过熄火把的门槛，
- * 星光暗过刷怪的门槛；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍
- */
-const DEG = Math.PI / 180
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'cave') === (m.cave !== undefined), `maps.${id} 是溶洞当且仅当写了 cave`)
-  const c = m.cave
-  if (!c) continue
-  const mapW = m.size?.w ?? MAP_DEFAULTS.width
-  const mapH = m.size?.h ?? MAP_DEFAULTS.height
-  const side = Math.min(mapW, mapH)
-  const span = (r: readonly [number, number]): boolean => r[0] <= r[1]
-  const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 0 && span(r)
-  const { hall, skylights: s, alcoves: a, formations: f, pools: p, sky, light, torch, view } = c
-  need(hall.insetU[0] > 0 && span(hall.insetU) && hall.waveU > 0 && hall.cornerU >= 0 && hall.neckU > 0 && hall.wallU > 0, `maps.${id}.cave.hall 的边距、波长、窄缝与洞壁宽须为正，磨角不为负`)
-  need(hall.ceilingM > f.stalagmiteM[1] && hall.ceilingM > s.rubbleM, `maps.${id}.cave.hall.ceilingM 须高过最高的石笋与碎石坡`)
-  need(Math.max(mapW, mapH) <= FRAME_U - SAFE_U * 2, `maps.${id}.cave 的地图须放得进方框的安全区`)
-  need(a.outU + a.pocketU + 1.2 < side / 2 - 4, `maps.${id}.cave.alcoves 往外走的深度须让洞厅中间留得出地方`)
-  need(s.mainU[0] > 0 && span(s.mainU) && s.mainOffsetU[0] >= 0 && span(s.mainOffsetU) && s.jitter >= 0 && s.jitter < 0.5 && s.gapU >= 0, `maps.${id}.cave.skylights 的半径与偏移须为正、起伏在 0 到 0.5 之间`)
-  need(s.mainOffsetU[1] + s.mainU[1] * (1 + s.jitter) < side / 2 - Math.max(hall.insetU[1], a.outU + a.pocketU + 1.2) - 1, `maps.${id}.cave.skylights 的主天窗须整个开在洞厅上方`)
-  need(ints(s.mainCount) && s.mainCount[0] >= 1, `maps.${id}.cave.skylights 至少一个大天窗：出生点附近要有天光`)
-  need(ints(s.minorCount) && s.minorU[0] > 0 && span(s.minorU) && s.rubbleM >= 0 && s.rubbleSpread >= 1, `maps.${id}.cave.skylights 的小天窗个数须为非负整数、半径为正，碎石坡不比天窗小`)
-  need(ints(a.count) && a.count[0] >= 1, `maps.${id}.cave.alcoves 至少一条：白天怪物要有暗处出来`)
-  need(a.widthU > 2 * hall.neckU && a.outU > a.widthU / 2 && a.alongU[0] > 0 && span(a.alongU) && a.pocketU * 2 >= a.widthU, `maps.${id}.cave.alcoves 须宽过窄缝、拐进岩体、尽头的暗室不比通道窄`)
-  need(ints(f.columns) && ints(f.stalagmites) && ints(f.clusters) && f.columnU[0] > f.blockU && span(f.columnU), `maps.${id}.cave.formations 的个数须为非负整数，石柱挡路`)
-  need(f.stalagmiteU[0] > 0 && span(f.stalagmiteU) && f.stalagmiteM[0] > 0 && span(f.stalagmiteM) && f.lowM[0] > 0 && span(f.lowM), `maps.${id}.cave.formations 的石笋尺寸须为正`)
-  {
-    const B = OBSTACLES.body
-    const layerM = B.heightM / B.layers
-    const over = Math.floor(B.layers * B.step)
-    need(f.lowM[1] <= over * layerM && f.stalagmiteM[0] > B.heightM, `maps.${id}.cave.formations 的矮石笋须矮得让标准身体跨过去，挡路的石笋须高过标准身体`)
-  }
-  need(f.clearU >= SPAWN_CLEAR_U + hall.neckU, `maps.${id}.cave.formations.clearU 须比出生点要空出的 ${SPAWN_CLEAR_U} 格再宽一道窄缝：石头之间的窄缝填平后，出生点四周也空得开`)
-  need(ints(p.count) && p.sizeU[0] > 0 && span(p.sizeU) && p.viscosity >= 1 && p.exertion >= 0, `maps.${id}.cave.pools 的个数须为非负整数、尺寸为正，水里不比平地快`)
-  need(Math.abs(Math.tan(sky.latitudeDeg * DEG) * Math.tan(sky.declinationDeg * DEG)) < 1, `maps.${id}.cave.sky 须让太阳每天升起又落下`)
-  need(sky.dayS > 0 && sky.startHour >= 0 && sky.startHour < 24 && sky.extinction > 0 && sky.dwell >= 0 && sky.dwellWidthDeg > 0, `maps.${id}.cave.sky 的一天须为正、开局的钟点在一天里`)
-  const dusk = crossings(sky, sky.dwellCenterDeg)
-  need(dusk !== null && sky.dwellCenterDeg < 0, `maps.${id}.cave.sky.dwellCenterDeg 须落在日落之后、太阳每天都经过的高度`)
-  need(light.albedo > 0 && light.albedo < 1 && light.bounceU > 0 && ints(light.glowCount) && light.glowLux >= 0 && light.glowLux < c.spawnLux, `maps.${id}.cave.light 的反照率在 0 到 1 之间，荧光暗过刷怪的门槛`)
-  need(torch.candela > 0 && torch.heightM > 0 && torch.staggerMs >= 0 && torch.igniteLux > c.spawnLux && torch.douseLux > torch.igniteLux, `maps.${id}.cave.torch 须比刷怪的门槛亮时就点起，熄火的门槛高过点火的（不来回闪）`)
-  need(view.darkLux > 0 && view.brightLux > view.darkLux && view.clearLux > 0 && view.nightU > 0 && view.dayU > view.nightU, `maps.${id}.cave.view 须白天比夜里看得远、照度门槛为正`)
-  const noon = noonElevDeg(sky)
-  const noonSky = skyLux(noon) * discViewFactor(s.mainU[0], hall.ceilingM)
-  need(noonSky > torch.douseLux, `maps.${id}.cave 正午主天窗正下方的天光只有 ${Math.round(noonSky)} 勒克斯，熄不了火把`)
-  need(skyLux(-18) < c.spawnLux, `maps.${id}.cave 深夜的星光须暗过刷怪的门槛`)
-  const reach = torchReachU(torch, view.clearLux)
-  need(reach >= view.nightU / 2, `maps.${id}.cave 火把只照得清 ${reach.toFixed(1)} 格，盖不住夜里镜头短边的一半 ${view.nightU / 2} 格`)
-  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
-  need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
-  need(view.dayU <= FRAME_U, `maps.${id}.cave.view.dayU 须让白天的镜头落在方框以内`)
-}
-
-/**
  * 紫水晶洞穴：参数说得通；主晶洞与它上方的塌顶落得进地图，出生点在主晶洞里；挡路的晶体挡得住平射与视线，矮晶丛与地上的晶洞矮得标准身体跨得过去；
  * 太阳每天升过、落过晨昏的高度；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍。抽一批种子真的生成一遍、按正午与午夜算一遍光：
  * 暗道挖得够、出生点四周空得开；正午洞厅亮得看得清整个洞、塌顶下亮得熄得了火把，暗道尽头暗得出得了怪；没有月亮的午夜洞厅暗得出得了怪
  */
+const DEG = Math.PI / 180
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'amethyst') === (m.amethyst !== undefined), `maps.${id} 是紫水晶洞穴当且仅当写了 amethyst`)
   const a = m.amethyst
@@ -596,135 +492,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 红叶林：参数说得通；槛下的溪比槛顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
- * 开局站位离边够远，桥两头落在能走的地方，石槛顶没有塌下去的缺口
- */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'maple') === (m.maple !== undefined), `maps.${id} 是红叶林当且仅当写了 maple`)
-  const s = m.maple
-  if (!s) continue
-  const at = `maps.${id}.maple`
-  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
-  const { wall, forest: fo, stream: st, flow: f, rocks: rk, sill: sl, bridge: bg, trees: tr, body: b } = s
-  need(s.meterPerU > 0 && s.cellU > 0 && s.sizeU > 0 && s.neckU > 0, `${at} 的米每格、地形格子、地图边长与窄缝须为正`)
-  need(s.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
-  need(s.areaU2[0] > 0 && range(s.areaU2, false) && s.areaU2[1] < s.sizeU * s.sizeU, `${at}.areaU2 须是比整张地图小的正的范围`)
-  need(wall.insetU[0] > wall.thickU / 2 && range(wall.insetU, false) && wall.skewDeg >= 0 && wall.skewDeg < 30 && wall.kinkDeg >= 0 && wall.kinkDeg < 30, `${at}.wall 的墙身离地图边至少半个墙厚，整条斜与中途拐都不到 30 度`)
-  need(wall.thickU > 0 && wall.heightM > 0 && wall.eaveU >= 0 && wall.gateU > 0, `${at}.wall 的墙厚、墙高、院门宽须为正，屋檐不为负`)
-  need(fo.insetU[0] > 0 && range(fo.insetU, false) && fo.bendU >= 0 && fo.waveU > 0 && fo.scallopU >= 0 && range(fo.lobes, true) && range(fo.lobeU, false) && fo.lobeWidthU[0] > 0 && range(fo.lobeWidthU, false), `${at}.forest 的林缘离地图边、弯的幅度与波长、林舌草湾的大小须说得通`)
-  need(st.slantDeg > 0 && st.slantDeg < 45 && st.turnDeg >= 0 && st.meanderU >= 0 && st.minBend >= 1 && st.wallGapU >= 0, `${at}.stream 的斜角在 (0, 45) 度里，偏角与蜿蜒不为负、弯道半径至少一个水面宽、离寺墙不为负`)
-  need(f.discharge > 0 && f.widthCoef > 0 && f.depthCoef > 0 && f.manning > 0 && f.bedShape >= 1, `${at}.flow 的流量、水力几何系数与糙率须为正，断面形状指数不小于 1`)
-  need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `${at}.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出溪岸`)
-  need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `${at}.flow 的溪岸须有高有宽，滩地不往溪里倾`)
-  need(rk.radiusU[0] > 0 && range(rk.radiusU, false) && range(rk.gapU, false) && rk.gapU[1] < b.radiusU && rk.heightM > 0, `${at}.rocks 的石头有大小，石缝窄过身子的半径，石顶露出水面`)
-  need(sl.rampU > 0 && sl.dropM + 0.3 > MAPLE_SINK_M && sl.postU > 0 && sl.heightM > 0, `${at}.sill 的槛前有坡，槛下的溪比槛顶低过 ${MAPLE_SINK_M} 米（水流到那里才算落下去），竹栅有桩距有高`)
-  need(bg.widthU > s.neckU * 2 && bg.rampU > 0 && bg.riseM > 0 && bg.at[0] > 0 && range(bg.at, false) && bg.at[1] < 1, `${at}.bridge 的桥面须比窄缝宽、坡道与拱有长有高，架在溪的 (0, 1) 段`)
-  need(tr.crownU[0] > tr.overhangU && range(tr.crownU, false) && tr.heightM[0] > 0 && range(tr.heightM, false) && range(tr.inside, true) && tr.templeGapU > 0, `${at}.trees 的树冠须比能走进去的那截大，树高为正，空地上的棵数为非负整数范围，寺里的间距为正`)
-  need(b.kg > 0 && b.radiusU > 0 && b.density > 0 && b.drag > 0, `${at}.body 的体重、半径、密度与阻力系数须为正`)
-  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.mu > 0, `${at}.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂与脚底摩擦系数为正`)
-  need(b.swim >= 0 && b.wetM > 0, `${at}.body 的划水不为负，湿地水深为正`)
-  for (let k = 0; k < 8; k++) {
-    const plan = maplePlan(s, k * 7919 + 13)
-    const where = `${at} 第 ${k} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
-    const br = plan.bridge
-    for (const sgn of [-1, 1]) {
-      const x = br.x + br.ax * sgn * (br.half - 0.3)
-      const y = br.y + br.ay * sgn * (br.half - 0.3)
-      need(roomAt(plan.basin, x * UNIT, y * UNIT) > 0.5 * UNIT && Math.abs(mapleBridgeLocal(br, x, y).a) < br.half, `${where} 的桥头没落在能走的地方`)
-    }
-    const t = plan.terrain
-    let notch = 0
-    for (let i = 0; i < t.z.length; i++) {
-      const wl = mapleWeirLocal(plan.weir, t.x0 + ((i % t.cols) + 0.5) * t.cell, t.y0 + (Math.floor(i / t.cols) + 0.5) * t.cell)
-      if (wl.side < plan.weir.half && wl.along >= 0 && wl.along < MAPLE_CREST_U - 0.05 && t.z[i]! < plan.weir.crest - 0.01) notch++
-    }
-    need(notch === 0, `${where} 的石槛顶有 ${notch} 格塌了下去，水会从缺口漏走`)
-  }
-}
-
-/**
- * 电路板：参数说得通——过道与两尖之间走得过标准身体，时钟线的线距比线宽宽，队长和小怪站在开关的圆金上脚碰不到盘外带电的铜（栅格再差一格也碰不到）；
- * 抽一批种子真的生成一遍：每块都生成得出来，开局站位四周空着，带电网络的条数编得进电流着色器，电弧的处数在范围里
- */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'circuit') === (m.circuit !== undefined), `maps.${id} 是电路板当且仅当写了 circuit`)
-  const c = m.circuit
-  if (!c) continue
-  const at = `maps.${id}.circuit`
-  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
-  const body = TEAM_BASELINE.member.radius * 2
-  const { frame, shock, rail, clock, arc, button } = c
-  need(c.mmPerU > 0 && c.bodyMM > 0 && c.sizeU > 0 && c.neckU > 0 && c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at} 的毫米每格、身高、地图边长与窄缝须为正，开局空地空得出出生点要的格数`)
-  need(c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
-  need(c.areaU2[0] > 0 && range(c.areaU2, false) && c.areaU2[1] < c.sizeU * c.sizeU, `${at}.areaU2 须为正的范围、小于整张地图`)
-  need(frame.insetU[0] > 0 && range(frame.insetU, false) && frame.chamferU[0] > 0 && range(frame.chamferU, false) && frame.heightMM > 0, `${at}.frame 的内缩、斜角与罩高须为正`)
-  need(range(c.aisleU, false) && c.aisleU[0] > body + c.neckU * 2 && range(c.chipU, false), `${at}.aisleU 须走得过标准身体，chipU 须为非负的范围`)
-  need(shock.teamDps > 0 && shock.enemyDps > 0 && shock.tickMs > 0 && shock.footFrac > 0 && shock.footFrac <= 1, `${at}.shock 的伤害与结算间隔须为正，脚的范围在 (0, 1] 内`)
-  need(rail.widthU[0] > 0 && range(rail.widthU, false), `${at}.rail.widthU 须为正的范围`)
-  need(clock.traces[0] >= 1 && range(clock.traces, true) && clock.widthU > 0 && clock.pitchU > clock.widthU, `${at}.clock 须至少一条线，线距比线宽宽`)
-  need(clock.offMs > 0 && clock.warnMs > 0 && clock.onMs > 0, `${at}.clock 的节拍须为正`)
-  need(arc.count[0] >= 1 && range(arc.count, true) && arc.count[1] <= 3, `${at}.arc.count 须在 1 到 3 处之间`)
-  need(arc.gapU[0] > body && range(arc.gapU, false) && arc.reachU >= 0, `${at}.arc.gapU 须走得过标准身体`)
-  need(arc.restMs >= 0 && arc.chargeMs > 0 && arc.arcMs > 0 && arc.teamDamage > 0 && arc.enemyDamage > 0, `${at}.arc 的节拍与伤害须为正`)
-  need(button.padU > 0 && button.plateU[0] > button.padU && range(button.plateU, false) && button.reachU[0] > 0 && range(button.reachU, false), `${at}.button 的开关、铜板与连线须为正，铜板比开关大`)
-  need(button.holdMs > 0 && button.rearmMs >= 0, `${at}.button 通多久须为正、歇多久不能为负`)
-  const feet = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0)) * shock.footFrac
-  need(button.touchU > 0 && button.padU - button.touchU > feet + COPPER_CELL_U, `${at}.button.touchU 须为正，离盘边比队长和小怪的脚宽出一格栅格：站在开关上碰不到带电的铜`)
-  for (let s = 0; s < 16; s++) {
-    const plan = circuitPlan(c, s * 7919 + 13)
-    const where = `${at} 第 ${s} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
-    need(plan.nets.length <= NET_SLOTS, `${where} 的带电网络太多，编不进电流着色器`)
-    need(plan.gaps.length >= arc.count[0] && plan.gaps.length <= arc.count[1], `${where} 的电弧处数不在范围里`)
-  }
-}
-
-/**
- * 天枢：大厅放得进方框的安全区，开局空地空得出出生点要的格数；门线是整格长、落在格线上；
- * 全息台挡得住标准身体、又比平射的子弹矮；门的对数不超过颜色的种数，挪门的间隔比预警长。
- * 抽一批种子真的生成一遍：每个都生成得出来，开局站位四周空着，门的对数在范围里，同一对朝向相同、隔得够远，横竖两种门各有足够的地方挪
- */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'nexus') === (m.nexus !== undefined), `maps.${id} 是天枢当且仅当写了 nexus`)
-  const c = m.nexus
-  if (!c) continue
-  const at = `maps.${id}.nexus`
-  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
-  const w = c.warps
-  const B = OBSTACLES.body
-  const layerM = B.heightM / B.layers
-  const chestM = (B.layers - 0.5) * layerM
-  const layersOf = (h: number): number => Math.ceil(h / layerM - 1e-9)
-  need(c.sizeU > 0 && c.sizeU <= FRAME_U - SAFE_U * 2, `${at}.sizeU 须放得进方框的安全区`)
-  need(c.plazaU - 0.5 >= SPAWN_CLEAR_U, `${at}.plazaU 须空得出出生点要的格数`)
-  need(c.glassU > 0 && c.neckU > 0 && range(c.chamferU, false) && c.chamferU[1] < c.sizeU / 2, `${at} 的玻璃地面、窄缝与切角须为正，切角小于半边`)
-  need(c.pillars.radiusU > 0 && range(c.pillars.count, true) && range(c.pillars.ringU, false) && c.pillars.ringU[0] > c.plazaU + c.pillars.radiusU, `${at}.pillars 须在开局空地以外`)
-  need(c.pedestals.radiusU > 0 && range(c.pedestals.count, true), `${at}.pedestals 的半径须为正、座数是整数范围`)
-  need(layersOf(c.pedestals.heightM) > Math.floor(B.layers * B.step) && layersOf(c.pedestals.heightM) * layerM < chestM, `${at}.pedestals.heightM 须挡得住标准身体、又比平射的子弹矮`)
-  need(c.cores.widthU > c.cores.doorU * 2 && c.cores.depthU > 0 && range(c.cores.count, true) && c.cores.count[1] <= 2, `${at}.cores 须放得下两扇门，最多两座`)
-  need(range(c.hatches, true), `${at}.hatches 须是整数范围`)
-  need(Number.isInteger(w.lenU) && w.lenU > 0, `${at}.warps.lenU 须是整格：门线落在格线上`)
-  need(w.pairs[0] >= 1 && range(w.pairs, true) && w.pairs[1] <= 3, `${at}.warps.pairs 须在 1 到 3 对之间：门的颜色只有三种`)
-  need(w.apronU >= 1 && w.apartU > w.lenU && w.pairU > w.apartU, `${at}.warps 门线两侧至少空一格，同一对隔得比任两扇门远，任两扇门的中点隔得比门长`)
-  need(w.warnMs > 0 && range(w.everyMs, false) && w.everyMs[0] > w.warnMs, `${at}.warps 挪门的间隔须比预警长`)
-  need(c.tiles.fadeMs > 0, `${at}.tiles.fadeMs 须为正`)
-  for (let s = 0; s < 16; s++) {
-    const plan = nexusPlan(c, s * 7919 + 13)
-    const where = `${at} 第 ${s} 个样本`
-    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
-    const pairs = plan.warps.length / 2
-    need(pairs >= w.pairs[0] && pairs <= w.pairs[1], `${where} 的门的对数不在范围里`)
-    for (let k = 0; k < plan.warps.length; k += 2) {
-      const a = plan.warps[k]!
-      const b = plan.warps[k + 1]!
-      need(a.axis === b.axis && warpApart(a, b, w.lenU) >= w.pairU, `${where} 的第 ${k / 2} 对门朝向不同或隔得太近`)
-    }
-    for (const axis of [0, 1]) need(plan.spots.filter((p) => p.axis === axis).length >= 12, `${where} 摆得下${axis === 0 ? '竖' : '横'}门的地方不到 12 处，门挪不开`)
-  }
-}
-
-/**
  * 培养皿：皿放得进安全区，开局空地空得出出生点、落在划线区以内；四区划线的区数、道数是范围，每区落菌的间距一区比一区稀；
  * 菌落的前沿在格子上长得圆（过渡带宽过一格），显式积分不出负数也不发散，皿边常驻的一圈宽过一格、碰不到开局空地；
  * 算作菌落的密度线、黏脚、溶菌的参数说得通，标准身体溶出的圈盖得过它掉的金币；
@@ -824,40 +591,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       last = k.act
     }
   }
-}
-
-/**
- * 梦幻乐园：台面、内圈、外圈由里往外，外圈放得进安全区，出发的台面正中四周空得开；两圈传送带与台沿的入口都过得去最大的身体；
- * 倾到底时闲着的身体滑得起来、又不陡得站不住；入口关严之后台子才动，最短的一次停留也等得到入口开足；传送带慢过最慢的队员，逆着也走得动
- */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'dreamland') === (m.dreamland !== undefined), `maps.${id} 是梦幻乐园当且仅当写了 dreamland`)
-  const c = m.dreamland
-  if (!c) continue
-  const at = `maps.${id}.dreamland`
-  const { fence, operator: o, gate, belt, friction: f, gait } = c
-  const range = (v: readonly [number, number], min: number): boolean => v[0] >= min && v[0] <= v[1]
-  need(c.meterPerU > 0 && Number.isInteger(c.sides) && c.sides >= 3 && Number.isFinite(c.rotDeg), `${at} 的米每格须为正，边数是不小于 3 的整数`)
-  need(c.stageU > 0 && c.innerU > c.stageU && c.outerU > c.innerU && c.pivotM > 0, `${at} 的台面、内圈、外圈须由里往外，支点高须为正`)
-  need(c.stageU * Math.cos(Math.PI / c.sides) >= SPAWN_CLEAR_U + fence.postU, `${at}.stageU 的台面正中离台沿不到 ${SPAWN_CLEAR_U} 格`)
-  const plan = dreamlandPlan(c)
-  const reach = Math.max(...cornersOf(plan, plan.outer).flatMap((p) => [Math.abs(p.x - plan.cx), Math.abs(p.y - plan.cy)])) / UNIT
-  need(reach <= FRAME_U / 2 - SAFE_U, `${at}.outerU 的外圈伸出中心 ${+reach.toFixed(2)} 格，放不进安全区`)
-  const body = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ENEMIES[m.boss].radius, ...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0))
-  need(c.innerU - c.stageU >= 2 * body && c.outerU - c.innerU >= 2 * body, `${at} 的两圈传送带须走得过最大的身体（半径 ${body} 格）`)
-  need(fence.heightM > 0 && fence.postU > 0 && plan.door / UNIT >= 1.5 * body, `${at}.fence 的高与立柱须为正，入口须过得去最大的身体`)
-  const tilt = Math.atan(c.pivotM / (c.stageU * c.meterPerU))
-  const deg = (r: number): string => `${+((r * 180) / Math.PI).toFixed(1)}°`
-  need(Math.tan(tilt) > f.body.static && Math.tan(tilt) > f.coin.static, `${at} 倾到底只有 ${deg(tilt)}，闲着的身体与金币滑不起来`)
-  need(tilt <= Math.PI / 6, `${at} 倾到底有 ${deg(tilt)}，陡得站不住`)
-  need(o.warnMs > 0 && o.tiltMs > 0 && o.levelMs > 0 && range(o.holdMs, 0) && o.holdMs[0] > 0 && range(o.restMs, 0) && o.direct >= 0 && o.direct <= 1, `${at}.operator 的时长须为正、范围从小到大，直接转向的概率在 [0, 1] 内`)
-  need(gate.openMs >= 0 && gate.swingMs > 0 && gate.closeMs >= gate.swingMs, `${at}.gate 离开前提早关的时间须够关上一次门：台子动之前门已关严`)
-  need(o.holdMs[0] > gate.openMs + gate.swingMs + gate.closeMs, `${at}.operator.holdMs 最短的一次停留须等得到入口开足`)
-  need(belt.speedU > 0 && belt.warnMs >= 0 && belt.turnMs > 0 && range(belt.flipMs, 0) && belt.flipMs[0] > belt.warnMs + belt.turnMs, `${at}.belt 的速度与换向的时长须为正，两次换向之间放得下预警与换向`)
-  const slowest = Math.min(...Object.values<CharacterAuthoring>(CHARACTERS).map((ch) => ch.stats.moveSpeed))
-  need(belt.speedU < slowest, `${at}.belt.speedU 须慢过最慢的队员（${slowest} 格/秒），逆着传送带也走得动`)
-  need(f.body.static >= f.body.kinetic && f.body.kinetic > 0 && f.coin.static >= f.coin.kinetic && f.coin.kinetic > 0, `${at}.friction 的静摩擦须不小于动摩擦、动摩擦为正`)
-  need(gait.flatResistance > 0 && gait.downhillMax >= 1 && gait.effortMin > 0 && gait.effortMin <= 1, `${at}.gait 的平地阻力须为正、下坡倍率不小于 1、最少的费力在 (0, 1] 内`)
 }
 
 /**

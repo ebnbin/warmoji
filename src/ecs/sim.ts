@@ -50,8 +50,6 @@ export interface Sim {
   mapId: import('../types/maps').MapId
   mapW: number
   mapH: number
-  /** 开战时屏幕是竖的：帆船据此船头朝上，之后不随屏幕转 */
-  readonly portrait: boolean
   hooks: WorldHooks
   worldState: WorldState
   view: { x: number; y: number; right: number; bottom: number }
@@ -159,7 +157,6 @@ export function makeSim(
   origin: { x: number; y: number },
   mapW: number,
   mapH: number,
-  portrait: boolean,
   damageNumbers: boolean,
   fight: FightDef,
 ): Sim {
@@ -175,7 +172,6 @@ export function makeSim(
     mapId: run.mapId,
     mapW,
     mapH,
-    portrait,
     hooks: worldFor(run.mapId),
     worldState: newWorldState(),
     view: { x: 0, y: 0, right: mapW, bottom: mapH },

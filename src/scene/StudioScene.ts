@@ -371,7 +371,7 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
     const smalls: [Picture, Picture][] = []
     const grounds = [
       { name: MAPS.volcano.name, color: MAPS.volcano.palette.map },
-      { name: MAPS.ship.name, color: MAPS.ship.palette.map },
+      { name: MAPS.desert.name, color: MAPS.desert.palette.map },
     ]
     grounds.forEach((g, i) => {
       const gx = i === 0 ? lx : rx

@@ -22,7 +22,7 @@ export interface Ramp {
 
 const ramp = (hi: string, base: string, lo: string, deep: string): Ramp => ({ hi, base, lo, deep })
 
-/** 全套只用这些色阶：比 Twemoji 暗一些、暖一些，取自火山与帆船两张地图 */
+/** 全套只用这些色阶：比 Twemoji 暗一些、暖一些 */
 export const RAMP = {
   skin: ramp('#ffe8ad', '#f3c566', '#cc8a3f', '#8f5526'),
   auburn: ramp('#ec9c5c', '#c1662f', '#86401f', '#552512'),

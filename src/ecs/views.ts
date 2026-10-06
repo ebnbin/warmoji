@@ -46,8 +46,6 @@ export interface ViewCtx {
   readonly def: MapDef
   /** 战斗镜头：地图不自己动镜头；跟着屏幕走的东西（底色与遮罩、暗角、闪屏、震屏、按镜头撒的粒子）都经它的屏幕层 */
   readonly lens: Lens
-  /** 开战时屏幕是竖的：按屏幕摆向的地图据此定朝向，之后不随屏幕转 */
-  readonly portrait: boolean
   /** 地上的布景：不是实体，地图往里放、删、挪；场景的布景层按列表的次序、按地图的光画在躺着的精灵那一层 */
   readonly decor: PaintSprite[]
   w: number
