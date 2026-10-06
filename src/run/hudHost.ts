@@ -28,6 +28,8 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  /** 在水坑打的一局才有：兽群此刻多惊慌、在哪一段、要往哪跑 */
+  herd: HerdSnapshot | null
 }
 
 /**
@@ -58,6 +60,15 @@ export interface SubmarineSnapshot {
   readonly phase: 'down' | 'warn' | 'away'
   readonly ratio: number
   readonly inSec: number
+}
+
+/** 兽群：phase 是平时（calm）、要狂奔了（alarm）、狂奔中（run）还是慢下来了（slow），fear 是惊慌（0 到 1），ratio 是这一段走了多少；dir 是要跑或正在跑的方向，没有为 null；emoji 是盘心画哪种动物 */
+export interface HerdSnapshot {
+  readonly phase: 'calm' | 'alarm' | 'run' | 'slow'
+  readonly fear: number
+  readonly ratio: number
+  readonly dir: Point | null
+  readonly emoji: string
 }
 
 export interface WaveSummary {

@@ -39,6 +39,7 @@ export const RAMP = {
   pearl: ramp('#ffffff', '#efeaf3', '#b8afc9', '#7a7197'),
   rot: ramp('#cbd5a6', '#99aa78', '#647854', '#3d4d36'),
   fur: ramp('#aa9d92', '#7d706a', '#524743', '#322a27'),
+  hide: ramp('#d6cbbf', '#a69a8f', '#726862', '#47403c'),
   pink: ramp('#ffcbc1', '#e98b8c', '#b45b65', '#7a3743'),
   leaf: ramp('#b9d47c', '#6e9a44', '#45702d', '#2a4a1d'),
   moss: ramp('#9fbb6a', '#5c8738', '#395c24', '#223a16'),

@@ -78,9 +78,10 @@ import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhas
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
+import { fleeDir, phaseProgress } from '../maps/savanna/herd'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { ClockSnapshot, HerdSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -612,6 +613,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      herd: sim ? herdSnapshot(sim) : null,
     }
   }
 
@@ -1061,6 +1063,21 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 在水坑打的一局：兽群的惊慌与要往哪跑；盘心画第一种动物 */
+function herdSnapshot(sim: Sim): HerdSnapshot | null {
+  const st = sim.worldState.savanna
+  const cfg = MAPS[sim.mapId].savanna
+  if (!st || !cfg) return null
+  const h = st.herd
+  return {
+    phase: h.phase,
+    fear: h.fear,
+    ratio: phaseProgress(h, cfg, st.clock),
+    dir: h.phase === 'calm' || h.phase === 'slow' ? fleeDir(h) : h.dir,
+    emoji: Object.values(cfg.herd.kinds)[0]!.emoji,
+  }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {

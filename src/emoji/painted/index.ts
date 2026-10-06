@@ -2,6 +2,7 @@ import { render } from './design.ts'
 import type { Design, Drawn, Rig } from './design.ts'
 import { COWBOY, FIREFIGHTER, JUGGLER, UNICORN } from './cast.ts'
 import { BOMB, CROC, EYE, GHOST, PUFFER, RAT, SKULL, VILLAIN, ZOMBIE } from './foes.ts'
+import { BUFFALO, ELEPHANT, GIRAFFE, RHINO, ZEBRA } from './beasts.ts'
 import { AXE, BLUE_ORB, DROP, PISTOL, TOMATO, VIOLET_ORB, WAVE } from './gear.ts'
 import type { AnimClipId } from '../../types/anim'
 
@@ -27,6 +28,11 @@ export const PAINTED: Readonly<Record<string, Design>> = {
   '1f7e3': VIOLET_ORB,
   '1f535': BLUE_ORB,
   '1f30a': WAVE,
+  '1f418': ELEPHANT,
+  '1f98f': RHINO,
+  '1f403': BUFFALO,
+  '1f993': ZEBRA,
+  '1f992': GIRAFFE,
 }
 
 const drawn = new Map<string, Drawn>()
