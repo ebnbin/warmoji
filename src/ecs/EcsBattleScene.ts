@@ -1066,17 +1066,20 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
 
 /** 新一页立起来以后，章名在书页盘下面写这么久，毫秒 */
 const BOOK_TITLE_MS = 4500
+/** 离换页不到这么久，书页盘闪着催人，毫秒 */
+const BOOK_WARN_MS = 3000
 
-/** 在立体书里打的一局：翻页的倒计时 */
+/** 在立体书里打的一局：换页的倒计时 */
 function bookSnapshot(sim: Sim): BookSnapshot | null {
   const s = sim.worldState.storybook
   if (!s) return null
   const c = s.clock
   const fresh = c.phase === 'stand' && c.at < BOOK_TITLE_MS && c.page > 0
   const ch = CHAPTERS[chapterOf(s.book, c.page)]!
-  const title = fresh || c.phase === 'pop' ? `第${ch.num}章 · ${ch.name}` : null
-  if (c.phase === 'stand') return { phase: 'stand', ratio: 1 - c.at / c.len, inSec: (c.len - c.at) / 1000, title }
-  return { phase: c.phase === 'warn' ? 'warn' : 'turn', ratio: 0, inSec: 0, title }
+  const title = fresh || c.phase === 'redraw' ? `第${ch.num}章 · ${ch.name}` : null
+  if (c.phase === 'redraw') return { phase: 'turn', ratio: 0, inSec: 0, title }
+  const left = c.len - c.at
+  return { phase: left < BOOK_WARN_MS ? 'warn' : 'stand', ratio: 1 - c.at / c.len, inSec: left / 1000, title }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {

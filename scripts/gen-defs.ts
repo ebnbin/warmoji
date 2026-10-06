@@ -677,9 +677,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 立体书：两页连封面放得进安全区，书脊正中空得出出生点；翻页的各段时长为正，一件布景的翻动放得进折平与弹起的那一段，每页立得比翻页长；
+ * 立体书：两页连封面放得进安全区，书脊正中空得出出生点；换页的各段时长为正；
  * 矮布景挡得住标准身体、子弹从上面飞过、头目跨得过，高布景挡得住视线与平射；路宽过得去最大的小怪与头目，页边与布景之间也过得去；
- * 抽一批种子把四章都摆一遍：件数在范围里，都落在半页里、不跨书脊，别组之间留够路，开局那一页不压着出生的空地，翻页的钟按段走
+ * 抽一批种子把四章都摆一遍：件数在范围里，都落在半页里、不跨书脊，别组之间留够路，开局那一页不压着出生的空地，换页的钟按段走
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'storybook') === (m.storybook !== undefined), `maps.${id} 是立体书当且仅当写了 storybook`)
@@ -691,8 +691,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < page.hU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
   need(Number.isInteger(c.pieces[0]) && Number.isInteger(c.pieces[1]) && c.pieces[0] >= 1 && c.pieces[0] <= c.pieces[1], `${at}.pieces 须为不小于 1 的整数范围`)
   need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一页与每页立着的时长须为正`)
-  need(t.warnMs > 0 && t.foldMs > 0 && t.leafMs > 0 && t.restMs >= 0 && t.popMs > 0 && t.flipMs > 0, `${at}.turn 各段的时长须为正`)
-  need(t.flipMs <= t.foldMs && t.flipMs <= t.popMs, `${at}.turn.flipMs 须放得进折平与弹起的那一段`)
+  need(t.sweepMs > 0 && t.eraseMs > 0 && t.sketchMs > 0 && t.colorMs > 0 && t.flipMs > 0, `${at}.turn 各段的时长须为正`)
   need(c.reflowMs > 0, `${at}.reflowMs 须为正`)
   const B = OBSTACLES.body
   const layer = B.heightM / B.layers
@@ -733,7 +732,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     let last = -1
     for (let ms = 0; ms < 400000; ms += 250) {
       const k = clockAt(c, book, ms)
-      need(k.page >= last && k.at >= 0 && k.at <= k.len + 1e-6, `${at} 第 ${s} 个样本的翻页钟在 ${ms} 毫秒处倒着走或越出了段`)
+      need(k.page >= last && k.at >= 0 && k.at <= k.len + 1e-6, `${at} 第 ${s} 个样本的换页钟在 ${ms} 毫秒处倒着走或越出了段`)
       last = k.page
     }
   }

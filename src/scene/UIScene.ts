@@ -456,7 +456,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.submarineDial.setSubmarine(b.phase, b.ratio, b.inSec, this.time.now)
   }
 
-  /** 在立体书里打的一局：离下一次翻页还有多久、正在翻还是快要翻了，随时看得见 */
+  /** 在立体书里打的一局：离下一次换页还有多久、正在换还是快要换了，随时看得见 */
   private updateBook(b: HudSnapshot['book']): void {
     if (!b) return
     this.bookDial ??= new BookDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)

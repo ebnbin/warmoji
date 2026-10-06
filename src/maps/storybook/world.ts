@@ -1,10 +1,8 @@
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
+import { Radius, Transform } from '../../ecs/components'
 import { SPAWN } from '../../data/enemies'
-import { query } from 'bitecs'
-import { Alive, Phys, Radius, Transform, Uid } from '../../ecs/components'
-import { displace } from '../../ecs/systems/shared/displace'
 import { clockSec } from '../../ecs/fight/clock'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { leaderPoint } from '../../ecs/utils/team'
@@ -12,7 +10,7 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { BASIN_CELL_U, clockAt, laid, leafEdge, makeBook, pageOf, slabOf, slabSd, standing } from './model'
+import { BASIN_CELL_U, clockAt, laid, makeBook, pageOf, slabOf, slabSd, standing } from './model'
 import type { Basin } from '../basin'
 import type { Landmark } from '../landmark'
 import type { Book, BookClock, Page, Piece, Slab } from './model'
@@ -35,14 +33,6 @@ const GUTTER_END_U = 1.6
 /** 布景后面的出怪口：离背面多远，离布景的一头多远，格 */
 const WINGS_BACK_U = 0.75
 const WINGS_END_U = 0.55
-/**
- * 翻页时被书页扬起来的身体：书页的自由边扫到它前 TOSS_LEAD 格就抛起来，腾空 TOSS_MS 毫秒、最高 TOSS_U 格，
- * 落回原地附近，顺着书页翻的方向被风带出 TOSS_DRIFT_U 格之间
- */
-const TOSS_LEAD_U = 0.5
-const TOSS_MS = 900
-const TOSS_U = 1.4
-const TOSS_DRIFT_U = [0.3, 0.9] as const
 /** 一件布景弹起来时沿底边冒几团碎纸 */
 const POP_PUFFS = 3
 
@@ -62,7 +52,7 @@ interface Stand {
 }
 
 /**
- * 立体书此刻：摊开的书，按页缓存的布景，翻到哪；立着的布景（哪一页、哪几件）与它们挡人的块；
+ * 立体书此刻：摊开的书，按页缓存的布景，换到哪；立着的布景（哪一页、哪几件）与它们挡人的块；
  * 小个子与跨得过矮布景的大个子各按一张距离场与一张寻路走；布景后面的出怪口
  */
 export interface StorybookState {
@@ -78,9 +68,6 @@ export interface StorybookState {
   readonly gutter: readonly Landmark[]
   wings: Landmark[]
   wingsKey: string
-  /** 这一次翻页已经扬起来的身体：翻到第几页时记的，记的是实体与它的编号 */
-  tossPage: number
-  readonly tossed: Set<string>
 }
 
 function cfgOf(sim: Sim): StorybookConfig {
@@ -103,7 +90,7 @@ export function pageAt(s: Pick<StorybookState, 'pages' | 'book'>, cfg: Storybook
   return p
 }
 
-/** 书此刻翻到哪：按难度时钟走，同一局里接着上一场 */
+/** 书此刻换到哪：按难度时钟走，同一局里接着上一场 */
 export function bookClock(sim: Sim, cfg: StorybookConfig, book: Book): BookClock {
   return clockAt(cfg, book, clockSec(sim) * 1000)
 }
@@ -132,8 +119,6 @@ export function storybookOf(sim: Sim): StorybookState {
       gutter,
       wings: [],
       wingsKey: '',
-      tossPage: -1,
-      tossed: new Set(),
     }
     sim.worldState.storybook = s
     refresh(s, cfg)
@@ -160,23 +145,22 @@ function stamp(b: Basin, slab: Slab): void {
   }
 }
 
-/** 此刻立着的是哪一页的哪几件：变了就重铺距离场、作废寻路、重摆布景后的出怪口 */
+/** 此刻立着的是哪几件：换页时旧页还没折平的与新页已经弹起来的都算；变了就重铺距离场、作废寻路、重摆布景后的出怪口；返回刚立起来的 */
 function refresh(s: StorybookState, cfg: StorybookConfig): Piece[] {
   const c = s.clock
-  const page = pageAt(s, cfg, c.page)
-  const up: number[] = []
-  page.pieces.forEach((p, i) => {
-    if (standing(laid(cfg, c, c.page, p))) up.push(i)
-  })
-  const key = `${c.page}:${up.join(',')}`
+  const pages = c.phase === 'redraw' ? [c.page - 1, c.page] : [c.page]
+  const up: { page: number; i: number; p: Piece }[] = []
+  for (const k of pages) {
+    pageAt(s, cfg, k).pieces.forEach((p, i) => {
+      if (standing(laid(cfg, c, s.book, k, p))) up.push({ page: k, i, p })
+    })
+  }
+  const key = up.map((u) => `${u.page}:${u.i}`).join(',')
   if (key === s.key) return []
-  const before = new Set(s.key.startsWith(`${c.page}:`) ? s.key.slice(s.key.indexOf(':') + 1).split(',').filter(Boolean).map(Number) : [])
+  const before = new Set(s.key.split(','))
   s.key = key
   s.version++
-  s.stands = up.map((i) => {
-    const p = page.pieces[i]!
-    return { slab: slabOf(p), top: topOf(p.h), piece: p }
-  })
+  s.stands = up.map((u) => ({ slab: slabOf(u.p), top: topOf(u.p.h), piece: u.p }))
   s.low.room.set(s.book.basin.room)
   s.high.room.set(s.book.basin.room)
   for (const st of s.stands) {
@@ -185,7 +169,7 @@ function refresh(s: StorybookState, cfg: StorybookConfig): Piece[] {
   }
   s.flows[0] = null
   s.flows[1] = null
-  return up.filter((i) => !before.has(i)).map((i) => page.pieces[i]!)
+  return up.filter((u) => !before.has(`${u.page}:${u.i}`)).map((u) => u.p)
 }
 
 /** 每件高的布景背后、靠一头的地方一处出怪口：从那里往那一头外面走出来 */
@@ -208,30 +192,6 @@ function wingsOf(s: StorybookState): Landmark[] {
     }
   }
   return out
-}
-
-/**
- * 书页翻过去时不会盖在谁身上：书页从右往左扫，自由边快扫到谁，谁就被托起、扇起来抛到半空，
- * 书页从他脚下翻过去，他落在新的一页上。敌我、掉落物一样，锚定的、霸体的也一样
- */
-function toss(sim: Sim, s: StorybookState): void {
-  const edge = leafEdge(s.clock, s.book)
-  if (edge === null) return
-  if (s.tossPage !== s.clock.page) {
-    s.tossPage = s.clock.page
-    s.tossed.clear()
-  }
-  for (const eid of query(sim.world, [Phys, Transform, Radius])) {
-    if (!Alive.v[eid]) continue
-    const x = Transform.x[eid]!
-    if (edge > x / UNIT + TOSS_LEAD_U) continue
-    const key = `${eid}:${Uid.v[eid]}`
-    if (s.tossed.has(key)) continue
-    s.tossed.add(key)
-    const drift = (TOSS_DRIFT_U[0] + (TOSS_DRIFT_U[1] - TOSS_DRIFT_U[0]) * sim.rng.next()) * UNIT
-    const y = Transform.y[eid]!
-    displace(sim, eid, { kind: 'arc', x: x - drift, y: y + (sim.rng.next() - 0.5) * 0.4 * UNIT, ms: TOSS_MS, height: TOSS_U * UNIT }, { self: false, free: true })
-  }
 }
 
 /** 跨得过矮布景的身体按高的那张距离场 */
@@ -453,8 +413,8 @@ function openNear(s: StorybookState, p: Point, room: number): Point {
 
 /**
  * 立体书：能走的是摊开的两页，页边是硬边界；页面上印的都能走。立起来的剪纸布景挡人：齐腰的矮布景跨得过的大个子照走、小个子绕着走，
- * 高的谁都绕着走，也挡子弹和视线（矮的只挡低处飞的）；穿墙的身体穿得过卡纸。书按难度时钟翻页：这一页的布景依次折平就不再挡路，
- * 新一页的布景依次弹起来，弹起处站着的身体按距离场挤到最近的空处
+ * 高的谁都绕着走，也挡子弹和视线（矮的只挡低处飞的）；穿墙的身体穿得过卡纸。书按难度时钟换页：一道前沿扫过两页，旧布景在前沿碰到前折平就不再挡路，
+ * 新布景等脚下的画上完色弹起来，弹起处站着的身体按距离场挤到最近的空处
  */
 export const storybook: WorldHooks = {
   ...bounded,
@@ -545,19 +505,18 @@ export const storybook: WorldHooks = {
   onStart(sim) {
     storybookOf(sim)
   },
-  /** 按难度时钟翻页；书页扫过的身体扬起来落到新的一页上；立着的布景一变就重铺距离场，刚弹起来的沿底边冒碎纸 */
+  /** 按难度时钟换页；立着的布景一变就重铺距离场，换页时刚弹起来的沿底边冒碎纸 */
   tick(sim) {
     const cfg = cfgOf(sim)
     const s = storybookOf(sim)
     s.clock = bookClock(sim, cfg, s.book)
-    toss(sim, s)
     const popped = refresh(s, cfg)
     const wings = s.clock.phase === 'stand' ? s.key : ''
     if (wings !== s.wingsKey) {
       s.wingsKey = wings
       s.wings = wings ? wingsOf(s) : []
     }
-    if (s.clock.phase !== 'pop') return
+    if (s.clock.phase !== 'redraw') return
     for (const p of popped) {
       const sl = slabOf(p)
       for (let k = 0; k < POP_PUFFS; k++) {

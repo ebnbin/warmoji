@@ -16,8 +16,8 @@ function fill4(g: Phaser.GameObjects.Graphics, pts: readonly { x: number; y: num
 }
 
 /**
- * 书页盘：盘心一本摊开的立体书，外圈一道倒计时——立着时是离下一次翻页还有多久，快翻页时整圈闪着橙光、页角翘起来，
- * 翻页时一页书立在半空。盘下右对齐写着还有几秒；新一页刚立起来的那几秒写着这一章叫什么
+ * 书页盘：盘心一本摊开的立体书，外圈一道倒计时——立着时是离下一次换页还有多久，快换页时整圈闪着橙光、一支铅笔在书上晃，
+ * 换页时铅笔在书页上画。盘下右对齐写着还有几秒；新一页刚画好的那几秒写着这一章叫什么
  */
 export class BookDial extends Widget {
   private readonly ring: Phaser.GameObjects.Graphics
@@ -39,19 +39,19 @@ export class BookDial extends Widget {
     this.add([face, this.ring, this.glyph, this.reading])
   }
 
-  /** phase 是立着（stand）、快翻页（warn）还是正在翻（turn）；ratio 是离下一次翻页还剩多少；title 不为空时写章名 */
+  /** phase 是立着（stand）、快换页（warn）还是正在换（turn）；ratio 是离下一次换页还剩多少；title 不为空时写章名 */
   setBook(phase: 'stand' | 'warn' | 'turn', ratio: number, inSec: number, title: string | null, now: number): this {
     const s = this.shown
     const blink = phase === 'warn' && Math.floor(now / 250) % 2 === 0
     if (phase !== s.phase || Math.abs(ratio - s.ratio) > 0.004 || blink !== s.blink) {
       this.drawRing(phase, ratio, blink)
-      if (phase !== s.phase || phase === 'warn') this.drawGlyph(phase, now)
+      if (phase !== s.phase || phase !== 'stand') this.drawGlyph(phase, now)
       s.phase = phase
       s.ratio = ratio
       s.blink = blink
     }
     const sec = Math.max(0, Math.ceil(inSec))
-    const text = title ?? (phase === 'stand' ? `${sec} 秒后翻页` : phase === 'warn' ? '要翻页了' : '翻页中')
+    const text = title ?? (phase === 'stand' ? `${sec} 秒后换页` : phase === 'warn' ? '要换页了' : '重绘中')
     if (text !== s.text) {
       this.reading.setText(text).setInk(phase === 'stand' ? 'ink' : 'warn')
       s.text = text
@@ -74,7 +74,7 @@ export class BookDial extends Widget {
     g.strokePath()
   }
 
-  /** 一本摊开的书：封面垫底，两页微微往书脊弯，书脊上立着一棵剪纸小树；快翻页时右下角翘起来，翻页时一页立在半空 */
+  /** 一本摊开的书：封面垫底，两页微微往书脊弯，书脊两边立着剪纸；快换页时一支铅笔在书上晃，换页时铅笔在右页上画、剪纸倒了 */
   private drawGlyph(phase: string, now: number): void {
     const g = this.glyph.clear()
     const r = this.radius * 0.62
@@ -90,23 +90,22 @@ export class BookDial extends Widget {
       fill4(g, [{ x: x0, y: -r * 0.5 }, { x: x1, y: -r * 0.56 - lift }, { x: x1, y: r * 0.5 - lift }, { x: x0, y: r * 0.56 }])
     }
     page(-1, 0)
-    if (phase === 'turn') {
-      page(1, 0)
-      g.fillStyle(SURFACE.outline, 1)
-      fill4(g, [{ x: 0, y: -r * 0.5 }, { x: r * 0.2, y: -r * 1.05 }, { x: r * 0.2, y: r * 0.05 }, { x: 0, y: r * 0.56 }])
-      g.fillStyle(INK.soft, 1)
-      fill4(g, [{ x: 2, y: -r * 0.46 }, { x: r * 0.2 - 2, y: -r * 0.98 }, { x: r * 0.2 - 2, y: r * 0.02 }, { x: 2, y: r * 0.5 }])
-      return
-    }
     page(1, 0)
     g.lineStyle(2, INK.faint, 1).lineBetween(0, -r * 0.5, 0, r * 0.56)
-    if (phase === 'warn') {
-      const s = r * (0.36 + 0.06 * Math.sin(now / 80))
-      const cx = r * 0.94
-      const cy = r * 0.5
-      g.fillStyle(cover, 1).fillTriangle(cx - s, cy, cx, cy - s, cx, cy)
-      g.fillStyle(INK.soft, 1).fillTriangle(cx - s, cy, cx, cy - s, cx - s, cy - s)
-      g.lineStyle(2, SURFACE.outline, 1).strokeTriangle(cx - s, cy, cx, cy - s, cx - s, cy - s)
+    if (phase === 'turn') {
+      // 画到一半：右页上一道铅笔线，笔尖跟着来回走
+      const k = 0.5 + 0.5 * Math.sin(now / 120)
+      g.lineStyle(2, SURFACE.outline, 0.8)
+      g.beginPath()
+      for (let i = 0; i <= 12; i++) {
+        const x = r * (0.15 + 0.7 * (i / 12) * k)
+        const y = r * 0.25 + Math.sin(i * 1.3) * r * 0.08
+        if (i === 0) g.moveTo(x, y)
+        else g.lineTo(x, y)
+      }
+      g.strokePath()
+      this.pencil(g, r * (0.15 + 0.7 * k), r * 0.25, -0.9, r)
+      return
     }
     // 书脊两边各立着一件剪纸：一棵树，一座小塔
     g.fillStyle(SURFACE.outline, 1).fillTriangle(-r * 0.62, r * 0.18, -r * 0.4, -r * 0.5, -r * 0.18, r * 0.18)
@@ -115,5 +114,28 @@ export class BookDial extends Widget {
     g.fillStyle(TONE.bad.face, 1).fillRect(r * 0.28, -r * 0.36, r * 0.26, r * 0.52)
     g.fillStyle(SURFACE.outline, 1).fillTriangle(r * 0.2, -r * 0.38, r * 0.41, -r * 0.72, r * 0.62, -r * 0.38)
     g.fillStyle(TONE.accent.face, 1).fillTriangle(r * 0.26, -r * 0.41, r * 0.41, -r * 0.64, r * 0.56, -r * 0.41)
+    if (phase === 'warn') this.pencil(g, r * 0.5, r * 0.1 + Math.sin(now / 90) * r * 0.08, -0.9 + Math.sin(now / 70) * 0.15, r)
+  }
+
+  /** 一支铅笔：笔尖在 (x, y)，笔杆朝 ang 弧度伸出去，长短按 r */
+  private pencil(g: Phaser.GameObjects.Graphics, x: number, y: number, ang: number, r: number): void {
+    const ux = Math.cos(ang)
+    const uy = Math.sin(ang)
+    const nx = -uy
+    const ny = ux
+    const w = r * 0.13
+    const at = (a: number, b: number): { x: number; y: number } => ({ x: x + ux * a + nx * b, y: y + uy * a + ny * b })
+    const band = (a0: number, a1: number, color: number): void => {
+      g.fillStyle(SURFACE.outline, 1)
+      fill4(g, [at(a0 - 1.5, -w - 1.5), at(a0 - 1.5, w + 1.5), at(a1 + 1.5, w + 1.5), at(a1 + 1.5, -w - 1.5)])
+      g.fillStyle(color, 1)
+      fill4(g, [at(a0, -w), at(a0, w), at(a1, w), at(a1, -w)])
+    }
+    band(r * 0.28, r * 1.1, TONE.accent.face)
+    band(r * 1.1, r * 1.3, TONE.bad.face)
+    const tip = [at(0, 0), at(r * 0.28, -w), at(r * 0.28, w)]
+    g.fillStyle(SURFACE.outline, 1).fillTriangle(tip[0]!.x, tip[0]!.y, tip[1]!.x, tip[1]!.y, tip[2]!.x, tip[2]!.y)
+    const wood = [at(r * 0.06, 0), at(r * 0.26, -w * 0.8), at(r * 0.26, w * 0.8)]
+    g.fillStyle(INK.soft, 1).fillTriangle(wood[0]!.x, wood[0]!.y, wood[1]!.x, wood[1]!.y, wood[2]!.x, wood[2]!.y)
   }
 }

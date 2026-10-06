@@ -68,7 +68,7 @@ export type PieceKind =
 
 /**
  * 一件立起来的布景，格与米：正面的底边中点 (x, y)，底边朝 a 弧度（0 是横的，正面朝屏幕下方），底边长 w，往后厚 d（卡纸是 CARD_U，盒子按它自己的进深）；
- * 高 h 米，low 的是齐腰的矮布景；同一 group 的几件拼成一组，可以挨着；order 是弹起的先后、fold 是折平的先后，都在 0 到 1 之间；seed 定画法上的变化
+ * 高 h 米，low 的是齐腰的矮布景；同一 group 的几件拼成一组，可以挨着；seed 定画法上的变化
  */
 export interface Piece {
   readonly kind: PieceKind
@@ -81,8 +81,6 @@ export interface Piece {
   readonly low: boolean
   readonly box: boolean
   readonly group: number
-  readonly order: number
-  readonly fold: number
   readonly seed: number
 }
 
@@ -480,7 +478,7 @@ function fits(cfg: StorybookConfig, book: Book, p: Piece, placed: readonly Piece
 function piece(spec: Spec, cfg: StorybookConfig, rng: Rng, x: number, y: number, a: number, group: number, w?: number): Piece {
   const pw = w ?? spec.w[0] + (spec.w[1] - spec.w[0]) * rng.next()
   const h = spec.h === 'low' ? cfg.lowM : spec.h[0] + (spec.h[1] - spec.h[0]) * rng.next()
-  return { kind: spec.kind, x, y, a, w: pw, d: spec.d > 0 ? spec.d : CARD_U, h, low: spec.h === 'low', box: spec.d > 0, group, order: 0, fold: 0, seed: Math.floor(rng.next() * 0x7fffffff) }
+  return { kind: spec.kind, x, y, a, w: pw, d: spec.d > 0 ? spec.d : CARD_U, h, low: spec.h === 'low', box: spec.d > 0, group, seed: Math.floor(rng.next() * 0x7fffffff) }
 }
 
 /** 半页里随机的一点：side 为 -1 是左页、1 是右页 */
@@ -538,20 +536,15 @@ export function pageOf(cfg: StorybookConfig, book: Book, index: number): Page {
   let pieces: Piece[] | null = null
   for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, book, chapter, blend, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
   if (!pieces) throw new Error(`立体书第 ${index} 页摆不下 ${cfg.pieces[0]} 件布景`)
-  const half = (book.x1 - book.x0) / 2
-  const ordered = pieces.map((p): Piece => {
-    const s = slabOf(p)
-    return { ...p, order: Math.min(1, Math.abs(s.cx - book.gx) / half), fold: Math.min(1, Math.max(0, (book.x1 - s.cx) / (book.x1 - book.x0))) }
-  })
   // 远的先摆在后面：画的时候按底边从屏幕里往外排
-  ordered.sort((p, q) => p.y - q.y)
+  const ordered = [...pieces].sort((p, q) => p.y - q.y)
   return { index, chapter, number: book.number0 + index * 2, seed: base, blend, pieces: ordered }
 }
 
-/** 翻页的一段：stand 立着，warn 预兆，fold 折平，leaf 翻书页，rest 新一页平躺着，pop 弹起来 */
-export type Phase = 'stand' | 'warn' | 'fold' | 'leaf' | 'rest' | 'pop'
+/** 换页的一段：stand 立着，redraw 一道前沿扫过两页，前沿过处擦掉旧画、画上新画 */
+export type Phase = 'stand' | 'redraw'
 
-/** 此刻翻到哪：page 是正立着或正折平的那一页（leaf 以后是新的那一页），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次预兆在几时（毫秒） */
+/** 此刻换到哪：page 是正立着或正画上的那一页（redraw 时旧的是 page - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换页在几时（毫秒） */
 export interface BookClock {
   readonly page: number
   readonly phase: Phase
@@ -560,18 +553,29 @@ export interface BookClock {
   readonly next: number
 }
 
-function jitter(book: Book, k: number): number {
-  const h = Math.imul((book.seed ^ 0x1f2e3d) + Math.imul(k + 7, 0x27d4eb2f), 0x165667b1) >>> 0
-  return (h / 4294967296) * 2 - 1
+function hash01(seed: number, k: number, salt: number): number {
+  let h = Math.imul((seed ^ salt) + Math.imul(k + 7, 0x27d4eb2f), 0x165667b1) >>> 0
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0
+  return ((h ^ (h >>> 13)) >>> 0) / 4294967296
 }
 
-/** 一次翻页从预兆到弹完多长，毫秒 */
+function jitter(book: Book, k: number): number {
+  return hash01(book.seed, k, 0x1f2e3d) * 2 - 1
+}
+
+/** 一处从前沿到了算起，旧画擦完、新画上完色要多久，毫秒 */
+export function drawLen(cfg: StorybookConfig): number {
+  const t = cfg.turn
+  return t.eraseMs * 0.5 + t.sketchMs * 0.7 + t.colorMs
+}
+
+/** 一次换页从前沿出发到新布景全弹起来多长，毫秒 */
 export function turnLen(cfg: StorybookConfig): number {
   const t = cfg.turn
-  return t.warnMs + t.foldMs + t.leafMs + t.restMs + t.popMs
+  return t.sweepMs + drawLen(cfg) + t.flipMs
 }
 
-/** 难度时钟走到 ms 毫秒时书翻到哪 */
+/** 难度时钟走到 ms 毫秒时书换到哪 */
 export function clockAt(cfg: StorybookConfig, book: Book, ms: number): BookClock {
   const t = cfg.turn
   let k = 0
@@ -585,13 +589,61 @@ export function clockAt(cfg: StorybookConfig, book: Book, ms: number): BookClock
     k++
   }
   if (ms < w) return { page: 0, phase: 'stand', at: ms, len: w, next: w }
-  const steps: readonly [Phase, number][] = [['warn', t.warnMs], ['fold', t.foldMs], ['leaf', t.leafMs], ['rest', t.restMs], ['pop', t.popMs]]
-  let from = w
-  for (const [phase, len] of steps) {
-    if (ms < from + len) return { page: phase === 'warn' || phase === 'fold' ? k : k + 1, phase, at: ms - from, len, next: w }
-    from += len
-  }
-  return { page: k + 1, phase: 'stand', at: 0, len: t.intervalMs, next: w + turnLen(cfg) + t.intervalMs }
+  return { page: k + 1, phase: 'redraw', at: ms - w, len: turnLen(cfg), next: w }
+}
+
+/**
+ * 换到第 page 页时扫过两页的那道前沿：朝 (ux, uy) 推进，沿前沿按波长 waveU、幅度 amp 起伏；
+ * 前沿从 lo 推到 hi（格，按 (ux, uy) 方向量），每次换页方向随机
+ */
+export interface Sweep {
+  readonly ux: number
+  readonly uy: number
+  readonly amp: number
+  readonly waveU: number
+  readonly phase: number
+  readonly lo: number
+  readonly hi: number
+}
+
+export function sweepOf(book: Book, page: number): Sweep {
+  const a = hash01(book.seed, page, 0x5e1a7) * Math.PI * 2
+  const ux = Math.cos(a)
+  const uy = Math.sin(a)
+  const amp = 1 + hash01(book.seed, page, 0x2b7) * 1.2
+  const waveU = 7 + hash01(book.seed, page, 0x9c1) * 6
+  const phase = hash01(book.seed, page, 0x44d) * Math.PI * 2
+  const ds = [book.x0 * ux + book.y0 * uy, book.x1 * ux + book.y0 * uy, book.x0 * ux + book.y1 * uy, book.x1 * ux + book.y1 * uy]
+  return { ux, uy, amp, waveU, phase, lo: Math.min(...ds) - amp - 0.2, hi: Math.max(...ds) + amp + 0.2 }
+}
+
+/** (x, y) 格在前沿推进的方向上量出来有多远，算上前沿的起伏 */
+export function sweepD(sw: Sweep, x: number, y: number): number {
+  const along = -x * sw.uy + y * sw.ux
+  return x * sw.ux + y * sw.uy + sw.amp * Math.sin((along / sw.waveU) * Math.PI * 2 + sw.phase)
+}
+
+/** 前沿在换页开始后几毫秒到 (x, y) 格 */
+export function arrival(cfg: StorybookConfig, sw: Sweep, x: number, y: number): number {
+  return clamp01((sweepD(sw, x, y) - sw.lo) / (sw.hi - sw.lo)) * cfg.turn.sweepMs
+}
+
+/** 前沿此刻推到哪了（按 sweepD 量，格）：前沿过后 ms 毫秒的地方 */
+export function frontD(cfg: StorybookConfig, sw: Sweep, at: number): number {
+  return sw.lo + (sw.hi - sw.lo) * (at / cfg.turn.sweepMs)
+}
+
+/** 前沿过后 tau 毫秒的一处：旧画擦掉了多少、新画的草稿出来多少、上了多少色，都在 0 到 1 之间 */
+export function stageOf(cfg: StorybookConfig, tau: number): { readonly erase: number; readonly sketch: number; readonly color: number } {
+  const t = cfg.turn
+  const sk = tau - t.eraseMs * 0.5
+  return { erase: easeInOut(clamp01(tau / t.eraseMs)), sketch: easeInOut(clamp01(sk / t.sketchMs)), color: easeInOut(clamp01((sk - t.sketchMs * 0.7) / t.colorMs)) }
+}
+
+/** 前沿最早、最晚到一件布景的哪儿，毫秒 */
+function reach(cfg: StorybookConfig, sw: Sweep, p: Piece): readonly [number, number] {
+  const ts = corners(slabOf(p)).map((q) => arrival(cfg, sw, q.x, q.y))
+  return [Math.min(...ts), Math.max(...ts)]
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
@@ -605,29 +657,29 @@ function springUp(v: number): number {
 
 /**
  * 一件布景此刻往后倒了多少，0 是立正、1 是平躺在页面上，冲过头时略小于 0（往前探）：
- * 折平的那一页按 fold 的先后一件件倒下，弹起的那一页按 order 的先后一件件立起来
+ * 旧页的布景在前沿碰到它之前折平，新页的布景等前沿过去、它脚下的画上完色再弹起来
  */
-export function laid(cfg: StorybookConfig, c: BookClock, page: number, p: Piece): number {
+export function laid(cfg: StorybookConfig, c: BookClock, book: Book, page: number, p: Piece): number {
+  if (c.phase === 'stand') return page === c.page ? 0 : 1
   const t = cfg.turn
-  if (c.phase === 'stand' || c.phase === 'warn') return page === c.page ? 0 : 1
-  if (c.phase === 'fold') {
-    if (page !== c.page) return 1
-    const s = p.fold * (t.foldMs - t.flipMs)
-    return easeInOut(clamp01((c.at - s) / t.flipMs))
-  }
-  if (c.phase !== 'pop' || page !== c.page) return 1
-  const s = p.order * (t.popMs - t.flipMs)
-  return 1 - springUp(clamp01((c.at - s) / t.flipMs))
+  const sw = sweepOf(book, c.page)
+  const [first, last] = reach(cfg, sw, p)
+  if (page === c.page - 1) return easeInOut(clamp01((c.at - Math.max(0, first - t.flipMs)) / t.flipMs))
+  if (page !== c.page) return 1
+  return 1 - springUp(clamp01((c.at - (last + drawLen(cfg))) / t.flipMs))
+}
+
+/** 一件平躺着的布景此刻印在页面上有多浓：旧页的跟着地上的画一起擦掉，新页的跟着上色 */
+export function inked(cfg: StorybookConfig, c: BookClock, book: Book, page: number, p: Piece): number {
+  if (c.phase === 'stand') return page === c.page ? 1 : 0
+  const sw = sweepOf(book, c.page)
+  const s = slabOf(p)
+  const st = stageOf(cfg, c.at - arrival(cfg, sw, s.cx, s.cy))
+  if (page === c.page - 1) return 1 - st.erase
+  return page === c.page ? st.color : 0
 }
 
 /** 倒下不到一半的布景挡路 */
 export function standing(lay: number): boolean {
   return lay < 0.5
-}
-
-/** 翻页时书页的自由边此刻在哪，格：从右页外沿转过书脊落到左页外沿；不在翻页时为 null */
-export function leafEdge(c: BookClock, book: Book): number | null {
-  if (c.phase !== 'leaf') return null
-  const th = Math.PI * easeInOut(clamp01(c.at / c.len))
-  return book.gx + (book.x1 - book.gx) * Math.cos(th)
 }
