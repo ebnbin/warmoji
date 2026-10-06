@@ -6,12 +6,13 @@ import { playSfx } from '../../audio/sfx'
 import { Alive, Due, ENEMY_SET, Telegraph, Transform } from '../../ecs/components'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
-import { nextRoom } from './layout'
+import { inBox, nextRoom, platesIn, pressedStrips } from './layout'
 import { WarpPainter } from './painter'
-import { CORE_GLOW, FOE_GLOW, lift, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
+import { CORE_GLOW, FOE_GLOW, lift, mix, PRESS_HOT, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP, WALL_SEAM, WALL_TOP } from './palette'
 import { encodeTiles, TILES_FRAG, VOID_FRAG } from './shader'
 import { textureSize } from './ground'
 import { warpPlanFor } from './world'
+import { decorSprite } from '../../ecs/decor'
 import type { Hop, WarpState } from './world'
 import type { WarpPlan, WarpRoom } from './layout'
 import type { PaintScene, PixelRect } from './ground'
@@ -47,6 +48,15 @@ const PAD_LIGHT_U = 2.6
 const PAD_FILL = 0.45
 /** 核心柱照亮四周的身体：多远（格）以内 */
 const CORE_LIGHT_U = 6
+/** 墙顶上的箭头：隔多远一排（格），往里滑多快（格/秒） */
+const CHEVRON_U = 1.2
+const CHEVRON_SPEED = 0.9
+/** 核心柱四周刻满一圈要转多少圈 */
+const LAPS_PER_RING = 24
+/** 标本罐：罐身多宽多高（格），封着的东西多大（格） */
+const JAR_W = 0.78
+const JAR_H = 1.15
+const RELIC_U = 0.5
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const ease = (t: number): number => t * t * (3 - 2 * t)
@@ -62,6 +72,12 @@ function noise(a: number, b: number): number {
 function upload(tex: Phaser.Textures.CanvasTexture, filter: Phaser.Textures.FilterMode): void {
   tex.refresh()
   tex.setFilter(filter)
+}
+
+/** 标本罐立在哪（格）：这间房内角的台沿上，朝着核心柱的那个角 */
+function jarAt(room: WarpRoom, lip: number): Point {
+  const f = room.floor
+  return { x: room.out.x < 0 ? f.x1 + lip / 2 : f.x0 - lip / 2, y: room.out.y < 0 ? f.y1 + lip / 2 : f.y0 - lip / 2 }
 }
 
 /** 每格一个像素的数据图：画布与它的像素 */
@@ -144,6 +160,8 @@ export class WarpView implements MapView {
   private floorFx?: Phaser.GameObjects.Graphics
   private glowFx?: Phaser.GameObjects.Graphics
   private airFx?: Phaser.GameObjects.Graphics
+  private pressFx?: Phaser.GameObjects.Graphics
+  private pressGlow?: Phaser.GameObjects.Graphics
   private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1 }
   private jumpsSeen = 0
   private shuttleSeen: number[] = []
@@ -194,7 +212,15 @@ export class WarpView implements MapView {
     return { map: FRAME, edge: 'wrap', tile: true }
   }
 
-  decor(_v: ViewCtx, _atlas: EcsAtlas): void {}
+  /** 每间房内角的台沿上一只标本罐，罐里浮着那间的那样东西；罐子每帧现画 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const plan = this.planOf(v)
+    const lip = v.def.warp!.room.lipU
+    for (const room of plan.rooms) {
+      const j = jarAt(room, lip)
+      v.decor.push(decorSprite(atlas, SIGNS[room.sign]!.relic, j.x * UNIT, (j.y - JAR_H * 0.45) * UNIT, RELIC_U * UNIT, 0, 1))
+    }
+  }
 
   async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
     const plan = this.planOf(v)
@@ -220,7 +246,9 @@ export class WarpView implements MapView {
     this.floorFx = scene.add.graphics().setDepth(-0.8)
     this.glowFx = scene.add.graphics().setDepth(-0.75).setBlendMode(Phaser.BlendModes.ADD)
     this.airFx = scene.add.graphics().setDepth(9.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.visuals.push(this.floorFx, this.glowFx, this.airFx)
+    this.pressFx = scene.add.graphics().setDepth(-0.7)
+    this.pressGlow = scene.add.graphics().setDepth(-0.68).setBlendMode(Phaser.BlendModes.ADD)
+    this.visuals.push(this.floorFx, this.glowFx, this.airFx, this.pressFx, this.pressGlow)
     const st = sim.worldState.warp
     this.jumpsSeen = st?.jumps ?? 0
     this.shuttleSeen = st ? st.pads.map((p) => p.shuttledAt) : []
@@ -274,7 +302,7 @@ export class WarpView implements MapView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const st = sim.worldState.warp
     const cfg = this.cfg
-    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx) return
+    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx || !this.pressFx || !this.pressGlow) return
     this.state = st
     const now = sim.elapsedMs
     const t = sim.fxMs / 1000
@@ -286,11 +314,15 @@ export class WarpView implements MapView {
     this.floorFx.clear()
     this.glowFx.clear()
     this.airFx.clear()
+    this.pressFx.clear()
+    this.pressGlow.clear()
     this.chargeRing(st, cfg)
     this.sounds(v, st, cfg)
     st.plan.rooms.forEach((room) => this.bridge(st, cfg, room, now, t))
     st.plan.rooms.forEach((room) => this.pad(sim, st, cfg, room, now, t))
     this.core(sim, st, t)
+    st.plan.rooms.forEach((room) => this.wall(st, cfg, room, t))
+    st.plan.rooms.forEach((room) => this.jar(cfg, room, t))
     this.pillars(st, cfg, t)
     this.forming(sim, st, cfg, now)
     for (const h of st.hops) this.voxels(h, cfg, now)
@@ -308,7 +340,7 @@ export class WarpView implements MapView {
       this.u.chargeRoom = -1
       return
     }
-    const f = room.floor
+    const f = st.boxes[i]!
     const reach = Math.max(...[f.x0, f.x1].flatMap((x) => [f.y0, f.y1].map((y) => Math.hypot(x - room.pad.x, y - room.pad.y))))
     const r = cfg.pad.radiusU + (reach + 1 - cfg.pad.radiusU) * ease(k)
     this.u.charge = [room.pad.x, room.pad.y, r, 0.4 + 0.6 * k]
@@ -580,6 +612,21 @@ export class WarpView implements MapView {
       g.fillStyle(k < 0.6 ? 0xffffff : tint, al * (1 + 0.6 * hot))
       g.fillCircle(cx, cy, r * k)
     }
+    // 转过的圈数：每回到出发的那间刻下一道，这一圈走到哪亮一段弧
+    const rooms = st.plan.rooms.length
+    const laps = Math.floor(st.jumps / rooms)
+    const tr = r * 1.85
+    for (let k = 0; k < Math.min(laps, LAPS_PER_RING); k++) {
+      const a = -Math.PI / 2 + (k / LAPS_PER_RING) * Math.PI * 2
+      g.lineStyle(0.06 * UNIT, tint, 0.85)
+      g.lineBetween(cx + Math.cos(a) * tr, cy + Math.sin(a) * tr, cx + Math.cos(a) * (tr + 0.22 * UNIT), cy + Math.sin(a) * (tr + 0.22 * UNIT))
+    }
+    if (st.jumps % rooms > 0) {
+      g.lineStyle(0.05 * UNIT, tint, 0.5)
+      g.beginPath()
+      g.arc(cx, cy, tr - 0.12 * UNIT, -Math.PI / 2, -Math.PI / 2 + ((st.jumps % rooms) / rooms) * Math.PI * 2, false)
+      g.strokePath()
+    }
     for (let k = 0; k < 3; k++) {
       const a0 = t * (0.6 + k * 0.35) * (k % 2 ? -1 : 1) + (k * Math.PI * 2) / 3
       g.lineStyle(0.06 * UNIT, tint, 0.7)
@@ -591,6 +638,142 @@ export class WarpView implements MapView {
     }
   }
 
+  /**
+   * 推进来的墙：深色钢板的墙顶，板缝跟着墙走；墙顶上一排排箭头朝墙走的方向滑，队伍在这间时往里推、不在时往外退；
+   * 墙面一道光，平时是这间的颜色，越压越烧成橙红，压到底时一闪一闪。出怪板嵌在墙脚。传送台外面一圈刻度记着这间压到了几成
+   */
+  private wall(st: WarpState, cfg: WarpConfig, room: WarpRoom, t: number): void {
+    const i = room.index
+    const c = st.press[i]!
+    const box = st.boxes[i]!
+    const f = this.pressFx!
+    const g = this.pressGlow!
+    const fl = room.floor
+    const base = SIGNS[room.sign]!.color
+    const hot = mix(base, PRESS_HOT, c * c)
+    const full = c >= 1
+    const blink = full ? 0.55 + 0.45 * Math.sin(t * 14) : 1
+    const dir = i === st.teamRoom ? 1 : -1
+    const strips = pressedStrips(room, box)
+    for (const b of [strips.x, strips.y]) {
+      if (!b) continue
+      f.fillStyle(WALL_TOP, 1)
+      f.fillRect(b.x0 * UNIT, b.y0 * UNIT, (b.x1 - b.x0) * UNIT, (b.y1 - b.y0) * UNIT)
+    }
+    // 两面墙各按自己的坐标画：face 是墙面所在，o 是墙背朝哪边，depth 是墙有多厚，along 是墙面的那一段
+    const walls = [
+      { on: !!strips.x, face: room.out.x < 0 ? box.x0 : box.x1, o: room.out.x, depth: Math.abs((room.out.x < 0 ? box.x0 : box.x1) - (room.out.x < 0 ? fl.x0 : fl.x1)), a0: box.y0, a1: box.y1, b0: fl.y0, b1: fl.y1, vertical: true },
+      { on: !!strips.y, face: room.out.y < 0 ? box.y0 : box.y1, o: room.out.y, depth: Math.abs((room.out.y < 0 ? box.y0 : box.y1) - (room.out.y < 0 ? fl.y0 : fl.y1)), a0: box.x0, a1: box.x1, b0: fl.x0, b1: fl.x1, vertical: false },
+    ]
+    const at = (w: (typeof walls)[number], d: number, a: number): Point => (w.vertical ? { x: (w.face + w.o * d) * UNIT, y: a * UNIT } : { x: a * UNIT, y: (w.face + w.o * d) * UNIT })
+    for (const w of walls) {
+      if (!w.on) continue
+      // 板缝：顺着墙面每隔 1.5 格一道，跟着墙走；横着的按原来的格子
+      f.lineStyle(0.04 * UNIT, WALL_SEAM, 1)
+      for (let d = 1.5; d < w.depth; d += 1.5) {
+        const p = at(w, d, w.b0)
+        const q = at(w, d, w.b1)
+        f.lineBetween(p.x, p.y, q.x, q.y)
+      }
+      for (let a = w.b0 + 1.5; a < w.b1; a += 1.5) {
+        const p = at(w, 0, a)
+        const q = at(w, w.depth, a)
+        f.lineBetween(p.x, p.y, q.x, q.y)
+      }
+      // 墙面那一截斜面
+      const e0 = at(w, 0, w.a0)
+      const e1 = at(w, Math.min(0.28, w.depth), w.a1)
+      f.fillStyle(lift(WALL_TOP, 0.18), 1)
+      f.fillRect(Math.min(e0.x, e1.x), Math.min(e0.y, e1.y), Math.abs(e1.x - e0.x), Math.abs(e1.y - e0.y))
+      // 箭头：朝墙走的方向滑，离墙面越远越淡
+      const phase = (((t * CHEVRON_SPEED) % CHEVRON_U) + CHEVRON_U) % CHEVRON_U
+      for (let d = CHEVRON_U * 0.5 - dir * phase; d < w.depth; d += CHEVRON_U) {
+        if (d < 0.45) continue
+        const al = 0.55 * Math.exp(-d / 4) * blink
+        g.lineStyle(0.07 * UNIT, hot, al)
+        for (let a = w.a0 + 0.75; a < w.a1 - 0.3; a += 1.5) {
+          const tip = at(w, d - dir * 0.18, a)
+          const l = at(w, d + dir * 0.18, a - 0.32)
+          const r = at(w, d + dir * 0.18, a + 0.32)
+          g.lineBetween(l.x, l.y, tip.x, tip.y)
+          g.lineBetween(r.x, r.y, tip.x, tip.y)
+        }
+      }
+      // 墙面的光
+      const p = at(w, 0, w.a0)
+      const q = at(w, 0, w.a1)
+      f.lineStyle(0.16 * UNIT, shade(hot, 0.55), 1)
+      f.lineBetween(p.x, p.y, q.x, q.y)
+      for (const [wd, al] of [
+        [1.1, 0.1],
+        [0.55, 0.22],
+        [0.24, 0.6],
+      ] as const) {
+        g.lineStyle(wd * UNIT, hot, al * blink * (0.6 + 0.4 * c))
+        g.lineBetween(p.x, p.y, q.x, q.y)
+      }
+      g.lineStyle(0.07 * UNIT, lift(hot, 0.6), blink)
+      g.lineBetween(p.x, p.y, q.x, q.y)
+    }
+    // 出怪板：嵌在墙脚的暗槽，一根根栅条，四边一圈房间颜色的灯
+    for (const pl of platesIn(room, box)) {
+      const b = pl.box
+      const w = (b.x1 - b.x0) * UNIT
+      const h = (b.y1 - b.y0) * UNIT
+      f.fillStyle(0x03111c, 1)
+      f.fillRect(b.x0 * UNIT, b.y0 * UNIT, w, h)
+      f.lineStyle(0.035 * UNIT, 0x3a5a6c, 1)
+      const across = w > h
+      for (let k = 0.1; k < (across ? b.x1 - b.x0 : b.y1 - b.y0); k += 0.2) {
+        if (across) f.lineBetween((b.x0 + k) * UNIT, (b.y0 + 0.15) * UNIT, (b.x0 + k) * UNIT, (b.y1 - 0.15) * UNIT)
+        else f.lineBetween((b.x0 + 0.15) * UNIT, (b.y0 + k) * UNIT, (b.x1 - 0.15) * UNIT, (b.y0 + k) * UNIT)
+      }
+      g.lineStyle(0.05 * UNIT, base, 0.8)
+      g.strokeRect(b.x0 * UNIT, b.y0 * UNIT, w, h)
+    }
+    // 传送台外面一圈刻度：压到几成就亮到哪
+    const R = cfg.pad.radiusU * 1.16 * UNIT
+    const x = room.pad.x * UNIT
+    const y = room.pad.y * UNIT
+    const ticks = 20
+    for (let k = 0; k < ticks; k++) {
+      const a = -Math.PI / 2 + ((k + 0.5) / ticks) * Math.PI * 2
+      const on = (k + 0.5) / ticks <= c
+      g.lineStyle(0.07 * UNIT, on ? hot : shade(base, 0.35), on ? 0.95 * blink : 0.5)
+      g.lineBetween(x + Math.cos(a) * R, y + Math.sin(a) * R, x + Math.cos(a) * (R + 0.16 * UNIT), y + Math.sin(a) * (R + 0.16 * UNIT))
+    }
+    if (full && i === st.teamRoom) {
+      g.lineStyle(0.1 * UNIT, PRESS_HOT, blink)
+      g.strokeCircle(x, y, R + 0.3 * UNIT)
+    }
+  }
+
+  /** 标本罐：金属的底座嵌着这间的颜色，玻璃的罐身上两道反光、罐口一圈盖子 */
+  private jar(cfg: WarpConfig, room: WarpRoom, t: number): void {
+    const j = jarAt(room, cfg.room.lipU)
+    const color = SIGNS[room.sign]!.color
+    const x = j.x * UNIT
+    const y = j.y * UNIT
+    const w = JAR_W * UNIT
+    const h = JAR_H * UNIT
+    const f = this.floorFx!
+    const g = this.airFx!
+    f.fillStyle(0x1a2c3a, 1)
+    f.fillEllipse(x, y, w * 1.15, w * 0.5)
+    f.lineStyle(0.04 * UNIT, color, 0.9)
+    f.strokeEllipse(x, y, w * 1.15, w * 0.5)
+    g.fillStyle(color, 0.06 + 0.03 * Math.sin(t * 1.3 + room.index))
+    g.fillRect(x - w / 2, y - h, w, h)
+    g.lineStyle(0.03 * UNIT, 0xbff6ff, 0.45)
+    g.strokeRect(x - w / 2, y - h, w, h)
+    g.fillStyle(0xffffff, 0.22)
+    g.fillRect(x - w * 0.36, y - h * 0.92, w * 0.09, h * 0.8)
+    g.fillStyle(0xffffff, 0.1)
+    g.fillRect(x + w * 0.22, y - h * 0.85, w * 0.05, h * 0.6)
+    g.fillStyle(0x9fdcff, 0.35)
+    g.fillRect(x - w * 0.56, y - h - 0.1 * UNIT, w * 1.12, 0.12 * UNIT)
+  }
+
   /** 立柱：墩子上立着一根半透明的光柱，一圈圈光往上走 */
   private pillars(st: WarpState, cfg: WarpConfig, t: number): void {
     const g = this.airFx!
@@ -598,7 +781,9 @@ export class WarpView implements MapView {
     for (const room of st.plan.rooms) {
       if (room.pillars.length === 0) continue
       const color = SIGNS[room.sign]!.color
+      const box = st.boxes[room.index]!
       room.pillars.forEach((b, k) => {
+        if (!inBox(box, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2)) return
         const x0 = b.x0 * UNIT + 0.12 * UNIT
         const w = (b.x1 - b.x0) * UNIT - 0.24 * UNIT
         const base = b.y1 * UNIT - 0.25 * UNIT
@@ -632,7 +817,7 @@ export class WarpView implements MapView {
       const y = Transform.y[e]!
       const boss = Telegraph.boss[e] === 1
       for (const room of st.plan.rooms) {
-        for (const p of room.plates) {
+        for (const p of platesIn(room, st.boxes[room.index]!)) {
           if (Math.hypot(x / UNIT - p.x, y / UNIT - p.y) > cfg.emitters.markU + 0.8) continue
           f.fillStyle(FOE_GLOW, 0.2 + 0.5 * k)
           f.fillRect(p.box.x0 * UNIT, p.box.y0 * UNIT, (p.box.x1 - p.box.x0) * UNIT, (p.box.y1 - p.box.y0) * UNIT)
@@ -772,6 +957,8 @@ export class WarpView implements MapView {
     this.floorFx = undefined
     this.glowFx = undefined
     this.airFx = undefined
+    this.pressFx = undefined
+    this.pressGlow = undefined
     this.state = undefined
     for (const key of [GROUND_KEY, TILES_KEY, MASK_KEY, TINT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }

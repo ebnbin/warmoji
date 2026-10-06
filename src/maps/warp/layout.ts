@@ -46,6 +46,8 @@ export interface WarpRoom {
   readonly pit: Box | null
   readonly deck: Box | null
   readonly toward: Point
+  /** 背对核心柱的那两面墙朝哪边：x、y 各是 −1（墙在小的那头）或 1；压缩时这两面往里推 */
+  readonly out: Point
 }
 
 /**
@@ -219,6 +221,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
       pit: l.pit && at(l.pit),
       deck: l.deck && at(l.deck),
       toward: placeDir(i, mirror, 1, 0),
+      out: { x: floor.x1 <= MID ? -1 : 1, y: floor.y1 <= MID ? -1 : 1 },
     }
   })
   const hall = rooms.find((r) => r.shape === 'hall')!
@@ -237,7 +240,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
       for (let i = Math.floor(r.floor.x0); i < Math.ceil(r.floor.x1); i++) {
         const x = i + 0.5
         const y = j + 0.5
-        if (!openIn(r, x, y) || r.plates.some((p) => inBox(p.box, x, y))) continue
+        if (!openIn(r, x, y)) continue
         if (Math.hypot(x - r.pad.x, y - r.pad.y) < cfg.pad.radiusU + 0.25) continue
         tiles[j * FRAME_U + i] = r.index
       }
@@ -256,4 +259,41 @@ export function roomIndexAt(plan: WarpPlan, x: number, y: number): number {
 /** 第 i 间的下一间：它的传送台送到那里 */
 export function nextRoom(plan: WarpPlan, i: number): WarpRoom {
   return plan.rooms[(i + 1) % plan.rooms.length]!
+}
+
+/** 第 room 间压到 c（0 敞开，1 压到最小）时能走的方块，格：背对核心柱的两面墙往里推，每边最小推到 minU 格（本来就比它窄的不推） */
+export function pressBox(room: WarpRoom, c: number, minU: number): Box {
+  const f = room.floor
+  const w = f.x1 - f.x0
+  const h = f.y1 - f.y0
+  const nw = w - c * (w - Math.min(w, minU))
+  const nh = h - c * (h - Math.min(h, minU))
+  return {
+    x0: room.out.x < 0 ? f.x1 - nw : f.x0,
+    x1: room.out.x < 0 ? f.x1 : f.x0 + nw,
+    y0: room.out.y < 0 ? f.y1 - nh : f.y0,
+    y1: room.out.y < 0 ? f.y1 : f.y0 + nh,
+  }
+}
+
+/** 推进来的两面墙各占的那一条，格：能走的方块原来的边到墙面之间；没推进来的那面为 null */
+export function pressedStrips(room: WarpRoom, box: Box): { readonly x: Box | null; readonly y: Box | null } {
+  const f = room.floor
+  const x: Box = room.out.x < 0 ? { x0: f.x0, y0: f.y0, x1: box.x0, y1: f.y1 } : { x0: box.x1, y0: f.y0, x1: f.x1, y1: f.y1 }
+  const y: Box = room.out.y < 0 ? { x0: f.x0, y0: f.y0, x1: f.x1, y1: box.y0 } : { x0: f.x0, y0: box.y1, x1: f.x1, y1: f.y1 }
+  return { x: x.x1 - x.x0 > 1e-6 ? x : null, y: y.y1 - y.y0 > 1e-6 ? y : null }
+}
+
+/** 出怪板嵌在墙上，跟着墙走：板心按能走的方块缩放到 box 里，离墙半格；板的大小不变 */
+export function platesIn(room: WarpRoom, box: Box): Plate[] {
+  const f = room.floor
+  const sx = (box.x1 - box.x0) / (f.x1 - f.x0)
+  const sy = (box.y1 - box.y0) / (f.y1 - f.y0)
+  return room.plates.map((p) => {
+    const x = Math.min(box.x1 - 0.5, Math.max(box.x0 + 0.5, box.x0 + (p.x - f.x0) * sx))
+    const y = Math.min(box.y1 - 0.5, Math.max(box.y0 + 0.5, box.y0 + (p.y - f.y0) * sy))
+    const hw = (p.box.x1 - p.box.x0) / 2
+    const hh = (p.box.y1 - p.box.y0) / 2
+    return { box: { x0: x - hw, y0: y - hh, x1: x + hw, y1: y + hh }, x, y }
+  })
 }

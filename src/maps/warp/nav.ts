@@ -1,6 +1,7 @@
 import { FRAME_U, UNIT } from '../../util/units'
 import { roomAt } from '../basin'
 import type { Basin } from '../basin'
+import type { Box } from './layout'
 import type { Point } from '../../util/vec'
 
 /** 寻路的格子边长，格 */
@@ -30,9 +31,18 @@ export interface NavGrid {
   readonly open: Uint8Array
 }
 
-export function navGrid(b: Basin): NavGrid {
+/** 能走的地面再框进 box（格）里：墙推进来的那一截走不通 */
+export function navGrid(b: Basin, box: Box): NavGrid {
   const open = new Uint8Array(N * N)
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) open[j * N + i] = roomAt(b, (i + 0.5) * NAV_U * UNIT, (j + 0.5) * NAV_U * UNIT) >= CLEAR_U * UNIT ? 1 : 0
+  for (let j = 0; j < N; j++) {
+    const y = (j + 0.5) * NAV_U
+    if (y < box.y0 + CLEAR_U || y > box.y1 - CLEAR_U) continue
+    for (let i = 0; i < N; i++) {
+      const x = (i + 0.5) * NAV_U
+      if (x < box.x0 + CLEAR_U || x > box.x1 - CLEAR_U) continue
+      open[j * N + i] = roomAt(b, x * UNIT, y * UNIT) >= CLEAR_U * UNIT ? 1 : 0
+    }
+  }
   return { open }
 }
 

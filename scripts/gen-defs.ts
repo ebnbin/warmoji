@@ -47,7 +47,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
-import { roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
+import { platesIn, pressBox, roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -619,6 +619,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(Number.isInteger(em.plateU) && em.plateU >= 1 && em.markU > 0 && em.clearU >= 0, `${at}.emitters 的板长须是正整数，凝成形的半径为正`)
   need(c.core.radiusU > 0 && c.core.radiusU < r.gapU + r.lipU, `${at}.core 的核心柱须为正、立得进十字缝`)
   need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
+  need(c.press.closeMs > 0 && c.press.openMs > 0 && c.press.ejectMs > 0, `${at}.press 的推墙、退墙与压到底后自己充能的时长须为正`)
+  need(c.press.minU >= 2 * pad.radiusU + 2 * em.plateU && c.press.minU <= f.f1 - f.f0, `${at}.press.minU 须放得下传送台与墙脚的出怪板，也不比能走的方块宽`)
   const g = m.gates
   need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
   need(g?.boss === 'core' && g.kinds.core?.at.kind === 'mark', `${at} 的头目须从核心柱（地标上的出怪口 core）出来`)
@@ -632,6 +634,10 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(roomAt(b, room.pad.x * UNIT, room.pad.y * UNIT) >= pad.radiusU * UNIT * 0.9, `${where} 第 ${i} 间的传送台没落在能走的地方`)
       need(room.plates.length > 0 && room.plates.every((p) => roomAt(b, p.x * UNIT, p.y * UNIT) >= em.markU * UNIT * 0.5), `${where} 第 ${i} 间的出怪板没落在能走的地方`)
       need(plan.tiles.some((t) => t === i), `${where} 第 ${i} 间没有会亮的瓷砖`)
+      const tight = pressBox(room, 1, c.press.minU)
+      const pr = pad.radiusU
+      need(room.pad.x - pr >= tight.x0 && room.pad.x + pr <= tight.x1 && room.pad.y - pr >= tight.y0 && room.pad.y + pr <= tight.y1, `${where} 第 ${i} 间压到底时传送台被墙压住了`)
+      need(platesIn(room, tight).every((p) => Math.hypot(p.x - room.pad.x, p.y - room.pad.y) >= pad.radiusU + em.markU), `${where} 第 ${i} 间压到底时出怪板挤到了传送台上`)
     })
     need(new Set(plan.rooms.map((x) => x.quad)).size === 4, `${where} 的四间房没占满四个象限`)
   }

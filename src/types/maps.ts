@@ -1067,6 +1067,11 @@ export interface WarpConfig {
   readonly core: { readonly radiusU: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
+  /**
+   * 压缩：队伍在哪间，那间背对核心柱的两面墙就往传送台那个内角推，closeMs 从敞开推到最小，最小时能走的方块每边不超过 minU 格；
+   * 队伍走了，墙按 openMs 从最小退回敞开。压到最小时那间的传送台自己充能，ejectMs 充满，整队被送去下一间
+   */
+  readonly press: { readonly closeMs: number; readonly openMs: number; readonly minU: number; readonly ejectMs: number }
 }
 export interface TorusConfig {
   readonly arenaLong: number

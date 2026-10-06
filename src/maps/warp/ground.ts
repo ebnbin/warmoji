@@ -192,17 +192,6 @@ function plinth(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
   if (d > 0.3) mixIn(out, [24, 30, 44], 0.7)
 }
 
-/** 出怪板：嵌进地面的暗槽，一根根栅条，四边一圈房间颜色的灯 */
-function plate(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
-  const d = -sdBox(b, x, y)
-  set(out, DEEP, 1.4)
-  const across = b.x1 - b.x0 > b.y1 - b.y0 ? x - b.x0 : y - b.y0
-  const bar = Math.abs(((across + 0.1) % 0.2) - 0.1) < 0.035
-  if (bar && d > 0.12) set(out, STEEL, 0.45)
-  addGlow(out, color, 0.9 * Math.exp(-(((d - 0.05) / 0.04) ** 2)))
-  addGlow(out, [255, 70, 90], 0.12 * smooth(0.1, 0.4, d))
-}
-
 /** 传送台的台座：钢的外圈与斜面，暗色的台面上两道刻槽、一圈刻度，正中一块镜面 */
 function padBase(out: Rgb, r: number, R: number, ang: number, aa: number): void {
   const t = r / R
@@ -281,7 +270,6 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
   if (inFloor) {
     if (room.pit && sdBox(room.pit, x, y) < 0) return pit(out, color, room.pit, x, y, aa)
     for (const b of room.pillars) if (sdBox(grow(b, 0.12), x, y) < 0) return plinth(out, color, grow(b, 0.12), x, y)
-    for (const p of room.plates) if (sdBox(p.box, x, y) < 0) return plate(out, color, p.box, x, y)
     let ao = 0
     ao = Math.max(ao, Math.exp(-Math.max(0, -sdBox(f, x, y)) / 0.35) * 0.55)
     if (room.pit) ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(room.pit, x, y)) / 0.3) * 0.25)
@@ -310,7 +298,7 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
 
 /**
  * 跃迁站的地面：虚空透明，留给底下的着色器；四块平台的顶面是一格一块的冷白地砖，四边一圈护栏台沿，
- * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与传送台的台座也画在这里
+ * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜与传送台的台座也画在这里；出怪板嵌在会推进来的墙上，每帧现画
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const plan = sc.plan

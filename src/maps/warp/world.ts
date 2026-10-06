@@ -14,11 +14,12 @@ import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { bounded, wanderIn, ZERO } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { inBox, nextRoom, roomIndexAt, warpPlan } from './layout'
+import { inBox, nextRoom, platesIn, pressBox, pressedStrips, roomIndexAt, warpPlan } from './layout'
 import { clearWalk, flowDir, flowTo, navDist, navGrid } from './nav'
 import type { NavField, NavGrid } from './nav'
-import type { WarpPlan } from './layout'
+import type { Box, WarpPlan } from './layout'
 import type { Solid, Solids } from '../../ecs/worlds/solids'
+import type { Crossing } from '../../ecs/utils/pass'
 import type { Landmark } from '../landmark'
 import type { WarpConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -97,17 +98,20 @@ export interface Tiles {
 }
 
 /**
- * 跃迁站此刻：按种子定下的站，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间；四座传送台；
- * 寻路的底子、各间到传送台的步数场与到队长的步数场；地砖；画面要的送人、发车与力场受击的记录
+ * 跃迁站此刻：按种子定下的站，挡弹体与视线的力场，出怪的地标（跟着墙走）；队伍此刻在哪间；四座传送台；
+ * 各间的墙压到几成与此刻能走的方块；寻路的底子、各间到传送台的步数场与到队长的步数场（墙每推进半格重铺一次）；地砖；画面要的送人、发车与力场受击的记录
  */
 export interface WarpState {
   readonly plan: WarpPlan
   readonly solids: Solids
-  readonly marks: Readonly<Record<string, readonly Landmark[]>>
+  marks: Readonly<Record<string, readonly Landmark[]>>
   teamRoom: number
   readonly pads: PadState[]
-  readonly grids: readonly NavGrid[]
-  readonly toPad: readonly NavField[]
+  readonly press: Float32Array
+  readonly boxes: Box[]
+  readonly navKeys: number[]
+  readonly grids: NavGrid[]
+  readonly toPad: NavField[]
   toLeader: NavField | null
   navAt: number
   navCell: number
@@ -131,13 +135,13 @@ export function warpPlanFor(cfg: WarpConfig, decorSeed: number): WarpPlan {
   return warpPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
-/** 出怪的地标：每间房的出怪板归到那间配方的名下；核心柱单独一组 */
-function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
+/** 出怪的地标：每间房的出怪板（嵌在此刻的墙上）归到那间配方的名下；核心柱单独一组 */
+function marksOf(cfg: WarpConfig, plan: WarpPlan, boxes: readonly Box[]): Record<string, Landmark[]> {
   const out: Record<string, Landmark[]> = {}
   for (const name of cfg.recipes) out[name] = []
   for (const room of plan.rooms) {
     const list = out[cfg.recipes[room.recipe]!]!
-    for (const p of room.plates) list.push({ x: p.x * UNIT, y: p.y * UNIT, r: cfg.emitters.markU * UNIT, nx: 0, ny: 0 })
+    for (const p of platesIn(room, boxes[room.index]!)) list.push({ x: p.x * UNIT, y: p.y * UNIT, r: cfg.emitters.markU * UNIT, nx: 0, ny: 0 })
   }
   out.core = [{ x: plan.core.x * UNIT, y: plan.core.y * UNIT, r: cfg.core.radiusU * UNIT, nx: 0, ny: 0 }]
   return out
@@ -149,12 +153,13 @@ export function warpOf(sim: Sim): WarpState {
     const cfg = cfgOf(sim)
     const plan = warpPlanFor(cfg, sim.run.decorSeed)
     const b = plan.basin
-    const grids = plan.basins.map(navGrid)
+    const boxes = plan.rooms.map((r) => pressBox(r, 0, cfg.press.minU))
+    const grids = plan.basins.map((basin, i) => navGrid(basin, boxes[i]!))
     const never = (): Float32Array => new Float32Array(FRAME_U * FRAME_U).fill(-1e9)
     s = {
       plan,
       solids: makeSolids((x, y) => (plan.rooms.some((r) => inBox(r.floor, x / UNIT, y / UNIT)) ? null : FIELD), b.x0, b.y0, b.cols, b.rows, b.cell),
-      marks: marksOf(cfg, plan),
+      marks: marksOf(cfg, plan, boxes),
       teamRoom: roomIndexAt(plan, plan.start.x, plan.start.y),
       pads: plan.rooms.map((_, i) => ({
         charge: 0,
@@ -164,6 +169,9 @@ export function warpOf(sim: Sim): WarpState {
         shuttledAt: -1e9,
         shuttled: 0,
       })),
+      press: new Float32Array(plan.rooms.length),
+      boxes,
+      navKeys: boxes.map(navKey),
       grids,
       toPad: plan.rooms.map((r, i) => flowTo(grids[i]!, r.pad.x * UNIT, r.pad.y * UNIT)),
       toLeader: null,
@@ -180,6 +188,18 @@ export function warpOf(sim: Sim): WarpState {
     sim.worldState.warp = s
   }
   return s
+}
+
+/** 墙的位置按半格取整：变了才重铺这间的寻路 */
+function navKey(b: Box): number {
+  return Math.round(b.x0 * 2) * 1e6 + Math.round(b.x1 * 2) * 1e4 + Math.round(b.y0 * 2) * 100 + Math.round(b.y1 * 2)
+}
+
+/** 半径 r 像素的身体收进 box（格）里；box 比身体还窄就站在正中 */
+function inside(b: Box, x: number, y: number, r: number): Point {
+  const rx = Math.min(r, ((b.x1 - b.x0) / 2) * UNIT)
+  const ry = Math.min(r, ((b.y1 - b.y0) / 2) * UNIT)
+  return { x: Math.min(b.x1 * UNIT - rx, Math.max(b.x0 * UNIT + rx, x)), y: Math.min(b.y1 * UNIT - ry, Math.max(b.y0 * UNIT + ry, y)) }
 }
 
 /** (x, y) 像素落在哪间房 */
@@ -310,7 +330,7 @@ function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
   }
 }
 
-/** 四座传送台：队长站在队伍所在那间的台上攒能、走开就漏，满了整队出发；每座台到点发一趟车 */
+/** 四座传送台：队长站在队伍所在那间的台上攒能、走开就漏，满了整队出发；那间压到底时台子不管队长在哪自己充能；每座台到点发一趟车 */
 function stepPads(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
   const now = sim.elapsedMs
   const lead = sim.leader
@@ -320,7 +340,9 @@ function stepPads(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void 
   if (ready) s.teamRoom = roomOf(s, lx, ly)
   s.pads.forEach((p, i) => {
     const standing = ready && i === s.teamRoom && now >= p.coolUntil && onPad(s, cfg, i, lx, ly)
-    p.charge = standing ? p.charge + delta : Math.max(0, p.charge - (delta * cfg.pad.chargeMs) / cfg.pad.drainMs)
+    const forced = ready && i === s.teamRoom && s.press[i]! >= 1
+    const gain = Math.max(standing ? delta : 0, forced ? (delta * cfg.pad.chargeMs) / cfg.press.ejectMs : 0)
+    p.charge = gain > 0 ? p.charge + gain : Math.max(0, p.charge - (delta * cfg.pad.chargeMs) / cfg.pad.drainMs)
     if (p.charge >= cfg.pad.chargeMs) {
       p.charge = 0
       depart(sim, s, cfg, i, true)
@@ -331,6 +353,95 @@ function stepPads(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void 
       p.shuttledAt = now
     }
   })
+}
+
+/**
+ * 墙：队伍所在那间往里推、别的几间往外退；墙每推进半格，那间的寻路重铺一遍；出怪板跟着墙走
+ */
+function stepPress(s: WarpState, cfg: WarpConfig, delta: number): void {
+  const pc = cfg.press
+  s.plan.rooms.forEach((room, i) => {
+    const c = s.press[i]! + (i === s.teamRoom ? delta / pc.closeMs : -delta / pc.openMs)
+    s.press[i] = Math.min(1, Math.max(0, c))
+    const box = pressBox(room, s.press[i]!, pc.minU)
+    s.boxes[i] = box
+    const key = navKey(box)
+    if (key === s.navKeys[i]) return
+    s.navKeys[i] = key
+    s.grids[i] = navGrid(s.plan.basins[i]!, box)
+    s.toPad[i] = flowTo(s.grids[i]!, room.pad.x * UNIT, room.pad.y * UNIT, s.toPad[i])
+    if (i === s.navRoom) s.navRoom = -1
+  })
+  s.marks = marksOf(cfg, s.plan, s.boxes)
+}
+
+/** 墙推着身体、掉落物与召唤出的装置往里挤：在墙里的都推回墙面上；正被送过虚空的不管 */
+function squeeze(sim: Sim, s: WarpState): void {
+  for (const e of query(sim.world, [Phys, Transform, Radius])) {
+    if (!Alive.v[e] || inTransit(e)) continue
+    const x = Transform.x[e]!
+    const y = Transform.y[e]!
+    const p = inside(s.boxes[roomOf(s, x, y)]!, x, y, Radius.v[e]!)
+    if (p.x === x && p.y === y) continue
+    Transform.x[e] = p.x
+    Transform.y[e] = p.y
+  }
+  for (const e of query(sim.world, [Pickup, Transform])) {
+    const x = Transform.x[e]!
+    const y = Transform.y[e]!
+    const p = inside(s.boxes[roomOf(s, x, y)]!, x, y, 0.3 * UNIT)
+    Transform.x[e] = p.x
+    Transform.y[e] = p.y
+  }
+  for (const e of query(sim.world, [Minion, Transform])) {
+    if (hasComponent(sim.world, e, Phys)) continue
+    const x = Transform.x[e]!
+    const y = Transform.y[e]!
+    const p = inside(s.boxes[roomOf(s, x, y)]!, x, y, 0.3 * UNIT)
+    Transform.x[e] = p.x
+    Transform.y[e] = p.y
+  }
+}
+
+/** 线段 a→b（像素）先撞上哪一间推进来的墙：墙是力场，进了就挡 */
+function pressTrace(s: WarpState, ax: number, ay: number, bx: number, by: number): Crossing | null {
+  let best: Crossing | null = null
+  const dx = bx - ax
+  const dy = by - ay
+  const hit = (b: Box): void => {
+    let t0 = 0
+    let t1 = 1
+    for (const [a, d, lo, hi] of [
+      [ax, dx, b.x0 * UNIT, b.x1 * UNIT],
+      [ay, dy, b.y0 * UNIT, b.y1 * UNIT],
+    ] as const) {
+      if (Math.abs(d) < 1e-9) {
+        if (a < lo || a >= hi) return
+        continue
+      }
+      const u = (lo - a) / d
+      const v = (hi - a) / d
+      t0 = Math.max(t0, Math.min(u, v))
+      t1 = Math.min(t1, Math.max(u, v))
+    }
+    if (t0 < t1 && (!best || t0 < best.t0)) best = { t0, t1, material: 'field' }
+  }
+  s.plan.rooms.forEach((room, i) => {
+    if (s.press[i]! <= 0) return
+    const st = pressedStrips(room, s.boxes[i]!)
+    if (st.x) hit(st.x)
+    if (st.y) hit(st.y)
+  })
+  return best
+}
+
+/** (x, y) 像素在不在哪一间推进来的墙里 */
+function inPress(s: WarpState, x: number, y: number): boolean {
+  const i = roomOf(s, x, y)
+  const f = s.plan.rooms[i]!.floor
+  const u = x / UNIT
+  const v = y / UNIT
+  return inBox(f, u, v) && !inBox(s.boxes[i]!, u, v)
 }
 
 /** 活着、脚沾地的身体踩亮脚下的瓷砖 */
@@ -387,14 +498,16 @@ function towardPad(s: WarpState, cfg: WarpConfig, room: number, eid: number, dx:
   return steer(s, room, s.toPad[room]!, x, y, px, py, Radius.v[eid]!)
 }
 
-/** 第 i 间里随手挑一处离壁至少 clear 像素的地方 */
+/** 第 i 间此刻墙里面随手挑一处离壁至少 clear 像素的地方 */
 function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
   const r = s.plan.rooms[i]!
   const b = s.plan.basins[i]!
+  const f = s.boxes[i]!
   let p: Point = { x: r.pad.x * UNIT, y: r.pad.y * UNIT }
   for (let k = 0; k < 32; k++) {
-    p = { x: (r.floor.x0 + sim.rng.next() * (r.floor.x1 - r.floor.x0)) * UNIT, y: (r.floor.y0 + sim.rng.next() * (r.floor.y1 - r.floor.y0)) * UNIT }
-    if (roomAt(b, p.x, p.y) >= clear) return p
+    p = { x: (f.x0 + sim.rng.next() * (f.x1 - f.x0)) * UNIT, y: (f.y0 + sim.rng.next() * (f.y1 - f.y0)) * UNIT }
+    const q = inside(f, p.x, p.y, clear)
+    if (roomAt(b, p.x, p.y) >= clear && q.x === p.x && q.y === p.y) return p
   }
   return p
 }
@@ -402,14 +515,20 @@ function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
 /**
  * 跃迁站：四块悬空的平台，平台之间是虚空，身体只能在自己那块上走；平台四周的力场挡弹体也挡视线。
  * 每块一座传送台：队长站上去充满能，整支队伍连同召唤物穿过虚空到下一块的传送台；每座台定期发车，台上的敌人一起送走。
+ * 队伍在哪间，那间背对核心柱的两面墙就往传送台推，把里面的身体、掉落物和出怪板都挤过去，推到底就把队伍送走；队伍走了墙再退回去。
  * 队伍不在的那几间，敌人一边刷一边往传送台聚
  */
 export const warp: WorldHooks = {
   ...bounded,
+  /** 挡在自己那间的地面里，也挡在此刻推进来的墙里面 */
   constrainBody(sim, eid, from, next) {
     const s = warpOf(sim)
     const room = s.crossing ? roomOf(s, next.x, next.y) : roomOf(s, from.x, from.y)
-    return keepOut(s.plan.basins[room]!, next.x, next.y, Radius.v[eid]!)
+    const r = Radius.v[eid]!
+    const box = s.boxes[room]!
+    const a = inside(box, next.x, next.y, r)
+    const b = keepOut(s.plan.basins[room]!, a.x, a.y, r)
+    return inside(box, b.x, b.y, r)
   },
   basin(sim) {
     return warpOf(sim).plan.basin
@@ -427,10 +546,14 @@ export const warp: WorldHooks = {
     return steer(s, room, room === s.navRoom ? s.toLeader : null, x, y, tx, ty, Radius.v[eid]!)
   },
   trace(sim, probe, ax, ay, bx, by) {
-    return solidsTrace(warpOf(sim).solids, probe, ax, ay, bx, by)
+    const s = warpOf(sim)
+    const fixed = solidsTrace(s.solids, probe, ax, ay, bx, by)
+    const wall = pressTrace(s, ax, ay, bx, by)
+    return !wall || (fixed && fixed.t0 <= wall.t0) ? fixed : wall
   },
   solidAt(sim, x, y) {
-    return solidOf(warpOf(sim).solids, x, y)
+    const s = warpOf(sim)
+    return solidOf(s.solids, x, y) ?? (inPress(s, x, y) ? FIELD : null)
   },
   /** 队伍不在的房间里，没事做的敌人往传送台聚 */
   wanderDir(sim, eid, dx, dy) {
@@ -470,12 +593,17 @@ export const warp: WorldHooks = {
   },
   settle(sim, p) {
     const s = warpOf(sim)
-    return keepOut(s.plan.basins[roomOf(s, p.x, p.y)]!, p.x, p.y, SPAWN.edgeInset * UNIT)
+    const i = roomOf(s, p.x, p.y)
+    const q = keepOut(s.plan.basins[i]!, p.x, p.y, SPAWN.edgeInset * UNIT)
+    return inside(s.boxes[i]!, q.x, q.y, SPAWN.edgeInset * UNIT)
   },
-  /** 站得下，也不贴着队长冒出来：出怪板离队长太近的这一回不出 */
+  /** 站得下、不在推进来的墙里，也不贴着队长冒出来：出怪板离队长太近的这一回不出 */
   canSpawn(sim, x, y, radius) {
+    const s = warpOf(sim)
     const lead = leaderPoint(sim)
-    return roomFor(warpOf(sim).plan.basin, x, y, radius) && Math.hypot(x - lead.x, y - lead.y) >= cfgOf(sim).emitters.clearU * UNIT
+    const box = s.boxes[roomOf(s, x, y)]!
+    const fits = x - radius >= box.x0 * UNIT && x + radius <= box.x1 * UNIT && y - radius >= box.y0 * UNIT && y + radius <= box.y1 * UNIT
+    return fits && roomFor(s.plan.basin, x, y, radius) && Math.hypot(x - lead.x, y - lead.y) >= cfgOf(sim).emitters.clearU * UNIT
   },
   landmarks(sim) {
     return warpOf(sim).marks
@@ -508,7 +636,9 @@ export const warp: WorldHooks = {
   tick(sim, delta) {
     const cfg = cfgOf(sim)
     const s = warpOf(sim)
+    stepPress(s, cfg, delta)
     stepPads(sim, s, cfg, delta)
+    squeeze(sim, s)
     spill(sim, s, cfg)
     stepTiles(sim, s)
     stepNav(sim, s)
