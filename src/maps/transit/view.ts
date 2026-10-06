@@ -16,6 +16,7 @@ import { textureSize } from './ground'
 import { TransitPainter } from './painter'
 import { drawBeam, drawBrush, drawCabin, drawGlow, drawRobot, drawRoof, drawTrainShadow, trainFrame } from './sprites'
 import { scheduleOf, transitOf, transitPlanFor } from './world'
+import { nextStart } from './timetable'
 import type { PaintTask } from './painter'
 import type { PaintScene } from './ground'
 import type { Fixture, Track, TransitPlan } from './layout'
@@ -72,6 +73,8 @@ const AMBER = 0xffaa2c
 const GREEN = 0x4dea8a
 const RED = 0xff4d4d
 const HOLO = 0x7ff3ff
+/** 全息牌的底：深青的半透明玻璃 */
+const HOLO_GLASS = 0x0d2a3a
 /** 车影往背着太阳的方向偏多远（格） */
 const SHADOW_OFF_U = 0.55
 /** 撞车时镜头震多久、多狠 */
@@ -242,12 +245,11 @@ export class TransitView implements MapView {
 
   private holo(v: ViewCtx, plan: TransitPlan, f: Extract<Fixture, { kind: 'kiosk' }>): Holo {
     const w = toWorld(plan, f.u, f.v)
-    const panel = v.scene.add.graphics().setDepth(HOLO_DEPTH).setBlendMode(Phaser.BlendModes.ADD)
+    const panel = v.scene.add.graphics().setDepth(HOLO_DEPTH)
     const text = v.scene.add
-      .text(w.x * UNIT, w.y * UNIT - 1.55 * UNIT, '', { fontFamily: FONT_FAMILY, fontSize: `${Math.round(0.34 * UNIT)}px`, fontStyle: 'bold', color: '#c8fbff', align: 'center', lineSpacing: 2 })
+      .text(w.x * UNIT, w.y * UNIT - 1.55 * UNIT, '', { fontFamily: FONT_FAMILY, fontSize: `${Math.round(0.32 * UNIT)}px`, fontStyle: 'bold', color: '#aef6ff', align: 'left', lineSpacing: 3 })
       .setOrigin(0.5, 0.5)
       .setDepth(HOLO_DEPTH + 0.1)
-      .setBlendMode(Phaser.BlendModes.ADD)
     this.visuals.push(panel, text)
     return { f, panel, text, shown: '' }
   }
@@ -442,7 +444,11 @@ export class TransitView implements MapView {
         const tr = sched[i] ?? null
         const dir = toWorld(plan, t.dir, 0)
         const arrow = dir.x > 0 ? '→' : dir.x < 0 ? '←' : dir.y > 0 ? '↓' : '↑'
-        if (!tr) return `${t.label}  ${arrow}  待发`
+        if (!tr) {
+          const next = nextStart(cfg, plan, t, st.clocks[i]!, now)
+          const warn = next.express ? cfg.expressRun.warnMs : cfg.timetable.warnMs
+          return `${t.label}  ${arrow}  ${Math.max(0, Math.ceil((next.start + warn - now) / 1000))} 秒进站`
+        }
         if (tr.phase === 'warn') return `${t.label}  ${arrow}  ${Math.ceil(tr.left / 1000)} 秒进站`
         if (tr.phase === 'arrive') return `${t.label}  ${arrow}  进站`
         if (tr.phase === 'depart') return `${t.label}  ${arrow}  出站`
@@ -462,10 +468,10 @@ export class TransitView implements MapView {
       const cx = p.x * UNIT
       const cy = p.y * UNIT - 1.55 * UNIT
       const g = h.panel.clear()
-      g.fillStyle(HOLO, 0.1 * flick).fillRect(cx - w / 2, cy - hh / 2, w, hh)
-      g.lineStyle(2, HOLO, 0.55 * flick).strokeRect(cx - w / 2, cy - hh / 2, w, hh)
-      for (let k = 0; k < 6; k++) g.fillStyle(HOLO, 0.05 * flick).fillRect(cx - w / 2, cy - hh / 2 + ((k + ((now / 900) % 1)) / 6) * hh, w, 2)
-      g.fillStyle(HOLO, 0.12 * flick).fillTriangle(cx - h.f.r * UNIT * 0.5, cy + hh / 2 + 1.55 * UNIT - hh / 2, cx + h.f.r * UNIT * 0.5, cy + hh / 2 + 1.55 * UNIT - hh / 2, cx, cy + hh / 2)
+      g.fillStyle(HOLO_GLASS, 0.62 * flick).fillRoundedRect(cx - w / 2, cy - hh / 2, w, hh, 6)
+      g.lineStyle(2, HOLO, 0.75 * flick).strokeRoundedRect(cx - w / 2, cy - hh / 2, w, hh, 6)
+      for (let k = 0; k < 6; k++) g.fillStyle(HOLO, 0.08 * flick).fillRect(cx - w / 2 + 3, cy - hh / 2 + ((k + ((now / 900) % 1)) / 6) * hh, w - 6, 2)
+      g.fillStyle(HOLO, 0.16 * flick).fillTriangle(cx - h.f.r * UNIT * 0.5, cy + hh / 2 + 1.55 * UNIT - hh / 2, cx + h.f.r * UNIT * 0.5, cy + hh / 2 + 1.55 * UNIT - hh / 2, cx, cy + hh / 2)
     }
   }
 

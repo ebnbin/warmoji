@@ -331,10 +331,16 @@ function pillar(f: Extract<Fixture, { kind: 'pillar' }>, du: number, dv: number,
     mixTo(o, 178, 186, 196, 1 - smooth(f.r + 0.1 - aa, f.r + 0.1 + aa, r))
     return true
   }
-  const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny))
-  const lit = 0.72 + 0.28 * clamp01(nx * L.x + ny * L.y + nz * L.z)
-  set(o, 250 * lit, 251 * lit, 252 * lit)
-  mixTo(o, 210, 216, 224, smooth(f.r * 0.82, f.r, r) * 0.5)
+  // 柱顶是一圈扁的弧面：边上往下弯，迎着太阳的一侧亮、背着的一侧暗，正中一块平的顶板
+  const k = smooth(f.r * 0.55, f.r, r)
+  const tilt = k * 1.2
+  const sx = nx * Math.sin(tilt)
+  const sy = ny * Math.sin(tilt)
+  const sz = Math.cos(tilt)
+  const lit = 0.62 + 0.42 * clamp01(sx * L.x + sy * L.y + sz * L.z)
+  set(o, 246 * lit, 248 * lit, 250 * lit)
+  mixTo(o, 255, 255, 255, Math.exp(-((r / (f.r * 0.4)) ** 2)) * 0.25)
+  mixTo(o, 196, 204, 214, (1 - smooth(0.012, 0.03, Math.abs(r - f.r * 0.55))) * 0.6)
   return true
 }
 
