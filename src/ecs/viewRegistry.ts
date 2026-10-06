@@ -3,6 +3,7 @@ import type { MapDef, MapId } from '../types/maps'
 import { BoundedView, DayNightView, IceView, NebulaOldView, OldRiverView, OldRuinsView, SpaceView, TorusView } from './views'
 import type { MapView } from './views'
 import { CaveView } from '../maps/cave/view'
+import { AmethystView } from '../maps/amethyst/view'
 import { CircuitView } from '../maps/circuit/view'
 import { DesertView } from '../maps/desert/view'
 import { DreamlandView } from '../maps/dreamland/view'
@@ -37,6 +38,7 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   ship: () => new ShipView(),
   floe: () => new FloeView(),
   cave: () => new CaveView(),
+  amethyst: () => new AmethystView(),
   meadow: () => new MeadowView(),
   sakura: () => new SakuraView(),
   maple: () => new MapleView(),

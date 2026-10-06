@@ -6,6 +6,8 @@ export const OBSTACLES = {
   materials: {
     // 岩石：溶洞的洞壁、石柱与石笋，火山的崖壁与山体，樱庭溪里的石组
     rock: { name: '岩体', phase: true, opaque: true, pierce: null, strength: null },
+    // 晶体：紫水晶洞穴的洞壁、晶簇、巨晶与矮晶丛
+    crystal: { name: '晶体', phase: true, opaque: true, pierce: null, strength: null },
     // 木头：帆船的桅杆与舷墙，林子与树干
     wood: { name: '木头', phase: true, opaque: true, pierce: null, strength: null },
     // 土：樱庭寺院的土墙，草甸的陡坡

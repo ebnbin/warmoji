@@ -614,6 +614,116 @@ export interface CaveConfig {
   /** 怪物只刷在照度不到 spawnLux 的地方 */
   readonly spawnLux: number
 }
+/**
+ * 紫水晶洞穴：玄武岩里几个晶洞连成的洞厅，洞壁长满紫水晶。阳光、天光、月光从塌开的洞顶与顶缝照进来，随真实的太阳与月亮移动；入夜后队员点起火把。
+ * 光照按勒克斯算，一格 1 米；镜头短边看到多少格由洞里的亮度决定；怪物只从暗处出来；洞壁、晶簇与巨晶挡人也挡子弹
+ */
+export interface AmethystConfig {
+  /**
+   * 晶洞：主晶洞的半径、圆心离方框中心至多多远；旁边几个小晶洞的个数、半径与跟主晶洞叠进去多深，格；轮廓按谐波起伏 ±jitter 倍，再按波长 waveU 的噪声起伏 wobbleU 格；
+   * 窄过两倍 neckU 的缝填成岩体；洞厅与暗道离地图边至少 rimU 格；洞顶高 ceilingM 米，洞壁从洞底弯上洞顶要横着走 wallU 格
+   */
+  readonly chambers: {
+    readonly mainU: readonly [number, number]
+    readonly driftU: number
+    readonly sideCount: readonly [number, number]
+    readonly sideU: readonly [number, number]
+    readonly overlapU: readonly [number, number]
+    readonly jitter: number
+    readonly wobbleU: number
+    readonly waveU: number
+    readonly neckU: number
+    readonly rimU: number
+    readonly ceilingM: number
+    readonly wallU: number
+  }
+  /** 暗道：从洞壁往岩体里走 outU 格再拐 turnU 格，宽 widthU，尽头是半径 pocketU 的小晶洞；拐过弯的一段离洞厅至少隔 rockU 格岩体 */
+  readonly tunnels: {
+    readonly count: readonly [number, number]
+    readonly widthU: number
+    readonly outU: number
+    readonly turnU: readonly [number, number]
+    readonly pocketU: number
+    readonly rockU: number
+  }
+  /**
+   * 洞顶的开口，格：主晶洞上一处塌顶，离方框中心 breachOffsetU、半径 breachU；小晶洞上另有几处小塌顶；几道顶缝的长与最宽处；塌顶的轮廓起伏 ±jitter 倍，开口之间至少隔 gapU；
+   * 塌顶下堆着中间高 debrisM 米、铺到塌顶半径 debrisSpread 倍的碎晶坡，顶缝下撒着一道碎晶
+   */
+  readonly openings: {
+    readonly breachU: readonly [number, number]
+    readonly breachOffsetU: readonly [number, number]
+    readonly sideBreaches: readonly [number, number]
+    readonly sideBreachU: readonly [number, number]
+    readonly rifts: readonly [number, number]
+    readonly riftLenU: readonly [number, number]
+    readonly riftWidthU: readonly [number, number]
+    readonly jitter: number
+    readonly gapU: number
+    readonly debrisM: number
+    readonly debrisSpread: number
+  }
+  /**
+   * 晶体：晶簇的丛数、底半径（格）与高（米），挡路；巨晶从洞壁斜伸进洞厅，截面半径与伸出的长度（格），挡路；
+   * 地上半埋的晶洞与矮晶丛的个数、半径（格）与高（米），矮得标准身体跨得过去；出生点 clearU 格内不长挡路的晶体
+   */
+  readonly crystals: {
+    readonly clusters: readonly [number, number]
+    readonly clusterU: readonly [number, number]
+    readonly clusterM: readonly [number, number]
+    readonly beams: readonly [number, number]
+    readonly beamU: readonly [number, number]
+    readonly beamLenU: readonly [number, number]
+    readonly geodes: readonly [number, number]
+    readonly geodeU: readonly [number, number]
+    readonly geodeM: number
+    readonly druse: readonly [number, number]
+    readonly druseU: readonly [number, number]
+    readonly druseM: readonly [number, number]
+    readonly clearU: number
+  }
+  /** 碎晶坡上的地面：黏滞与每走一格耗的体力 */
+  readonly debris: {
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /** 天：纬度与太阳赤纬（度），开局在几点；太阳高过 twilightDeg 度是白天、低过负的 twilightDeg 度是夜里，中间是黄昏与黎明，四段各走多少秒；大气消光系数 */
+  readonly sky: {
+    readonly latitudeDeg: number
+    readonly declinationDeg: number
+    readonly startHour: number
+    readonly twilightDeg: number
+    readonly dayS: number
+    readonly duskS: number
+    readonly nightS: number
+    readonly dawnS: number
+    readonly extinction: number
+  }
+  /** 光：洞底与晶壁的反照率，反光在洞厅里铺开多远（格）；暗道里每往深处走 tunnelFadeU 格，反光暗到 1/e */
+  readonly light: {
+    readonly albedo: number
+    readonly bounceU: number
+    readonly tunnelFadeU: number
+  }
+  /** 火把：发光强度（坎德拉）、举多高（米）；身边的光暗过 igniteLux 就点起、亮过 douseLux 才熄灭；一个个点起时最多相差几毫秒 */
+  readonly torch: {
+    readonly candela: number
+    readonly heightM: number
+    readonly igniteLux: number
+    readonly douseLux: number
+    readonly staggerMs: number
+  }
+  /** 看多远：洞里的平均照度从 darkLux 到 brightLux（按对数）时，镜头短边从 nightU 格拉到 dayU 格；眼睛最暗只适应到 brightLux，照度不到 clearLux 就看不清 */
+  readonly view: {
+    readonly dayU: number
+    readonly nightU: number
+    readonly darkLux: number
+    readonly brightLux: number
+    readonly clearLux: number
+  }
+  /** 怪物只刷在照度不到 spawnLux 的地方 */
+  readonly spawnLux: number
+}
 export interface OldRiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -1352,8 +1462,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，shards 迸开的碎晶 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'shards'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1418,7 +1528,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1442,6 +1552,7 @@ export interface MapDef {
   readonly oldRiver?: OldRiverConfig
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
+  readonly amethyst?: AmethystConfig
   readonly desert?: DesertConfig
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig

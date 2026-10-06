@@ -49,6 +49,8 @@ export const SFX = {
   warp: { wave: 'sine', freq: 520, freqEnd: 1650, duration: 0.16, volume: 0.16, attack: 0.005, decayPow: 1.3, throttleMs: 90, jitter: 0.1 },
   glitch: { wave: 'noise', freq: 4200, freqEnd: 1200, duration: 0.5, volume: 0.13, attack: 0.005, decayPow: 0.9, steps: [1, 0.3, 1.2, 0.2, 0.9, 0.4, 1.1, 0.25], throttleMs: 600, jitter: 0.2 },
   print: { wave: 'square', freq: 660, duration: 0.3, volume: 0.1, steps: [1, 1.5, 2], throttleMs: 300 },
+  // 紫水晶洞穴：子弹敲在晶体上、晶体入夜遇冷的轻响
+  tink: { wave: 'sine', freq: 2900, freqEnd: 2760, duration: 0.42, volume: 0.07, attack: 0.002, decayPow: 2.4, steps: [1, 1.498], throttleMs: 90, jitter: 0.12 },
   // 梦幻乐园：操作员预警的叮咚铃、台子动起来的电机、入口开关的咔嗒、传送带换向前的蜂鸣
   chime: { wave: 'sine', freq: 1568, duration: 0.62, volume: 0.17, attack: 0.003, decayPow: 1.5, steps: [1, 1.26, 1, 1.26], throttleMs: 600 },
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },

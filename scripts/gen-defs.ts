@@ -37,6 +37,11 @@ import { roomAt } from '../src/maps/basin.ts'
 import { FRAME_U, SAFE_U, SPAWN_CLEAR_U, UNIT, VIEW } from '../src/util/units.ts'
 import { WindSea } from '../src/maps/floe/sea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/maps/cave/sky.ts'
+import { makeAmethyst } from '../src/maps/amethyst/layout.ts'
+import { diffuseAt, directAt, makeLighting, stepLighting } from '../src/maps/amethyst/light.ts'
+import { blankSky, crossing as amethystCrossing, secsUntil, skyAt as amethystSky, skyLux as amethystSkyLux, torchReach } from '../src/maps/amethyst/sky.ts'
+import { centered, FRAME_MID } from '../src/maps/frame.ts'
+import { Rng } from '../src/util/rng.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { bankShape, meadowPlan } from '../src/maps/meadow/layout.ts'
 import { bridgeLocal, CREST_U, sakuraPlan, SINK_M, weirLocal } from '../src/maps/sakura/layout.ts'
@@ -343,6 +348,84 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
   need(view.dayU <= FRAME_U, `maps.${id}.cave.view.dayU 须让白天的镜头落在方框以内`)
+}
+
+/**
+ * 紫水晶洞穴：参数说得通；主晶洞与它上方的塌顶落得进地图，出生点在主晶洞里；挡路的晶体挡得住平射与视线，矮晶丛与地上的晶洞矮得标准身体跨得过去；
+ * 太阳每天升过、落过晨昏的高度；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍。抽一批种子真的生成一遍、按正午与午夜算一遍光：
+ * 暗道挖得够、出生点四周空得开；正午洞厅亮得看得清整个洞、塌顶下亮得熄得了火把，暗道尽头暗得出得了怪；没有月亮的午夜洞厅暗得出得了怪
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'amethyst') === (m.amethyst !== undefined), `maps.${id} 是紫水晶洞穴当且仅当写了 amethyst`)
+  const a = m.amethyst
+  if (!a) continue
+  const at = `maps.${id}.amethyst`
+  const span = (r: readonly [number, number]): boolean => r[0] <= r[1]
+  const pos = (r: readonly [number, number]): boolean => r[0] > 0 && span(r)
+  const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 0 && span(r)
+  const { chambers: ch, tunnels: tn, openings: op, crystals: cr, debris, sky, light, torch, view } = a
+  const mapW = m.size?.w ?? MAP_DEFAULTS.width
+  const mapH = m.size?.h ?? MAP_DEFAULTS.height
+  need(mapW === mapH && mapW <= FRAME_U - SAFE_U * 2, `${at} 的地图须是方的、放得进方框的安全区`)
+  need(pos(ch.mainU) && ch.driftU >= 0 && ints(ch.sideCount) && pos(ch.sideU) && pos(ch.overlapU) && ch.jitter >= 0 && ch.jitter < 0.5, `${at}.chambers 的半径与叠进去的深度须为正、个数须为非负整数、起伏在 0 到 0.5 之间`)
+  need(ch.wobbleU >= 0 && ch.waveU > 0 && ch.neckU > 0 && ch.rimU > 0 && ch.wallU > 0, `${at}.chambers 的起伏、波长、窄缝、离地图边的岩体与洞壁宽须为正`)
+  const mainIn = ch.mainU[0] * (1 - ch.jitter) - ch.wobbleU - ch.driftU
+  need(ch.mainU[1] * (1 + ch.jitter) + ch.wobbleU + ch.driftU <= mapW / 2 - ch.rimU, `${at}.chambers 的主晶洞须整个落在地图里`)
+  need(mainIn > SPAWN_CLEAR_U + ch.neckU, `${at}.chambers 的出生点须在主晶洞里、四周空得开`)
+  need(ch.overlapU[1] < ch.sideU[0], `${at}.chambers 小晶洞叠进主晶洞的深度须小于它的半径`)
+  need(ints(tn.count) && tn.count[0] >= 1, `${at}.tunnels 至少一条：白天怪物要有暗处出来`)
+  need(tn.widthU > 2 * ch.neckU && tn.outU > tn.widthU / 2 && pos(tn.turnU) && tn.pocketU * 2 >= tn.widthU && tn.rockU > 0, `${at}.tunnels 须宽过窄缝、拐进岩体，尽头的小晶洞不比洞道窄`)
+  need(pos(op.breachU) && pos(op.breachOffsetU) && ints(op.sideBreaches) && pos(op.sideBreachU) && ints(op.rifts) && pos(op.riftLenU) && pos(op.riftWidthU), `${at}.openings 的尺寸须为正、个数须为非负整数`)
+  need(op.jitter >= 0 && op.jitter < 0.5 && op.gapU >= 0 && op.debrisM >= 0 && op.debrisSpread >= 1, `${at}.openings 的起伏在 0 到 0.5 之间，碎晶坡不比塌顶小`)
+  need(op.breachOffsetU[0] + op.breachU[0] + 0.8 < ch.mainU[0] - ch.driftU, `${at}.openings 最近最小的塌顶须开得进主晶洞`)
+  need(ints(cr.clusters) && pos(cr.clusterU) && pos(cr.clusterM) && ints(cr.beams) && pos(cr.beamU) && pos(cr.beamLenU), `${at}.crystals 的晶簇与巨晶个数须为非负整数、尺寸为正`)
+  need(ints(cr.geodes) && pos(cr.geodeU) && cr.geodeM > 0 && ints(cr.druse) && pos(cr.druseU) && pos(cr.druseM), `${at}.crystals 的晶洞与矮晶丛个数须为非负整数、尺寸为正`)
+  need(ch.ceilingM > Math.max(cr.clusterM[1], op.debrisM, Math.sqrt(3) * cr.beamU[1] + 1.2), `${at}.chambers.ceilingM 须高过晶体与碎晶坡`)
+  {
+    const B = OBSTACLES.body
+    const layerM = B.heightM / B.layers
+    const over = Math.floor(B.layers * B.step)
+    const flat = B.layers - 1
+    const above = (h: number): boolean => Math.ceil(h / layerM - 1e-9) > flat
+    need(above(cr.clusterM[0]) && above(Math.sqrt(3) * cr.beamU[0]), `${at}.crystals 的晶簇与巨晶须高过平射飞的那一层：挡得住子弹与视线`)
+    need(cr.druseM[1] <= over * layerM && cr.geodeM <= over * layerM, `${at}.crystals 的矮晶丛与地上的晶洞须矮得让标准身体跨过去`)
+  }
+  need(cr.clearU >= SPAWN_CLEAR_U + ch.neckU, `${at}.crystals.clearU 须比出生点要空出的 ${SPAWN_CLEAR_U} 格再宽一道窄缝`)
+  need(debris.viscosity >= 1 && debris.exertion >= 0, `${at}.debris 碎晶坡不比平地好走`)
+  need(Math.abs(Math.tan(sky.latitudeDeg * DEG) * Math.tan(sky.declinationDeg * DEG)) < 1 && sky.twilightDeg > 0, `${at}.sky 须让太阳每天升起又落下、晨昏的高度为正`)
+  need(amethystCrossing(sky, sky.twilightDeg) !== null && amethystCrossing(sky, -sky.twilightDeg) !== null, `${at}.sky 的太阳须每天升过、落过正负 twilightDeg 度`)
+  need(sky.dayS > 0 && sky.duskS > 0 && sky.nightS > 0 && sky.dawnS > 0 && sky.startHour >= 0 && sky.startHour < 24 && sky.extinction > 0, `${at}.sky 的四段须各走一阵、开局的钟点在一天里、消光为正`)
+  need(light.albedo > 0 && light.albedo < 1 && light.bounceU > 0 && light.tunnelFadeU > 0, `${at}.light 的反照率在 0 到 1 之间，反光铺开的范围与暗道里暗下去的快慢为正`)
+  need(torch.candela > 0 && torch.heightM > 0 && torch.staggerMs >= 0 && torch.igniteLux > a.spawnLux && torch.douseLux > torch.igniteLux, `${at}.torch 须比刷怪的门槛亮时就点起，熄火的门槛高过点火的（不来回闪）`)
+  need(view.darkLux > 0 && view.brightLux > view.darkLux && view.clearLux > 0 && view.nightU > 0 && view.dayU > view.nightU && view.dayU <= FRAME_U, `${at}.view 须白天比夜里看得远、白天的镜头落在方框以内、照度门槛为正`)
+  need(amethystSkyLux(-18) < a.spawnLux, `${at} 深夜的星光须暗过刷怪的门槛`)
+  const reach = torchReach(torch, view.clearLux)
+  need(reach >= view.nightU / 2, `${at} 火把只照得清 ${reach.toFixed(1)} 格，盖不住夜里镜头短边的一半 ${view.nightU / 2} 格`)
+  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(view.nightU / 2 > squad, `${at}.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
+  if (errors.length > 0) continue
+  const noon = amethystSky(sky, secsUntil(sky, sky.startHour, 12), 0, blankSky())
+  const midnight = amethystSky(sky, secsUntil(sky, sky.startHour, 0), 0, blankSky())
+  for (let k = 0; k < 6; k++) {
+    const seed = k * 7919 + 23
+    const L = makeAmethyst(a, centered(mapW, mapH), new Rng(seed))
+    need(L.tunnels.length >= tn.count[0], `${at} 种子 ${seed} 只挖出 ${L.tunnels.length} 条暗道`)
+    need(roomAt(L.basin, FRAME_MID.x, FRAME_MID.y) >= SPAWN_CLEAR_U * UNIT, `${at} 种子 ${seed} 的出生点四周空不出 ${SPAWN_CLEAR_U} 格`)
+    const lt = makeLighting(L, a)
+    stepLighting(lt, L, a, noon)
+    need(lt.hallLux > view.brightLux, `${at} 种子 ${seed} 正午洞厅平均只有 ${lt.hallLux.toFixed(1)} 勒克斯，白天看不清整个洞`)
+    const main = L.breaches[0]!
+    need(main.r >= op.breachU[0] * UNIT * 0.75, `${at} 种子 ${seed} 的塌顶在主晶洞上方落不下`)
+    const under = diffuseAt(lt, main.x, main.y) + directAt(lt, L.ceilingM, noon, main.x, main.y)
+    need(under > torch.douseLux, `${at} 种子 ${seed} 正午塌顶下只有 ${under.toFixed(1)} 勒克斯，熄不了火把`)
+    L.tunnels.forEach((t, i) => {
+      const end = t.path[t.path.length - 1]!
+      const lux = diffuseAt(lt, end.x, end.y) + directAt(lt, L.ceilingM, noon, end.x, end.y)
+      need(lux < a.spawnLux, `${at} 种子 ${seed} 正午第 ${i + 1} 条暗道的尽头还有 ${lux.toFixed(2)} 勒克斯，白天出不了怪`)
+    })
+    stepLighting(lt, L, a, midnight)
+    need(lt.hallLux < a.spawnLux, `${at} 种子 ${seed} 没有月亮的午夜洞厅还有 ${lt.hallLux.toFixed(3)} 勒克斯，夜里出不了怪`)
+  }
 }
 
 /**
