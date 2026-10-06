@@ -302,8 +302,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(view.nightU / 2 > squad, `${at}.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
   if (errors.length > 0) continue
-  const noon = amethystSky(sky, secsUntil(sky, sky.startHour, 12), 0, blankSky())
-  const midnight = amethystSky(sky, secsUntil(sky, sky.startHour, 0), 0, blankSky())
+  const noon = amethystSky(sky, secsUntil(sky, sky.startHour, 12), blankSky())
+  const midnight = amethystSky(sky, secsUntil(sky, sky.startHour, 0), blankSky())
   for (let k = 0; k < 6; k++) {
     const seed = k * 7919 + 23
     const L = makeAmethyst(a, centered(mapW, mapH), new Rng(seed))
@@ -322,7 +322,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(lux < a.spawnLux, `${at} 种子 ${seed} 正午第 ${i + 1} 条暗道的尽头还有 ${lux.toFixed(2)} 勒克斯，白天出不了怪`)
     })
     stepLighting(lt, L, a, midnight)
-    need(lt.hallLux < a.spawnLux, `${at} 种子 ${seed} 没有月亮的午夜洞厅还有 ${lt.hallLux.toFixed(3)} 勒克斯，夜里出不了怪`)
+    need(lt.hallLux < a.spawnLux, `${at} 种子 ${seed} 头一夜的午夜洞厅还有 ${lt.hallLux.toFixed(3)} 勒克斯，夜里出不了怪`)
   }
 }
 

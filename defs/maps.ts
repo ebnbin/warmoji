@@ -495,7 +495,7 @@ export const MAPS = {
   amethyst: {
     emoji: '1f48e',
     name: '紫水晶洞穴',
-    desc: '玄武岩里一座巨大的紫水晶晶洞：几个晶洞连成洞厅，洞壁上密密麻麻长满紫色的晶体，洞底立着一丛丛晶簇，几根巨晶从洞壁斜伸进来。阳光从塌开的洞顶和几道顶缝照进来，随太阳东升西落，照到哪里哪里的晶体就闪起来：白天看得到大半个洞；黄昏光变红、洞里一点点暗下来；入夜后只看得清火把照亮的那一圈，晶体映着火光。怪物只从暗处出来：白天从拐进岩体深处的暗道里，夜里也会从地上半埋的晶洞里爬出来、从顶缝落下来。晶簇和巨晶挡人也挡子弹，塌下来的碎晶坡走着慢',
+    desc: '玄武岩里一座巨大的紫水晶晶洞：几个晶洞连成洞厅，洞壁上密密麻麻长满紫色的晶体，其中几片是金黄的黄水晶，洞底立着一丛丛晶簇，几根巨晶从洞壁斜伸进来。阳光从塌开的洞顶和几道顶缝照进来，随太阳东升西落，照到哪里哪里的晶体就闪起来：白天看得到大半个洞；黄昏光变红、洞里一点点暗下来；入夜后只看得清火把照亮的那一圈，晶体映着火光。开局那天正是中秋：头一夜一轮满月，升高以后月光从塌顶照进来。怪物只从暗处出来：白天从拐进岩体深处的暗道里，夜里也会从地上半埋的晶洞里爬出来、从顶缝落下来。晶簇和巨晶挡人也挡子弹，塌下来的碎晶坡走着慢',
     kind: 'amethyst',
     size: { w: 36, h: 36 },
     stamina: { exertion: 0.5, regen: 1 },
@@ -535,7 +535,8 @@ export const MAPS = {
       openings: { breachU: [3, 3.6], breachOffsetU: [4.4, 6], sideBreaches: [0, 1], sideBreachU: [1.8, 2.4], rifts: [2, 3], riftLenU: [5, 7.5], riftWidthU: [0.7, 1.1], jitter: 0.18, gapU: 2.5, debrisM: 1.1, debrisSpread: 1.12 },
       crystals: { clusters: [9, 12], clusterU: [0.65, 1.15], clusterM: [1.9, 2.9], beams: [2, 3], beamU: [1, 1.2], beamLenU: [3.5, 5.5], geodes: [4, 6], geodeU: [0.5, 0.75], geodeM: 0.42, druse: [26, 36], druseU: [0.14, 0.3], druseM: [0.22, 0.5], clearU: 4.8 },
       debris: { viscosity: 1.3, exertion: 1.15 },
-      sky: { latitudeDeg: 22, declinationDeg: 8, startHour: 9.5, twilightDeg: 7, dayS: 62, duskS: 26, nightS: 48, dawnS: 16, extinction: 0.21 },
+      // 开局那天是中秋：太阳在秋分点上，头一夜的子夜月亮正圆
+      sky: { latitudeDeg: 22, declinationDeg: 0, startHour: 9.5, fullMoonHour: 24, twilightDeg: 7, dayS: 62, duskS: 26, nightS: 48, dawnS: 16, extinction: 0.21 },
       light: { albedo: 0.46, bounceU: 4.5, tunnelFadeU: 1.9 },
       torch: { candela: 110, heightM: 1.4, igniteLux: 15, douseLux: 40, staggerMs: 1400 },
       view: { dayU: 18, nightU: 7, darkLux: 0.5, brightLux: 30, clearLux: 2 },
