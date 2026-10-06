@@ -441,11 +441,15 @@ export interface AmethystConfig {
     readonly viscosity: number
     readonly exertion: number
   }
-  /** 天：纬度与太阳赤纬（度），开局在几点；太阳高过 twilightDeg 度是白天、低过负的 twilightDeg 度是夜里，中间是黄昏与黎明，四段各走多少秒；大气消光系数 */
+  /**
+   * 天：纬度与太阳赤纬（度），开局在几点，从开局那天零点起过多少个钟点月亮正圆；太阳高过 twilightDeg 度是白天、低过负的 twilightDeg 度是夜里，
+   * 中间是黄昏与黎明，四段各走多少秒；大气消光系数
+   */
   readonly sky: {
     readonly latitudeDeg: number
     readonly declinationDeg: number
     readonly startHour: number
+    readonly fullMoonHour: number
     readonly twilightDeg: number
     readonly dayS: number
     readonly duskS: number
