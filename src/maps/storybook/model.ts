@@ -625,9 +625,58 @@ export function standing(lay: number): boolean {
   return lay < 0.5
 }
 
-/** 翻页时书页的自由边此刻在哪，格：从右页外沿转过书脊落到左页外沿；不在翻页时为 null */
-export function leafEdge(c: BookClock, book: Book): number | null {
-  if (c.phase !== 'leaf') return null
-  const th = Math.PI * easeInOut(clamp01(c.at / c.len))
-  return book.gx + (book.x1 - book.gx) * Math.cos(th)
+/** 翻页时书页弯起来的截面从书脊到自由边分多少段 */
+export const LEAF_SEGS = 32
+/** 下页角比上页角先翻起来多少（占翻页那一段的比例），书页斜着卷过去 */
+const LEAF_LEAD = 0.35
+/** 自由边比书脊先翻多少：自由边先卷起来翻过去，书脊那一头最后才放下 */
+const LEAF_CURL = 0.5
+/** 右页上脚下的书页抬起多高（格）就算把人掀起来了；左页上翻过来的书页低到多高以下才算压过来 */
+const LEAF_LIFT_U = 0.3
+const LEAF_LOW_U = 2
+
+/** 书页一行的截面：每段端点的横坐标与离页面的高（格，LEAF_SEGS + 1 个），每段的倾角（LEAF_SEGS 个，0 是平躺在右页，π 是平躺在左页） */
+export interface LeafSection {
+  readonly x: number[]
+  readonly z: number[]
+  readonly phi: number[]
+}
+
+export function leafBuffer(): LeafSection {
+  return { x: new Array<number>(LEAF_SEGS + 1).fill(0), z: new Array<number>(LEAF_SEGS + 1).fill(0), phi: new Array<number>(LEAF_SEGS).fill(0) }
+}
+
+/**
+ * 翻页时书页上 yn（0 是上页边，1 是下页边）那一行此刻弯成什么样，写进 out；不在翻页时返回 false。
+ * 自由边先卷起来翻过书脊，书脊那一头跟着转过去，越往自由边弯得越厉害；下页角领先，整张斜着卷过去
+ */
+export function leafSection(c: BookClock, book: Book, yn: number, out: LeafSection): boolean {
+  if (c.phase !== 'leaf') return false
+  const p = clamp01(c.at / c.len)
+  const q = clamp01(p * (1 + LEAF_LEAD) - LEAF_LEAD * (1 - yn))
+  const tip = Math.PI * easeInOut(clamp01(q * (1 + LEAF_CURL)))
+  const root = Math.PI * easeInOut(clamp01(q * (1 + LEAF_CURL) - LEAF_CURL))
+  const ds = (book.x1 - book.gx) / LEAF_SEGS
+  let x = book.gx
+  let z = 0
+  out.x[0] = x
+  out.z[0] = 0
+  for (let i = 0; i < LEAF_SEGS; i++) {
+    const u = (i + 0.5) / LEAF_SEGS
+    const phi = root + (tip - root) * u * u
+    out.phi[i] = phi
+    x += Math.cos(phi) * ds
+    z += Math.sin(phi) * ds
+    out.x[i + 1] = x
+    out.z[i + 1] = z
+  }
+  return true
+}
+
+/** 翻页时 (x, y) 格处的身体此刻被书页掀动没有：右页上是脚下那一块书页抬起来了，左页上是翻过来的书页低低地压到了跟前 lead 格 */
+export function leafTouch(c: BookClock, book: Book, x: number, y: number, lead: number, buf: LeafSection): boolean {
+  if (!leafSection(c, book, clamp01((y - book.y0) / (book.y1 - book.y0)), buf)) return false
+  if (x >= book.gx) return buf.z[Math.min(LEAF_SEGS, Math.round(((x - book.gx) / (book.x1 - book.gx)) * LEAF_SEGS))]! > LEAF_LIFT_U
+  for (let i = 0; i <= LEAF_SEGS; i++) if (buf.z[i]! < LEAF_LOW_U && buf.x[i]! <= x + lead) return true
+  return false
 }

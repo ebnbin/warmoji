@@ -12,7 +12,7 @@ import { FRAME, FRAME_MID } from '../frame'
 import { drawFace, drawRoof, faceSize, FLAT_U_PER_M, roofSize, STAND_U_PER_M } from './art'
 import { textureSize } from './backdrop'
 import { canvasUv, QuadLayer } from './layer'
-import { laid } from './model'
+import { laid, LEAF_SEGS, leafBuffer, leafSection } from './model'
 import { StorybookPainter } from './painter'
 import { paintPrint, PRINT_PPU } from './print'
 import { bookFor, pageAt } from './world'
@@ -37,7 +37,6 @@ const SPREAD_DEPTH = -0.9
 const FLAT_DEPTH = -0.6
 const SHADOW_DEPTH = -0.4
 const RIBBON_DEPTH = -0.5
-const CURL_DEPTH = -0.3
 const STAND_DEPTH = 2.7
 /** 翻过去的书页从扬到半空的身体脚下扫过：画在立着的布景之上、身体之下 */
 const LEAF_DEPTH = 2.95
@@ -54,11 +53,10 @@ const LEAF_LIGHT = { min: 0.62, max: 1.04 } as const
 /** 图集的宽，像素；每件之间空几像素 */
 const ATLAS_W = 2048
 const ATLAS_GAP = 4
-/** 页角翘起来最大多少格 */
-const CURL_U = 3.2
+/** 翻页时书页从上页边到下页边分几行 */
+const LEAF_ROWS = 12
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
-const easeInOut = (x: number): number => x * x * (3 - 2 * x)
 
 /** 图集里的一块：像素位置与大小 */
 interface Cell {
@@ -154,9 +152,9 @@ export class StorybookView implements MapView {
   private stand?: QuadLayer
   private shadow?: QuadLayer
   private leaf?: QuadLayer
-  private curl?: Phaser.GameObjects.Graphics
   private leafKeys: { front: string; back: string; page: number } | null = null
-  private leafShadow: Quad | null = null
+  private leafShadow: Quad[] = []
+  private readonly leafRows = Array.from({ length: LEAF_ROWS + 1 }, () => leafBuffer())
   private readonly scratch = document.createElement('canvas')
   private readonly print = document.createElement('canvas')
   private lastPhase = ''
@@ -213,8 +211,7 @@ export class StorybookView implements MapView {
     this.shadow = new QuadLayer(scene, SHADOW_DEPTH, SHADOW_ALPHA)
     this.stand = new QuadLayer(scene, STAND_DEPTH)
     this.leaf = new QuadLayer(scene, LEAF_DEPTH)
-    this.curl = scene.add.graphics().setDepth(CURL_DEPTH)
-    this.visuals.push(this.spreadA, this.spreadB, this.flat, this.shadow, this.stand, this.leaf, this.curl, this.ribbon(scene, book))
+    this.visuals.push(this.spreadA, this.spreadB, this.flat, this.shadow, this.stand, this.leaf, this.ribbon(scene, book))
     const c = st.clock
     this.sheet(v, st, c.page)
     if (c.phase === 'warn' || c.phase === 'fold') this.sheet(v, st, c.page + 1)
@@ -363,7 +360,6 @@ export class StorybookView implements MapView {
     this.ground(c, cur, old)
     this.pieces(cfg, c, cur, c.phase === 'leaf' ? old : null)
     this.leafTurn(v, c, cur, old)
-    this.warnings(c)
     this.sounds(cfg, c, cur)
     this.hide(sim)
   }
@@ -405,7 +401,7 @@ export class StorybookView implements MapView {
     } else put(cur, 0)
     this.flat!.quads = flat
     this.stand!.quads = stand
-    this.shadow!.quads = this.leafShadow ? shade.concat([this.leafShadow]) : shade
+    this.shadow!.quads = this.leafShadow.length ? shade.concat(this.leafShadow) : shade
   }
 
   /** 一件布景的几块：影子、卡纸的厚边、盒子的侧面与顶面、正面 */
@@ -448,34 +444,60 @@ export class StorybookView implements MapView {
     out.push(quad(key, o.TA, o.A, o.TB, o.B, f, tw, th, grey(lit), 1))
   }
 
-  /** 翻过去的书页：前半程是旧右页的正面，过了竖直是新左页的背面；地上铺着它的影子 */
+  /**
+   * 翻过去的书页：一行行算出弯成什么样，切成小块贴上去；朝上的是旧右页的正面，翻过头朝上的是新左页的背面。
+   * 高的块后画，卷过来的自由边盖在书脊那一头上面；地上铺着它的影子
+   */
   private leafTurn(v: ViewCtx, c: BookClock, cur: Sheet, old: Sheet | null): void {
     const layer = this.leaf!
     if (c.phase !== 'leaf' || !old) {
       layer.quads = []
-      this.leafShadow = null
+      this.leafShadow = []
       this.leafKeys = null
       return
     }
     const book = this.book!
     if (!this.leafKeys || this.leafKeys.page !== cur.page.index) this.leafKeys = this.composeLeaf(v, old, cur)
-    const p = easeInOut(clamp01(c.at / c.len))
-    const th = Math.PI * p
-    const W = (book.x1 - book.gx) * UNIT
-    const gx = book.gx * UNIT
-    const y0 = book.y0 * UNIT
-    const y1 = book.y1 * UNIT
-    const ex = gx + W * Math.cos(th)
-    const lift = W * Math.sin(th) * LEAF_LIFT
-    const front = th < Math.PI / 2
-    const nx = front ? -Math.sin(th) : Math.sin(th)
-    const nz = front ? Math.cos(th) : -Math.cos(th)
-    const light = LEAF_LIGHT.min + (LEAF_LIGHT.max - LEAF_LIGHT.min) * clamp01(0.5 + 0.5 * (0.45 * -nx + 0.66 * nz) / 0.8)
-    const key = front ? this.leafKeys.front : this.leafKeys.back
-    const uv = front ? { u0: 0, uw: 1 } : { u0: 1, uw: -1 }
-    layer.quads = [{ key, x: [gx, gx, ex, ex], y: [y0, y1, y0 - lift, y1 - lift], u0: uv.u0, v0: 1, uw: uv.uw, vh: -1, color: grey(light), alpha: 1, fill: false }]
-    const sl = W * Math.sin(th) * SHADOW_PER_M * 1.4
-    this.leafShadow = { key: '__WHITE', x: [gx, gx, ex + AWAY.x * sl, ex + AWAY.x * sl], y: [y0, y1, y0 + AWAY.y * sl, y1 + AWAY.y * sl], u0: 0, v0: 0, uw: 1, vh: 1, color: SHADOW_COLOR, alpha: 1, fill: true }
+    const rows = this.leafRows
+    for (let r = 0; r <= LEAF_ROWS; r++) leafSection(c, book, r / LEAF_ROWS, rows[r]!)
+    const H = book.y1 - book.y0
+    const sx = (r: number, i: number): number => rows[r]!.x[i]! * UNIT
+    const sy = (r: number, i: number): number => (book.y0 + (H * r) / LEAF_ROWS - rows[r]!.z[i]! * LEAF_LIFT) * UNIT
+    const sl = SHADOW_PER_M * 1.4
+    const gx = (r: number, i: number): number => (rows[r]!.x[i]! + AWAY.x * rows[r]!.z[i]! * sl) * UNIT
+    const gy = (r: number, i: number): number => (book.y0 + (H * r) / LEAF_ROWS + AWAY.y * rows[r]!.z[i]! * sl) * UNIT
+    const cells: { q: Quad; z: number }[] = []
+    const shade: Quad[] = []
+    for (let r = 0; r < LEAF_ROWS; r++) {
+      for (let i = 0; i < LEAF_SEGS; i++) {
+        const phi = (rows[r]!.phi[i]! + rows[r + 1]!.phi[i]!) / 2
+        const front = Math.cos(phi) >= 0
+        const nx = front ? -Math.sin(phi) : Math.sin(phi)
+        const nz = Math.abs(Math.cos(phi))
+        const light = LEAF_LIGHT.min + (LEAF_LIGHT.max - LEAF_LIGHT.min) * clamp01(0.5 + 0.5 * (0.45 * -nx + 0.66 * nz) / 0.8)
+        const u = i / LEAF_SEGS
+        const z = rows[r]!.z[i]! + rows[r]!.z[i + 1]! + rows[r + 1]!.z[i]! + rows[r + 1]!.z[i + 1]!
+        cells.push({
+          z,
+          q: {
+            key: front ? this.leafKeys.front : this.leafKeys.back,
+            x: [sx(r, i), sx(r + 1, i), sx(r, i + 1), sx(r + 1, i + 1)],
+            y: [sy(r, i), sy(r + 1, i), sy(r, i + 1), sy(r + 1, i + 1)],
+            u0: front ? u : 1 - u,
+            v0: 1 - r / LEAF_ROWS,
+            uw: (front ? 1 : -1) / LEAF_SEGS,
+            vh: -1 / LEAF_ROWS,
+            color: grey(light),
+            alpha: 1,
+            fill: false,
+          },
+        })
+        if (z > 0.01) shade.push({ key: '__WHITE', x: [gx(r, i), gx(r + 1, i), gx(r, i + 1), gx(r + 1, i + 1)], y: [gy(r, i), gy(r + 1, i), gy(r, i + 1), gy(r + 1, i + 1)], u0: 0, v0: 0, uw: 1, vh: 1, color: SHADOW_COLOR, alpha: 1, fill: true })
+      }
+    }
+    cells.sort((a, b) => a.z - b.z)
+    layer.quads = cells.map((e) => e.q)
+    this.leafShadow = shade
   }
 
   /** 翻页开始时拼出书页的两面：正面是旧页的右半边连同平躺的布景，背面是新页的左半边连同平躺的布景 */
@@ -510,29 +532,6 @@ export class StorybookView implements MapView {
     }
     for (const k of [this.leafKeys?.front, this.leafKeys?.back]) if (k && v.scene.textures.exists(k)) v.scene.textures.remove(k)
     return { front: make(`storybook-leaf-a-${n}`, old, 1), back: make(`storybook-leaf-b-${n}`, cur, -1), page: cur.page.index }
-  }
-
-  /** 预兆：右页的下角一点点翘起来、抖着 */
-  private warnings(c: BookClock): void {
-    const g = this.curl!.clear()
-    const book = this.book!
-    if (c.phase !== 'warn') return
-    const p = clamp01(c.at / c.len)
-    const s = (0.5 + (CURL_U - 0.5) * Math.sqrt(p) + Math.sin(c.at / 70) * 0.08 * p) * UNIT
-    const x1 = book.x1 * UNIT
-    const y1 = book.y1 * UNIT
-    // 翘起来的地方露出底下一页的纸
-    g.fillStyle(0xefe2c4, 1)
-    g.fillTriangle(x1 - s, y1, x1, y1 - s, x1, y1)
-    g.fillStyle(SHADOW_COLOR, 0.28)
-    g.fillTriangle(x1 - s, y1, x1, y1 - s, x1 - s * 1.08, y1 - s * 1.08)
-    // 翻过来的页角是书页的背面
-    g.fillStyle(0xf7eedb, 1)
-    g.fillTriangle(x1 - s, y1, x1, y1 - s, x1 - s * 0.94, y1 - s * 0.94)
-    g.fillStyle(0xd9c9a6, 1)
-    g.fillTriangle(x1 - s * 0.5, y1 - s * 0.5, x1 - s * 0.97, y1 - s * 0.03, x1 - s * 0.94, y1 - s * 0.94)
-    g.lineStyle(0.03 * UNIT, 0x6b5536, 0.8)
-    g.strokeTriangle(x1 - s, y1, x1, y1 - s, x1 - s * 0.94, y1 - s * 0.94)
   }
 
   /** 每进一段响一声：预兆时哗啦一声，书页翻起来呼地一声；每件布景折平、弹起时各响一下 */

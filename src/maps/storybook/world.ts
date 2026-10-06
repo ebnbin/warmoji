@@ -12,7 +12,7 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { BASIN_CELL_U, clockAt, laid, leafEdge, makeBook, pageOf, slabOf, slabSd, standing } from './model'
+import { BASIN_CELL_U, clockAt, laid, leafBuffer, leafTouch, makeBook, pageOf, slabOf, slabSd, standing } from './model'
 import type { Basin } from '../basin'
 import type { Landmark } from '../landmark'
 import type { Book, BookClock, Page, Piece, Slab } from './model'
@@ -36,13 +36,15 @@ const GUTTER_END_U = 1.6
 const WINGS_BACK_U = 0.75
 const WINGS_END_U = 0.55
 /**
- * 翻页时被书页扬起来的身体：书页的自由边扫到它前 TOSS_LEAD 格就抛起来，腾空 TOSS_MS 毫秒、最高 TOSS_U 格，
+ * 翻页时被书页扬起来的身体：脚下的书页抬起来、或翻过来的书页压到跟前 TOSS_LEAD 格，就抛起来，腾空 TOSS_MS 毫秒、最高 TOSS_U 格，
  * 落回原地附近，顺着书页翻的方向被风带出 TOSS_DRIFT_U 格之间
  */
 const TOSS_LEAD_U = 0.5
 const TOSS_MS = 900
 const TOSS_U = 1.4
 const TOSS_DRIFT_U = [0.3, 0.9] as const
+/** 算书页截面用的草稿 */
+const LEAF_BUF = leafBuffer()
 /** 一件布景弹起来时沿底边冒几团碎纸 */
 const POP_PUFFS = 3
 
@@ -215,8 +217,7 @@ function wingsOf(s: StorybookState): Landmark[] {
  * 书页从他脚下翻过去，他落在新的一页上。敌我、掉落物一样，锚定的、霸体的也一样
  */
 function toss(sim: Sim, s: StorybookState): void {
-  const edge = leafEdge(s.clock, s.book)
-  if (edge === null) return
+  if (s.clock.phase !== 'leaf') return
   if (s.tossPage !== s.clock.page) {
     s.tossPage = s.clock.page
     s.tossed.clear()
@@ -224,12 +225,12 @@ function toss(sim: Sim, s: StorybookState): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (!Alive.v[eid]) continue
     const x = Transform.x[eid]!
-    if (edge > x / UNIT + TOSS_LEAD_U) continue
+    const y = Transform.y[eid]!
+    if (!leafTouch(s.clock, s.book, x / UNIT, y / UNIT, TOSS_LEAD_U, LEAF_BUF)) continue
     const key = `${eid}:${Uid.v[eid]}`
     if (s.tossed.has(key)) continue
     s.tossed.add(key)
     const drift = (TOSS_DRIFT_U[0] + (TOSS_DRIFT_U[1] - TOSS_DRIFT_U[0]) * sim.rng.next()) * UNIT
-    const y = Transform.y[eid]!
     displace(sim, eid, { kind: 'arc', x: x - drift, y: y + (sim.rng.next() - 0.5) * 0.4 * UNIT, ms: TOSS_MS, height: TOSS_U * UNIT }, { self: false, free: true })
   }
 }
