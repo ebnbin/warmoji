@@ -283,10 +283,10 @@ void main ()
   vec4 sn = texture2D(uSnow, tc);
   float depth = sn.r;
   vec2 q = vec2(dot(cell, uWind), dot(cell, vec2(-uWind.y, uWind.x)));
-  float n = vnoise(vec2(q.x * 0.3, q.y * 0.55) + 3.1) * 0.5 + vnoise(cell * 1.2 + 7.7) * 0.28 + vnoise(cell * 3.1 + 1.3) * 0.14 + vnoise(cell * 7.3 + 5.9) * 0.08;
+  float n = vnoise(vec2(q.x * 0.3, q.y * 0.55) + 3.1) * 0.5 + vnoise(cell * 1.2 + 7.7) * 0.28 + vnoise(cell * 3.1 + 1.3) * 0.14 + vnoise(cell * 4.4 + 5.9) * 0.08;
   n = clamp((n - 0.5) * 1.8 + 0.5, 0.02, 0.98);
   float solid = max(smoothstep(-0.03, 0.16, depth - n), smoothstep(0.9, 1.0, depth));
-  float grain = vnoise(cell * 9.0 + 2.0);
+  float grain = vnoise(cell * 3.5 + 2.0);
   float dust = smoothstep(0.0, 0.55, depth) * (0.3 + 0.4 * grain) * (1.0 - solid);
   float cover = solid + dust;
   float wet = sn.b * (1.0 - cover);
@@ -295,7 +295,7 @@ void main ()
     return;
   }
   vec3 lit = texture2D(uShine, tc).rgb;
-  float swell = vnoise(cell * 0.35 + 31.0) - 0.5 + (vnoise(cell * 9.0 + 5.0) - 0.5) * 0.3;
+  float swell = vnoise(cell * 0.35 + 31.0) - 0.5 + (vnoise(cell * 3.5 + 5.0) - 0.5) * 0.3;
   vec3 col = lit * (1.0 + 0.06 * swell) * mix(0.86, 1.0, solid);
   float lum = dot(lit, vec3(0.3, 0.5, 0.2));
   float streak = vnoise(vec2(q.x * 0.35, q.y * 2.6) + 9.0);
