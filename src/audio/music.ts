@@ -1209,6 +1209,49 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/** 神庙：多利亚调式的丛林鼓点，低音的木鼓一记记敲，三角波的木琴短促地轮着琶音，正弦的竹笛带着回声在上面吹，沙锤一刻不停地沙沙响 */
+function buildTemple(): BgmScore {
+  const chords = [0, 0, 6, 6, 3, 3, 4, 4, 0, 0, 6, 6, 3, 4, 0, 0]
+  return track(
+    {
+      bpm: 100,
+      stepsPerBeat: 4,
+      stepsPerBar: 16,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 100) * 0.75, feedback: 0.3, level: 0.22 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.15, attack: 0.004, release: 0.12, octave: -1 }
+      const marimba: Voice = { wave: 'triangle', vol: 0.06, attack: 0.002, release: 0.05, octave: 1 }
+      const pad: Voice = { wave: 'sine', vol: 0.03, attack: 0.5, release: 0.9, octave: 0 }
+      const flute: Voice = { wave: 'sine', vol: 0.1, attack: 0.05, release: 0.25, octave: 1, echo: true }
+      b.bass(bass, chords, 'r..r..o.r...f...')
+      b.arp(marimba, chords, [0, 2, 1, 3, 2, 4, 1, 2], 2)
+      b.pad(pad, chords, [0, 2])
+      b.line(flute, [
+        [2, 0, 4, 6], [2, 6, 3, 2], [2, 8, 4, 8],
+        [3, 0, 2, 12], [3, 12, 0, 4],
+        [4, 0, 3, 4], [4, 4, 4, 4], [4, 8, 6, 8],
+        [5, 0, 5, 12], [5, 12, 4, 4],
+        [6, 0, 6, 6], [6, 6, 7, 2], [6, 8, 6, 4], [6, 12, 4, 4],
+        [7, 0, 4, 16],
+        [10, 0, 7, 6], [10, 6, 6, 2], [10, 8, 7, 8],
+        [11, 0, 8, 12], [11, 12, 7, 4],
+        [12, 0, 6, 4], [12, 4, 4, 4], [12, 8, 3, 8],
+        [13, 0, 4, 12], [13, 12, 2, 4],
+        [14, 0, 1, 8], [14, 8, 2, 8],
+        [15, 0, 0, 16],
+      ])
+      b.drums('tom', 'x..x..x.x...x...', 0, 16, 0.09)
+      b.drums('kick', 'x.......x.......', 4, 16, 0.1)
+      b.drums('hat', '.o.oo.o..o.oo.o.', 0, 16, 0.02)
+      b.drums('snare', '............x...', 8, 16, 0.04)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1235,6 +1278,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  temple: buildTemple,
 }
 
 const cache = new Map<BgmId, BgmScore>()

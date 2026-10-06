@@ -212,6 +212,18 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const TEMPLE_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
+  { kind: 'snake', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'skeleton', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'chameleon', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'gargoyle', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'mushroom', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'raccoon', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'rat', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1347,5 +1359,58 @@ export const MAPS = {
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
     },
     boss: 'eclipse',
+  },
+  temple: {
+    emoji: '1f6d5',
+    name: '神庙',
+    desc: '丛林深处一座失落神庙的前庭，长满青苔的石板地被大树根拱得高低不平。一头是台阶金字塔的底座，两侧是嵌着石雕兽头的高墙，另一头是丛林。满地都是机关：地上有颜色发黑、刻着符号的压板，够分量的身体一踩就咔哒一声，片刻后它的机关发动——兽头喷出飞镖横扫一条过道，带孔的石板里弹起石刺，金字塔上的滚石顺着石槽碾过前庭，翻板翻开成陷坑。压板上的符号告诉你它管哪种机关，机关发动完要过一阵才复位。敌我通吃：把怪引上压板、引进石槽，地形就是你的武器',
+    kind: 'temple',
+    stamina: { exertion: 0.45, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(150 26% 30%)',
+      bgTo: 'hsl(168 34% 9%)',
+      map: hslToInt(24, 0.2, 0.58),
+      shadow: 0x000000,
+    },
+    // 正午的太阳从树冠的缝里照进前庭，背光面泛着丛林的绿，影子短而浓
+    light: { sun: 0xfff8ea, shade: 0xb4c4b2, shadow: { color: 0x0b1a10, alpha: 0.42, length: 0.6 } },
+    decor: {
+      emojis: ['1f33f', '1f343'],
+      sizeU: [0.26, 0.4],
+      alpha: [0.8, 0.92],
+      density: [0.004, 0.007],
+    },
+    mix: TEMPLE_MIX,
+    // 骷髅与石像鬼从神庙正门走下来，石板的裂缝里钻出来，蛇和变色龙顺着藤蔓落下来，丛林里走出来，墙头翻进来；蛛后从正门下台阶
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'door',
+      kinds: {
+        door: { name: '正门', at: { kind: 'mark' }, enter: 'walk', snapU: 6, weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'gargoyle', 'elf', 'treant'] },
+        crack: { name: '地缝', at: { kind: 'mark' }, enter: 'rise', weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'rat', 'mushroom', 'snake'] },
+        vine: { name: '藤蔓', at: { kind: 'mark' }, enter: 'drop', look: 'leaves', weight: 2, perSec: 1, only: ['snake', 'chameleon'] },
+        jungle: { name: '丛林', at: { kind: 'mark' }, enter: 'walk', look: 'leaves', snapU: 5, weight: 4, perSec: 1.5, only: ['zombie', 'chameleon', 'raccoon', 'elf', 'mushroom', 'rat', 'snake'] },
+        wall: { name: '墙头', at: { kind: 'mark' }, enter: 'climb', look: 'leaves', weight: 2, perSec: 1, only: ['gargoyle', 'skeleton', 'raccoon', 'zombie'] },
+        flags: { name: '石板', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
+      },
+    },
+    finalWaveSub: '蛛后从神庙正门爬下来了——把它引上压板、引进石槽！',
+    temple: {
+      meterPerU: 0.5,
+      court: { depthU: [23, 25], widthU: [24, 27], skewDeg: 5, jungleU: 1.4, waveU: 7, cornerU: 2.6, neckU: 0.35 },
+      shiftU: 1.5,
+      plazaU: 4.5,
+      pyramid: { tiers: 5, tierU: 2.2, tierM: 1.3, stairU: 4.6, stairOutU: 2.6, doorU: 2.2 },
+      altar: { lengthU: 2.2, widthU: 1.3, heightM: 0.85, gapU: 2.2 },
+      walls: { thickU: 1.5, heightM: 3.4, headU: 4.5, snoutU: 0.7 },
+      jungle: { crownU: [2, 3.4], heightM: [18, 28], overhangU: 1.6, roots: [2, 4], rootU: [3, 6] },
+      plate: { sizeU: 1.1, weight: 0.75 },
+      darts: { count: [2, 3], laneU: 1.6, rows: 2, perRow: 5, rowMs: 160, speedU: 16, heightM: 1.1, primeMs: 650, rearmMs: 9000, harm: { team: 7, enemy: 0.14, boss: 30 } },
+      spikes: { count: [2, 3], lengthU: [3, 4], widthU: [2.2, 2.8], heightM: 0.9, upMs: 1800, viscosity: 3, primeMs: 500, rearmMs: 7000, harm: { team: 20, enemy: 0.5, boss: 120 } },
+      boulder: { count: [1, 1], radiusU: 1.35, grooveU: 3.2, speedU: 7, pushU: 9, primeMs: 1300, rearmMs: 16000, harm: { team: 34, enemy: 1, boss: 220 } },
+      pit: { count: [1, 2], sizeU: 2.6, primeMs: 400, openMs: 4500, climbMs: 1500, bigU: 0.9, rearmMs: 12000, harm: { team: 18, enemy: 0.6, boss: 0 } },
+    },
+    boss: 'treant',
   },
 } as const satisfies Record<string, MapDef>

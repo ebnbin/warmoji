@@ -47,6 +47,7 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { templePlan } from '../src/maps/temple/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -672,6 +673,66 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 神庙：前庭放得进安全区，开局站位四周空得开；机关的个数是范围、时长与伤害说得通；压板只有队长踩得下去、跟着的队员与老鼠跳蝗太轻，
+ * 飞镖飞得过贴地爬的蛇与老鼠的头顶、扎得到标准身体，滚石碾得死小怪、比石槽窄，头目卡在陷坑口、别的身体都掉得下去；
+ * 抽一批种子真的生成一遍：机关个数在范围里，能走的地方都在安全区里，开局站位四周空着
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'temple') === (m.temple !== undefined), `maps.${id} 是神庙当且仅当写了 temple`)
+  const c = m.temple
+  if (!c) continue
+  const at = `maps.${id}.temple`
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const B = OBSTACLES.body
+  const layerM = B.heightM / B.layers
+  const ref = B.refRadiusU
+  const weight = (r: number): number => (r / ref) ** 3
+  const harm = (h: { team: number; enemy: number; boss: number }): boolean => h.team >= 0 && h.boss >= 0 && h.enemy >= 0 && h.enemy <= 1
+  const { court, pyramid: py, plate, darts, spikes, boulder, pit } = c
+  need(c.meterPerU > 0 && court.skewDeg >= 0 && court.jungleU >= 0 && court.waveU > 0 && court.cornerU > 0 && court.neckU > 0, `${at}.court 的尺度、弯曲与磨角须为正`)
+  need(range(court.depthU, false) && range(court.widthU, false) && court.depthU[0] > 0 && court.widthU[0] > 0, `${at}.court 的深与宽须为正的范围`)
+  need(c.plazaU - 0.5 >= SPAWN_CLEAR_U && c.shiftU >= 0 && c.shiftU + c.plazaU < court.depthU[0] / 2, `${at}.plazaU 须空得出出生点要的格数，开局站位挪开后仍在前庭里`)
+  need(Number.isInteger(py.tiers) && py.tiers >= 1 && py.tierU > 0 && py.tierM > 0 && py.stairU > 0 && py.stairOutU > 0 && py.doorU > 0 && py.doorU < py.stairU, `${at}.pyramid 的层数是正整数，尺寸为正，门比台阶窄`)
+  need(c.altar.lengthU > 0 && c.altar.widthU > 0 && c.altar.gapU > 0 && c.altar.heightM > 0 && c.altar.heightM < (B.layers - 0.5) * layerM, `${at}.altar 须有大小，矮过平射的子弹`)
+  need(c.walls.thickU > 0 && c.walls.heightM > B.heightM && c.walls.headU > 0 && c.walls.snoutU > 0, `${at}.walls 须有厚度、高过标准身体`)
+  need(range(c.jungle.crownU, false) && c.jungle.crownU[0] > 0 && range(c.jungle.heightM, false) && c.jungle.overhangU >= 0 && range(c.jungle.roots, true) && range(c.jungle.rootU, false), `${at}.jungle 的树与树根须是合理的范围`)
+  const lead = TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul
+  const follower = TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(plate.sizeU > 0 && weight(lead) >= plate.weight && weight(follower) < plate.weight, `${at}.plate.weight 须让队长踩得下去、跟着的队员踩不下去`)
+  for (const e of ['rat', 'locust'] as const) need(weight(ENEMIES[e].radius) < plate.weight, `${at}.plate.weight 须让 ${e} 踩不下去：玩法说明里说它太轻`)
+  need(weight(ENEMIES[m.boss].radius) >= plate.weight, `${at}.plate.weight 须让头目踩得下去`)
+  const timing = (t: { primeMs: number; rearmMs: number }): boolean => t.primeMs > 0 && t.rearmMs > 0
+  need(range(darts.count, true) && darts.count[0] >= 1 && timing(darts) && darts.laneU > plate.sizeU && Number.isInteger(darts.rows) && darts.rows >= 1 && Number.isInteger(darts.perRow) && darts.perRow >= 1 && darts.rowMs > 0 && darts.speedU > 0 && harm(darts.harm), `${at}.darts 的个数、时长、排数、速度与伤害须合理，过道放得下压板`)
+  for (const e of ['snake', 'rat'] as const) need(((ENEMIES[e].span?.[1] ?? B.layers - 1) + 1) * layerM <= darts.heightM, `${at}.darts.heightM 须高过 ${e} 的头顶：玩法说明里说它从镖底下钻过去`)
+  need(darts.heightM < B.heightM, `${at}.darts.heightM 须扎得到标准身体`)
+  need(range(spikes.count, true) && spikes.count[0] >= 1 && timing(spikes) && range(spikes.lengthU, false) && range(spikes.widthU, false) && spikes.widthU[0] > 0 && spikes.heightM > 0 && spikes.upMs > 0 && spikes.viscosity >= 1 && harm(spikes.harm), `${at}.spikes 的个数、大小、时长与伤害须合理`)
+  need(range(boulder.count, true) && boulder.count[0] >= 1 && timing(boulder) && boulder.radiusU > 0 && boulder.radiusU * 2 < boulder.grooveU && boulder.speedU > 0 && boulder.pushU > 0 && harm(boulder.harm), `${at}.boulder 的个数、时长与伤害须合理，滚石比石槽窄`)
+  need(boulder.harm.enemy >= 1, `${at}.boulder.harm.enemy 须碾得死小怪：玩法说明里说当场碾死`)
+  need(range(pit.count, true) && pit.count[0] >= 1 && timing(pit) && pit.sizeU > 0 && pit.openMs > 0 && pit.climbMs > 0 && harm(pit.harm), `${at}.pit 的个数、大小、时长与伤害须合理`)
+  need(ENEMIES[m.boss].radius >= pit.bigU, `${at}.pit.bigU 须让头目卡在坑口`)
+  need(lead < pit.bigU && m.mix.every((row) => ENEMIES[row.kind].radius < pit.bigU), `${at}.pit.bigU 须让队员与小怪都掉得下去`)
+  need(pit.sizeU > 2 * lead, `${at}.pit.sizeU 须掉得下队长`)
+  for (let s = 0; s < 16; s++) {
+    const plan = templePlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    const count = (k: string): number => plan.traps.filter((t) => t.kind === k).length
+    for (const [k, r] of [['darts', darts.count], ['spikes', spikes.count], ['boulder', boulder.count], ['pit', pit.count]] as const) need(count(k) >= r[0] && count(k) <= r[1], `${where} 的 ${k} 个数不在范围里`)
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= (c.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+    const b = plan.basin
+    let out = 0
+    for (let j = 0; j < b.rows; j++) {
+      for (let i = 0; i < b.cols; i++) {
+        if (b.room[j * b.cols + i]! <= 0) continue
+        const x = b.x0 / UNIT + (i + 0.5) * (b.cell / UNIT)
+        const y = b.y0 / UNIT + (j + 0.5) * (b.cell / UNIT)
+        if (x < SAFE_U || y < SAFE_U || x > FRAME_U - SAFE_U || y > FRAME_U - SAFE_U) out++
+      }
+    }
+    need(out === 0, `${where} 有 ${out} 格能走的地方出了安全区`)
   }
 }
 

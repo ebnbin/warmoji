@@ -1333,6 +1333,128 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/** 一次机关打中一个身体的伤害：队员挨多少点；敌人按它最大生命的比例掉，个子再大也一样；头目只挨固定的点数 */
+export interface TrapHarm {
+  readonly team: number
+  readonly enemy: number
+  readonly boss: number
+}
+/**
+ * 神庙：丛林深处一座失落神庙的前庭，能走的是石板铺的前庭，一头是台阶金字塔的底座，两侧是嵌着石雕兽头的高墙，另一头是丛林的边。
+ * 地上散着压板，压得下去的身体（够分量、脚沾着地）一踩上去就咔哒一声，片刻后触发它的机关：墙上的兽头喷出两排飞镖横扫一条过道，
+ * 一片带孔的石板里弹起石刺，金字塔上的滚石顺着斜槽滚下来、沿着地上的石槽滚过前庭，一片翻板翻开成陷坑。机关发动完要重新蓄力，复位前再踩也没用。敌我通吃。
+ * 物理量按米、秒算，一格 meterPerU 米
+ */
+export interface TempleConfig {
+  readonly meterPerU: number
+  /**
+   * 前庭：从金字塔底座量到丛林边多深、两墙之间多宽（格），整片最多斜 skewDeg 度；丛林边按噪声往前庭里外弯出最多 jungleU 格（波长 waveU），
+   * 墙脚与丛林相接的两个角被树根拱成圆角，半径 cornerU 格；窄过两倍 neckU 的缝填掉
+   */
+  readonly court: {
+    readonly depthU: readonly [number, number]
+    readonly widthU: readonly [number, number]
+    readonly skewDeg: number
+    readonly jungleU: number
+    readonly waveU: number
+    readonly cornerU: number
+    readonly neckU: number
+  }
+  /** 开局站位：前庭正中往丛林那边挪 shiftU 格；四周 plazaU 格以内不放压板、刺阵、陷坑 */
+  readonly shiftU: number
+  readonly plazaU: number
+  /** 金字塔：几层台、每层退进多少格、高多少米；正中的台阶多宽、从底座往前庭里伸出多少格（台阶底下走不进去）；顶上神殿的门多宽（格） */
+  readonly pyramid: {
+    readonly tiers: number
+    readonly tierU: number
+    readonly tierM: number
+    readonly stairU: number
+    readonly stairOutU: number
+    readonly doorU: number
+  }
+  /** 台阶脚下翻倒的祭坛：长、宽（格）、高（米），离台阶脚多远（格）；挡人，子弹从上面飞过去 */
+  readonly altar: {
+    readonly lengthU: number
+    readonly widthU: number
+    readonly heightM: number
+    readonly gapU: number
+  }
+  /** 两侧的墙：多厚（格）、多高（米）；墙面上的石雕兽头大约隔多远一个（格），兽头从墙面伸出多少格 */
+  readonly walls: {
+    readonly thickU: number
+    readonly heightM: number
+    readonly headU: number
+    readonly snoutU: number
+  }
+  /** 丛林：大树的树冠半径（格）与树高（米）；林缘的树冠最多伸进前庭多少格；拱进前庭的大树根有几条、多长（格） */
+  readonly jungle: {
+    readonly crownU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly overhangU: number
+    readonly roots: readonly [number, number]
+    readonly rootU: readonly [number, number]
+  }
+  /** 压板：多大见方（格）；压得下去要标准身体的几成分量，分量按半径的三次方折算；队长换人时新队长身子变大，跟着的队员个子小 */
+  readonly plate: {
+    readonly sizeU: number
+    readonly weight: number
+  }
+  /**
+   * 飞镖：几处；兽头的嘴对着的过道多宽（格）；一次喷几排、每排几支、排与排隔多久（毫秒），飞多快（格/秒），飞在离地多高（米），每支镖钉住它碰上的第一个身体；
+   * 踩下到喷出多久，喷完到复位多久（毫秒）
+   */
+  readonly darts: {
+    readonly count: readonly [number, number]
+    readonly laneU: number
+    readonly rows: number
+    readonly perRow: number
+    readonly rowMs: number
+    readonly speedU: number
+    readonly heightM: number
+    readonly primeMs: number
+    readonly rearmMs: number
+    readonly harm: TrapHarm
+  }
+  /** 石刺：几片，每片带孔的石板顺着前庭多长、横着多宽（格）；石刺弹起多高（米）、立多久；立着时石刺间难走，慢到 1/viscosity；踩下到弹起、收回到复位多久 */
+  readonly spikes: {
+    readonly count: readonly [number, number]
+    readonly lengthU: readonly [number, number]
+    readonly widthU: readonly [number, number]
+    readonly heightM: number
+    readonly upMs: number
+    readonly viscosity: number
+    readonly primeMs: number
+    readonly rearmMs: number
+    readonly harm: TrapHarm
+  }
+  /**
+   * 滚石：几条石槽；滚石的半径（格）、石槽多宽（格）、滚多快（格/秒）；碾到的身体被挤出槽外，横着的速度 pushU 格/秒；
+   * 踩下到滚出、滚完到下一块滚石架好多久
+   */
+  readonly boulder: {
+    readonly count: readonly [number, number]
+    readonly radiusU: number
+    readonly grooveU: number
+    readonly speedU: number
+    readonly pushU: number
+    readonly primeMs: number
+    readonly rearmMs: number
+    readonly harm: TrapHarm
+  }
+  /**
+   * 陷坑：几处；翻板多大见方（格）；踩下到翻开、翻开多久再合上；掉下去的身体多久从坑边爬上来；半径不小于 bigU 格的身体卡在坑口掉不下去；合上到复位多久
+   */
+  readonly pit: {
+    readonly count: readonly [number, number]
+    readonly sizeU: number
+    readonly primeMs: number
+    readonly openMs: number
+    readonly climbMs: number
+    readonly bigU: number
+    readonly rearmMs: number
+    readonly harm: TrapHarm
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1407,7 +1529,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'temple'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,13 +1563,14 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly temple?: TempleConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown' | 'dart' | 'spike' | 'boulder' | 'pit'
 
 export interface DecorInstance {
   emoji: string
