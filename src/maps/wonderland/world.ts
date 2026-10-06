@@ -67,6 +67,8 @@ export interface Sizing {
   lo: number
   hi: number
   squeeze: boolean
+  /** 正被挤出去时，新个子能站的地面：挤的这一阵只许往它里面走 */
+  into: Basin | null
 }
 
 /** 给画面的一件事：谁在哪吃了什么、变成了什么体型 */
@@ -165,11 +167,16 @@ function reachOf(lo: number, hi: number, phase: boolean): Reach {
   return { clearM: overOf(lo, hi) * LAYER_M, topM: (hi + 1) * LAYER_M, phase }
 }
 
-/** 这个身体此刻的过法：按身段，穿墙的只受草坪边挡；正被挤出去的也只受草坪边挡 */
+/** 正被挤出去的身体：新个子能站的地面，没在挤就是 null */
+function squeezeOf(sim: Sim, eid: number): Basin | null {
+  const z = wonderOf(sim).sizes.get(eid)
+  return z && z.uid === Uid.v[eid] && z.squeeze ? z.into : null
+}
+
+/** 这个身体此刻的过法：按身段，穿墙的只受草坪边挡 */
 function passageOf(sim: Sim, eid: number): Passage {
   const s = wonderOf(sim)
-  const squeezing = s.sizes.get(eid)?.squeeze === true && s.sizes.get(eid)!.uid === Uid.v[eid]
-  const phase = squeezing || phases(sim.world, eid, 'hedge')
+  const phase = phases(sim.world, eid, 'hedge')
   const p = passage(s.field, hasComponent(sim.world, eid, Span) ? reachOf(Span.lo[eid]!, Span.hi[eid]!, phase) : reachOf(0, 2, phase))
   p.usedAt = sim.elapsedMs
   return p
@@ -199,7 +206,7 @@ function openNear(sim: Sim, p: Point, room: number): Point {
 function sizingOf(s: WonderState, eid: number): Sizing {
   let z = s.sizes.get(eid)
   if (!z || z.uid !== Uid.v[eid]) {
-    z = { uid: Uid.v[eid]!, want: 0, now: 0, until: 0, lo0: Span.lo[eid]!, hi0: Span.hi[eid]!, mass0: Phys.mass[eid]!, lo: Span.lo[eid]!, hi: Span.hi[eid]!, squeeze: false }
+    z = { uid: Uid.v[eid]!, want: 0, now: 0, until: 0, lo0: Span.lo[eid]!, hi0: Span.hi[eid]!, mass0: Phys.mass[eid]!, lo: Span.lo[eid]!, hi: Span.hi[eid]!, squeeze: false, into: null }
     s.sizes.set(eid, z)
   }
   return z
@@ -231,6 +238,7 @@ function applySize(sim: Sim, cfg: WonderlandConfig, eid: number, z: Sizing, to: 
   foldBody(sim.world, sim, eid)
   z.now = to
   z.squeeze = false
+  z.into = null
   emit(wonderOf(sim), { kind: 'size', eid, x: Transform.x[eid]!, y: Transform.y[eid]!, treat: null, size: to })
 }
 
@@ -287,6 +295,7 @@ function stepSizes(sim: Sim, cfg: WonderlandConfig, dt: number): void {
       continue
     }
     z.squeeze = true
+    z.into = f.basin
     const n = awayFromWall(f.basin, Transform.x[eid]!, Transform.y[eid]!)
     Transform.x[eid] = Transform.x[eid]! + n.x * SQUEEZE_U * UNIT * dt
     Transform.y[eid] = Transform.y[eid]! + n.y * SQUEEZE_U * UNIT * dt
@@ -373,8 +382,12 @@ export function serveCountdown(sim: Sim): { leftMs: number; intervalMs: number }
  */
 export const wonderland: WorldHooks = {
   ...bounded,
-  constrainBody(sim, eid, _from, next) {
-    return keepOut(passageOf(sim, eid).basin, next.x, next.y, Radius.v[eid]!)
+  /** 正被挤出去的身体只受草坪边挡，但只许往新个子站得下的地方挪，不许往里钻 */
+  constrainBody(sim, eid, from, next) {
+    const into = squeezeOf(sim, eid)
+    if (!into) return keepOut(passageOf(sim, eid).basin, next.x, next.y, Radius.v[eid]!)
+    const p = keepOut(wonderOf(sim).field.lawn, next.x, next.y, Radius.v[eid]!)
+    return roomAt(into, p.x, p.y) >= roomAt(into, from.x, from.y) ? p : from
   },
   basin(sim) {
     return normalBasin(sim)
