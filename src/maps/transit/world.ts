@@ -37,8 +37,10 @@ const TRAIN_TINT = 0xffc857
 const SKIRT_U = 0.4
 /** 开门的列车在门开到几成以上才往车厢里出怪 */
 const SPILL_DOORS = 0.6
-/** 车身挤开身体后身体贴着车身外这么近（格）以内也算撞上：挤开在撞车之前结算，这一帧车身扫过的那一段都算 */
-const CONTACT_U = 0.2
+/** 撞车按这一帧车身扫过的那一段算：横过轨道离车身侧面这么近（格）以内都算撞上，挤开在撞车之前结算 */
+const CONTACT_U = 0.05
+/** 停着的车关门时把车厢里的身体挤到车外再远这么多（格）：比撞车的余量远，车开走时不算撞上 */
+const CLEAR_U = 0.12
 /** 能走的地面上的格子边长：只围站厅、不算设施的那张距离场 */
 const HALL_CELL_U = 0.25
 
@@ -180,7 +182,7 @@ function clearTrains(trains: readonly (TrainNow | null)[], l: { u: number; v: nu
       if (hullSd(tr, l.u, l.v) >= r) continue
       const tv = tr.track.v
       const side = Math.sign(fromV - tv) || Math.sign(l.v - tv) || 1
-      l.v = tv + side * (tr.shape.spec.widthU / 2 + r + 0.01)
+      l.v = tv + side * (tr.shape.spec.widthU / 2 + r + (tr.speed > 0 ? 0.01 : CLEAR_U))
       continue
     }
     for (let k = 0; k < 4; k++) {
@@ -360,7 +362,7 @@ function ram(sim: Sim, s: TransitState, cfg: TransitConfig): void {
       if (!Alive.v[b] || inTransit(b) || Motion.kind[b] === MOTION.arc || phases(sim.world, b, 'train')) continue
       const l = local(s.plan, Transform.x[b]!, Transform.y[b]!)
       const r = Radius.v[b]! / UNIT
-      if (hullSd(tr, l.u, l.v) >= r + CONTACT_U && (Math.abs(l.v - tv) > spec.widthU / 2 + r + CONTACT_U || l.u < lo - r || l.u > hi + r)) continue
+      if (Math.abs(l.v - tv) > spec.widthU / 2 + r + CONTACT_U || l.u < lo - r || l.u > hi + r) continue
       const key = Uid.v[b]!
       const last = s.hits.get(key)
       if (last && last.track === tr.track.index && now - last.at < h.immuneMs) continue
