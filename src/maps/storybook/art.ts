@@ -321,7 +321,7 @@ const drawLog: Draw = (ctx, W, H, rng) => {
 
 /** 带山墙的一座小房子的正面：墙、门、窗，山墙尖顶着上沿 */
 function house(ctx: Ctx, W: number, H: number, rng: Rng, wall: Inked, roof: Inked, logs: boolean): void {
-  const eave = H * 0.42
+  const eave = H * (1 - EAVE)
   const tri: Pt[] = [[-1, eave + 4], [W / 2, 3], [W + 1, eave + 4]]
   ink(ctx, rect(4, eave, W - 8, H - eave), wall, W, H)
   if (logs) {
@@ -543,21 +543,30 @@ const drawTopiary: Draw = (ctx, W, H, rng) => {
   }), 1, INK.pineLo)
 }
 
-/** 一块嶙峋的岩石：几处折角，石缝，排线 */
+/** 一块嶙峋的岩柱：顶上高低不平，两侧往下微微张开，一层层的岩层，脚下压暗 */
 function rock(ctx: Ctx, H: number, rng: Rng, x0: number, w: number, top: number, fill: string, lo: string): void {
-  const n = 9
-  const pts: Pt[] = [[x0 + w * 0.02, H]]
-  for (let i = 1; i < n; i++) {
-    const t = i / n
-    const bulge = Math.sin(t * Math.PI)
-    pts.push([x0 + w * t + (rng.next() - 0.5) * w * 0.06, H - (H - top) * bulge * (0.75 + 0.25 * rng.next())])
-  }
-  pts.push([x0 + w * 0.98, H])
+  const pts: Pt[] = [[x0, H], [x0 + w * 0.04, H * 0.62], [x0 + w * 0.1, top + (H - top) * 0.28]]
+  const n = 6
+  for (let i = 0; i <= n; i++) pts.push([x0 + w * (0.14 + (0.72 * i) / n), top + (H - top) * (0.02 + 0.2 * rng.next())])
+  pts.push([x0 + w * 0.92, top + (H - top) * 0.32], [x0 + w * 0.97, H * 0.7], [x0 + w, H])
   ink(ctx, poly(pts), { fill, hi: '#b9adb4', lo, line: LW }, w, H - top)
+  ctx.save()
+  ctx.beginPath()
+  poly(pts)(ctx)
+  ctx.clip()
+  const layers: Pt[][] = []
+  for (let k = 1; k < 5; k++) {
+    const y = top + ((H - top) * k) / 5
+    layers.push(Array.from({ length: 7 }, (_, i) => [x0 + (w * i) / 6, y + (rng.next() - 0.5) * (H - top) * 0.06] as Pt))
+  }
+  strokes(ctx, layers, 1.1, lo)
+  ctx.fillStyle = dots(ctx, lo, 0.45)
+  ctx.fillRect(x0, H - (H - top) * 0.18, w, H)
+  ctx.restore()
   strokes(ctx, Array.from({ length: 3 }, () => {
     const x = x0 + w * (0.2 + 0.6 * rng.next())
-    const y = top + (H - top) * (0.3 + 0.5 * rng.next())
-    return [[x, y], [x + w * 0.05, y + (H - top) * 0.1], [x + w * 0.02, y + (H - top) * 0.2]] as Pt[]
+    const y = top + (H - top) * (0.25 + 0.4 * rng.next())
+    return [[x, y], [x + w * 0.04, y + (H - top) * 0.12], [x + w * 0.01, y + (H - top) * 0.24]] as Pt[]
   }), 1.4)
 }
 
@@ -742,6 +751,14 @@ const ROOF: Partial<Record<PieceKind, (ctx: Ctx, W: number, H: number, rng: Rng)
       ctx.stroke()
     }
   },
+}
+
+/** 带山墙的房子：檐口在正面高的这么多处，顶面画成从檐口坡到屋脊的两片屋顶 */
+export const EAVE = 0.58
+
+/** 这一种是带山墙的房子 */
+export function gabled(kind: PieceKind): boolean {
+  return kind === 'hut' || kind === 'cottage'
 }
 
 /** 一张布景的正面画多大，像素：宽是底边长，高是立起来时画面上的高 */

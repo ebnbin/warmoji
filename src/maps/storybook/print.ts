@@ -18,7 +18,7 @@ const PALETTE: Record<ChapterKey, { readonly line: string; readonly wash: string
   forest: { line: '#2f3a26', wash: '#dfe8c2', deep: '#9fbf78', accent: '#c8553d' },
   mill: { line: '#4a3420', wash: '#efe2b4', deep: '#cdb066', accent: '#3d6fb0' },
   castle: { line: '#2c2c4a', wash: '#dfe3c8', deep: '#a8b9d8', accent: '#b8333a' },
-  lair: { line: '#2e2430', wash: '#ded3d2', deep: '#a99aa6', accent: '#d9a62e' },
+  lair: { line: '#33223a', wash: '#e4d3df', deep: '#bfa0c4', accent: '#d9a62e' },
 }
 
 const TILES = new Map<string, HTMLCanvasElement>()
@@ -282,7 +282,6 @@ const mill: Painter = (ctx, w, h, _gx, rng) => {
 
 const castle: Painter = (ctx, w, h, gx, rng) => {
   const P = PALETTE.castle
-  for (let i = 0; i < 10; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 2 + rng.next() * 3, 2 + rng.next() * 2), '#cddca8', { alpha: 0.6 })
   // 护城河：沿上页边横过两页
   const moat = meander(rng, [-1, 1.6], [w + 1, 1.6], 8, 0.25)
   band(ctx, moat, 1.2, '#9fc6dc', '#2d5a74', { shade: '#4d88ad' })
@@ -297,18 +296,30 @@ const castle: Painter = (ctx, w, h, gx, rng) => {
     ctx.strokeRect(u - 0.7, 0.8, 1.4, 1.6)
     for (let k = 1; k < 5; k++) line(ctx, [[u - 0.7, 0.8 + k * 0.32], [u + 0.7, 0.8 + k * 0.32]], '#8a5a35', 0.04, [], false)
   }
-  // 庭院：卵石铺地的一大片
-  const cx0 = 2.5
-  const cy0 = 4
+  // 修剪过的草坪：深浅相间的条纹
   ctx.save()
   ctx.beginPath()
-  ctx.roundRect(cx0, cy0, w - cx0 * 2, h - cy0 - 2.2, 2)
+  ctx.rect(0, 2.4, w, h)
+  ctx.clip()
+  for (let x = 0; x < w; x += 1.4) {
+    ctx.fillStyle = Math.round(x / 1.4) % 2 === 0 ? 'rgba(150,186,104,0.35)' : 'rgba(205,224,160,0.35)'
+    ctx.fillRect(x, 2.4, 1.4, h)
+  }
+  ctx.restore()
+  // 庭院：书脊两边一片卵石铺的广场
+  const pw = w * (0.42 + 0.12 * rng.next())
+  const ph = h * (0.4 + 0.12 * rng.next())
+  const px0 = gx - pw / 2
+  const py0 = h * 0.5 - ph / 2 + 0.8
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(px0, py0, pw, ph, 2.2)
   ctx.fillStyle = '#ddd6e2'
   ctx.fill()
   ctx.clip()
-  for (let y = cy0; y < h; y += 0.42) {
+  for (let y = py0; y < py0 + ph; y += 0.42) {
     const off = (Math.floor(y / 0.42) % 2) * 0.3
-    for (let x = cx0 + off; x < w; x += 0.6) {
+    for (let x = px0 + off; x < px0 + pw; x += 0.6) {
       ctx.beginPath()
       ctx.roundRect(x + 0.04, y + 0.04, 0.52 + (rng.next() - 0.5) * 0.1, 0.34, 0.12)
       ctx.strokeStyle = '#a69fb6'
@@ -316,25 +327,48 @@ const castle: Painter = (ctx, w, h, gx, rng) => {
       ctx.stroke()
     }
   }
+  ctx.fillStyle = dots(ctx, '#8d85a3', 0.2)
+  ctx.fillRect(px0 + pw * 0.55, py0, pw, ph)
   ctx.restore()
   ctx.beginPath()
-  ctx.roundRect(cx0, cy0, w - cx0 * 2, h - cy0 - 2.2, 2)
-  ctx.lineWidth = 0.06
+  ctx.roundRect(px0, py0, pw, ph, 2.2)
+  ctx.lineWidth = 0.07
   ctx.strokeStyle = P.line
   ctx.stroke()
+  // 花坛：广场四周几块方方正正的，绿篱镶边，里面开满花
+  for (let i = 0; i < 6; i++) {
+    const bw = 2.2 + rng.next() * 1.6
+    const bh = 1.4 + rng.next() * 1
+    const left = i % 2 === 0
+    const bx = left ? 1.6 + rng.next() * (px0 - bw - 2.4) : px0 + pw + 0.8 + rng.next() * Math.max(0, w - px0 - pw - bw - 2.4)
+    const by = 4.2 + rng.next() * (h - bh - 5.6)
+    ctx.save()
+    ctx.translate(0.035, 0.025)
+    ctx.beginPath()
+    ctx.roundRect(bx, by, bw, bh, 0.3)
+    ctx.fillStyle = '#7fa65a'
+    ctx.fill()
+    ctx.restore()
+    ctx.beginPath()
+    ctx.roundRect(bx, by, bw, bh, 0.3)
+    ctx.lineWidth = 0.05
+    ctx.strokeStyle = P.line
+    ctx.stroke()
+    for (let k = 0; k < bw * bh * 5; k++) flower(ctx, bx + 0.25 + rng.next() * (bw - 0.5), by + 0.25 + rng.next() * (bh - 0.5), 0.06, [P.accent, '#ffffff', INK.gold, '#e98aa6'][Math.floor(rng.next() * 4)]!)
+  }
   // 红毯：从下页边铺进来，金边
-  const cu = gx + (rng.next() < 0.5 ? -1 : 1) * (4 + rng.next() * 6)
+  const cu = gx + (rng.next() < 0.5 ? -1 : 1) * (2.5 + rng.next() * 2.5)
   ctx.save()
   ctx.translate(0.035, 0.025)
   ctx.fillStyle = P.accent
-  ctx.fillRect(cu - 0.8, h * 0.35, 1.6, h)
+  ctx.fillRect(cu - 0.8, py0 + ph - 0.4, 1.6, h)
   ctx.restore()
   ctx.fillStyle = dots(ctx, '#7a1c24', 0.3)
-  ctx.fillRect(cu + 0.2, h * 0.35, 0.6, h)
-  for (const s of [-0.8, 0.8]) line(ctx, [[cu + s, h * 0.35], [cu + s, h + 1]], INK.gold, 0.12, [], false)
+  ctx.fillRect(cu + 0.2, py0 + ph - 0.4, 0.6, h)
+  for (const s of [-0.8, 0.8]) line(ctx, [[cu + s, py0 + ph - 0.4], [cu + s, h + 1]], INK.gold, 0.12, [], false)
   // 喷泉
-  const fx = gx + (cu < gx ? 1 : -1) * (5 + rng.next() * 5)
-  const fy = h * (0.45 + 0.2 * rng.next())
+  const fx = gx + (cu < gx ? 1 : -1) * pw * 0.28
+  const fy = py0 + ph * 0.5
   patch(ctx, blob(rng, fx, fy, 1.5, 1.5, 12, 0.02), '#cfc7d9', { line: P.line, lw: 0.06 })
   patch(ctx, blob(rng, fx, fy, 1.1, 1.1, 12, 0.02), '#9fc6dc', { shade: '#4d88ad', line: P.line, lw: 0.05 })
   for (const r of [0.35, 0.65]) {
@@ -366,8 +400,8 @@ const castle: Painter = (ctx, w, h, gx, rng) => {
 
 const lair: Painter = (ctx, w, h, _gx, rng) => {
   const P = PALETTE.lair
-  for (let i = 0; i < 16; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 1.5 + rng.next() * 3.5, 1.2 + rng.next() * 2.4, 7, 0.3), P.deep, { alpha: 0.55, shade: '#6e5f6c', cover: 0.25, line: P.line, lw: 0.04 })
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 9; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 2.2 + rng.next() * 3.5, 1.6 + rng.next() * 2.4, 7, 0.3), P.deep, { alpha: 0.6, shade: '#7d5f86', cover: 0.22 })
+  for (let i = 0; i < 7; i++) {
     let x = rng.next() * w
     let y = rng.next() * h
     const pts: Pt[] = [[x, y]]
@@ -426,10 +460,16 @@ const lair: Painter = (ctx, w, h, _gx, rng) => {
     ctx.fillStyle = '#6fe6d0'
     ctx.fill()
   })
-  scatter(rng, 5, w, h, (x, y) => {
+  // 墙上漏下来的几点闪光：四角的小星
+  scatter(rng, 26, w, h, (x, y) => {
+    const r = 0.12 + rng.next() * 0.1
     ctx.beginPath()
-    ctx.ellipse(x, y, 1.2, 0.8, rng.next(), 0, 6.28)
-    ctx.fillStyle = dots(ctx, '#3a2c2c', 0.45)
+    ctx.moveTo(x, y - r * 2)
+    ctx.quadraticCurveTo(x, y, x + r * 2, y)
+    ctx.quadraticCurveTo(x, y, x, y + r * 2)
+    ctx.quadraticCurveTo(x, y, x - r * 2, y)
+    ctx.quadraticCurveTo(x, y, x, y - r * 2)
+    ctx.fillStyle = rng.next() < 0.5 ? '#f1d36b' : '#ffffff'
     ctx.fill()
   })
 }
@@ -461,28 +501,33 @@ function frame(ctx: Ctx, x0: number, x1: number, h: number, color: string): void
 /** 左页左上角印着章名与几行故事，字底下的插画淡开；两页下角印页码 */
 function words(ctx: Ctx, page: Page, w: number, h: number, color: string): void {
   const ch = CHAPTERS[page.chapter]!
+  const k = PRINT_PPU
   const x = 1.5
-  const y = 1.6
-  const g = ctx.createRadialGradient(x + 3.6, y + 1.8, 0.5, x + 3.6, y + 1.8, 5.2)
-  g.addColorStop(0, 'rgba(255,255,255,0.92)')
-  g.addColorStop(0.6, 'rgba(255,255,255,0.75)')
+  const y = 1.5
+  // 字底下的插画淡开：一团柔边的白
+  const g = ctx.createRadialGradient(x + 3.4, y + 1.7, 0.3, x + 3.4, y + 1.7, 5)
+  g.addColorStop(0, 'rgba(255,255,255,0.95)')
+  g.addColorStop(0.55, 'rgba(255,255,255,0.8)')
   g.addColorStop(1, 'rgba(255,255,255,0)')
   ctx.fillStyle = g
-  ctx.fillRect(0, 0, x + 9, y + 5.5)
+  ctx.beginPath()
+  ctx.ellipse(x + 3.4, y + 1.7, 5, 3.4, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.fillStyle = color
   ctx.textBaseline = 'top'
-  ctx.font = `0.42px ${SERIF}`
-  ctx.fillText(`第${ch.num}章`, x, y)
-  ctx.font = `bold 0.82px ${SERIF}`
-  ctx.fillText(ch.name, x, y + 0.55)
-  ctx.font = `0.36px ${SERIF}`
-  ch.text.forEach((t, i) => ctx.fillText(t, x, y + 1.65 + i * 0.52))
-  ctx.font = `0.36px ${SERIF}`
   ctx.textAlign = 'left'
-  ctx.fillText(`· ${page.number} ·`, 1.2, h - 0.62)
+  ctx.font = `${Math.round(0.42 * k)}px ${SERIF}`
+  ctx.fillText(`第${ch.num}章`, x * k, y * k)
+  ctx.font = `bold ${Math.round(0.82 * k)}px ${SERIF}`
+  ctx.fillText(ch.name, x * k, (y + 0.55) * k)
+  ctx.font = `${Math.round(0.36 * k)}px ${SERIF}`
+  ch.text.forEach((t, i) => ctx.fillText(t, x * k, (y + 1.65 + i * 0.5) * k))
+  ctx.fillText(`· ${page.number} ·`, 1.2 * k, (h - 0.66) * k)
   ctx.textAlign = 'right'
-  ctx.fillText(`· ${page.number + 1} ·`, w - 1.2, h - 0.62)
-  ctx.textAlign = 'left'
+  ctx.fillText(`· ${page.number + 1} ·`, (w - 1.2) * k, (h - 0.66) * k)
+  ctx.restore()
 }
 
 /**
@@ -505,7 +550,7 @@ export function paintPrint(page: Page, book: Book, canvas: HTMLCanvasElement): v
   const rng = new Rng(page.seed ^ 0x9a1e7)
   PAINTERS[key](ctx, w, h, book.gx - book.x0, rng)
   const gx = book.gx - book.x0
-  frame(ctx, 0, gx, h, P.line)
-  frame(ctx, gx, w, h, P.line)
+  frame(ctx, 0, w, h, P.line)
+  void gx
   words(ctx, page, w, h, P.line)
 }

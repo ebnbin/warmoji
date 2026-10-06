@@ -96,9 +96,9 @@ function desk(sc: PaintScene, x: number, y: number): Rgb {
   const v = (y - row * plank) / plank
   const shift = valueNoise(row * 3.1, 0.5, sc.seed) * 40
   const gx = x + shift
-  const warp = fbm(gx * 0.08, y * 0.6, sc.seed + 11, 3)
-  const grain = 0.5 + 0.5 * Math.sin((y * 9 + warp * 14 + fbm(gx * 0.5, y * 3, sc.seed + 3, 2) * 3) * 1.3)
-  const fine = fbm(gx * 2.5, y * 22, sc.seed + 5, 2)
+  const warp = fbm(gx * 0.08, y * 0.6, sc.seed + 11, 2)
+  const grain = 0.5 + 0.5 * Math.sin((y * 9 + warp * 14 + valueNoise(gx * 0.5, y * 3, sc.seed + 3) * 3) * 1.3)
+  const fine = valueNoise(gx * 2.5, y * 22, sc.seed + 5)
   const tone = 0.32 + 0.28 * valueNoise(row * 7.7, 1.3, sc.seed + 1) + 0.22 * grain + 0.18 * fine
   let c = lerp3(WOOD_LO, WOOD_HI, clamp01(tone))
   const seam = Math.min(v, 1 - v) * plank
@@ -126,9 +126,9 @@ function lamp(sc: PaintScene, x: number, y: number): number {
 function paper(sc: PaintScene, x: number, y: number): Rgb {
   const edge = pageRoom(sc.x0, sc.x1, sc.y0, sc.y1, x, y)
   const outer = Math.min(Math.abs(x - (x < sc.gx ? sc.x0 : sc.x1)), y - sc.y0, sc.y1 - y)
-  const age = (1 - smooth(0, 2.4, outer)) * 0.55 + fbm(x * 0.3, y * 0.3, sc.seed + 21, 3) * 0.25
+  const age = (1 - smooth(0, 2.4, outer)) * 0.55 + fbm(x * 0.3, y * 0.3, sc.seed + 21, 2) * 0.25
   let c = lerp3(PAPER, PAPER_OLD, clamp01(age * 0.6))
-  const fox = fbm(x * 1.7, y * 1.7, sc.seed + 31, 3)
+  const fox = fbm(x * 1.7, y * 1.7, sc.seed + 31, 2)
   c = lerp3(c, FOX, smooth(0.74, 0.86, fox) * 0.25 * (1 - smooth(0, 6, outer)))
   const fiber = fbm(x * 9, y * 2.2, sc.seed + 41, 2) - 0.5
   const grain = valueNoise(x * 30, y * 30, sc.seed + 51) - 0.5

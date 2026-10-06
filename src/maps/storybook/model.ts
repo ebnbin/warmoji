@@ -203,10 +203,10 @@ const GROVE = S('grove', [3.6, 5.4], 0, [3.2, 3.7], 0.35)
 const BUSH = S('bush', [1.8, 3.4], 0, 'low', 0.5)
 const LOG = S('log', [2, 2.6], 0, 'low', 0.5)
 const HUT = S('hut', [2.3, 2.7], 1.6, [2.6, 2.9], 0.15)
-const WINDMILL = S('windmill', [1.8, 1.9], 1.8, [4.3, 4.6], 0.08)
+const WINDMILL = S('windmill', [2, 2.3], 0, [4.3, 4.6], 0.15)
 const COTTAGE = S('cottage', [2.2, 2.9], 1.6, [2.8, 3.1], 0.15)
 const FENCE = S('fence', [3, 5.2], 0, 'low', 0.3)
-const HAYSTACK = S('haystack', [1.3, 1.6], 1.1, 'low', 0.2)
+const HAYSTACK = S('haystack', [1.4, 1.8], 0, 'low', 0.3)
 const WELL = S('well', [1.1, 1.2], 1.1, 'low', 0.1)
 const WALL = S('wall', [4, 6.4], 0, [2.7, 3], 0.12)
 const TOWER = S('tower', [1.7, 1.8], 1.7, [3.9, 4.3], 0)
@@ -215,7 +215,7 @@ const TOPIARY = S('topiary', [1.6, 3], 0, 'low', 0.3)
 const PILLAR = S('pillar', [1.6, 2.6], 0, [2.8, 3.4], 0.4)
 const SPIRE = S('spire', [0.9, 1.3], 0, [2.7, 3.2], 0.3)
 const CRYSTAL = S('crystal', [1.2, 1.6], 0, [2.4, 2.8], 0.35)
-const HOARD = S('hoard', [1.8, 2.4], 1.1, 'low', 0.2)
+const HOARD = S('hoard', [1.8, 2.6], 0, 'low', 0.3)
 const DRAGON = S('dragon', [6.2, 7], 0, [3.1, 3.4], 0.15)
 
 /** 一章怎么摆：先摆的是大件，每一项是几件、可能的样子；组里的几件拼在一起 */
@@ -225,30 +225,31 @@ const LAYOUTS: Record<ChapterKey, readonly Item[]> = {
   forest: [
     { n: [2, 3], specs: [GROVE] },
     { n: [0, 1], specs: [HUT] },
-    { n: [3, 5], specs: [TREE, TREE, PINE] },
-    { n: [3, 4], specs: [BUSH] },
-    { n: [0, 1], specs: [LOG] },
+    { n: [4, 6], specs: [TREE, TREE, PINE] },
+    { n: [4, 5], specs: [BUSH] },
+    { n: [1, 2], specs: [LOG] },
   ],
   mill: [
     { n: [1, 1], specs: [WINDMILL] },
     { n: [2, 3], specs: [COTTAGE] },
     { n: [1, 2], specs: [FENCE], combo: 'corner' },
-    { n: [1, 2], specs: [FENCE] },
+    { n: [2, 3], specs: [FENCE] },
     { n: [2, 3], specs: [HAYSTACK] },
     { n: [0, 1], specs: [WELL] },
-    { n: [0, 2], specs: [TREE] },
+    { n: [1, 3], specs: [TREE] },
   ],
   castle: [
     { n: [2, 3], specs: [WALL], combo: 'walled' },
     { n: [0, 1], specs: [KEEP] },
-    { n: [3, 5], specs: [TOPIARY] },
-    { n: [0, 2], specs: [TOWER] },
+    { n: [1, 2], specs: [WALL] },
+    { n: [4, 6], specs: [TOPIARY] },
+    { n: [1, 2], specs: [TOWER] },
   ],
   lair: [
     { n: [1, 1], specs: [DRAGON] },
-    { n: [3, 4], specs: [PILLAR] },
-    { n: [2, 3], specs: [SPIRE, CRYSTAL] },
-    { n: [2, 3], specs: [HOARD] },
+    { n: [4, 5], specs: [PILLAR] },
+    { n: [3, 4], specs: [SPIRE, CRYSTAL] },
+    { n: [3, 4], specs: [HOARD] },
   ],
 }
 

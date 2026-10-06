@@ -9,7 +9,7 @@ import { Alive, Depth, ENEMY_SET, Transform } from '../../ecs/components'
 import { LYING_Z, UNDER_Z } from '../../ecs/render/bands'
 import { canvasTexture } from '../textures'
 import { FRAME, FRAME_MID } from '../frame'
-import { drawFace, drawRoof, drawSails, faceSize, FLAT_U_PER_M, roofSize, STAND_U_PER_M } from './art'
+import { drawFace, drawRoof, drawSails, EAVE, faceSize, FLAT_U_PER_M, gabled, roofSize, STAND_U_PER_M } from './art'
 import { textureSize } from './backdrop'
 import { canvasUv, QuadLayer } from './layer'
 import { laid } from './model'
@@ -57,7 +57,7 @@ const ATLAS_GAP = 4
 const SAIL_SPIN = 0.7
 const SAIL_R = 0.95
 /** 页角翘起来最大多少格 */
-const CURL_U = 2.4
+const CURL_U = 3.2
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const easeInOut = (x: number): number => x * x * (3 - 2 * x)
@@ -413,7 +413,16 @@ export class StorybookView implements MapView {
     }
     // 迎着灯的面亮：立着的正面朝外偏一点就暗一点，平躺着最亮
     const lit = 0.84 + 0.16 * (1 - cos) + 0.05 * Math.max(0, -o.fx)
-    if (p.box) {
+    if (p.box && gabled(p.kind)) {
+      // 山墙房子：两片屋顶从前后檐口坡到进深正中的屋脊
+      const r = sh.roofs[i]!
+      const at = (q: Point, k: number, depth: number): Point => ({ x: q.x - o.fx * (o.back * k + depth), y: q.y - o.fy * (o.back * k + depth) - o.up * k })
+      const half = (p.d * UNIT) / 2
+      const ra = at(o.A, 1, half)
+      const rb = at(o.B, 1, half)
+      out.push(quad(key, at(o.A, EAVE, p.d * UNIT), ra, at(o.B, EAVE, p.d * UNIT), rb, r, tw, th, grey(0.8), 1))
+      out.push(quad(key, ra, at(o.A, EAVE, 0), rb, at(o.B, EAVE, 0), r, tw, th, grey(1.02), 1))
+    } else if (p.box) {
       const r = sh.roofs[i]!
       out.push(quad(key, o.TC, o.TA, o.TD, o.TB, r, tw, th, grey(1.02), 1))
       const right = o.fy > 0 && Math.sin(p.a) > 0.01
@@ -519,7 +528,7 @@ export class StorybookView implements MapView {
       return
     }
     const p = clamp01(c.at / c.len)
-    const s = (0.35 + (CURL_U - 0.35) * p * p + Math.sin(c.at / 70) * 0.05 * p) * UNIT
+    const s = (0.5 + (CURL_U - 0.5) * Math.sqrt(p) + Math.sin(c.at / 70) * 0.08 * p) * UNIT
     const x1 = book.x1 * UNIT
     const y1 = book.y1 * UNIT
     // 翘起来的地方露出底下一页的纸
@@ -545,7 +554,7 @@ export class StorybookView implements MapView {
       .setVisible(true)
       .setPosition(x * UNIT, book.y0 * UNIT)
       .setDisplaySize(6 * UNIT, (book.y1 - book.y0) * UNIT)
-      .setAlpha(0.22 * Math.sin(Math.PI * k) + 0.04)
+      .setAlpha(0.34 * Math.sin(Math.PI * k) + 0.05)
   }
 
   /** 每进一段响一声：预兆时哗啦一声，书页翻起来呼地一声；每件布景折平、弹起时各响一下 */

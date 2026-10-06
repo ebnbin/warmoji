@@ -46,6 +46,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
+import { CARD_U, clockAt, makeBook, pageOf, slabGap, slabOf, slabSd, turnLen } from '../src/maps/storybook/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
@@ -672,6 +673,70 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 立体书：两页连封面放得进安全区，书脊正中空得出出生点；翻页的各段时长为正，一件布景的翻动放得进折平与弹起的那一段，每页立得比翻页长；
+ * 矮布景挡得住标准身体、子弹从上面飞过、头目跨得过，高布景挡得住视线与平射；路宽过得去最大的小怪与头目，页边与布景之间也过得去；
+ * 抽一批种子把四章都摆一遍：件数在范围里，都落在半页里、不跨书脊，别组之间留够路，开局那一页不压着出生的空地，翻页的钟按段走
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'storybook') === (m.storybook !== undefined), `maps.${id} 是立体书当且仅当写了 storybook`)
+  const c = m.storybook
+  if (!c) continue
+  const at = `maps.${id}.storybook`
+  const { page, margin, gapU, turn: t } = c
+  need(page.wU > 0 && page.hU > 0 && page.wU * 2 + 2 <= FRAME_U - SAFE_U * 2 && page.hU + 2 <= FRAME_U - SAFE_U * 2, `${at}.page 两页连封面须放得进方框的安全区`)
+  need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < page.hU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
+  need(Number.isInteger(c.pieces[0]) && Number.isInteger(c.pieces[1]) && c.pieces[0] >= 1 && c.pieces[0] <= c.pieces[1], `${at}.pieces 须为不小于 1 的整数范围`)
+  need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一页与每页立着的时长须为正`)
+  need(t.warnMs > 0 && t.foldMs > 0 && t.leafMs > 0 && t.restMs >= 0 && t.popMs > 0 && t.flipMs > 0, `${at}.turn 各段的时长须为正`)
+  need(t.flipMs <= t.foldMs && t.flipMs <= t.popMs, `${at}.turn.flipMs 须放得进折平与弹起的那一段`)
+  need(t.intervalMs - t.jitterMs > turnLen(c) * 2, `${at}.turn 每页立着的时长须比翻一次页长得多`)
+  need(c.reflowMs > 0, `${at}.reflowMs 须为正`)
+  const B = OBSTACLES.body
+  const layer = B.heightM / B.layers
+  const over = (span: Span): number => (span[0] + Math.floor((span[1] - span[0] + 1) * B.step)) * layer
+  const top = (h: number): number => Math.ceil(h / layer - 1e-9) * layer
+  const chest = (B.layers - 0.5) * layer
+  const boss = ENEMIES[m.boss]
+  const standard: Span = [0, B.layers - 1]
+  need(top(c.lowM) > over(standard) + 1e-9, `${at}.lowM 须高过标准身体跨得过的 ${+over(standard).toFixed(2)} 米：矮布景要挡得住人`)
+  need(top(c.lowM) < chest, `${at}.lowM 须低过平射的高度 ${+chest.toFixed(2)} 米：子弹要从矮布景上面飞过去`)
+  need(top(c.lowM) <= over(boss.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${m.boss} 跨得过去`)
+  const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]!.radius))
+  need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与页边之间须过得去最大的小怪（半径 ${small} 格）`)
+  need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与页边之间须过得去头目（半径 ${boss.radius} 格）`)
+  need(margin.gutter > 0, `${at}.margin.gutter 须为正：布景不跨书脊`)
+  for (let s = 0; s < 6; s++) {
+    const book = makeBook(c, s * 7919 + 13)
+    for (let i = 0; i < 4; i++) {
+      const where = `${at} 第 ${s} 个样本的第 ${i} 页`
+      let pg: ReturnType<typeof pageOf>
+      try {
+        pg = pageOf(c, book, i)
+      } catch (e) {
+        need(false, `${where}：${(e as Error).message}`)
+        continue
+      }
+      need(pg.pieces.length >= c.pieces[0] && pg.pieces.length <= c.pieces[1], `${where} 摆了 ${pg.pieces.length} 件，不在范围里`)
+      for (const p of pg.pieces) {
+        need(p.low || top(p.h) > chest, `${where} 的 ${p.kind} 不比平射高，挡不住子弹`)
+        need(p.d >= CARD_U, `${where} 的 ${p.kind} 比卡纸还薄`)
+        if (i === 0) need(slabSd(slabOf(p), book.start.x, book.start.y) >= c.plazaU, `${where} 的 ${p.kind} 压着出生的空地`)
+        for (const q of pg.pieces) {
+          if (q === p || q.group === p.group) continue
+          need(slabGap(slabOf(p), slabOf(q)) >= (p.low || q.low ? gapU.low : gapU.tall) - 1e-6, `${where} 的 ${p.kind} 与 ${q.kind} 之间的路太窄`)
+        }
+      }
+    }
+    let last = -1
+    for (let ms = 0; ms < 400000; ms += 250) {
+      const k = clockAt(c, book, ms)
+      need(k.page >= last && k.at >= 0 && k.at <= k.len + 1e-6, `${at} 第 ${s} 个样本的翻页钟在 ${ms} 毫秒处倒着走或越出了段`)
+      last = k.page
+    }
   }
 }
 
