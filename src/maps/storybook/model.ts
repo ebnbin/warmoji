@@ -563,10 +563,15 @@ function jitter(book: Book, k: number): number {
   return hash01(book.seed, k, 0x1f2e3d) * 2 - 1
 }
 
+/** 一处从前沿到了算起，擦、打草稿、上色各从几时开始，毫秒：擦到七成开始打草稿，草稿打到八成开始上色 */
+export function stageStarts(cfg: StorybookConfig): { readonly erase: number; readonly sketch: number; readonly color: number } {
+  const t = cfg.turn
+  return { erase: 0, sketch: t.eraseMs * 0.7, color: t.eraseMs * 0.7 + t.sketchMs * 0.8 }
+}
+
 /** 一处从前沿到了算起，旧画擦完、新画上完色要多久，毫秒 */
 export function drawLen(cfg: StorybookConfig): number {
-  const t = cfg.turn
-  return t.eraseMs * 0.5 + t.sketchMs * 0.7 + t.colorMs
+  return stageStarts(cfg).color + cfg.turn.colorMs
 }
 
 /** 一次换页从前沿出发到新布景全弹起来多长，毫秒 */
@@ -628,16 +633,11 @@ export function arrival(cfg: StorybookConfig, sw: Sweep, x: number, y: number): 
   return clamp01((sweepD(sw, x, y) - sw.lo) / (sw.hi - sw.lo)) * cfg.turn.sweepMs
 }
 
-/** 前沿此刻推到哪了（按 sweepD 量，格）：前沿过后 ms 毫秒的地方 */
-export function frontD(cfg: StorybookConfig, sw: Sweep, at: number): number {
-  return sw.lo + (sw.hi - sw.lo) * (at / cfg.turn.sweepMs)
-}
-
 /** 前沿过后 tau 毫秒的一处：旧画擦掉了多少、新画的草稿出来多少、上了多少色，都在 0 到 1 之间 */
 export function stageOf(cfg: StorybookConfig, tau: number): { readonly erase: number; readonly sketch: number; readonly color: number } {
   const t = cfg.turn
-  const sk = tau - t.eraseMs * 0.5
-  return { erase: easeInOut(clamp01(tau / t.eraseMs)), sketch: easeInOut(clamp01(sk / t.sketchMs)), color: easeInOut(clamp01((sk - t.sketchMs * 0.7) / t.colorMs)) }
+  const s = stageStarts(cfg)
+  return { erase: easeInOut(clamp01(tau / t.eraseMs)), sketch: easeInOut(clamp01((tau - s.sketch) / t.sketchMs)), color: easeInOut(clamp01((tau - s.color) / t.colorMs)) }
 }
 
 /** 前沿最早、最晚到一件布景的哪儿，毫秒 */

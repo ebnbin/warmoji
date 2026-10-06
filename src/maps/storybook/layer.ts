@@ -4,7 +4,7 @@ import { packTint, TINT_FILL } from '../../ecs/render/tint'
 
 /**
  * 一张贴在任意四边形上的图：四个角按左上、左下、右上、右下给世界像素坐标，取贴图上 (u0, v0) 起 uw×vh 的一块；
- * fill 为真时整块填成 color，只留剪影；fade 给了就按同样的次序给四个角各乘一个浓度，角与角之间渐变
+ * fill 为真时整块填成 color，只留剪影
  */
 export interface Quad {
   readonly key: string
@@ -17,7 +17,6 @@ export interface Quad {
   readonly color: number
   readonly alpha: number
   readonly fill: boolean
-  readonly fade?: readonly [number, number, number, number]
 }
 
 /** 画布贴图上 (sx, sy) 起 sw×sh 像素那一块的取样范围：画布传上显卡是上下颠倒的 */
@@ -72,7 +71,6 @@ export class QuadLayer extends EcsLayer {
       const tex = textures.get(q.key).get().source.glTexture
       if (!tex) continue
       const tint = packTint(q.color, q.alpha)
-      const f = q.fade
       node.batch(
         drawingContext,
         tex,
@@ -82,10 +80,7 @@ export class QuadLayer extends EcsLayer {
         m.getX(q.x[3], q.y[3]), m.getY(q.x[3], q.y[3]),
         q.u0, q.v0, q.uw, q.vh,
         q.fill ? TINT_FILL : 0,
-        f ? packTint(q.color, q.alpha * f[0]) : tint,
-        f ? packTint(q.color, q.alpha * f[1]) : tint,
-        f ? packTint(q.color, q.alpha * f[2]) : tint,
-        f ? packTint(q.color, q.alpha * f[3]) : tint,
+        tint, tint, tint, tint,
         self.renderOptions,
       )
     }
