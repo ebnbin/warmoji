@@ -1,15 +1,17 @@
 import { AWAY, SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
-import { FRAME_U } from '../../util/units'
-import { bankAt, insideBy } from './layout'
+import { FRAME_U, UNIT } from '../../util/units'
+import { bankAt, inSweep, insideBy } from './layout'
+import { makeBasin, roomAt } from '../basin'
+import type { Basin } from '../basin'
 import type { CanyonPlan, Mesa } from './layout'
 import type { CanyonConfig } from '../../types/maps'
 
 /** 谷底的影子：台面往下推一个崖高后，再顺着太阳的方位往外铺这么多格 */
-export const SHADOW_U = 3.4
+export const SHADOW_U = 4.6
 /** 影子按这么多个样本算软边 */
-const SHADOW_STEPS = 7
+const SHADOW_STEPS = 9
 /** 崖壁上的岩层：一层多厚（格）、往哪边微微倾 */
 const STRATA_U = 0.21
 /** 台沿往里这么宽（格）是风化的边 */
@@ -36,8 +38,8 @@ const WALL_BANDS: readonly Rgb[] = [
 /** 谷里的雾色：越深越往这个蓝紫里沉 */
 const HAZE: Rgb = [62, 52, 98]
 /** 谷底：晒着的砂砾、背阴的砂砾、河心、浅滩的河水、河边的卵石滩 */
-const FLOOR_SUN: Rgb = [196, 150, 108]
-const FLOOR_SHADE: Rgb = [70, 58, 104]
+const FLOOR_SUN: Rgb = [176, 130, 98]
+const FLOOR_SHADE: Rgb = [52, 44, 92]
 const RIVER_DEEP: Rgb = [22, 98, 104]
 const RIVER_SHALLOW: Rgb = [62, 156, 146]
 const SHOAL: Rgb = [176, 160, 138]
@@ -112,11 +114,31 @@ interface Columns {
 /** 画之前一次算好的：每座台每列的台面 */
 export interface Prepared {
   readonly cols: readonly Columns[]
+  /** 谷底离崖脚（石台露出来的那片与两岸的崖壁）多远，像素：只按崖，不按能走的范围 */
+  readonly ao: Basin
+}
+
+/** 谷底离崖脚的距离场：格子 AO_CELL_U 格 */
+const AO_CELL_U = 0.25
+
+function occlusion(plan: CanyonPlan): Basin {
+  const open = (x: number, y: number): boolean => {
+    const u = x / UNIT
+    const v = y / UNIT
+    const b = bankAt(plan.banks, u)
+    if (v < b.north + plan.depth || v > b.south) return false
+    return !plan.mesas.some((m) => inSweep(m, plan.depth, u, v))
+  }
+  const n = Math.round(FRAME_U / AO_CELL_U)
+  const keep: { x: number; y: number }[] = []
+  for (let j = 1; j < FRAME_U; j += 2) for (let i = 1; i < FRAME_U; i += 2) if (open(i * UNIT, j * UNIT)) keep.push({ x: i * UNIT, y: j * UNIT })
+  return makeBasin(open, -UNIT, 0, n + 8, n, AO_CELL_U * UNIT, keep, 0)
 }
 
 export function prepare(sc: PaintScene): Prepared {
   const ppu = GROUND_PPU
   return {
+    ao: occlusion(sc.plan),
     cols: sc.plan.mesas.map((m) => {
       const x0 = Math.floor(m.box[0] * ppu) - 1
       const x1 = Math.ceil(m.box[2] * ppu) + 1
@@ -179,6 +201,11 @@ function sunlit(c: Rgb, k: number): void {
   c[2] *= 1 + (SUNLIGHT[2] - 1) * k
 }
 
+/** 台面的起伏，格：几道低矮的岩包 */
+function relief(x: number, y: number, seed: number): number {
+  return (fbm(x * 0.32, y * 0.32, seed + 61, 3) - 0.5) * 0.9 + (valueNoise(x * 1.1, y * 1.1, seed + 63) - 0.5) * 0.08
+}
+
 /**
  * 砂岩台面：交错层理的一道道彩带按噪声扭着走，大片的色调起伏，节理的细缝、零星的小坑和碎石；
  * 台沿往里一窄条风化得粗糙发暗，朝着太阳的边沿亮一线；台心稍稍拱起
@@ -199,9 +226,17 @@ function paintTop(out: Rgb, x: number, y: number, depth: number, nx: number, ny:
     mixTo(out, SAND_RUST, 0.25)
     scale(out, 0.92)
   }
-  // 大片的明暗：被风吹蚀的浅洼与鼓包
+  // 细密的纹层：顺着彩带一道道发丝样的暗线
+  const lam = Math.abs(Math.sin(along * 9.5 + fbm(wx * 0.55, wy * 0.55, seed + 12, 3) * 9))
+  if (lam < 0.12) scale(out, 0.9 + lam * 0.8)
+  // 被风磨圆的岩包：按起伏朝着太阳打光
+  const hx = (relief(x + 0.08, y, seed) - relief(x - 0.08, y, seed)) / 0.16
+  const hy = (relief(x, y + 0.08, seed) - relief(x, y - 0.08, seed)) / 0.16
+  const nl = Math.hypot(hx, hy, 1)
+  const lit = (-hx * SUN_N.x - hy * SUN_N.y + SUN_N.z) / nl
+  scale(out, 0.72 + (lit - SUN_N.z) * 0.9 + 0.28)
   const swell = fbm(x * 0.12, y * 0.12, seed + 13, 4)
-  scale(out, 0.9 + swell * 0.18)
+  scale(out, 0.94 + swell * 0.12)
   // 节理：一道道细缝
   const joint = cellEdge(x * 0.34 + 0.4 * fbm(x * 0.8, y * 0.8, seed + 15, 2), y * 0.34, seed + 17)
   if (joint < 0.035 && fbm(x * 0.5, y * 0.5, seed + 16, 2) > 0.48) scale(out, 0.84 + joint * 4.5)
@@ -337,7 +372,7 @@ function riverDist(plan: CanyonPlan, x: number, y: number): number {
  * 谷底：晒着的地方是暖灰的砂砾，影子里沉成蓝紫；河在中间弯着，河心深青、两边浅，河边一圈卵石滩；散着几块大石头；
  * 整个谷底蒙着一层雾色
  */
-function paintFloor(out: Rgb, sc: PaintScene, x: number, y: number, seed: number): void {
+function paintFloor(out: Rgb, sc: PaintScene, ao: Basin, x: number, y: number, seed: number): void {
   const sh = shadowAt(sc, x, y)
   set(out, FLOOR_SUN)
   mixTo(out, [164, 128, 110], fbm(x * 0.3, y * 0.3, seed + 41, 3))
@@ -358,27 +393,36 @@ function paintFloor(out: Rgb, sc: PaintScene, x: number, y: number, seed: number
     set(out, RIVER_SHALLOW)
     mixTo(out, RIVER_DEEP, depth)
   }
-  // 大石头：圆滚滚的，朝太阳的一面亮
-  const rock = cellNearest(x * 0.55, y * 0.55, seed + 47)
-  const rr = 0.18 + rock.h * 0.2
+  // 大小不一的石头：圆滚滚的，朝太阳的一面亮，背着太阳拖一小截影子
+  const big = fbm(x * 0.15, y * 0.15, seed + 46, 2) > 0.55
+  const rock = cellNearest(x * (big ? 0.5 : 1.3), y * (big ? 0.5 : 1.3), seed + (big ? 47 : 48))
+  const rr = (big ? 0.2 : 0.09) + rock.h * (big ? 0.25 : 0.1)
   const r = Math.hypot(rock.dx, rock.dy)
-  if (rock.h < 0.16 && rd > 0.2) {
+  if (rock.h < (big ? 0.1 : 0.14) && rd > 0.2) {
     const sx = rock.dx - AWAY.x * rr * 0.6
     const sy = rock.dy - AWAY.y * rr * 0.6
     if (Math.hypot(sx, sy) < rr) scale(out, 0.7)
     if (r < rr) {
       const nz = Math.sqrt(Math.max(0, 1 - (r / rr) ** 2))
       const lit = clamp01((rock.dx / rr) * SUN_N.x + (rock.dy / rr) * SUN_N.y + nz * SUN_N.z)
-      set(out, [150, 104, 84])
+      set(out, mix3([150, 104, 84], [126, 108, 104], rock.h * 5))
       scale(out, 0.55 + lit * 0.6)
     }
   }
+  // 崖脚背着天光，越贴着崖脚越暗
+  const room = roomAt(ao, x * UNIT, y * UNIT) / UNIT
+  scale(out, 0.62 + 0.38 * smooth(0, 2.2, room))
   // 影子里沉成蓝紫，晒着的地方也蒙着雾
   const sun = 1 - sh
   const shadeCol: Rgb = [out[0] * 0.42 + FLOOR_SHADE[0] * 0.58, out[1] * 0.42 + FLOOR_SHADE[1] * 0.58, out[2] * 0.42 + FLOOR_SHADE[2] * 0.58]
   mixTo(out, shadeCol, 1 - sun)
   if (sun > 0) sunlit(out, sun * 0.8)
-  mixTo(out, HAZE, 0.18 + 0.12 * (1 - sun))
+  mixTo(out, HAZE, 0.26 + 0.14 * (1 - sun))
+}
+
+function mix3(a: Rgb, b: Rgb, t: number): Rgb {
+  const k = clamp01(t)
+  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
 }
 
 /** 画一块：每个像素先看是不是台面（石台或两岸），再看是不是露出来的崖壁，都不是就是谷底 */
@@ -435,7 +479,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, px: Uint8ClampedArra
           done = true
         }
       }
-      if (!done) paintFloor(c, sc, x, y, seed)
+      if (!done) paintFloor(c, sc, prep.ao, x, y, seed)
       const o = ((py - rect.y0) * w + (ix - rect.x0)) * 4
       px[o] = c[0]
       px[o + 1] = c[1]

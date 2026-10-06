@@ -1393,7 +1393,7 @@ export const MAPS = {
     },
     finalWaveSub: '暴龙从崖顶跳了下来——它有近一吨重，踩上哪座桥哪座就断，把它引上桥！',
     canyon: {
-      mesas: { count: [6, 8], centerU: [5.6, 6.2], radiusU: [2.4, 4.4], ringU: [9.5, 14.5], wobble: 0.22, gapU: [3, 8.5], clearU: 1.4 },
+      mesas: { count: [6, 8], centerU: [5.6, 6.2], radiusU: [3, 4.8], ringU: [9.5, 14.5], wobble: 0.22, gapU: [3, 8.5], clearU: 1.4 },
       depthU: 2.8,
       bridge: {
         widthU: 1.3,

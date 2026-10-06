@@ -72,7 +72,7 @@ void main ()
   vec2 drift = uWind * uTime;
   float n = fbm(w * 0.09 + drift);
   float m = fbm(w * 0.23 - drift * 1.7 + vec2(n * 1.3, 0.0));
-  float fog = open * (0.06 + 0.4 * smoothstep(0.42, 0.85, n * 0.65 + m * 0.35)) * (1.0 - 0.35 * sun);
+  float fog = open * (0.1 + 0.42 * smoothstep(0.4, 0.85, n * 0.65 + m * 0.35)) * (1.0 - 0.4 * sun);
   vec3 fc = mix(vec3(0.42, 0.38, 0.62), vec3(0.86, 0.66, 0.6), sun * 0.45);
   col = col * (1.0 - fog) + fc * fog;
   a = a * (1.0 - fog) + fog;
