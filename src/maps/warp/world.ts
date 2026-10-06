@@ -3,11 +3,11 @@ import { FRAME_U, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Alive, ENEMY_SET, FACTION, Faction, Minion, Mounted, Pet, Phys, Pickup, Radius, Transform, Uid } from '../../ecs/components'
+import { Alive, ENEMY_SET, FACTION, Faction, MARK, Minion, Mounted, Pet, Phys, Pickup, Radius, TAG, Transform, Uid } from '../../ecs/components'
 import { displace } from '../../ecs/systems/shared/displace'
 import type { Mover } from '../../ecs/systems/shared/displace'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
-import { inTransit } from '../../ecs/utils/marks'
+import { addMark, inTransit } from '../../ecs/utils/marks'
 import { grounded } from '../../ecs/utils/pass'
 import { leaderPoint } from '../../ecs/utils/team'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
@@ -17,7 +17,7 @@ import { roomFor } from '../landmark'
 import { inBox, nextRoom, roomIndexAt, warpPlan } from './layout'
 import { clearWalk, flowDir, flowTo, navDist, navGrid } from './nav'
 import type { NavField, NavGrid } from './nav'
-import type { WarpPlan } from './layout'
+import type { WarpPlan, WarpRoom } from './layout'
 import type { Solid, Solids } from '../../ecs/worlds/solids'
 import type { Landmark } from '../landmark'
 import type { WarpConfig } from '../../types/maps'
@@ -44,6 +44,10 @@ const RINGS = [
   [1.3, 10],
 ] as const
 
+/** 眼睛给它盯着的那间里的敌人续一次加持：隔多久续一次、一次管多久，毫秒 */
+const BUFF_EVERY_MS = 100
+const BUFF_MS = 350
+
 /** 传送是被摆布：锚定的、霸体的、头目也照送 */
 const SHIPPED: Mover = { self: false, free: true }
 
@@ -60,6 +64,27 @@ export interface PadState {
   jumpedAt: number
   shuttledAt: number
   shuttled: number
+  /** 上一次被眼睛调去队伍那间的时刻、那一趟送走了几只、送去了哪间（画面用） */
+  calledAt: number
+  called: number
+  calledTo: number
+}
+
+/**
+ * 核心柱那只眼此刻：视线落在哪（格），盯着哪间（落在虚空里为 −1）；跟丢了要搜到哪一刻、在哪间搜；锁定攒到多少（0 到 1）；
+ * 队伍从它眼皮底下逃掉过几次；上一次锁定的时刻与一共锁定过几次；上一次给敌人续加持的时刻
+ */
+export interface Gaze {
+  x: number
+  y: number
+  room: number
+  lostUntil: number
+  lostRoom: number
+  heat: number
+  escapes: number
+  lockedAt: number
+  locks: number
+  buffAt: number
 }
 
 /** 一个身体被送走：从哪到哪（像素）、哪一刻出发（对局时钟）、多大、是不是敌人 */
@@ -120,6 +145,7 @@ export interface WarpState {
   readonly arrivals: Arrival[]
   /** 队伍一共跃迁过几次：画面按它认出新的一次 */
   jumps: number
+  readonly gaze: Gaze
 }
 
 function cfgOf(sim: Sim): WarpConfig {
@@ -163,6 +189,9 @@ export function warpOf(sim: Sim): WarpState {
         jumpedAt: -1e9,
         shuttledAt: -1e9,
         shuttled: 0,
+        calledAt: -1e9,
+        called: 0,
+        calledTo: 0,
       })),
       grids,
       toPad: plan.rooms.map((r, i) => flowTo(grids[i]!, r.pad.x * UNIT, r.pad.y * UNIT)),
@@ -176,6 +205,7 @@ export function warpOf(sim: Sim): WarpState {
       impacts: [],
       arrivals: [],
       jumps: 0,
+      gaze: { x: plan.start.x, y: plan.start.y, room: roomIndexAt(plan, plan.start.x, plan.start.y), lostUntil: -1e9, lostRoom: 0, heat: 0, escapes: 0, lockedAt: -1e9, locks: 0, buffAt: -1e9 },
     }
     sim.worldState.warp = s
   }
@@ -238,12 +268,11 @@ function logHop(s: WarpState, h: Hop): void {
 }
 
 /**
- * 第 i 座传送台发车：台上的敌人都送到下一间的传送台上；team 为真时是队长充满了能，整支队伍连同召唤物不论在房间哪里一起走。
+ * 第 i 座传送台发车：台上的敌人都送到 to 那间的传送台上（平常是下一间，眼睛调人时是队伍那间）；team 为真时是队长充满了能，整支队伍连同召唤物不论在房间哪里一起走到下一间。
  * 身体没有实体地穿过虚空，落地时散在对面的台上；敌人落地后往台外涌
  */
-function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolean): number {
+function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolean, to: WarpRoom = nextRoom(s.plan, i)): number {
   const from = s.plan.rooms[i]!
-  const to = nextRoom(s.plan, i)
   const now = sim.elapsedMs
   const ms = cfg.pad.transitMs
   let k = 0
@@ -278,6 +307,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolea
     s.pads[to.index]!.coolUntil = now + ms + cfg.pad.cooldownMs
     s.pads[i]!.jumpedAt = now
     s.jumps++
+    slip(s, cfg, i, now)
   }
   let foes = 0
   for (const e of query(sim.world, ENEMY_SET)) {
@@ -331,6 +361,85 @@ function stepPads(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void 
       p.shuttledAt = now
     }
   })
+}
+
+/** 逃掉 n 次以后眼睛跟丢了要搜多久，毫秒 */
+export function searchMs(cfg: WarpConfig, n: number): number {
+  return Math.max(cfg.gaze.minSearchMs, cfg.gaze.searchMs * cfg.gaze.learn ** n)
+}
+
+/** 逃掉 n 次以后眼睛转得多快，弧度/秒 */
+function turnRate(cfg: WarpConfig, n: number): number {
+  return (Math.min(cfg.gaze.maxTurnDegPerS, cfg.gaze.turnDegPerS / cfg.gaze.learn ** n) * Math.PI) / 180
+}
+
+/** 队伍从第 i 间跃迁走了：眼睛正盯着那间就算逃掉一次，它跟丢了，在那间里搜一阵；没盯着就照常转过来找 */
+function slip(s: WarpState, cfg: WarpConfig, i: number, now: number): void {
+  const g = s.gaze
+  if (g.room !== i) return
+  g.lostUntil = now + cfg.pad.transitMs + searchMs(cfg, g.escapes)
+  g.lostRoom = i
+  g.escapes++
+}
+
+/** 眼睛此刻要看哪（格）：跟丢时在跟丢的那间里来回扫，否则看着队长 */
+function gazeTarget(sim: Sim, s: WarpState): Point {
+  const g = s.gaze
+  if (sim.elapsedMs < g.lostUntil) {
+    const r = s.plan.rooms[g.lostRoom]!
+    const t = sim.elapsedMs / 1000
+    const f = r.floor
+    return { x: r.center.x + Math.sin(t * 1.7) * (f.x1 - f.x0) * 0.32, y: r.center.y + Math.sin(t * 1.1 + 1) * (f.y1 - f.y0) * 0.32 }
+  }
+  const lead = leaderPoint(sim)
+  return { x: lead.x / UNIT, y: lead.y / UNIT }
+}
+
+/**
+ * 眼睛：视线绕着核心柱转向要看的地方、沿半径追过去，转向与追赶都有限速；视线落在哪间的平台上就盯着哪间。
+ * 队伍被盯着就攒锁定，攒满了全站其余的传送台一起把台上的敌人送进队伍那间；不被盯着锁定慢慢消退。被盯着那间的敌人跑得快、打得疼
+ */
+function stepGaze(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
+  const g = s.gaze
+  const c = cfg.gaze
+  const now = sim.elapsedMs
+  const dt = delta / 1000
+  const core = s.plan.core
+  const t = gazeTarget(sim, s)
+  const a = Math.atan2(g.y - core.y, g.x - core.x)
+  const r = Math.hypot(g.x - core.x, g.y - core.y)
+  let da = Math.atan2(t.y - core.y, t.x - core.x) - a
+  da -= Math.PI * 2 * Math.round(da / (Math.PI * 2))
+  const turn = turnRate(cfg, g.escapes) * dt
+  const na = a + Math.max(-turn, Math.min(turn, da))
+  const step = c.trackU * dt
+  const nr = r + Math.max(-step, Math.min(step, Math.hypot(t.x - core.x, t.y - core.y) - r))
+  g.x = core.x + Math.cos(na) * nr
+  g.y = core.y + Math.sin(na) * nr
+  const q = roomIndexAt(s.plan, g.x, g.y)
+  g.room = inBox(s.plan.rooms[q]!.slab, g.x, g.y) ? q : -1
+  const lead = sim.leader
+  const seen = Alive.v[lead] === 1 && !inTransit(lead) && g.room === s.teamRoom
+  g.heat = seen ? g.heat + delta / c.lockMs : Math.max(0, g.heat - delta / c.coolMs)
+  if (g.heat >= 1) {
+    g.heat = 0
+    g.lockedAt = now
+    g.locks++
+    const to = s.plan.rooms[s.teamRoom]!
+    s.pads.forEach((p, i) => {
+      if (i === to.index) return
+      p.called = depart(sim, s, cfg, i, false, to)
+      p.calledAt = now
+      p.calledTo = to.index
+    })
+  }
+  if (g.room < 0 || now - g.buffAt < BUFF_EVERY_MS) return
+  g.buffAt = now
+  for (const e of query(sim.world, ENEMY_SET)) {
+    if (!Alive.v[e] || Faction.v[e] !== FACTION.enemy || roomOf(s, Transform.x[e]!, Transform.y[e]!) !== g.room) continue
+    addMark(e, MARK.speed, TAG.map, now + BUFF_MS, c.speedMul)
+    addMark(e, MARK.dmg, TAG.map, now + BUFF_MS, c.damageMul)
+  }
 }
 
 /** 活着、脚沾地的身体踩亮脚下的瓷砖 */
@@ -402,7 +511,7 @@ function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
 /**
  * 跃迁站：四块悬空的平台，平台之间是虚空，身体只能在自己那块上走；平台四周的力场挡弹体也挡视线。
  * 每块一座传送台：队长站上去充满能，整支队伍连同召唤物穿过虚空到下一块的传送台；每座台定期发车，台上的敌人一起送走。
- * 队伍不在的那几间，敌人一边刷一边往传送台聚
+ * 队伍不在的那几间，敌人一边刷一边往传送台聚。正中的核心柱是一只眼，转过来盯着队伍那间
  */
 export const warp: WorldHooks = {
   ...bounded,
@@ -509,6 +618,7 @@ export const warp: WorldHooks = {
     const cfg = cfgOf(sim)
     const s = warpOf(sim)
     stepPads(sim, s, cfg, delta)
+    stepGaze(sim, s, cfg, delta)
     spill(sim, s, cfg)
     stepTiles(sim, s)
     stepNav(sim, s)

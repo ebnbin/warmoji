@@ -619,6 +619,11 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(Number.isInteger(em.plateU) && em.plateU >= 1 && em.markU > 0 && em.clearU >= 0, `${at}.emitters 的板长须是正整数，凝成形的半径为正`)
   need(c.core.radiusU > 0 && c.core.radiusU < r.gapU + r.lipU, `${at}.core 的核心柱须为正、立得进十字缝`)
   need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
+  const gz = c.gaze
+  need(gz.spotU > 0 && gz.trackU > 0 && gz.turnDegPerS > 0 && gz.maxTurnDegPerS >= gz.turnDegPerS, `${at}.gaze 的光斑、追赶与转向须为正，最快转向不慢于起初`)
+  need(gz.learn > 0 && gz.learn < 1 && gz.minSearchMs > 0 && gz.searchMs >= gz.minSearchMs, `${at}.gaze 每逃一次搜的时间须缩短（learn 在 0 到 1 之间），最短的搜索为正、不长于起初`)
+  need(gz.speedMul >= 1 && gz.damageMul >= 1 && (gz.speedMul > 1 || gz.damageMul > 1), `${at}.gaze 被盯着的那间里的敌人须变强`)
+  need(gz.lockMs > 0 && gz.coolMs > 0, `${at}.gaze 锁定与消退的时间须为正`)
   const g = m.gates
   need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
   need(g?.boss === 'core' && g.kinds.core?.at.kind === 'mark', `${at} 的头目须从核心柱（地标上的出怪口 core）出来`)

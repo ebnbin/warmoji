@@ -91,7 +91,8 @@ void main ()
  * 地砖：每块瓷砖按掩码知道自己是不是会亮的瓷砖、属于哪间房、那间房的待机律动与它在律动里的相位，按着色图知道那间房的主色。
  * 闲着时缝里透着房间的主色，按律动明灭：从中心一圈圈往外的脉冲、顺着一个方向扫过的光波、棋盘式明灭、几乎不动的微光。
  * 被队伍踩过亮信号蓝、被敌人踩过亮信号红：四边一道亮线、往里一道细线、块面淡淡染一层，光渗到隔壁；刚踩上的一脚从中心扩一圈方框。
- * 队长在传送台上充能时，一圈光从台心扩到整间房，扫过的瓷砖亮起来，圈里的都染上一层。输出按预乘透明度
+ * 队长在传送台上充能时，一圈光从台心扩到整间房，扫过的瓷砖亮起来，圈里的都染上一层。
+ * 眼睛盯着的那间：一道扫描线一遍遍横扫过去，视线落下的那块光斑里瓷砖缝全亮，光斑边一圈亮环；锁定的那一下整间闪一次。输出按预乘透明度
  */
 export const TILES_FRAG = `${HEADER}
 uniform sampler2D uData;
@@ -102,6 +103,10 @@ uniform vec3 uTeam;
 uniform vec3 uFoe;
 uniform vec4 uCharge;
 uniform float uChargeRoom;
+uniform vec4 uGaze;
+uniform float uGazeRoom;
+uniform vec3 uGazeCol;
+uniform float uLock;
 uniform float uPx;
 const float N = ${FRAME_U.toFixed(1)};
 
@@ -180,6 +185,17 @@ void main ()
     col += uTeam * k;
     add += vec3(0.8, 0.92, 1.0) * front * seam * uCharge.w * 0.5;
     a += k * 0.8;
+  }
+  // 眼睛盯着的那间
+  if (abs(room - uGazeRoom) < 0.5) {
+    float sweep = fract(p.y / 6.0 - uTime * 0.22);
+    float scan = exp(-pow((sweep - 0.5) * 6.0 / 0.35, 2.0)) * 0.2 + 0.02;
+    float dg = length(p - uGaze.xy);
+    float spot = 1.0 - smoothstep(uGaze.z * 0.75, uGaze.z, dg);
+    float edgeRing = exp(-pow((dg - uGaze.z) / 0.12, 2.0));
+    float k = scan * (0.4 + seam) + spot * (0.12 + 0.7 * seam + 0.3 * inset) * (0.6 + 0.4 * uGaze.w) + edgeRing * 0.8 + uLock * (0.35 + seam);
+    col += uGazeCol * k;
+    a += k * 0.7;
   }
   a = clamp(a, 0.0, 0.92);
   gl_FragColor = vec4(col + add, a);

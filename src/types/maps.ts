@@ -1067,6 +1067,26 @@ export interface WarpConfig {
   readonly core: { readonly radiusU: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
+  /**
+   * 核心柱是一只眼，视线落在地上是一块 spotU 格的光斑，光斑所在的那间房就是被它盯着的房间。
+   * 光斑以 trackU 格/秒追着队长，绕核心柱转向最快 turnDegPerS 度/秒；队伍一跃迁它就跟丢，在原来那间里搜 searchMs 才转过来。
+   * 每从它眼皮底下逃掉一次，搜的时间乘一次 learn、转得快 1/learn 倍，最短搜 minSearchMs、最快转 maxTurnDegPerS。
+   * 被盯着的那间里的敌人移速乘 speedMul、伤害乘 damageMul；队伍被盯满 lockMs 就被锁定，不被盯时按 coolMs 消退。
+   * 锁定的那一刻全站其余的传送台一起发车，台上的敌人都送到队伍那间
+   */
+  readonly gaze: {
+    readonly spotU: number
+    readonly trackU: number
+    readonly turnDegPerS: number
+    readonly maxTurnDegPerS: number
+    readonly searchMs: number
+    readonly minSearchMs: number
+    readonly learn: number
+    readonly speedMul: number
+    readonly damageMul: number
+    readonly lockMs: number
+    readonly coolMs: number
+  }
 }
 export interface TorusConfig {
   readonly arenaLong: number

@@ -31,3 +31,16 @@ export function lift(c: number, k: number): number {
 export function shade(c: number, k: number): number {
   return (Math.round(((c >> 16) & 0xff) * k) << 16) | (Math.round(((c >> 8) & 0xff) * k) << 8) | Math.round((c & 0xff) * k)
 }
+
+/** 每种签名的房间里供着的一件标本，按签名的次序：金色那间一株仙人掌（夏），薄荷绿那间一朵樱花（春），紫色那间一片枫叶（秋），冰青那间一块冰（冬） */
+export const SPECIMENS = ['1f335', '1f338', '1f341', '1f9ca'] as const
+
+/** 眼睛的视线：平时是偏绿的青（和队伍的信号蓝分得开），锁定逼近时烧成警报红 */
+export const GAZE_COLD = 0x00c2d4
+export const GAZE_HOT = 0xff2a55
+
+/** 两个颜色按 k 混合 */
+export function mix(a: number, b: number, k: number): number {
+  const f = (s: number): number => Math.round(((a >> s) & 0xff) * (1 - k) + ((b >> s) & 0xff) * k)
+  return (f(16) << 16) | (f(8) << 8) | f(0)
+}

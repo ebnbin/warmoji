@@ -3,12 +3,13 @@ import { query } from 'bitecs'
 import { FRAME_U, LIFT_PER_M, UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Due, ENEMY_SET, Telegraph, Transform } from '../../ecs/components'
+import { Alive, Due, ENEMY_SET, Radius, Telegraph, Transform } from '../../ecs/components'
+import { emojiRaster } from '../../emoji/textures'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
 import { nextRoom } from './layout'
 import { WarpPainter } from './painter'
-import { CORE_GLOW, FOE_GLOW, lift, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
+import { FOE_GLOW, GAZE_COLD, GAZE_HOT, lift, mix, rgb, shade, SIGNS, SPECIMENS, TEAM_GLOW, VOID_DEEP } from './palette'
 import { encodeTiles, TILES_FRAG, VOID_FRAG } from './shader'
 import { textureSize } from './ground'
 import { warpPlanFor } from './world'
@@ -27,6 +28,7 @@ const GROUND_KEY = 'warp-ground'
 const TILES_KEY = 'warp-tiles'
 const MASK_KEY = 'warp-mask'
 const TINT_KEY = 'warp-tint'
+const SPECIMEN_KEY = 'warp-specimen-'
 const PAINT_THREADS = 4
 const STRIP_PX = 64
 /** 刚踩上那一脚的方框扩到四边要多久，毫秒 */
@@ -47,6 +49,17 @@ const PAD_LIGHT_U = 2.6
 const PAD_FILL = 0.45
 /** 核心柱照亮四周的身体：多远（格）以内 */
 const CORE_LIGHT_U = 6
+/** 眼睛的半径是核心柱的几倍；瞳仁最多偏出眼心几成；视线隔多远（格）就偏到底 */
+const EYE_K = 1.25
+const LOOK_K = 0.42
+const LOOK_FULL_U = 10
+/** 锁定的那一下闪多久，毫秒 */
+const LOCK_MS = 700
+/** 眼睛调人时从眼睛射向各座传送台的光多久，毫秒 */
+const CALL_MS = 500
+/** 标本的全息像多大、浮多高（格） */
+const SPECIMEN_U = 1.5
+const SPECIMEN_LIFT_U = 1.7
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const ease = (t: number): number => t * t * (3 - 2 * t)
@@ -57,6 +70,12 @@ function noise(a: number, b: number): number {
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
+}
+
+/** 按次序围成的四边形，两个三角拼成 */
+function quad(g: Phaser.GameObjects.Graphics, a: Point, b: Point, c: Point, d: Point): void {
+  g.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
+  g.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y)
 }
 
 function upload(tex: Phaser.Textures.CanvasTexture, filter: Phaser.Textures.FilterMode): void {
@@ -127,6 +146,10 @@ interface Uniforms {
   px: number
   charge: [number, number, number, number]
   chargeRoom: number
+  gaze: [number, number, number, number]
+  gazeRoom: number
+  gazeCol: [number, number, number]
+  lock: number
 }
 
 /**
@@ -144,10 +167,17 @@ export class WarpView implements MapView {
   private floorFx?: Phaser.GameObjects.Graphics
   private glowFx?: Phaser.GameObjects.Graphics
   private airFx?: Phaser.GameObjects.Graphics
-  private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1 }
+  private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1, gaze: [0, 0, 0, 0], gazeRoom: -1, gazeCol: [1, 1, 1], lock: 0 }
+  private eyeFx?: Phaser.GameObjects.Graphics
+  private eyeGlow?: Phaser.GameObjects.Graphics
+  private beamFx?: Phaser.GameObjects.Graphics
+  private markFx?: Phaser.GameObjects.Graphics
+  private specimens: { readonly img: Phaser.GameObjects.Image; readonly x: number; readonly y: number; readonly color: number }[] = []
   private jumpsSeen = 0
   private shuttleSeen: number[] = []
   private charging = false
+  private locksSeen = 0
+  private spotted = false
 
   private planOf(v: ViewCtx): WarpPlan {
     if (!this.plan) this.plan = warpPlanFor(v.def.warp!, v.run.decorSeed)
@@ -220,10 +250,16 @@ export class WarpView implements MapView {
     this.floorFx = scene.add.graphics().setDepth(-0.8)
     this.glowFx = scene.add.graphics().setDepth(-0.75).setBlendMode(Phaser.BlendModes.ADD)
     this.airFx = scene.add.graphics().setDepth(9.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.visuals.push(this.floorFx, this.glowFx, this.airFx)
+    this.beamFx = v.lens.mainOnly(scene.add.graphics().setDepth(-0.74))
+    this.markFx = scene.add.graphics().setDepth(9.45)
+    this.eyeFx = v.lens.mainOnly(scene.add.graphics().setDepth(-0.7))
+    this.eyeGlow = v.lens.mainOnly(scene.add.graphics().setDepth(-0.69).setBlendMode(Phaser.BlendModes.ADD))
+    this.visuals.push(this.floorFx, this.glowFx, this.airFx, this.beamFx, this.markFx, this.eyeFx, this.eyeGlow)
+    await this.specimenImages(v, plan)
     const st = sim.worldState.warp
     this.jumpsSeen = st?.jumps ?? 0
     this.shuttleSeen = st ? st.pads.map((p) => p.shuttledAt) : []
+    this.locksSeen = st?.gaze.locks ?? 0
     v.lens.screen.vignette(0.9, 0.12, 0x020610)
   }
 
@@ -257,6 +293,10 @@ export class WarpView implements MapView {
               set('uFoe', rgb(FOE_GLOW))
               set('uCharge', u.charge)
               set('uChargeRoom', u.chargeRoom)
+              set('uGaze', u.gaze)
+              set('uGazeRoom', u.gazeRoom)
+              set('uGazeCol', u.gazeCol)
+              set('uLock', u.lock)
               set('uPx', u.px)
             },
           },
@@ -274,7 +314,7 @@ export class WarpView implements MapView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const st = sim.worldState.warp
     const cfg = this.cfg
-    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx) return
+    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx || !this.eyeFx || !this.eyeGlow || !this.beamFx || !this.markFx) return
     this.state = st
     const now = sim.elapsedMs
     const t = sim.fxMs / 1000
@@ -286,11 +326,20 @@ export class WarpView implements MapView {
     this.floorFx.clear()
     this.glowFx.clear()
     this.airFx.clear()
+    this.eyeFx.clear()
+    this.eyeGlow.clear()
+    this.beamFx.clear()
+    this.markFx.clear()
     this.chargeRing(st, cfg)
+    this.gazeUniforms(st, cfg, now)
     this.sounds(v, st, cfg)
     st.plan.rooms.forEach((room) => this.bridge(st, cfg, room, now, t))
     st.plan.rooms.forEach((room) => this.pad(sim, st, cfg, room, now, t))
-    this.core(sim, st, t)
+    this.beam(st, cfg, now, t)
+    this.eyes(v, sim, st, cfg, now, t)
+    this.watched(sim, st)
+    this.reticle(sim, st, now, t)
+    this.specimenFx(t)
     this.pillars(st, cfg, t)
     this.forming(sim, st, cfg, now)
     for (const h of st.hops) this.voxels(h, cfg, now)
@@ -325,6 +374,15 @@ export class WarpView implements MapView {
       this.jumpsSeen = st.jumps
       playSfx('jump')
     }
+    const g = st.gaze
+    if (g.locks !== this.locksSeen) {
+      this.locksSeen = g.locks
+      playSfx('glare')
+      v.lens.screen.flash(220, 255, 40, 85)
+    }
+    const spotted = g.room === st.teamRoom
+    if (spotted && !this.spotted) playSfx('sonar')
+    this.spotted = spotted
     st.pads.forEach((pad, i) => {
       if (pad.shuttledAt === this.shuttleSeen[i]) return
       this.shuttleSeen[i] = pad.shuttledAt
@@ -528,6 +586,12 @@ export class WarpView implements MapView {
     const ty = to.pad.y * UNIT
     flash(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, tx, ty)
     flash(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, tx, ty)
+    // 被眼睛调去队伍那间：这座台烧红着发车，那边的台子到点一齐涌出来
+    const called = st.plan.rooms[p.calledTo]!.pad
+    column(p.calledAt, FOE_GLOW, p.called > 0 ? 1 : 0.35, x, y, true)
+    flash(p.calledAt, GAZE_HOT, 1, x, y)
+    column(p.calledAt + cfg.pad.transitMs, FOE_GLOW, p.called > 0 ? 1 : 0, called.x * UNIT, called.y * UNIT, false)
+    flash(p.calledAt + cfg.pad.transitMs, FOE_GLOW, p.called > 0 ? 1 : 0, called.x * UNIT, called.y * UNIT)
   }
 
   /** 此刻有没有敌人站在这座台上 */
@@ -537,58 +601,251 @@ export class WarpView implements MapView {
     return false
   }
 
+  /** 此刻视线的颜色：锁定越近越红 */
+  private gazeColor(st: WarpState): number {
+    return mix(GAZE_COLD, GAZE_HOT, st.gaze.heat * st.gaze.heat)
+  }
+
+  /** 着色器里眼睛盯着的那间：光斑在哪、多大、锁定攒到多少，视线的颜色，锁定那一下的闪 */
+  private gazeUniforms(st: WarpState, cfg: WarpConfig, now: number): void {
+    const g = st.gaze
+    this.u.gaze = [g.x, g.y, cfg.gaze.spotU, g.heat]
+    this.u.gazeRoom = g.room
+    this.u.gazeCol = rgb(this.gazeColor(st))
+    this.u.lock = clamp01(1 - (now - g.lockedAt) / LOCK_MS)
+  }
+
   /**
-   * 核心柱：方框正中一根发光的柱子，是全图唯一的高光——白亮的柱顶、外面几圈转着的光环，一道光往上冲出平台的高度；
-   * 头目要从核心里出来时，柱子先烧成红白色
+   * 视线：从眼睛斜斜地照到地上的一道光，落地是一块光斑，光斑边上一圈刻度慢慢转；跟丢时视线发虚、一闪一闪地在原来那间里乱扫。
+   * 只从真的那只眼睛照出来
    */
-  private core(sim: Sim, st: WarpState, t: number): void {
-    const g = this.glowFx!
+  private beam(st: WarpState, cfg: WarpConfig, now: number, t: number): void {
+    const g = st.gaze
+    const b = this.beamFx!
     const cx = st.plan.core.x * UNIT
     const cy = st.plan.core.y * UNIT
-    let boss = 0
-    for (const e of query(sim.world, [Telegraph, Due])) {
-      if (!Telegraph.boss[e]) continue
-      const span = Math.max(1, Due.at[e]! - Telegraph.bornMs[e]!)
-      boss = Math.max(boss, clamp01((sim.elapsedMs - Telegraph.bornMs[e]!) / span))
-    }
-    const hot = boss > 0 ? 0.5 + 0.5 * Math.sin(t * (8 + 20 * boss)) : 0
-    const tint = boss > 0 ? 0xff7a8a : CORE_GLOW
-    const r = (this.cfg?.core.radiusU ?? 1.5) * UNIT
-    const rise = 3.2 * LIFT_PER_M * 2
-    // 往上冲出平台的那一截光
-    const slices = 14
-    for (let j = 0; j < slices; j++) {
-      const s0 = j / slices
-      const fade = (1 - s0) ** 1.6
-      for (const [w, al] of [
-        [0.95, 0.07],
-        [0.5, 0.14],
-        [0.2, 0.35],
-      ] as const) {
-        const ww = r * w * (1 - 0.35 * s0)
-        g.fillStyle(tint, al * fade * (1 + hot))
-        g.fillRect(cx - ww, cy - rise * (s0 + 1 / slices), ww * 2, rise / slices)
-      }
-    }
-    for (const [k, al] of [
-      [2.6, 0.05],
-      [1.8, 0.1],
-      [1.25, 0.2],
-      [0.9, 0.45],
-      [0.55, 0.9],
+    const fx = g.x * UNIT
+    const fy = g.y * UNIT
+    const dx = fx - cx
+    const dy = fy - cy
+    const len = Math.hypot(dx, dy) || 1
+    const nx = -dy / len
+    const ny = dx / len
+    const lost = now < g.lostUntil
+    const color = this.gazeColor(st)
+    const flick = lost ? 0.45 + 0.35 * Math.abs(Math.sin(t * 23)) : 1
+    const R = cfg.core.radiusU * EYE_K * UNIT
+    const spot = cfg.gaze.spotU * UNIT
+    for (const [w, al] of [
+      [1, 0.06],
+      [0.7, 0.07],
+      [0.4, 0.08],
     ] as const) {
-      g.fillStyle(k < 0.6 ? 0xffffff : tint, al * (1 + 0.6 * hot))
-      g.fillCircle(cx, cy, r * k)
+      const r0 = R * 0.35 * w
+      const r1 = spot * w
+      b.fillStyle(color, al * flick * (1 + g.heat))
+      quad(b, { x: cx + nx * r0, y: cy + ny * r0 }, { x: fx + nx * r1, y: fy + ny * r1 }, { x: fx - nx * r1, y: fy - ny * r1 }, { x: cx - nx * r0, y: cy - ny * r0 })
     }
-    for (let k = 0; k < 3; k++) {
-      const a0 = t * (0.6 + k * 0.35) * (k % 2 ? -1 : 1) + (k * Math.PI * 2) / 3
-      g.lineStyle(0.06 * UNIT, tint, 0.7)
-      for (let s = 0; s < 3; s++) {
-        g.beginPath()
-        g.arc(cx, cy, r * (1.15 + k * 0.28), a0 + (s * Math.PI * 2) / 3, a0 + (s * Math.PI * 2) / 3 + 1.2, false)
-        g.strokePath()
+    b.fillStyle(color, 0.12 * flick)
+    b.fillCircle(fx, fy, spot)
+    b.lineStyle(0.07 * UNIT, color, 0.85 * flick)
+    b.strokeCircle(fx, fy, spot)
+    const spin = t * 0.6
+    b.lineStyle(0.12 * UNIT, color, 0.8 * flick)
+    for (let k = 0; k < 12; k++) {
+      const a = spin + (k / 12) * Math.PI * 2
+      const r = spot * (k % 3 === 0 ? 0.82 : 0.9)
+      b.lineBetween(fx + Math.cos(a) * r, fy + Math.sin(a) * r, fx + Math.cos(a) * spot * 0.97, fy + Math.sin(a) * spot * 0.97)
+    }
+  }
+
+  /**
+   * 核心柱是一只眼：一圈暗色的机壳上八片光圈叶片，里面眼白、青色的虹膜、黑的瞳孔。虹膜朝视线落下的地方偏过去，锁定越近越红、瞳孔越缩越小；
+   * 跟丢时虹膜发暗。画面往四周平铺出的每一只眼都是它，每一只都转过来看着同一处
+   */
+  private eyes(v: ViewCtx, sim: Sim, st: WarpState, cfg: WarpConfig, now: number, t: number): void {
+    const g = st.gaze
+    const e = this.eyeFx!
+    const glow = this.eyeGlow!
+    const R = cfg.core.radiusU * EYE_K * UNIT
+    const W = FRAME_U * UNIT
+    const fx = g.x * UNIT
+    const fy = g.y * UNIT
+    const heat = g.heat
+    const lost = now < g.lostUntil
+    const iris = mix(0x18c8ee, 0xe8203f, heat * heat)
+    const lock = clamp01(1 - (now - g.lockedAt) / LOCK_MS)
+    let boss = 0
+    for (const b of query(sim.world, [Telegraph, Due])) {
+      if (!Telegraph.boss[b]) continue
+      const span = Math.max(1, Due.at[b]! - Telegraph.bornMs[b]!)
+      boss = Math.max(boss, clamp01((sim.elapsedMs - Telegraph.bornMs[b]!) / span))
+    }
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const cx = st.plan.core.x * UNIT + i * W
+        const cy = st.plan.core.y * UNIT + j * W
+        if (!v.lens.screen.sees(cx, cy, R * 3)) continue
+        const dx = fx - cx
+        const dy = fy - cy
+        const d = Math.hypot(dx, dy) || 1
+        const off = R * LOOK_K * Math.min(1, d / (LOOK_FULL_U * UNIT))
+        const ex = cx + (dx / d) * off
+        const ey = cy + (dy / d) * off
+        // 机壳与光圈叶片
+        e.fillStyle(0x07141c, 1)
+        e.fillCircle(cx, cy, R * 1.24)
+        e.lineStyle(0.05 * UNIT, 0x2a6a80, 1)
+        e.strokeCircle(cx, cy, R * 1.24)
+        for (let k = 0; k < 8; k++) {
+          const a = t * 0.15 + (k / 8) * Math.PI * 2
+          e.lineStyle(0.04 * UNIT, 0x1d4c5c, 1)
+          e.lineBetween(cx + Math.cos(a) * R * 1.02, cy + Math.sin(a) * R * 1.02, cx + Math.cos(a + 0.5) * R * 1.22, cy + Math.sin(a + 0.5) * R * 1.22)
+        }
+        // 眼白：背着光的那一边暗一点，像个球
+        e.fillStyle(0xcfeef6, 1)
+        e.fillCircle(cx, cy, R)
+        e.fillStyle(0x7fb6c6, 0.55)
+        e.fillCircle(cx + R * 0.16, cy + R * 0.2, R * 0.86)
+        e.fillStyle(0xe8fbff, 1)
+        e.fillCircle(cx - R * 0.08, cy - R * 0.1, R * 0.8)
+        // 眼白上几根血丝，锁定越近越多
+        const veins = Math.round(heat * 9)
+        e.lineStyle(0.03 * UNIT, 0xd8344c, 0.75)
+        for (let k = 0; k < veins; k++) {
+          const a = (k / 9) * Math.PI * 2 + 0.4
+          e.lineBetween(cx + Math.cos(a) * R * 0.97, cy + Math.sin(a) * R * 0.97, cx + Math.cos(a + 0.12) * R * 0.66, cy + Math.sin(a + 0.12) * R * 0.66)
+        }
+        // 虹膜
+        const ir = R * 0.52
+        e.fillStyle(shade(iris, lost ? 0.45 : 0.75), 1)
+        e.fillCircle(ex, ey, ir)
+        e.fillStyle(lost ? shade(iris, 0.6) : iris, 1)
+        e.fillCircle(ex, ey, ir * 0.82)
+        e.lineStyle(0.03 * UNIT, lift(iris, 0.5), 0.8)
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          e.lineBetween(ex + Math.cos(a) * ir * 0.4, ey + Math.sin(a) * ir * 0.4, ex + Math.cos(a) * ir * 0.8, ey + Math.sin(a) * ir * 0.8)
+        }
+        // 瞳孔：锁定越近缩得越小
+        const pr = ir * (0.5 - 0.22 * heat)
+        e.fillStyle(0x020608, 1)
+        e.fillCircle(ex, ey, pr)
+        e.fillStyle(0xffffff, 0.85)
+        e.fillCircle(ex - ir * 0.32, ey - ir * 0.36, ir * 0.16)
+        // 眼睛四周的光，锁定那一下扩出一圈红；头目要出来时整只眼一闪一闪地发红
+        glow.fillStyle(iris, 0.18 + 0.25 * heat)
+        glow.fillCircle(ex, ey, ir * 1.25)
+        glow.fillStyle(GAZE_COLD, 0.06)
+        glow.fillCircle(cx, cy, R * 1.9)
+        if (lock > 0) {
+          glow.lineStyle(0.18 * UNIT, GAZE_HOT, lock)
+          glow.strokeCircle(cx, cy, R * (1.3 + 3 * (1 - lock)))
+        }
+        if (boss > 0) {
+          glow.fillStyle(0xff4060, 0.3 * boss * (0.5 + 0.5 * Math.sin(t * (8 + 20 * boss))))
+          glow.fillCircle(cx, cy, R * 1.4)
+        }
       }
     }
+    // 锁定那一刻：从眼睛射向全站其余的传送台
+    for (const [i, p] of st.pads.entries()) {
+      const d = now - p.calledAt
+      if (d < 0 || d > CALL_MS) continue
+      const k = 1 - d / CALL_MS
+      const pad = st.plan.rooms[i]!.pad
+      this.airFx!.lineStyle(0.16 * UNIT, GAZE_HOT, 0.8 * k)
+      this.airFx!.lineBetween(st.plan.core.x * UNIT, st.plan.core.y * UNIT, pad.x * UNIT, pad.y * UNIT)
+    }
+  }
+
+  /** 被盯着的那间里的敌人脚下一圈视线色的圈：它们跑得快、打得疼 */
+  private watched(sim: Sim, st: WarpState): void {
+    const room = st.gaze.room
+    if (room < 0) return
+    const f = st.plan.rooms[room]!.slab
+    const color = this.gazeColor(st)
+    const g = this.floorFx!
+    g.lineStyle(0.08 * UNIT, color, 0.9)
+    for (const e of query(sim.world, ENEMY_SET)) {
+      if (!Alive.v[e]) continue
+      const x = Transform.x[e]!
+      const y = Transform.y[e]!
+      if (x < f.x0 * UNIT || x >= f.x1 * UNIT || y < f.y0 * UNIT || y >= f.y1 * UNIT) continue
+      const r = Radius.v[e]! * 1.2
+      g.strokeEllipse(x, y + r * 0.25, r * 2, r * 1.2)
+    }
+  }
+
+  /** 队伍被盯着时，队长四周四个角标往里收，锁定越近收得越紧、越红，快满时一闪一闪 */
+  private reticle(sim: Sim, st: WarpState, now: number, t: number): void {
+    const g = st.gaze
+    if (g.room !== st.teamRoom || now < g.lostUntil) return
+    const lead = sim.leader
+    if (!Alive.v[lead]) return
+    const x = Transform.x[lead]!
+    const y = Transform.y[lead]!
+    const k = g.heat
+    const r = (2.4 - 1.5 * k) * UNIT
+    const color = this.gazeColor(st)
+    const blink = k > 0.8 ? 0.5 + 0.5 * Math.sign(Math.sin(t * 18)) : 1
+    const a = this.markFx!
+    a.lineStyle(0.1 * UNIT, color, (0.45 + 0.55 * k) * blink)
+    const arm = 0.5 * UNIT
+    for (let q = 0; q < 4; q++) {
+      const ang = t * (0.5 + 2 * k) + (q * Math.PI) / 2
+      const cx = x + Math.cos(ang) * r
+      const cy = y - 0.5 * UNIT + Math.sin(ang) * r
+      const ux = -Math.cos(ang)
+      const uy = -Math.sin(ang)
+      a.lineBetween(cx, cy, cx - uy * arm, cy + ux * arm)
+      a.lineBetween(cx, cy, cx + uy * arm, cy - ux * arm)
+    }
+  }
+
+  /** 每间房的标本：按那间的签名画出它的 emoji，放进自己的贴图里；狭长那间供在机柜台上，回廊那间浮在凹槽上，别的浮在离核心柱最远的那个角上 */
+  private async specimenImages(v: ViewCtx, plan: WarpPlan): Promise<void> {
+    const imgs = await Promise.all(plan.rooms.map((r) => emojiRaster(SPECIMENS[r.sign]!, 'player')))
+    plan.rooms.forEach((room, i) => {
+      const key = SPECIMEN_KEY + i
+      if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+      v.scene.textures.addImage(key, imgs[i]!)
+      const f = room.floor
+      const corner = { x: room.center.x < plan.core.x ? f.x0 + 2.5 : f.x1 - 2.5, y: room.center.y < plan.core.y ? f.y0 + 3.5 : f.y1 - 2 }
+      const at = room.deck ? { x: (room.deck.x0 + room.deck.x1) / 2, y: (room.deck.y0 + room.deck.y1) / 2 } : room.pit ? room.center : corner
+      const img = v.scene.add.image(at.x * UNIT, (at.y - SPECIMEN_LIFT_U) * UNIT, key).setDepth(9.4)
+      img.setDisplaySize(SPECIMEN_U * UNIT, SPECIMEN_U * UNIT)
+      this.visuals.push(img)
+      this.specimens.push({ img, x: at.x * UNIT, y: at.y * UNIT, color: SIGNS[room.sign]!.color })
+    })
+  }
+
+  /** 标本的全息像：脚下一圈投影台，一道光往上托着它，像慢慢转着、上下浮，一道道扫描线往上走 */
+  private specimenFx(t: number): void {
+    const size = SPECIMEN_U * UNIT
+    this.specimens.forEach((sp, k) => {
+      const bob = Math.sin(t * 1.3 + k) * 0.12 * UNIT
+      const top = sp.y - SPECIMEN_LIFT_U * UNIT + bob
+      const turn = Math.cos(t * 0.7 + k * 1.7)
+      const base = size / sp.img.width
+      sp.img.setScale(base * (0.7 + 0.3 * turn), base)
+      sp.img.setPosition(sp.x, top)
+      sp.img.setAlpha(0.8 + 0.15 * Math.sin(t * 9 + k) * Math.sin(t * 2.3))
+      const g = this.glowFx!
+      g.lineStyle(0.06 * UNIT, sp.color, 0.8)
+      g.strokeEllipse(sp.x, sp.y, 1.3 * UNIT, 0.7 * UNIT)
+      g.fillStyle(sp.color, 0.25)
+      g.fillEllipse(sp.x, sp.y, 0.9 * UNIT, 0.45 * UNIT)
+      const a = this.airFx!
+      a.fillStyle(sp.color, 0.08)
+      quad(a, { x: sp.x - 0.4 * UNIT, y: sp.y }, { x: sp.x - size * 0.55, y: top - size * 0.1 }, { x: sp.x + size * 0.55, y: top - size * 0.1 }, { x: sp.x + 0.4 * UNIT, y: sp.y })
+      for (let j = 0; j < 3; j++) {
+        const s = (t * 0.5 + j / 3) % 1
+        const y = top + size * 0.5 - s * size
+        a.lineStyle(0.04 * UNIT, sp.color, 0.45 * Math.sin(Math.PI * s))
+        a.lineBetween(sp.x - size * 0.5, y, sp.x + size * 0.5, y)
+      }
+    })
   }
 
   /** 立柱：墩子上立着一根半透明的光柱，一圈圈光往上走 */
@@ -733,7 +990,7 @@ export class WarpView implements MapView {
     }
   }
 
-  /** 传送台给身边的身体打一层下一间颜色的补光；核心柱四周的身体迎着柱子那一面亮一点 */
+  /** 传送台给身边的身体打一层下一间颜色的补光；眼睛四周的身体迎着眼睛那一面染上视线的颜色 */
   lightAt(x: number, y: number, out: LocalLight): void {
     const st = this.state
     const cfg = this.cfg
@@ -757,7 +1014,7 @@ export class WarpView implements MapView {
     if (d >= CORE_LIGHT_U) return
     out.fx = (st.plan.core.x - x / UNIT) / d
     out.fy = (st.plan.core.y - y / UNIT) / d
-    out.color = CORE_GLOW
+    out.color = this.gazeColor(st)
     out.fill = 0.35 * (1 - d / CORE_LIGHT_U)
   }
 
@@ -772,7 +1029,12 @@ export class WarpView implements MapView {
     this.floorFx = undefined
     this.glowFx = undefined
     this.airFx = undefined
+    this.eyeFx = undefined
+    this.eyeGlow = undefined
+    this.beamFx = undefined
+    this.markFx = undefined
+    this.specimens = []
     this.state = undefined
-    for (const key of [GROUND_KEY, TILES_KEY, MASK_KEY, TINT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [GROUND_KEY, TILES_KEY, MASK_KEY, TINT_KEY, ...[0, 1, 2, 3].map((i) => SPECIMEN_KEY + i)]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }

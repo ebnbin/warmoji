@@ -48,4 +48,6 @@ export const SFX = {
   // 跃迁：传送台充能越升越高的嗡鸣，整队被送走的那一下
   charge: { wave: 'sine', freq: 180, freqEnd: 760, duration: 1.4, volume: 0.13, attack: 1.1, decayPow: 0.5, throttleMs: 1200 },
   jump: { wave: 'sawtooth', freq: 140, freqEnd: 1500, duration: 0.42, volume: 0.17, attack: 0.008, decayPow: 1.3, throttleMs: 300 },
+  // 跃迁：眼睛锁定队伍、把全站的敌人调过来的那一声警报
+  glare: { wave: 'square', freq: 880, duration: 0.6, volume: 0.15, attack: 0.005, decayPow: 0.9, steps: [1, 0.75, 1, 0.75], throttleMs: 1500 },
 } as const satisfies Record<string, SfxDef>
