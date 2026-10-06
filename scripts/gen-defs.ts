@@ -774,9 +774,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const c = m.theater
   if (!c) continue
   const at = `maps.${id}.theater`
-  const { sizeU, margin, gapU, turn: t } = c
-  need(sizeU > 0 && sizeU + 2 <= FRAME_U - SAFE_U * 2, `${at}.sizeU 台面连四周的台板须放得进方框的安全区`)
-  need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < sizeU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
+  const { size, margin, gapU, turn: t } = c
+  need(size.wU > 0 && size.hU > 0 && size.wU <= FRAME_U - SAFE_U * 2 && size.hU <= FRAME_U - SAFE_U * 2, `${at}.size 台面须放得进方框的安全区`)
+  need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < size.hU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
   need(Number.isInteger(c.pieces[0]) && Number.isInteger(c.pieces[1]) && c.pieces[0] >= 1 && c.pieces[0] <= c.pieces[1], `${at}.pieces 须为不小于 1 的整数范围`)
   need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一幕与每幕演着的时长须为正`)
   need(t.lightMs > 0 && t.staggerMs >= 0 && t.flyMs > 0 && t.slideMs > 0 && t.lightMs <= t.staggerMs + t.flyMs, `${at}.turn 各段的时长须为正，聚光灯亮起来、收回去都放得进吊布景的那一段`)

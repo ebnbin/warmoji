@@ -398,19 +398,19 @@ const meadow: Painter = (ctx, w, h, rng, env) => {
   const fa = side.at(side.len / 2, wob(side.len / 2) - SL / 2)
   const fb = side.at(side.len / 2, wob(side.len / 2) + SL / 2)
   const fg = ctx.createLinearGradient(fa[0], fa[1], fb[0], fb[1])
-  fg.addColorStop(0, lit > 0 ? '#d8e09a' : '#5a8a4a')
-  fg.addColorStop(1, lit > 0 ? '#8aae5a' : '#24462a')
+  fg.addColorStop(0, lit > 0 ? '#d8e09a' : '#8ab868')
+  fg.addColorStop(1, lit > 0 ? '#8aae5a' : '#4a7a46')
   ctx.save()
   ctx.beginPath()
   smoothPath(ctx, face)
   ctx.fillStyle = fg
   ctx.fill()
   ctx.clip()
-  ctx.fillStyle = dots(ctx, '#1f3a1e', lit > 0 ? 0.12 : 0.35)
+  ctx.fillStyle = dots(ctx, '#1f3a1e', lit > 0 ? 0.12 : 0.22)
   ctx.fill()
   for (let s = 0; s < side.len; s += 0.45) {
     const at = side.at(s + rng.next() * 0.3, wob(s) + (rng.next() - 0.3) * SL * 0.7)
-    tuft(ctx, at[0], at[1], 0.22, lit > 0 ? '#6a8a3e' : '#14301a')
+    tuft(ctx, at[0], at[1], 0.22, lit > 0 ? '#6a8a3e' : '#2a4a26')
   }
   ctx.restore()
   line2(ctx, shoulder, '#fbf6c8', 0.16)
@@ -1093,49 +1093,61 @@ const ruins: Painter = (ctx, w, h, rng, env) => {
 }
 
 /**
- * 秋的接缝：晶洞的洞壁。从洞里往外：一排朝着洞心长的大晶、后面一排小的，再是一道道玛瑙纹，最外是发紫的黑玄武岩；
- * 洞壁外红叶被风吹进来，堆在岩脚
+ * 秋的接缝：晶洞塌开的洞口。洞口一圈是塌下来的玄武岩乱石，大大小小、有疏有密，朝洞里那面长着紫晶；
+ * 碎石与碎晶从洞口往外撒开，越远越稀；洞里的紫光往外漫出一点；红叶从残垣那边一路吹进洞里，越往里越稀
  */
 const geodeRim: Painter = (ctx, w, h, rng, env) => {
   const b = env.blend
   const seed = rng.int(0, 1 << 20)
-  // 玛瑙纹与玄武岩：离洞壁越远越暗，外沿按噪声淡进残垣
-  const AGATE: readonly Rgba[] = [[160, 148, 186, 1], [134, 118, 166, 1], [150, 138, 180, 1], [122, 104, 154, 1], [140, 124, 172, 1], [154, 142, 184, 1]]
+  // 洞口往外漫出的一点紫光、往里压一点暗
   field(ctx, w, h, 2, (x, y) => {
-    const d = env.sd(x, y) + (valueNoise(x * 0.8, y * 0.8, seed) - 0.5) * 0.3
-    if (d < -0.25 || d > 2.4) return null
-    if (d < 0.9) {
-      const q = Math.max(0, (d + 0.1) / 1)
-      const k = Math.min(AGATE.length - 1, Math.floor(q * AGATE.length))
-      const f = q * AGATE.length - Math.floor(q * AGATE.length)
-      const c = AGATE[k]!
-      const seam = 1 - 0.3 * (1 - smooth(0.06, 0.18, f))
-      return [c[0] * seam, c[1] * seam, c[2] * seam, smooth(-0.25, -0.05, d)]
-    }
-    const pit = valueNoise(x * 4, y * 4, seed + 3) > 0.82 ? 0.6 : 1
-    const fade = 1 - smooth(1.6 + (fbm(x * 0.5, y * 0.5, seed + 1, 2) - 0.5) * 1.2, 2.4, d)
-    const t = valueNoise(x * 1.2, y * 1.2, seed + 2)
-    return [(36 + 12 * t) * pit, (26 + 8 * t) * pit, (50 + 14 * t) * pit, fade]
-  })
-  for (const run of contour(b, env.ox, env.oy, w, h, 0.95)) line(ctx, run, '#1a0e26', 0.05)
-  // 两排晶体：后面一排小的，前面一排大的，尖朝洞心
-  for (const [off, gap, len, wid] of [[-0.05, 0.22, 0.45, 0.13], [-0.25, 0.32, 0.85, 0.22]] as const) {
-    along(contour(b, env.ox, env.oy, w, h, off), gap, (x, y) => {
-      const o = outward(env.sd, x, y)
-      const a = Math.atan2(-o[1], -o[0]) + (rng.next() - 0.5) * 0.7
-      prism(ctx, x - o[0] * 0.05, y - o[1] * 0.05, len * (0.7 + rng.next() * 0.5), wid * (0.8 + rng.next() * 0.4), a, 0.7 + rng.next() * 0.3)
-    })
-  }
-  along(contour(b, env.ox, env.oy, w, h, -0.6), 1.3, (x, y) => glint(ctx, x, y, 0.1, '#f4ecff'))
-  // 岩外吹进来的红叶
-  sow(rng, 220, w, h, (x, y) => {
     const d = env.sd(x, y)
-    return d > 1.6 && d < 3.4 ? 1 : d > -0.6 && d < 0.4 ? 0.35 : 0
+    if (d > 3 || d < -3) return null
+    return d > 0 ? [150, 110, 200, 0.22 * (1 - smooth(0, 3, d))] : [30, 14, 44, 0.25 * (1 - smooth(-3, 0, d))]
+  })
+  const rock = (x: number, y: number, r: number): void => {
+    const o = outward(env.sd, x, y)
+    ctx.beginPath()
+    ctx.ellipse(x + 0.08, y + 0.1, r * 1.05, r * 0.8, 0, 0, 6.28)
+    ctx.fillStyle = 'rgba(16,8,24,0.45)'
+    ctx.fill()
+    const shape = blob(rng, x, y, r, r * 0.78, 7, 0.22)
+    patch(ctx, shape, pick(rng, ['#54465e', '#5e5068', '#4a3e56']), { shade: '#1e1428', cover: 0.3, line: '#1e1428', lw: 0.035 })
+    // 迎光的一面亮一点：几道棱
+    line(ctx, [[x - r * 0.5, y - r * 0.2], [x - r * 0.1, y - r * 0.55], [x + r * 0.3, y - r * 0.4]], 'rgba(150,130,180,0.7)', 0.04, [], false)
+    // 朝洞里的那面长着一簇晶
+    if (r > 0.3) {
+      const n = 2 + Math.floor(rng.next() * 4)
+      for (let k = 0; k < n; k++) {
+        const a = Math.atan2(-o[1], -o[0]) + (rng.next() - 0.5) * 1.4
+        prism(ctx, x - o[0] * r * 0.4 + (rng.next() - 0.5) * r * 0.6, y - o[1] * r * 0.4 + (rng.next() - 0.5) * r * 0.5, r * (0.6 + rng.next() * 0.7), r * 0.26, a, 0.7 + rng.next() * 0.3)
+      }
+    }
+  }
+  // 洞口的乱石：沿界线有疏有密，大的小的混着，前后错开
+  along(contour(b, env.ox, env.oy, w, h, 0), 0.6, (x, y) => {
+    if (valueNoise(x * 0.35, y * 0.35, seed) < 0.45 || rng.next() < 0.35) return
+    const o = outward(env.sd, x, y)
+    const off = (rng.next() - 0.4) * 1.2
+    rock(x + o[0] * off, y + o[1] * off, 0.25 + rng.next() * rng.next() * 0.75)
+  })
+  // 往外撒开的碎石与碎晶，往里吹进去的红叶
+  sow(rng, 600, w, h, (x, y) => {
+    const d = env.sd(x, y)
+    return d > -1 && d < 3.5 ? (1 - smooth(-1, 3.5, d)) * 0.8 : 0
+  }, (x, y) => {
+    if (rng.next() < 0.5) {
+      stone(ctx, rng, x, y, 0.05 + rng.next() * 0.1, pick(rng, ['#3a2e46', '#5a4a68', '#2a2234']), '#140a1e')
+    } else prism(ctx, x, y, 0.12 + rng.next() * 0.16, 0.06, rng.next() * 6.28, 0.6 + rng.next() * 0.4)
+  })
+  sow(rng, 700, w, h, (x, y) => {
+    const d = env.sd(x, y)
+    return d > -4 && d < 1.5 ? smooth(-4, 1, d) * 0.9 : 0
   }, (x, y) => {
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(rng.next() * 6.28)
-    mapleLeaf(ctx, 0.13, pick(rng, FALL_LEAF), 0.018)
+    mapleLeaf(ctx, 0.15 + rng.next() * 0.08, pick(rng, FALL_LEAF), 0.02)
     ctx.restore()
   })
 }
@@ -1158,12 +1170,12 @@ function lavaPaths(sd: Sd, cone: { x: number; y: number; w: number; a: number } 
     let [x, y] = f
     const pts: Pt[] = [[x, y]]
     const g0 = gradOf(sd, x, y)
-    let a = Math.atan2(g0[1], g0[0]) + (i - 1) * 0.7
+    let a = Math.atan2(g0[1], g0[0]) + (i - 1) * 0.9
     for (let k = 0; k < 90 && sd(x, y) < 1.4; k++) {
       const [gx, gy] = gradOf(sd, x, y)
       const want = Math.atan2(gy, gx)
       const turn = Math.atan2(Math.sin(want - a), Math.cos(want - a))
-      a += Math.sign(turn) * Math.min(Math.abs(turn), 0.18) + (rng.next() - 0.5) * 0.45
+      a += Math.sign(turn) * Math.min(Math.abs(turn), 0.12) + (rng.next() - 0.5) * 0.3
       x += Math.cos(a) * 0.35
       y += Math.sin(a) * 0.35
       if (x < 0.3 || x > w - 0.3 || y < 0.3 || y > h - 0.3) break
@@ -1226,13 +1238,13 @@ const volcano: Painter = (ctx, w, h, rng, env) => {
     const cy = rng.next() * h
     if (env.sd(cx, cy) > -1.5) continue
     const tongue = blob(rng, cx, cy, 1.4 + rng.next(), 0.8 + rng.next() * 0.5, 9, 0.28)
-    patch(ctx, tongue, '#22272b', { line: '#0e1012', lw: 0.04 })
+    patch(ctx, tongue, '#4a5056', { alpha: 0.85, line: '#2a2e32', lw: 0.03 })
     ctx.save()
     ctx.beginPath()
     smoothPath(ctx, tongue)
     ctx.clip()
-    ctx.strokeStyle = '#3a4046'
-    ctx.lineWidth = 0.035
+    ctx.strokeStyle = '#30353a'
+    ctx.lineWidth = 0.03
     for (let k = -4; k <= 4; k++) {
       ctx.beginPath()
       ctx.arc(cx - 2.5, cy + k * 0.25, 2.4, -0.5, 0.5)
@@ -1265,186 +1277,153 @@ function windOf(rng: Rng): number {
   return rng.next() * 6.28
 }
 
+/** 一块浮冰：中心、大小、轮廓 */
+interface Floe {
+  readonly x: number
+  readonly y: number
+  readonly r: number
+  readonly pts: readonly Pt[]
+}
+
+/** 一块浮冰的轮廓：几道折断的直边 */
+function floeShape(rng: Rng, x: number, y: number, r: number, stretch: number, ang: number): Pt[] {
+  const n = 6 + Math.floor(rng.next() * 4)
+  const ph = rng.next() * 6.28
+  const pts: Pt[] = []
+  for (let k = 0; k < n; k++) {
+    const a = ph + ((k + (rng.next() - 0.5) * 0.5) / n) * Math.PI * 2
+    const rr = r * (0.72 + rng.next() * 0.38)
+    const lx = Math.cos(a) * rr * stretch
+    const ly = Math.sin(a) * rr
+    pts.push([x + lx * Math.cos(ang) - ly * Math.sin(ang), y + lx * Math.sin(ang) + ly * Math.cos(ang)])
+  }
+  return pts
+}
+
+function polyPath(ctx: Ctx, pts: readonly Pt[]): void {
+  ctx.beginPath()
+  ctx.moveTo(pts[0]![0], pts[0]![1])
+  for (const q of pts) ctx.lineTo(q[0], q[1])
+  ctx.closePath()
+}
+
+/** 画一块浮冰：水下一圈青绿的冰脚、背光一侧落在水上的影子，冰面积雪、露着发蓝的老冰，断口透着青光 */
+function drawFloe(ctx: Ctx, rng: Rng, f: Floe, wind: number): void {
+  ctx.save()
+  polyPath(ctx, f.pts)
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = Math.min(0.7, 0.25 + f.r * 0.2)
+  ctx.strokeStyle = 'rgba(31,120,128,0.65)'
+  ctx.stroke()
+  ctx.translate(0.12, 0.1)
+  polyPath(ctx, f.pts)
+  ctx.fillStyle = 'rgba(4,16,22,0.5)'
+  ctx.fill()
+  ctx.restore()
+  ctx.save()
+  polyPath(ctx, f.pts)
+  ctx.fillStyle = '#bdcfd9'
+  ctx.fill()
+  ctx.clip()
+  // 发蓝的老冰露出来几块，积雪顺着风堆成一片片
+  for (let k = 0; k < Math.max(1, Math.round(f.r * 1.5)); k++) {
+    patch(ctx, blob(rng, f.x + (rng.next() - 0.5) * f.r * 1.4, f.y + (rng.next() - 0.5) * f.r * 1.2, f.r * (0.25 + rng.next() * 0.3), f.r * (0.18 + rng.next() * 0.2), 7, 0.3), '#7099ab', { alpha: 0.75 })
+  }
+  for (let k = 0; k < Math.max(1, Math.round(f.r * 2)); k++) {
+    ctx.save()
+    ctx.translate(f.x + (rng.next() - 0.5) * f.r * 1.2, f.y + (rng.next() - 0.5) * f.r * 1.0)
+    ctx.rotate(wind)
+    patch(ctx, blob(rng, 0, 0, f.r * (0.4 + rng.next() * 0.4), f.r * (0.22 + rng.next() * 0.15), 9, 0.2), '#f7f9fc', { shade: '#9cb4d0', cover: 0.2 })
+    ctx.restore()
+  }
+  if (f.r > 1.2) {
+    ctx.strokeStyle = 'rgba(232,240,245,0.8)'
+    ctx.lineWidth = 0.025
+    for (let k = 0; k < f.r * 3; k++) {
+      let x = f.x + (rng.next() - 0.5) * f.r * 1.4
+      let y = f.y + (rng.next() - 0.5) * f.r * 1.2
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      for (let j = 0; j < 3; j++) {
+        x += (rng.next() - 0.5) * 0.8
+        y += (rng.next() - 0.5) * 0.8
+        ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+    }
+  }
+  // 冰边一圈湿冰发青
+  polyPath(ctx, f.pts)
+  ctx.lineWidth = 0.22
+  ctx.strokeStyle = 'rgba(107,168,199,0.8)'
+  ctx.stroke()
+  ctx.restore()
+  polyPath(ctx, f.pts)
+  ctx.lineWidth = 0.04
+  ctx.strokeStyle = LINE.winter
+  ctx.stroke()
+}
+
 /**
- * 冬的第二个景：冻海与浮冰。深青黑的冷水，浪尖一道道白；离岸远处浮着一大块浮冰，边缘一道道折断的直边，
- * 冰下一圈青绿的冰脚，断口透着青光；冰面上积雪顺着风拉成长条，没雪处是发蓝的老冰与白色的裂纹网，
- * 几道重新冻上的裂缝是深灰的新冰，上面开着霜花；冰边水里漂着碎冰
+ * 冬的第二个景：南极的冻海。深青黑的冷水，浪尖一道道白，一溜溜油脂似的薄冰顺着风；水面上漂着大大小小一块块分开的浮冰：
+ * 冰山、冰脊、雪堆各自坐在一块大浮冰上，别处还有中的小的，离岸越远越大，冰与冰之间露着水；靠岸的地方是一片片荷叶冰
  */
 const floe: Painter = (ctx, w, h, rng, env) => {
   const seed = rng.int(0, 1 << 20)
   const wind = windOf(rng)
+  const b = env.blend
   field(ctx, w, h, 2, (x, y) => {
-    const n = fbm(x * 0.2, y * 0.2, seed, 3)
-    return mix([9, 29, 36, 1], [28, 71, 82, 1], n)
+    const n = fbm(x * 0.18, y * 0.18, seed, 3)
+    const swell = 0.5 + 0.5 * Math.sin((x * Math.cos(wind) + y * Math.sin(wind)) * 0.9 + n * 4)
+    return mix(mix([8, 26, 34, 1], [26, 66, 78, 1], n), [36, 84, 96, 1], swell * 0.25)
   })
-  // 浪：顺着风的一道道浪尖
-  ripples(ctx, rng, w, h, wind, 0.55, 'rgba(120,170,180,0.35)', 0.04, () => true)
-  sow(rng, 160, w, h, () => 1, (x, y) => {
+  ripples(ctx, rng, w, h, wind, 0.55, 'rgba(120,170,180,0.3)', 0.04, () => true)
+  // 油脂冰：顺着风一溜溜发暗的平水
+  for (let i = 0; i < 8; i++) {
+    ctx.save()
+    ctx.translate(rng.next() * w, rng.next() * h)
+    ctx.rotate(wind)
+    patch(ctx, blob(rng, 0, 0, 2 + rng.next() * 2.5, 0.3 + rng.next() * 0.3, 8, 0.3), '#1c2b30', { alpha: 0.5 })
+    ctx.restore()
+  }
+  sow(rng, 140, w, h, () => 1, (x, y) => {
     ctx.beginPath()
     ctx.ellipse(x, y, 0.22, 0.04, wind, 0, 6.28)
-    ctx.fillStyle = 'rgba(220,232,236,0.7)'
+    ctx.fillStyle = 'rgba(220,232,236,0.6)'
     ctx.fill()
   })
-  // 浮冰：圈外离岸 band + FLOE_GAP_U 格起，按折断的直边围出来
-  const b = env.blend
-  const poly = floeEdge(b, env.ox, env.oy, b.band + FLOE_GAP_U, rng)
-  const ice = (c: Ctx): void => {
-    c.beginPath()
-    c.rect(-2, -2, w + 4, h + 4)
-    c.moveTo(poly[0]![0], poly[0]![1])
-    for (const p of poly) c.lineTo(p[0], p[1])
-    c.closePath()
+  // 浮冰：先给每件布景垫一块大的，再往空处撒中的小的，彼此不挨着
+  const floes: Floe[] = []
+  const free = (x: number, y: number, r: number): boolean => floes.every((f) => Math.hypot(f.x - x, f.y - y) > f.r + r + 0.35)
+  for (const p of spots(env, ['berg', 'ridge', 'drift'])) {
+    const r = Math.max(1.5, p.w * 0.62) + 0.5
+    floes.push({ x: p.x, y: p.y - 0.4, r, pts: floeShape(rng, p.x, p.y - 0.4, r, 1.15, p.a) })
   }
-  // 冰脚：水下一圈青绿
-  ctx.save()
-  ctx.beginPath()
-  ctx.moveTo(poly[0]![0], poly[0]![1])
-  for (const p of poly) ctx.lineTo(p[0], p[1])
-  ctx.closePath()
-  ctx.lineWidth = 0.9
-  ctx.lineJoin = 'round'
-  ctx.strokeStyle = 'rgba(31,120,128,0.7)'
-  ctx.stroke()
-  ctx.lineWidth = 0.35
-  ctx.strokeStyle = 'rgba(230,242,245,0.8)'
-  ctx.setLineDash([0.4, 0.3])
-  ctx.stroke()
-  ctx.restore()
-  ctx.save()
-  ice(ctx)
-  ctx.clip('evenodd')
-  field(ctx, w, h, 2, (x, y) => {
-    const m = fbm(x * 0.35, y * 0.35, seed + 5, 3)
-    return mix([112, 153, 171, 1], [189, 207, 217, 1], smooth(0.35, 0.65, m))
-  })
-  // 白色的裂纹网
-  ctx.strokeStyle = 'rgba(230,237,242,0.75)'
-  ctx.lineWidth = 0.025
-  for (let i = 0; i < 40; i++) {
-    let x = rng.next() * w
-    let y = rng.next() * h
-    ctx.beginPath()
-    ctx.moveTo(x, y)
-    for (let k = 0; k < 4; k++) {
-      x += (rng.next() - 0.5) * 1.4
-      y += (rng.next() - 0.5) * 1.4
-      ctx.lineTo(x, y)
-    }
-    ctx.stroke()
+  for (let t = 0; t < 900 && floes.length < 70; t++) {
+    const x = rng.next() * w
+    const y = rng.next() * h
+    const d = env.sd(x, y) - b.band
+    if (d < 0.6) continue
+    const big = Math.min(1, d / 9)
+    const r = 0.35 + rng.next() * rng.next() * (0.8 + 2.4 * big)
+    if (!free(x, y, r)) continue
+    floes.push({ x, y, r, pts: floeShape(rng, x, y, r, 1 + rng.next() * 0.5, rng.next() * 6.28) })
   }
-  // 新冰：横穿浮冰的几道折线，深灰，开着霜花
-  for (let i = 0; i < 2; i++) {
-    const pts: Pt[] = []
-    let x = rng.next() * w
-    let y = rng.next() * h
-    let a = rng.next() * 6.28
-    for (let k = 0; k < 7; k++) {
-      pts.push([x, y])
-      a += (rng.next() - 0.5) * 1.2
-      x += Math.cos(a) * 2.2
-      y += Math.sin(a) * 2.2
-    }
-    line(ctx, pts, '#5a7480', 0.38, [], false)
-    line(ctx, pts, 'rgba(40,58,66,0.5)', 0.03, [], false)
-    for (let k = 0; k < 18; k++) {
-      const s = pts[Math.floor(rng.next() * (pts.length - 1))]!
-      const t = pts[pts.indexOf(s) + 1]!
-      const u = rng.next()
-      const fx = s[0] + (t[0] - s[0]) * u + (rng.next() - 0.5) * 0.35
-      const fy = s[1] + (t[1] - s[1]) * u + (rng.next() - 0.5) * 0.35
-      for (let j = 0; j < 5; j++) {
-        ctx.beginPath()
-        ctx.arc(fx + Math.cos((j / 5) * 6.28) * 0.04, fy + Math.sin((j / 5) * 6.28) * 0.04, 0.03, 0, 6.28)
-        ctx.fillStyle = '#eef5fa'
-        ctx.fill()
-      }
-    }
-  }
-  // 积雪：顺着风拉长的一片片，盖住一半冰面，背风一侧泛淡蓝；冰边一圈没有雪
-  const cw = Math.cos(wind)
-  const sw = Math.sin(wind)
-  field(ctx, w, h, 2, (x, y) => {
-    const u = x * cw + y * sw
-    const v = -x * sw + y * cw
-    const n = fbm(u * 0.12, v * 0.38, seed + 6, 3)
-    const edge = smooth(b.band + FLOE_GAP_U + 0.4, b.band + FLOE_GAP_U + 1.8, env.sd(x, y))
-    const t = smooth(0.46, 0.52, n) * edge
-    if (t <= 0) return null
-    const lee = smooth(0.52, 0.62, fbm(u * 0.12 + 0.6, v * 0.38, seed + 6, 3))
-    return [247 - 40 * (1 - lee), 249 - 30 * (1 - lee), 252 - 10 * (1 - lee), t]
-  })
-  ripples(ctx, rng, w, h, wind, 0.3, 'rgba(200,214,232,0.5)', 0.025, (x, y) => env.sd(x, y) > b.band + FLOE_GAP_U + 1)
-  ctx.restore()
-  // 断口：一道透着青光的边，外面一溜湿冰
-  ctx.beginPath()
-  ctx.moveTo(poly[0]![0], poly[0]![1])
-  for (const p of poly) ctx.lineTo(p[0], p[1])
-  ctx.closePath()
-  ctx.lineJoin = 'miter'
-  ctx.lineWidth = 0.14
-  ctx.strokeStyle = '#6ba8c7'
-  ctx.stroke()
-  ctx.lineWidth = 0.04
-  ctx.strokeStyle = LINE.winter
-  ctx.stroke()
-  // 冰边的碎冰：一块块棱角分明的小冰片，越靠冰边越密
+  for (const f of floes) drawFloe(ctx, rng, f, wind)
+  // 靠岸一带：荷叶冰，一个个圆盘，边上翻起一圈白
   sow(rng, 260, w, h, (x, y) => {
-    const d = env.sd(x, y) - b.band - FLOE_GAP_U
-    return d < 0 && d > -2.4 ? 1 + d / 2.4 : 0
+    const d = env.sd(x, y) - b.band
+    return d > 0 && d < 3.5 && free(x, y, 0.2) ? 1 - d / 3.5 : 0
   }, (x, y) => {
-    const r = 0.18 + rng.next() * 0.22
-    const pts: Pt[] = []
-    const n = 5 + Math.floor(rng.next() * 2)
-    const ph = rng.next() * 6.28
-    for (let k = 0; k < n; k++) {
-      const a = ph + (k / n) * 6.28
-      const rr = r * (0.7 + rng.next() * 0.5)
-      pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr])
-    }
+    const r = 0.12 + rng.next() * 0.16
     ctx.beginPath()
-    ctx.moveTo(pts[0]![0], pts[0]![1])
-    for (const p of pts) ctx.lineTo(p[0], p[1])
-    ctx.closePath()
-    ctx.fillStyle = pick(rng, ['#e6f0f4', '#a8c9d6', '#80a8b3'])
+    ctx.ellipse(x, y, r, r * 0.85, rng.next() * 3, 0, 6.28)
+    ctx.fillStyle = '#9fbcc6'
     ctx.fill()
-    ctx.lineWidth = 0.02
-    ctx.strokeStyle = '#2a4a58'
+    ctx.lineWidth = 0.04
+    ctx.strokeStyle = '#eef6f9'
     ctx.stroke()
   })
-}
-
-/** 浮冰离岸多远起，格（再加上分界的渐变带） */
-const FLOE_GAP_U = 2.6
-
-/** 浮冰的边：沿着圈外 off 格那一圈，每隔两三格折一下，断口是直的，再加一点锯齿 */
-function floeEdge(b: Blend, ox: number, oy: number, off: number, rng: Rng): Pt[] {
-  const pts: Pt[] = []
-  if (b.kind === 'ring') {
-    const k = Math.max(2, Math.round((b.r * 2 * Math.PI) / b.waveU))
-    let a = -Math.PI
-    while (a < Math.PI) {
-      const r = b.r + off + b.amp * Math.sin(a * k + b.phase) + (rng.next() - 0.5) * 0.7
-      pts.push([b.cx + Math.cos(a) * r - ox, b.cy + Math.sin(a) * r - oy])
-      a += (1.8 + rng.next() * 1.4) / Math.max(1, b.r + off)
-    }
-  } else {
-    const tx = -b.ny
-    const ty = b.nx
-    for (let s = -60; s <= 60; s += 1.8 + rng.next() * 1.4) {
-      const d = off - b.amp * Math.sin((s / b.waveU) * Math.PI * 2 + b.phase) + (rng.next() - 0.5) * 0.7
-      pts.push([b.cx + tx * s + b.nx * d - ox, b.cy + ty * s + b.ny * d - oy])
-    }
-    pts.push([b.cx + b.nx * 200 - ox, b.cy + b.ny * 200 - oy])
-  }
-  // 折线每段中间加一个小锯齿
-  const out: Pt[] = []
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i]!
-    const q = pts[(i + 1) % pts.length]!
-    out.push(p)
-    out.push([(p[0] + q[0]) / 2 + (rng.next() - 0.5) * 0.3, (p[1] + q[1]) / 2 + (rng.next() - 0.5) * 0.3])
-  }
-  return out
 }
 
 /**
@@ -1500,7 +1479,7 @@ interface Season {
 const SEASONS: Record<ChapterKey, Season> = {
   spring: { a: meadow, b: garden, mask: (d) => smooth(-2.4, 2.4, d), wob: 1.4, seam: brook },
   summer: { a: desert, b: sea, mask: (d) => smooth(-0.05, 0.25, d), wob: 0, seam: shore },
-  autumn: { a: geode, b: ruins, mask: (d) => smooth(-0.15, 0.15, d), wob: 0, seam: geodeRim },
+  autumn: { a: geode, b: ruins, mask: (d) => smooth(-1.4, 1.4, d), wob: 1.1, seam: geodeRim },
   winter: { a: volcano, b: floe, mask: (d) => smooth(-0.3, 0.3, d), wob: 0.3, seam: steamShore },
 }
 

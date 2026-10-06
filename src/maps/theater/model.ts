@@ -21,7 +21,7 @@ const BIG_U = 1.15
 /** 摆在两个景交界那一带的布景离界线最多多远，格 */
 const MID_U = 2.6
 /** 摆在第二个景远处的布景离界线至少再远多少，格：冬天岸边那一圈是冷水，浮冰从这里起 */
-export const FAR_U = 3.6
+export const FAR_U = 2
 /** 台中线上的活门离台中心多远，格 */
 const TRAP_DY = [-11, -6.5, 6.5, 11] as const
 /** 一幕最多换几次种子重摆 */
@@ -153,10 +153,10 @@ export interface Stage {
 /** 台面摆在方框正中，台中线竖着；开局演到哪一章按种子定 */
 export function makeStage(cfg: TheaterConfig, seed: number): Stage {
   const c = FRAME_U / 2
-  const x0 = c - cfg.sizeU / 2
-  const x1 = c + cfg.sizeU / 2
-  const y0 = c - cfg.sizeU / 2
-  const y1 = c + cfg.sizeU / 2
+  const x0 = c - cfg.size.wU / 2
+  const x1 = c + cfg.size.wU / 2
+  const y0 = c - cfg.size.hU / 2
+  const y1 = c + cfg.size.hU / 2
   const pad = BASIN_PAD_U
   const cell = BASIN_CELL_U * UNIT
   const bx0 = (x0 - pad) * UNIT
@@ -291,8 +291,8 @@ type Where = 'a' | 'b' | 'far' | 'mid' | 'any'
 type Item = { readonly n: readonly [number, number]; readonly specs: readonly Spec[]; readonly at: Where }
 
 /**
- * 四章：春是草甸流进樱庭，夏是沙漠走到深海，秋是台角的紫水晶洞通到外面落满红叶的残垣，冬是台角的雪火山流下熔岩、淌进漂着浮冰的冻海；
- * 冬天的冰山、冰脊、雪堆都立在浮冰上，离岸边的冷水远一点
+ * 四章：春是草甸流进樱庭，夏是沙漠走到深海，秋是台角的紫水晶洞通到外面落满红叶的残垣，冬是海岸一边的雪火山流下熔岩、淌进另一边漂着浮冰的冻海；
+ * 冬天的冰山、冰脊、雪堆离岸远一点，各自坐在一块浮冰上
  */
 const LAYOUTS: Record<ChapterKey, readonly Item[]> = {
   spring: [
@@ -347,7 +347,7 @@ const FILLER: Record<ChapterKey, { readonly spec: Spec; readonly at: Where }> = 
   winter: { spec: DRIFT, at: 'far' },
 }
 
-/** 这一章的两个景怎么分：春、夏是一道弯弯的线（小溪、海岸线）斜着穿过两页，秋、冬是围着台边一处的一圈（晶洞里、火山脚下） */
+/** 这一章的两个景怎么分：春、夏是一道弯弯的线（小溪、海岸线）斜着穿过台面，冬是一道大致竖着的海岸线，秋是围着台边一处的一圈（晶洞里） */
 function blendOf(stage: Stage, chapter: number, rng: Rng): Blend {
   const key = CHAPTERS[chapter]!.key
   const w = stage.x1 - stage.x0
@@ -367,13 +367,29 @@ function blendOf(stage: Stage, chapter: number, rng: Rng): Blend {
       band: key === 'summer' ? 1.6 : 3.2,
     }
   }
+  if (key === 'winter') {
+    // 海岸线大致竖着把台面分成左右两半：一边火山，一边冻海
+    const a = (rng.next() < 0.5 ? 0 : Math.PI) + (rng.next() - 0.5) * 0.9
+    return {
+      kind: 'line',
+      cx: stage.cx + (rng.next() - 0.5) * w * 0.16,
+      cy: stage.cy,
+      nx: Math.cos(a),
+      ny: Math.sin(a),
+      r: 0,
+      amp: 1.3,
+      waveU: 6 + rng.next() * 4,
+      phase: rng.next() * Math.PI * 2,
+      band: 1.2,
+    }
+  }
   // 圈心落在四个角或四条边的中段附近，圈不碰出生的地方
   const spots: Point[] = [
     { x: stage.x0 + 2, y: stage.y0 + 2 }, { x: stage.x1 - 2, y: stage.y0 + 2 }, { x: stage.x0 + 2, y: stage.y1 - 2 }, { x: stage.x1 - 2, y: stage.y1 - 2 },
     { x: stage.x0 + 1, y: stage.cy }, { x: stage.x1 - 1, y: stage.cy }, { x: stage.cx + w * 0.22, y: stage.y0 }, { x: stage.cx - w * 0.22, y: stage.y1 },
   ]
   const at = spots[Math.floor(rng.next() * spots.length)]!
-  return { kind: 'ring', cx: at.x, cy: at.y, nx: 0, ny: 0, r: 11.5 + rng.next() * 2.5, amp: 1, waveU: 6, phase: rng.next() * Math.PI * 2, band: key === 'winter' ? 1.8 : 3 }
+  return { kind: 'ring', cx: at.x, cy: at.y, nx: 0, ny: 0, r: 12 + rng.next() * 2.5, amp: 1.2, waveU: 6, phase: rng.next() * Math.PI * 2, band: 3 }
 }
 
 /** 一件布景落在这一处合不合它的景 */
