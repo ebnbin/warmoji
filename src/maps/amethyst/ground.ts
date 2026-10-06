@@ -13,6 +13,8 @@ export const RELIEF_PPU = 16
 const SKY_SOFT_U = 2.5 / RELIEF_PPU
 /** 画不到的地方的底色：比最暗的岩体还暗一点的紫黑 */
 export const ROCK_BG = [13, 8, 19] as const
+/** 晶面的镜面有多尖：越大，晶面要越正对着反射方向才闪 */
+export const SHINE = 56
 /** 从洞厅进暗道这么深，洞底与洞壁才全换成暗道里的样子，格 */
 const TUNNEL_BLEND_U = 2
 
@@ -548,7 +550,8 @@ function sample(p: Px, L: AmethystLayout, seams: readonly Seam[], wx: number, wy
 /**
  * 画第 r0 到 r1 行（每格 ppu 像素）的地面固有色与表面朝向，洞壁上画出晶缝：albedo 是 RGBA 的颜色，face 的 R、G 是法线的 x、y（按 0.5 偏移）、B 是镜面的强弱，
  * 都要满 alpha（画布会按透明度预乘）。不含光，光照在着色器里随太阳、月亮与火把实时算；表面朝向先按高度场求，晶体、碎石与卵石换成它们自己的晶面。
- * 每个像素先在中心画一次，和上下左右差得多的（东西的边上）再在 AA 的几处补画、连中心一起取平均，放大了看边上不起台阶
+ * 每个像素先在中心画一次，和上下左右差得多的（东西的边上）再在 AA 的几处补画、连中心一起取平均，放大了看边上不起台阶；
+ * 镜面则按各处的朝向偏离平均朝向多少打折，免得混出来的朝向谁也不朝着却照样闪
  */
 export function paintRows(L: AmethystLayout, seams: readonly Seam[], ppu: number, r0: number, r1: number, albedo: Uint8ClampedArray, normal: Uint8ClampedArray): void {
   const f = L.field
@@ -593,6 +596,7 @@ export function paintRows(L: AmethystLayout, seams: readonly Seam[], ppu: number
     Math.max(Math.abs(col[a * 3]! - col[b * 3]!), Math.abs(col[a * 3 + 1]! - col[b * 3 + 1]!), Math.abs(col[a * 3 + 2]! - col[b * 3 + 2]!)) > EDGE_RGB ||
     Math.abs(nor[a * 3]! - nor[b * 3]!) + Math.abs(nor[a * 3 + 1]! - nor[b * 3 + 1]!) > EDGE_NORMAL ||
     Math.abs(gloss[a]! - gloss[b]!) > EDGE_GLOSS
+  const taps = new Float32Array((AA.length + 1) * 4)
   for (let py = r0; py < r1; py++) {
     const j = py - r0 + 1
     const wy = f.y + (py + 0.5) * step
@@ -606,7 +610,12 @@ export function paintRows(L: AmethystLayout, seams: readonly Seam[], ppu: number
       let nz = nor[k * 3 + 2]!
       let gl = gloss[k]!
       if ((i > 0 && differs(k, k - 1)) || (i < W - 1 && differs(k, k + 1)) || differs(k, k - W) || differs(k, k + W)) {
-        for (const [ox, oy] of AA) {
+        taps[0] = nx
+        taps[1] = ny
+        taps[2] = nz
+        taps[3] = gl
+        for (let s = 1; s <= AA.length; s++) {
+          const [ox, oy] = AA[s - 1]!
           sample(p, L, seams, f.x + (i + 0.5 + ox) * step, wy + oy * step, base[k * 3]!, base[k * 3 + 1]!, base[k * 3 + 2]!)
           r += p.r
           g += p.g
@@ -614,15 +623,21 @@ export function paintRows(L: AmethystLayout, seams: readonly Seam[], ppu: number
           nx += p.nx
           ny += p.ny
           nz += p.nz
-          gl += p.gloss
+          taps[s * 4] = p.nx
+          taps[s * 4 + 1] = p.ny
+          taps[s * 4 + 2] = p.nz
+          taps[s * 4 + 3] = p.gloss
         }
         r /= AA.length + 1
         g /= AA.length + 1
         b /= AA.length + 1
-        gl /= AA.length + 1
         const l = Math.hypot(nx, ny, nz) || 1
         nx /= l
         ny /= l
+        nz /= l
+        gl = 0
+        for (let s = 0; s <= AA.length; s++) gl += taps[s * 4 + 3]! * Math.max(0, taps[s * 4]! * nx + taps[s * 4 + 1]! * ny + taps[s * 4 + 2]! * nz) ** SHINE
+        gl /= AA.length + 1
       }
       const o = ((py - r0) * W + i) * 4
       albedo[o] = r

@@ -1,4 +1,4 @@
-import { bandBuffer, paintNebula } from './render'
+import { bandBuffer, paintBand } from './render'
 import type { NebulaSheet, SheetJob, SheetPiece } from './render'
 
 let sheet: NebulaSheet | undefined
@@ -11,7 +11,7 @@ self.onmessage = (e: MessageEvent<SheetJob>) => {
   }
   if (!sheet) throw new Error('画星云的线程还没收到 setup')
   const pixels = bandBuffer(sheet, job.band)
-  paintNebula(sheet, pixels, job.band.r0, job.band.r1)
+  paintBand(sheet, job.band, pixels)
   const piece: SheetPiece = { index: job.index, band: job.band, pixels }
   self.postMessage(piece, { transfer: [pixels.buffer] })
 }
