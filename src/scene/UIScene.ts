@@ -6,7 +6,7 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, StageDial, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TiltDial } from '../ui'
+import { AimGuide, Announcer, StageDial, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial } from '../ui'
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
@@ -37,8 +37,8 @@ const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 
 const GOALS = { top: 124, step: 42 } as const
 /** 左上角的全队经验条，右边跟着等级与还没领的升级 */
 const XP_BAR = { x: 12, y: 12, w: 200, h: 16, gap: 12 } as const
-/** 船上的一局在右上角计数下方放倾斜仪：盘心离右边与上边多远、盘的半径 */
-const TILT = { right: 64, top: 166, radius: 52 } as const
+/** 地图专属的表盘放在右上角计数下方：盘心离右边与上边多远、盘的半径 */
+const DIAL = { right: 64, top: 166, radius: 52 } as const
 
 export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
@@ -55,7 +55,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private fxKey = ''
   private goalChips: Chip[] = []
   private goalKey = ''
-  private tiltDial?: TiltDial
   private submarineDial?: SubmarineDial
   private sundial?: Sundial
   private stageDial?: StageDial
@@ -102,7 +101,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       bossHp: null,
       bossMaxHp: 1,
       battleFx: [],
-      tilt: null,
       clock: null,
       submarine: null,
       stage: null,
@@ -132,7 +130,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.fxKey = ''
     this.goalChips = []
     this.goalKey = ''
-    this.tiltDial = undefined
     this.sundial = undefined
     this.submarineDial = undefined
     this.stageDial = undefined
@@ -193,7 +190,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     const s = this.arena.hudSnapshot()
     this.updateFxIndicators(s.battleFx)
     this.updateGoals(s.goals)
-    this.updateTilt(s.tilt)
     this.updateClock(s.clock)
     this.updateSubmarine(s.submarine)
     this.updateStage(s.stage)
@@ -435,31 +431,24 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     })
   }
 
-  /** 在船上或梦幻乐园里打的一局：甲板或台面往哪边倾、倾多少，台子下一次往哪倾、哪个入口开着，随时看得见 */
-  private updateTilt(t: HudSnapshot['tilt']): void {
-    if (!t) return
-    this.tiltDial ??= new TiltDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius, t)
-    this.tiltDial.setTilt(t, this.time.now)
-  }
-
-  /** 在溶洞或紫水晶洞穴里打的一局：太阳月亮走到哪、离天黑或天亮还有多久，随时看得见 */
+  /** 在紫水晶洞穴里打的一局：太阳月亮走到哪、离天黑或天亮还有多久，随时看得见 */
   private updateClock(c: HudSnapshot['clock']): void {
     if (!c) return
-    this.sundial ??= new Sundial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
+    this.sundial ??= new Sundial(this, viewport.logicalWidth - safeInsets.right - DIAL.right, safeInsets.top + DIAL.top, DIAL.radius)
     this.sundial.setSky(c.sun, c.moon, c.phase, c.night, c.inSec)
   }
 
   /** 在深海打的一局：潜艇还有多久开走、开走了还有多久停稳，随时看得见 */
   private updateSubmarine(b: HudSnapshot['submarine']): void {
     if (!b) return
-    this.submarineDial ??= new SubmarineDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
+    this.submarineDial ??= new SubmarineDial(this, viewport.logicalWidth - safeInsets.right - DIAL.right, safeInsets.top + DIAL.top, DIAL.radius)
     this.submarineDial.setSubmarine(b.phase, b.ratio, b.inSec, this.time.now)
   }
 
   /** 在舞台剧里打的一局：离下一次换幕还有多久、正在换还是快要换了，随时看得见 */
   private updateStage(b: HudSnapshot['stage']): void {
     if (!b) return
-    this.stageDial ??= new StageDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
+    this.stageDial ??= new StageDial(this, viewport.logicalWidth - safeInsets.right - DIAL.right, safeInsets.top + DIAL.top, DIAL.radius)
     this.stageDial.setStage(b.phase, b.ratio, b.inSec, b.title, this.time.now)
   }
 

@@ -276,150 +276,6 @@ export interface VolcanoConfig {
     readonly buryMs: number
   }
 }
-/** 一列涌浪：波高（米）、周期（秒）、相对船头往哪个方向传（度，0 为顺着船头、90 为从左舷推向右舷） */
-export interface Swell {
-  readonly heightM: number
-  readonly periodS: number
-  readonly towardDeg: number
-}
-/** 身体脚下或金币与甲板之间的库仑摩擦系数 */
-export interface Friction {
-  readonly static: number
-  readonly kinetic: number
-}
-/**
- * 船：海上航行的一艘帆船，能走的是舷墙围着的甲板，舷墙与桅杆是硬边界。甲板上的人、怪、召唤物、掉落物、炮弹都有重量，
- * 船按静水力学与刚体动力学横摇、纵摇，海浪也推着它摇；甲板倾斜后重力沿甲板的分量让东西按库仑摩擦滑、炮弹按滚动摩擦滚，赶路按恒定功率上坡慢、下坡快。
- * 物理量按米、千克、秒算，一格 meterPerU 米
- */
-export interface ShipConfig {
-  readonly meterPerU: number
-  /** 甲板的平面形状，格：船摆在方框正中，横屏船头朝右、竖屏朝上 */
-  readonly hull: {
-    /** 甲板从船尾横板到船首柱的长、最宽处的宽 */
-    readonly lengthU: number
-    readonly beamU: number
-    /** 船头从最宽处收到船首柱的那段占船长的比例，半宽按余弦的 bowPow 次方收拢 */
-    readonly bow: number
-    readonly bowPow: number
-    /** 船尾从最宽处收到横板的那段占船长的比例，按指数 sternPow 的超椭圆收拢；横板的半宽占最宽处的比例，横板中间往后鼓出船宽的 transomBulge 倍 */
-    readonly stern: number
-    readonly sternPow: number
-    readonly transom: number
-    readonly transomBulge: number
-    /** 舷墙的厚度（格）与高（米） */
-    readonly bulwarkU: number
-    readonly bulwarkM: number
-    /** 窄过两倍 neckU 的尖角填掉 */
-    readonly neckU: number
-    /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路，队伍从船长正中出发，前后各有桅杆 */
-    readonly masts: readonly number[]
-    readonly mastU: number
-  }
-  /** 空船的静水力学，米：吃水、舯剖面系数（横剖面面积占宽乘吃水的比例）、重心高、型深；海水密度，千克/米³ */
-  readonly hydro: {
-    readonly draftM: number
-    readonly midship: number
-    readonly kgM: number
-    readonly depthM: number
-    readonly rho: number
-    /** 横摇、纵摇的惯性半径占船宽、船长的比例；附加质量占惯量的比例；阻尼比 */
-    readonly rollGyration: number
-    readonly pitchGyration: number
-    readonly rollAdded: number
-    readonly pitchAdded: number
-    readonly rollDamping: number
-    readonly pitchDamping: number
-  }
-  /** 甲板上的重量，千克：身体按半径的三次方与身体的质量折算，重心离甲板 bodyHeightM 米 */
-  readonly weight: {
-    readonly bodyKg: number
-    readonly bodyRadiusU: number
-    readonly bodyHeightM: number
-    readonly pickupKg: number
-    readonly ballKg: number
-  }
-  /** 海：船速（米/秒）与几列涌浪 */
-  readonly sea: {
-    readonly speedMs: number
-    readonly swells: readonly Swell[]
-  }
-  /** 摩擦：身体脚下、金币的静与动摩擦系数；炮弹的滚动摩擦系数 */
-  readonly friction: {
-    readonly body: Friction
-    readonly coin: Friction
-    readonly ballRolling: number
-  }
-  /** 赶路按恒定功率 P = m·v·(c − g∥)：c 是平地上的阻力（米/秒²），下坡最多快到 downhillMax 倍；每格的费力按 1 − g∥/c，最少 effortMin */
-  readonly gait: {
-    readonly flatResistance: number
-    readonly downhillMax: number
-    readonly effortMin: number
-  }
-  /** 甲板上散着的炮弹：几颗、半径（格）、与舷墙桅杆和彼此相撞的恢复系数 */
-  readonly balls: {
-    readonly count: number
-    readonly radiusU: number
-    readonly restitution: number
-  }
-}
-/**
- * 梦幻乐园：童话游乐园正中一座正多边形的摇摆台，四周贴着两圈正多边形的传送带。台面是一整块硬板，正中架在支点上，平着时比传送带高出支点那么高；
- * 看不见的操作员隔一阵随机挑一条边，先预警，再让台子往那边倾，倾到那条边贴着传送带为止，对边翘到两倍高；贴平了那条边围栏上的入口才打开，离开前先关上。
- * 入口关着或高度没接平，台上台下谁都过不去。倾斜的台面上赶路按恒定功率上坡慢、下坡快，闲着的身体与金币按库仑摩擦顺坡滑。
- * 内圈与外圈的传送带方向相反，每圈按边分段，隔一阵一齐换向。物理量按米、秒算，一格 meterPerU 米
- */
-export interface DreamlandConfig {
-  readonly meterPerU: number
-  /** 台子与两圈传送带的边数：倾斜的方向是各边朝外的法线 */
-  readonly sides: number
-  /** 第一条边朝外的法线朝哪，度：0 朝右，往下转为正 */
-  readonly rotDeg: number
-  /** 台面、内圈外沿、外圈外沿的边心距，格 */
-  readonly stageU: number
-  readonly innerU: number
-  readonly outerU: number
-  /** 支点离地多高，米 */
-  readonly pivotM: number
-  /** 台面一圈的围栏：多高（米），一条边两头立柱占的宽（格），中间是入口 */
-  readonly fence: {
-    readonly heightM: number
-    readonly postU: number
-  }
-  /** 操作员，毫秒：预警多久、倾过去多久、倾到底停多久（最短、最长）、回平多久、平着歇多久（最短、最长）；停完不回平、直接转去下一条边的概率 */
-  readonly operator: {
-    readonly warnMs: number
-    readonly tiltMs: number
-    readonly holdMs: readonly [number, number]
-    readonly levelMs: number
-    readonly restMs: readonly [number, number]
-    readonly direct: number
-  }
-  /** 入口，毫秒：贴平后隔多久开、离开前多久关，开关一次要多久 */
-  readonly gate: {
-    readonly openMs: number
-    readonly closeMs: number
-    readonly swingMs: number
-  }
-  /** 传送带：速度（格/秒）；隔多久换一次向（毫秒，最短、最长），换向前预警多久、换向时停下再反转用多久 */
-  readonly belt: {
-    readonly speedU: number
-    readonly flipMs: readonly [number, number]
-    readonly warnMs: number
-    readonly turnMs: number
-  }
-  /** 台面上身体脚下、金币的静与动摩擦系数 */
-  readonly friction: {
-    readonly body: Friction
-    readonly coin: Friction
-  }
-  /** 台面上赶路按恒定功率 P = m·v·(c − g∥)：c 是平地上的阻力（米/秒²），下坡最多快到 downhillMax 倍；每格的费力按 1 − g∥/c，最少 effortMin */
-  readonly gait: {
-    readonly flatResistance: number
-    readonly downhillMax: number
-    readonly effortMin: number
-  }
-}
 /**
  * 浮冰：南极海上一块近似方形的浮冰，形状按断裂、碰撞的成因每局随机生成；冰面没有边，滑出冰缘就掉进冰点附近的海水里。
  * 冰面上的一切按库仑摩擦走、滑、停，积雪、老冰、新冰的摩擦各不相同；海风一阵阵吹，风压超过脚下的摩擦就被吹着滑。
@@ -511,108 +367,6 @@ export interface FloeConfig {
   readonly waterExertion: number
   readonly waterRegen: number
   readonly coldTickMs: number
-}
-/**
- * 溶洞：方形地图里一座部分露天的石灰岩溶洞。阳光、天光、月光从洞顶的天窗照进洞里，随真实的太阳与月亮移动；入夜后队员点起火把。
- * 光照按勒克斯算，一格 1 米；镜头短边看到多少格由洞里的亮度决定；怪物只从暗处出来；洞壁、石柱与大石笋挡人也挡子弹
- */
-export interface CaveConfig {
-  /** 洞厅：边离方形地图的边 insetU 格之间按噪声起伏、波长 waveU，角按 cornerU 的半径磨圆；窄过两倍 neckU 的缝与尖角填成岩壁 */
-  readonly hall: {
-    readonly insetU: readonly [number, number]
-    readonly waveU: number
-    readonly cornerU: number
-    readonly neckU: number
-    /** 洞顶离洞底多高，米：天窗开在洞顶上 */
-    readonly ceilingM: number
-    /** 洞壁从洞底弯上洞顶要横着走多宽，格 */
-    readonly wallU: number
-  }
-  /**
-   * 天窗：大天窗几个、半径多大，第一个离地图中心 mainOffsetU 格，其余散在洞厅别处；小天窗的个数与半径，格；
-   * 轮廓按方位角在 ±jitter 倍内起伏；天窗之间的空隙至少 gapU 格
-   */
-  readonly skylights: {
-    readonly mainCount: readonly [number, number]
-    readonly mainU: readonly [number, number]
-    readonly mainOffsetU: readonly [number, number]
-    readonly minorCount: readonly [number, number]
-    readonly minorU: readonly [number, number]
-    readonly jitter: number
-    readonly gapU: number
-    /** 天窗正下方塌落的碎石坡：中间高多少米，铺到天窗半径的几倍 */
-    readonly rubbleM: number
-    readonly rubbleSpread: number
-  }
-  /** 支洞：从洞厅边往岩体里走 outU 格再顺着洞壁拐 alongU 格，宽 widthU，尽头是半径 pocketU 的暗室；天光与反光都照不进拐角后面 */
-  readonly alcoves: {
-    readonly count: readonly [number, number]
-    readonly widthU: number
-    readonly outU: number
-    readonly alongU: readonly [number, number]
-    readonly pocketU: number
-  }
-  /**
-   * 石柱（顶到洞顶）与石笋：个数、底半径（格）；石笋多半长成 clusters 丛。底半径不到 blockU 的石笋矮小，高 lowM 米，人跨得过；
-   * 粗的高 stalagmiteM 米，挡路；出生点 clearU 格内不长
-   */
-  readonly formations: {
-    readonly columns: readonly [number, number]
-    readonly columnU: readonly [number, number]
-    readonly stalagmites: readonly [number, number]
-    readonly clusters: readonly [number, number]
-    readonly stalagmiteU: readonly [number, number]
-    readonly stalagmiteM: readonly [number, number]
-    readonly lowM: readonly [number, number]
-    readonly blockU: number
-    readonly clearU: number
-  }
-  /** 边石坝水潭：几片、每片多大（格）；蹚水时的黏滞与每走一格耗的体力 */
-  readonly pools: {
-    readonly count: readonly [number, number]
-    readonly sizeU: readonly [number, number]
-    readonly viscosity: number
-    readonly exertion: number
-  }
-  /**
-   * 天：纬度与太阳赤纬（度），一天多少秒，开局在几点；大气消光系数（直射光按 exp(−消光·大气质量) 衰减）。
-   * 太阳高度在 dwellCenterDeg 附近时时间放慢到 1/(1+dwell)，按高度的高斯窗、宽 dwellWidthDeg：天黑天亮仍连续，只是看得清
-   */
-  readonly sky: {
-    readonly latitudeDeg: number
-    readonly declinationDeg: number
-    readonly dayS: number
-    readonly startHour: number
-    readonly extinction: number
-    readonly dwell: number
-    readonly dwellCenterDeg: number
-    readonly dwellWidthDeg: number
-  }
-  /** 光照：洞底与洞顶的反照率，经洞顶反射的光铺开多远（格）；荧光苔与发光蘑菇的丛数，贴近时的照度（勒克斯） */
-  readonly light: {
-    readonly albedo: number
-    readonly bounceU: number
-    readonly glowCount: readonly [number, number]
-    readonly glowLux: number
-  }
-  /** 火把：发光强度（坎德拉）、举多高（米）；身边的光暗过 igniteLux 就点起、亮过 douseLux 才熄灭；一个个点起时最多相差几毫秒 */
-  readonly torch: {
-    readonly candela: number
-    readonly heightM: number
-    readonly igniteLux: number
-    readonly douseLux: number
-    readonly staggerMs: number
-  }
-  /** 看多远：洞里的平均照度从 darkLux 到 brightLux（按对数）时，镜头短边从 nightU 格拉到 dayU 格；眼睛最暗只适应到 brightLux，照度不到 clearLux 就看不清 */
-  readonly view: {
-    readonly dayU: number
-    readonly nightU: number
-    readonly darkLux: number
-    readonly brightLux: number
-    readonly clearLux: number
-  }
-  /** 怪物只刷在照度不到 spawnLux 的地方 */
-  readonly spawnLux: number
 }
 /**
  * 紫水晶洞穴：玄武岩里几个晶洞连成的洞厅，洞壁长满紫水晶。阳光、天光、月光从塌开的洞顶与顶缝照进来，随真实的太阳与月亮移动；入夜后队员点起火把。
@@ -863,124 +617,6 @@ export interface SakuraConfig {
   readonly body: WadeConfig
 }
 /**
- * 红叶林：寺院外溪边的一片枫林空地，正是红叶最盛的时候。一面是寺院的瓦顶土墙，另外三面是枫林，林缘上的枫树一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
- * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流是浅水方程在溪床上的稳态解，溪上架着一座木桥；
- * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
- */
-export interface MapleConfig {
-  readonly meterPerU: number
-  /** 地形格子的边长，格；地形铺满方框 */
-  readonly cellU: number
-  /** 地图是 sizeU 见方的方形，摆在方框正中 */
-  readonly sizeU: number
-  /** 能走的地面连同溪面有多大，格²：生成出来不在这个范围里就换一组随机数 */
-  readonly areaU2: readonly [number, number]
-  /** 窄过两倍 neckU 的缝与尖角不能走 */
-  readonly neckU: number
-  /**
-   * 寺墙：墙身中线离地图边 insetU 格之间，整条最多斜 skewDeg 度，中途再拐最多 kinkDeg 度；墙身厚（格）、墙高（米）、瓦顶往墙两边伸出多宽（格）；
-   * 院门宽（格）
-   */
-  readonly wall: {
-    readonly insetU: readonly [number, number]
-    readonly skewDeg: number
-    readonly kinkDeg: number
-    readonly thickU: number
-    readonly heightM: number
-    readonly eaveU: number
-    readonly gateU: number
-  }
-  /**
-   * 枫林：林缘离地图边 insetU 格之间，按噪声弯出最多 bendU（波长 waveU），一棵棵树冠再排出 scallopU 的参差；每条林缘另有 lobes 处伸进空地的林舌或凹进林子的草湾，
-   * 伸出或凹进 lobeU 格、宽约 lobeWidthU 格
-   */
-  readonly forest: {
-    readonly insetU: readonly [number, number]
-    readonly bendU: number
-    readonly waveU: number
-    readonly scallopU: number
-    readonly lobes: readonly [number, number]
-    readonly lobeU: readonly [number, number]
-    readonly lobeWidthU: readonly [number, number]
-  }
-  /**
-   * 溪：从进林缘到出林缘的走向离横竖方向至少 slantDeg 度，两头进出林子时再各偏最多 turnDeg 度；蜿蜒的幅度（格），弯道半径至少是水面宽的 minBend 倍；
-   * 溪岸离寺墙至少 wallGapU 格
-   */
-  readonly stream: {
-    readonly slantDeg: number
-    readonly turnDeg: number
-    readonly meanderU: number
-    readonly minBend: number
-    readonly wallGapU: number
-  }
-  /**
-   * 溪的流量 discharge（米³/秒），河道按流量定：水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米），坡降由曼宁糙率 manning 反算；
-   * 横断面的水深按 1 − |ξ|^bedShape 从深泓往两岸收；弯顶的深潭、过渡段的浅滩相对平均的水深倍率 pool、riffle，深泓往凹岸偏到半宽的 thalwegShift 倍；
-   * 河岸高出水面 bankM 米、岸坡宽 bankU 格，岸顶以外的滩地每格升 floodSlope 米；空地上地面的起伏 reliefM 米
-   */
-  readonly flow: {
-    readonly discharge: number
-    readonly widthCoef: number
-    readonly depthCoef: number
-    readonly manning: number
-    readonly bedShape: number
-    readonly pool: number
-    readonly riffle: number
-    readonly thalwegShift: number
-    readonly bankM: number
-    readonly bankU: number
-    readonly floodSlope: number
-    readonly reliefM: number
-  }
-  /** 上游的石组：石头的半径（格）、石缝多宽（格）、石顶比水面高多少米 */
-  readonly rocks: {
-    readonly radiusU: readonly [number, number]
-    readonly gapU: readonly [number, number]
-    readonly heightM: number
-  }
-  /** 下游的石槛：槛前从河床升上槛顶的坡多长（格）、槛下的溪比槛顶低多少米；槛上的竹栅：竹桩隔多远（格）、多高（米） */
-  readonly sill: {
-    readonly rampU: number
-    readonly dropM: number
-    readonly postU: number
-    readonly heightM: number
-  }
-  /** 木桥：桥面宽（格）、两头落地的坡道多长（格）、桥面正中拱起多高（米）；架在溪的哪一段（弧长的比例） */
-  readonly bridge: {
-    readonly widthU: number
-    readonly rampU: number
-    readonly riseM: number
-    readonly at: readonly [number, number]
-  }
-  /** 枫树：空地上几棵；树冠半径（格）与树高（米）；树冠下能走进去多深（格）；寺墙外（寺里）的枫树隔多远一棵（格） */
-  readonly trees: {
-    readonly inside: readonly [number, number]
-    readonly crownU: readonly [number, number]
-    readonly heightM: readonly [number, number]
-    readonly overhangU: number
-    readonly templeGapU: number
-  }
-  /**
-   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克，别的身体质量按半径的三次方与质量倍率缩放（半径不算队长倍率），身高按占的层数；
-   * 身体的密度 density（千克/米³）与水里的阻力系数 drag。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
-   * 或者干脆浮起来，就站不住、随水漂。站着时胯以下迎水的是两条腿：腿宽占身宽 legs、胯高占身高 hip；站着时重心到脚掌下游边的水平距离占身高 lever；
-   * 脚底踩在湿河床上的静摩擦系数 mu；随水漂着时自己划水的速度（相对水）占想走的速度的 swim；水深不到 wetM 米算干地
-   */
-  readonly body: {
-    readonly kg: number
-    readonly radiusU: number
-    readonly density: number
-    readonly drag: number
-    readonly legs: number
-    readonly hip: number
-    readonly lever: number
-    readonly mu: number
-    readonly swim: number
-    readonly wetM: number
-  }
-}
-/**
  * 草甸：一片开阔的草地，场里没有障碍，也没有任何特殊规则。四周按种子生成：一边是一道陡坡，坡上是高一层的草甸；
  * 其余几边是针叶林，其中一边换成牧场的木栅栏。林子、栅栏和坡脚都是硬边界。一格 meterPerU 米：树高、坡高与影子长短按米算
  */
@@ -1046,108 +682,6 @@ export interface MeadowConfig {
   readonly flowers: { readonly cover: number; readonly patchU: number }
   /** 栅栏外吃草的羊有几只 */
   readonly sheep: readonly [number, number]
-}
-/**
- * 电路板：队伍和敌人缩小在一块电路板上，四周围着一圈金属屏蔽罩，芯片像楼、走线像路。一格 mmPerU 毫米：元件多高、影子多长按毫米算。
- * 镀金的裸铜线带电，碰到就触电（敌我通吃）：电源线一直通电；时钟线按节拍一通一断，通电前先预警；开关线平时不通，有人踩上触摸开关，
- * 电才从开关沿线一路通过去，连着的铜板通一阵。芯片和罩壁之间的过道里有一对电极，隔一阵蓄满电，在两极之间打出一道电弧。阻焊层底下的暗线不带电
- */
-export interface CircuitConfig {
-  readonly mmPerU: number
-  /** 标准身体在板上高多少毫米：比芯片矮得多，元件与罩壁多高、挡不挡子弹按它换算成层 */
-  readonly bodyMM: number
-  /** 地图是 sizeU 见方的方形，摆在方框正中；地面画满方框 */
-  readonly sizeU: number
-  /** 能走的板面有多大，格²：生成出来不在这个范围里就换一组随机数 */
-  readonly areaU2: readonly [number, number]
-  /** 窄过两倍 neckU 的缝不能走 */
-  readonly neckU: number
-  /** 屏蔽罩：罩壁离地图边 insetU 格，四个角斜切掉 chamferU 格，罩壁高 heightMM 毫米 */
-  readonly frame: { readonly insetU: readonly [number, number]; readonly chamferU: readonly [number, number]; readonly heightMM: number }
-  /** 开局站的那片空地的半径（格）：里面没有元件，带电的铜离它至少再远一格 */
-  readonly plazaU: number
-  /** 靠墙的芯片和罩壁之间留出的过道有多宽（格），芯片离那面墙的中点多远（格） */
-  readonly aisleU: readonly [number, number]
-  readonly chipU: readonly [number, number]
-  /** 触电：身体半径的 footFrac 倍以内碰到带电的铜就算，每 tickMs 结算一次，按每秒伤害折算 */
-  readonly shock: { readonly teamDps: number; readonly enemyDps: number; readonly tickMs: number; readonly footFrac: number }
-  /** 电源线：一直通电，线宽（格） */
-  readonly rail: { readonly widthU: readonly [number, number] }
-  /** 时钟线：几条并排，线宽与线距（格），线距就是时钟芯片的脚距；按节拍断 offMs、预警 warnMs、通 onMs，一通整条同时通 */
-  readonly clock: {
-    readonly traces: readonly [number, number]
-    readonly widthU: number
-    readonly pitchU: number
-    readonly offMs: number
-    readonly warnMs: number
-    readonly onMs: number
-  }
-  /**
-   * 电弧：几处，两极的尖相隔 gapU 格；歇 restMs、蓄电 chargeMs、放电 arcMs，循环往复，各处错开；
-   * 放电时离电弧 reachU 格以内的身体挨一下
-   */
-  readonly arc: {
-    readonly count: readonly [number, number]
-    readonly gapU: readonly [number, number]
-    readonly restMs: number
-    readonly chargeMs: number
-    readonly arcMs: number
-    readonly reachU: number
-    readonly teamDamage: number
-    readonly enemyDamage: number
-  }
-  /**
-   * 开关：触摸盘的半径（格），盘中间那块圆金的半径（格），连着的铜板边长（格），盘到铜板的连线多长（格）；
-   * 身体中心踩进圆金，连线与铜板一齐通电 holdMs，断开后 rearmMs 内再踩也不通
-   */
-  readonly button: {
-    readonly padU: number
-    readonly touchU: number
-    readonly plateU: readonly [number, number]
-    readonly reachU: readonly [number, number]
-    readonly holdMs: number
-    readonly rearmMs: number
-  }
-}
-/**
- * 天枢：未来城市一座高楼顶上的空中大厅，切了角的方形，四周是落地的玻璃幕墙，贴着幕墙一圈玻璃地面，往下看是夜里城市的灯海。
- * 厅里的地面是一格一块的瓷砖，谁踩上去就亮起谁的颜色、慢慢暗下去；立柱与电梯井顶到天花板，全息台齐腰。
- * 厅里有几对传送门：每扇门是格线上一段发光的粗线，同一对门朝向相同、颜色相同；任何东西的中心越过一扇门的门线，
- * 就平移到另一扇门同一侧接着走，速度不变。每隔一阵有一扇门挪到别处：旧处闪烁、错位，新处先出一条虚线、被一个光点沿线画实，预警过后一下换过去
- */
-export interface NexusConfig {
-  /** 大厅外接的方形边长（格），摆在方框正中；四个角斜切 chamferU 格 */
-  readonly sizeU: number
-  readonly chamferU: readonly [number, number]
-  /** 贴着幕墙内侧那一圈玻璃地面多宽，格 */
-  readonly glassU: number
-  /** 窄过两倍 neckU 的缝不能走 */
-  readonly neckU: number
-  /** 开局站的那片空地的半径，格 */
-  readonly plazaU: number
-  /** 立柱：几根，半径（格），围着厅心摆在多远的一圈上（格） */
-  readonly pillars: { readonly count: readonly [number, number]; readonly radiusU: number; readonly ringU: readonly [number, number] }
-  /** 全息台：几座，台面半径（格），多高（米） */
-  readonly pedestals: { readonly count: readonly [number, number]; readonly radiusU: number; readonly heightM: number }
-  /** 电梯井：几座，沿墙多宽、往厅里多深（格），每座两扇门，门多宽（格） */
-  readonly cores: { readonly count: readonly [number, number]; readonly widthU: number; readonly depthU: number; readonly doorU: number }
-  /** 地上的检修口：几处 */
-  readonly hatches: readonly [number, number]
-  /**
-   * 传送门：几对；门线多长（格）；门线两侧各要空出 apronU 格；同一对的两扇门至少隔 pairU 格，任两扇门至少隔 apartU 格；
-   * 每隔 everyMs 有一扇门挪到别处，旧处与新处一起预警 warnMs 后换过去
-   */
-  readonly warps: {
-    readonly pairs: readonly [number, number]
-    readonly lenU: number
-    readonly apronU: number
-    readonly pairU: number
-    readonly apartU: number
-    readonly everyMs: readonly [number, number]
-    readonly warnMs: number
-  }
-  /** 地砖被踩亮以后按 fadeMs 的时间常数暗下去 */
-  readonly tiles: { readonly fadeMs: number }
 }
 /** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
 export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
@@ -1575,7 +1109,7 @@ export interface GateKind {
 
 /**
  * 出怪口：敌人照常先定一个出生点，再吸附到 snapU 格以内的出怪口，从那里按它的进场方式出来；哪一处都够不着就在原地按 fallback 出来。
- * look 是在原地出来时冒出的样子；boss 是头目从哪种出怪口登场；lean 让地图偏向的那一侧（船低的一舷、浮冰的上风）边上的出怪口权重变大，偏到 full 时乘满 mul 倍，full 按这张图偏向的单位
+ * look 是在原地出来时冒出的样子；boss 是头目从哪种出怪口登场；lean 让地图偏向的那一侧（浮冰的上风）边上的出怪口权重变大，偏到 full 时乘满 mul 倍，full 按这张图偏向的单位
  */
 export interface GatesConfig {
   readonly snapU: number
@@ -1604,7 +1138,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'theater' | 'warp'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'floe' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'deep' | 'petri' | 'theater' | 'warp'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1624,21 +1158,15 @@ export interface MapDef {
   readonly nebulaOld?: NebulaOldConfig
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
-  readonly ship?: ShipConfig
   readonly oldRiver?: OldRiverConfig
   readonly floe?: FloeConfig
-  readonly cave?: CaveConfig
   readonly amethyst?: AmethystConfig
   readonly desert?: DesertConfig
   readonly ruins?: RuinsConfig
   readonly meadow?: MeadowConfig
   readonly sakura?: SakuraConfig
-  readonly maple?: MapleConfig
-  readonly circuit?: CircuitConfig
-  readonly nexus?: NexusConfig
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
-  readonly dreamland?: DreamlandConfig
   readonly theater?: TheaterConfig
   readonly warp?: WarpConfig
   readonly torus?: TorusConfig
@@ -1647,7 +1175,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'drown'
 
 export interface DecorInstance {
   emoji: string

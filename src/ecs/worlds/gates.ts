@@ -100,7 +100,7 @@ function hashOf(s: string): number {
   return h >>> 0
 }
 
-/** 能走的地面最外面那一圈：面积最大的环，场地中间的洞（桅杆）不算 */
+/** 能走的地面最外面那一圈：面积最大的环，场地中间的洞不算 */
 function outerLoop(b: Basin): readonly Point[] {
   let best: readonly Point[] = []
   let most = 0

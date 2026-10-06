@@ -1,7 +1,6 @@
 import type Phaser from 'phaser'
 import type { Polarity } from '../types/battlefield'
 import type { StatValues } from '../types/stats'
-import type { Point } from '../util/vec'
 
 export interface HudSnapshot {
   xp: number
@@ -22,28 +21,12 @@ export interface HudSnapshot {
   bossHp: number | null
   bossMaxHp: number
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
-  /** 在船上或梦幻乐园里打的一局才有：脚下那块会倾的面此刻往哪边倾、倾多少 */
-  tilt: TiltSnapshot | null
-  /** 在溶洞或紫水晶洞穴里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
+  /** 在紫水晶洞穴里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
   /** 在舞台剧里打的一局才有：离下一次换幕还有多久，正在换还是快要换了，新一幕刚画好时这一章叫什么 */
   stage: StageSnapshot | null
-}
-
-/**
- * 一块会倾的面：往下的方向是屏幕上的单位向量，倾角、站着会滑的门槛与盘边代表的倾角是度；盘里画的轮廓是朝着船头 bow 的船形，
- * 或按各边朝外的法线画的正多边形台面。next 是台子预警里要倾向的那条边，open 是入口开着的那条边，没有为 -1
- */
-export interface TiltSnapshot {
-  readonly down: Point
-  readonly deg: number
-  readonly slipDeg: number
-  readonly fullDeg: number
-  readonly outline: { readonly kind: 'hull'; readonly bow: Point } | { readonly kind: 'stage'; readonly normals: readonly Point[] }
-  readonly next: number
-  readonly open: number
 }
 
 /** 天上此刻的样子：太阳与月亮的时角（弧度，正午为 0、往西为正），月龄占朔望月的比例；night 为真时下一件事是天亮，inSec 是还有几秒 */

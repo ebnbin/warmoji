@@ -14,9 +14,7 @@ import type { Basin } from '../../maps/basin'
 import type { GateRuntime } from './gates'
 import type { Landmark } from '../../maps/landmark'
 import type { VolcanoState } from '../../maps/volcano/model'
-import type { ShipState } from '../../maps/ship/model'
 import type { FloeState } from '../../maps/floe/model'
-import type { CaveState } from '../../maps/cave/model'
 import type { AmethystState } from '../../maps/amethyst/world'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from './oldRiver'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from './torus'
@@ -44,14 +42,10 @@ import type { Solid } from './solids'
 import type { ObstacleId } from '../../types/obstacles'
 import type { MeadowState } from '../../maps/meadow/world'
 import type { SakuraState } from '../../maps/sakura/world'
-import type { MapleState } from '../../maps/maple/world'
-import type { CircuitState } from '../../maps/circuit/world'
 import type { DesertState } from '../../maps/desert/world'
 import type { RuinsState } from '../../maps/ruins/world'
-import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
-import type { DreamlandWorld } from '../../maps/dreamland/world'
 import type { TheaterState } from '../../maps/theater/world'
 import type { WarpState } from '../../maps/warp/world'
 
@@ -97,28 +91,22 @@ export interface WorldState {
   walls: Walls | null
   hole: Point | null
   volcano: VolcanoState | null
-  ship: ShipState | null
   ruins: RuinsState | null
   nebula: NebulaState | null
   floe: FloeState | null
-  cave: CaveState | null
   amethyst: AmethystState | null
   desert: DesertState | null
   meadow: MeadowState | null
   sakura: SakuraState | null
-  maple: MapleState | null
-  circuit: CircuitState | null
-  nexus: NexusState | null
   deep: DeepState | null
   petri: PetriState | null
-  dreamland: DreamlandWorld | null
   theater: TheaterState | null
   warp: WarpState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, amethyst: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, theater: null, warp: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ruins: null, nebula: null, floe: null, amethyst: null, desert: null, meadow: null, sakura: null, deep: null, petri: null, theater: null, warp: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
@@ -151,7 +139,7 @@ export interface WorldHooks {
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
   /** 跟随中的身体从 from 被拉到 next 时的位置修正；不写就照拉，隔着障碍也贴到宿主身上 */
   follow?(sim: Sim, eid: number, from: Point, next: Point): Point
-  /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
+  /** 岩壁这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
   /** 能站的地面：出怪口沿它的外边界摆，翻进从它外面起跳；默认是 basin，冰面外是海、空腔外是软壳层这类没有硬墙的地图另给 */
   ground(sim: Sim): Basin | null
@@ -183,7 +171,7 @@ export interface WorldHooks {
   canSpawn(sim: Sim, x: number, y: number, radius: number): boolean
   /** 地图自己的地标，按组：出怪口里摆在同名地标上的从这里取；一组要么整组都在、要么整组都空（火山口只在喷发时有），组里的次序不变 */
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
-  /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（船是倾角的度数，浮冰是风速）；不偏为零 */
+  /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（浮冰是风速）；不偏为零 */
   lean(sim: Sim): Point
   /** 队员在队长 from 身后的坑位 at 落在不该站的地方（会伤人、贴着或隔着传送门）时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point

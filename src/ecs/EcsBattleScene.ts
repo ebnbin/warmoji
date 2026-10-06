@@ -80,12 +80,9 @@ import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { StageSnapshot, ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { StageSnapshot, HudSnapshot, SubmarineSnapshot } from '../run/hudHost'
 import { CHAPTERS, chapterOf } from '../maps/theater/model'
-import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { amethystClock } from '../maps/amethyst/world'
-import { deckTilt } from '../maps/ship/model'
-import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
@@ -107,7 +104,7 @@ import { wallLoops } from '../maps/basin'
 import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
-const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙，沙漠的标志物' })
+const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体，残垣里标准身高跨不过的墙，沙漠的标志物' })
 const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
 const meters = (layers: number): string => `${+(layers * LAYER_M).toFixed(1)} 米`
 const showHeights = defineDevFlag({
@@ -447,7 +444,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
     this.lens = new Lens(this)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, portrait: viewport.logicalWidth < viewport.logicalHeight, decor: [], w: 0, h: 0 }
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, decor: [], w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
@@ -540,7 +537,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       paper: burstEmitter(this, [0xfbf3df, 0xf1e4c4, 0xffffff, 0xe6d3ad], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
-    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
+    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
@@ -611,8 +608,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         remainMs: Math.max(0, Lifetime.until[e]! - elapsed),
         totalMs: Modifier.totalMs[e]!,
       })),
-      tilt: sim ? tiltSnapshot(sim) : null,
-      clock: sim ? (clockSnapshot(sim) ?? amethystClock(sim)) : null,
+      clock: sim ? amethystClock(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
       stage: sim ? stageSnapshot(sim) : null,
     }
@@ -1020,43 +1016,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 }
 
-/** 船上的倾斜仪盘边代表的倾角，度：再倾也压在盘边上 */
-const SHIP_FULL_DEG = 10
-
-/** 船上或梦幻乐园里的一局：甲板或台面此刻往哪边倾、倾多少，站着会滑的门槛；台子还有预警里要倾向的边与开着的入口 */
-function tiltSnapshot(sim: Sim): TiltSnapshot | null {
-  const ship = sim.worldState.ship
-  const cfg = MAPS[sim.mapId].ship
-  if (ship && cfg) {
-    const t = deckTilt(ship)
-    return {
-      down: t.down,
-      deg: (t.angle * 180) / Math.PI,
-      slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
-      fullDeg: SHIP_FULL_DEG,
-      outline: { kind: 'hull', bow: { x: ship.deck.bx, y: ship.deck.by } },
-      next: -1,
-      open: -1,
-    }
-  }
-  const land = sim.worldState.dreamland
-  const lcfg = MAPS[sim.mapId].dreamland
-  if (!land || !lcfg) return null
-  const s = land.s
-  const plan = s.plan
-  const len = Math.hypot(s.sx, s.sy)
-  return {
-    down: len > 0 ? { x: s.sx / len, y: s.sy / len } : { x: 0, y: 0 },
-    deg: (tiltOf(plan, s.sx, s.sy) * 180) / Math.PI,
-    slipDeg: (Math.atan(lcfg.friction.body.static) * 180) / Math.PI,
-    fullDeg: (tiltOf(plan, fullSlope(lcfg, plan), 0) * 180) / Math.PI,
-    outline: { kind: 'stage', normals: plan.normals },
-    next: s.op.phase === 'warn' ? s.op.next : -1,
-    open: openSide(s, lcfg),
-  }
-}
-
-/** 溶洞里的一局：太阳与月亮此刻的时角、月相，以及离天黑（太阳落到时间放慢的那个高度）或天亮还有几秒 */
 /** 在深海打的一局：潜艇的倒计时 */
 function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   const deep = sim.worldState.deep
@@ -1082,22 +1041,4 @@ function stageSnapshot(sim: Sim): StageSnapshot | null {
   if (c.phase === 'change') return { phase: 'turn', ratio: 0, inSec: 0, title }
   const left = c.len - c.at
   return { phase: left < STAGE_WARN_MS ? 'warn' : 'stand', ratio: 1 - c.at / c.len, inSec: left / 1000, title }
-}
-
-function clockSnapshot(sim: Sim): ClockSnapshot | null {
-  const cave = sim.worldState.cave
-  const cfg = MAPS[sim.mapId].cave
-  if (!cave || !cfg) return null
-  const hour = hourAt(cfg.sky, clockSec(sim))
-  const turn = crossings(cfg.sky, cfg.sky.dwellCenterDeg)
-  if (!turn) return null
-  const night = hour >= turn.set || hour < turn.rise
-  const sun = ((hour - 12) / 12) * Math.PI
-  return {
-    sun,
-    moon: sun - elongation(cave.sky.age),
-    phase: cave.sky.age / SYNODIC_DAYS,
-    night,
-    inSec: secsBetween(cfg.sky, hour, night ? turn.rise : turn.set),
-  }
 }
