@@ -1419,7 +1419,7 @@ export const MAPS = {
         drinkShare: 0.45,
         spaceU: 0.5,
       },
-      fear: { blast: 0.6, blastU: 6, hit: 0.07, crowd: 0.06, crowdFree: 2, decay: 0.06, quietMs: 3000, tiredMs: 9000, tired: 0.35 },
+      fear: { blast: 0.6, blastU: 6, hit: 0.1, crowd: 0.07, crowdFree: 2, decay: 0.05, quietMs: 4000, tiredMs: 9000, tired: 0.35 },
       stampede: { warnMs: 1800, runMs: 2800, slowMs: 1600, spreadDeg: 10, laneU: 18, trample: 0.5, damage: 0.22, tossU: 11 },
     },
     boss: 'rhino',

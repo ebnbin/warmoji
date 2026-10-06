@@ -188,8 +188,6 @@ export class SavannaView implements MapView {
     this.water(v, plan)
     // 跑道先整层画实，再按浓度整层叠上去：几条叠在一起的地方不会越叠越浓
     this.lanes = scene.add.graphics().setDepth(DEPTH.lane)
-    this.lanes.enableFilters()
-    this.lanes.filtersForceComposite = true
     this.shadows = scene.add.graphics().setDepth(-0.85)
     this.visuals.push(this.lanes, this.shadows)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, CANOPY_KEY).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(DEPTH.canopy))
@@ -406,7 +404,6 @@ export class SavannaView implements MapView {
     let n = 0
     if (show > 0) {
       const blink = h.phase === 'alarm' ? 0.75 + 0.25 * Math.sin(st.clock / 70) : 1
-      this.lanes!.filterCamera?.setAlpha(0.34 * show * blink)
       const lanes: { path: Point[]; w: number }[] = []
       h.beasts.forEach((b, i) => {
         const path = this.paths[i]
