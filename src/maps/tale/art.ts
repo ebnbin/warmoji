@@ -5,9 +5,9 @@ export const ART_PPU = 96
 /** 笔尖：贴图里笔尖朝左，从尖到看得见的尽头多长、最宽处多宽，格 */
 export const NIB = { lenU: 1.7, widthU: 0.62 } as const
 /** 指尖：贴图里指尖朝右，多长、多宽，格 */
-export const FINGER = { lenU: 2.6, widthU: 1.05 } as const
+export const FINGER = { lenU: 6.5, widthU: 2.5 } as const
 /** 橡皮的影子：多长、多宽，格 */
-export const RUB = { lenU: 2.3, widthU: 1.15 } as const
+export const RUB = { lenU: 2.6, widthU: 1.3 } as const
 
 /** 笔尖的外形：尖在 (0, h/2)，往右张开到肩，肩后收成笔杆，再往后淡出 */
 function nibPath(ctx: CanvasRenderingContext2D, w: number, h: number): void {

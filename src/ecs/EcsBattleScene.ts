@@ -920,7 +920,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private aimLens(delta: number): void {
     this.lens.setMode(lensMode())
     this.lens.setFollowZoom(this.map.followZoom?.(this.ctx) ?? 1)
-    this.lens.step(this.anchor, delta)
+    this.lens.step(this.map.aim?.(this.ctx, this.anchor) ?? this.anchor, delta)
     this.drawDevGrid()
   }
 

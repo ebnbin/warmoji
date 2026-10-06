@@ -92,9 +92,9 @@ void main ()
   vec2 dir = vec2(cos(ang), sin(ang));
   vec2 sp = vec2(dot(wp, dir), dot(wp, vec2(-dir.y, dir.x)));
   float streak = vnoise(sp * vec2(0.025, 0.35)) * 0.7 + vnoise(sp * vec2(0.05, 0.9)) * 0.3;
-  float e = clamp(s1.r * 1.45 - streak * 0.45, 0.0, 1.0);
-  float gray = smoothstep(0.0, 0.5, e);
-  float gone = smoothstep(0.3, 1.0, e);
+  float e = clamp(s1.r * 1.3 - streak * 0.3, 0.0, 1.0);
+  float gray = smoothstep(0.0, 0.45, e);
+  float gone = smoothstep(0.45, 1.0, e);
 
   vec3 fc = ink * (1.0 - 0.16 * wet);
   float lum = dot(fc, vec3(0.299, 0.587, 0.114));

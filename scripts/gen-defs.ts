@@ -47,6 +47,8 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { talePlan } from '../src/maps/tale/layout.ts'
+import { FADE, INK, newAuthor, perSeason, SOLID, stepAuthor } from '../src/maps/tale/author.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -672,6 +674,85 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 童话书：页面放得进安全区，画好的地面占四到六成；开局那一块空得出出生点要的格数；一次只描一块，平时画一块、擦一块的间隔放得下起稿、描线与上色，
+ * 一次擦完才轮到下一次；推回墨稿比最慢的队员走得慢（轻轻地推），聚怪的时长为正、头目聚得更久。
+ * 抽一批种子真的生成一遍、让作者画上十五分钟：每块都挨着别的块、全部块连成一片；能站的地面始终连成一片、块数大致不变；作者一直在画，走到对角又走回来，四季都画到
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'tale') === (m.tale !== undefined), `maps.${id} 是童话书当且仅当写了 tale`)
+  const t = m.tale
+  if (!t) continue
+  const at = `maps.${id}.tale`
+  const { page, patch, author: a, form } = t
+  need(page.wU > 0 && page.hU > 0 && page.wU <= FRAME_U - SAFE_U * 2 && page.hU <= FRAME_U - SAFE_U * 2, `${at}.page 须放得进方框的安全区`)
+  need(page.marginU >= 0 && page.marginU * 2 < Math.min(page.wU, page.hU), `${at}.page.marginU 不为负，且留得出能画的地方`)
+  need(patch.spacingU > 0 && patch.warpU >= 0 && patch.warpU < patch.spacingU / 4, `${at}.patch 的块距须为正，边界扭开的幅度不为负、小于块距的四分之一`)
+  need(patch.firstU >= SPAWN_CLEAR_U && patch.firstU * 2 + 1 < Math.min(page.wU, page.hU) - page.marginU * 2, `${at}.patch.firstU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且放得进页面`)
+  need(t.share >= 0.4 && t.share <= 0.6, `${at}.share 须在四到六成之间`)
+  need(Object.values(a).every((v) => v > 0), `${at}.author 的时长须为正`)
+  need(a.openLineMs + a.openFillMs <= a.openMs, `${at}.author 开局一块描完才描下一块：描线加上色不能长过 openMs`)
+  need(a.jitterMs < a.everyMs / 2 && a.sketchMs + a.lineMs + a.fillMs < a.everyMs - a.jitterMs, `${at}.author.everyMs 减去抖动须放得下起稿、描线与上色`)
+  need(a.warnMs + a.fadeMs < a.everyMs * 2 - a.jitterMs * 2, `${at}.author 一块擦完才轮到下一次擦`)
+  const slowest = Math.min(...Object.values<CharacterAuthoring>(CHARACTERS).map((ch) => ch.stats.moveSpeed))
+  need(t.pushU > 0 && t.pushU < slowest, `${at}.pushU 须为正、慢过最慢的队员（${slowest} 格/秒）：是轻轻推回去，不是冲回去`)
+  need(form.ms >= 300 && form.bossMs > form.ms, `${at}.form 聚怪至少 300 毫秒，头目聚得更久`)
+  for (let s = 0; s < 12; s++) {
+    const plan = talePlan(t, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    const n = plan.patches.length
+    need(n >= 12, `${where} 只切出 ${n} 块`)
+    need(plan.patches[plan.first]!.inner >= SPAWN_CLEAR_U - 0.5, `${where} 开局那一块离边只有 ${plan.patches[plan.first]!.inner.toFixed(2)} 格`)
+    need(plan.patches.every((p) => p.near.length > 0), `${where} 有块谁也不挨着`)
+    need(plan.opening.length === Math.round(t.share * n) && plan.opening[0] === plan.first, `${where} 开局那一片的块数不对`)
+    const auth = newAuthor(plan, t)
+    let rand = s + 1
+    const next = (): number => ((rand = (rand * 16807) % 2147483647) / 2147483647)
+    const target = plan.opening.length
+    const seasons = new Set<number>()
+    let low = Infinity
+    let high = 0
+    let lastDraw = 0
+    let stall = 0
+    let turns = 0
+    let dir = auth.dir
+    for (let ms = 0; ms <= 15 * 60_000; ms += 100) {
+      const before = auth.draws
+      stepAuthor(auth, plan, t, ms, next)
+      if (auth.draws > before) {
+        stall = Math.max(stall, ms - lastDraw)
+        lastDraw = ms
+        auth.phase.forEach((p, i) => {
+          if (p === INK) seasons.add(auth.season[i]!)
+        })
+      }
+      if (auth.dir !== dir) {
+        turns++
+        dir = auth.dir
+      }
+      if (auth.open < plan.opening.length) continue
+      const walk = new Set<number>()
+      auth.phase.forEach((p, i) => {
+        if (p === SOLID || p === FADE) walk.add(i)
+      })
+      const seen = new Set<number>()
+      const stack = [walk.values().next().value!]
+      seen.add(stack[0]!)
+      while (stack.length > 0) for (const j of plan.patches[stack.pop()!]!.near) if (walk.has(j) && !seen.has(j)) (seen.add(j), stack.push(j))
+      need(seen.size === walk.size, `${where} 第 ${ms} 毫秒能站的地面断成了几片`)
+      if (seen.size !== walk.size) break
+      if (ms > 60_000) {
+        low = Math.min(low, walk.size)
+        high = Math.max(high, walk.size)
+      }
+    }
+    need(low >= target - 2 && high <= target + 2, `${where} 能站的块数在 ${low} 到 ${high} 之间起伏，离开局的 ${target} 块太远`)
+    need(stall <= a.everyMs * 3, `${where} 作者停笔最久 ${stall} 毫秒`)
+    need(seasons.size === 4 || perSeason(plan) * 3 > auth.draws, `${where} 十五分钟里没画全四季`)
+    need(turns >= 1, `${where} 十五分钟里作者没走到对角`)
   }
 }
 

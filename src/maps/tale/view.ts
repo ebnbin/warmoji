@@ -6,6 +6,7 @@ import { MAPS } from '../../data/maps'
 import { playSfx } from '../../audio/sfx'
 import { Due, Telegraph, Transform } from '../../ecs/components'
 import { telegraphDef } from '../../ecs/store'
+import { viewport } from '../../util/apply'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
 import { ART_PPU, drawFinger, drawNib, drawNibShadow, drawRub, FINGER, NIB, RUB, clipHalf, turnOf } from './art'
@@ -47,12 +48,12 @@ const FILL_TURNS = 2.5
 const RUB_HZ = 2.4
 const RUB_SWING = 0.55
 /** 墨迹聚成怪物：几笔从多远（格）卷进来，每笔多粗（像素） */
-const FORM = { strokes: 5, bossStrokes: 14, fromU: 1.5, bossFromU: 3.4, width: 3, bossWidth: 5.5 } as const
+const FORM = { strokes: 5, bossStrokes: 14, fromU: 1.15, bossFromU: 3, width: 3, bossWidth: 5.5 } as const
 const INK_COLOR = 0x241c18
 /** 开局翻书：翻过几张、每张隔多久、一张翻多久；之后笔尖落下描头一块，描线、上色各多久，描完抬笔多久，毫秒 */
 const OPEN = { leaves: 3, gapMs: 230, leafMs: 640, pauseMs: 250, lineMs: 1500, fillMs: 750, liftMs: 350 } as const
 /** 赢了翻页：镜头拉远、指尖伸过来捏住页角、把这一页翻过去，各多久；拉远到几倍 */
-const CLOSE = { zoomMs: 600, reachMs: 450, turnMs: 1500, holdMs: 350, zoom: 0.5 } as const
+const CLOSE = { zoomMs: 700, reachMs: 600, turnMs: 1700, holdMs: 400, leftU: 4 } as const
 /** 纸的正面、背面、翻起时的影子 */
 const LEAF_FRONT = 0xf6efdd
 const LEAF_BACK = [0xd6ccb5, 0xe2d9c3, 0xebe3cf, 0xf1eadb, 0xf5efe2] as const
@@ -126,6 +127,17 @@ export class TaleView implements MapView {
 
   followZoom(): number {
     return this.zoom
+  }
+
+  /** 收尾时镜头从队长挪到整页的正中，连书脊那边一起看见 */
+  aim(_v: ViewCtx, from: Point): Point {
+    const c = this.closing
+    const pg = this.plan?.page
+    if (!c || !pg) return from
+    const k = ease(clamp01(c.t / CLOSE.zoomMs))
+    const x = ((pg.x0 + pg.x1) / 2 - CLOSE.leftU / 2) * UNIT
+    const y = ((pg.y0 + pg.y1) / 2) * UNIT
+    return { x: from.x + (x - from.x) * k, y: from.y + (y - from.y) * k }
   }
 
   /** 纸上不撒 emoji：这一页上的一切都是画出来的 */
@@ -396,7 +408,7 @@ export class TaleView implements MapView {
         .setPosition((x + AWAY.x * lift * 1.6) * UNIT, (y + AWAY.y * lift * 1.6) * UNIT)
         .setRotation(dir)
         .setScale(k)
-        .setAlpha(0.3 * (1 - 0.75 * clamp01(lift)))
+        .setAlpha(0.42 * (1 - 0.75 * clamp01(lift)))
       if (land >= 1 && leave <= 0) playSfx('rub')
     })
     for (let k = used; k < this.rubs.length; k++) this.rubs[k]!.setVisible(false)
@@ -548,7 +560,10 @@ export class TaleView implements MapView {
     if (!c || !st) return
     c.t += delta
     const plan = st.plan
-    this.zoom = 1 + (CLOSE.zoom - 1) * ease(clamp01(c.t / CLOSE.zoomMs))
+    // 拉远到整页放得进屏幕：页面连书脊那边与上下一点桌面
+    const rs = viewport.renderScale
+    const fit = Math.min(1, v.scene.scale.width / (rs * (plan.page.x1 - plan.page.x0 + CLOSE.leftU + 1) * UNIT), v.scene.scale.height / (rs * (plan.page.y1 - plan.page.y0 + 2) * UNIT))
+    this.zoom = 1 + (fit - 1) * ease(clamp01(c.t / CLOSE.zoomMs))
     const reach = clamp01((c.t - CLOSE.zoomMs) / CLOSE.reachMs)
     const s = clamp01((c.t - CLOSE.zoomMs - CLOSE.reachMs) / CLOSE.turnMs)
     const g = this.turn!
@@ -559,7 +574,7 @@ export class TaleView implements MapView {
     const f = this.finger!
     if (reach <= 0) return void f.setVisible(false)
     // 指尖从右下方伸过来，按住页角时微微一压，翻的时候捏着页角走
-    const away = (1 - ease(reach)) * 3 * UNIT
+    const away = (1 - ease(reach)) * 7 * UNIT
     const press = reach >= 1 && s <= 0.05 ? 0.96 : 1
     f.setVisible(true)
       .setPosition(at.x + REACH.x * away, at.y + REACH.y * away)

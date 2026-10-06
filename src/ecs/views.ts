@@ -62,6 +62,8 @@ export interface MapView {
   framing(v: ViewCtx): Framing
   /** 跟随时的缩放倍率，1 是标准；每帧取一次，不写就是 1 */
   followZoom?(v: ViewCtx): number
+  /** 镜头此刻对着哪（像素）：from 是本来要对着的点（队长）；每帧取一次，不写就对着 from */
+  aim?(v: ViewCtx, from: Point): Point
   decor(v: ViewCtx, atlas: EcsAtlas): void
   /** 要画很久的地图可以返回 Promise：画完之前战斗不开始 */
   onSimReady(v: ViewCtx, sim: Sim): void | Promise<void>

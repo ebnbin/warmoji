@@ -103,11 +103,11 @@ function connected(plan: TalePlan, set: ReadonlySet<number>): boolean {
   return seen.size === set.size
 }
 
-/** 擦完以后还会在的块：墨稿、正在描的与起好铅笔稿的，正在擦的不算 */
+/** 这一块擦完时还能站的块：墨稿与正在描的（它比橡皮先完事），正在擦的与还只是铅笔稿的不算 */
 function staying(a: Author): Set<number> {
   const s = new Set<number>()
   a.phase.forEach((p, i) => {
-    if (p === SOLID || p === INK || p === SKETCH) s.add(i)
+    if (p === SOLID || p === INK) s.add(i)
   })
   return s
 }
@@ -141,7 +141,7 @@ function pickNext(plan: TalePlan, a: Author): number {
   return -1
 }
 
-/** 擦哪一块：刚描完的几块以外的墨稿里，往作者走的方向数最靠后、擦掉以后剩下的还连成一片的那块 */
+/** 擦哪一块：刚描完的几块以外的墨稿里，往作者走的方向数最靠后、擦掉以后剩下的地面还连成一片、等着描的铅笔稿也还挨着地面的那块 */
 function pickErase(plan: TalePlan, a: Author): number {
   const keep = staying(a)
   const fresh = a.inked.slice(0, SPARE)
@@ -152,7 +152,8 @@ function pickErase(plan: TalePlan, a: Author): number {
   cands.sort((x, y) => order(plan, a, x) - order(plan, a, y))
   for (const i of cands) {
     keep.delete(i)
-    if (keep.size >= 2 && connected(plan, keep)) return i
+    const touched = a.next < 0 || plan.patches[a.next]!.near.some((j) => keep.has(j))
+    if (keep.size >= 2 && touched && connected(plan, keep)) return i
     keep.add(i)
   }
   return -1
