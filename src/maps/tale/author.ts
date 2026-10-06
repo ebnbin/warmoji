@@ -164,6 +164,12 @@ function begin(a: Author, i: number, phase: number, now: number): void {
   a.at[i] = now
 }
 
+/** 起一块铅笔稿：照着它描成墨稿时那一季的样子起 */
+function sketch(a: Author, plan: TalePlan, i: number, now: number): void {
+  begin(a, i, SKETCH, now)
+  a.season[i] = (1 + Math.floor(a.draws / perSeason(plan))) % 4
+}
+
 /** 开始把一块描成墨稿 */
 function ink(a: Author, i: number, now: number, lineMs: number, fillMs: number, season: number): void {
   begin(a, i, INK, now)
@@ -189,7 +195,7 @@ export function stepAuthor(a: Author, plan: TalePlan, cfg: TaleConfig, now: numb
       if (a.inked.length > FRESH) a.inked.length = FRESH
       if (a.open >= plan.opening.length && a.next < 0) {
         a.next = pickNext(plan, a)
-        if (a.next >= 0) begin(a, a.next, SKETCH, now)
+        if (a.next >= 0) sketch(a, plan, a.next, now)
       }
     } else if (p === FADE && now >= a.at[i]! + c.warnMs + c.fadeMs) {
       begin(a, i, BLANK, now)
@@ -211,9 +217,9 @@ export function stepAuthor(a: Author, plan: TalePlan, cfg: TaleConfig, now: numb
     a.draw = now + c.everyMs + jitter()
     if (a.next < 0 && !a.phase.some((p) => p === INK)) {
       a.next = pickNext(plan, a)
-      if (a.next >= 0) begin(a, a.next, SKETCH, now)
+      if (a.next >= 0) sketch(a, plan, a.next, now)
     } else if (a.next >= 0 && now >= a.at[a.next]! + c.sketchMs && live(a) <= target) {
-      ink(a, a.next, now, c.lineMs, c.fillMs, (1 + Math.floor(a.draws / perSeason(plan))) % 4)
+      ink(a, a.next, now, c.lineMs, c.fillMs, a.season[a.next]!)
       a.draws++
       a.next = -1
     }

@@ -52,8 +52,8 @@ const FORM = { strokes: 5, bossStrokes: 14, fromU: 1.15, bossFromU: 3, width: 3,
 const INK_COLOR = 0x241c18
 /** 开局翻书：翻过几张、每张隔多久、一张翻多久；之后笔尖落下描头一块，描线、上色各多久，描完抬笔多久，毫秒 */
 const OPEN = { leaves: 3, gapMs: 230, leafMs: 640, pauseMs: 250, lineMs: 1500, fillMs: 750, liftMs: 350 } as const
-/** 赢了翻页：镜头拉远、指尖伸过来捏住页角、把这一页翻过去，各多久；拉远到几倍 */
-const CLOSE = { zoomMs: 700, reachMs: 600, turnMs: 1700, holdMs: 400, leftU: 4 } as const
+/** 赢了翻页：镜头拉远、指尖伸过来捏住页角、把这一页翻过去、翻完停一停，各多久；镜头连左页看进去多宽、往下偏多少（横屏放不下整页时先看见被捏住的页角），格 */
+const CLOSE = { zoomMs: 700, reachMs: 600, turnMs: 1700, holdMs: 400, leftU: 4, downU: 2.5 } as const
 /** 纸的正面、背面、翻起时的影子 */
 const LEAF_FRONT = 0xf6efdd
 const LEAF_BACK = [0xd6ccb5, 0xe2d9c3, 0xebe3cf, 0xf1eadb, 0xf5efe2] as const
@@ -138,7 +138,7 @@ export class TaleView implements MapView {
     if (!c || !pg) return from
     const k = ease(clamp01(c.t / CLOSE.zoomMs))
     const x = ((pg.x0 + pg.x1) / 2 - CLOSE.leftU / 2) * UNIT
-    const y = ((pg.y0 + pg.y1) / 2) * UNIT
+    const y = ((pg.y0 + pg.y1) / 2 + CLOSE.downU) * UNIT
     return { x: from.x + (x - from.x) * k, y: from.y + (y - from.y) * k }
   }
 

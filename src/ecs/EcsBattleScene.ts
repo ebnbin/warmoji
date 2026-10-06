@@ -845,21 +845,21 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
 
 
-  /** 这一场赢了：记下队长、打出小结，稍后走到下一步 */
+  /** 这一场赢了：记下队长；地图先演完它的收尾，再打出小结，稍后走到下一步 */
   private scheduleWaveEnd(): void {
     this.ending = true
     const sim = this.sim!
     const run = sim.run
     run.leaderId = run.roster[sim.characters.indexOf(sim.leader)]!
     playSfx('wave')
-    this.hud.emit(HudEvent.WaveComplete, {
-      title: `${this.fightDef.name ?? '本场'}完成！`,
-      kills: run.kills - this.waveBaseKills,
-      coins: run.coins - this.waveBaseCoins,
-      reward: rewardText(this.fightDef.reward),
-    })
+    const kills = run.kills - this.waveBaseKills
+    const coins = run.coins - this.waveBaseCoins
     nextStep(run)
-    this.time.delayedCall(Math.max(WAVE.summaryMs, this.map.won?.(this.ctx, sim) ?? 0), () => this.settle())
+    const outro = this.map.won?.(this.ctx, sim) ?? 0
+    this.time.delayedCall(outro, () => {
+      this.hud.emit(HudEvent.WaveComplete, { title: `${this.fightDef.name ?? '本场'}完成！`, kills, coins, reward: rewardText(this.fightDef.reward) })
+      this.time.delayedCall(WAVE.summaryMs, () => this.settle())
+    })
   }
 
   /** 小结之后：地上没捡的升级替玩家捡起来，逐个选完再走到下一步 */
