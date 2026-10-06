@@ -1,4 +1,4 @@
-import { bandBuffer, paintNebula } from './render'
+import { bandBuffer, paintBand } from './render'
 import type { NebulaSheet, SheetBand, SheetJob, SheetPiece } from './render'
 
 /** 退回主线程画时每画这么久让一次主线程，毫秒 */
@@ -6,7 +6,7 @@ const SLICE_MS = 40
 
 const nextTick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
-/** 画星云的数据贴图：几个后台线程分条画，谁画完一条就再给它一条；开不了线程或线程出错，剩下的退回主线程分片画 */
+/** 画星云的数据贴图与遗迹图集：几个后台线程分条画，谁画完一条就再给它一条；开不了线程或线程出错，剩下的退回主线程分片画 */
 export class NebulaPainter {
   private readonly sheet: NebulaSheet
   private workers: Worker[] = []
@@ -46,7 +46,7 @@ export class NebulaPainter {
       if (done[index]) continue
       const band = bands[index]!
       const pixels = bandBuffer(this.sheet, band)
-      paintNebula(this.sheet, pixels, band.r0, band.r1)
+      paintBand(this.sheet, band, pixels)
       take({ index, band, pixels })
       if (performance.now() - t < SLICE_MS) continue
       await nextTick()
