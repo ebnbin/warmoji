@@ -77,16 +77,16 @@ export const NO_SPILL: Spill = { cells: [], share: [] }
 /** 熔岩从口沿往外这么多格宽的一圈里漫出 */
 const SPILL_CELLS = 1.5
 
-/** 火山口：随机挑一条地图边，落在这条边的中段、离边 insetU；朝地图里的方向垂直于这条边 */
-function craterOf(rng: Rng, cfg: VolcanoConfig, map: Rect): { x: number; y: number; inX: number; inY: number } {
+/** 火山口：随机挑一条地图边，落在这条边的中段、离边 inset 像素；朝地图里的方向垂直于这条边 */
+function craterOf(rng: Rng, cfg: VolcanoConfig, map: Rect): { x: number; y: number; inX: number; inY: number; inset: number } {
   const side = Math.floor(rng.next() * 4)
   const along = 0.25 + rng.next() * 0.5
   const [near, far] = cfg.cone.insetU
   const inset = (near + rng.next() * (far - near)) * UNIT
-  if (side === 0) return { x: map.x + along * map.w, y: map.y + inset, inX: 0, inY: 1 }
-  if (side === 1) return { x: map.x + map.w - inset, y: map.y + along * map.h, inX: -1, inY: 0 }
-  if (side === 2) return { x: map.x + along * map.w, y: map.y + map.h - inset, inX: 0, inY: -1 }
-  return { x: map.x + inset, y: map.y + along * map.h, inX: 1, inY: 0 }
+  if (side === 0) return { x: map.x + along * map.w, y: map.y + inset, inX: 0, inY: 1, inset }
+  if (side === 1) return { x: map.x + map.w - inset, y: map.y + along * map.h, inX: -1, inY: 0, inset }
+  if (side === 2) return { x: map.x + along * map.w, y: map.y + map.h - inset, inX: 0, inY: -1, inset }
+  return { x: map.x + inset, y: map.y + along * map.h, inX: 1, inY: 0, inset }
 }
 
 /**
@@ -149,8 +149,8 @@ function rimRise(cfg: VolcanoConfig, depthU: number, tall: number): number {
 }
 
 /**
- * 按种子生成地形：先定下能走的盆地（地图矩形里起伏的边，扣掉山体，出生点四周总空着），再铺高度：火山加上朝地图里的整体下倾与起伏，
- * 盆地边外立起崖壁与高地（靠近火山处让给山体）；再补上开局前那几次喷发留下的岩石。格子铺满方框
+ * 按种子生成地形：先定下能走的盆地（地图矩形里起伏的边，扣掉山体，出生点四周总空着），再铺高度：火山加上以它为心往四周的整体下倾与起伏，
+ * 盆地边外立起崖壁与高地（靠近火山处让给山体；火山背后、地图边外那一片不立高地，顺着山背往外下倾，熔岩从那边也流得走）；再补上开局前那几次喷发留下的岩石。格子铺满方框
  */
 export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point): LavaField {
   const cell = cfg.cellU * UNIT
@@ -199,9 +199,9 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
       const relief = (fbm(x / UNIT / t.waveU, y / UNIT / t.waveU, seed, 3) - 0.5) * 2 * t.relief
       const outside = Math.min(1, Math.max(0, dU / cone.craterU - 1))
       const tall = spread01(fbm(x / UNIT / 4, y / UNIT / 4, seed + 127, 2))
-      const bank = rimRise(cfg, -roomAt(basin, x, y) / UNIT, tall) * Math.min(1, Math.max(0, (dU - foot - 0.5) / 2))
-      const g =
-        coneHeight(cfg, dCone) - gully(cfg, seed, dx, dy, dCone) + (relief * Math.min(1, dU / cone.radiusU) - t.tilt * (dx * c.inX + dy * c.inY)) * outside + bank
+      const behind = Math.min(1, Math.max(0, (-(dx * c.inX + dy * c.inY) - c.inset / UNIT) / 1.5)) * Math.min(1, Math.max(0, (cone.radiusU + 4 - dU) / 4))
+      const bank = rimRise(cfg, -roomAt(basin, x, y) / UNIT, tall) * Math.min(1, Math.max(0, (dU - foot - 0.5) / 2)) * (1 - behind)
+      const g = coneHeight(cfg, dCone) - gully(cfg, seed, dx, dy, dCone) + (relief * Math.min(1, dU / cone.radiusU) - t.tilt * dU) * outside + bank
       f.ground[i] = g
       f.cool[i] = cfg.lava.cooling * (1 + (dU / cfg.lava.coolRadiusU) ** 2)
       if (dU < cone.craterU * 0.8) f.conduit[i] = 1
@@ -248,13 +248,14 @@ export function volcanoMarks(f: LavaField, cfg: VolcanoConfig, vents: readonly P
   return { calm, erupt: { ...calm, crater: [crater] } }
 }
 
-/** 这次喷发熔岩从口沿外那一圈格子漫出：随机几股集中、大多朝着盆地，其余方向只漫出一点 */
+/** 这次喷发熔岩从口沿外那一圈格子漫出：集中成几股，股心绕口沿一圈大致均分（整体随机转一个角度，各股在自己的位置附近抖一抖），其余方向只漫出一点 */
 export function spillOf(f: LavaField, cfg: VolcanoConfig, rng: Rng): Spill {
   const e = cfg.eruption
   const count = e.lobes[0] + Math.floor(rng.next() * (e.lobes[1] - e.lobes[0] + 1))
+  const turn = rng.next() * Math.PI * 2
+  const gap = (Math.PI * 2) / count
   const lobes: number[] = []
-  const toward = Math.atan2(f.inY, f.inX)
-  for (let k = 0; k < count; k++) lobes.push(toward + (rng.next() * 2 - 1) * ((e.lobeSpreadDeg * Math.PI) / 180))
+  for (let k = 0; k < count; k++) lobes.push(turn + (k + (rng.next() * 2 - 1) * e.lobeJitter) * gap)
   const width = (e.lobeDeg * Math.PI) / 180
   const r0 = cfg.cone.craterU * UNIT
   const r1 = r0 + SPILL_CELLS * f.cell

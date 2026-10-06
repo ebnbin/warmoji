@@ -26,7 +26,7 @@ const DRY_MS = 40000
 export interface Snow {
   /** 这里的雪下得多大，0 到 1：火山周围一大片是 1，往外由大变小到 0 */
   readonly fall: Float32Array
-  /** 积满时有多厚，0 到 1：雪下得小的地方薄，洼处、背阴处厚，凸起、向阳处薄，山体陡坡上露出一道道顺坡的石棱；火山口、喷气孔、洞口与陡崖留不住雪 */
+  /** 积满时有多厚，0 到 1：雪下得小的地方薄，洼处、背阴处、背风处厚，凸起、向阳处、迎风处薄，山体陡坡上露出一道道顺坡的石棱；火山口、喷气孔、洞口与陡崖留不住雪 */
   readonly full: Float32Array
   /** 当下的积雪，0 到 1：着色器拿它和噪声比，薄的时候先积在一个个洼处，成片斑驳 */
   readonly cover: Float32Array
@@ -51,7 +51,7 @@ export interface CraterHeat {
 }
 
 /**
- * 开局的积雪：雪区以朝地图里挪过的火山口为心，半径按方位起伏、边界再抖一抖；洼处、背阴处积得厚，山体陡坡上露出顺坡的石棱，陡崖只在台阶上留雪，口沿一圈落着灰。
+ * 开局的积雪：雪区以朝地图里挪过的火山口为心，半径按方位起伏、边界再抖一抖；洼处、背阴处、背风处积得厚，山体陡坡上露出顺坡的石棱，陡崖只在台阶上留雪，口沿一圈落着灰。
  * 已有的岩石按凉了多久积了一部分，熔岩上没有雪
  */
 export function makeSnow(f: LavaField, cfg: VolcanoConfig, marks: GroundMarks, now: number): Snow {
@@ -114,7 +114,8 @@ export function makeSnow(f: LavaField, cfg: VolcanoConfig, marks: GroundMarks, n
       const gx = (r - l) / (2 * cellU)
       const gy = (d - u) / (2 * cellU)
       const lambert = Math.max(0, (-gx * SUN.x - gy * SUN.y + SUN.z) / Math.sqrt(gx * gx + gy * gy + 1))
-      const lift = Math.max(-0.35, Math.min(0.25, lap * 0.3)) - 0.35 * (lambert - SUN.z)
+      const lee = Math.max(-0.12, Math.min(0.12, -(gx * wx + gy * wy) * 0.25))
+      const lift = Math.max(-0.35, Math.min(0.25, lap * 0.3)) - 0.35 * (lambert - SUN.z) + lee
       const steep = smooth(cone.blockU + 0.3, cone.blockU - 0.6, dU) * smooth(cone.craterU, cone.craterU + 0.5, dU)
       const bearing = Math.atan2(oy, ox)
       const rib = smooth(0.52, 0.72, fbm(Math.cos(bearing) * 14 + 5, Math.sin(bearing) * 14 + dU * 0.35, seed + 81, 2)) * steep
@@ -260,7 +261,8 @@ export function shineSnow(f: Pick<LavaField, 'basin' | 'cols' | 'rows' | 'cell' 
 }
 
 /**
- * 积雪的片元着色器，四边形盖住整块场地，取样同熔岩着色器。积雪量和噪声比出盖没盖住：薄的时候只盖住噪声低的洼处，斑驳成片，越厚连成一片；雪的边按一个像素宽抗锯齿，不会大片发虚；
+ * 积雪的片元着色器，四边形盖住整块场地，取样同熔岩着色器。薄雪是半透明撒了一层、带着细碎颗粒，透出底下的地面；积雪量和顺风拉长的噪声比，
+ * 盖过的地方渐渐厚成整片的雪，先厚在噪声低的洼处，边缘柔和、带细碎的边，越厚连成一片；
  * 雪面的明暗来自光照图，顺风有浅浅的雪纹，向阳干净的雪上零星闪光；灰顺着风一缕缕染在雪上；熔岩与火山口的红光映在雪上。
  * 雪化了的地方按湿地压暗地面。输出按预乘透明度
  */
@@ -279,24 +281,22 @@ void main ()
   vec2 tc = outTexCoord;
   vec2 cell = vec2(tc.x, 1.0 - tc.y) * uGrid;
   vec4 sn = texture2D(uSnow, tc);
-  float n = vnoise(cell * 0.45 + 3.1) * 0.55 + vnoise(cell * 1.2 + 7.7) * 0.3 + vnoise(cell * 3.1 + 1.3) * 0.15;
+  float depth = sn.r;
+  vec2 q = vec2(dot(cell, uWind), dot(cell, vec2(-uWind.y, uWind.x)));
+  float n = vnoise(vec2(q.x * 0.3, q.y * 0.55) + 3.1) * 0.5 + vnoise(cell * 1.2 + 7.7) * 0.28 + vnoise(cell * 3.1 + 1.3) * 0.14 + vnoise(cell * 7.3 + 5.9) * 0.08;
   n = clamp((n - 0.5) * 1.8 + 0.5, 0.02, 0.98);
-#ifdef GL_OES_standard_derivatives
-  float aa = clamp(fwidth(sn.r - n) * 0.75, 0.002, 0.05);
-#else
-  float aa = 0.04;
-#endif
-  float cover = smoothstep(-aa, aa, sn.r - n);
+  float solid = max(smoothstep(-0.03, 0.16, depth - n), smoothstep(0.9, 1.0, depth));
+  float grain = vnoise(cell * 9.0 + 2.0);
+  float dust = smoothstep(0.0, 0.55, depth) * (0.3 + 0.4 * grain) * (1.0 - solid);
+  float cover = solid + dust;
   float wet = sn.b * (1.0 - cover);
   if (cover < 0.002 && wet < 0.002) {
     gl_FragColor = vec4(0.0);
     return;
   }
   vec3 lit = texture2D(uShine, tc).rgb;
-  float thick = max(smoothstep(0.0, 0.12, sn.r - n), smoothstep(0.96, 1.0, sn.r));
-  vec2 q = vec2(dot(cell, uWind), dot(cell, vec2(-uWind.y, uWind.x)));
   float swell = vnoise(cell * 0.35 + 31.0) - 0.5 + (vnoise(cell * 9.0 + 5.0) - 0.5) * 0.3;
-  vec3 col = lit * (1.0 + 0.06 * swell) * mix(0.82, 1.0, thick);
+  vec3 col = lit * (1.0 + 0.06 * swell) * mix(0.86, 1.0, solid);
   float lum = dot(lit, vec3(0.3, 0.5, 0.2));
   float streak = vnoise(vec2(q.x * 0.35, q.y * 2.6) + 9.0);
   float dirty = clamp(sn.g * (0.6 + 0.8 * streak), 0.0, 1.0);
@@ -305,7 +305,7 @@ void main ()
   vec2 h = hash2(floor(sp));
   float twinkle = 0.5 + 0.5 * sin(uTime * (1.5 + 2.5 * h.y) + h.x * 60.0);
   float glint = step(0.972, h.x) * (1.0 - smoothstep(0.05, 0.3, length(fract(sp) - 0.5))) * twinkle * twinkle;
-  col += vec3(0.55) * glint * smoothstep(0.7, 0.9, lum) * (1.0 - dirty) * thick;
+  col += vec3(0.55) * glint * smoothstep(0.7, 0.9, lum) * (1.0 - dirty) * solid;
   float glow = texture2D(uAux, tc).r;
   float rim = uCraterGlow * (1.0 - smoothstep(uCrater.z, uCrater.z * 3.0, length(cell - uCrater.xy)));
   col += vec3(1.0, 0.42, 0.15) * (glow * 0.5 + rim * 0.45);

@@ -4,7 +4,7 @@ import { keepDecor } from '../../ecs/decor'
 import type { Point } from '../../util/vec'
 import type { LocalLight } from '../../ecs/render/sprites'
 import type { Sim } from '../../ecs/sim'
-import { clamp01, drawBomb, encodeLava, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround, smooth, WIND } from './render'
+import { clamp01, drawBomb, drawFlake, encodeLava, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround, smooth, WIND } from './render'
 import { canvasTexture, drawPuff, drawSpark } from '../textures'
 import type { CellRect, GroundMarks, GroundPiece, LavaShown } from './render'
 import { GroundPainter } from './painter'
@@ -28,6 +28,7 @@ import type { CraterHeat, Snow } from './snow'
 const VOLCANO_BG = 0x150d0b
 const PUFF_KEY = 'volcano-puff'
 const SPARK_KEY = 'volcano-spark'
+const FLAKE_KEY = 'volcano-flake'
 const BOMB_KEY = 'volcano-bomb'
 /** 火山弹落地后那块发红的地面多久暗下去 */
 const SPLAT_MS = 2600
@@ -48,9 +49,11 @@ const LAVA_ON_BODY = { color: 0xffa45c, max: 0.55, span: 0.2 } as const
 const SETTLE_MS = 30000
 /** 熔岩喷泉喷得最猛时每秒抛出几块岩浆 */
 const FOUNTAIN_RATE = 160
-/** 按镜头撒点，每格²每秒撒几处：落在雪区里按雪下得多大飘雪，雪区外偶尔扬起一点灰，喷发前后下风落灰 */
-const AIR_RATE = 0.8
-const DUST_SHARE = 0.06
+/** 按镜头撒点，每格²每秒撒几处：细雪与近处的大雪片按雪下得多大飘，喷发前后下风那片按落灰的多少飘灰，雪区外偶尔被风扬起一点灰 */
+const FLAKE_RATE = 1.6
+const DRIFT_RATE = 0.12
+const FALLOUT_RATE = 0.8
+const DUST_RATE = 0.05
 /** 按镜头找冒汽的地方，每格²每秒看几处 */
 const STEAM_RATE = 4
 
@@ -145,14 +148,47 @@ function puffAt(em: Phaser.GameObjects.Particles.ParticleEmitter | undefined, n:
   return n
 }
 
-/** 粒子出生后先淡入、临死淡出，最浓到 peak */
+/** 在镜头四周放宽一成的范围里随机挑 n 的整数部分那么多处，每处按 weight 的概率冒一粒，返回剩下的零头 */
+function scatter(em: Phaser.GameObjects.Particles.ParticleEmitter | undefined, n: number, f: LavaField, view: Rect, weight: (i: number) => number): number {
+  for (; n >= 1; n--) {
+    const x = view.x + (Math.random() * 1.2 - 0.1) * view.w
+    const y = view.y + (Math.random() * 1.2 - 0.1) * view.h
+    const i = cellAt(f, x, y)
+    if (i >= 0 && Math.random() < weight(i)) em?.emitParticleAt(x, y, 1)
+  }
+  return n
+}
+
+/** 粒子出生后先淡入、临死淡出：活到 t 成时的浓淡 */
+function fade(t: number): number {
+  return Math.min(1, t * 5, (1 - t) * 3)
+}
+
+/** 粒子照 fade 淡入淡出，最浓到 peak */
 function fadeInOut(peak: number): Phaser.Types.GameObjects.Particles.EmitterOpCustomUpdateConfig {
-  return { onEmit: () => 0, onUpdate: (_p, _k, t) => Math.min(1, t * 5, (1 - t) * 3) * peak }
+  return { onEmit: () => 0, onUpdate: (_p, _k, t) => fade(t) * peak }
 }
 
 /** 熔岩的辉光场在 (x, y) 像素处的值 */
 function glowAt(f: VolcanoState['field'], glow: Float32Array, x: number, y: number): number {
   return bilinear(glow, f.cols, f.rows, f.cell, f.x0, f.y0, x, y, 0)
+}
+
+/** 辉光场的值到这么大时，熔岩上方的热气把雪片化掉到几成 */
+function melt(glow: number): number {
+  return smooth(0.03, 0.3, glow)
+}
+
+/** 雪片照 fade 淡入淡出，最浓到 peak；飘到熔岩上方按热气淡掉，化透了就没了 */
+function melting(f: VolcanoState['field'], glow: Float32Array, peak: number): Phaser.Types.GameObjects.Particles.EmitterOpCustomUpdateConfig {
+  return {
+    onEmit: () => 0,
+    onUpdate: (p, _k, t) => {
+      const m = melt(glowAt(f, glow, p.x, p.y))
+      if (m >= 1) p.kill()
+      return fade(t) * peak * (1 - m)
+    },
+  }
 }
 
 /** 画好的一块地面的像素，和它在地面贴图上的左上角 */
@@ -175,7 +211,7 @@ function patchTexture(scene: Phaser.Scene, tex: Phaser.Textures.CanvasTexture, i
 /**
  * 火山：盆地的边不画线，靠崖壁、高地与岩壁脚下的碎石看出来；地表按高度场打光，熔岩由着色器按每格的厚度、温度画出结壳与流动。
  * 火山连同周围一大片盖着雪，积雪是叠在地面上的一层着色器，按每格的积雪量涨落：熔岩盖过的地方雪没了，凝成的岩石凉透后雪又慢慢积回来；
- * 雪区里一直飘着雪，雪区外偶尔被风扬起一点灰，喷气孔冒白汽。平时火山口黑着，只冒一缕白汽；预兆时地震渐强，口底透红、口沿的雪化开，冒起灰烟；
+ * 雪区里一直飘着远近两层雪，雪区外偶尔被风扬起一点灰，喷气孔冒白汽。平时火山口黑着，只冒一缕白汽；预兆时地震渐强，口底透红、口沿的雪化开，冒起灰烟；
  * 喷发时熔岩从口里翻涌着漫过口沿，熔岩喷泉一股股往上喷，灰柱冲起、下风落灰把雪染脏，火山弹随流量飞出，画面一闪一震；熔岩边化雪冒汽。
  */
 export class VolcanoView extends BoundedView {
@@ -193,6 +229,7 @@ export class VolcanoView extends BoundedView {
   private fountain?: Phaser.GameObjects.Particles.ParticleEmitter
   private embers?: Phaser.GameObjects.Particles.ParticleEmitter
   private flakes?: Phaser.GameObjects.Particles.ParticleEmitter
+  private drifts?: Phaser.GameObjects.Particles.ParticleEmitter
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter
   private fallout?: Phaser.GameObjects.Particles.ParticleEmitter
   private steam?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -206,7 +243,7 @@ export class VolcanoView extends BoundedView {
   private spare: Bomb[] = []
   private splats: Splat[] = []
   /** 各样东西攒着没冒出来的零头 */
-  private readonly acc = { breath: 0, plume: 0, column: 0, fountain: 0, air: 0, steam: 0, ember: 0, bomb: 0 }
+  private readonly acc = { breath: 0, plume: 0, column: 0, fountain: 0, flake: 0, drift: 0, fallout: 0, dust: 0, steam: 0, ember: 0, bomb: 0 }
   private phase: EruptionPhase = 'dormant'
   /** 这次预兆的第二声闷雷响过没有 */
   private rumbled = false
@@ -225,6 +262,7 @@ export class VolcanoView extends BoundedView {
     this.visuals.push(v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, VOLCANO_BG).setDepth(-2)))
     if (!v.scene.textures.exists(PUFF_KEY)) canvasTexture(v.scene, PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
     if (!v.scene.textures.exists(SPARK_KEY)) canvasTexture(v.scene, SPARK_KEY, 16, 16, (ctx) => drawSpark(ctx, 16))
+    if (!v.scene.textures.exists(FLAKE_KEY)) canvasTexture(v.scene, FLAKE_KEY, 24, 24, (ctx) => drawFlake(ctx, 24))
     if (!v.scene.textures.exists(BOMB_KEY)) canvasTexture(v.scene, BOMB_KEY, 32, 32, (ctx) => drawBomb(ctx, 32))
     this.light = v.lens.screen.cover(v.scene.add.rectangle(0, 0, 1, 1, 0xff4a1a, 0).setDepth(85).setVisible(false))
     this.visuals.push(this.light)
@@ -260,13 +298,14 @@ export class VolcanoView extends BoundedView {
     this.ground = { tex, ppc, seen: f.rockAt.slice(), dirty, busy: false }
     const lava = canvasTexture(scene, LAVA_KEY, f.cols, f.rows)
     const aux = canvasTexture(scene, AUX_KEY, f.cols, f.rows)
+    const glow = new Float32Array(f.cols * f.rows)
     this.data = {
       field: f,
       lava,
       aux,
       lavaImg: lava.getContext().createImageData(f.cols, f.rows),
       auxImg: aux.getContext().createImageData(f.cols, f.rows),
-      glow: new Float32Array(f.cols * f.rows),
+      glow,
       soft: new Float32Array(f.cols * f.rows),
       shown: lavaShown(f, sim.elapsedMs),
     }
@@ -341,8 +380,8 @@ export class VolcanoView extends BoundedView {
     keepDecor(v.decor, (s) => roomAt(f.basin, s.x, s.y) >= 0.5 * UNIT)
     const puff = (depth: number, config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig): Phaser.GameObjects.Particles.ParticleEmitter =>
       scene.add.particles(0, 0, PUFF_KEY, { rotate: { min: 0, max: 360 }, emitting: false, ...config }).setDepth(depth)
-    const dots = (depth: number, config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig): Phaser.GameObjects.Particles.ParticleEmitter =>
-      scene.add.particles(0, 0, SPARK_KEY, { emitting: false, ...config }).setDepth(depth)
+    const dots = (depth: number, config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig, key = SPARK_KEY): Phaser.GameObjects.Particles.ParticleEmitter =>
+      scene.add.particles(0, 0, key, { emitting: false, ...config }).setDepth(depth)
     this.breath = puff(35, {
       lifespan: { min: 3200, max: 5200 },
       speedX: { min: WIND.x * 0.35, max: WIND.x * 0.9 },
@@ -392,15 +431,32 @@ export class VolcanoView extends BoundedView {
       tint: [0xffe082, 0xffa726, 0xff5722],
       blendMode: Phaser.BlendModes.ADD,
     })
-    this.flakes = dots(38, {
-      lifespan: { min: 3000, max: 5000 },
-      speedX: { min: WIND.x * 0.5, max: WIND.x * 1.1 },
-      speedY: { min: 14, max: 32 },
-      accelerationX: { onEmit: () => 0, onUpdate: (p, _k, t) => Math.sin(t * 9 + p.x * 0.02) * 26 },
-      scale: { min: 0.3, max: 0.65 },
-      alpha: fadeInOut(0.9),
-      tint: [0xffffff, 0xf5f8fc, 0xe8eff7],
-    })
+    this.flakes = dots(
+      38,
+      {
+        lifespan: { min: 3000, max: 5000 },
+        speedX: { min: WIND.x * 0.5, max: WIND.x * 1.1 },
+        speedY: { min: 18, max: 40 },
+        accelerationX: { onEmit: () => 0, onUpdate: (p, _k, t) => Math.sin(t * 9 + p.x * 0.02) * 26 },
+        scale: { min: 0.25, max: 0.5 },
+        alpha: melting(f, glow, 0.95),
+        tint: [0xffffff, 0xf5f8fc, 0xe8eff7],
+      },
+      FLAKE_KEY,
+    )
+    this.drifts = dots(
+      39,
+      {
+        lifespan: { min: 1400, max: 2400 },
+        speedX: { min: WIND.x * 1.4, max: WIND.x * 2.6 },
+        speedY: { min: 55, max: 105 },
+        accelerationX: { onEmit: () => 0, onUpdate: (p, _k, t) => Math.sin(t * 7 + p.y * 0.02) * 40 },
+        scale: { min: 0.75, max: 1.25 },
+        alpha: melting(f, glow, 0.6),
+        tint: [0xffffff, 0xf2f6fb],
+      },
+      FLAKE_KEY,
+    )
     this.dust = dots(38, {
       lifespan: { min: 1400, max: 2600 },
       speedX: { min: WIND.x * 1.8, max: WIND.x * 3.2 },
@@ -458,7 +514,7 @@ export class VolcanoView extends BoundedView {
     })
     this.bombGfx = scene.add.graphics().setDepth(1.7)
     this.splatGfx = scene.add.graphics().setDepth(1.6).setBlendMode(Phaser.BlendModes.ADD)
-    this.visuals.push(this.breath, this.plume, this.column, this.fountain, this.embers, this.flakes, this.dust, this.fallout, this.steam, this.sparks, this.trail, this.bombGfx, this.splatGfx)
+    this.visuals.push(this.breath, this.plume, this.column, this.fountain, this.embers, this.flakes, this.drifts, this.dust, this.fallout, this.steam, this.sparks, this.trail, this.bombGfx, this.splatGfx)
     this.vignette = v.lens.screen.vignette(0.7, 0.22, 0x000000)
   }
 
@@ -558,7 +614,7 @@ export class VolcanoView extends BoundedView {
     if (this.vignette) this.vignette.strength = 0.22 + 0.1 * Math.max(c.warn, c.vigor)
     const view = v.lens.screen.view()
     this.emitCrater(f, cfg, c, now, delta)
-    this.emitAir(f, this.snow.state, view, c, delta)
+    this.emitAir(f, this.snow.state, this.data.glow, view, c, delta)
     this.emitSteam(f, this.snow.state, view, delta)
     this.emitEmbers(f, view, delta)
     this.stepBombs(v, s, delta, now)
@@ -608,19 +664,15 @@ export class VolcanoView extends BoundedView {
     acc.fountain = puffAt(this.fountain, acc.fountain + dt * FOUNTAIN_RATE * c.vigor * pulse, f.craterX, f.craterY, r * 0.35)
   }
 
-  /** 按镜头撒点：落在雪区里按雪下得多大飘雪；喷发前后落在下风那片按落灰的多少飘灰；雪区外偶尔被风扬起一点灰 */
-  private emitAir(f: LavaField, sn: Snow, view: Rect, c: Crater, delta: number): void {
-    this.acc.air += (delta / 1000) * ((view.w * view.h * 1.44) / (UNIT * UNIT)) * AIR_RATE
-    for (; this.acc.air >= 1; this.acc.air--) {
-      const x = view.x + (Math.random() * 1.2 - 0.1) * view.w
-      const y = view.y + (Math.random() * 1.2 - 0.1) * view.h
-      const i = cellAt(f, x, y)
-      if (i < 0) continue
-      const fall = sn.fall[i]!
-      if (Math.random() < fall) this.flakes?.emitParticleAt(x, y, 1)
-      else if (Math.random() < sn.fan[i]! * c.fallout) this.fallout?.emitParticleAt(x, y, 1)
-      else if (Math.random() < (1 - fall) * DUST_SHARE) this.dust?.emitParticleAt(x, y, 1)
-    }
+  /** 按镜头撒点：雪区里按雪下得多大飘细雪与近处的大雪片，熔岩上方的热气里不生雪片；喷发前后下风那片按落灰的多少飘灰；雪区外偶尔被风扬起一点灰 */
+  private emitAir(f: LavaField, sn: Snow, glow: Float32Array, view: Rect, c: Crater, delta: number): void {
+    const area = (delta / 1000) * ((view.w * view.h * 1.44) / (UNIT * UNIT))
+    const acc = this.acc
+    const snowing = (i: number): number => sn.fall[i]! * (1 - melt(glow[i]!))
+    acc.flake = scatter(this.flakes, acc.flake + area * FLAKE_RATE, f, view, snowing)
+    acc.drift = scatter(this.drifts, acc.drift + area * DRIFT_RATE, f, view, snowing)
+    acc.fallout = scatter(this.fallout, acc.fallout + area * FALLOUT_RATE, f, view, (i) => sn.fan[i]! * c.fallout)
+    acc.dust = scatter(this.dust, acc.dust + area * DUST_RATE, f, view, (i) => 1 - sn.fall[i]!)
   }
 
   /** 熔岩四周化雪、雪落在没凉透的岩石上，冒起白汽：按镜头撒点，冒汽越强越容易冒 */
@@ -660,7 +712,7 @@ export class VolcanoView extends BoundedView {
     return { x: 0, y: 0, vx: 0, vy: 0, z: 0, vz: 0, r: 0, spin: 0, rock, glow }
   }
 
-  /** 火山弹：喷发时从火山口抛出，按重力画弧，影子背着太阳落在地上；落地溅起火星，砸出一小片渐暗的红光，砸在雪上还砸出一个冒汽的坑 */
+  /** 火山弹：喷发时从火山口往四面八方抛出，按重力画弧，影子背着太阳落在地上；落地溅起火星，砸出一小片渐暗的红光，砸在雪上还砸出一个冒汽的坑 */
   private stepBombs(v: ViewCtx, s: VolcanoState, delta: number, now: number): void {
     const g = this.bombGfx
     const sg = this.splatGfx
@@ -669,11 +721,11 @@ export class VolcanoView extends BoundedView {
     const dt = delta / 1000
     const reach = v.def.light?.shadow?.length ?? 0
     if (s.phase === 'erupt') {
-      this.acc.bomb += dt * 13 * this.u.vigor
+      this.acc.bomb += dt * 20 * this.u.vigor
       while (this.acc.bomb >= 1) {
         this.acc.bomb -= 1
         const b = this.bomb(v.scene)
-        const a = Math.atan2(f.inY, f.inX) + (Math.random() * 2 - 1) * 2.2
+        const a = Math.random() * Math.PI * 2
         const sp = (1.2 + Math.random() * 3.6) * UNIT
         b.x = f.craterX + (Math.random() - 0.5) * UNIT
         b.y = f.craterY + (Math.random() - 0.5) * UNIT

@@ -220,7 +220,7 @@ export interface VolcanoConfig {
     /** 山坡上放射状冲沟的深度 */
     readonly gullyDepth: number
   }
-  /** 地势：朝地图里整体下倾的坡度，起伏的幅度与波长 */
+  /** 地势：以火山为心往四周整体下倾的坡度，起伏的幅度与波长 */
   readonly terrain: {
     readonly tilt: number
     readonly relief: number
@@ -237,9 +237,9 @@ export interface VolcanoConfig {
     readonly peakMs: number
     readonly waneMs: number
     readonly effuseMs: number
-    /** 每次喷发熔岩集中从口沿的几股漫出，股心落在朝盆地的方向两侧 lobeSpreadDeg 内，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
+    /** 每次喷发熔岩集中从口沿的几股漫出，股心绕口沿一圈均分、各自在均分的位置上下抖不超过 lobeJitter 倍间距，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
     readonly lobes: readonly [number, number]
-    readonly lobeSpreadDeg: number
+    readonly lobeJitter: number
     readonly lobeDeg: number
     readonly lobeFloor: number
     /** 开局前已经喷过几次，地图上留下旧熔岩 */
