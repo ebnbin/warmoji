@@ -67,6 +67,8 @@ export interface MapView {
   decor(v: ViewCtx, atlas: EcsAtlas): void
   /** 要画很久的地图可以返回 Promise：画完之前战斗不开始 */
   onSimReady(v: ViewCtx, sim: Sim): void | Promise<void>
+  /** 画好以后、开战之前的开场：返回的 Promise 了结了才开战；不写就直接开战 */
+  intro?(v: ViewCtx, sim: Sim): Promise<void>
   step(v: ViewCtx, sim: Sim, delta: number): void
   /** 新画风下 (x, y) 处的单位受的光：out 里先填着太阳，地图可以换掉主光的方向、加一层补光 */
   lightAt?(x: number, y: number, out: LocalLight): void

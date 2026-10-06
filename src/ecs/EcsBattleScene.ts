@@ -545,6 +545,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     hint.setText('绘制地图…')
     await this.map.onSimReady(this.ctx, this.sim)
     if (gen !== this.bootGen) return
+    if (this.map.intro) {
+      hint.setVisible(false)
+      await this.map.intro(this.ctx, this.sim)
+      if (gen !== this.bootGen) return
+    }
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run)

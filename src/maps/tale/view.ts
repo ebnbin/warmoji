@@ -104,6 +104,8 @@ export class TaleView implements MapView {
   private opening?: { readonly t0: number; first: Look }
   /** 赢了以后翻页的那一阵：从几时起 */
   private closing?: { t: number }
+  /** 开场还在演时，停掉它每帧的推进 */
+  private stopIntro?: () => void
   private zoom = 1
 
   private planOf(v: ViewCtx): TalePlan {
@@ -188,7 +190,6 @@ export class TaleView implements MapView {
     this.pageLayer(v, st, ps)
     this.sprites(v)
     v.lens.screen.vignette(0.85, 0.12, 0x2a1a0e)
-    await this.open(v, sim, st)
   }
 
   /** 这一页的合成层：每块的样子编成状态图，着色器铺满页面画 */
@@ -251,7 +252,9 @@ export class TaleView implements MapView {
   /**
    * 开局：书翻到这一页（几张纸从右往左翻过去，盖着的队伍随之露出来，脚下只有铅笔稿），笔尖落下把头一块描深、填上颜色，抬起笔，战斗才开始
    */
-  private open(v: ViewCtx, sim: Sim, st: TaleState): Promise<void> {
+  intro(v: ViewCtx, sim: Sim): Promise<void> {
+    const st = sim.worldState.tale
+    if (!st || !this.state) return Promise.resolve()
     const scene = v.scene
     const first: Look = { pencil: 1, line: 0, fill: 0, fade: 0 }
     this.opening = { t0: scene.time.now, first }
@@ -278,12 +281,16 @@ export class TaleView implements MapView {
         if (d > 0 && d < OPEN.lineMs + OPEN.fillMs) playSfx('scribble')
         this.paintState(v, sim, st)
         if (t < end) return
-        scene.events.off(Phaser.Scenes.Events.UPDATE, tick)
+        this.stopIntro?.()
         this.turn?.clear()
-        this.opening = undefined
         resolve()
       }
       scene.events.on(Phaser.Scenes.Events.UPDATE, tick)
+      this.stopIntro = (): void => {
+        scene.events.off(Phaser.Scenes.Events.UPDATE, tick)
+        this.opening = undefined
+        this.stopIntro = undefined
+      }
       playSfx('leaf')
     })
   }
@@ -588,7 +595,7 @@ export class TaleView implements MapView {
   destroy(v: ViewCtx): void {
     this.painter?.close()
     this.painter = undefined
-    this.opening = undefined
+    this.stopIntro?.()
     for (const o of this.visuals) o.destroy()
     this.visuals = []
     this.rubs = []

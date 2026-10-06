@@ -267,9 +267,9 @@ const CHAPTERS: readonly (readonly [Chapter, Chapter])[] = [
     {
       base: hex(0xf39b4b),
       motifs: (rng, spot) => {
-        const r = between(rng, 1.05, 1.4)
+        const r = between(rng, 1.15, 1.5)
         const p = spot(r * 1.05)
-        return p ? [{ kind: 'volcano', ...p, r, rot: 0 }] : []
+        return p ? [{ kind: 'volcano', ...p, y: p.y + r * 0.2, r, rot: 0 }] : []
       },
     },
   ],
@@ -375,16 +375,25 @@ function paintMotif(m: Motif, x: number, y: number, aa: number, col: Rgb): numbe
     }
     case 'volcano': {
       const r = m.r
-      const body = sdPoly(lx, ly, [[-r, 0.5 * r], [-0.32 * r, -0.55 * r], [0.32 * r, -0.55 * r], [r, 0.5 * r]]) - 0.08
+      const body = sdPoly(lx, ly, [[-r, 0.5 * r], [-0.3 * r, -0.55 * r], [0.3 * r, -0.55 * r], [r, 0.5 * r]]) - 0.08
       over(hex(0xd6432d), fillOf(body))
       over(hex(0xb2311f), fillOf(body) * smooth(-0.1, 0.4, lx / r) * 0.5)
-      const crater = Math.hypot(lx / (0.3 * r), (ly + 0.55 * r) / (0.09 * r)) - 1
-      over(hex(0x6e2015), fillOf(crater * 0.09 * r))
+      // 口里的岩浆，顺着山坡淌下来的两三道
+      const crater = Math.hypot(lx / (0.3 * r), (ly + 0.55 * r) / (0.1 * r)) - 1
+      over(hex(0xffb243), fillOf(crater * 0.1 * r))
       let lava = Infinity
-      for (const s of [-1, 1]) lava = Math.min(lava, sdSeg(lx, ly, s * 0.12 * r, -0.5 * r, s * 0.3 * r, -0.05 * r), sdSeg(lx, ly, s * 0.3 * r, -0.05 * r, s * 0.24 * r, 0.22 * r))
-      over(hex(0xffb243), strokeOf(lava, 0.08) * fillOf(body))
+      const flows: readonly (readonly [number, number])[][] = [
+        [[-0.12, -0.52], [-0.2, -0.25], [-0.36, -0.02], [-0.42, 0.22]],
+        [[0.1, -0.52], [0.16, -0.2], [0.12, 0.08], [0.2, 0.32]],
+      ]
+      for (const f of flows) for (let i = 1; i < f.length; i++) lava = Math.min(lava, sdSeg(lx, ly, f[i - 1]![0] * r, f[i - 1]![1] * r, f[i]![0] * r, f[i]![1] * r) + i * 0.012)
+      over(hex(0xffb243), strokeOf(lava, 0.1) * fillOf(body))
       over(hex(0x5c1a10), strokeOf(Math.abs(body), 0.045))
-      return Math.min(Math.abs(body), Math.abs(crater * 0.09 * r))
+      // 口上冒的一团烟
+      let puff = Infinity
+      for (const [px, py, pr] of [[0.05, -0.78, 0.13], [-0.1, -0.92, 0.11], [0.12, -1.0, 0.09]] as const) puff = Math.min(puff, Math.hypot(lx - px * r, ly - py * r) - pr * r)
+      over(hex(0x8a8580), fillOf(puff) * 0.85)
+      return Math.min(Math.abs(body), Math.abs(puff), lava)
     }
   }
 }
