@@ -16,7 +16,7 @@ import { StorybookPainter } from './painter'
 import { paintPrint, PRINT_PPU } from './print'
 import { bookFor, pageAt } from './world'
 import type { Quad } from './layer'
-import type { Book, BookClock, Page, Piece, Sweep } from './model'
+import type { Book, BookClock, Page, Piece } from './model'
 import type { PaintScene, PixelRect } from './backdrop'
 import type { StorybookState } from './world'
 import type { StorybookConfig } from '../../types/maps'
@@ -31,13 +31,12 @@ const BACK_KEY = 'storybook-back'
 /** 开局最多几个线程分着画；贴图按这么多像素高的条分块交给线程 */
 const PAINT_THREADS = 4
 const STRIP_PX = 64
-/** 各层的深度：页面、平躺的布景、书签带、布景投的影子、立着的布景、刷子（在谁头上都过得去） */
+/** 各层的深度：页面、平躺的布景、书签带、布景投的影子、立着的布景 */
 const SPREAD_DEPTH = -0.9
 const FLAT_DEPTH = -0.6
 const SHADOW_DEPTH = -0.4
 const RIBBON_DEPTH = -0.5
 const STAND_DEPTH = 2.7
-const BRUSH_DEPTH = 70
 /** 影子的浓度，每米高的东西影子铺多长（格） */
 const SHADOW_ALPHA = 0.3
 const SHADOW_PER_M = STAND_U_PER_M * 0.75
@@ -49,8 +48,6 @@ const BRUSH_WIDE = 1.3
 const BRISTLES = 18
 const BRISTLE_SEG_U = 0.25
 const DRY_FROM = 0.92
-/** 刷头：刷毛多长、铁箍多长、笔杆往后往上伸多远（格） */
-const HEAD = { hair: 0.9, ferrule: 0.5, handle: 2.2, lift: 3.6 } as const
 /** 换页时正在刷的那张页面；刷完以后多久（毫秒）淡成印好的新一页 */
 const LIVE_KEY = 'storybook-live'
 const LIVE_FADE_MS = 700
@@ -119,15 +116,6 @@ function quad(key: string, tl: Point, bl: Point, tr: Point, br: Point, cell: Cel
   return { key, x: [tl.x, bl.x, tr.x, br.x], y: [tl.y, bl.y, tr.y, br.y], ...uv, color, alpha, fill }
 }
 
-/** 一张画布的平均颜色：缩成一个像素读出来 */
-function averageOf(src: HTMLCanvasElement): number {
-  const c = Object.assign(document.createElement('canvas'), { width: 1, height: 1 })
-  const ctx = c.getContext('2d', { willReadFrequently: true })!
-  ctx.drawImage(src, 0, 0, 1, 1)
-  const d = ctx.getImageData(0, 0, 1, 1).data
-  return (d[0]! << 16) | (d[1]! << 8) | d[2]!
-}
-
 /** 整数对上的哈希，落在 [0, 1) */
 function hash01(a: number, b: number, salt: number): number {
   let h = Math.imul(a ^ Math.imul(salt, 0x9e3779b9), 0x27d4eb2d) ^ Math.imul(b, 0x165667b1)
@@ -155,7 +143,7 @@ function inside(poly: readonly Point[], x: number, y: number): boolean {
  * 立体书：桌面、封面、纸边与纸面是开局在后台线程画好的贴图；每一页的插画印在白底上、乘到纸面上，是一张贴图；
  * 布景的正面与盒子的顶面画进每页一张图集，按倒下的程度贴在四边形上：立着的画在身体后面，平躺的贴着页面，影子画在页面上、整层按一个浓度叠。
  * 站在立着的布景背后、被它的正面挡住的身体挪到最底下那一层，露出来的只有高过布景的那截。
- * 换页时一把大刷子来回刷过两页，刷过处就是新一页，布景跟着折平与弹起；刷子本身画在最上面
+ * 换页时一把看不见的大刷子来回刷过两页，刷过处就是新一页，布景跟着折平与弹起
  */
 export class StorybookView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -167,9 +155,7 @@ export class StorybookView implements MapView {
   private live?: Phaser.Textures.CanvasTexture
   private livePage = -1
   private liveAt = 0
-  private brush?: Phaser.GameObjects.Graphics
   private liveOver?: Phaser.GameObjects.Image
-  private paint = 0xffffff
   private flat?: QuadLayer
   private stand?: QuadLayer
   private shadow?: QuadLayer
@@ -226,12 +212,11 @@ export class StorybookView implements MapView {
     const at = (x: number, y: number): Phaser.GameObjects.Image => scene.add.image(x, y, '__WHITE').setOrigin(0, 0).setDepth(SPREAD_DEPTH)
     this.spreadA = at(book.x0 * UNIT, book.y0 * UNIT)
     this.live = canvasTexture(scene, LIVE_KEY, Math.round((book.x1 - book.x0) * PRINT_PPU), Math.round((book.y1 - book.y0) * PRINT_PPU))
-    this.brush = scene.add.graphics().setDepth(BRUSH_DEPTH)
     this.liveOver = scene.add.image(book.x0 * UNIT, book.y0 * UNIT, LIVE_KEY).setOrigin(0, 0).setDepth(SPREAD_DEPTH + 0.01).setVisible(false)
     this.flat = new QuadLayer(scene, FLAT_DEPTH)
     this.shadow = new QuadLayer(scene, SHADOW_DEPTH, SHADOW_ALPHA)
     this.stand = new QuadLayer(scene, STAND_DEPTH)
-    this.visuals.push(this.spreadA, this.liveOver, this.brush, this.flat, this.shadow, this.stand, this.ribbon(scene, book))
+    this.visuals.push(this.spreadA, this.liveOver, this.flat, this.shadow, this.stand, this.ribbon(scene, book))
     const c = st.clock
     this.sheet(v, st, c.page)
     if (c.phase === 'redraw') this.sheet(v, st, c.page - 1)
@@ -447,10 +432,9 @@ export class StorybookView implements MapView {
 
   /**
    * 换页：一把大刷子在一张页面上来回刷——开头铺上旧页，此后每帧把上一帧到这一帧之间刷过的那段画上去，刷过处露出新一页。
-   * 一笔是并排的一根根刷毛，每根宽窄浓淡不一，两边的细一点淡一点；收笔前刷毛开叉，越往后断得越多。刷头画在最上面
+   * 一笔是并排的一根根刷毛，每根宽窄浓淡不一，两边的细一点淡一点；收笔前刷毛开叉，越往后断得越多。刷子本身不画
    */
   private wipe(cfg: StorybookConfig, c: BookClock, cur: Sheet, old: Sheet | null): void {
-    const g = this.brush!.clear()
     const over = this.liveOver!
     if (!old) {
       // 刷完以后刷痕留着的纹慢慢收干，露出印好的新一页
@@ -468,7 +452,6 @@ export class StorybookView implements MapView {
       this.livePage = c.page
       this.liveAt = 0
       ctx.drawImage(old.spread, 0, 0)
-      this.paint = averageOf(cur.spread)
     }
     const from = this.liveAt
     const to = Math.min(c.at, cfg.turn.sweepMs)
@@ -548,54 +531,6 @@ export class StorybookView implements MapView {
     }
     ctx.globalAlpha = 1
     if (drew) tex.refresh()
-    const now = brushPhase(sw, c.at)
-    if (now) this.drawBrush(g, sw, now.r, now.f)
-  }
-
-  /** 刷头：一排刷毛贴着纸、蘸着新一页的颜色，后面一截铁箍，笔杆往后往上翘起来；纸上投一块影子 */
-  private drawBrush(g: Phaser.GameObjects.Graphics, sw: Sweep, r: number, f: number): void {
-    const p = brushAt(sw, r, f)
-    const q = brushAt(sw, r, Math.min(1, f + 0.01))
-    const back = brushAt(sw, r, Math.max(0, f - 0.01))
-    let mx = q.x - back.x
-    let my = q.y - back.y
-    const ml = Math.hypot(mx, my) || 1
-    mx /= ml
-    my /= ml
-    const half = (sw.step * BRUSH_WIDE * 0.5) * UNIT
-    const ax = -my * half
-    const ay = mx * half
-    const at = (along: number, side: number, lift = 0): Phaser.Math.Vector2 =>
-      new Phaser.Math.Vector2(p.x * UNIT - mx * along * UNIT + ax * side, p.y * UNIT - my * along * UNIT + ay * side - lift * UNIT)
-    const quad4 = (pts: Phaser.Math.Vector2[], color: number, alpha = 1): void => {
-      g.fillStyle(color, alpha)
-      g.fillPoints(pts, true)
-    }
-    const hair = HEAD.hair
-    const fe = hair + HEAD.ferrule
-    // 影子
-    g.fillStyle(SHADOW_COLOR, 0.22)
-    g.fillEllipse((p.x - mx * fe * 0.6 + AWAY.x * 0.8) * UNIT, (p.y - my * fe * 0.6 + AWAY.y * 0.8) * UNIT, half * 2.2, half * 1.2)
-    // 笔杆：从铁箍往后往上伸
-    const h0 = at(fe, -0.22, 0.25)
-    const h1 = at(fe, 0.22, 0.25)
-    const h2 = at(fe + HEAD.handle, 0.12, HEAD.lift)
-    const h3 = at(fe + HEAD.handle, -0.12, HEAD.lift)
-    quad4([h0, h1, h2, h3], 0x5e2a1c)
-    quad4([at(fe, -0.17, 0.25), at(fe, 0.17, 0.25), at(fe + HEAD.handle, 0.08, HEAD.lift), at(fe + HEAD.handle, -0.08, HEAD.lift)], 0xb5523b)
-    // 铁箍
-    quad4([at(hair, -1, 0.05), at(hair, 1, 0.05), at(fe, 0.6, 0.25), at(fe, -0.6, 0.25)], 0x6b6f78)
-    quad4([at(hair + 0.03, -0.92, 0.07), at(hair + 0.03, 0.92, 0.07), at(fe - 0.03, 0.52, 0.23), at(fe - 0.03, -0.52, 0.23)], 0xc3c7cf)
-    // 刷毛：根部本色，梢上蘸着颜色
-    quad4([at(0, -1.02), at(0, 1.02), at(hair, 1, 0.05), at(hair, -1, 0.05)], 0x8a6a44)
-    quad4([at(0.02, -0.98), at(0.02, 0.98), at(hair - 0.02, 0.96, 0.05), at(hair - 0.02, -0.96, 0.05)], 0xd8b98a)
-    quad4([at(0, -1.02), at(0, 1.02), at(hair * 0.45, 1.01, 0.02), at(hair * 0.45, -1.01, 0.02)], this.paint)
-    g.lineStyle(1.5, 0x5a4630, 0.6)
-    for (let i = -4; i <= 4; i++) {
-      const a = at(hair * 0.5, i / 4.6, 0.03)
-      const b = at(hair, i / 4.6, 0.05)
-      g.lineBetween(a.x, a.y, b.x, b.y)
-    }
   }
 
   /** 刷子每刷一道唰一声；每件布景折平、弹起时各响一下 */
