@@ -4,7 +4,8 @@ import { UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
 import { AWAY } from '../../data/light'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Depth, ENEMY_SET, Transform } from '../../ecs/components'
+import { Alive, Depth, ENEMY_SET, Motion, Transform, TRANSIT, VisOff } from '../../ecs/components'
+import { inTransit } from '../../ecs/utils/marks'
 import { LYING_Z, UNDER_Z } from '../../ecs/render/bands'
 import { leaderPoint } from '../../ecs/utils/team'
 import { FRAME_U } from '../../util/units'
@@ -404,6 +405,7 @@ export class TheaterView implements MapView {
     const shown = old ? [old, cur] : [cur]
     this.pieces(cfg, c, shown)
     this.lights(cfg, c, sim)
+    this.hangers(sim)
     this.sounds(cfg, c, shown)
     this.hide(sim, cfg, c, shown)
   }
@@ -454,6 +456,19 @@ export class TheaterView implements MapView {
     const lead = leaderPoint(sim)
     this.dark!.setVisible(k > 0.001).setAlpha(k * DARK_MAX).setPosition(lead.x, lead.y)
     this.wash!.setVisible(k > 0.001).setAlpha(k * WASH_MAX).setPosition(lead.x, lead.y)
+  }
+
+  /** 被吊起来的角色头顶两根吊绳，一直通到台框上面 */
+  private hangers(sim: Sim): void {
+    const ropes = this.ropes!
+    ropes.lineStyle(0.04 * UNIT, 0x2a1d18, 0.9)
+    for (const m of sim.characters) {
+      if (!inTransit(m) || Motion.look[m] !== TRANSIT.hoist) continue
+      const x = Transform.x[m]!
+      const top = Transform.y[m]! + VisOff.y[m]! - Transform.h[m]! * 0.55
+      const hw = Transform.w[m]! * 0.22
+      for (const dx of [-hw, hw]) ropes.lineBetween(x + dx, top, x + dx * 0.3, -FRAME_U * UNIT)
+    }
   }
 
   /**

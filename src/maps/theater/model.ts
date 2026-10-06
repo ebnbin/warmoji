@@ -535,7 +535,7 @@ export function actOf(cfg: TheaterConfig, stage: Stage, index: number): Act {
   return { index, chapter, seed: base, blend, pieces: ordered }
 }
 
-/** 换幕的一段：stand 演着，change 换幕——台上暗下来只留追光，旧布景依次吊上去，地布与天幕从右往左推过去换成新的，新布景依次吊下来，灯亮回来 */
+/** 换幕的一段：stand 演着，change 换幕——台上暗下来只留追光，角色被吊绳吊起，旧布景依次吊上去，地布与天幕连同台上的一切从右往左推过去换成新的，新布景依次吊下来，角色原地放下，灯亮回来 */
 export type Phase = 'stand' | 'change'
 
 /** 此刻演到哪：act 是正演着或正换上的那一幕（change 时旧的是 act - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换幕在几时（毫秒） */
@@ -621,6 +621,12 @@ export function glare(cfg: TheaterConfig, c: StageClock): number {
   const t = cfg.turn
   const end = turnLen(cfg)
   return easeInOut(clamp01(Math.min(c.at, end - c.at) / t.lightMs))
+}
+
+/** 角色此刻被吊绳吊起多高（占吊到顶的比例）：换幕一开头吊起来，整个换幕都吊着，新布景落完前原地放下 */
+export function hoisted(cfg: TheaterConfig, c: StageClock): number {
+  if (c.phase === 'stand') return 0
+  return easeInOut(clamp01(Math.min(c.at, turnLen(cfg) - c.at) / cfg.turn.lightMs))
 }
 
 /** 台中线上的几扇活门，格：怪从这里升上台 */

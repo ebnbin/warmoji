@@ -1,7 +1,13 @@
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
-import { Radius, Transform } from '../../ecs/components'
+import { query, removeEntity } from 'bitecs'
+import { Alive, Boss, ENEMY_SET, Motion, PICKUP_SET, Radius, Shard, Transform, TRANSIT, VisOff } from '../../ecs/components'
+import { pickupDef, pickupSfx } from '../../ecs/store'
+import { despawnEnemy } from '../../ecs/systems/shared/combat'
+import { displace, endMotion } from '../../ecs/systems/shared/displace'
+import { hoverPx } from '../../ecs/utils/ground'
+import { inTransit } from '../../ecs/utils/marks'
 import { SPAWN } from '../../data/enemies'
 import { clockSec } from '../../ecs/fight/clock'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
@@ -10,7 +16,7 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { BASIN_CELL_U, clockAt, lifted, makeStage, actOf, slabOf, slabSd, standing, trapsOf } from './model'
+import { BASIN_CELL_U, clockAt, hoisted, lifted, makeStage, actOf, slabOf, slabSd, slid, standing, trapsOf, turnLen } from './model'
 import type { Basin } from '../basin'
 import type { Landmark } from '../landmark'
 import type { Stage, StageClock, Act, Piece, Slab } from './model'
@@ -30,6 +36,10 @@ const FLOW_CLEAR_U = 0.42
 /** 布景后面的出怪口：离背面多远，离布景的一头多远，格 */
 const WINGS_BACK_U = 0.75
 const WINGS_END_U = 0.55
+/** 角色被吊起来在画面上抬多高，格 */
+export const HOIST_U = 3
+/** 推景时离台左边沿不到这么远（格，算上身体半径）的就算推进了侧幕，退场 */
+const EXIT_U = 0.3
 /** 一件布景落到台上时沿底边扬起几团灰 */
 const POP_PUFFS = 3
 
@@ -65,6 +75,10 @@ export interface TheaterState {
   readonly traps: readonly Landmark[]
   wings: Landmark[]
   wingsKey: string
+  /** 吊过的是第几幕的换幕；地布推到哪了（上一帧）；正吊着的角色 */
+  hoistAct: number
+  slidAt: number
+  readonly hung: Set<number>
 }
 
 function cfgOf(sim: Sim): TheaterConfig {
@@ -115,6 +129,9 @@ export function theaterOf(sim: Sim): TheaterState {
       traps,
       wings: [],
       wingsKey: '',
+      hoistAct: -1,
+      slidAt: 1,
+      hung: new Set(),
     }
     sim.worldState.theater = s
     refresh(s, cfg)
@@ -188,6 +205,58 @@ function wingsOf(s: TheaterState): Landmark[] {
     }
   }
   return out
+}
+
+/**
+ * 换幕时吊角色：一开头每个站着的角色都被吊绳原地吊起来——穿行到原处，整个换幕都吊着，碰不到谁、谁也碰不到他，
+ * 不能动、不能打、不受伤、捡不了东西；画面上按吊起的高度往上抬，放下时落回原处，原处被新布景占了就挤到旁边
+ */
+function hoist(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
+  const c = s.clock
+  if (c.phase === 'change' && s.hoistAct !== c.act) {
+    s.hoistAct = c.act
+    for (const m of sim.characters) {
+      if (!Alive.v[m] || inTransit(m)) continue
+      if (displace(sim, m, { kind: 'transit', x: Transform.x[m]!, y: Transform.y[m]!, ms: turnLen(cfg) * 2, look: 'hoist', color: 0 }, { self: false, free: true })) s.hung.add(m)
+    }
+  }
+  const k = hoisted(cfg, c)
+  for (const m of s.hung) {
+    let up = inTransit(m) && Motion.look[m] === TRANSIT.hoist
+    // 换幕按难度时钟走，吊着的那段按模拟时间走：换完就放下，不等那段走完
+    if (up && c.phase === 'stand') {
+      endMotion(m)
+      up = false
+    }
+    VisOff.y[m] = -hoverPx(m) - (up ? k * HOIST_U * UNIT : 0)
+    if (!up) s.hung.delete(m)
+  }
+}
+
+/** 推景：地布从右往左推过去时，地上的东西——敌人（头目除外）、掉落物、碎屑——都跟着地布一起往左挪，吊着的角色与飞在半空的不动；推进左边侧幕的退场，不算打倒、不掉东西 */
+function carry(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
+  const u = slid(cfg, s.clock)
+  const du = u - s.slidAt
+  s.slidAt = u
+  if (s.clock.phase !== 'change' || du <= 0) return
+  const dx = -du * (s.stage.x1 - s.stage.x0) * UNIT
+  const edge = (s.stage.x0 + EXIT_U) * UNIT
+  for (const eid of [...query(sim.world, ENEMY_SET)]) {
+    if (!Alive.v[eid] || Boss.v[eid] === 1 || inTransit(eid)) continue
+    Transform.x[eid] = Transform.x[eid]! + dx
+    if (Transform.x[eid]! - Radius.v[eid]! < edge) despawnEnemy(sim, eid, false)
+  }
+  for (const eid of [...query(sim.world, PICKUP_SET)]) {
+    Transform.x[eid] = Transform.x[eid]! + dx
+    if (Transform.x[eid]! >= edge) continue
+    pickupDef[eid] = undefined
+    pickupSfx[eid] = undefined
+    removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, [Shard, Transform])]) {
+    Transform.x[eid] = Transform.x[eid]! + dx
+    if (Transform.x[eid]! < edge) removeEntity(sim.world, eid)
+  }
 }
 
 /** 跨得过矮布景的身体按高的那张距离场 */
@@ -501,11 +570,13 @@ export const theater: WorldHooks = {
   onStart(sim) {
     theaterOf(sim)
   },
-  /** 按难度时钟换幕；台上的布景一变就重铺距离场，换幕时刚落下来的沿底边扬灰 */
+  /** 按难度时钟换幕：吊起角色、推走台上的一切；台上的布景一变就重铺距离场，换幕时刚落下来的沿底边扬灰 */
   tick(sim) {
     const cfg = cfgOf(sim)
     const s = theaterOf(sim)
     s.clock = stageClock(sim, cfg, s.stage)
+    hoist(sim, s, cfg)
+    carry(sim, s, cfg)
     const popped = refresh(s, cfg)
     const wings = s.clock.phase === 'stand' ? s.key : ''
     if (wings !== s.wingsKey) {

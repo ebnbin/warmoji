@@ -22,9 +22,9 @@ const STREAK_ALPHA = 0.5
 /** 看不见的身体只剩这么淡的影子 */
 const UNSEEN_ALPHA = 0.35
 
-/** 存在感：隐身穿行的看不见，残影穿行的半透明，被吞的几乎看不见，碰不到的半透明，看不见的只剩淡影 */
+/** 存在感：隐身穿行的看不见，残影穿行的半透明，吊起的照常看得见，被吞的几乎看不见，碰不到的半透明，看不见的只剩淡影 */
 export function presence(sim: Sim, eid: number): number {
-  if (inTransit(eid)) return Motion.look[eid] === TRANSIT.hidden ? 0 : STREAK_ALPHA
+  if (inTransit(eid)) return Motion.look[eid] === TRANSIT.hidden ? 0 : Motion.look[eid] === TRANSIT.hoist ? 1 : STREAK_ALPHA
   if (hasMark(sim, eid, MARK.devoured)) return 0.1
   if (isHidden(sim, eid)) return UNSEEN_ALPHA
   if (hasMark(sim, eid, MARK.untargetable)) return 0.5
@@ -41,9 +41,9 @@ export function hostShown(host: number): number {
   return Tint.alpha[host]!
 }
 
-/** 身上的底色：穿行中是穿行的颜色，其余按控制的轻重排 */
+/** 身上的底色：穿行中是穿行的颜色（吊起的不染色），其余按控制的轻重排 */
 export function statusTint(sim: Sim, eid: number): number {
-  if (inTransit(eid)) return Motion.color[eid]!
+  if (inTransit(eid)) return Motion.look[eid] === TRANSIT.hoist ? 0 : Motion.color[eid]!
   for (const [kind, color] of TINTS) if (hasMark(sim, eid, kind)) return color
   if (isAirborne(eid)) return 0xfff59d
   return hasMark(sim, eid, MARK.realm) ? REALM_TINT : 0
