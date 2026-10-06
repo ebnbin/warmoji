@@ -21,7 +21,7 @@ const HEAT_FLOOR = 0.02
 const DRY_MS = 40000
 
 /**
- * 积雪的格子场，和熔岩场同一套格子。fall、full、fan、dist 开局定下，其余随时间变；只是画面，不碰玩法
+ * 积雪的格子场，和熔岩场同一套格子。fall、full、fan、dist、grime 开局定下，其余随时间变；只是画面，不碰玩法
  */
 export interface Snow {
   /** 这里的雪下得多大，0 到 1：火山周围一大片是 1，往外由大变小到 0 */
@@ -51,7 +51,7 @@ export interface CraterHeat {
 }
 
 /**
- * 开局的积雪：雪区以朝地图里挪过的火山口为心，半径按方位起伏、边界再抖一抖；山体、洼处、背阴处积得厚，陡崖只在台阶上留雪。
+ * 开局的积雪：雪区以朝地图里挪过的火山口为心，半径按方位起伏、边界再抖一抖；洼处、背阴处积得厚，山体陡坡上露出顺坡的石棱，陡崖只在台阶上留雪，口沿一圈落着灰。
  * 已有的岩石按凉了多久积了一部分，熔岩上没有雪
  */
 export function makeSnow(f: LavaField, cfg: VolcanoConfig, marks: GroundMarks, now: number): Snow {
