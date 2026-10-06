@@ -42,8 +42,7 @@ export const CLIMBING = 3
 export type Mode = typeof TOP | typeof FALLING | typeof DOWN | typeof CLIMBING
 
 /**
- * 一个身体的处境：uid 认实体；mode 与它从 at 毫秒起、要 ms 毫秒；掉与爬都是从 (fx, fy) 到 (tx, ty)，爬时 climb 是第几根绳梯；
- * vx、vy 是开始掉时的速度
+ * 一个身体的处境：uid 认实体；mode 与它从 at 毫秒起、要 ms 毫秒；掉与爬都是从 (fx, fy) 到 (tx, ty)，爬时 climb 是第几根绳梯
  */
 export interface Footing {
   uid: number
@@ -55,8 +54,6 @@ export interface Footing {
   tx: number
   ty: number
   climb: number
-  vx: number
-  vy: number
 }
 
 /** 给画面的事：一座桥崩断、一个身体掉下去、摔到谷底、一枚金币掉进谷里、一个身体爬上了台 */

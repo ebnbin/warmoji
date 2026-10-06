@@ -72,7 +72,7 @@ export function weightKg(cfg: CanyonConfig, eid: number): number {
 export function footOf(s: CanyonState, eid: number): Footing {
   let f = s.feet.get(eid)
   if (!f || f.uid !== Uid.v[eid]) {
-    f = { uid: Uid.v[eid]!, mode: TOP, at: 0, ms: 0, fx: 0, fy: 0, tx: 0, ty: 0, climb: -1, vx: 0, vy: 0 }
+    f = { uid: Uid.v[eid]!, mode: TOP, at: 0, ms: 0, fx: 0, fy: 0, tx: 0, ty: 0, climb: -1 }
     s.feet.set(eid, f)
   }
   return f
@@ -113,8 +113,6 @@ function startFall(sim: Sim, s: CanyonState, f: Footing, eid: number): void {
   f.fy = y
   f.tx = land.x
   f.ty = land.y
-  f.vx = Phys.vx[eid]!
-  f.vy = Phys.vy[eid]!
   // 冲出台沿的冲刺到此为止
   if (Motion.kind[eid] === MOTION.dash) endMotion(eid)
   enterGorge(eid)
