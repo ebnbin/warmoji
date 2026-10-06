@@ -6,6 +6,7 @@ import { SPAWN } from '../../data/enemies'
 import { ACQUIRE } from '../../data/abilities'
 import { Alive, Drive, Faction, FACTION, Grow, Hp, MARK, Motion, MOTION, Phys, Pickup, PICKUP_SET, Radius, Span, TAG, Transform, Uid } from '../../ecs/components'
 import { hit } from '../../ecs/systems/shared/damage'
+import { endMotion } from '../../ecs/systems/shared/displace'
 import { addCc, addMark, clearMarks } from '../../ecs/utils/marks'
 import { hazardSource } from '../../ecs/utils/source'
 import { moveSpeed } from '../../ecs/utils/stats'
@@ -39,6 +40,8 @@ const QUEUE_AT = 0.95
 const HEAD_IN_U = 1
 const BOARD_U = 1.3
 const BOARD_LANE = 0.55
+/** 队长推的方向离桥的走向不到这么多（余弦）就顺着桥走 */
+const RAIL_COS = 0.55
 
 /** 这一局的峡谷：视图要它画，规则要它定边界，两边按同一个种子各要一次 */
 export function canyonPlanFor(cfg: CanyonConfig, decorSeed: number): CanyonPlan {
@@ -81,11 +84,12 @@ export function below(s: CanyonState, eid: number): boolean {
   return f !== undefined && f.uid === Uid.v[eid] && f.mode !== TOP
 }
 
-/** 脚踏实地、自己在走：站着的身体才压桥、才会踩空；冲刺、腾空、穿行、贴着别人的不算 */
+/** 脚踏实地：站着、走着、冲刺着的身体才压桥、才会踩空；飘着的、跳在半空的、穿行的、贴着别人的不算 */
 function standing(sim: Sim, eid: number): boolean {
   if (Span.lo[eid]! > 0) return false
   if (!hasComponent(sim.world, eid, Motion)) return true
-  return Motion.kind[eid] === MOTION.none
+  const k = Motion.kind[eid]
+  return k === MOTION.none || k === MOTION.dash
 }
 
 function enterGorge(eid: number): void {
@@ -111,6 +115,8 @@ function startFall(sim: Sim, s: CanyonState, f: Footing, eid: number): void {
   f.ty = land.y
   f.vx = Phys.vx[eid]!
   f.vy = Phys.vy[eid]!
+  // 冲出台沿的冲刺到此为止
+  if (Motion.kind[eid] === MOTION.dash) endMotion(eid)
   enterGorge(eid)
   s.events.push({ kind: 'fall', x, y, r: Radius.v[eid]!, at: sim.elapsedMs })
 }
@@ -413,7 +419,10 @@ export const canyon: WorldHooks = {
   contact(sim, eid, _dt, _x, _y, _vx, _vy, out) {
     const s = canyonOf(sim)
     const f = s.feet.get(eid)
-    if (!f || f.uid !== Uid.v[eid] || f.mode === TOP) return false
+    if (!f || f.uid !== Uid.v[eid] || f.mode === TOP) {
+      if (eid === sim.leader) alongRail(s, eid)
+      return false
+    }
     if (f.mode === FALLING || f.mode === CLIMBING) {
       const p = Math.min(1, (sim.elapsedMs - f.at) / f.ms)
       const q = f.mode === FALLING ? fallPoint(f, p) : climbPoint(s, f, p)
@@ -436,12 +445,15 @@ export const canyon: WorldHooks = {
     const s = canyonOf(sim)
     const f = s.feet.get(eid)
     if (f && f.uid === Uid.v[eid] && f.mode !== TOP) return f.mode === DOWN ? keepOut(s.plan.floor, next.x, next.y, Math.min(Radius.v[eid]!, 0.4 * UNIT)) : next
-    if (eid === sim.leader || !supported(s, from.x, from.y)) return next
+    if (!supported(s, from.x, from.y)) return next
     if (queued(sim, s, eid, from, next)) return from
     if (supported(s, next.x, next.y)) return next
-    // 被打飞的拦不住
-    if (Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) > moveSpeed(eid) * FLUNG) return next
+    // 被打飞的拦不住；自己冲刺的在台沿刹住
+    const charging = Motion.kind[eid] === MOTION.dash && Motion.self[eid] === 1
+    if (!charging && Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) > moveSpeed(eid) * FLUNG) return next
     const j = mesaOf(s, from.x, from.y) < 0 ? deckAt(s, from.x, from.y) : -1
+    // 桥两边有扶绳：走着翻不出去，队长也一样；台沿没有，队长走过头就掉下去
+    if (eid === sim.leader && j < 0) return next
     if (j >= 0) {
       const b = s.bridges[j]!
       const c = deckCoord(b, next.x, next.y)
@@ -567,6 +579,25 @@ export const canyon: WorldHooks = {
     dropLoot(sim, s)
     if (s.events.length > 96) s.events.splice(0, s.events.length - 96)
   },
+}
+
+/** 队长在桥上大致顺着桥走时，把摇杆的方向顺到桥面上：窄桥上斜着推也不会一直蹭着扶绳 */
+function alongRail(s: CanyonState, eid: number): void {
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  if (mesaOf(s, x, y) >= 0) return
+  const j = deckAt(s, x, y)
+  if (j < 0) return
+  const b = s.bridges[j]!
+  const dx = Drive.x[eid]!
+  const dy = Drive.y[eid]!
+  const sp = Math.hypot(dx, dy)
+  if (sp < 1e-6) return
+  const along = (dx * b.ux + dy * b.uy) / sp
+  if (Math.abs(along) < RAIL_COS) return
+  const d = alongDeck(b, x, y, along > 0 ? 1.2 : -0.2)
+  Drive.x[eid] = d.x * sp
+  Drive.y[eid] = d.y * sp
 }
 
 /** 队员与召唤物从桥外踏上一座桥时，加上自己会压过上限就不上 */

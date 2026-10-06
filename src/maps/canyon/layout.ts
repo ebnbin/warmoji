@@ -492,7 +492,7 @@ export function navDist(p: CanyonPlan, x: number, y: number): number {
   return p.nav.dist[j * f.cols + i]!
 }
 
-/** 谷底 (x, y) 像素处往哪走离绳梯脚下更近：看四周一圈格子挑最近的那格，没有路是 null；同时给出走向第几根 */
+/** 谷底 (x, y) 像素处往哪走离绳梯脚下更近：看四周两圈格子里离绳梯最近的那格，没有路是 null；同时给出走向第几根 */
 export function navStep(p: CanyonPlan, x: number, y: number): { x: number; y: number; climb: number } | null {
   const f = p.floor
   const ci = Math.floor((x - f.x0) / f.cell)
@@ -505,7 +505,8 @@ export function navStep(p: CanyonPlan, x: number, y: number): { x: number; y: nu
       const j = cj + dj
       if (i < 0 || j < 0 || i >= f.cols || j >= f.rows) continue
       const k = j * f.cols + i
-      const d = p.nav.dist[k]! + Math.hypot(di, dj) * f.cell
+      // 往离绳梯最近的那格走：同样近的取离自己近的
+      const d = p.nav.dist[k]! + Math.hypot(di, dj) * 1e-3
       if (d < best) {
         best = d
         bi = k
