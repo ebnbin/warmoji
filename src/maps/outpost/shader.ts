@@ -57,6 +57,35 @@ float segDist(vec2 p, vec2 a, vec2 b) {
   return length(p - a - ab * t);
 }
 
+/** p 起往下 len 那一截竖线 p + (0, h)（h 在 0 到 len 之间）与段 a + u·t 最近的两点：返回 (t, h) */
+vec2 closest(vec2 p, float len, vec2 a, vec2 u) {
+  vec2 d1 = vec2(0.0, len);
+  vec2 r = p - a;
+  float aa = dot(d1, d1);
+  float e = dot(u, u);
+  float f = dot(u, r);
+  float s;
+  float t;
+  if (aa < 1e-4) {
+    s = 0.0;
+    t = clamp(f / e, 0.0, 1.0);
+  } else {
+    float c = dot(d1, r);
+    float b = dot(d1, u);
+    float den = aa * e - b * b;
+    s = den > 1e-3 ? clamp((b * f - c * e) / den, 0.0, 1.0) : 0.0;
+    t = (b * s + f) / e;
+    if (t < 0.0) {
+      t = 0.0;
+      s = clamp(-c / aa, 0.0, 1.0);
+    } else if (t > 1.0) {
+      t = 1.0;
+      s = clamp((b - c) / aa, 0.0, 1.0);
+    }
+  }
+  return vec2(t, s * len);
+}
+
 void main ()
 {
   vec2 p = uOrigin + vec2(outTexCoord.x, 1.0 - outTexCoord.y) * uSize;
@@ -110,42 +139,25 @@ void main ()
       alpha += (core * 0.9 + halo * 0.35) * on;
     }
     if (level <= 0.001) continue;
-    // 光墙：竖直往上的一片。按横向把 p 放回段上，再看它比段线高出多少
+    // 光墙：竖直往上的一片。p 往下挪 h 落在段上就在光墙里：按 p 往上那一截竖线与段最近的两点求出沿段的 t 与高 h
     float hgt = uH * level;
-    float t;
-    float h;
-    float lateral;
-    if (abs(dir.x) > 0.3) {
-      t = (p.x - A.x) / u.x;
-      float baseY = A.y + u.y * t;
-      h = baseY - p.y;
-      lateral = 0.0;
-      float tc = clamp(t, 0.0, 1.0);
-      lateral = abs(p.x - (A.x + u.x * tc));
-      t = tc;
-    } else {
-      float yTop = min(A.y, B.y) - hgt;
-      float yBot = max(A.y, B.y);
-      float tc = clamp((p.y + hgt * 0.5 - A.y) / u.y, 0.0, 1.0);
-      t = tc;
-      vec2 at = A + u * tc;
-      lateral = abs(p.x - at.x);
-      h = (p.y < yTop || p.y > yBot) ? -1.0 : clamp((at.y - p.y), 0.0, hgt);
-      lateral = max(lateral - abs(dir.x) * len * 0.5, 0.0);
-    }
-    float half = uThick * 0.5 + abs(dir.y) * 0.0;
-    float side = 1.0 - smoothstep(half, half + 1.5, lateral);
-    if (side <= 0.0 || h < -1.0 || h > hgt + 1.5) continue;
+    vec2 cl = closest(p, hgt, A, u);
+    float t = cl.x;
+    float h = cl.y;
+    float lateral = length(p + vec2(0.0, h) - (A + u * t));
+    float halfT = uThick * 0.5;
+    float side = 1.0 - smoothstep(halfT, halfT + 1.5, lateral);
+    if (side <= 0.0 || h > hgt + 1.5) continue;
     float sv = clamp(h / max(uH, 1.0), 0.0, 1.0);
     float top = clamp(h / max(hgt, 1.0), 0.0, 1.0);
     float x = t * len / uUnit;
-    float body = 0.2 + 0.32 * pow(1.0 - sv, 1.4);
+    float body = 0.16 + 0.42 * pow(1.0 - sv, 1.6);
     float streak = vnoise(vec2(x * 7.0, sv * 2.5 - uTime * 1.6)) * 0.75 + vnoise(vec2(x * 19.0, sv * 6.0 - uTime * 3.1)) * 0.35;
     float scan = 0.5 + 0.5 * sin((sv * 9.0 - uTime * 2.4) * 3.14159);
     float hex = smoothstep(0.82, 0.95, abs(sin(x * 11.0 + sv * 6.0)) * abs(sin(x * 11.0 - sv * 6.0 + 1.0)));
-    float edgeTop = exp(-pow((hgt - h) / 2.2, 2.0)) * 1.4;
-    float edgeBot = exp(-pow(h / 2.5, 2.0)) * 1.1;
-    float a = body * (0.65 + 0.55 * streak) + scan * 0.06 + hex * 0.05;
+    float edgeTop = exp(-pow((hgt - h) / 1.4, 2.0)) * 1.2;
+    float edgeBot = exp(-pow(h / 1.6, 2.0)) * 0.8;
+    float a = body * (0.35 + 0.95 * streak) + scan * 0.07 + hex * 0.06;
     float ripple = 0.0;
     for (int r = 0; r < RIPS; r++) {
       vec4 rp = uRip[r];
@@ -160,7 +172,7 @@ void main ()
     }
     float breakup = crackle > 0.0 ? step(0.45, vnoise(vec2(x * 9.0, sv * 4.0 + uTime * 9.0))) : 1.0;
     float k = (a + edgeTop * (0.6 + 0.4 * (1.0 - top)) + edgeBot * 0.6 + ripple) * side * flick * breakup;
-    vec3 tone = mix(c.rgb, vec3(1.0), clamp(edgeTop * 0.55 + edgeBot * 0.3 + ripple * 0.5, 0.0, 0.9));
+    vec3 tone = mix(c.rgb * 1.15, vec3(1.0), clamp(edgeTop * 0.35 + edgeBot * 0.15 + ripple * 0.5, 0.0, 0.85));
     col += tone * k;
     alpha += min(k, 1.0) * 0.72;
   }

@@ -23,6 +23,20 @@ const WILD_OUT_U = 1.3
 export const FLOW_CELL_U = 0.5
 /** 连着两座圆顶舱的走廊多高，米 */
 export const TUBE_M = 2
+/** 圆顶舱朝站心伸出的气闸：从几倍半径处起，伸出多长、多宽（格），多高（米） */
+export const AIRLOCK = { from: 0.82, len: 0.75, wid: 0.62, m: 1.4 } as const
+
+/** (x, y) 格在不在圆顶舱 d 的气闸里，往外放宽 pad 格；气闸朝着站心 (cx, cy) */
+export function inAirlock(d: Disc, cx: number, cy: number, x: number, y: number, pad: number): { u: number; v: number } | null {
+  const a = Math.atan2(cy - d.y, cx - d.x)
+  const ca = Math.cos(a)
+  const sa = Math.sin(a)
+  const dx = x - d.x
+  const dy = y - d.y
+  const u = dx * ca + dy * sa - d.r * AIRLOCK.from
+  const v = -dx * sa + dy * ca
+  return u >= -pad && u <= AIRLOCK.len + pad && Math.abs(v) <= AIRLOCK.wid / 2 + pad ? { u, v } : null
+}
 
 /** 一根立柱，格 */
 export interface Pylon {
@@ -432,7 +446,7 @@ export function outpostPlan(cfg: OutpostConfig, seed: number): OutpostPlan {
       const a = lean + (rng.next() - 0.5) * 2.2
       const off = rng.next() * r * 0.45
       const o = rng.next() * TAU
-      return { dx: Math.cos(o) * off, dy: Math.sin(o) * off, a, len: r * (0.55 + rng.next() * 0.6), w: r * (0.18 + rng.next() * 0.14) }
+      return { dx: Math.cos(o) * off, dy: Math.sin(o) * off, a, len: r * (0.5 + rng.next() * 0.45), w: r * (0.28 + rng.next() * 0.16) }
     })
     crystals.push({ x: p.x, y: p.y, r, tall, prisms })
     made++
@@ -440,7 +454,7 @@ export function outpostPlan(cfg: OutpostConfig, seed: number): OutpostPlan {
 
   const tall = (x: number, y: number, pad: number): boolean => {
     for (const p of pylons) if (Math.hypot(x - p.x, y - p.y) < cfg.fence.pylonU + pad) return true
-    for (const d of domes) if (Math.hypot(x - d.x, y - d.y) < d.r + pad) return true
+    for (const d of domes) if (Math.hypot(x - d.x, y - d.y) < d.r + pad || inAirlock(d, cx, cy, x, y, pad)) return true
     for (const t of tubes) if (segDist(t.ax, t.ay, t.bx, t.by, x, y) < t.w / 2 + pad) return true
     if (mast && Math.hypot(x - mast.x, y - mast.y) < mast.r + pad) return true
     for (const c of crystals) if (c.tall && Math.hypot(x - c.x, y - c.y) < c.r + pad) return true
@@ -658,6 +672,7 @@ export function distances(g: FlowGrid, pass: Uint8Array, start: number, dist: Fl
 export function gearAt(plan: OutpostPlan, cfg: OutpostConfig, x: number, y: number): { readonly topM: number; readonly material: 'rock' | 'structure' | 'steel' } | null {
   for (const p of plan.pylons) if (Math.hypot(x - p.x, y - p.y) < cfg.fence.pylonU) return { topM: cfg.fence.pylonM, material: 'structure' }
   for (const d of plan.domes) if (Math.hypot(x - d.x, y - d.y) < d.r) return { topM: cfg.gear.domeM, material: 'structure' }
+  for (const d of plan.domes) if (inAirlock(d, plan.cx, plan.cy, x, y, 0)) return { topM: AIRLOCK.m, material: 'structure' }
   for (const t of plan.tubes) if (segDist(t.ax, t.ay, t.bx, t.by, x, y) < t.w / 2) return { topM: TUBE_M, material: 'structure' }
   const m = plan.mast
   if (m && Math.hypot(x - m.x, y - m.y) < m.r) return { topM: cfg.gear.mastM, material: 'structure' }

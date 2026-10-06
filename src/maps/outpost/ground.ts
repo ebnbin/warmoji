@@ -2,7 +2,7 @@ import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { FRAME_U } from '../../util/units'
-import { rimAt, segDist } from './layout'
+import { AIRLOCK, inAirlock, rimAt, segDist } from './layout'
 import type { Disc, OutpostPlan, Panel } from './layout'
 import type { OutpostConfig } from '../../types/maps'
 
@@ -10,18 +10,24 @@ import type { OutpostConfig } from '../../types/maps'
 export const FACE_U_PER_M = 0.2
 /** 高度与影子的格子：每格多少格地图 */
 const HF_U = 0.125
-/** 岩脊在台地边外每往外一格高多少米、最高多高（米） */
-const RIDGE_RISE = 1.6
-const RIDGE_MAX_M = 5.5
+/** 台地边那道陡坎多高，米 */
+const SCARP_M = 2.6
+/** 高地上圆石的疏密：每格多少个细胞 */
+const BOULDER_FREQ = 1.15
+/** 细胞的哈希高过它才有圆石；大石台的疏密 */
+const BOULDER_KEEP = 0.78
+const MESA_FREQ = 0.3
 /** 影子最长追多远，格 */
 const SHADOW_REACH_U = 8
 /** 背光处还剩多少光（天光与行星的反光），影子的边软多宽（格） */
-const AMBIENT = 0.5
+const AMBIENT = 0.6
 const PENUMBRA_U = 0.09
 /** 站心那块金属甲板的半径比空场小多少（格） */
 const DECK_INSET_U = 0.6
 /** 一格米数：一格就是一米 */
 const M_PER_U = 1
+/** 舱顶玻璃天窗占圆顶半径的比例 */
+const SKYLIGHT = 0.46
 
 type Rgb = [number, number, number]
 
@@ -143,14 +149,33 @@ function beyond(plan: OutpostPlan, x: number, y: number): number {
   return Math.hypot(dx, dy) - rimAt(plan, Math.atan2(dy, dx))
 }
 
-/** 岩脊在 (x, y) 处多高，米：从台地边往外一路抬起，顶上参差 */
+/** 岩脊在 (x, y) 处多高，米：台地边上一道陡坎，坎上是起伏的高地，散着一块块圆石 */
 function ridgeM(plan: OutpostPlan, x: number, y: number): number {
-  const d = beyond(plan, x, y)
+  const d = beyond(plan, x, y) + (fbm(x * 0.6, y * 0.6, 31, 3) - 0.5) * 0.5
   if (d <= -0.05) return 0
-  const jag = fbm(x * 0.55, y * 0.55, 31, 4)
-  const crag = 1 - Math.abs(valueNoise(x * 1.4, y * 1.4, 37) * 2 - 1)
-  const base = Math.min(RIDGE_MAX_M, Math.max(0, d + 0.05) * RIDGE_RISE * (0.7 + 0.6 * jag))
-  return base * (0.75 + 0.25 * crag) + smooth(0, 1.2, d) * (jag - 0.5) * 1.4
+  const scarp = SCARP_M * smooth(-0.05, 0.8, d)
+  const rise = Math.min(1.6, Math.max(0, d - 0.8) * 0.3)
+  const roll = (fbm(x * 0.22, y * 0.22, 33, 3) - 0.5) * 1.8 * smooth(0.5, 2.5, d)
+  return Math.max(0, scarp + rise + roll + boulderM(x, y, d) * smooth(0.4, 1.2, d))
+}
+
+/** 高地上的石头，米：零星的圆石，离坎越远越稀；几座平顶的大石台 */
+function boulderM(x: number, y: number, d: number): number {
+  let h = 0
+  const b = cellNearest(x * BOULDER_FREQ, y * BOULDER_FREQ, 37)
+  if (b.h > BOULDER_KEEP + 0.25 * smooth(1, 6, d)) {
+    const r = 0.2 + 0.28 * (b.h - BOULDER_KEEP) / (1 - BOULDER_KEEP)
+    const q = Math.hypot(b.dx, b.dy) / BOULDER_FREQ / r
+    if (q < 1) h = 0.7 * Math.sqrt(1 - q * q) * (0.6 + 0.4 * b.h)
+  }
+  const m = cellNearest(x * MESA_FREQ, y * MESA_FREQ, 39)
+  if (m.h > 0.58) {
+    const r = 0.8 + 1.6 * (m.h - 0.58) / 0.42
+    const wob = 1 + (fbm(x * 1.4, y * 1.4, 41, 2) - 0.5) * 0.35
+    const q = Math.hypot(m.dx, m.dy) / MESA_FREQ / (r * wob)
+    if (q < 1) h = Math.max(h, (1 + 1.6 * m.h) * smooth(1, 0.7, q))
+  }
+  return h
 }
 
 /** 圆顶舱在 (x, y) 处的高（米）：半球按 h 拉成扁的 */
@@ -173,7 +198,7 @@ function inPanel(p: Panel, x: number, y: number, pad: number): { u: number; v: n
 function gearM(sc: PaintScene, x: number, y: number): number {
   const { plan, cfg } = sc
   let h = 0
-  for (const d of plan.domes) h = Math.max(h, domeM(d, cfg.gear.domeM, x, y))
+  for (const d of plan.domes) h = Math.max(h, domeM(d, cfg.gear.domeM, x, y), inAirlock(d, plan.cx, plan.cy, x, y, 0) ? AIRLOCK.m : 0)
   for (const t of plan.tubes) {
     const q = segDist(t.ax, t.ay, t.bx, t.by, x, y) / (t.w / 2)
     if (q < 1) h = Math.max(h, 2 * Math.sqrt(1 - q * q))
@@ -307,43 +332,64 @@ function sunAt(prep: Prepared, x: number, y: number): number {
   return (sample(prep, prep.lit, x, y) * 2 + sample(prep, prep.lit, x + p, y + p) + sample(prep, prep.lit, x - p, y - p) + sample(prep, prep.lit, x + p, y - p) + sample(prep, prep.lit, x - p, y + p)) / 6
 }
 
-/** 天空：看向方向 (dx, dy, dz)（z 朝上）的颜色。暮紫的天，背着太阳那边挂着一颗带环的气态巨行星，两颗小月亮 */
-const GIANT = dirOf(Math.atan2(-SUN.y, -SUN.x) + 0.35, 52)
-const MOON_A = dirOf(Math.atan2(-SUN.y, -SUN.x) - 0.9, 34)
-const MOON_B = dirOf(Math.atan2(SUN.y, SUN.x) + 1.4, 61)
+/** 天空：暮紫的天，背着太阳那边挂着一颗带环的气态巨行星（朝太阳的一侧亮），旁边两颗小月亮 */
+const GIANT = dirOf(Math.atan2(-SUN.y, -SUN.x) + 0.3, 50)
+const MOONS = [dirOf(Math.atan2(-SUN.y, -SUN.x) - 1.5, 34), dirOf(Math.atan2(-SUN.y, -SUN.x) + 1.7, 72)] as const
+/** 巨行星的角半径（弧度）、环的外沿与内沿（倍角半径）、环倾斜后在画面上压扁成多少 */
+const GIANT_R = 0.42
+const RING = { outer: 2.05, inner: 1.35, tilt: 0.3 } as const
 function dirOf(az: number, elevDeg: number): { x: number; y: number; z: number } {
   const e = (elevDeg * Math.PI) / 180
   return { x: Math.cos(az) * Math.cos(e), y: Math.sin(az) * Math.cos(e), z: Math.sin(e) }
 }
+/** 巨行星切平面上的两个方向：e1 水平，e2 朝上 */
+const G1 = (() => {
+  const l = Math.hypot(GIANT.x, GIANT.y)
+  return { x: -GIANT.y / l, y: GIANT.x / l, z: 0 }
+})()
+const G2 = { x: GIANT.y * G1.z - GIANT.z * G1.y, y: GIANT.z * G1.x - GIANT.x * G1.z, z: GIANT.x * G1.y - GIANT.y * G1.x }
 export function skyColor(dx: number, dy: number, dz: number, out: Rgb): void {
-  const up = clamp01(dz)
-  out[0] = 70 + (38 - 70) * up
-  out[1] = 62 + (40 - 62) * up
-  out[2] = 104 + (86 - 104) * up
-  const sunDot = dx * L.x + dy * L.y + dz * L.z
-  const glow = Math.pow(clamp01(sunDot), 24)
-  mixInto(out, 255, 228, 196, glow * 0.85)
-  const g = dx * GIANT.x + dy * GIANT.y + dz * GIANT.z
-  const ang = Math.acos(Math.min(1, g))
-  const R = 0.36
-  if (ang < R * 1.9) {
-    const ux = -GIANT.y
-    const uy = GIANT.x
-    const lat = (dx * ux + dy * uy) / Math.max(1e-6, Math.sin(ang) || 1)
-    const band = Math.sin(((dz - GIANT.z) / R) * 9 + lat * 2) * 0.5 + 0.5
-    if (ang < R) {
-      const rim = smooth(R, R * 0.6, ang)
-      const t = band
-      out[0] = (214 + (168 - 214) * t) * (0.55 + 0.45 * rim)
-      out[1] = (176 + (118 - 176) * t) * (0.55 + 0.45 * rim)
-      out[2] = (146 + (104 - 146) * t) * (0.55 + 0.45 * rim)
+  const l = Math.hypot(dx, dy, dz) || 1
+  const x = dx / l
+  const y = dy / l
+  const z = dz / l
+  const up = clamp01(z)
+  out[0] = 74 + (30 - 74) * up
+  out[1] = 60 + (30 - 60) * up
+  out[2] = 104 + (70 - 104) * up
+  mixInto(out, 255, 226, 196, Math.pow(clamp01(x * L.x + y * L.y + z * L.z), 20) * 0.8)
+  const g = x * GIANT.x + y * GIANT.y + z * GIANT.z
+  if (g > 0) {
+    const px = (x * G1.x + y * G1.y + z * G1.z) / GIANT_R
+    const py = (x * G2.x + y * G2.y + z * G2.z) / GIANT_R
+    const rr = Math.hypot(px, py)
+    const ring = Math.hypot(px / RING.outer, py / (RING.outer * RING.tilt))
+    const ringIn = Math.hypot(px / RING.inner, py / (RING.inner * RING.tilt))
+    const onRing = ring < 1 && ringIn > 1
+    const ringBack = onRing && py < 0 && rr < 1
+    if (rr < 1 && !(onRing && !ringBack)) {
+      const pz = Math.sqrt(1 - rr * rr)
+      const nx = px * G1.x + py * G2.x + pz * GIANT.x
+      const ny = px * G1.y + py * G2.y + pz * GIANT.y
+      const nz = px * G1.z + py * G2.z + pz * GIANT.z
+      const lit = clamp01(0.1 + 1.1 * (nx * L.x + ny * L.y + nz * L.z))
+      const band = Math.sin(py * 11 + Math.sin(px * 3) * 0.6) * 0.5 + 0.5
+      const storm = Math.exp(-(((px - 0.3) / 0.16) ** 2 + ((py + 0.35) / 0.08) ** 2))
+      const r0 = 222 + (176 - 222) * band
+      const g0 = 182 + (124 - 182) * band
+      const b0 = 150 + (110 - 150) * band
+      out[0] = (r0 * (1 - storm) + 196 * storm) * (0.12 + 0.88 * lit)
+      out[1] = (g0 * (1 - storm) + 96 * storm) * (0.12 + 0.88 * lit)
+      out[2] = (b0 * (1 - storm) + 80 * storm) * (0.14 + 0.86 * lit)
+    } else if (rr < 1.06) mixInto(out, 180, 150, 170, (1.06 - rr) / 0.06 * 0.4)
+    if (onRing && !(ringBack && rr < 1)) {
+      const k = Math.sin(ring * 40) * 0.5 + 0.5
+      mixInto(out, 230, 214, 194, 0.55 + 0.25 * k)
     }
-    const ring = Math.abs(ang - R * 1.45)
-    if (ring < R * 0.16 && (ang > R || lat > 0)) mixInto(out, 232, 214, 196, (1 - ring / (R * 0.16)) * 0.7)
   }
-  for (const m of [MOON_A, MOON_B]) {
-    const a = Math.acos(Math.min(1, dx * m.x + dy * m.y + dz * m.z))
-    if (a < 0.07) mixInto(out, 236, 232, 240, smooth(0.07, 0.05, a))
+  for (const m of MOONS) {
+    const a = Math.acos(Math.min(1, x * m.x + y * m.y + z * m.z))
+    if (a < 0.09) mixInto(out, 232, 228, 236, smooth(0.09, 0.07, a))
   }
 }
 
@@ -422,10 +468,10 @@ function regolith(plan: OutpostPlan, x: number, y: number, c: Rgb): void {
     mixInto(c, 76 * shade, 68 * shade, 92 * shade, basalt * 0.85)
     mixInto(c, 46, 40, 56, basalt * (1 - crack) * 0.8)
   }
-  const drift = smooth(0.55, 0.72, fbm(x * 0.22 + y * 0.05, y * 0.11 - x * 0.04, 23, 4))
-  mixInto(c, 170, 128, 98, drift * 0.42)
-  const salt = smooth(0.66, 0.74, fbm(x * 0.3, y * 0.3, 29, 3))
-  if (salt > 0) mixInto(c, 214, 204, 212, salt * (0.55 + 0.45 * smooth(0.4, 0.7, valueNoise(x * 3.1, y * 3.1, 41))))
+  const drift = smooth(0.52, 0.7, fbm(x * 0.16 + y * 0.05, y * 0.08 - x * 0.04, 23, 4))
+  mixInto(c, 164, 124, 100, drift * 0.34)
+  const salt = smooth(0.72, 0.8, fbm(x * 0.24, y * 0.24, 29, 3))
+  if (salt > 0) mixInto(c, 196, 186, 196, salt * 0.45 * (0.5 + 0.5 * smooth(0.35, 0.7, valueNoise(x * 3.1, y * 3.1, 41))))
   const grit = valueNoise(x * 9.3, y * 9.3, 43)
   if (grit > 0.8) {
     const k = (grit - 0.8) / 0.2
@@ -444,29 +490,44 @@ function regolith(plan: OutpostPlan, x: number, y: number, c: Rgb): void {
   }
 }
 
-/** 岩脊：按高度场的坡打光，背着太阳的坡暗，峭壁上一道道竖纹，顶上零星的晶脉；返回这里是不是岩脊 */
+/** 岩脊：按高度场的坡打光，陡坎背着太阳的那面暗、有一道道竖纹，坎上的高地落着一层浮土，圆石迎光的一面亮；越往外越暗；返回这里是不是岩脊 */
 function ridge(prep: Prepared, plan: OutpostPlan, x: number, y: number, d: number, c: Rgb): boolean {
   const h = ridgeM(plan, x, y)
   if (h <= 0.02 && d < 0) return false
   const e = HF_U
-  const gx = (sample(prep, prep.height, x + e, y) - sample(prep, prep.height, x - e, y)) / (2 * e) + (fbm(x * 2.2, y * 2.2, 57, 2) - 0.5) * 1.2
-  const gy = (sample(prep, prep.height, x, y + e) - sample(prep, prep.height, x, y - e)) / (2 * e) + (fbm(x * 2.2 + 5, y * 2.2, 57, 2) - 0.5) * 1.2
+  let gx = (sample(prep, prep.height, x + e, y) - sample(prep, prep.height, x - e, y)) / (2 * e)
+  let gy = (sample(prep, prep.height, x, y + e) - sample(prep, prep.height, x, y - e)) / (2 * e)
+  const b = cellNearest(x * BOULDER_FREQ, y * BOULDER_FREQ, 37)
+  const br = (0.2 + 0.28 * (b.h - BOULDER_KEEP) / (1 - BOULDER_KEEP)) * BOULDER_FREQ
+  const bq = Math.hypot(b.dx, b.dy) / br
+  const onRock = b.h > BOULDER_KEEP + 0.25 * smooth(1, 6, d) && bq < 1 && d > 0.4
+  if (onRock) {
+    const k = 1 / Math.sqrt(Math.max(0.05, 1 - bq * bq))
+    gx = (b.dx / br) * k * 1.4
+    gy = (b.dy / br) * k * 1.4
+  }
+  const slope = Math.hypot(gx, gy)
   const nl = Math.hypot(gx, gy, 1)
   const lam = lambert(-gx / nl, -gy / nl, 1 / nl)
-  const strata = 0.85 + 0.15 * Math.sin((h * 3.2 + fbm(x * 0.8, y * 0.8, 53, 2) * 3) * Math.PI)
-  const fall = 1 - 0.55 * smooth(0, 6, d)
-  const base = fbm(x * 0.7, y * 0.7, 59, 3)
-  const r = (84 + base * 26) * strata
-  const g = (72 + base * 22) * strata
-  const b = (100 + base * 26) * strata
+  const grain = fbm(x * 1.3, y * 1.3, 59, 3)
+  const t: Rgb = [86 + grain * 30, 76 + grain * 26, 98 + grain * 28]
+  const steep = smooth(0.8, 2.6, slope) * (onRock ? 0 : 1)
+  if (steep > 0) {
+    const striae = 0.85 + 0.15 * Math.sin((x * 0.7 - y * 0.4) * 9 + grain * 6)
+    scale(t, 1 - 0.2 * steep * (1 - striae))
+  }
+  const dusty = (1 - smooth(0.4, 1.4, slope)) * (onRock ? 0.15 : 0.55)
+  mixInto(t, 140, 124, 140, dusty)
+  if (onRock) scale(t, 0.9 + 0.2 * b.h)
   const sun = sunAt(prep, x, y)
-  const light = (0.42 + 0.68 * lam * (0.35 + 0.65 * sun)) * fall
-  const t = smooth(-0.05, 0.25, h)
-  mixInto(c, r * light, g * light, b * light, t)
-  tint(c, 1 - lam)
-  const vein = smooth(0.03, 0, Math.abs(fbm(x * 0.35, y * 0.35, 61, 3) - 0.5)) * smooth(0.6, 2, d) * smooth(0.5, 0.75, valueNoise(x * 0.5, y * 0.5, 67))
-  if (vein > 0) mixInto(c, 210, 196, 232, vein * 0.7)
-  return t >= 0.999
+  const fall = 1 - 0.5 * smooth(1, 8, d)
+  const light = (0.5 + 0.62 * lam * (0.3 + 0.7 * sun)) * fall
+  const k = smooth(-0.05, 0.25, h)
+  mixInto(c, t[0] * light, t[1] * light, t[2] * light, k)
+  tint(c, 1 - Math.min(1, lam))
+  const glint = cellNearest(x * 3.3, y * 3.3, 61)
+  if (glint.h > 0.985 && Math.hypot(glint.dx, glint.dy) < 0.08 && d > 1) mixInto(c, 236, 222, 255, 0.8)
+  return k >= 0.999
 }
 
 /** 外圈围栏里被压平的地：颜色浅一点、砾石少，靠近外圈的地方过渡回荒野 */
@@ -581,8 +642,9 @@ function riftsAt(plan: OutpostPlan, prep: Prepared, x: number, y: number, aa: nu
     const inside = smooth(wid + aa, wid - aa, d)
     if (inside > 0) {
       const depth = 1 - d / Math.max(1e-3, wid)
-      const r0 = 46 + 120 * depth * depth
-      mixInto(c, r0, 22 + 20 * depth, 30, inside)
+      mixInto(c, 34, 22, 30, inside)
+      const hot = smooth(0.45, 0.95, depth) * (0.7 + 0.3 * valueNoise(x * 6, y * 6, 91))
+      mixInto(c, 255, 110 + 110 * hot, 40 + 60 * hot, hot * inside)
     }
   }
 }
@@ -593,7 +655,7 @@ function riftGlow(plan: OutpostPlan, prep: Prepared, x: number, y: number): numb
   for (const k of near(prep.rifts, x, y)) {
     const r = plan.rifts[k]!
     const { d } = polyDist(r.pts, x, y)
-    g += 0.12 * Math.exp(-d / 0.35)
+    g += 0.09 * Math.exp(-d / 0.3)
   }
   return g
 }
@@ -658,10 +720,9 @@ function padAt(plan: OutpostPlan, x: number, y: number, aa: number, c: Rgb): voi
   if (chev) mixInto(t, 240, 132, 58, 0.9)
   const lx = Math.abs(x - p.x)
   const ly = Math.abs(y - p.y)
-  const arm = (lx < 0.09 && ly < p.r * 0.36) || (ly < 0.09 && lx < p.r * 0.2 && false)
-  const bar = Math.abs(lx - p.r * 0.2) < 0.09 && ly < p.r * 0.36
-  const mid = ly < 0.08 && lx < p.r * 0.2
-  if (arm || bar || mid) mixInto(t, 236, 232, 226, 0.85)
+  const bar = Math.abs(lx - p.r * 0.2) < 0.08 && ly < p.r * 0.34
+  const mid = ly < 0.07 && lx < p.r * 0.2
+  if (bar || mid) mixInto(t, 236, 232, 226, 0.85)
   const rim = Math.abs(d - p.r) < 0.06 ? 0.65 : 1
   scale(t, rim)
   for (let i = 0; i < 8; i++) {
@@ -721,6 +782,7 @@ function raisedAt(sc: PaintScene, prep: Prepared, x: number, y: number, aa: numb
   for (const k of near(prep.crystals, x, y)) crystal(plan.crystals[k]!, cfg, x, y, c)
   for (const p of plan.panels) panel(p, cfg.gear.panelM, x, y, aa, c, tmp)
   for (const t of plan.tubes) tube(t, x, y, aa, c)
+  for (const d of plan.domes) airlock(plan, d, x, y, aa, c)
   for (const d of plan.domes) dome(d, cfg.gear.domeM, x, y, aa, c, tmp)
   const m = plan.mast
   if (m) mastBase(m, cfg.gear.mastM, x, y, aa, c)
@@ -802,14 +864,17 @@ function crystal(cr: { x: number; y: number; r: number; tall: boolean; prisms: r
     const f = side / Math.max(1e-3, wid)
     const nx = (-ay / len) * f
     const ny = (ax / len) * f
-    const nz = Math.sqrt(Math.max(0, 1 - f * f)) * 0.8 + 0.2
+    const nz = Math.sqrt(Math.max(0, 1 - f * f)) * 0.7 + 0.3
     const lam = lambert(nx, ny, nz)
-    const facet = f > 0.15 ? 0.82 : f < -0.15 ? 1.08 : 1
-    const bright = (0.55 + 0.6 * lam) * facet * (0.85 + 0.15 * u)
-    c[0] = 214 * bright
-    c[1] = 200 * bright
-    c[2] = 236 * bright
-    if (Math.abs(Math.abs(f) - 0.15) < 0.06) mixInto(c, 255, 250, 255, 0.55)
+    const facet = f > 0.2 ? 0.7 : f < -0.2 ? 1.12 : 0.95
+    const depth = 0.75 + 0.25 * u
+    const bright = (0.45 + 0.65 * lam) * facet * depth
+    const inner = 0.5 + 0.5 * Math.sin(u * 9 + f * 3)
+    c[0] = (176 + 40 * inner) * bright
+    c[1] = (150 + 34 * inner) * bright
+    c[2] = (220 + 30 * inner) * bright
+    if (Math.abs(Math.abs(f) - 0.2) < 0.07) mixInto(c, 255, 248, 255, 0.6)
+    if (Math.abs(f) > 0.88) mixInto(c, 90, 70, 120, 0.5)
     if (u > 0.82) mixInto(c, 250, 244, 255, 0.35)
   }
 }
@@ -832,9 +897,9 @@ function panel(p: Panel, h: number, x: number, y: number, aa: number, c: Rgb, sk
   const cellU = ((q.u + hu) / p.len) * 6
   const cellV = t * 2
   const grid = Math.min(Math.abs(cellU - Math.round(cellU)) * (p.len / 6), Math.abs(cellV - Math.round(cellV)) * (p.wid / 2))
-  const tone: Rgb = [30, 40, 76]
-  mixInto(tone, sky[0], sky[1], sky[2], 0.3 + 0.25 * t)
-  if (grid < 0.025) mixInto(tone, 110, 122, 156, 0.85)
+  const tone: Rgb = [22, 30, 66]
+  mixInto(tone, sky[0], sky[1], sky[2], 0.12 + 0.18 * t)
+  if (grid < 0.022) mixInto(tone, 128, 140, 176, 0.9)
   const frame = edge < 0.05
   if (frame) {
     tone[0] = 196
@@ -907,17 +972,21 @@ function dome(d: Disc, H: number, x: number, y: number, aa: number, c: Rgb, sky:
   const t: Rgb = [228 * v, 224 * v, 216 * v]
   if (seamLat || seamLon) scale(t, 0.8)
   if (q > 0.93) scale(t, 0.62)
-  if (q < 0.36) {
+  if (q < SKYLIGHT) {
+    const fx = ox / SKYLIGHT
+    const fy = oy / SKYLIGHT
+    const fr = Math.min(1, Math.hypot(fx, fy))
+    const elev = (1 - fr) * (Math.PI / 2)
+    const az = Math.atan2(fy, fx)
+    skyColor(Math.cos(az) * Math.cos(elev), Math.sin(az) * Math.cos(elev), Math.sin(elev), sky)
+    t[0] = sky[0] * 0.9
+    t[1] = sky[1] * 0.9
+    t[2] = sky[2] * 0.95
     const rx = (2 * nz / nl) * (nx / nl)
     const ry = (2 * nz / nl) * (ny / nl)
     const rz = 2 * (nz / nl) * (nz / nl) - 1
-    skyColor(rx * 2.2, ry * 2.2, Math.max(0.05, rz), sky)
-    t[0] = sky[0] * 0.8
-    t[1] = sky[1] * 0.8
-    t[2] = sky[2] * 0.85
-    const spec = Math.pow(Math.max(0, rx * L.x + ry * L.y + rz * L.z), 60)
-    mixInto(t, 255, 250, 240, spec)
-    const frame = Math.abs(q - 0.36) < 0.025 || (Math.abs(Math.sin(lon * 3)) < 0.05 && q < 0.36)
+    mixInto(t, 255, 250, 240, Math.pow(Math.max(0, rx * L.x + ry * L.y + rz * L.z), 60))
+    const frame = Math.abs(q - SKYLIGHT) < 0.025 || (Math.abs(Math.sin(lon * 3)) < 0.04 && q < SKYLIGHT)
     if (frame) {
       v = 0.5 + 0.5 * lam
       t[0] = 120 * v
@@ -925,15 +994,26 @@ function dome(d: Disc, H: number, x: number, y: number, aa: number, c: Rgb, sky:
       t[2] = 134 * v
     }
   }
-  const door = Math.atan2(d.y - FRAME_U / 2, d.x - FRAME_U / 2) + Math.PI
-  const dd = Math.abs(Math.atan2(Math.sin(lon - door), Math.cos(lon - door)))
-  if (dd < 0.22 && q > 0.72 && q < 0.95) {
-    t[0] = 236 * (0.55 + 0.5 * lam)
-    t[1] = 128 * (0.55 + 0.5 * lam)
-    t[2] = 60 * (0.55 + 0.5 * lam)
-    if (Math.abs(q - 0.84) < 0.02) scale(t, 0.7)
-  }
   mixInto(c, t[0], t[1], t[2], k)
+}
+
+/** 圆顶舱朝站心那边伸出的气闸：一个方盒子，顶是白板、朝外那头一扇橙色的门 */
+function airlock(plan: OutpostPlan, d: Disc, x: number, y: number, aa: number, c: Rgb): void {
+  const a = Math.atan2(plan.cy - d.y, plan.cx - d.x)
+  const face = Math.cos(a) * TO_SUN.x + Math.sin(a) * TO_SUN.y
+  const top = inAirlock(d, plan.cx, plan.cy, x, y + AIRLOCK.m * FACE_U_PER_M, 0)
+  if (top) {
+    const edge = Math.min(top.u, AIRLOCK.len - top.u, AIRLOCK.wid / 2 - Math.abs(top.v))
+    const tone = edge < 0.05 ? 0.8 : 1
+    mixInto(c, 226 * tone, 222 * tone, 216 * tone, smooth(-aa, aa, edge))
+    if (top.u > AIRLOCK.len - 0.16 && Math.abs(top.v) < AIRLOCK.wid * 0.3) mixInto(c, 238, 124, 56, 0.95)
+    return
+  }
+  const side = inAirlock(d, plan.cx, plan.cy, x, y, 0)
+  if (!side) return
+  const sh = 0.5 + 0.3 * Math.max(0, face)
+  mixInto(c, 176 * sh, 172 * sh, 168 * sh, 1)
+  if (Math.abs(side.v) < AIRLOCK.wid * 0.26 && side.u > AIRLOCK.len * 0.55) mixInto(c, 220 * sh, 112 * sh, 48 * sh, 0.95)
 }
 
 /** 天线的底座：方形的地脚板与螺栓，往上一截格构塔（塔身更高处与转着的碟由画面画） */

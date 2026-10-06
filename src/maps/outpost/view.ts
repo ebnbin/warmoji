@@ -545,14 +545,23 @@ export class OutpostView implements MapView {
       const w = 0.62 * UNIT
       const c = Math.cos(m.a)
       const s = Math.sin(m.a)
-      g.lineStyle(0.05 * UNIT, 0x8a8c98, 1).lineBetween(x, y + 0.25 * UNIT, x, y - 0.05 * UNIT)
-      g.fillStyle(0x5c5e6a, 1).fillEllipse(x + s * 0.06 * UNIT, y + 0.02 * UNIT, w * 2 * Math.max(0.18, Math.abs(c)) + 2, w * 0.95)
-      g.fillStyle(c > 0 ? 0xe2e0ea : 0xa9a8b6, 1).fillEllipse(x, y, w * 2 * Math.max(0.15, Math.abs(c)), w * 0.9)
-      g.lineStyle(0.03 * UNIT, 0x6e6c7a, 1).lineBetween(x, y, x + c * 0.4 * UNIT, y - 0.32 * UNIT)
-      g.fillStyle(0x2c2b33, 1).fillCircle(x + c * 0.4 * UNIT, y - 0.32 * UNIT, 0.05 * UNIT)
+      const face = Math.abs(c)
+      const ew = w * 2 * Math.max(0.16, face)
+      const eh = w * 0.95
+      const fx = x + s * 0.08 * UNIT
+      g.lineStyle(0.06 * UNIT, 0x7c7e8c, 1).lineBetween(x, y + 0.3 * UNIT, x, y)
+      g.fillStyle(0x3e3d48, 1).fillEllipse(fx + (c > 0 ? -1 : 1) * 0.03 * UNIT, y + 0.03 * UNIT, ew + 3, eh + 3)
+      g.fillStyle(c > 0 ? 0xdcdae6 : 0x9b9aa8, 1).fillEllipse(fx, y, ew, eh)
+      g.fillStyle(c > 0 ? 0xc4c2d0 : 0x8a8998, 1).fillEllipse(fx + c * 0.04 * UNIT, y + 0.02 * UNIT, ew * 0.68, eh * 0.68)
+      g.fillStyle(c > 0 ? 0xb0aebc : 0x7c7b8a, 1).fillEllipse(fx + c * 0.07 * UNIT, y + 0.03 * UNIT, ew * 0.34, eh * 0.34)
+      g.lineStyle(0.02 * UNIT, 0xf2f0fa, c > 0 ? 0.9 : 0.4).strokeEllipse(fx, y, ew, eh)
+      const tipX = fx + c * 0.42 * UNIT
+      const tipY = y - 0.3 * UNIT
+      g.lineStyle(0.025 * UNIT, 0x5e5d6a, 1).lineBetween(fx - ew * 0.3, y + eh * 0.2, tipX, tipY).lineBetween(fx + ew * 0.3, y + eh * 0.2, tipX, tipY)
+      g.fillStyle(0x2c2b33, 1).fillCircle(tipX, tipY, 0.055 * UNIT)
       const sh = m.shadow.clear()
       const off = cfg.gear.mastM * 0.85 * SHADOW_PER_M * UNIT
-      sh.fillStyle(0x0b0612, 0.24).fillEllipse(x + AWAY.x * off, pm.y * UNIT + AWAY.y * off, w * 2 * Math.max(0.15, Math.abs(c)), w * 0.9)
+      sh.fillStyle(0x0b0612, 0.22).fillEllipse(x + AWAY.x * off, pm.y * UNIT + AWAY.y * off, ew, eh)
       m.lamp.setAlpha(Math.floor(now / 700) % 2 === 0 ? 1 : 0.15)
     }
     const shadows = this.droneShadows

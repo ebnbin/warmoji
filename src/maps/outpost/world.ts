@@ -250,7 +250,9 @@ export const outpost: WorldHooks = {
     const lead = leaderPoint(sim)
     if ((tx - lead.x) ** 2 + (ty - lead.y) ** 2 < (3 * UNIT) ** 2 && (tx - x) ** 2 + (ty - y) ** 2 > (1.2 * UNIT) ** 2) {
       const dir = descend(s, flowOf(sim, s), x / UNIT, y / UNIT)
-      if (dir) d = dir
+      // 隔着光墙到不了队长的，径直顶上去
+      if (!dir) return alongWall(s.plan.basin, x, y, d.x, d.y, rad + 0.3 * UNIT)
+      d = dir
     }
     const w = alongWall(s.plan.basin, x, y, d.x, d.y, rad + 0.3 * UNIT)
     return alongFence(sim, s, x, y, w.x, w.y, rad + 0.3 * UNIT)
