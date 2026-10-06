@@ -6,14 +6,16 @@ import { AWAY } from '../../data/light'
 import { playSfx } from '../../audio/sfx'
 import { Alive, Depth, ENEMY_SET, Transform } from '../../ecs/components'
 import { LYING_Z, UNDER_Z } from '../../ecs/render/bands'
+import { leaderPoint } from '../../ecs/utils/team'
+import { FRAME_U } from '../../util/units'
 import { canvasTexture } from '../textures'
 import { FRAME, FRAME_MID } from '../frame'
 import { drawFace, drawRoof, faceSize, FLAT_U_PER_M, roofSize, STAND_U_PER_M } from './art'
 import { textureSize } from './backdrop'
 import { canvasUv, QuadLayer } from './layer'
-import { brushAt, brushPhase, inked, laid, sweepOf } from './model'
+import { darkness, flyLen, lifted, slabOf, swapped, trapsOf } from './model'
 import { StorybookPainter } from './painter'
-import { paintPrint, PRINT_PPU } from './print'
+import { CARD_H_U, CARD_W_U, paintCard, paintDrop, paintPrint, PRINT_PPU } from './print'
 import { bookFor, pageAt } from './world'
 import type { Quad } from './layer'
 import type { Book, BookClock, Page, Piece } from './model'
@@ -25,32 +27,47 @@ import type { MapView, ViewCtx } from '../../ecs/views'
 import type { Sim } from '../../ecs/sim'
 import type { Point } from '../../util/vec'
 
-/** 方框外的底色：桌子底下的暗处 */
+/** 方框外的底色：剧场里的暗处 */
 const BG = 0x1c120c
 const BACK_KEY = 'storybook-back'
 /** 开局最多几个线程分着画；贴图按这么多像素高的条分块交给线程 */
 const PAINT_THREADS = 4
 const STRIP_PX = 64
-/** 各层的深度：页面、平躺的布景、书签带、布景投的影子、立着的布景 */
+/** 各层的深度：天幕、地布、幕牌、落点的影子、布景投的影子、台上的布景；吊在半空的布景与吊绳在谁头上，暗场盖住所有东西 */
+const DROP_DEPTH = -0.95
 const SPREAD_DEPTH = -0.9
-const FLAT_DEPTH = -0.6
+const CARD_DEPTH = -0.8
+const MARK_DEPTH = -0.45
 const SHADOW_DEPTH = -0.4
-const RIBBON_DEPTH = -0.5
 const STAND_DEPTH = 2.7
+const FLY_DEPTH = 63
+const DARK_DEPTH = 64
 /** 影子的浓度，每米高的东西影子铺多长（格） */
 const SHADOW_ALPHA = 0.3
 const SHADOW_PER_M = STAND_U_PER_M * 0.75
 const SHADOW_COLOR = 0x3b2614
 /** 卡纸的厚度在画面上露出多少，格 */
 const CARD_EDGE_U = 0.06
-/** 刷痕：笔宽是道距的几倍（相邻两道叠一点），一笔里并排多少根刷毛，刷毛每段多长（格）；收笔前从几成起刷毛开叉断开 */
-const BRUSH_WIDE = 1.3
-const BRISTLES = 18
-const BRISTLE_SEG_U = 0.25
-const DRY_FROM = 0.92
-/** 换页时正在刷的那张页面；刷完以后多久（毫秒）淡成印好的新一页 */
-const LIVE_KEY = 'storybook-live'
-const LIVE_FADE_MS = 700
+/** 活门多大，格 */
+const TRAP_U = 1.3
+/** 天幕多高（画面上，格），离台后沿多远；吊上去时一路升到方框外 */
+const DROP_H_U = 9.4
+const DROP_GAP_U = 0.25
+/** 幕牌立在台口左前方：离台面左边、台口多远，格 */
+const CARD_DX_U = 0.4
+const CARD_DY_U = 2.9
+/** 吊着的布景晃多大（格）、多快（毫秒一个来回的 2π 分之一） */
+const SWAY_U = 0.18
+const SWAY_MS = 260
+/** 离台面不到这么高（占吊起来的比例）就算落在台上，画在身体后面 */
+const LANDED = 0.02
+/** 暗场：中间一圈追光照着队长，追光半径、边上糊开多宽，格；最暗时多暗 */
+const SPOT_U = 4.5
+const SPOT_SOFT_U = 3.5
+const DARK_MAX = 0.86
+/** 暗到几成时追光还亮着：再暗下去追光跟着灭 */
+const SPOT_FROM = 0.55
+const DARK_KEY = 'storybook-dark'
 /** 图集的宽，像素；每件之间空几像素 */
 const ATLAS_W = 2048
 const ATLAS_GAP = 4
@@ -64,11 +81,13 @@ interface Cell {
   readonly h: number
 }
 
-/** 一页画好的东西：印好的页面（画布与贴图名），布景的图集，每件的正面、顶面在图集里的位置 */
+/** 一幕画好的东西：画好的地布（画布与贴图名）、天幕、幕牌，布景的图集，每件的正面、顶面在图集里的位置 */
 interface Sheet {
   readonly page: Page
   readonly spread: HTMLCanvasElement
   readonly spreadKey: string
+  readonly dropKey: string
+  readonly cardKey: string
   readonly atlas: HTMLCanvasElement
   readonly atlasKey: string
   readonly faces: Cell[]
@@ -116,12 +135,15 @@ function quad(key: string, tl: Point, bl: Point, tr: Point, br: Point, cell: Cel
   return { key, x: [tl.x, bl.x, tr.x, br.x], y: [tl.y, bl.y, tr.y, br.y], ...uv, color, alpha, fill }
 }
 
-/** 整数对上的哈希，落在 [0, 1) */
-function hash01(a: number, b: number, salt: number): number {
-  let h = Math.imul(a ^ Math.imul(salt, 0x9e3779b9), 0x27d4eb2d) ^ Math.imul(b, 0x165667b1)
-  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
-  return ((h ^ (h >>> 13)) >>> 0) / 4294967296
+
+/** 整件挪 (dx, dy) 像素 */
+function liftPose(o: Pose, dx: number, dy: number): Pose {
+  const m = (q: Point): Point => ({ x: q.x + dx, y: q.y + dy })
+  return { ...o, A: m(o.A), B: m(o.B), TA: m(o.TA), TB: m(o.TB), C: m(o.C), D: m(o.D), TC: m(o.TC), TD: m(o.TD) }
 }
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+const easeInOut = (v: number): number => v * v * (3 - 2 * v)
 
 function grey(k: number): number {
   const v = Math.round(255 * Math.max(0, Math.min(1, k)))
@@ -140,10 +162,10 @@ function inside(poly: readonly Point[], x: number, y: number): boolean {
 }
 
 /**
- * 立体书：桌面、封面、纸边与纸面是开局在后台线程画好的贴图；每一页的插画印在白底上、乘到纸面上，是一张贴图；
+ * 纸剧场：地布、台板、台口、观众席与两边大幕是开局在后台线程画好的贴图；每一幕的地布画在白底上、乘到粗布上，是一张贴图；
  * 布景的正面与盒子的顶面画进每页一张图集，按倒下的程度贴在四边形上：立着的画在身体后面，平躺的贴着页面，影子画在页面上、整层按一个浓度叠。
  * 站在立着的布景背后、被它的正面挡住的身体挪到最底下那一层，露出来的只有高过布景的那截。
- * 换页时一把看不见的大刷子来回刷过两页，刷过处就是新一页，布景跟着折平与弹起
+ * 换幕时灯暗下去、追光照着队长，旧布景挂着吊绳一件件升出方框，暗转里地布、天幕与幕牌换过去，新布景一件件吊下来，落点先投下影子
  */
 export class StorybookView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -152,17 +174,21 @@ export class StorybookView implements MapView {
   private back?: HTMLCanvasElement
   private readonly sheets = new Map<number, Sheet>()
   private spreadA?: Phaser.GameObjects.Image
-  private live?: Phaser.Textures.CanvasTexture
-  private livePage = -1
-  private liveAt = 0
-  private liveOver?: Phaser.GameObjects.Image
-  private flat?: QuadLayer
+  private spreadB?: Phaser.GameObjects.Image
+  private dropA?: Phaser.GameObjects.Image
+  private dropB?: Phaser.GameObjects.Image
+  private cardA?: Phaser.GameObjects.Image
+  private cardB?: Phaser.GameObjects.Image
+  private dark?: Phaser.GameObjects.Image
+  private blackout?: Phaser.GameObjects.Rectangle
+  private marks?: Phaser.GameObjects.Graphics
+  private ropes?: Phaser.GameObjects.Graphics
   private stand?: QuadLayer
+  private fly?: QuadLayer
   private shadow?: QuadLayer
   private readonly scratch = document.createElement('canvas')
   private readonly print = document.createElement('canvas')
   private lastPhase = ''
-  private lastStroke = -1
   private readonly flipped = new Set<string>()
   private ready = false
   private serial = 0
@@ -192,7 +218,7 @@ export class StorybookView implements MapView {
     const scene = v.scene
     const book = bookFor(this.cfg(v), v.run.decorSeed)
     this.book = book
-    const sc: PaintScene = { x0: book.x0, x1: book.x1, y0: book.y0, y1: book.y1, gx: book.gx, seed: book.seed }
+    const sc: PaintScene = { x0: book.x0, x1: book.x1, y0: book.y0, y1: book.y1, seed: book.seed }
     const size = textureSize()
     const tex = canvasTexture(scene, BACK_KEY, size.w, size.h)
     const painter = new StorybookPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
@@ -209,66 +235,51 @@ export class StorybookView implements MapView {
     tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
     this.back = tex.getSourceImage() as HTMLCanvasElement
     this.visuals.push(scene.add.image(0, 0, BACK_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
-    const at = (x: number, y: number): Phaser.GameObjects.Image => scene.add.image(x, y, '__WHITE').setOrigin(0, 0).setDepth(SPREAD_DEPTH)
-    this.spreadA = at(book.x0 * UNIT, book.y0 * UNIT)
-    this.live = canvasTexture(scene, LIVE_KEY, Math.round((book.x1 - book.x0) * PRINT_PPU), Math.round((book.y1 - book.y0) * PRINT_PPU))
-    this.liveOver = scene.add.image(book.x0 * UNIT, book.y0 * UNIT, LIVE_KEY).setOrigin(0, 0).setDepth(SPREAD_DEPTH + 0.01).setVisible(false)
-    this.flat = new QuadLayer(scene, FLAT_DEPTH)
+    const img = (depth: number): Phaser.GameObjects.Image => scene.add.image(0, 0, '__WHITE').setOrigin(0, 0).setDepth(depth)
+    this.spreadA = img(SPREAD_DEPTH).setPosition(book.x0 * UNIT, book.y0 * UNIT)
+    this.spreadB = img(SPREAD_DEPTH + 0.01).setPosition(book.x0 * UNIT, book.y0 * UNIT).setVisible(false)
+    this.dropA = img(DROP_DEPTH)
+    this.dropB = img(DROP_DEPTH + 0.01).setVisible(false)
+    this.cardA = img(CARD_DEPTH).setPosition((book.x0 + CARD_DX_U) * UNIT, (book.y1 + CARD_DY_U) * UNIT)
+    this.cardB = img(CARD_DEPTH + 0.01).setPosition((book.x0 + CARD_DX_U) * UNIT, (book.y1 + CARD_DY_U) * UNIT).setVisible(false)
+    if (!scene.textures.exists(DARK_KEY)) {
+      const n = 512
+      const span = FRAME_U * 3
+      canvasTexture(scene, DARK_KEY, n, n, (ctx) => {
+        const g = ctx.createRadialGradient(n / 2, n / 2, (SPOT_U / span) * n, n / 2, n / 2, ((SPOT_U + SPOT_SOFT_U) / span) * n)
+        g.addColorStop(0, 'rgba(10,5,16,0)')
+        g.addColorStop(1, 'rgba(10,5,16,1)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, n, n)
+      })
+    }
+    this.dark = scene.add.image(0, 0, DARK_KEY).setDepth(DARK_DEPTH).setDisplaySize(FRAME_U * 3 * UNIT, FRAME_U * 3 * UNIT).setVisible(false)
+    this.blackout = scene.add.rectangle(0, 0, FRAME_U * UNIT, FRAME_U * UNIT, 0x0a0510).setOrigin(0, 0).setDepth(DARK_DEPTH + 0.01).setVisible(false)
+    this.marks = scene.add.graphics().setDepth(MARK_DEPTH)
+    this.ropes = scene.add.graphics().setDepth(FLY_DEPTH - 0.01)
     this.shadow = new QuadLayer(scene, SHADOW_DEPTH, SHADOW_ALPHA)
     this.stand = new QuadLayer(scene, STAND_DEPTH)
-    this.visuals.push(this.spreadA, this.liveOver, this.flat, this.shadow, this.stand, this.ribbon(scene, book))
+    this.fly = new QuadLayer(scene, FLY_DEPTH)
+    this.visuals.push(this.spreadA, this.spreadB, this.dropA, this.dropB, this.cardA, this.cardB, this.dark, this.blackout, this.marks, this.ropes, this.shadow, this.stand, this.fly, this.traps(scene, book))
     const c = st.clock
     this.sheet(v, st, c.page)
-    if (c.phase === 'redraw') this.sheet(v, st, c.page - 1)
+    if (c.phase === 'change') this.sheet(v, st, c.page - 1)
     this.lastPhase = c.phase
     this.ready = true
-    v.lens.screen.vignette(0.8, 0.22, 0x140a04)
+    v.lens.screen.vignette(0.85, 0.3, 0x0c0608)
   }
 
-  /** 书签带：从书脊上头的堵头布垂下来，弯弯地搭在右页上，尾巴剪成燕尾；平躺在页面上，谁都踩得过 */
-  private ribbon(scene: Phaser.Scene, book: Book): Phaser.GameObjects.Graphics {
-    const g = scene.add.graphics().setDepth(RIBBON_DEPTH)
-    const pts: Point[] = []
-    const n = 40
-    const len = 9.5
-    for (let i = 0; i <= n; i++) {
-      const t = i / n
-      pts.push({ x: (book.gx + 0.12 + Math.sin(t * Math.PI * 1.3) * 1.1 + t * 1.6) * UNIT, y: (book.y0 - 0.35 + t * len) * UNIT })
-    }
-    const half = 0.17 * UNIT
-    const side = (k: number, off: number): Point[] =>
-      pts.map((p, i) => {
-        const q = pts[Math.min(n, i + 1)]!
-        const r = pts[Math.max(0, i - 1)]!
-        const dx = q.x - r.x
-        const dy = q.y - r.y
-        const l = Math.hypot(dx, dy) || 1
-        return { x: p.x - (dy / l) * half * k + off, y: p.y + (dx / l) * half * k + off }
-      })
-    const strip = (off: number, color: number, alpha: number): void => {
-      const a = side(1, off)
-      const b = side(-1, off).reverse()
-      const end = pts[n]!
-      g.fillStyle(color, alpha)
-      g.beginPath()
-      g.moveTo(a[0]!.x, a[0]!.y)
-      for (const p of a) g.lineTo(p.x, p.y)
-      g.lineTo(end.x + off, end.y - half * 1.2 + off)
-      for (const p of b) g.lineTo(p.x, p.y)
-      g.closePath()
-      g.fillPath()
-    }
-    strip(0.08 * UNIT, SHADOW_COLOR, 0.25)
-    strip(0, 0xa52f38, 1)
-    g.lineStyle(0.03 * UNIT, 0xd86a6f, 0.8)
-    g.beginPath()
-    pts.forEach((p, i) => (i === 0 ? g.moveTo(p.x - 2, p.y) : g.lineTo(p.x - 2, p.y)))
-    g.strokePath()
-    for (const k of [1, -1]) {
-      g.lineStyle(0.025 * UNIT, 0x5e171d, 0.9)
-      g.beginPath()
-      side(k, 0).forEach((p, i) => (i === 0 ? g.moveTo(p.x, p.y) : g.lineTo(p.x, p.y)))
-      g.strokePath()
+  /** 台中线上的几扇活门：地布上剪开的方口，四边一道深缝，一边两个合页 */
+  private traps(scene: Phaser.Scene, book: Book): Phaser.GameObjects.Graphics {
+    const g = scene.add.graphics().setDepth(MARK_DEPTH - 0.01)
+    const h = TRAP_U / 2
+    for (const t of trapsOf(book)) {
+      const x = t.x * UNIT
+      const y = t.y * UNIT
+      g.fillStyle(SHADOW_COLOR, 0.12).fillRect(x - h * UNIT, y - h * UNIT, TRAP_U * UNIT, TRAP_U * UNIT)
+      g.lineStyle(0.06 * UNIT, 0x3b2614, 0.55).strokeRect(x - h * UNIT, y - h * UNIT, TRAP_U * UNIT, TRAP_U * UNIT)
+      g.fillStyle(0x6b6f78, 0.8)
+      for (const k of [-0.5, 0.5]) g.fillRect(x - h * UNIT - 0.06 * UNIT, y + k * h * UNIT - 0.12 * UNIT, 0.14 * UNIT, 0.24 * UNIT)
     }
     return g
   }
@@ -283,6 +294,13 @@ export class StorybookView implements MapView {
     const w = Math.round((book.x1 - book.x0) * PRINT_PPU)
     const h = Math.round((book.y1 - book.y0) * PRINT_PPU)
     paintPrint(page, book, this.print)
+    const scratch = document.createElement('canvas')
+    const dropKey = `storybook-drop-${n}`
+    paintDrop(page.chapter, page.seed, book.x1 - book.x0, DROP_H_U, scratch)
+    canvasTexture(v.scene, dropKey, scratch.width, scratch.height, (ctx) => ctx.drawImage(scratch, 0, 0))
+    const cardKey = `storybook-card-${n}`
+    paintCard(page.chapter, scratch)
+    canvasTexture(v.scene, cardKey, scratch.width, scratch.height, (ctx) => ctx.drawImage(scratch, 0, 0))
     const spreadKey = `storybook-spread-${n}`
     const spreadTex = canvasTexture(v.scene, spreadKey, w, h, (ctx) => {
       ctx.drawImage(this.back!, book.x0 * GROUND_PPU, book.y0 * GROUND_PPU, w, h, 0, 0, w, h)
@@ -333,6 +351,8 @@ export class StorybookView implements MapView {
       page,
       spread: spreadTex.getSourceImage() as HTMLCanvasElement,
       spreadKey,
+      dropKey,
+      cardKey,
       atlas: atlasTex.getSourceImage() as HTMLCanvasElement,
       atlasKey,
       faces,
@@ -347,7 +367,7 @@ export class StorybookView implements MapView {
   private prune(v: ViewCtx, keep: number): void {
     for (const [i, s] of this.sheets) {
       if (i === keep || i === keep + 1 || i === keep - 1) continue
-      for (const key of [s.spreadKey, s.atlasKey]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+      for (const key of [s.spreadKey, s.dropKey, s.cardKey, s.atlasKey]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
       this.sheets.delete(i)
     }
   }
@@ -358,49 +378,101 @@ export class StorybookView implements MapView {
     const cfg = this.cfg(v)
     const c = st.clock
     const cur = this.sheet(v, st, c.page)
-    const old = c.phase === 'redraw' ? this.sheet(v, st, c.page - 1) : null
-    // 立着的时候把下一页先画好，换页时就不用现画
+    const old = c.phase === 'change' ? this.sheet(v, st, c.page - 1) : null
+    // 演着的时候把下一幕先画好，换幕时就不用现画
     if (c.phase === 'stand' && c.at > 1500) this.sheet(v, st, c.page + 1)
     this.prune(v, c.page)
-    this.wipe(cfg, c, cur, old)
-    this.spreadA!.setTexture(old ? LIVE_KEY : cur.spreadKey).setDisplaySize((this.book.x1 - this.book.x0) * UNIT, (this.book.y1 - this.book.y0) * UNIT)
+    this.scenery(cfg, c, cur, old)
     const shown = old ? [old, cur] : [cur]
     this.pieces(cfg, c, shown)
+    this.lights(cfg, c, sim)
     this.sounds(cfg, c, shown)
     this.hide(sim, cfg, c, shown)
   }
 
-  /** 这一刻要画的布景：立着的、正在倒或正在弹的画在身体后面，平躺的贴着页面、按印上去的浓淡，都投影子 */
-  private pieces(cfg: StorybookConfig, c: BookClock, shown: readonly Sheet[]): void {
-    const flat: Quad[] = []
-    const stand: Quad[] = []
-    const shade: Quad[] = []
+  /** 地布、天幕与幕牌：换幕时旧天幕吊上去、新天幕吊下来，地布与幕牌在暗转里换过去 */
+  private scenery(cfg: StorybookConfig, c: BookClock, cur: Sheet, old: Sheet | null): void {
     const book = this.book!
+    const w = (book.x1 - book.x0) * UNIT
+    const h = (book.y1 - book.y0) * UNIT
+    const k = old ? swapped(cfg, c) : 1
+    const base = (book.y0 - DROP_GAP_U - DROP_H_U) * UNIT
+    const away = (book.y0 + 2) * UNIT
+    const up = flyLen(cfg)
+    const t = cfg.turn
+    const rise = old ? easeInOut(clamp01(c.at / up)) : 0
+    const fall = old ? 1 - easeInOut(clamp01((c.at - up - t.darkMs) / up)) : 0
+    const put = (img: Phaser.GameObjects.Image, key: string, x: number, y: number, dw: number, dh: number, alpha = 1): void => {
+      if (img.texture.key !== key) img.setTexture(key)
+      img.setPosition(x, y).setDisplaySize(dw, dh).setAlpha(alpha).setVisible(alpha > 0.001)
+    }
+    put(this.spreadA!, (old ?? cur).spreadKey, book.x0 * UNIT, book.y0 * UNIT, w, h)
+    put(this.spreadB!, cur.spreadKey, book.x0 * UNIT, book.y0 * UNIT, w, h, old ? k : 0)
+    const dh = DROP_H_U * UNIT
+    put(this.dropA!, (old ?? cur).dropKey, book.x0 * UNIT, base - (old ? rise * away : 0), w, dh, old && c.at > up ? 0 : 1)
+    put(this.dropB!, cur.dropKey, book.x0 * UNIT, base - fall * away, w, dh, old && c.at > up ? 1 : 0)
+    const cx = (book.x0 + CARD_DX_U) * UNIT
+    const cy = (book.y1 + CARD_DY_U) * UNIT
+    put(this.cardA!, (old ?? cur).cardKey, cx, cy, CARD_W_U * UNIT, CARD_H_U * UNIT)
+    put(this.cardB!, cur.cardKey, cx, cy, CARD_W_U * UNIT, CARD_H_U * UNIT, old ? k : 0)
+  }
+
+  /** 暗场：整块黑盖上来，中间一圈追光跟着队长；暗转那一下追光也灭了，全台一片黑 */
+  private lights(cfg: StorybookConfig, c: BookClock, sim: Sim): void {
+    const k = darkness(cfg, c)
+    const d = Math.min(k, SPOT_FROM) / SPOT_FROM * DARK_MAX
+    const lead = leaderPoint(sim)
+    this.dark!.setVisible(d > 0.001).setAlpha(d).setPosition(lead.x, lead.y)
+    const out = clamp01((k - SPOT_FROM) / (1 - SPOT_FROM)) * DARK_MAX
+    this.blackout!.setVisible(out > 0.001).setAlpha(out)
+  }
+
+  /**
+   * 这一刻要画的布景：落在台上的画在身体后面、投影子；吊在半空的挂着两根吊绳、微微晃着，画在谁头上，
+   * 落点先投下一块影子，越低越浓
+   */
+  private pieces(cfg: StorybookConfig, c: BookClock, shown: readonly Sheet[]): void {
+    const stand: Quad[] = []
+    const fly: Quad[] = []
+    const shade: Quad[] = []
+    const marks = this.marks!.clear()
+    const ropes = this.ropes!.clear()
     for (const sh of shown) {
       sh.page.pieces.forEach((p, i) => {
-        const lay = laid(cfg, c, book, sh.page.index, p)
-        const lying = lay > 0.97
-        const alpha = lying ? inked(cfg, c, book, sh.page.index, p) : 1
-        if (alpha <= 0.002) return
-        this.piece(sh, p, i, lay, lying ? flat : stand, shade, alpha)
+        const lift = lifted(cfg, c, sh.page.index, p)
+        if (lift >= 1) return
+        if (lift < LANDED) {
+          this.piece(sh, p, i, stand, shade, 0, 0)
+          return
+        }
+        const rise = lift * (p.y + p.h * STAND_U_PER_M + 2) * UNIT
+        const dx = Math.sin(c.at / SWAY_MS + p.seed) * SWAY_U * lift * UNIT
+        const o = this.piece(sh, p, i, fly, null, rise, dx)
+        ropes.lineStyle(0.04 * UNIT, 0x2a1d18, 0.9)
+        for (const q of [o.TA, o.TB]) ropes.lineBetween(q.x + dx, q.y - rise, q.x + dx * 0.2, -FRAME_U * UNIT)
+        const sl = slabOf(p)
+        marks.fillStyle(SHADOW_COLOR, 0.45 * (1 - lift) ** 2)
+        marks.fillEllipse(sl.cx * UNIT, sl.cy * UNIT, (p.w + 0.6) * UNIT * (1.3 - 0.3 * lift), (sl.hd * 2 + 0.9) * UNIT * (1.3 - 0.3 * lift))
       })
     }
-    this.flat!.quads = flat
     this.stand!.quads = stand
+    this.fly!.quads = fly
     this.shadow!.quads = shade
   }
 
-  /** 一件布景的几块：影子、卡纸的厚边、盒子的侧面与顶面、正面；alpha 是印在页面上有多浓 */
-  private piece(sh: Sheet, p: Piece, i: number, lay: number, out: Quad[], shade: Quad[], alpha: number): void {
+  /** 一件立着的布景的几块：影子（落在台上才有）、卡纸的厚边、盒子的侧面与顶面、正面；吊着的整件往上挪 rise、往旁边晃 dx（像素） */
+  private piece(sh: Sheet, p: Piece, i: number, out: Quad[], shade: Quad[] | null, rise: number, dx: number): Pose {
     const tw = sh.atlas.width
     const th = sh.atlas.height
     const key = sh.atlasKey
     const f = sh.faces[i]!
-    const o = poseOf(p, lay)
-    const cos = Math.cos(lay * (Math.PI / 2))
+    const at = poseOf(p, 0)
+    const o = rise === 0 && dx === 0 ? at : liftPose(at, dx, -rise)
+    const cos = 1
+    const alpha = 1
     // 影子：顶边顺着背光的方向铺到地上
     const sl = p.h * SHADOW_PER_M * Math.max(0, cos) * UNIT
-    if (sl > 0.5) {
+    if (shade && sl > 0.5) {
       const sx = AWAY.x * sl
       const sy = AWAY.y * sl
       const g = (q: Point): Point => ({ x: q.x - o.fx * o.back + sx, y: q.y - o.fy * o.back + sy })
@@ -428,134 +500,25 @@ export class StorybookView implements MapView {
       out.push(quad(key, e(o.TA), e(o.A), e(o.TB), e(o.B), f, tw, th, 0xe9dcc0, alpha, true))
     }
     out.push(quad(key, o.TA, o.A, o.TB, o.B, f, tw, th, grey(lit), alpha))
+    return o
   }
 
-  /**
-   * 换页：一把大刷子在一张页面上来回刷——开头铺上旧页，此后每帧把上一帧到这一帧之间刷过的那段画上去，刷过处露出新一页。
-   * 一笔是并排的一根根刷毛，每根宽窄浓淡不一，两边的细一点淡一点；收笔前刷毛开叉，越往后断得越多。刷子本身不画
-   */
-  private wipe(cfg: StorybookConfig, c: BookClock, cur: Sheet, old: Sheet | null): void {
-    const over = this.liveOver!
-    if (!old) {
-      // 刷完以后刷痕留着的纹慢慢收干，露出印好的新一页
-      const k = this.livePage === c.page ? 1 - c.at / LIVE_FADE_MS : 0
-      over.setVisible(k > 0).setAlpha(k).setDisplaySize((this.book!.x1 - this.book!.x0) * UNIT, (this.book!.y1 - this.book!.y0) * UNIT)
-      if (k <= 0) this.livePage = -1
-      return
-    }
-    over.setVisible(false)
-    const book = this.book!
-    const sw = sweepOf(cfg, book, c.page)
-    const tex = this.live!
-    const ctx = tex.getContext()
-    if (this.livePage !== c.page || c.at < this.liveAt) {
-      this.livePage = c.page
-      this.liveAt = 0
-      ctx.drawImage(old.spread, 0, 0)
-    }
-    const from = this.liveAt
-    const to = Math.min(c.at, cfg.turn.sweepMs)
-    this.liveAt = Math.max(from, to)
-    const k = PRINT_PPU
-    const px = (p: Point): Point => ({ x: (p.x - book.x0) * k, y: (p.y - book.y0) * k })
-    const wide = sw.step * BRUSH_WIDE * k
-    const src = ctx.createPattern(cur.spread, 'no-repeat')!
-    ctx.lineCap = 'round'
-    let drew = false
-    for (let r = Math.floor(from / sw.rowMs); r <= Math.min(sw.spans.length - 1, Math.floor(to / sw.rowMs)); r++) {
-      const fa = brushPhase(sw, Math.max(from, r * sw.rowMs))
-      const fb = brushPhase(sw, Math.min(to, (r + 1) * sw.rowMs - 1e-6))
-      if (!fa || !fb) continue
-      const f0 = fa.r === r ? fa.f : 0
-      const f1 = fb.r === r ? fb.f : 1
-      if (f1 <= f0) continue
-      const [s0, s1] = sw.spans[r]!
-      const segs = Math.max(4, Math.ceil((s1 - s0) / BRISTLE_SEG_U))
-      const j0 = Math.floor(f0 * segs)
-      const j1 = Math.min(segs, Math.ceil(f1 * segs))
-      drew = true
-      for (let b = 0; b < BRISTLES; b++) {
-        const across = b / (BRISTLES - 1) - 0.5
-        const edge = 1 - Math.abs(across) * 2
-        const off = across * wide
-        const seed = r * 97 + b
-        ctx.globalAlpha = edge > 0.2 ? 1 : 0.75 + 0.25 * hash01(seed, 0, 41)
-        ctx.lineWidth = (wide / BRISTLES) * (1.8 + 1.2 * hash01(seed, 0, 43))
-        const dryEnd = 1 - 0.06 * hash01(seed, 0, 45) * (1 - edge * 0.5)
-        ctx.beginPath()
-        for (let j = j0; j < j1; j++) {
-          const fA = j / segs
-          const fB = (j + 1) / segs
-          if (fA > dryEnd) break
-          if (fA > DRY_FROM && hash01(seed, j, 47) < ((fA - DRY_FROM) / (1 - DRY_FROM)) * 0.35) continue
-          const pA = brushAt(sw, r, fA)
-          const pB = brushAt(sw, r, fB)
-          // 刷毛横着排开，方向按这一段刷的方向
-          const dx = pB.x - pA.x
-          const dy = pB.y - pA.y
-          const l = Math.hypot(dx, dy) || 1
-          const ox = (-dy / l) * off
-          const oy = (dx / l) * off
-          const a = px(pA)
-          const e = px(pB)
-          ctx.moveTo(a.x + ox, a.y + oy)
-          ctx.lineTo(e.x + ox, e.y + oy)
-        }
-        ctx.strokeStyle = src
-        ctx.stroke()
-        // 刷毛拖出来的纹：隔几根压一道深的或亮的细线
-        const streak = hash01(seed, 0, 49)
-        if (streak < 0.35) {
-          ctx.globalAlpha = 1
-          ctx.lineWidth = 1.5
-          ctx.strokeStyle = streak < 0.2 ? 'rgba(40,24,12,0.16)' : 'rgba(255,255,255,0.2)'
-          ctx.stroke()
-        }
-      }
-      // 每一道颜料的厚薄不一样：整道压一层淡淡的亮或暗，看得出是一道道刷上去的
-      const tone = hash01(r, this.livePage, 51)
-      ctx.globalAlpha = 1
-      ctx.lineWidth = wide * 0.86
-      ctx.strokeStyle = tone < 0.5 ? `rgba(255,248,232,${0.06 + tone * 0.12})` : `rgba(70,45,20,${0.03 + (tone - 0.5) * 0.1})`
-      ctx.beginPath()
-      for (let j = j0; j < j1; j++) {
-        if (j / segs > DRY_FROM) break
-        const a = px(brushAt(sw, r, j / segs))
-        const e = px(brushAt(sw, r, (j + 1) / segs))
-        ctx.moveTo(a.x, a.y)
-        ctx.lineTo(e.x, e.y)
-      }
-      ctx.lineCap = 'butt'
-      ctx.stroke()
-      ctx.lineCap = 'round'
-    }
-    ctx.globalAlpha = 1
-    if (drew) tex.refresh()
-  }
-
-  /** 刷子每刷一道唰一声；每件布景折平、弹起时各响一下 */
+  /** 每件布景起吊时吊绳一响，落到台上时咚一声 */
   private sounds(cfg: StorybookConfig, c: BookClock, shown: readonly Sheet[]): void {
     if (c.phase !== this.lastPhase) {
       this.lastPhase = c.phase
       this.flipped.clear()
-      this.lastStroke = -1
     }
-    if (c.phase !== 'redraw') return
-    const book = this.book!
-    const now = brushPhase(sweepOf(cfg, book, c.page), c.at)
-    if (now && now.r !== this.lastStroke) {
-      this.lastStroke = now.r
-      playSfx('swish')
-    }
+    if (c.phase !== 'change') return
     for (const sh of shown) {
       const fresh = sh.page.index === c.page
       sh.page.pieces.forEach((p, i) => {
         const key = `${sh.page.index}:${i}`
         if (this.flipped.has(key)) return
-        const lay = laid(cfg, c, book, sh.page.index, p)
-        if (fresh ? lay < 0.5 : lay > 0.5) {
+        const lift = lifted(cfg, c, sh.page.index, p)
+        if (fresh ? lift < LANDED : lift > LANDED) {
           this.flipped.add(key)
-          playSfx(fresh ? 'pop' : 'fold')
+          playSfx(fresh ? 'land' : 'hoist')
         }
       })
     }
@@ -564,12 +527,10 @@ export class StorybookView implements MapView {
   /** 站在立着的布景背后、被它的正面或顶面挡住的身体挪到最底下那一层画 */
   private hide(sim: Sim, cfg: StorybookConfig, c: BookClock, shown: readonly Sheet[]): void {
     const polys: { poly: Point[]; ax: number; ay: number; fx: number; fy: number }[] = []
-    const book = this.book!
     for (const sh of shown) {
       for (const p of sh.page.pieces) {
-        const lay = laid(cfg, c, book, sh.page.index, p)
-        if (lay > 0.9) continue
-        const o = poseOf(p, lay)
+        if (lifted(cfg, c, sh.page.index, p) >= LANDED) continue
+        const o = poseOf(p, 0)
         const poly = p.box ? [o.A, o.B, o.TB, o.TD, o.TC, o.TA] : [o.A, o.B, o.TB, o.TA]
         polys.push({ poly, ax: o.A.x, ay: o.A.y, fx: o.fx, fy: o.fy })
       }
@@ -602,8 +563,8 @@ export class StorybookView implements MapView {
     this.visuals = []
     v.decor.length = 0
     this.ready = false
-    for (const s of this.sheets.values()) for (const key of [s.spreadKey, s.atlasKey]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const s of this.sheets.values()) for (const key of [s.spreadKey, s.dropKey, s.cardKey, s.atlasKey]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
     this.sheets.clear()
-    for (const k of [BACK_KEY, LIVE_KEY]) if (v.scene.textures.exists(k)) v.scene.textures.remove(k)
+    for (const k of [BACK_KEY]) if (v.scene.textures.exists(k)) v.scene.textures.remove(k)
   }
 }

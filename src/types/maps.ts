@@ -1334,34 +1334,35 @@ export interface PetriConfig {
   }
 }
 /**
- * 立体书：桌上摊开的一本巨型立体童话书，两页摊开就是战场，书脊在正中。页面上印着插画，印的都能走；立起来的是剪纸布景，挡人，高的也挡子弹和视线。
- * 书隔一阵换一页：一把大刷子来回刷过两页，刷过处就是新一页，旧布景折平，新布景再依次弹起来，压着谁就把谁挤开。一页是故事的一章，章按故事的次序轮下去
+ * 纸剧场：桌上一座纸做的小剧场，台面就是战场：台口一排脚灯，两边红幕与侧幕，台后挂着画好的天幕。台上铺着画好的地布，铺的都能走；
+ * 台上立着剪纸布景，挡人，高的也挡子弹和视线。隔一阵换一幕：灯暗下去，旧布景依次吊上去，暗转里换地布与天幕，新布景依次吊下来，
+ * 落地时压着谁就把谁挤开，灯再亮起来。一幕是故事的一章，按故事的次序轮下去
  */
 export interface StorybookConfig {
-  /** 一页多宽多高，格：两页摊开，书脊竖在方框正中 */
+  /** 台面多宽多高，格：宽是半个台面宽（台中线两边各这么宽），台面在方框正中 */
   readonly page: { readonly wU: number; readonly hU: number }
-  /** 开局站的那片空地的半径，格：开局那一页的布景不落在里面 */
+  /** 开局站的那片空地的半径，格：开局那一幕的布景不落在里面 */
   readonly plazaU: number
-  /** 布景离页边、离书脊至少多远，格：高的按 tall，矮的按 low */
-  readonly margin: { readonly tall: number; readonly low: number; readonly gutter: number }
+  /** 布景离台边、离台中线（一溜活门）至少多远，格：离台边高的按 tall，矮的按 low */
+  readonly margin: { readonly tall: number; readonly low: number; readonly aisle: number }
   /** 布景之间至少留多宽的路，格：两件高的之间按 tall（头目也挤得过去），有一件矮的就按 low（头目跨得过矮的） */
   readonly gapU: { readonly tall: number; readonly low: number }
-  /** 矮的布景（树篱、栅栏、草垛、财宝堆）多高，米：齐腰，挡身体，子弹从上面飞过去，个子大的跨得过 */
+  /** 矮的布景多高，米：齐腰，挡身体，子弹从上面飞过去，个子大的跨得过 */
   readonly lowM: number
-  /** 一页立几件布景 */
+  /** 一幕立几件布景 */
   readonly pieces: readonly [number, number]
   /**
-   * 换页：开局 firstMs 后第一次换，之后每页立 intervalMs 上下 jitterMs；一把大刷子用 sweepMs 来回刷 strokes 道盖满两页，刷过处就是新一页；
-   * 旧布景在刷子碰到前折平，新布景整个刷出来后再过 settleMs 弹起来，折平或弹起要 flipMs，竖过一半时开始或不再挡路
+   * 换幕：开局 firstMs 后第一次换，之后每幕演 intervalMs 上下 jitterMs；灯用 dimMs 暗下去（亮起来也是），
+   * 旧布景在 staggerMs 里先后起吊、每件 flyMs 吊出视线，暗转 darkMs 里换地布与天幕，新布景再照样先后吊下来
    */
   readonly turn: {
     readonly firstMs: number
     readonly intervalMs: number
     readonly jitterMs: number
-    readonly sweepMs: number
-    readonly strokes: number
-    readonly settleMs: number
-    readonly flipMs: number
+    readonly dimMs: number
+    readonly staggerMs: number
+    readonly flyMs: number
+    readonly darkMs: number
   }
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number

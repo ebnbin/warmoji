@@ -677,12 +677,12 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 立体书：两页连封面放得进安全区，书脊正中空得出出生点；换页的各段时长为正；
- * 矮布景挡得住标准身体、子弹从上面飞过、头目跨得过，高布景挡得住视线与平射；路宽过得去最大的小怪与头目，页边与布景之间也过得去；
- * 抽一批种子把四章都摆一遍：件数在范围里，都落在半页里、不跨书脊，别组之间留够路，开局那一页不压着出生的空地，换页的钟按段走
+ * 纸剧场：台面连四周的台板放得进安全区，台中空得出出生点；换幕的各段时长为正；
+ * 矮布景挡得住标准身体、子弹从上面飞过、头目跨得过，高布景挡得住视线与平射；路宽过得去最大的小怪与头目，台边与布景之间也过得去；
+ * 抽一批种子把四章都摆一遍：件数在范围里，都落在半边台上、不压台中线，别组之间留够路，开局那一页不压着出生的空地，换页的钟按段走
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'storybook') === (m.storybook !== undefined), `maps.${id} 是立体书当且仅当写了 storybook`)
+  need((m.kind === 'storybook') === (m.storybook !== undefined), `maps.${id} 是纸剧场当且仅当写了 storybook`)
   const c = m.storybook
   if (!c) continue
   const at = `maps.${id}.storybook`
@@ -690,8 +690,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(page.wU > 0 && page.hU > 0 && page.wU * 2 + 2 <= FRAME_U - SAFE_U * 2 && page.hU + 2 <= FRAME_U - SAFE_U * 2, `${at}.page 两页连封面须放得进方框的安全区`)
   need(c.plazaU >= SPAWN_CLEAR_U && c.plazaU < page.hU / 2, `${at}.plazaU 须空得出出生点要的 ${SPAWN_CLEAR_U} 格，且落在页里`)
   need(Number.isInteger(c.pieces[0]) && Number.isInteger(c.pieces[1]) && c.pieces[0] >= 1 && c.pieces[0] <= c.pieces[1], `${at}.pieces 须为不小于 1 的整数范围`)
-  need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一页与每页立着的时长须为正`)
-  need(t.sweepMs > 0 && t.settleMs >= 0 && t.flipMs > 0 && Number.isInteger(t.strokes) && t.strokes >= 2, `${at}.turn 各段的时长须为正，至少来回刷两道`)
+  need(t.firstMs > 0 && t.intervalMs - t.jitterMs > 0 && t.jitterMs >= 0, `${at}.turn 的第一幕与每幕演着的时长须为正`)
+  need(t.dimMs > 0 && t.staggerMs >= 0 && t.flyMs > 0 && t.darkMs > 0 && t.dimMs * 2 <= t.staggerMs + t.flyMs, `${at}.turn 各段的时长须为正，灯暗下去、亮起来都放得进吊布景的那一段`)
   need(c.reflowMs > 0, `${at}.reflowMs 须为正`)
   const B = OBSTACLES.body
   const layer = B.heightM / B.layers
@@ -704,9 +704,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(top(c.lowM) < chest, `${at}.lowM 须低过平射的高度 ${+chest.toFixed(2)} 米：子弹要从矮布景上面飞过去`)
   need(top(c.lowM) <= over(boss.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${m.boss} 跨得过去`)
   const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]!.radius))
-  need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与页边之间须过得去最大的小怪（半径 ${small} 格）`)
-  need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与页边之间须过得去头目（半径 ${boss.radius} 格）`)
-  need(margin.gutter > 0, `${at}.margin.gutter 须为正：布景不跨书脊`)
+  need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与台边之间须过得去最大的小怪（半径 ${small} 格）`)
+  need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与台边之间须过得去头目（半径 ${boss.radius} 格）`)
+  need(margin.aisle > 0, `${at}.margin.aisle 须为正：布景不压台中线上的活门`)
   for (let s = 0; s < 6; s++) {
     const book = makeBook(c, s * 7919 + 13)
     for (let i = 0; i < 4; i++) {
@@ -732,7 +732,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     let last = -1
     for (let ms = 0; ms < 400000; ms += 250) {
       const k = clockAt(c, book, ms)
-      need(k.page >= last && k.at >= 0 && k.at <= k.len + 1e-6, `${at} 第 ${s} 个样本的换页钟在 ${ms} 毫秒处倒着走或越出了段`)
+      need(k.page >= last && k.at >= 0 && k.at <= k.len + 1e-6, `${at} 第 ${s} 个样本的换幕钟在 ${ms} 毫秒处倒着走或越出了段`)
       last = k.page
     }
   }

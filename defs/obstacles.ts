@@ -38,7 +38,7 @@ export const OBSTACLES = {
     belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
     // 梦幻乐园四周的布景
     scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
-    // 立体书立起来的剪纸布景：厚卡纸，挡视线，打不穿也打不坏
+    // 纸剧场台上立着的剪纸布景：厚卡纸，挡视线，打不穿也打不坏
     paper: { name: '卡纸', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning

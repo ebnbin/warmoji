@@ -10,7 +10,7 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { BASIN_CELL_U, clockAt, laid, makeBook, pageOf, slabOf, slabSd, standing } from './model'
+import { BASIN_CELL_U, clockAt, lifted, makeBook, pageOf, slabOf, slabSd, standing, trapsOf } from './model'
 import type { Basin } from '../basin'
 import type { Landmark } from '../landmark'
 import type { Book, BookClock, Page, Piece, Slab } from './model'
@@ -20,20 +20,17 @@ import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
 
-/** 立体书按布景种子打散出自己的种子 */
+/** 纸剧场按布景种子打散出自己的种子 */
 const BOOK_SEED = 0x5707b0
-/** 布景的距离场往外只算这么远，格：再远的地方按页边算 */
+/** 布景的距离场往外只算这么远，格：再远的地方按台边算 */
 const FIELD_REACH_U = 4
 /** 寻路的粗格子边长，格；离挡路处至少这么远才算走得过 */
 const FLOW_CELL_U = 0.5
 const FLOW_CLEAR_U = 0.42
-/** 书脊中缝上每隔这么远（格）一处出怪的口子，离上下页边至少这么远（格） */
-const GUTTER_STEP_U = 2.4
-const GUTTER_END_U = 1.6
 /** 布景后面的出怪口：离背面多远，离布景的一头多远，格 */
 const WINGS_BACK_U = 0.75
 const WINGS_END_U = 0.55
-/** 一件布景弹起来时沿底边冒几团碎纸 */
+/** 一件布景落到台上时沿底边扬起几团灰 */
 const POP_PUFFS = 3
 
 /** 一档跨步高度的寻路：粗格子上到队长的路程（格），到不了为无穷；按哪一格的队长、哪一版布景、几时算的 */
@@ -52,7 +49,7 @@ interface Stand {
 }
 
 /**
- * 立体书此刻：摊开的书，按页缓存的布景，换到哪；立着的布景（哪一页、哪几件）与它们挡人的块；
+ * 纸剧场此刻：台面，按幕缓存的布景，演到哪；落在台上的布景（哪一幕、哪几件）与它们挡人的块；
  * 小个子与跨得过矮布景的大个子各按一张距离场与一张寻路走；布景后面的出怪口
  */
 export interface StorybookState {
@@ -65,7 +62,7 @@ export interface StorybookState {
   readonly low: Basin
   readonly high: Basin
   readonly flows: (Flow | null)[]
-  readonly gutter: readonly Landmark[]
+  readonly traps: readonly Landmark[]
   wings: Landmark[]
   wingsKey: string
 }
@@ -104,8 +101,7 @@ export function storybookOf(sim: Sim): StorybookState {
   if (!s) {
     const cfg = cfgOf(sim)
     const book = bookFor(cfg, sim.run.decorSeed)
-    const gutter: Landmark[] = []
-    for (let y = book.y0 + GUTTER_END_U; y <= book.y1 - GUTTER_END_U + 1e-6; y += GUTTER_STEP_U) gutter.push({ x: book.gx * UNIT, y: y * UNIT, r: 0.6 * UNIT, nx: 0, ny: 0 })
+    const traps = trapsOf(book).map((t): Landmark => ({ x: t.x * UNIT, y: t.y * UNIT, r: 0.6 * UNIT, nx: 0, ny: 0 }))
     s = {
       book,
       pages: new Map(),
@@ -116,7 +112,7 @@ export function storybookOf(sim: Sim): StorybookState {
       low: copyBasin(book.basin),
       high: copyBasin(book.basin),
       flows: [null, null],
-      gutter,
+      traps,
       wings: [],
       wingsKey: '',
     }
@@ -145,14 +141,14 @@ function stamp(b: Basin, slab: Slab): void {
   }
 }
 
-/** 此刻立着的是哪几件：换页时旧页还没折平的与新页已经弹起来的都算；变了就重铺距离场、作废寻路、重摆布景后的出怪口；返回刚立起来的 */
+/** 此刻落在台上的是哪几件：换幕时旧幕还没吊起来的与新幕已经落下来的都算；变了就重铺距离场、作废寻路、重摆布景后的出怪口；返回刚落下来的 */
 function refresh(s: StorybookState, cfg: StorybookConfig): Piece[] {
   const c = s.clock
-  const pages = c.phase === 'redraw' ? [c.page - 1, c.page] : [c.page]
+  const pages = c.phase === 'change' ? [c.page - 1, c.page] : [c.page]
   const up: { page: number; i: number; p: Piece }[] = []
   for (const k of pages) {
     pageAt(s, cfg, k).pieces.forEach((p, i) => {
-      if (standing(laid(cfg, c, s.book, k, p))) up.push({ page: k, i, p })
+      if (standing(lifted(cfg, c, k, p))) up.push({ page: k, i, p })
     })
   }
   const key = up.map((u) => `${u.page}:${u.i}`).join(',')
@@ -262,7 +258,7 @@ const DIRS = [
   [-1, -1, Math.SQRT2],
 ] as const
 
-/** 寻路的粗格子铺满书页 */
+/** 寻路的粗格子铺满台面 */
 function flowGrid(book: Book): { cols: number; rows: number } {
   return { cols: Math.ceil((book.x1 - book.x0) / FLOW_CELL_U), rows: Math.ceil((book.y1 - book.y0) / FLOW_CELL_U) }
 }
@@ -398,7 +394,7 @@ function slabSpan(sl: Slab, ax: number, ay: number, bx: number, by: number): [nu
   return [t0, t1]
 }
 
-/** 页面上离布景与页边至少 room 像素的一点：从 p 往外一圈圈找，近处找不到就退回开局站位 */
+/** 台上离布景与台边至少 room 像素的一点：从 p 往外一圈圈找，近处找不到就退回开局站位 */
 function openNear(s: StorybookState, p: Point, room: number): Point {
   for (let r = 0; r <= 10 * UNIT; r += 0.5 * UNIT) {
     const n = r === 0 ? 1 : Math.ceil((r * Math.PI * 2) / (0.5 * UNIT))
@@ -412,9 +408,9 @@ function openNear(s: StorybookState, p: Point, room: number): Point {
 }
 
 /**
- * 立体书：能走的是摊开的两页，页边是硬边界；页面上印的都能走。立起来的剪纸布景挡人：齐腰的矮布景跨得过的大个子照走、小个子绕着走，
- * 高的谁都绕着走，也挡子弹和视线（矮的只挡低处飞的）；穿墙的身体穿得过卡纸。书按难度时钟换页：一把大刷子来回刷过两页，旧布景在刷子碰到前折平就不再挡路，
- * 新布景整件刷出来后弹起来，弹起处站着的身体按距离场挤到最近的空处
+ * 纸剧场：能走的是台面，台边是硬边界；地布上画的都能走。台上立着的剪纸布景挡人：齐腰的矮布景跨得过的大个子照走、小个子绕着走，
+ * 高的谁都绕着走，也挡子弹和视线（矮的只挡低处飞的）；穿墙的身体穿得过卡纸。按难度时钟换幕：旧布景吊离台面就不再挡路，
+ * 新布景落到台上，压着的身体按距离场挤到最近的空处
  */
 export const storybook: WorldHooks = {
   ...bounded,
@@ -474,7 +470,7 @@ export const storybook: WorldHooks = {
     const d = fleeSteer(x, y, awayX, awayY, sim.mapW, sim.mapH, 1.5 * UNIT)
     return alongWall(basinOf(sim, storybookOf(sim), eid), x, y, d.x, d.y, Radius.v[eid]! + 1.5 * UNIT)
   },
-  /** 刷怪点落在页面上、离布景与页边至少一格，离队长够远；头目更远 */
+  /** 刷怪点落在台上、离布景与台边至少一格，离队长够远；头目更远 */
   spawnPoint(sim, boss) {
     const s = storybookOf(sim)
     const book = s.book
@@ -500,12 +496,12 @@ export const storybook: WorldHooks = {
   },
   landmarks(sim) {
     const s = storybookOf(sim)
-    return { gutter: s.gutter, wings: s.wings }
+    return { trap: s.traps, wings: s.wings }
   },
   onStart(sim) {
     storybookOf(sim)
   },
-  /** 按难度时钟换页；立着的布景一变就重铺距离场，换页时刚弹起来的沿底边冒碎纸 */
+  /** 按难度时钟换幕；台上的布景一变就重铺距离场，换幕时刚落下来的沿底边扬灰 */
   tick(sim) {
     const cfg = cfgOf(sim)
     const s = storybookOf(sim)
@@ -516,7 +512,7 @@ export const storybook: WorldHooks = {
       s.wingsKey = wings
       s.wings = wings ? wingsOf(s) : []
     }
-    if (s.clock.phase !== 'redraw') return
+    if (s.clock.phase !== 'change') return
     for (const p of popped) {
       const sl = slabOf(p)
       for (let k = 0; k < POP_PUFFS; k++) {

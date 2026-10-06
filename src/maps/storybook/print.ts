@@ -968,47 +968,192 @@ function frame(ctx: Ctx, x0: number, x1: number, h: number, color: string): void
   }
 }
 
-/** 左页左上角印着章名与几行故事，字底下的插画淡开；两页下角印页码 */
-function words(ctx: Ctx, page: Page, w: number, h: number, color: string): void {
-  const ch = CHAPTERS[page.chapter]!
+/** 幕牌：立在台口一角的一块米色牌子，镶双线边，写着第几幕、幕名与几行故事 */
+export function paintCard(chapter: number, canvas: HTMLCanvasElement): void {
+  const ch = CHAPTERS[chapter]!
+  const color = LINE[ch.key]
   const k = PRINT_PPU
-  const x = 1.5
-  const y = 1.5
-  // 字印在一块米色的题签上，镶一道双线边，盖住底下的插画
-  ctx.save()
-  ctx.translate(0.035, 0.025)
+  canvas.width = Math.round(CARD_W_U * k)
+  canvas.height = Math.round(CARD_H_U * k)
+  const ctx = canvas.getContext('2d')!
+  ctx.setTransform(k, 0, 0, k, 0, 0)
   ctx.beginPath()
-  ctx.roundRect(x - 0.4, y - 0.35, 7, 3.7, 0.3)
+  ctx.roundRect(0.05, 0.05, CARD_W_U - 0.1, CARD_H_U - 0.1, 0.3)
   ctx.fillStyle = '#fbf3df'
   ctx.fill()
-  ctx.restore()
-  for (const [inset, lw] of [[0, 0.05], [0.12, 0.025]] as const) {
+  for (const [inset, lw] of [[0.05, 0.08], [0.22, 0.03]] as const) {
     ctx.beginPath()
-    ctx.roundRect(x - 0.4 + inset, y - 0.35 + inset, 7 - inset * 2, 3.7 - inset * 2, 0.3 - inset)
+    ctx.roundRect(inset, inset, CARD_W_U - inset * 2, CARD_H_U - inset * 2, 0.3 - inset * 0.5)
     ctx.lineWidth = lw
     ctx.strokeStyle = color
     ctx.stroke()
   }
-  ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.fillStyle = color
   ctx.textBaseline = 'top'
   ctx.textAlign = 'left'
+  const x = 0.55
   ctx.font = `${Math.round(0.42 * k)}px ${SERIF}`
-  ctx.fillText(`第${ch.num}章`, x * k, y * k)
+  ctx.fillText(`第${ch.num}幕`, x * k, 0.45 * k)
   ctx.font = `bold ${Math.round(0.82 * k)}px ${SERIF}`
-  ctx.fillText(ch.name, x * k, (y + 0.55) * k)
+  ctx.fillText(ch.name, x * k, 1.0 * k)
   ctx.font = `${Math.round(0.36 * k)}px ${SERIF}`
-  ch.text.forEach((t, i) => ctx.fillText(t, x * k, (y + 1.65 + i * 0.5) * k))
-  ctx.fillText(`· ${page.number} ·`, 1.2 * k, (h - 0.66) * k)
-  ctx.textAlign = 'right'
-  ctx.fillText(`· ${page.number + 1} ·`, (w - 1.2) * k, (h - 0.66) * k)
-  ctx.restore()
+  ch.text.forEach((t, i) => ctx.fillText(t, x * k, (2.1 + i * 0.5) * k))
+}
+
+/** 幕牌多宽多高，格 */
+export const CARD_W_U = 7.4
+export const CARD_H_U = 3.9
+
+/** 天幕上一季的天色：天顶、天边，远处的山、近一点的山 */
+const SKY: Record<ChapterKey, { readonly top: string; readonly low: string; readonly far: string; readonly near: string }> = {
+  spring: { top: '#9fd0ec', low: '#f8dfe6', far: '#b9d89a', near: '#86b865' },
+  summer: { top: '#4f9fdc', low: '#bfe6f2', far: '#e9c98a', near: '#5fb3c9' },
+  autumn: { top: '#e98a4a', low: '#f8d79a', far: '#c66a3a', near: '#8a4a2e' },
+  winter: { top: '#8aa3bf', low: '#e6eef5', far: '#c9d6e3', near: '#f4f8fb' },
+}
+
+/** 远远近近一道起伏的山脊，底下填满 */
+function ridge(ctx: Ctx, rng: Rng, w: number, base: number, amp: number, n: number, fill: string, line: string): void {
+  const pts: Pt[] = [[-1, base + 5]]
+  for (let i = 0; i <= n; i++) pts.push([(w * i) / n, base - amp * (0.4 + 0.6 * rng.next())])
+  pts.push([w + 1, base + 5])
+  ctx.beginPath()
+  smoothPath(ctx, pts)
+  ctx.fillStyle = fill
+  ctx.fill()
+  ctx.lineWidth = 0.05
+  ctx.strokeStyle = line
+  ctx.stroke()
+}
+
+function cloud(ctx: Ctx, x: number, y: number, s: number, line: string): void {
+  ctx.beginPath()
+  for (const [dx, dy, r] of [[-0.9, 0.15, 0.55], [-0.3, -0.2, 0.75], [0.45, -0.05, 0.65], [1.0, 0.2, 0.45]] as const) ctx.ellipse(x + dx * s, y + dy * s, r * s, r * s * 0.8, 0, 0, 6.28)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+  ctx.lineWidth = 0.04
+  ctx.strokeStyle = line
+  ctx.stroke()
 }
 
 /**
- * 一页的印刷：白底上的油墨，乘到纸面上就是印出来的样子。插画平涂、偏一点套版、网点压暗、描墨线；
- * 一页两个景各印一张，第二个景按界线淡进来，再印上连着两个景的东西；两页各印一道双线框，左页左上角是章名与故事，下角是页码
+ * 天幕：挂在台后的一大块画布，画着这一季的天和远处的景——春天粉蓝的天、绿山上开着樱花，夏天大太阳、一边沙丘一边海，
+ * 秋天橘红的晚霞、山上的红叶与城墙，冬天灰蓝的天、雪山和远处冒烟的火山；上边一根吊杆，下边一道压脚
+ */
+export function paintDrop(chapter: number, seed: number, w: number, h: number, canvas: HTMLCanvasElement): void {
+  const ch = CHAPTERS[chapter]!
+  const key = ch.key
+  const S = SKY[key]
+  const L = LINE[key]
+  const k = PRINT_PPU / 2
+  canvas.width = Math.round(w * k)
+  canvas.height = Math.round(h * k)
+  const ctx = canvas.getContext('2d')!
+  ctx.setTransform(k, 0, 0, k, 0, 0)
+  const rng = new Rng(seed ^ 0xd209)
+  const g = ctx.createLinearGradient(0, 0, 0, h)
+  g.addColorStop(0, S.top)
+  g.addColorStop(0.75, S.low)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = dots(ctx, S.top, 0.12)
+  ctx.fillRect(0, 0, w, h * 0.45)
+  const sunX = w * (0.15 + 0.7 * rng.next())
+  if (key === 'summer') {
+    ctx.strokeStyle = '#f6c84a'
+    ctx.lineWidth = 0.12
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      ctx.beginPath()
+      ctx.moveTo(sunX + Math.cos(a) * 1.4, h * 0.3 + Math.sin(a) * 1.4)
+      ctx.lineTo(sunX + Math.cos(a) * 2, h * 0.3 + Math.sin(a) * 2)
+      ctx.stroke()
+    }
+  }
+  if (key !== 'winter') {
+    ctx.beginPath()
+    ctx.arc(sunX, h * 0.3, key === 'autumn' ? 1.6 : 1.1, 0, 6.28)
+    ctx.fillStyle = key === 'autumn' ? '#f6c060' : key === 'spring' ? '#fff3c4' : '#ffd84a'
+    ctx.fill()
+  }
+  for (let i = 0; i < (key === 'summer' ? 3 : 5); i++) cloud(ctx, rng.next() * w, h * (0.12 + 0.3 * rng.next()), 0.6 + rng.next() * 0.6, key === 'autumn' ? '#c97a4a' : '#9ab3c8')
+  if (key === 'winter') {
+    // 雪山一排，远处一座火山冒着烟
+    const vx = rng.next() < 0.5 ? w * 0.2 : w * 0.8
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath()
+      ctx.moveTo(vx - 0.5 + i * 0.3, h * 0.42)
+      ctx.quadraticCurveTo(vx + (rng.next() - 0.3) * 3, h * 0.25 - i * 0.6, vx + 1 + i * 0.6, h * 0.05 - i * 0.2)
+      ctx.lineWidth = 0.5 - i * 0.05
+      ctx.strokeStyle = 'rgba(120,120,130,0.35)'
+      ctx.stroke()
+    }
+    patch(ctx, [[vx - 4, h * 0.85], [vx - 0.7, h * 0.42], [vx + 0.7, h * 0.42], [vx + 4, h * 0.85]], '#6d5f5a', { line: L, lw: 0.05 })
+    line(ctx, [[vx - 0.5, h * 0.44], [vx - 0.2, h * 0.55], [vx + 0.1, h * 0.5]], '#e85d2a', 0.15)
+    for (let x = -1; x < w + 2; x += 3 + rng.next() * 3) {
+      if (Math.abs(x - vx) < 4.5) continue
+      const top = h * (0.3 + 0.2 * rng.next())
+      patch(ctx, [[x - 3, h * 0.9], [x, top], [x + 3, h * 0.9]], S.far, { line: L, lw: 0.04 })
+      patch(ctx, [[x - 0.9, top + 1.2], [x, top], [x + 0.9, top + 1.2], [x + 0.3, top + 0.9], [x - 0.3, top + 1.1]], '#ffffff', {})
+    }
+    ridge(ctx, rng, w, h * 0.9, 0.6, 10, S.near, L)
+    for (let i = 0; i < 70; i++) {
+      ctx.beginPath()
+      ctx.arc(rng.next() * w, rng.next() * h, 0.05 + rng.next() * 0.05, 0, 6.28)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+    }
+  } else if (key === 'summer') {
+    // 一边是沙丘，一边是海天一线
+    const left = rng.next() < 0.5
+    ctx.fillStyle = S.near
+    ctx.fillRect(0, h * 0.62, w, h)
+    for (let y = h * 0.66; y < h; y += 0.45) line(ctx, [[0, y], [w, y]], 'rgba(255,255,255,0.5)', 0.04, [0.3, 0.5], false)
+    const dunes: Pt[] = left ? [[-1, h + 1], [-1, h * 0.5], [w * 0.2, h * 0.55], [w * 0.38, h * 0.7], [w * 0.45, h + 1]] : [[w + 1, h + 1], [w + 1, h * 0.5], [w * 0.8, h * 0.55], [w * 0.62, h * 0.7], [w * 0.55, h + 1]]
+    patch(ctx, dunes, S.far, { shade: '#c99a50', cover: 0.2, line: L, lw: 0.05 })
+  } else if (key === 'spring') {
+    ridge(ctx, rng, w, h * 0.72, 1.6, 6, S.far, L)
+    ridge(ctx, rng, w, h * 0.9, 1.2, 8, S.near, L)
+    for (let i = 0; i < 9; i++) {
+      const x = rng.next() * w
+      const y = h * (0.62 + 0.25 * rng.next())
+      ctx.beginPath()
+      ctx.arc(x, y, 0.45 + rng.next() * 0.3, 0, 6.28)
+      ctx.fillStyle = '#f2a7bd'
+      ctx.fill()
+      ctx.lineWidth = 0.04
+      ctx.strokeStyle = L
+      ctx.stroke()
+    }
+  } else {
+    ridge(ctx, rng, w, h * 0.7, 2, 5, S.far, L)
+    // 山上一截城墙，山脚一个洞口
+    const wx = w * (0.2 + 0.6 * rng.next())
+    for (let i = 0; i < 6; i++) patch(ctx, [[wx + i * 0.7, h * 0.6], [wx + i * 0.7 + 0.6, h * 0.6], [wx + i * 0.7 + 0.6, h * 0.48 - (i % 2) * 0.25], [wx + i * 0.7, h * 0.48 - (i % 2) * 0.25]], '#c9bba2', { line: L, lw: 0.04 })
+    ridge(ctx, rng, w, h * 0.92, 1.1, 8, S.near, L)
+    const cx = wx < w / 2 ? w * 0.78 : w * 0.18
+    patch(ctx, [[cx - 1.4, h * 0.95], [cx - 1, h * 0.72], [cx, h * 0.66], [cx + 1, h * 0.72], [cx + 1.4, h * 0.95]], '#2a1e24', { line: L, lw: 0.05 })
+    for (let i = 0; i < 40; i++) leaf(ctx, rng, rng.next() * w, rng.next() * h, 0.12, L)
+  }
+  // 画布的褶：几道竖着的淡影；上边的吊杆，下边的压脚
+  for (let x = 2; x < w; x += 3.4) {
+    const gr = ctx.createLinearGradient(x - 0.8, 0, x + 0.8, 0)
+    gr.addColorStop(0, 'rgba(0,0,0,0)')
+    gr.addColorStop(0.5, 'rgba(40,20,10,0.08)')
+    gr.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = gr
+    ctx.fillRect(x - 0.8, 0, 1.6, h)
+  }
+  ctx.fillStyle = '#5a3a24'
+  ctx.fillRect(0, 0, w, 0.3)
+  ctx.fillStyle = 'rgba(40,20,10,0.35)'
+  ctx.fillRect(0, h - 0.25, w, 0.25)
+}
+
+/**
+ * 一幕的地布：白底上的颜料，乘到粗布上就是画上去的样子。插画平涂、偏一点套版、网点压暗、描墨线；
+ * 两个景各画一张，第二个景按界线淡进来，再画上连着两个景的东西；四周一道双线框
  */
 export function paintPrint(page: Page, book: Book, canvas: HTMLCanvasElement): void {
   const w = book.x1 - book.x0
@@ -1043,5 +1188,4 @@ export function paintPrint(page: Page, book: Book, canvas: HTMLCanvasElement): v
   ctx.setTransform(PRINT_PPU, 0, 0, PRINT_PPU, 0, 0)
   S.seam(ctx, w, h, new Rng(seed ^ 0x2c3), sd, page.blend, book.x0, book.y0)
   frame(ctx, 0, w, h, LINE[key])
-  words(ctx, page, w, h, LINE[key])
 }

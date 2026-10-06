@@ -5,9 +5,9 @@ import type { Basin } from '../basin'
 import type { StorybookConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
-/** 页边的距离场按这么细的格子算，格；立起来的布景也叠在同一套格子上 */
+/** 台边的距离场按这么细的格子算，格；台上的布景也叠在同一套格子上 */
 export const BASIN_CELL_U = 0.125
-/** 距离场比书页多铺这么宽，格：最外一圈是页外 */
+/** 距离场比台面多铺这么宽，格：最外一圈是台外 */
 const BASIN_PAD_U = 1
 /** 页角磨圆的半径，格 */
 const CORNER_U = 0.35
@@ -18,10 +18,10 @@ const REACH_CELL_U = 0.25
 /** 查连通时小个子、头目各按多大的半径，格：配比里最大的小怪、地图的头目都挤得过布景之间的路 */
 const SMALL_U = 0.65
 const BIG_U = 1.15
-/** 左页左上角印字的那一块，格：离页角多远、多宽多高 */
-export const TEXT_BOX = { x: 0, y: 0, w: 9, h: 4.8 } as const
 /** 摆在两个景交界那一带的布景离界线最多多远，格 */
 const MID_U = 2.6
+/** 台中线上的活门离台中心多远，格 */
+const TRAP_DY = [-11, -6.5, 6.5, 11] as const
 /** 一页最多换几次种子重摆 */
 const PAGE_TRIES = 12
 /** 一件布景最多换几个地方试 */
@@ -119,17 +119,16 @@ export function blendAt(b: Blend, x: number, y: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** 一页：第几页（从开局那一页起数），哪一章，左右两页的页码，这一页的种子、两个景的分界与立着的布景 */
+/** 一幕（代码里叫一页）：第几幕（从开局那一幕起数），哪一章，这一幕的种子、两个景的分界与台上的布景 */
 export interface Page {
   readonly index: number
   readonly chapter: number
-  readonly number: number
   readonly seed: number
   readonly blend: Blend
   readonly pieces: readonly Piece[]
 }
 
-/** 摊开的书，格：两页合起来的范围，书脊的横坐标，页边的距离场（像素），开局站位，开局翻到哪一章、左页的页码 */
+/** 台面（代码里叫书），格：台面的范围，台中线的横坐标，台边的距离场（像素），开局站位，开局演到哪一章 */
 export interface Book {
   readonly x0: number
   readonly x1: number
@@ -140,11 +139,10 @@ export interface Book {
   readonly basin: Basin
   readonly start: Point
   readonly chapter0: number
-  readonly number0: number
   readonly seed: number
 }
 
-/** 书摊在方框正中，书脊竖着；开局翻到哪一章、哪一页按种子定 */
+/** 台面摆在方框正中，台中线竖着；开局演到哪一章按种子定 */
 export function makeBook(cfg: StorybookConfig, seed: number): Book {
   const c = FRAME_U / 2
   const x0 = c - cfg.page.wU
@@ -160,10 +158,10 @@ export function makeBook(cfg: StorybookConfig, seed: number): Book {
   const open = (px: number, py: number): boolean => pageRoom(x0, x1, y0, y1, px / UNIT, py / UNIT) > 0
   const basin = makeBasin(open, bx0, by0, cols, rows, cell, { x: c * UNIT, y: c * UNIT }, 0.05 * UNIT)
   const rng = new Rng(seed ^ 0x5b00c)
-  return { x0, x1, y0, y1, gx: c, cy: c, basin, start: { x: c, y: c }, chapter0: rng.int(0, CHAPTERS.length - 1), number0: 2 * rng.int(3, 40), seed }
+  return { x0, x1, y0, y1, gx: c, cy: c, basin, start: { x: c, y: c }, chapter0: rng.int(0, CHAPTERS.length - 1), seed }
 }
 
-/** (x, y) 格离页边多远，格：页里为正，四角磨圆 */
+/** (x, y) 格离台边多远，格：台上为正，四角磨圆 */
 export function pageRoom(x0: number, x1: number, y0: number, y1: number, x: number, y: number): number {
   const hx = (x1 - x0) / 2 - CORNER_U
   const hy = (y1 - y0) / 2 - CORNER_U
@@ -452,7 +450,7 @@ class Reach {
   }
 }
 
-/** 一页能不能放下这件：落在自己那半页里、离页边与书脊够远，离别组的布景留得出路，开局那一页不压着出生的空地 */
+/** 一幕能不能放下这件：落在自己那半边台上、离台边与台中线（一溜活门）够远，离别组的布景留得出路，开局那一幕不压着出生的空地 */
 function fits(cfg: StorybookConfig, book: Book, p: Piece, placed: readonly Piece[], plaza: boolean): boolean {
   const s = slabOf(p)
   const m = p.low ? cfg.margin.low : cfg.margin.tall
@@ -460,13 +458,9 @@ function fits(cfg: StorybookConfig, book: Book, p: Piece, placed: readonly Piece
   const right = p.x > book.gx
   for (const c of cs) {
     if (c.x < book.x0 + m || c.x > book.x1 - m || c.y < book.y0 + m || c.y > book.y1 - m) return false
-    if ((c.x > book.gx) !== right || Math.abs(c.x - book.gx) < cfg.margin.gutter) return false
+    if ((c.x > book.gx) !== right || Math.abs(c.x - book.gx) < cfg.margin.aisle) return false
   }
   if (plaza && slabSd(s, book.start.x, book.start.y) < cfg.plazaU) return false
-  // 左页左上角印着章名与故事：布景不压着字
-  const tx = book.x0 + TEXT_BOX.x
-  const ty = book.y0 + TEXT_BOX.y
-  if (cs.some((c) => c.x < tx + TEXT_BOX.w && c.y < ty + TEXT_BOX.h) || (s.cx < tx + TEXT_BOX.w && s.cy < ty + TEXT_BOX.h)) return false
   for (const q of placed) {
     if (q.group === p.group) continue
     const gap = p.low || q.low ? cfg.gapU.low : cfg.gapU.tall
@@ -484,8 +478,8 @@ function piece(spec: Spec, cfg: StorybookConfig, rng: Rng, x: number, y: number,
 /** 半页里随机的一点：side 为 -1 是左页、1 是右页 */
 function spot(cfg: StorybookConfig, book: Book, rng: Rng, side: number): Point {
   const m = cfg.margin.low
-  const lo = side < 0 ? book.x0 + m : book.gx + cfg.margin.gutter
-  const hi = side < 0 ? book.gx - cfg.margin.gutter : book.x1 - m
+  const lo = side < 0 ? book.x0 + m : book.gx + cfg.margin.aisle
+  const hi = side < 0 ? book.gx - cfg.margin.aisle : book.x1 - m
   return { x: lo + (hi - lo) * rng.next(), y: book.y0 + m + (book.y1 - book.y0 - 2 * m) * rng.next() }
 }
 
@@ -535,16 +529,16 @@ export function pageOf(cfg: StorybookConfig, book: Book, index: number): Page {
   const blend = blendOf(book, chapter, new Rng(base ^ 0x3b1e9d))
   let pieces: Piece[] | null = null
   for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, book, chapter, blend, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
-  if (!pieces) throw new Error(`立体书第 ${index} 页摆不下 ${cfg.pieces[0]} 件布景`)
+  if (!pieces) throw new Error(`纸剧场第 ${index} 幕摆不下 ${cfg.pieces[0]} 件布景`)
   // 远的先摆在后面：画的时候按底边从屏幕里往外排
   const ordered = [...pieces].sort((p, q) => p.y - q.y)
-  return { index, chapter, number: book.number0 + index * 2, seed: base, blend, pieces: ordered }
+  return { index, chapter, seed: base, blend, pieces: ordered }
 }
 
-/** 换页的一段：stand 立着，redraw 一把大刷子来回刷过两页，刷过处就是新一页 */
-export type Phase = 'stand' | 'redraw'
+/** 换幕的一段：stand 演着，change 换幕——灯暗下去，旧布景依次吊上去，暗转里换地布与天幕，新布景依次吊下来，灯亮起来 */
+export type Phase = 'stand' | 'change'
 
-/** 此刻换到哪：page 是正立着或正画上的那一页（redraw 时旧的是 page - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换页在几时（毫秒） */
+/** 此刻演到哪：page 是正演着或正换上的那一幕（change 时旧的是 page - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换幕在几时（毫秒） */
 export interface BookClock {
   readonly page: number
   readonly phase: Phase
@@ -563,13 +557,17 @@ function jitter(book: Book, k: number): number {
   return hash01(book.seed, k, 0x1f2e3d) * 2 - 1
 }
 
-/** 一次换页从起刷到新布景全弹起来多长，毫秒 */
-export function turnLen(cfg: StorybookConfig): number {
-  const t = cfg.turn
-  return t.sweepMs + t.settleMs + t.flipMs
+/** 布景依次吊上去（或吊下来）那一段多长，毫秒 */
+export function flyLen(cfg: StorybookConfig): number {
+  return cfg.turn.staggerMs + cfg.turn.flyMs
 }
 
-/** 难度时钟走到 ms 毫秒时书换到哪 */
+/** 一次换幕多长，毫秒：吊上去、暗转、吊下来 */
+export function turnLen(cfg: StorybookConfig): number {
+  return flyLen(cfg) * 2 + cfg.turn.darkMs
+}
+
+/** 难度时钟走到 ms 毫秒时演到哪 */
 export function clockAt(cfg: StorybookConfig, book: Book, ms: number): BookClock {
   const t = cfg.turn
   let k = 0
@@ -583,133 +581,58 @@ export function clockAt(cfg: StorybookConfig, book: Book, ms: number): BookClock
     k++
   }
   if (ms < w) return { page: 0, phase: 'stand', at: ms, len: w, next: w }
-  return { page: k + 1, phase: 'redraw', at: ms - w, len: turnLen(cfg), next: w }
-}
-
-/**
- * 换到第 page 页时那把大刷子怎么刷：一道道沿 (-uy, ux) 来回刷，一道刷完往 (ux, uy) 挪 step 格再刷回来，第 0 道的中线在 lo + step / 2（按 (ux, uy) 量）；
- * 每道中间往前鼓 bow 格（手腕摆出来的弧），spans 是每道从哪刷到哪（按 (-uy, ux) 量，格），偶数道正着刷、奇数道反着刷；每道刷 rowMs 毫秒。方向每次换页随机
- */
-export interface Sweep {
-  readonly ux: number
-  readonly uy: number
-  readonly lo: number
-  readonly step: number
-  readonly bow: number
-  readonly spans: readonly (readonly [number, number])[]
-  readonly rowMs: number
-}
-
-/** 刷子在一道两头多刷出去多远，格；手腕的弧占道距多少 */
-const SPAN_PAD_U = 0.6
-const BOW = 0.3
-/** 刷子扫过以后平躺的布景多久（毫秒）印浓或盖掉 */
-const INK_MS = 120
-
-export function sweepOf(cfg: StorybookConfig, book: Book, page: number): Sweep {
-  const a = hash01(book.seed, page, 0x5e1a7) * Math.PI * 2
-  const ux = Math.cos(a)
-  const uy = Math.sin(a)
-  const n = cfg.turn.strokes
-  const cs = [[book.x0, book.y0], [book.x1, book.y0], [book.x1, book.y1], [book.x0, book.y1]].map(([x, y]) => ({ s: -x! * uy + y! * ux, d: x! * ux + y! * uy }))
-  const lo = Math.min(...cs.map((c) => c.d))
-  const step = (Math.max(...cs.map((c) => c.d)) - lo) / n
-  const spans: [number, number][] = []
-  for (let r = 0; r < n; r++) {
-    // 书页与这一道（连上弧鼓出去的）相交的那一段
-    const d0 = lo + r * step - step * 0.2
-    const d1 = lo + (r + 1) * step + step * (0.2 + BOW)
-    const ss: number[] = []
-    for (let i = 0; i < 4; i++) {
-      const p = cs[i]!
-      const q = cs[(i + 1) % 4]!
-      if (p.d >= d0 && p.d <= d1) ss.push(p.s)
-      for (const d of [d0, d1]) if ((p.d - d) * (q.d - d) < 0) ss.push(p.s + ((q.s - p.s) * (d - p.d)) / (q.d - p.d))
-    }
-    spans.push([Math.min(...ss) - SPAN_PAD_U, Math.max(...ss) + SPAN_PAD_U])
-  }
-  return { ux, uy, lo, step, bow: step * BOW, spans, rowMs: cfg.turn.sweepMs / n }
-}
-
-/** 刷一道时走到几成：起笔慢、中间快、到头慢下来掉头 */
-function strokeAt(tau: number): number {
-  return 0.5 - 0.5 * Math.cos(Math.PI * clamp01(tau))
-}
-
-/** 第 r 道刷到 f 成（0 到 1，按这一道刷的方向）时刷子的中心，格 */
-export function brushAt(sw: Sweep, r: number, f: number): Point {
-  const [s0, s1] = sw.spans[r]!
-  const q = r % 2 === 0 ? f : 1 - f
-  const s = s0 + (s1 - s0) * q
-  const d = sw.lo + (r + 0.5) * sw.step + sw.bow * (1 - (2 * q - 1) ** 2)
-  return { x: -s * sw.uy + d * sw.ux, y: s * sw.ux + d * sw.uy }
-}
-
-/** 换页开始后 at 毫秒时刷子在第几道、刷到几成；刷完了为 null */
-export function brushPhase(sw: Sweep, at: number): { readonly r: number; readonly f: number } | null {
-  const r = Math.floor(at / sw.rowMs)
-  if (at < 0 || r >= sw.spans.length) return null
-  return { r, f: strokeAt(at / sw.rowMs - r) }
-}
-
-/** 刷子在换页开始后几毫秒刷到 (x, y) 格：落在哪一道（中线带弧）里，那一道刷到它的时候 */
-export function arrival(sw: Sweep, x: number, y: number): number {
-  const s = -x * sw.uy + y * sw.ux
-  const d = x * sw.ux + y * sw.uy
-  const n = sw.spans.length
-  let r = Math.min(n - 1, Math.max(0, Math.floor((d - sw.lo) / sw.step)))
-  for (let k = Math.max(0, r - 1); k <= r; k++) {
-    const [s0, s1] = sw.spans[k]!
-    const q = clamp01((s - s0) / (s1 - s0))
-    if (d <= sw.lo + (k + 1) * sw.step + sw.bow * (1 - (2 * q - 1) ** 2)) {
-      r = k
-      break
-    }
-  }
-  const [s0, s1] = sw.spans[r]!
-  const q = clamp01((s - s0) / (s1 - s0))
-  const f = r % 2 === 0 ? q : 1 - q
-  return (r + Math.acos(1 - 2 * f) / Math.PI) * sw.rowMs
-}
-
-/** 刷子最早、最晚刷到一件布景的哪儿，毫秒 */
-function reach(sw: Sweep, p: Piece): readonly [number, number] {
-  const ts = corners(slabOf(p)).map((q) => arrival(sw, q.x, q.y))
-  return [Math.min(...ts), Math.max(...ts)]
+  return { page: k + 1, phase: 'change', at: ms - w, len: turnLen(cfg), next: w }
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 const easeInOut = (v: number): number => v * v * (3 - 2 * v)
-/** 弹起来冲过头一点再回正 */
-function springUp(v: number): number {
-  const c = 2.4
-  const u = v - 1
-  return 1 + (c + 1) * u * u * u + c * u * u
-}
 
 /**
- * 一件布景此刻往后倒了多少，0 是立正、1 是平躺在页面上，冲过头时略小于 0（往前探）：
- * 旧页的布景在刷子碰到它之前折平，新页的布景等刷子把它整个刷出来、再过 settleMs 弹起来
+ * 一件布景此刻吊起来多高：0 是落在台上，1 是吊出了视线。旧幕的按各自的先后吊上去，
+ * 新幕的在暗转以后按各自的先后吊下来，快落地时放慢
  */
-export function laid(cfg: StorybookConfig, c: BookClock, book: Book, page: number, p: Piece): number {
+export function lifted(cfg: StorybookConfig, c: BookClock, page: number, p: Piece): number {
   if (c.phase === 'stand') return page === c.page ? 0 : 1
   const t = cfg.turn
-  const [first, last] = reach(sweepOf(cfg, book, c.page), p)
-  if (page === c.page - 1) return easeInOut(clamp01((c.at - Math.max(0, first - t.flipMs)) / t.flipMs))
+  const start = hash01(p.seed, page, 0x3f1) * t.staggerMs
+  if (page === c.page - 1) return easeInOut(clamp01((c.at - start) / t.flyMs))
   if (page !== c.page) return 1
-  return 1 - springUp(clamp01((c.at - (last + t.settleMs)) / t.flipMs))
+  const u = clamp01((c.at - flyLen(cfg) - t.darkMs - start) / t.flyMs)
+  return (1 - u) ** 3
 }
 
-/** 一件平躺着的布景此刻印在页面上有多浓：旧页的被刷子刷过就盖掉，新页的跟着刷子刷出来 */
-export function inked(cfg: StorybookConfig, c: BookClock, book: Book, page: number, p: Piece): number {
-  if (c.phase === 'stand') return page === c.page ? 1 : 0
-  const s = slabOf(p)
-  const k = clamp01((c.at - arrival(sweepOf(cfg, book, c.page), s.cx, s.cy)) / INK_MS)
-  if (page === c.page - 1) return 1 - k
-  return page === c.page ? k : 0
+/** 吊着的布景离台面不到这么高（占吊起来的比例）还挡路：落下来的一碰台面就挡，吊上去的离了台面就不挡 */
+const LIFT_BLOCK = 0.04
+
+/** 落在台上的布景挡路 */
+export function standing(lift: number): boolean {
+  return lift < LIFT_BLOCK
 }
 
-/** 倒下不到一半的布景挡路 */
-export function standing(lay: number): boolean {
-  return lay < 0.5
+/** 暗转里地布、天幕与幕牌换过去了多少：0 是旧幕，1 是新幕 */
+export function swapped(cfg: StorybookConfig, c: BookClock): number {
+  if (c.phase === 'stand') return 1
+  return easeInOut(clamp01((c.at - flyLen(cfg)) / cfg.turn.darkMs))
+}
+
+/** 台上此刻多暗：0 是灯全亮，1 是全黑；换幕开头暗下去一半，暗转时全黑，新布景落完再亮回来 */
+export function darkness(cfg: StorybookConfig, c: BookClock): number {
+  if (c.phase === 'stand') return 0
+  const t = cfg.turn
+  const up = flyLen(cfg)
+  const half = 0.55
+  if (c.at < t.dimMs) return half * easeInOut(c.at / t.dimMs)
+  if (c.at < up - t.dimMs) return half
+  if (c.at < up) return half + (1 - half) * easeInOut((c.at - (up - t.dimMs)) / t.dimMs)
+  if (c.at < up + t.darkMs) return 1
+  const back = up + t.darkMs
+  if (c.at < back + t.dimMs) return 1 - (1 - half) * easeInOut((c.at - back) / t.dimMs)
+  const end = turnLen(cfg)
+  if (c.at < end - t.dimMs) return half
+  return half * (1 - easeInOut((c.at - (end - t.dimMs)) / t.dimMs))
+}
+
+/** 台中线上的几扇活门，格：怪从这里升上台 */
+export function trapsOf(book: Book): Point[] {
+  return TRAP_DY.map((dy) => ({ x: book.gx, y: book.cy + dy }))
 }

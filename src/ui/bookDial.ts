@@ -16,8 +16,8 @@ function fill4(g: Phaser.GameObjects.Graphics, pts: readonly { x: number; y: num
 }
 
 /**
- * 书页盘：盘心一本摊开的立体书，外圈一道倒计时——立着时是离下一次换页还有多久，快换页时整圈闪着橙光、一把刷子在书上晃，
- * 换页时刷子在书页上来回刷。盘下右对齐写着还有几秒；新一页刚画好的那几秒写着这一章叫什么
+ * 换幕盘：盘心一座小剧场，外圈一道倒计时——演着时是离下一次换幕还有多久，快换幕时整圈闪着橙光、红幕往里收，
+ * 换幕时台上暗下来、布景吊在半空。盘下右对齐写着还有几秒；新一幕刚开演的那几秒写着这一幕叫什么
  */
 export class BookDial extends Widget {
   private readonly ring: Phaser.GameObjects.Graphics
@@ -39,7 +39,7 @@ export class BookDial extends Widget {
     this.add([face, this.ring, this.glyph, this.reading])
   }
 
-  /** phase 是立着（stand）、快换页（warn）还是正在换（turn）；ratio 是离下一次换页还剩多少；title 不为空时写章名 */
+  /** phase 是演着（stand）、快换幕（warn）还是正在换（turn）；ratio 是离下一次换幕还剩多少；title 不为空时写幕名 */
   setBook(phase: 'stand' | 'warn' | 'turn', ratio: number, inSec: number, title: string | null, now: number): this {
     const s = this.shown
     const blink = phase === 'warn' && Math.floor(now / 250) % 2 === 0
@@ -51,7 +51,7 @@ export class BookDial extends Widget {
       s.blink = blink
     }
     const sec = Math.max(0, Math.ceil(inSec))
-    const text = title ?? (phase === 'stand' ? `${sec} 秒后换页` : phase === 'warn' ? '要换页了' : '重绘中')
+    const text = title ?? (phase === 'stand' ? `${sec} 秒后换幕` : phase === 'warn' ? '要换幕了' : '换幕中')
     if (text !== s.text) {
       this.reading.setText(text).setInk(phase === 'stand' ? 'ink' : 'warn')
       s.text = text
@@ -74,60 +74,47 @@ export class BookDial extends Widget {
     g.strokePath()
   }
 
-  /** 一本摊开的书：封面垫底，两页微微往书脊弯，书脊两边立着剪纸；快换页时一把刷子在书上晃，换页时刷子在右页上来回刷、剪纸倒了 */
+  /**
+   * 一座小剧场：台面、两边红幕，台上立着一棵剪纸小树、一座小塔；快换幕时红幕一闪一闪地往里收，
+   * 换幕时台上暗下来、一束追光照着，小塔挂着两根吊绳升在半空
+   */
   private drawGlyph(phase: string, now: number): void {
     const g = this.glyph.clear()
     const r = this.radius * 0.62
-    const cover = TONE.info.lip
-    g.fillStyle(SURFACE.outline, 1).fillRoundedRect(-r * 1.08, -r * 0.68, r * 2.16, r * 1.36, r * 0.1)
-    g.fillStyle(cover, 1).fillRoundedRect(-r * 1.02, -r * 0.62, r * 2.04, r * 1.24, r * 0.08)
-    const page = (side: number, lift: number): void => {
-      const x0 = side * r * 0.04
-      const x1 = side * r * 0.94
+    const dark = phase === 'turn'
+    // 台后的墙与台面
+    g.fillStyle(SURFACE.outline, 1).fillRoundedRect(-r * 1.08, -r * 0.72, r * 2.16, r * 1.44, r * 0.1)
+    g.fillStyle(dark ? 0x1a1018 : 0x3a2a40, 1).fillRect(-r * 1.0, -r * 0.64, r * 2.0, r * 0.7)
+    g.fillStyle(dark ? 0x4a3020 : 0xc9925a, 1)
+    fill4(g, [{ x: -r * 1.0, y: r * 0.06 }, { x: r * 1.0, y: r * 0.06 }, { x: r * 1.0, y: r * 0.64 }, { x: -r * 1.0, y: r * 0.64 }])
+    if (dark) {
+      g.fillStyle(0xfff3c4, 0.35)
+      fill4(g, [{ x: -r * 0.12, y: -r * 0.64 }, { x: r * 0.12, y: -r * 0.64 }, { x: r * 0.36, y: r * 0.5 }, { x: -r * 0.36, y: r * 0.5 }])
+      g.fillStyle(0xfff3c4, 0.5).fillEllipse(0, r * 0.42, r * 0.8, r * 0.22)
+    }
+    // 台上的剪纸：小树一直立着；小塔换幕时吊在半空
+    g.fillStyle(SURFACE.outline, 1).fillTriangle(-r * 0.62, r * 0.32, -r * 0.4, -r * 0.36, -r * 0.18, r * 0.32)
+    g.fillStyle(dark ? 0x2f4a2a : TONE.good.face, 1).fillTriangle(-r * 0.57, r * 0.28, -r * 0.4, -r * 0.26, -r * 0.23, r * 0.28)
+    const up = dark ? r * (0.32 + 0.06 * Math.sin(now / 200)) : 0
+    if (dark) {
+      g.lineStyle(1.5, INK.faint, 1)
+      g.lineBetween(r * 0.26, -r * 0.26 - up, r * 0.26, -r * 0.72)
+      g.lineBetween(r * 0.56, -r * 0.26 - up, r * 0.56, -r * 0.72)
+    }
+    g.fillStyle(SURFACE.outline, 1).fillRect(r * 0.24, -r * 0.26 - up, r * 0.34, r * 0.6)
+    g.fillStyle(TONE.bad.face, 1).fillRect(r * 0.28, -r * 0.22 - up, r * 0.26, r * 0.52)
+    g.fillStyle(SURFACE.outline, 1).fillTriangle(r * 0.2, -r * 0.24 - up, r * 0.41, -r * 0.58 - up, r * 0.62, -r * 0.24 - up)
+    g.fillStyle(TONE.accent.face, 1).fillTriangle(r * 0.26, -r * 0.27 - up, r * 0.41, -r * 0.5 - up, r * 0.56, -r * 0.27 - up)
+    // 两边的红幕：快换幕时往里收一点、一闪一闪
+    const close = phase === 'warn' ? r * (0.12 + 0.08 * Math.sin(now / 90)) : 0
+    for (const side of [-1, 1]) {
+      const x0 = side * r * 1.0
+      const x1 = side * (r * 0.66 - close)
       g.fillStyle(SURFACE.outline, 1)
-      fill4(g, [{ x: x0, y: -r * 0.5 - 2 }, { x: x1, y: -r * 0.56 - lift - 2 }, { x: x1, y: r * 0.5 - lift + 2 }, { x: x0, y: r * 0.56 + 2 }])
-      g.fillStyle(INK.ink, 1)
-      fill4(g, [{ x: x0, y: -r * 0.5 }, { x: x1, y: -r * 0.56 - lift }, { x: x1, y: r * 0.5 - lift }, { x: x0, y: r * 0.56 }])
+      fill4(g, [{ x: x0, y: -r * 0.66 }, { x: x1 + side * 2, y: -r * 0.66 }, { x: side * (r * 0.8 - close) + side * 2, y: r * 0.66 }, { x: x0, y: r * 0.66 }])
+      g.fillStyle(TONE.bad.lip, 1)
+      fill4(g, [{ x: x0, y: -r * 0.64 }, { x: x1, y: -r * 0.64 }, { x: side * (r * 0.8 - close), y: r * 0.64 }, { x: x0, y: r * 0.64 }])
     }
-    page(-1, 0)
-    page(1, 0)
-    g.lineStyle(2, INK.faint, 1).lineBetween(0, -r * 0.5, 0, r * 0.56)
-    if (phase === 'turn') {
-      // 刷到一半：右页上几道刷过的颜色，刷子跟着来回走
-      const k = 0.5 + 0.5 * Math.sin(now / 120)
-      g.fillStyle(TONE.good.face, 0.85)
-      g.fillRect(r * 0.1, -r * 0.42, r * 0.78, r * 0.28)
-      g.fillRect(r * 0.1, -r * 0.14, r * 0.78, r * 0.28)
-      g.fillRect(r * 0.1, r * 0.14, r * 0.78 * k, r * 0.28)
-      this.brush(g, r * (0.12 + 0.76 * k), r * 0.28, -1.2, r)
-      return
-    }
-    // 书脊两边各立着一件剪纸：一棵树，一座小塔
-    g.fillStyle(SURFACE.outline, 1).fillTriangle(-r * 0.62, r * 0.18, -r * 0.4, -r * 0.5, -r * 0.18, r * 0.18)
-    g.fillStyle(TONE.good.face, 1).fillTriangle(-r * 0.57, r * 0.14, -r * 0.4, -r * 0.4, -r * 0.23, r * 0.14)
-    g.fillStyle(SURFACE.outline, 1).fillRect(r * 0.24, -r * 0.4, r * 0.34, r * 0.6)
-    g.fillStyle(TONE.bad.face, 1).fillRect(r * 0.28, -r * 0.36, r * 0.26, r * 0.52)
-    g.fillStyle(SURFACE.outline, 1).fillTriangle(r * 0.2, -r * 0.38, r * 0.41, -r * 0.72, r * 0.62, -r * 0.38)
-    g.fillStyle(TONE.accent.face, 1).fillTriangle(r * 0.26, -r * 0.41, r * 0.41, -r * 0.64, r * 0.56, -r * 0.41)
-    if (phase === 'warn') this.brush(g, r * 0.5, r * 0.1 + Math.sin(now / 90) * r * 0.08, -0.9 + Math.sin(now / 70) * 0.15, r)
-  }
-
-  /** 一把扁刷：刷毛贴在 (x, y)，笔杆朝 ang 弧度伸出去，长短按 r */
-  private brush(g: Phaser.GameObjects.Graphics, x: number, y: number, ang: number, r: number): void {
-    const ux = Math.cos(ang)
-    const uy = Math.sin(ang)
-    const nx = -uy
-    const ny = ux
-    const at = (a: number, b: number): { x: number; y: number } => ({ x: x + ux * a + nx * b, y: y + uy * a + ny * b })
-    const band = (a0: number, a1: number, w0: number, w1: number, color: number): void => {
-      g.fillStyle(SURFACE.outline, 1)
-      fill4(g, [at(a0 - 1.5, -w0 - 1.5), at(a0 - 1.5, w0 + 1.5), at(a1 + 1.5, w1 + 1.5), at(a1 + 1.5, -w1 - 1.5)])
-      g.fillStyle(color, 1)
-      fill4(g, [at(a0, -w0), at(a0, w0), at(a1, w1), at(a1, -w1)])
-    }
-    band(r * 0.42, r * 1.25, r * 0.08, r * 0.06, TONE.bad.face)
-    band(r * 0.26, r * 0.42, r * 0.17, r * 0.1, INK.faint)
-    band(0, r * 0.26, r * 0.2, r * 0.18, INK.soft)
-    band(0, r * 0.08, r * 0.2, r * 0.2, TONE.good.face)
+    g.fillStyle(TONE.accent.face, 1).fillRect(-r * 1.0, -r * 0.72, r * 2.0, r * 0.1)
   }
 }
