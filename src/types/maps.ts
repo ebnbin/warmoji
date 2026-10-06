@@ -1333,6 +1333,85 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/** 一种列车：几节车厢、每节多长、节间的风挡多长、车宽、车头收尖的那段多长（格），车顶离地多高（米）；每节每侧几扇门、门多宽、车壁多厚（格） */
+export interface TrainSpec {
+  readonly cars: number
+  readonly carU: number
+  readonly gapU: number
+  readonly widthU: number
+  readonly noseU: number
+  readonly heightM: number
+  readonly doors: number
+  readonly doorU: number
+  readonly wallU: number
+}
+/**
+ * 磁浮站：未来城市里一座磁悬浮列车换乘站的站台层，恒亮的室内光。几条轨道横穿站厅，把站台切成几块；轨道嵌在地里，没车的时候谁都走得过去。
+ * 列车按时刻表进站、停靠、开走：进站前站台边的灯朝着来车的方向一节节亮起、隧道口透出车头的光；行驶中的列车是又高又快的墙，撞到谁就把谁撞飞、掉血，
+ * 停靠时车门开着，可以从车厢里穿到对面；车门关上、列车开走，轨道又能走了。各条轨道班次错开、方向相反。敌我通吃
+ */
+export interface TransitConfig {
+  readonly meterPerU: number
+  /** 站厅能走的范围：沿轨道长 lengthU、横过轨道宽 widthU（格），摆在方框正中 */
+  readonly hall: { readonly lengthU: number; readonly widthU: number }
+  /** 轨道：几条，道床多宽（格）；站台边上一道 edgeU 宽的警示带 */
+  readonly tracks: { readonly count: readonly [number, number]; readonly bedU: number; readonly edgeU: number }
+  /** 站台最窄几格 */
+  readonly platformU: number
+  readonly train: TrainSpec
+  /** 头目乘的专列 */
+  readonly express: TrainSpec
+  /**
+   * 时刻表：每条轨道每 periodMs 一班，各条按 1/条数 错开、再抖 staggerMs；开局 firstMs 后头一班开始预警。
+   * 预警 warnMs，列车以 inU（格/秒）冲进站、匀减速停在站台正中；开门 doorMs，停 dwellMs（最后 closeWarnMs 响铃闪红），关门 doorMs，再以 outA（格/秒²）匀加速开走
+   */
+  readonly timetable: {
+    readonly periodMs: number
+    readonly firstMs: number
+    readonly staggerMs: number
+    readonly warnMs: number
+    readonly inU: number
+    readonly outA: number
+    readonly doorMs: number
+    readonly dwellMs: number
+    readonly closeWarnMs: number
+  }
+  /** 专列：预警 warnMs，停 dwellMs；进站出站同普通列车 */
+  readonly expressRun: { readonly warnMs: number; readonly dwellMs: number }
+  /**
+   * 撞车：车速不到 minU（格/秒）只把人挤开；快过它撞到的掉 frac 倍的生命上限（按车速占进站车速的比例，最少一半），撞飞 flingU 格、腾空 liftU 格、飞 flingMs 毫秒；
+   * 半径大过 heavyU 格的大个子站得住，只掉 heavyFrac 倍、被挤开；同一个身体 immuneMs 内不再被同一列车撞
+   */
+  readonly hit: {
+    readonly minU: number
+    readonly frac: number
+    readonly heavyU: number
+    readonly heavyFrac: number
+    readonly flingU: readonly [number, number]
+    readonly liftU: number
+    readonly flingMs: number
+    readonly immuneMs: number
+  }
+  /**
+   * 站台上的设施：顶到天花板的圆柱每隔 pillarEveryU 格一根、半径 pillarU 格；每块站台几张候车座椅（长、深，格；高，米）；岛式站台上的全息时刻表底座（半径格、高米）
+   */
+  readonly fixtures: {
+    readonly pillarEveryU: readonly [number, number]
+    readonly pillarU: number
+    readonly benches: readonly [number, number]
+    readonly bench: { readonly lengthU: number; readonly depthU: number; readonly heightM: number }
+    readonly kiosk: { readonly radiusU: number; readonly heightM: number }
+  }
+  /** 站厅边上的口子：一侧是检票口（每组几条通道、通道宽格）与几部电梯，另一侧是玻璃栏板与几部下到换乘层的自动扶梯（宽格） */
+  readonly edges: {
+    readonly lanes: readonly [number, number]
+    readonly laneU: number
+    readonly lifts: readonly [number, number]
+    readonly liftU: number
+    readonly escalators: readonly [number, number]
+    readonly escalatorU: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1407,7 +1486,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'transit'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1441,13 +1520,14 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
+  readonly transit?: TransitConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown' | 'train'
 
 export interface DecorInstance {
   emoji: string

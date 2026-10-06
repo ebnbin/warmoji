@@ -212,6 +212,17 @@ const DREAMLAND_MIX: readonly EnemyMixRow[] = [
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+const TRANSIT_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'rat', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
+  { kind: 'invader', sinceWave: 2, base: 11, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'raccoon', sinceWave: 2, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'creeper', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'alien', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'chameleon', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -1347,5 +1358,64 @@ export const MAPS = {
       gait: { flatResistance: 3.2, downhillMax: 1.45, effortMin: 0.4 },
     },
     boss: 'eclipse',
+  },
+  transit: {
+    emoji: '1f684',
+    name: '磁浮站',
+    desc: '未来城市里一座磁悬浮列车的换乘站，白天的光从玻璃顶棚洒下来，站台是白色和浅灰的石材，干净得发亮。两三条轨道横穿站台，嵌在地里，没车的时候谁都走得过去；列车按时刻表进站、停靠、开走，几条轨道班次错开、方向相反。进站前站台边的灯朝着来车的方向一节节亮起、隧道口透出车头的光，右上角的到站牌看得到每条轨道下一班还有几秒到、停多久。开着的列车又高又快，撞到谁就把谁撞飞、掉一大截血，挡子弹也挡视线；停稳后车门打开，可以从车厢里穿到对面，响铃闪红就要关门了。敌我通吃：怪物也会被撞飞，也会从车厢里穿过来，还会从检票口、电梯、扶梯和开着门的车厢里涌出来',
+    kind: 'transit',
+    stamina: { exertion: 0.4, regen: 1.1 },
+    palette: {
+      bgFrom: 'hsl(204 24% 88%)',
+      bgTo: 'hsl(212 16% 52%)',
+      map: hslToInt(210, 0.14, 0.9),
+      shadow: 0x000000,
+    },
+    // 光从玻璃顶棚洒下来，白天亮堂、四面都有反光：背光面不暗，影子短而淡
+    light: { sun: 0xffffff, shade: 0xcdd5de, shadow: { color: 0x1d2c3d, alpha: 0.26, length: 0.5 } },
+    decor: {
+      emojis: ['1f684'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: TRANSIT_MIX,
+    // 从检票口走进来、从电梯和扶梯上来、从停稳开门的车厢里涌出来；失控核心乘专列进站
+    gates: {
+      snapU: 4,
+      fallback: 'drop',
+      look: 'puff',
+      boss: 'express',
+      kinds: {
+        ticket: { name: '检票口', at: { kind: 'mark' }, enter: 'walk', snapU: 7, weight: 3, perSec: 1.5, only: ['zombie', 'rat', 'raccoon', 'creeper', 'chameleon', 'invader', 'alien'] },
+        lift: { name: '电梯', at: { kind: 'mark' }, enter: 'walk', snapU: 6, weight: 2, perSec: 1.2, only: ['zombie', 'invader', 'alien', 'creeper', 'ghost'] },
+        escalator: { name: '扶梯', at: { kind: 'mark' }, enter: 'walk', snapU: 6, weight: 2, perSec: 1.2, only: ['zombie', 'rat', 'raccoon', 'chameleon', 'creeper', 'ghost'] },
+        car0: { name: '车厢', at: { kind: 'mark' }, enter: 'walk', snapU: 7, weight: 4, perSec: 2 },
+        car1: { name: '车厢', at: { kind: 'mark' }, enter: 'walk', snapU: 7, weight: 4, perSec: 2 },
+        car2: { name: '车厢', at: { kind: 'mark' }, enter: 'walk', snapU: 7, weight: 4, perSec: 2 },
+        express: { name: '专列', at: { kind: 'mark' }, enter: 'walk', look: 'sparks', weight: 1, only: ['mecha'] },
+      },
+    },
+    finalWaveSub: '失控核心乘着专列进站了——它个子大，列车撞不飞它，却照样撞得它掉血！',
+    transit: {
+      meterPerU: 0.5,
+      hall: { lengthU: 33, widthU: 32 },
+      tracks: { count: [2, 3], bedU: 3.4, edgeU: 0.55 },
+      platformU: 4.2,
+      train: { cars: 3, carU: 7.4, gapU: 0.35, widthU: 2.6, noseU: 2.2, heightM: 3.6, doors: 2, doorU: 1.5, wallU: 0.22 },
+      express: { cars: 2, carU: 8.6, gapU: 0.35, widthU: 2.8, noseU: 2.6, heightM: 3.8, doors: 1, doorU: 2.8, wallU: 0.25 },
+      timetable: { periodMs: 40000, firstMs: 9000, staggerMs: 3000, warnMs: 5000, inU: 15, outA: 4.5, doorMs: 800, dwellMs: 11000, closeWarnMs: 2500 },
+      expressRun: { warnMs: 4000, dwellMs: 9000 },
+      hit: { minU: 2, frac: 0.4, heavyU: 0.8, heavyFrac: 0.1, flingU: [2.2, 3.6], liftU: 1.4, flingMs: 650, immuneMs: 1500 },
+      fixtures: {
+        pillarEveryU: [7, 9],
+        pillarU: 0.42,
+        benches: [1, 3],
+        bench: { lengthU: 2.4, depthU: 0.7, heightM: 0.8 },
+        kiosk: { radiusU: 0.55, heightM: 0.95 },
+      },
+      edges: { lanes: [4, 6], laneU: 1, lifts: [1, 2], liftU: 2.2, escalators: [1, 2], escalatorU: 1.8 },
+    },
+    boss: 'mecha',
   },
 } as const satisfies Record<string, MapDef>

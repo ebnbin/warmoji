@@ -78,6 +78,7 @@ import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhas
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
+import { arrivals } from '../maps/transit/world'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
 import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
@@ -610,6 +611,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      arrivals: sim?.worldState.transit ? arrivals(sim) : null,
     }
   }
 

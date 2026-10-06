@@ -128,6 +128,13 @@ export const BATTLEFIELD = {
       { id: 'nebula_dust', emoji: '1f32b', name: '星尘拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'nebula_redshift', emoji: '1f534', name: '红移', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
+    transit: [
+      { id: 'transit_ontime', emoji: '1f684', name: '准点到达', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'transit_signal', emoji: '1f6a6', name: '绿灯放行', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },
+      { id: 'transit_gate', emoji: '1f3ab', name: '闸机锁定', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'transit_rush', emoji: '1f465', name: '早高峰', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'transit_delay', emoji: '23f3', name: '列车晚点', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
     deep: [
       { id: 'deep_song', emoji: '1f40b', name: '鲸歌回荡', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'deep_glow', emoji: '1fabc', name: '冷光指路', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },

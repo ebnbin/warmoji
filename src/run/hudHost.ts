@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import type { Polarity } from '../types/battlefield'
 import type { StatValues } from '../types/stats'
 import type { Point } from '../util/vec'
+import type { BoardRow } from '../ui/arrivalBoard'
 
 export interface HudSnapshot {
   xp: number
@@ -28,6 +29,8 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  /** 在磁浮站打的一局才有：每条轨道下一班还有多久进站、停着还有多久关门 */
+  arrivals: readonly BoardRow[] | null
 }
 
 /**

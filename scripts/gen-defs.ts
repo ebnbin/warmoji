@@ -47,6 +47,8 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { doorOffsets, LINE_COLORS, trainLength, transitPlan } from '../src/maps/transit/layout.ts'
+import { runShape } from '../src/maps/transit/timetable.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -672,6 +674,72 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 磁浮站：站厅放得进安全区，横过站厅排得下最多的轨道与站台；每条轨道都有线路色与接它车厢出怪的出怪口；
+ * 列车比站厅短、停稳后车头车尾外都还走得过最大的身体，道床宽过车身，车门走得过配比里最大的身体、专列的门走得过头目；
+ * 一班车跑完一趟短过发车间隔，关门前的提醒短过停站；撞车的数值说得通；
+ * 抽一批种子按横竖屏各生成一遍：开局站的地方四周空着、不在道床上，检票口、电梯、扶梯与专列的门都有出怪的地标，专列门外落得下脚
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'transit') === (m.transit !== undefined), `maps.${id} 是磁浮站当且仅当写了 transit`)
+  const c = m.transit
+  if (!c) continue
+  const at = `maps.${id}.transit`
+  const { hall, tracks, train, express, timetable: tt, expressRun, hit, fixtures: f, edges } = c
+  const ints = (v: readonly [number, number], min: number): boolean => Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= min && v[0] <= v[1]
+  const range = (v: readonly [number, number]): boolean => v[0] > 0 && v[0] <= v[1]
+  need(c.meterPerU > 0 && hall.lengthU > 0 && hall.widthU > 0, `${at} 的米每格与站厅的长宽须为正`)
+  need(hall.lengthU <= FRAME_U - SAFE_U * 2 - 2 && hall.widthU <= FRAME_U - SAFE_U * 2 - 2, `${at}.hall 连两边的墙须放得进方框的安全区`)
+  need(ints(tracks.count, 1) && tracks.count[1] <= LINE_COLORS.length, `${at}.tracks.count 须在 1 到 ${LINE_COLORS.length} 条之间`)
+  need(tracks.edgeU > 0 && c.platformU > tracks.edgeU * 2, `${at} 的警示带须为正，站台宽过两道警示带`)
+  need(tracks.count[1] * tracks.bedU + (tracks.count[1] + 1) * c.platformU <= hall.widthU, `${at} 横过站厅排不下 ${tracks.count[1]} 条轨道与站台`)
+  for (let k = 0; k < tracks.count[1]; k++) need(m.gates?.kinds[`car${k}`]?.at.kind === 'mark', `${at} 第 ${k + 1} 条轨道没有接车厢出怪的出怪口 car${k}`)
+  need(m.gates?.boss !== undefined && m.gates.kinds[m.gates.boss]?.at.kind === 'mark', `${at} 的头目须从地标上的出怪口（专列的门）下车`)
+  const biggest = Math.max(...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0), TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul)
+  for (const [name, t] of [['train', train], ['express', express]] as const) {
+    const p = `${at}.${name}`
+    need(Number.isInteger(t.cars) && t.cars >= 1 && Number.isInteger(t.doors) && t.doors >= 1, `${p} 的车厢数与每节的门数须为正整数`)
+    need(t.carU > 0 && t.gapU >= 0 && t.widthU > 0 && t.noseU > 0 && t.wallU > 0 && t.wallU < t.widthU / 4, `${p} 的尺寸须为正，车壁薄过车宽的四分之一`)
+    need(t.heightM > OBSTACLES.body.heightM, `${p}.heightM 须高过标准身体：挡子弹也挡视线`)
+    need(t.widthU + 0.4 <= tracks.bedU, `${p} 车宽须比道床窄，两边各留 0.2 格`)
+    need(t.doorU < t.carU / t.doors - 0.4 && Math.min(...doorOffsets(t).map((o) => trainLength(t) / 2 - Math.abs(o))) >= t.doorU / 2 + t.noseU * 0.6, `${p} 的门须开在车厢一样宽的那段、彼此隔得开`)
+    need(hall.lengthU - trainLength(t) - 2 >= 2 * (2 * biggest + 0.4) + 2, `${p} 全长 ${trainLength(t).toFixed(1)} 格，停稳后车头车尾外走不过最大的身体`)
+  }
+  need(train.doorU >= 2 * biggest + 0.2, `${at}.train.doorU 须走得过配比里最大的身体（半径 ${biggest} 格）`)
+  need(express.doorU >= 2 * ENEMIES[m.boss].radius + 0.2, `${at}.express.doorU 须走得过头目`)
+  need(tt.periodMs > 0 && tt.firstMs >= 3000 && tt.staggerMs >= 0 && tt.warnMs >= 2000 && tt.inU > 0 && tt.outA > 0 && tt.doorMs > 0, `${at}.timetable 的时长与速度须为正，开局与预警至少留几秒`)
+  need(tt.closeWarnMs > 0 && tt.closeWarnMs < tt.dwellMs && expressRun.warnMs >= 2000 && expressRun.dwellMs > tt.closeWarnMs, `${at} 的关门提醒须短过停站，专列的预警与停站须够长`)
+  need(hit.minU > 0 && hit.minU < tt.inU && hit.frac > 0 && hit.frac <= 1 && hit.heavyFrac >= 0 && hit.heavyFrac < hit.frac, `${at}.hit 的撞人车速与掉血比例须说得通`)
+  need(range(hit.flingU) && hit.liftU >= 0 && hit.flingMs > 0 && hit.immuneMs > 0 && hit.heavyU > 0, `${at}.hit 的撞飞距离、时长与免撞时间须为正`)
+  need(range(f.pillarEveryU) && f.pillarU > 0 && ints(f.benches, 0) && f.bench.lengthU > 0 && f.bench.depthU > 0 && f.kiosk.radiusU > 0, `${at}.fixtures 的尺寸须为正，座椅张数为非负整数`)
+  const clearM = (OBSTACLES.body.heightM / OBSTACLES.body.layers) * Math.floor(OBSTACLES.body.layers * OBSTACLES.body.step)
+  need(f.bench.heightM > clearM && f.kiosk.heightM > clearM && Math.max(f.bench.heightM, f.kiosk.heightM) < (OBSTACLES.body.layers - 0.5) * (OBSTACLES.body.heightM / OBSTACLES.body.layers), `${at}.fixtures 的座椅与底座须挡得住标准身体、又矮过平射的子弹`)
+  need(ints(edges.lanes, 1) && ints(edges.lifts, 1) && ints(edges.escalators, 1) && edges.laneU >= 2 * Math.max(...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0)) && edges.liftU > 0 && edges.escalatorU > 0, `${at}.edges 至少各一处，检票通道走得过最大的身体`)
+  for (let s = 0; s < 24; s++) {
+    const plan = transitPlan(c, s * 7919 + 13, s % 2 === 0)
+    const where = `${at} 第 ${s} 个样本`
+    const st = plan.horiz ? { u: plan.start.x, v: plan.start.y } : { u: plan.start.y, v: plan.start.x }
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 开局站的地方离设施或站厅边不到 ${SPAWN_CLEAR_U} 格`)
+    need(plan.tracks.every((t) => Math.abs(st.v - t.v) >= tracks.bedU / 2 + 1.5), `${where} 开局站在道床上或离道床太近`)
+    need(plan.platforms.every((p) => p.v1 - p.v0 >= c.platformU - 1e-6), `${where} 有站台窄过 ${c.platformU} 格`)
+    const mk = plan.marks
+    need(mk.ticket.length > 0 && mk.lift.length > 0 && mk.escalator.length > 0 && mk.express.length > 0, `${where} 检票口、电梯、扶梯或专列的门缺出怪的地标`)
+    const xt = plan.tracks[plan.expressTrack]!
+    need(mk.express.every((e) => {
+      const ev = plan.horiz ? e.y / UNIT : e.x / UNIT
+      const nv = plan.horiz ? e.ny : e.nx
+      const land = ev + nv * FEEL.entrance.walk.distU[0]
+      return Math.abs(land - xt.v) >= tracks.bedU / 2 && plan.platforms.some((p) => land >= p.v0 && land <= p.v1)
+    }), `${where} 专列的门外落不到站台上：头目下车会落在道床上`)
+    for (const t of plan.tracks) {
+      for (const ex of [false, true]) {
+        const r = runShape(c, plan, t, ex)
+        need(r.total < tt.periodMs - 2000, `${where} 第 ${t.label} 条轨道的${ex ? '专列' : '列车'}一趟跑 ${(r.total / 1000).toFixed(1)} 秒，长过发车间隔`)
+      }
+    }
   }
 }
 

@@ -1209,6 +1209,58 @@ function buildDreamland(): BgmScore {
   )
 }
 
+/**
+ * 磁浮站：大调的明亮电子乐，一拍一下轻轻的底鼓推着走，像准点的时刻表；正弦波的琶音一颗颗跳在十六分音符上，三角波唱主旋律，
+ * 每四小节开头钟琴敲一遍站台的到站提示音，回声短而干净
+ */
+function buildTransit(): BgmScore {
+  const chords = [0, 0, 4, 4, 5, 5, 3, 3, 0, 0, 4, 4, 5, 3, 4, 4]
+  return track(
+    {
+      bpm: 112,
+      stepsPerBeat: 4,
+      stepsPerBar: 16,
+      bars: 16,
+      rootMidi: 52,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 112) * 0.5, feedback: 0.26, level: 0.18 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.15, attack: 0.006, release: 0.07, octave: -1 }
+      const pad: Voice = { wave: 'sine', vol: 0.03, attack: 0.5, release: 0.9, octave: 0 }
+      const pluck: Voice = { wave: 'sine', vol: 0.045, attack: 0.002, release: 0.07, octave: 1, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.1, attack: 0.015, release: 0.12, octave: 1 }
+      const bell: Voice = { wave: 'sine', vol: 0.06, attack: 0.002, release: 0.5, octave: 2, echo: true }
+      b.bass(bass, chords, 'r...r.o.r...r.o.')
+      b.pad(pad, chords, [0, 1, 2], 0.004)
+      b.arp(pluck, chords, [0, 1, 2, 4, 2, 1, 3, 1])
+      b.line(lead, [
+        [0, 0, 4, 6], [0, 6, 5, 2], [0, 8, 4, 4], [0, 12, 2, 4],
+        [1, 0, 4, 12], [1, 12, 5, 4],
+        [2, 0, 6, 6], [2, 6, 5, 2], [2, 8, 4, 4], [2, 12, 6, 4],
+        [3, 0, 7, 16],
+        [4, 0, 9, 6], [4, 6, 8, 2], [4, 8, 7, 4], [4, 12, 5, 4],
+        [5, 0, 7, 8], [5, 8, 5, 8],
+        [6, 0, 6, 4], [6, 4, 5, 4], [6, 8, 3, 4], [6, 12, 5, 4],
+        [7, 0, 4, 16],
+        [8, 0, 4, 6], [8, 6, 5, 2], [8, 8, 7, 4], [8, 12, 9, 4],
+        [9, 0, 8, 12], [9, 12, 7, 4],
+        [10, 0, 6, 6], [10, 6, 7, 2], [10, 8, 8, 4], [10, 12, 6, 4],
+        [11, 0, 7, 16],
+        [12, 0, 9, 4], [12, 4, 10, 4], [12, 8, 9, 4], [12, 12, 7, 4],
+        [13, 0, 5, 8], [13, 8, 6, 8],
+        [14, 0, 4, 6], [14, 6, 5, 2], [14, 8, 6, 8],
+        [15, 0, 4, 16],
+      ])
+      for (const bar of [0, 4, 8, 12]) b.line(bell, [[bar, 0, 9, 2], [bar, 2, 7, 2], [bar, 4, 4, 2], [bar, 6, 7, 4]])
+      b.drums('kick', 'x...x...x...x...', 0, 16, 0.12)
+      b.drums('hat', '..o...o...o...o.', 0, 16, 0.03)
+      b.drums('hat', 'o.o.o.o.o.o.o.o.', 8, 16, 0.014)
+      b.drums('snare', '....x.......x...', 4, 16, 0.045)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1235,6 +1287,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   dreamland: buildDreamland,
+  transit: buildTransit,
 }
 
 const cache = new Map<BgmId, BgmScore>()

@@ -53,5 +53,11 @@ export const SFX = {
   chime: { wave: 'sine', freq: 1568, duration: 0.62, volume: 0.17, attack: 0.003, decayPow: 1.5, steps: [1, 1.26, 1, 1.26], throttleMs: 600 },
   whir: { wave: 'sawtooth', freq: 68, freqEnd: 104, duration: 1.3, volume: 0.06, attack: 0.25, decayPow: 0.8, throttleMs: 1000 },
   clunk: { wave: 'noise', freq: 520, freqEnd: 150, duration: 0.17, volume: 0.24, attack: 0.002, decayPow: 1.9, throttleMs: 150, jitter: 0.15 },
+  // 磁浮列车进站、出站的呼啸：低沉的嗡声升上去
+  glide: { wave: 'sawtooth', freq: 70, freqEnd: 210, duration: 2.4, volume: 0.1, attack: 0.6, decayPow: 0.9, throttleMs: 700, jitter: 0.06 },
+  // 车门开合的气声
+  doors: { wave: 'noise', freq: 2600, freqEnd: 800, duration: 0.55, volume: 0.15, attack: 0.03, decayPow: 1.2, throttleMs: 400, jitter: 0.1 },
+  // 关门前的提示音：短促的嘀嘀
+  beep: { wave: 'square', freq: 1480, duration: 0.6, volume: 0.07, steps: [1, 0.5, 1, 0.5, 1, 0.5], throttleMs: 900 },
   buzz: { wave: 'square', freq: 233, duration: 0.42, volume: 0.07, attack: 0.01, decayPow: 0.6, steps: [1, 0.5, 1, 0.5], throttleMs: 800 },
 } as const satisfies Record<string, SfxDef>

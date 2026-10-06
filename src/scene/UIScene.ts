@@ -6,7 +6,7 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TiltDial } from '../ui'
+import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial, TiltDial, ArrivalBoard } from '../ui'
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
@@ -39,6 +39,8 @@ const GOALS = { top: 124, step: 42 } as const
 const XP_BAR = { x: 12, y: 12, w: 200, h: 16, gap: 12 } as const
 /** 船上的一局在右上角计数下方放倾斜仪：盘心离右边与上边多远、盘的半径 */
 const TILT = { right: 64, top: 166, radius: 52 } as const
+/** 到站牌：右边与金币的牌子对齐，顶在金币下面 */
+const BOARD = { right: 14, top: 116 } as const
 
 export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
@@ -57,6 +59,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private goalKey = ''
   private tiltDial?: TiltDial
   private submarineDial?: SubmarineDial
+  private arrivalBoard?: ArrivalBoard
   private sundial?: Sundial
   private squad: SquadIcon[] = []
   private squadArc: number[] = []
@@ -104,6 +107,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       tilt: null,
       clock: null,
       submarine: null,
+      arrivals: null,
     }
 
     const stick = EDGE + Joystick.RADIUS
@@ -133,6 +137,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.tiltDial = undefined
     this.sundial = undefined
     this.submarineDial = undefined
+    this.arrivalBoard = undefined
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
@@ -193,6 +198,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.updateTilt(s.tilt)
     this.updateClock(s.clock)
     this.updateSubmarine(s.submarine)
+    this.updateArrivals(s.arrivals)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
     if (s.level !== this.last.level || s.levelUps !== this.last.levelUps) this.updateLevel(s.level, s.levelUps)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
@@ -450,6 +456,13 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (!b) return
     this.submarineDial ??= new SubmarineDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
     this.submarineDial.setSubmarine(b.phase, b.ratio, b.inSec, this.time.now)
+  }
+
+  /** 在磁浮站打的一局：每条轨道下一班还有多久进站、停着还有多久关门，随时看得见 */
+  private updateArrivals(rows: HudSnapshot['arrivals']): void {
+    if (!rows) return
+    this.arrivalBoard ??= new ArrivalBoard(this, viewport.logicalWidth - safeInsets.right - BOARD.right, safeInsets.top + BOARD.top, rows.length)
+    this.arrivalBoard.setRows(rows, this.time.now)
   }
 
   private updateGoals(goals: HudSnapshot['goals']): void {

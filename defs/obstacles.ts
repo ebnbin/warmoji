@@ -38,5 +38,9 @@ export const OBSTACLES = {
     belt: { name: '传送带', phase: false, opaque: true, pierce: null, strength: null },
     // 梦幻乐园四周的布景
     scenery: { name: '布景', phase: true, opaque: true, pierce: null, strength: null },
+    // 磁浮站的列车：车身挡人、挡子弹也挡视线，穿墙的身体穿得过
+    train: { name: '列车', phase: true, opaque: true, pierce: null, strength: null },
+    // 磁浮站的候车座椅与全息时刻表的底座：矮的挡人，子弹与视线从上面过去
+    fixture: { name: '设施', phase: true, opaque: true, pierce: null, strength: null },
   },
 } as const satisfies ObstacleTuning
