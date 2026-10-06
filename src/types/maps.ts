@@ -1075,8 +1075,8 @@ export interface DesertConfig {
   readonly flats: { readonly loose: readonly [number, number]; readonly patches: number }
   /** 标志物：几对（每对一模一样，横竖各隔半圈），彼此至少隔多远（格） */
   readonly landmarks: { readonly pairs: number; readonly gapU: number }
-  /** 点缀的仙人掌：几对（范围内随机，每对一模一样，横竖各隔半圈），彼此至少隔多远（格），离标志物再多让出标志物伸出去的那么远 */
-  readonly cacti: { readonly pairs: readonly [number, number]; readonly gapU: number }
+  /** 点缀的仙人掌：立着的 emoji；几对（范围内随机，每对一模一样，横竖各隔半圈），彼此至少隔多远（格），离标志物再多让出标志物伸出去的那么远 */
+  readonly cacti: { readonly emoji: string; readonly pairs: readonly [number, number]; readonly gapU: number }
   /**
    * 走路的代谢按 Minetti 的坡度曲线：松沙上每米是硬地的 softSand 倍，被踩实的沙最多省掉多出来的 packRelief；
    * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍

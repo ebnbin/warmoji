@@ -7,6 +7,8 @@ import { Rng } from '../../util/rng'
 import { fbm } from '../../util/noise'
 import { devFlag } from '../../devtools'
 import { decorSprite } from '../../ecs/decor'
+import { ensureEmoji } from '../../emoji/textures'
+import { AWAY } from '../../data/light'
 import type { Decor } from '../../ecs/decor'
 import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
 import { DesertPainter } from './painter'
@@ -45,16 +47,23 @@ const TRACK_UPLOAD_MS = 50
 const CANOPY_DEPTH = 20
 const RAG_DEPTH = 21
 const RAG_SHADOW_DEPTH = -0.5
+/** 立着的仙人掌画在身体的影子之上、身体之下，它的影子画在身体的影子之下 */
+const CACTUS_DEPTH = 2.9
+const CACTUS_SHADOW_DEPTH = 2.4
+/** 仙人掌的图每高一米画多大，格：和队员的身高比例相当 */
+const CACTUS_U_PER_M = 0.7
+const CACTUS_SHADOW_KEY = 'desert-cactus-shadow'
 /** 开发工具里"显示碰撞边界"的开关：打开时标志物挡人的轮廓和别的地图的岩壁一样勾在一切之上 */
 const WALLS_FLAG = 'battle.walls'
 const WALLS_DEPTH = 1001
 /** 脚下扬起的沙每格²每秒最多这么多团：人多的时候不糊成一片，一圈里各处一样 */
 const PUFFS_PER_U2_S = 0.18
 
-/** 一样标志物在画面上的东西：树冠或杆头的图，杆子顶上的破布条 */
+/** 一样标志物在画面上的东西：树冠、杆头或立着的仙人掌的图，仙人掌的影子（锚在脚下），杆子顶上的破布条 */
 interface LandmarkFx {
   readonly land: Landmark
   readonly img: Phaser.GameObjects.Image | null
+  readonly shadow: Phaser.GameObjects.Image | null
   readonly rag: Point | null
   readonly phase: number
 }
@@ -83,6 +92,29 @@ function patchTexture(scene: Phaser.Scene, tex: Phaser.Textures.CanvasTexture, i
   r.glTextureUnits.bind(gt, 0)
   r.glWrapper.updateTexturing({ texturing: { flipY: gt.flipY, premultiplyAlpha: gt.pma } })
   gl.texSubImage2D(gl.TEXTURE_2D, 0, x, gt.flipY ? gt.height - y - img.height : y, gl.RGBA, gl.UNSIGNED_BYTE, img)
+}
+
+/**
+ * 立着的 emoji 投在地上的影子，和身体的影子一样：图上一点比脚下（图的底边）高多少，就顺着 (kx, ky) 往外铺多远。
+ * 返回贴图里脚下正中那一点的位置（贴图像素）
+ */
+function castShadow(scene: Phaser.Scene, key: string, from: string, color: number, kx: number, ky: number): Point {
+  const src = scene.textures.get(from).getSourceImage() as CanvasImageSource & { width: number; height: number }
+  const w = src.width
+  const h = src.height
+  const x0 = Math.min(0, kx * h)
+  const tw = Math.ceil(w + Math.abs(kx) * h)
+  const th = Math.ceil(Math.abs(ky) * h)
+  const y0 = Math.min(0, ky * h)
+  canvasTexture(scene, key, tw, th, (ctx) => {
+    ctx.setTransform(1, 0, -kx, -ky, kx * h - x0, ky * h - y0)
+    ctx.drawImage(src, 0, 0)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = 'source-in'
+    ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
+    ctx.fillRect(0, 0, tw, th)
+  })
+  return { x: w / 2 - x0, y: -y0 }
 }
 
 /** 勾一段挡人的胶囊：(cx, cy) 是标志物中心（像素） */
@@ -236,7 +268,7 @@ export class DesertView implements MapView {
       .setOrigin(0, 0)
       .setDepth(-1))
     this.visuals.push(this.ground)
-    this.landmarks(v, plan)
+    this.landmarks(v, plan, await ensureEmoji(scene, cfg.cacti.emoji, 'player'))
     this.ragShadow = scene.add.graphics().setDepth(RAG_SHADOW_DEPTH)
     this.ragGfx = scene.add.graphics().setDepth(RAG_DEPTH)
     this.puffs = scene.add
@@ -255,14 +287,35 @@ export class DesertView implements MapView {
     this.step(v, sim, 0)
   }
 
-  /** 标志物：枯树、路标杆与仙人掌在实体上面画出枝杈、杆头与顶；一对标志物共用一张图 */
-  private landmarks(v: ViewCtx, plan: DesertPlan): void {
+  /**
+   * 标志物：枯树与路标杆在实体上面画出枝杈与杆头，一对标志物共用一张图；
+   * 仙人掌是立着的 emoji，和身体一样站在它挡人的那块上，影子从脚下背着太阳铺出去
+   */
+  private landmarks(v: ViewCtx, plan: DesertPlan, cactusKey: string): void {
     const scene = v.scene
     const keys = new Map<object, string>()
+    const light = v.def.light?.shadow
+    const foot = light ? castShadow(scene, CACTUS_SHADOW_KEY, cactusKey, light.color, AWAY.x * light.length, AWAY.y * light.length) : null
+    const tex = scene.textures.get(CACTUS_SHADOW_KEY).getSourceImage()
+    const srcW = scene.textures.get(cactusKey).getSourceImage().width
     plan.landmarks.forEach((land, i) => {
       const sh = land.shape
       let img: Phaser.GameObjects.Image | null = null
-      if (sh.kind === 'tree' || sh.kind === 'post' || sh.kind === 'cactus') {
+      let shadow: Phaser.GameObjects.Image | null = null
+      if (sh.kind === 'cactus') {
+        const size = sh.top * CACTUS_U_PER_M * UNIT
+        img = scene.add.image(0, 0, cactusKey).setDisplaySize(size, size).setDepth(CACTUS_DEPTH)
+        this.visuals.push(img)
+        if (foot && light) {
+          shadow = scene.add
+            .image(0, 0, CACTUS_SHADOW_KEY)
+            .setOrigin(foot.x / tex.width, foot.y / tex.height)
+            .setScale(size / srcW)
+            .setAlpha(light.alpha)
+            .setDepth(CACTUS_SHADOW_DEPTH)
+          this.visuals.push(shadow)
+        }
+      } else if (sh.kind === 'tree' || sh.kind === 'post') {
         let key = keys.get(sh)
         if (!key) {
           key = `${CANOPY_KEY}-${i}`
@@ -275,7 +328,7 @@ export class DesertView implements MapView {
         this.visuals.push(img)
       }
       const pole = sh.kind === 'post' ? sh.limbs[0]! : null
-      this.marks.push({ land, img, rag: pole ? { x: pole.x1, y: pole.y1 } : null, phase: i * 1.7 })
+      this.marks.push({ land, img, shadow, rag: pole ? { x: pole.x1, y: pole.y1 } : null, phase: i * 1.7 })
     })
   }
 
@@ -360,6 +413,7 @@ export class DesertView implements MapView {
       const x = mid.x + wrapU(m.land.x * UNIT - mid.x, size)
       const y = mid.y + wrapU(m.land.y * UNIT - mid.y, size)
       m.img?.setPosition(x, y)
+      m.shadow?.setPosition(x, y + (m.img?.displayHeight ?? 0) / 2)
       if (showWalls) for (const sol of m.land.shape.solids) strokeSolid(walls, x, y, sol)
       if (!m.rag) continue
       const pole = m.land.shape.limbs[0]!
@@ -405,7 +459,7 @@ export class DesertView implements MapView {
     this.ragShadow = undefined
     this.solidGfx = undefined
     this.puffs = undefined
-    for (const key of [GROUND_KEY, TRACKS_KEY, INFO_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [GROUND_KEY, TRACKS_KEY, INFO_KEY, CACTUS_SHADOW_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
     for (const key of v.scene.textures.getTextureKeys()) if (key.startsWith(CANOPY_KEY)) v.scene.textures.remove(key)
   }
 }
