@@ -13,9 +13,9 @@ export const SIGNS = [
 export const TEAM_GLOW = 0x3d8bff
 export const FOE_GLOW = 0xff2e48
 
-/** 虚空的底色与核心柱的光 */
-export const VOID_DEEP = 0x02050d
-export const CORE_GLOW = 0xd9fbff
+/** 虚空的底色与核心柱的光：全站的主题色是 cyan */
+export const VOID_DEEP = 0x000610
+export const CORE_GLOW = 0xa8ffff
 
 export function rgb(c: number): [number, number, number] {
   return [((c >> 16) & 0xff) / 255, ((c >> 8) & 0xff) / 255, (c & 0xff) / 255]

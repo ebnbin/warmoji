@@ -34,11 +34,11 @@ uniform vec2 uCore;
 uniform float uPx;
 ${NOISE}
 const float N = ${FRAME_U.toFixed(1)};
-const vec3 DEEP = vec3(0.008, 0.02, 0.05);
-const vec3 HAZE = vec3(0.03, 0.08, 0.17);
-const vec3 LINE = vec3(0.12, 0.3, 0.5);
-const vec3 DATA = vec3(0.35, 0.9, 1.0);
-const vec3 CORE = vec3(0.75, 0.97, 1.0);
+const vec3 DEEP = vec3(0.0, 0.012, 0.035);
+const vec3 HAZE = vec3(0.0, 0.06, 0.12);
+const vec3 LINE = vec3(0.0, 1.0, 1.0);
+const vec3 DATA = vec3(0.35, 1.0, 1.0);
+const vec3 CORE = vec3(0.6, 1.0, 1.0);
 
 /** 离最近一条间距 g 的网格线多远，格 */
 float lineDist(float v, float g) {
@@ -75,13 +75,13 @@ void main ()
   col += LINE * 0.22 * (1.0 - smoothstep(0.0, aa, fine));
   col += LINE * 0.38 * (1.0 - smoothstep(0.0, aa * 1.4, major));
   float pulse = stream(p.x, p.y, 2.0, 1.0) + stream(p.y, p.x, 2.0, 2.0);
-  col += DATA * pulse * 0.55;
+  col += DATA * pulse * 0.9;
   // 核心柱往深处照下去：一根直立的光柱，越往下越暗
   float down = max(0.0, c.y);
   float shaft = exp(-pow(c.x / 1.1, 2.0)) * exp(-down / 13.0) * step(0.0, c.y) * (1.0 - smoothstep(16.0, 23.0, c.y));
   col += CORE * shaft * 0.5;
   col += CORE * 0.55 * exp(-r * r / 9.0);
-  col += vec3(0.25, 0.6, 0.9) * 0.18 * exp(-r / 7.0);
+  col += vec3(0.0, 1.0, 1.0) * 0.22 * exp(-r / 7.0);
   col = vec3(1.0) - exp(-col * 1.6);
   gl_FragColor = vec4(col, 1.0);
 }

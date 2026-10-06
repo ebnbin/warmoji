@@ -15,13 +15,15 @@ const WALL_FACE_U = 0.34
 /** 凹槽往下看得见的那一截内壁多高，格 */
 const PIT_FACE_U = 1.5
 /** 地砖：底色（冷白偏青）、缝的颜色、缝宽（格） */
-const TILE = [214, 236, 242] as const
-const SEAM = [128, 152, 168] as const
+const TILE = [236, 252, 255] as const
+const SEAM = [40, 215, 235] as const
 const SEAM_U = 0.045
 /** 台沿、机柜与传送台的金属 */
-const GRAPHITE = [27, 35, 50] as const
-const STEEL = [92, 108, 128] as const
-const DEEP = [8, 13, 26] as const
+const GRAPHITE = [10, 24, 38] as const
+const STEEL = [56, 106, 130] as const
+const DEEP = [0, 10, 22] as const
+/** 全站的主题色：台沿与平台侧面的灯带 */
+const CYAN = [0, 255, 255] as const
 
 type Rgb = [number, number, number]
 
@@ -103,9 +105,9 @@ function addGlow(out: Rgb, c: readonly number[], k: number): void {
 }
 
 /** 平台朝屏幕下方的侧面：上沿一道高光，往下暗下去，一条房间颜色的灯带，隔一段一道竖缝 */
-function face(out: Rgb, color: Rgb, x: number, t: number, aa: number): void {
+function face(out: Rgb, color: readonly number[], x: number, t: number, aa: number): void {
   set(out, STEEL, 0.62 - 0.38 * t)
-  mixIn(out, [210, 228, 240], 0.55 * Math.exp(-t / 0.06))
+  mixIn(out, [190, 255, 255], 0.55 * Math.exp(-t / 0.06))
   const strip = Math.exp(-(((t - 0.32) / 0.07) ** 2))
   addGlow(out, color, 0.85 * strip)
   const seam = 1 - smooth(0.02, 0.02 + aa, Math.abs(((x + 0.75) % 1.5) - 0.75))
@@ -119,10 +121,10 @@ function wallFace(out: Rgb, color: Rgb, t: number): void {
 }
 
 /** 台沿：亮一点的金属护栏，贴着虚空的那一边一道房间颜色的亮线，隔一段一根矮柱 */
-function lip(out: Rgb, color: Rgb, along: number, edge: number, aa: number): void {
+function lip(out: Rgb, color: readonly number[], along: number, edge: number, aa: number): void {
   set(out, STEEL, 0.72 + 0.25 * smooth(0.2, 0.9, edge))
   const post = 1 - smooth(0.08, 0.08 + aa, Math.abs(((along + 0.75) % 1.5) - 0.75))
-  mixIn(out, [200, 216, 230], 0.6 * post * smooth(0.3, 0.5, edge))
+  mixIn(out, [180, 250, 255], 0.6 * post * smooth(0.3, 0.5, edge))
   const rail = Math.exp(-(((edge - 0.86) / 0.05) ** 2))
   addGlow(out, color, 1.2 * rail)
   const inner = Math.exp(-(((edge - 0.1) / 0.05) ** 2))
@@ -169,7 +171,7 @@ function pit(out: Rgb, color: Rgb, b: Box, x: number, y: number, aa: number): vo
   }
   const rim = Math.exp(-((d / 0.05) ** 2))
   addGlow(out, color, 1.1 * rim)
-  mixIn(out, [230, 245, 255], 0.35 * (1 - smooth(0, aa * 2, d)))
+  mixIn(out, [200, 255, 255], 0.35 * (1 - smooth(0, aa * 2, d)))
 }
 
 /** 立柱的底座：方的金属墩子，四边斜面迎光亮、背光暗，顶上一圈房间颜色的灯 */
@@ -247,7 +249,7 @@ function emblem(out: Rgb, color: Rgb, room: WarpRoom, x: number, y: number): voi
     [3.1, 0.12],
   ] as const) {
     const k = Math.exp(-(((r - rr) / w) ** 2)) * (notch ? 0 : 1)
-    mixIn(out, [150, 176, 192], 0.55 * k)
+    mixIn(out, [40, 220, 240], 0.55 * k)
     addGlow(out, color, 0.08 * k)
   }
 }
@@ -303,7 +305,7 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
   }
   const toFloor = sdBox(f, x, y)
   const along = x < f.x0 || x >= f.x1 ? y : x
-  return lip(out, color, along, clamp01(toFloor / sc.cfg.room.lipU), aa)
+  return lip(out, CYAN, along, clamp01(toFloor / sc.cfg.room.lipU), aa)
 }
 
 /**
@@ -327,11 +329,11 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         slabTop(sc, prep, room, x, y, aa, col)
         // 平台的四条边缘：贴着虚空的那一圈一线亮
         const e = -sdBox(room.slab, x, y)
-        mixIn(col, [235, 245, 255], 0.4 * (1 - smooth(0, aa * 2.5, e)))
+        mixIn(col, [170, 255, 255], 0.4 * (1 - smooth(0, aa * 2.5, e)))
       } else {
         const f = faceAt(plan, x, y)
         if (f) {
-          face(col, prep.colors[f.room.index]!, x, f.t, aa)
+          face(col, CYAN, x, f.t, aa)
         } else {
           let shadow = 0
           let glow = 0
@@ -349,7 +351,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
               }
             }
           }
-          set(col, [2, 4, 10])
+          set(col, [0, 4, 12])
           alpha = Math.max(shadow * SHADOW.alpha, glow * 0.4)
           if (glow * 0.4 > shadow * SHADOW.alpha) set(col, gc, 0.6)
         }
