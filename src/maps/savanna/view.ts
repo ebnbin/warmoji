@@ -83,11 +83,14 @@ interface Vulture {
 }
 
 /** 沿一串点描一条线 */
-function stroke(g: Phaser.GameObjects.Graphics, pts: readonly Point[]): void {
+function stroke(g: Phaser.GameObjects.Graphics, pts: readonly Point[], color: number): void {
   g.beginPath()
   g.moveTo(pts[0]!.x, pts[0]!.y)
   for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y)
   g.strokePath()
+  // 拐弯处与两头补成圆的
+  g.fillStyle(color, 1)
+  for (const p of pts) g.fillCircle(p.x, p.y, g.defaultStrokeWidth / 2)
 }
 
 /** 把画布传上显卡并按线性插值采样 */
@@ -186,7 +189,10 @@ export class SavannaView implements MapView {
     }
     this.reflections(v, st)
     this.water(v, plan)
+    // 跑道先整层画实，再按浓度整层叠上去：几条叠在一起、拐弯处接缝的地方不会越叠越浓
     this.lanes = scene.add.graphics().setDepth(DEPTH.lane)
+    this.lanes.enableFilters()
+    this.lanes.filtersForceComposite = true
     this.shadows = scene.add.graphics().setDepth(-0.85)
     this.visuals.push(this.lanes, this.shadows)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, CANOPY_KEY).setOrigin(0, 0).setDisplaySize((sizes.canopy.w / CANOPY_PPU) * UNIT, (sizes.canopy.h / CANOPY_PPU) * UNIT).setDepth(DEPTH.canopy))
@@ -403,7 +409,7 @@ export class SavannaView implements MapView {
     let n = 0
     if (show > 0) {
       const blink = h.phase === 'alarm' ? 0.75 + 0.25 * Math.sin(st.clock / 70) : 1
-      g.setAlpha(0.3 * show * blink)
+      this.lanes!.filterCamera?.setAlpha(0.32 * show * blink)
       const lanes: { path: Point[]; w: number }[] = []
       h.beasts.forEach((b, i) => {
         const path = this.paths[i]
@@ -411,11 +417,11 @@ export class SavannaView implements MapView {
       })
       for (const l of lanes) {
         g.lineStyle(l.w + 0.18 * UNIT, 0x3a1424, 1)
-        stroke(g, l.path)
+        stroke(g, l.path, 0x3a1424)
       }
       for (const l of lanes) {
         g.lineStyle(l.w, 0xe2763e, 1)
-        stroke(g, l.path)
+        stroke(g, l.path, 0xe2763e)
       }
       h.beasts.forEach((b, i) => {
         const path = this.paths[i]
