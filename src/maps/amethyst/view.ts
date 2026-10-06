@@ -23,7 +23,7 @@ import { blankSky, clarity, skyAt, skyTint, spanAt, sunTint } from './sky'
 import { AmethystPainter } from './painter'
 import { FACE_PPU, heightSpan, RELIEF_PPU, ROCK_BG } from './ground'
 import { blendLux, castShade, doubleMultiply, encodeLux, LIGHT_FRAG, luxShot, MAX_TORCHES, SHADE_BINS, SHADE_ROWS, SHINE_FRAG, shootLux } from './shader'
-import { drawFlame, drawGlow, drawMoth, drawSmoke } from './sprites'
+import { drawBat, drawFlame, drawGlow, drawMoth, drawSmoke } from './sprites'
 import { LIGHT_MS, torchLights, torchSpot } from './world'
 import type { AmethystLayout } from './layout'
 import type { Facing } from './light'
@@ -48,6 +48,7 @@ const FLAME_KEY = 'amethyst-flame'
 const GLOW_KEY = 'amethyst-glow'
 const SMOKE_KEY = 'amethyst-smoke'
 const MOTH_KEY = 'amethyst-moth'
+const BAT_KEY = 'amethyst-bat'
 /** 开局最多几个线程分着画地面 */
 const THREADS = 4
 /** 洞里的光压在实体、特效与血条上面，指向箭头与伤害数字下面；晶面的闪光叠在光上；火苗自己发光，画在最上面 */
@@ -56,6 +57,8 @@ const SHINE_DEPTH = 39.1
 const FLAME_DEPTH = 39.3
 /** 飞蛾在光下面：近火处才亮 */
 const MOTH_DEPTH = 35
+/** 蝙蝠飞在单位与飞蛾上面、光下面：飞进暗处就看不见 */
+const BAT_DEPTH = 36
 /** 镜头与眼睛跟上亮度变化的时间常数，毫秒 */
 const VIEW_TAU = 700
 const ADAPT_TAU = 900
@@ -83,12 +86,43 @@ const MASK_PAD = 0.1
 const MOTHS = 3
 /** 太阳落到这个高度晶体开始遇冷，一直响到它落到负的这么多度，度 */
 const CHILL_DEG = 2
+/** 黄昏太阳落到这个高度一群蝙蝠从暗道里飞出去，黎明升到这个高度飞回来，度：出洞比晶体遇冷早两度，先看到蝙蝠出洞，晶体再叮响 */
+const BAT_OUT_DEG = CHILL_DEG + 2
+const BAT_IN_DEG = -2
+/** 一群几只，一只接一只动身的间隔，毫秒 */
+const BATS = 30
+const BAT_GAP_MS = 110
+/** 飞多快，格每秒；离下一处这么近就转向再下一处，格 */
+const BAT_SPEED_U = 5.5
+const BAT_REACH_U = 0.7
+/** 贴着洞底与飞到洞顶时翼展多宽，格：越高离镜头越近、看着越大 */
+const BAT_LOW_U = 0.55
+const BAT_HIGH_U = 1.5
 const RAD = Math.PI / 180
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function ease(e0: number, e1: number, x: number): number {
   const t = clamp01((x - e0) / (e1 - e0))
   return t * t * (3 - 2 * t)
+}
+
+/**
+ * 一只蝙蝠：沿 route 上的点一处处飞过去，leg 是正飞向第几处；出洞的从暗道尽头飞到塌顶下，绕着它盘旋着升出去，回洞的反过来；
+ * alt 是离洞底多高（0 到 1），wait 是还要等多久才动身，毫秒；spin 是绕圈的方向与松紧
+ */
+interface Bat {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  leg: number
+  alt: number
+  wait: number
+  readonly route: readonly Point[]
+  readonly out: boolean
+  readonly spin: number
+  readonly phase: number
+  readonly img: Phaser.GameObjects.Image
 }
 
 /** 一名队员手里的火把在画面上的样子：uid 对不上就是换了人；pop 是刚点着时火光一涨的剩余时间，毫秒 */
@@ -114,7 +148,8 @@ const faint = (x: number): number => (x < 0.002 ? 0 : x)
  * 紫水晶洞穴：地面是后台线程画的固有色与晶面朝向，光照由着色器按 2 倍调制压在整个画面上——开口下的光斑随太阳移动、被洞壁与晶体挡出影子，
  * 天光与紫色的反光从照度场来，火把按点光源照、被洞壁与高大的晶体挡住；晶面朝着反射方向时闪一下，光柱里晶尘浮动。
  * 镜头按洞里的平均照度推拉：亮时拉远看大半个洞，暗时推到火把那一圈；眼睛跟着适应，最暗只适应到 view.brightLux。
- * 火把点着、熄灭有火光与声音，冒烟和火星，夜里飞蛾绕着火飞；黑暗里的敌人露出反光的眼睛；黄昏时晶体遇冷，叮的一声闪一下；子弹敲在晶体上迸出碎晶
+ * 火把点着、熄灭有火光与声音，冒烟和火星，夜里飞蛾绕着火飞；黑暗里的敌人露出反光的眼睛；黄昏一群蝙蝠从暗道里飞出、绕着塌顶盘旋着飞走，黎明飞回暗道；
+ * 黄昏时晶体遇冷，叮的一声闪一下；子弹敲在晶体上迸出碎晶
  */
 export class AmethystView extends BoundedView {
   private painter?: AmethystPainter
@@ -154,6 +189,7 @@ export class AmethystView extends BoundedView {
   private shards?: Phaser.GameObjects.Particles.ParticleEmitter
   private eyes: Phaser.GameObjects.Image[] = []
   private flashes: { img: Phaser.GameObjects.Image; at: number }[] = []
+  private bats: Bat[] = []
   private vignette?: Phaser.Filters.Vignette
   private mask?: UprightMask
   /** 这一帧洞里的光与点着的火把：单位按它分明暗 */
@@ -180,6 +216,7 @@ export class AmethystView extends BoundedView {
     if (!scene.textures.exists(GLOW_KEY)) canvasTexture(scene, GLOW_KEY, 64, 64, (ctx) => drawGlow(ctx, 64))
     if (!scene.textures.exists(SMOKE_KEY)) canvasTexture(scene, SMOKE_KEY, 64, 64, (ctx) => drawSmoke(ctx, 64))
     if (!scene.textures.exists(MOTH_KEY)) canvasTexture(scene, MOTH_KEY, 48, 40, (ctx) => drawMoth(ctx, 48, 40))
+    if (!scene.textures.exists(BAT_KEY)) canvasTexture(scene, BAT_KEY, 64, 40, (ctx) => drawBat(ctx, 64, 40))
   }
 
   /** 布景要等洞的形状生成以后才撒得下去，见 scatter */
@@ -435,6 +472,7 @@ export class AmethystView extends BoundedView {
     this.mask?.paint(view.x - view.w * MASK_PAD, view.y - view.h * MASK_PAD, view.w * (1 + 2 * MASK_PAD), view.h * (1 + 2 * MASK_PAD), paintedEmojiOn())
     this.stepImpacts(v, s)
     this.stepChill(v, s, sunDeg, now)
+    this.stepBats(v, s, sunDeg, dt)
     this.sunDeg = sunDeg
   }
 
@@ -618,6 +656,90 @@ export class AmethystView extends BoundedView {
     playSfx('tink')
   }
 
+  /** 太阳落过 BAT_OUT_DEG 时一群蝙蝠从暗道里动身出洞，升过 BAT_IN_DEG 时从塌顶飞回来；每只沿自己的路线飞，忽左忽右地扑，到了终点就不见了 */
+  private stepBats(v: ViewCtx, s: AmethystState, sunDeg: number, dt: number): void {
+    if (this.sunDeg >= BAT_OUT_DEG && sunDeg < BAT_OUT_DEG) this.flock(v, s, true)
+    if (this.sunDeg <= BAT_IN_DEG && sunDeg > BAT_IN_DEG) this.flock(v, s, false)
+    const t = dt / 1000
+    const speed = BAT_SPEED_U * UNIT
+    const reach = BAT_REACH_U * UNIT
+    const kept: Bat[] = []
+    for (const b of this.bats) {
+      if (b.wait > 0) {
+        b.wait -= dt
+        kept.push(b)
+        continue
+      }
+      const goal = b.route[b.leg]!
+      const last = b.leg === b.route.length - 1
+      const dx = goal.x - b.x
+      const dy = goal.y - b.y
+      const dist = Math.hypot(dx, dy) || 1
+      // 侧着拐的分量：出洞的到了塌顶下就绕着它打转，越近转得越紧；一路上忽左忽右地扑
+      const side = (b.out && last ? b.spin * Math.min(2.5, (2 * UNIT) / dist) : 0) + 0.35 * Math.sin(this.u.time * 7 + b.phase)
+      const n = dist * Math.hypot(1, side)
+      const k = Math.min(1, t * 4)
+      b.vx += (((dx - dy * side) / n) * speed - b.vx) * k
+      b.vy += (((dy + dx * side) / n) * speed - b.vy) * k
+      b.x += b.vx * t
+      b.y += b.vy * t
+      if (b.out && last) b.alt = Math.min(1, b.alt + t * (dist < 2.5 * UNIT ? 0.5 : 0.12))
+      if (!b.out) b.alt = Math.max(0, b.alt - t * 0.55)
+      if (!last && dist < reach) b.leg++
+      if (b.out ? b.alt >= 1 : last && dist < reach) {
+        b.img.destroy()
+        continue
+      }
+      const span = ((BAT_LOW_U + (BAT_HIGH_U - BAT_LOW_U) * b.alt) * UNIT) / 64
+      b.img
+        .setVisible(true)
+        .setPosition(b.x, b.y)
+        .setRotation(Math.atan2(b.vy, b.vx) + Math.PI / 2)
+        .setScale(span * (0.45 + 0.55 * Math.abs(Math.sin(this.u.time * 15 + b.phase))), span)
+        .setAlpha(1 - ease(0.7, 1, b.alt))
+      kept.push(b)
+    }
+    this.bats = kept
+  }
+
+  /** 一群蝙蝠轮流分到各条暗道：出洞的从尽头沿暗道飞到洞口，再飞向离洞口最近的塌顶；回洞的从塌顶落下来，反着飞回暗道尽头 */
+  private flock(v: ViewCtx, s: AmethystState, out: boolean): void {
+    const L = s.layout
+    if (L.tunnels.length === 0 || L.breaches.length === 0) return
+    playSfx('flutter')
+    const spin = Math.random() < 0.5 ? 1 : -1
+    const spread = (p: Point, r: number): Point => ({ x: p.x + (Math.random() - 0.5) * r, y: p.y + (Math.random() - 0.5) * r })
+    for (let i = 0; i < BATS; i++) {
+      const tn = L.tunnels[i % L.tunnels.length]!
+      const mouth = tn.path[0]!
+      let sky = L.breaches[0]!
+      for (const b of L.breaches) if (Math.hypot(b.x - mouth.x, b.y - mouth.y) < Math.hypot(sky.x - mouth.x, sky.y - mouth.y)) sky = b
+      // 暗道里从尽头到洞口的几处，各自错开一点
+      const inside = tn.path
+        .slice()
+        .reverse()
+        .map((p, k) => spread(p, k === 0 ? tn.pocket : tn.half))
+      const a = Math.random() * Math.PI * 2
+      const top = { x: sky.x + Math.cos(a) * sky.r * 0.4, y: sky.y + Math.sin(a) * sky.r * 0.4 }
+      const route = out ? [...inside, top] : [top, ...inside.reverse()]
+      const from = route[0]!
+      this.bats.push({
+        x: from.x,
+        y: from.y,
+        vx: 0,
+        vy: 0,
+        leg: 1,
+        alt: out ? 0 : 1,
+        wait: i * BAT_GAP_MS * (0.5 + Math.random()),
+        route,
+        out,
+        spin: spin * (0.8 + 0.4 * Math.random()) * (Math.random() < 0.85 ? 1 : -1),
+        phase: Math.random() * Math.PI * 2,
+        img: v.scene.add.image(from.x, from.y, BAT_KEY).setDepth(BAT_DEPTH).setVisible(false),
+      })
+    }
+  }
+
   destroy(v: ViewCtx): void {
     this.vignette = undefined
     this.painter?.close()
@@ -631,6 +753,8 @@ export class AmethystView extends BoundedView {
     this.data = undefined
     this.eyes = []
     this.flashes = []
+    for (const b of this.bats) b.img.destroy()
+    this.bats = []
     this.embers = undefined
     this.smoke = undefined
     this.shards = undefined
