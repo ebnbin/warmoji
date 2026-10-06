@@ -1,5 +1,5 @@
 import { FRAME_U } from '../../util/units.ts'
-import { cellEdge, fbm, valueNoise } from '../../util/noise.ts'
+import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise.ts'
 import { fromWhale, inBoulder, reachOf, seabedM, skullHalf, SKULL_FRAC, SKULL_HALF, swing, toLocal, WHALE_HALF, whaleUV } from './layout.ts'
 import type { DeepPlan, Local, Reach, Whale } from './layout'
 
@@ -73,7 +73,7 @@ export interface Skeleton {
   readonly bones: readonly Bone[]
   readonly verts: readonly Vert[]
   readonly reach: number
-  /** 鲸骨连同四周染黑的泥的外框，地图坐标 x0、y0、x1、y1 */
+  /** 鲸骨连同四周沙窝的外框，地图坐标 x0、y0、x1、y1 */
   readonly box: readonly [number, number, number, number]
 }
 
@@ -255,7 +255,7 @@ function boneAt(s: Skeleton, x: number, y: number, out: BoneHit): BoneHit {
   return out
 }
 
-/** 冷泉里 (x, y) 处的样子：离中心占半径多少（0 心 1 边，外面大于 1） */
+/** 涌泉里 (x, y) 处的样子：离中心占半径多少（0 心 1 边，外面大于 1） */
 function seepAt(plan: DeepPlan, x: number, y: number): { k: number; seed: number; sx: number; sy: number } | null {
   for (const s of plan.seeps) {
     const d = Math.hypot(x - s.x, y - s.y)
@@ -294,208 +294,193 @@ const RE: Reach = { low: 0, high: 0, rubble: 0, lip: 0 }
 const LC: Local = { a: 0, b: 0 }
 const BH: BoneHit = { kind: 0, h: 0, shade: 1 }
 
-/** 软泥：灰白偏黄，大片地深浅不匀，细看是一粒粒的；新鲜的泥颜色浅 */
-function ooze(c: Rgb, x: number, y: number, seed: number): void {
+/** 沙纹：浪在沙上推出的一道道波纹，峰与峰隔 RIPPLE_U 格，顺着种子定的方向、被大尺度的噪声扭弯；返回 −1（沟底）到 1（峰顶），峰尖、沟圆 */
+const RIPPLE_U = 0.55
+function ripple(x: number, y: number, seed: number): number {
+  const a = hash(3, 5, seed) * Math.PI
+  const u = x * Math.cos(a) + y * Math.sin(a) + 2.4 * fbm(x / 3.2, y / 3.2, seed + 61, 2) + 0.15 * valueNoise(x * 1.7, y * 1.7, seed + 62)
+  const ph = ((u / RIPPLE_U) % 1 + 1) % 1
+  return ph < 0.35 ? -1 + 2 * (1 - ph / 0.35) ** 2 : -1 + 2 * ((ph - 0.35) / 0.65) ** 2
+}
+
+/** 海草从哪长到哪：大片低频噪声高过门槛的一块块，边上稀疏；0 没有，1 长满 */
+function grassAt(x: number, y: number, seed: number): number {
+  return smooth(0.66, 0.72, fbm(x / 4 + 11, y / 4, seed + 71, 3))
+}
+
+/** 珊瑚沙：浅暖的灰白，大片地深浅不匀，细看是一粒粒的，夹着碎贝壳与珊瑚屑 */
+function sand(c: Rgb, x: number, y: number, seed: number): void {
   const big = fbm(x / 7, y / 7, seed + 1, 3)
   const mid = fbm(x / 1.7, y / 1.7, seed + 2, 3)
-  const grain = valueNoise(x * 9, y * 9, seed + 3)
-  c[0] = 0.55 + 0.08 * big
-  c[1] = 0.52 + 0.07 * big
-  c[2] = 0.46 + 0.05 * big
-  scale(c, 0.9 + 0.12 * mid + 0.06 * grain)
-  mixTo(c, 0.55, 0.53, 0.42, smooth(0.55, 0.75, fbm(x / 3.3 + 7, y / 3.3, seed + 4, 2)) * 0.5)
-}
-
-/** 泥上的生痕：海参拖出的弯弯曲曲的沟、一个个洞口、匙虫在洞口四周舔出的放射状印子 */
-function traces(c: Rgb, x: number, y: number, seed: number): void {
-  // 海参的拖痕：一张低频噪声的等值线，沟底暗、沟沿浅
-  const f = fbm(x / 4.2, y / 4.2, seed + 11, 2) + 0.08 * valueNoise(x * 2, y * 2, seed + 12)
-  const band = Math.abs(f - 0.5) / 0.012
-  if (band < 2.2) {
-    const groove = Math.max(0, 1 - band)
-    const rim = smooth(1.2, 1.6, band) * (1 - smooth(1.8, 2.2, band))
-    scale(c, 1 - 0.22 * groove + 0.07 * rim)
-  }
-  sprinkle(x, y, 0.5, seed + 13, 0.22, (dx, dy, r) => {
-    const d = Math.hypot(dx, dy)
-    const hole = 0.035 + 0.04 * r
-    if (d < hole) scale(c, 0.62 + 0.25 * (d / hole))
-    else if (d < hole * 2.2) scale(c, 1.06)
-  })
-  scatter(x, y, 2.4, 0.72, seed + 14, 0.18, (dx, dy, r) => {
-    const d = Math.hypot(dx, dy)
-    const reach = 0.35 + 0.35 * r
-    if (d > reach) return
-    const a = Math.atan2(dy, dx)
-    const rays = 9 + Math.floor(r * 7)
-    const ray = Math.abs(Math.sin((a * rays) / 2 + r * 10))
-    if (d < 0.05) scale(c, 0.5)
-    else if (ray > 0.86) scale(c, 0.9 - 0.08 * (1 - d / reach))
+  const grain = valueNoise(x * 11, y * 11, seed + 3)
+  c[0] = 0.84 + 0.06 * big
+  c[1] = 0.81 + 0.05 * big
+  c[2] = 0.73 + 0.04 * big
+  scale(c, 0.92 + 0.08 * mid + 0.07 * grain)
+  sprinkle(x, y, 0.18, seed + 4, 0.35, (dx, dy, r) => {
+    const d = Math.hypot(dx * (1 + r), dy)
+    const s = 0.012 + 0.02 * r
+    if (d >= s) return
+    if (r < 0.55) mixTo(c, 0.97, 0.96, 0.92, 0.8)
+    else if (r < 0.8) mixTo(c, 0.62, 0.58, 0.5, 0.6)
+    else mixTo(c, 0.95, 0.78, 0.74, 0.7)
   })
 }
 
-/** 谷底的活物与小东西：蛇尾、玻璃海绵、海鳃、海葵、海猪、锰结核、粗粒的有孔虫球；颜色是本色，灯照上去才看得出来 */
-function life(c: Rgb, x: number, y: number, seed: number): void {
-  // 锰结核：成片的黑褐色小疙瘩
-  if (fbm(x / 5, y / 5, seed + 20, 2) > 0.62) {
-    sprinkle(x, y, 0.3, seed + 21, 0.45, (dx, dy, r) => {
-      const d = Math.hypot(dx * (1 + r * 0.4), dy)
-      const s = 0.04 + 0.06 * r
-      if (d < s) mixTo(c, 0.2, 0.17, 0.15, 0.85 - 0.3 * (d / s))
-      else if (d < s * 1.4) scale(c, 0.85)
-    })
-  }
-  // 蛇尾：五条细腕，盘在泥上
-  scatter(x, y, 1.6, 0.4, seed + 22, 0.28, (dx, dy, r) => {
+/** 沙上的小东西：沙纹的峰亮沟暗，几处洞口，散落的贝壳、海星与海参 */
+function strand(c: Rgb, x: number, y: number, seed: number, calm: number): void {
+  const rp = ripple(x, y, seed)
+  scale(c, 1 + 0.035 * rp * calm)
+  sprinkle(x, y, 0.7, seed + 13, 0.12, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
-    const arm = 0.22 + 0.16 * r
-    if (d > arm) return
-    const a = Math.atan2(dy, dx) + r * 6.28 + d * (r - 0.5) * 3
-    const k = Math.abs(Math.sin((a * 5) / 2))
-    const tone: Rgb = r < 0.5 ? [0.92, 0.72, 0.52] : [0.88, 0.84, 0.76]
-    if (d < 0.05) mixTo(c, tone[0], tone[1], tone[2], 0.9)
-    else if (k > 0.94 - 0.04 * (1 - d / arm)) mixTo(c, tone[0], tone[1], tone[2], 0.85 * (1 - d / arm) + 0.15)
+    const hole = 0.03 + 0.03 * r
+    if (d < hole) scale(c, 0.7 + 0.25 * (d / hole))
+    else if (d < hole * 2.4) scale(c, 1.04)
   })
-  // 玻璃海绵：从上往下看是一圈象牙白的瓶口，里面黑
-  scatter(x, y, 3.2, 0.42, seed + 23, 0.32, (dx, dy, r) => {
-    const d = Math.hypot(dx, dy)
-    const R0 = 0.16 + 0.18 * r
-    if (d > R0 * 1.15) return
-    if (d < R0 * 0.6) mixTo(c, 0.06, 0.06, 0.07, 0.9)
-    else if (d < R0) {
-      const lattice = Math.abs(Math.sin(Math.atan2(dy, dx) * 14)) * Math.abs(Math.sin(d * 90))
-      mixTo(c, 0.94, 0.92, 0.84, 0.75 + 0.2 * lattice)
-    } else scale(c, 0.82)
-  })
-  // 海鳃：一根羽毛似的橙红色
-  scatter(x, y, 2.9, 0.38, seed + 24, 0.22, (dx, dy, r) => {
+  // 贝壳：小小的扇形，白、粉、浅橙
+  scatter(x, y, 1.3, 0.12, seed + 14, 0.3, (dx, dy, r) => {
     const a = r * 6.28
     const u = dx * Math.cos(a) + dy * Math.sin(a)
     const v = -dx * Math.sin(a) + dy * Math.cos(a)
-    const len = 0.22 + 0.14 * r
-    if (Math.abs(u) > len) return
-    const width = 0.06 * Math.sqrt(1 - (u / len) ** 2)
-    if (Math.abs(v) < 0.012) mixTo(c, 0.75, 0.32, 0.18, 0.9)
-    else if (Math.abs(v) < width && Math.sin(u * 120) > -0.2) mixTo(c, 0.95, 0.45, 0.3, 0.75)
+    const R0 = 0.06 + 0.04 * r
+    const d = Math.hypot(u, v)
+    if (d > R0 || v < -R0 * 0.2) return
+    const tone: Rgb = r < 0.4 ? [0.98, 0.96, 0.92] : r < 0.7 ? [0.97, 0.78, 0.76] : [0.98, 0.8, 0.6]
+    const rib = Math.abs(Math.sin(Math.atan2(v, u) * 9)) > 0.75 ? 0.85 : 1
+    mixTo(c, tone[0] * rib, tone[1] * rib, tone[2] * rib, 0.9)
   })
-  // 海葵：一圈触手围着嘴，粉、紫、白
-  scatter(x, y, 2.3, 0.32, seed + 25, 0.26, (dx, dy, r) => {
+  // 海星：五条短腕，橙红或土黄，难得一只
+  scatter(x, y, 5.5, 0.32, seed + 15, 0.22, (dx, dy, r) => {
     const d = Math.hypot(dx, dy)
-    const R0 = 0.1 + 0.08 * r
-    if (d > R0 * 1.7) return
-    const hue: Rgb = r < 0.33 ? [0.95, 0.55, 0.68] : r < 0.66 ? [0.72, 0.52, 0.86] : [0.95, 0.92, 0.88]
-    if (d < R0 * 0.35) mixTo(c, hue[0] * 0.6, hue[1] * 0.5, hue[2] * 0.6, 0.9)
-    else if (d < R0) mixTo(c, hue[0], hue[1], hue[2], 0.9)
-    else if (Math.abs(Math.sin(Math.atan2(dy, dx) * 9)) > 0.6) mixTo(c, hue[0], hue[1], hue[2], 0.7 * (1 - (d - R0) / (0.7 * R0)))
+    const arm = 0.18 + 0.1 * r
+    if (d > arm) return
+    const a = Math.atan2(dy, dx) + r * 6.28
+    const k = Math.pow(Math.abs(Math.cos((a * 5) / 2)), 3)
+    if (d < arm * (0.28 + 0.72 * k)) {
+      const tone: Rgb = r < 0.6 ? [0.93, 0.42, 0.22] : [0.86, 0.66, 0.3]
+      mixTo(c, tone[0], tone[1], tone[2], 0.92)
+      if (valueNoise(dx * 60, dy * 60, seed) > 0.7) scale(c, 1.12)
+    } else if (d < arm * (0.34 + 0.72 * k)) scale(c, 0.85)
   })
-  // 海猪：几只一群，半透明的粉
-  scatter(x, y, 4.5, 0.62, seed + 26, 0.16, (dx, dy, r) => {
-    for (let i = 0; i < 3; i++) {
-      const ox = (hash(i, 1, Math.floor(r * 1e6)) - 0.5) * 0.9
-      const oy = (hash(i, 2, Math.floor(r * 1e6)) - 0.5) * 0.9
-      const a = hash(i, 3, Math.floor(r * 1e6)) * 6.28
-      const u = (dx - ox) * Math.cos(a) + (dy - oy) * Math.sin(a)
-      const v = -(dx - ox) * Math.sin(a) + (dy - oy) * Math.cos(a)
-      const e = (u / 0.14) ** 2 + (v / 0.075) ** 2
-      if (e < 1) mixTo(c, 0.94, 0.7, 0.72, 0.65 + 0.25 * (1 - e))
-    }
-  })
-  // 有孔虫球：灰色、碎碎的，偶尔一个
-  scatter(x, y, 3.6, 0.17, seed + 27, 0.14, (dx, dy, r) => {
-    const d = Math.hypot(dx, dy)
-    const R0 = 0.09 + 0.07 * r
-    if (d < R0) mixTo(c, 0.66, 0.66, 0.62, 0.7 + 0.25 * valueNoise(dx * 60, dy * 60, seed))
+  // 海参：一条深褐的软管，难得一只
+  scatter(x, y, 6.5, 0.36, seed + 16, 0.2, (dx, dy, r) => {
+    const a = r * 6.28
+    const u = dx * Math.cos(a) + dy * Math.sin(a)
+    const v = -dx * Math.sin(a) + dy * Math.cos(a) - 0.05 * Math.sin(u * 9)
+    const e = (u / (0.24 + 0.08 * r)) ** 2 + (v / 0.06) ** 2
+    if (e < 1) mixTo(c, 0.22, 0.16, 0.12, 0.9 - 0.25 * e)
+    else if (e < 1.5) scale(c, 0.88)
   })
 }
 
-/** 岩面：深灰的玄武岩，有裂隙、有亮一点的剥落面，朝上的地方积着一层泥，石缝里长着小珊瑚与海绵 */
-function rock(c: Rgb, x: number, y: number, seed: number, drape: number): void {
-  const n = fbm(x / 1.4, y / 1.4, seed + 31, 3)
-  c[0] = 0.33 + 0.14 * n
-  c[1] = 0.32 + 0.13 * n
-  c[2] = 0.31 + 0.11 * n
-  const crack = cellEdge(x * 1.6, y * 1.6, seed + 32)
-  if (crack < 0.05) scale(c, 0.55 + 8 * crack)
-  const facet = valueNoise(Math.floor(x * 2.2), Math.floor(y * 2.2), seed + 33)
-  scale(c, 0.88 + 0.22 * facet)
-  mixTo(c, 0.57, 0.54, 0.47, drape * (0.75 + 0.25 * fbm(x * 2, y * 2, seed + 34, 2)))
-  scatter(x, y, 0.9, 0.12, seed + 35, 0.2 * (1 - drape * 0.5), (dx, dy, r) => {
-    const d = Math.hypot(dx, dy)
-    const R0 = 0.05 + 0.06 * r
-    if (d > R0) return
-    if (r < 0.4) mixTo(c, 0.98, 0.8, 0.25, 0.85)
-    else if (r < 0.7) mixTo(c, 0.95, 0.5, 0.25, 0.85)
-    else mixTo(c, 0.95, 0.94, 0.9, 0.8)
+/** 海草：一片片细长的草叶顺着水流倒向一边，深浅两种绿，草底下的沙也染成暗绿 */
+function seagrass(c: Rgb, x: number, y: number, seed: number, k: number): void {
+  if (k <= 0) return
+  const a = 0.6 + 0.5 * fbm(x / 4, y / 4, seed + 72, 2)
+  const u = x * Math.cos(a) + y * Math.sin(a)
+  const v = -x * Math.sin(a) + y * Math.cos(a)
+  const dense = k * (0.6 + 0.4 * fbm(x * 1.4, y * 1.4, seed + 74, 2))
+  mixTo(c, 0.36, 0.47, 0.28, 0.75 * dense)
+  sprinkle(u, v, 0.09, seed + 73, 0.85 * dense, (du, dv, r) => {
+    const t = (r - 0.5) * 0.5
+    const along = du * Math.cos(t) + dv * Math.sin(t)
+    const across = -du * Math.sin(t) + dv * Math.cos(t)
+    const len = 0.1 + 0.1 * r
+    if (along < -0.02 || along > len || Math.abs(across) > 0.014) return
+    const lit = 0.55 + 0.45 * (along / len)
+    mixTo(c, 0.22 + 0.2 * lit * r, 0.42 + 0.2 * lit, 0.14 + 0.06 * lit, 0.92)
   })
 }
 
-/** 鲸骨四周：骨头被硫化物染黑的泥，泥上一块块白的、黄的细菌席，骨头上一簇簇红的食骨虫 */
+/**
+ * 礁：浅灰褐的老珊瑚石上一丛丛活珊瑚，一丛一个圆鼓鼓的头，一丛一个样——脑珊瑚的回纹、鹿角珊瑚的细枝、桌面珊瑚的放射纹、绿褐的藻皮，
+ * 零星几小丛橙、粉、紫的；丛与丛之间是暗下去的缝。cover 是顶上铺的珊瑚沙有多厚
+ */
+function reef(c: Rgb, x: number, y: number, seed: number, cover: number): void {
+  const n = fbm(x / 1.3, y / 1.3, seed + 31, 3)
+  c[0] = 0.7 + 0.08 * n
+  c[1] = 0.66 + 0.07 * n
+  c[2] = 0.57 + 0.06 * n
+  const cell = cellNearest(x * 1.1, y * 1.1, seed + 32)
+  const d = Math.hypot(cell.dx, cell.dy)
+  const h = cell.h
+  const g = fbm(x * 3, y * 3, seed + 33, 2)
+  if (h < 0.3) {
+    const groove = Math.abs(Math.sin((cell.dx * 0.8 + cell.dy * 0.5) * 16 + g * 10 + h * 40))
+    mixTo(c, 0.84, 0.79, 0.64, 0.8)
+    if (groove < 0.32) scale(c, 0.86)
+  } else if (h < 0.5) {
+    const twig = valueNoise(x * 16, y * 16, seed + 34)
+    mixTo(c, 0.78, 0.68, 0.5, 0.75)
+    if (twig > 0.64) mixTo(c, 0.93, 0.88, 0.74, 0.6)
+    else if (twig < 0.3) scale(c, 0.86)
+  } else if (h < 0.7) {
+    mixTo(c, 0.58, 0.6, 0.42, 0.65)
+    scale(c, 0.92 + 0.14 * g)
+  } else if (h < 0.88) {
+    mixTo(c, 0.86, 0.83, 0.72, 0.75)
+    if (Math.abs(Math.sin(Math.atan2(cell.dy, cell.dx) * 14)) > 0.88) scale(c, 0.9)
+  } else {
+    // 零星几丛颜色鲜的：只占丛心一小块
+    const tone: Rgb = h < 0.93 ? [1, 0.5, 0.26] : h < 0.97 ? [0.98, 0.5, 0.66] : [0.64, 0.46, 0.9]
+    mixTo(c, 0.8, 0.76, 0.64, 0.6)
+    if (d < 0.42) mixTo(c, tone[0], tone[1], tone[2], 0.9 * (1 - smooth(0.3, 0.42, d)))
+  }
+  scale(c, 1.06 - 0.3 * Math.max(0, d - 0.35))
+  const crack = cellEdge(x * 1.1, y * 1.1, seed + 32)
+  if (crack < 0.07) scale(c, 0.72 + 4 * crack)
+  mixTo(c, 0.86, 0.83, 0.75, cover * (0.7 + 0.3 * fbm(x * 2, y * 2, seed + 35, 2)))
+}
+
+/** 鲸骨四周：沙被骨头挡出一圈浅浅的窝，窝里积着碎贝壳 */
 function whaleSurrounds(c: Rgb, s: Skeleton, x: number, y: number): void {
   const bx = s.box
   if (x < bx[0] || x > bx[2] || y < bx[1] || y > bx[3]) return
   const w = s.whale
   const d = fromWhale(w, x, y)
-  const halo = 1 - smooth(WHALE_HALF * w.length * 0.6, WHALE_HALF * w.length * 1.25, d)
+  const halo = 1 - smooth(WHALE_HALF * w.length * 0.5, WHALE_HALF * w.length * 1.2, d)
   if (halo <= 0) return
-  mixTo(c, 0.24, 0.24, 0.23, halo * 0.75)
-  const mat = fbm(x / 0.9, y / 0.9, w.seed + 5, 3)
-  if (mat > 0.56) mixTo(c, 0.93, 0.92, 0.86, halo * smooth(0.56, 0.66, mat) * 0.85)
-  else if (mat < 0.32) mixTo(c, 0.92, 0.72, 0.32, halo * smooth(0.32, 0.24, mat) * 0.6)
+  scale(c, 1 - 0.08 * halo)
+  if (fbm(x / 0.8, y / 0.8, w.seed + 5, 3) > 0.6) mixTo(c, 0.97, 0.96, 0.92, halo * 0.5)
 }
 
+/** 晒白的骨头：象牙白，背阴处偏灰，零星长着一点绿藻 */
 function boneColor(c: Rgb, hit: BoneHit, x: number, y: number, seed: number): void {
   const grime = fbm(x * 1.8, y * 1.8, seed + 7, 3)
-  c[0] = 0.86 - 0.18 * grime
-  c[1] = 0.83 - 0.18 * grime
-  c[2] = 0.74 - 0.16 * grime
+  c[0] = 0.97 - 0.1 * grime
+  c[1] = 0.95 - 0.1 * grime
+  c[2] = 0.9 - 0.1 * grime
   scale(c, hit.shade)
-  const fuzz = fbm(x * 3, y * 3, seed + 8, 2)
-  if (fuzz > 0.62) mixTo(c, 0.97, 0.97, 0.94, smooth(0.62, 0.72, fuzz) * 0.7)
-  scatter(x, y, 0.35, 0.05, seed + 9, 0.3, (dx, dy) => {
-    if (Math.hypot(dx, dy) < 0.04) mixTo(c, 0.85, 0.12, 0.12, 0.9)
-  })
+  const algae = fbm(x * 2.4, y * 2.4, seed + 8, 2)
+  if (algae > 0.64) mixTo(c, 0.55, 0.66, 0.4, smooth(0.64, 0.74, algae) * 0.55)
 }
 
-/** 冷泉：发黑的泥上一块块白色与橙黄色的细菌席，一圈白色的蛤壳，正中一丛顶着红羽的管虫；泥上几个冒气的小坑 */
+/** 涌泉：沙底一个浅浅的漏斗，一圈圈被水推出的细纹，漏斗里的沙更白更细，正中几个冒水的小眼 */
 function seepColor(c: Rgb, q: { k: number; seed: number; sx: number; sy: number }, x: number, y: number): void {
   const k = q.k
   const edge = 1 - smooth(0.85, 1.3, k)
   if (edge <= 0) return
-  mixTo(c, 0.2, 0.2, 0.2, edge * 0.85)
-  const mat = fbm(x / 0.6, y / 0.6, q.seed + 1, 3)
-  if (mat > 0.5) mixTo(c, 0.95, 0.95, 0.9, edge * smooth(0.5, 0.6, mat))
-  else if (mat < 0.36) mixTo(c, 0.97, 0.66, 0.2, edge * smooth(0.36, 0.28, mat) * 0.9)
-  if (k > 0.45 && k < 1.05) {
-    scatter(x, y, 0.28, 0.09, q.seed + 2, 0.5, (dx, dy, r) => {
-      const a = r * 6.28
-      const u = dx * Math.cos(a) + dy * Math.sin(a)
-      const v = -dx * Math.sin(a) + dy * Math.cos(a)
-      const e = (u / 0.08) ** 2 + (v / 0.05) ** 2
-      if (e < 1) mixTo(c, 0.95, 0.93, 0.88, 0.9 - 0.3 * e)
-    })
-  }
+  mixTo(c, 0.94, 0.93, 0.88, edge * 0.55)
+  const ring = Math.abs(Math.sin(k * 15 + 2 * fbm(x / 0.7, y / 0.7, q.seed + 1, 2)))
+  if (ring > 0.86) scale(c, 1 - 0.1 * edge)
   if (k < 0.4) {
-    scatter(x, y, 0.16, 0.075, q.seed + 3, 0.7, (dx, dy, r) => {
+    scatter(x, y, 0.3, 0.08, q.seed + 3, 0.6, (dx, dy) => {
       const d = Math.hypot(dx, dy)
-      if (d < 0.035) mixTo(c, 0.9, 0.15, 0.12, 0.95)
-      else if (d < 0.05 + 0.02 * r) mixTo(c, 0.95, 0.95, 0.92, 0.8)
+      if (d < 0.035) scale(c, 0.6 + 8 * d)
+      else if (d < 0.06) scale(c, 1.06)
     })
   }
-  scatter(x, y, 0.7, 0.07, q.seed + 4, 0.35, (dx, dy) => {
-    const d = Math.hypot(dx, dy)
-    if (k < 0.9 && d < 0.06) scale(c, 0.4 + 6 * d)
-  })
 }
 
-/** 陡坎下的坡：泥被一道道往下冲出的沟拉成条纹 */
+/** 陡坎下的坡：沙被一道道往下淌的沙流拉成条纹，零星几块礁石 */
 function slope(c: Rgb, along: number, down: number, seed: number): void {
   const streak = swing(along / 0.9, down / 6, seed + 41, 3)
-  scale(c, 0.86 + 0.12 * streak)
+  scale(c, 0.9 + 0.1 * streak)
   const gully = Math.abs(Math.sin(along * 2.1 + 3 * fbm(along / 3, down / 4, seed + 42, 2)))
-  if (gully > 0.92) scale(c, 0.8)
+  if (gully > 0.92) scale(c, 0.88)
 }
 
-/** 画地面的东西：谷底、生成好的鲸骨形状、一格多少米 */
+/** 画地面的东西：礁湖、生成好的鲸骨形状、一格多少米 */
 export interface PaintScene {
   readonly plan: DeepPlan
   readonly skeleton: Skeleton
@@ -506,6 +491,12 @@ export function paintScene(plan: DeepPlan, meterPerU: number): PaintScene {
   return { plan, skeleton: skeletonOf(plan.whale), meterPerU }
 }
 
+/** 沙纹在 (x, y) 处有多显：离礁墙脚、陡坎沿近了，长着海草，都被抹平 */
+function calmAt(x: number, y: number, seed: number): number {
+  const edge = Math.min(RE.low, RE.high, RE.rubble, RE.lip + 1.5)
+  return smooth(0, 1.5, edge) * (1 - grassAt(x, y, seed))
+}
+
 /** 地面的固有色写进 out，地图坐标 (x, y) 格；alpha 恒为满 */
 function albedoAt(sc: PaintScene, x: number, y: number, c: Rgb): void {
   const plan = sc.plan
@@ -513,28 +504,28 @@ function albedoAt(sc: PaintScene, x: number, y: number, c: Rgb): void {
   const seed = plan.seed
   toLocal(plan.frame, x, y, LC)
   reachOf(e, LC.a, LC.b, RE)
-  ooze(c, x, y, seed)
+  sand(c, x, y, seed)
   const lowT = -RE.low / e.wallU[0]
   const highT = -RE.high / e.wallU[1]
   const wallT = Math.max(lowT, highT)
   const pileT = -RE.rubble / e.rubbleU
   if (wallT > 0 || pileT > 0) {
-    // 岩壁：一级级岩架的平处积泥；岩堆：一块块石头，顶上积泥
+    // 礁墙：一级级礁台的平处积着沙；礁石堆：一块块珊瑚石，缝里积沙
     const k = wallT * 3
     const ledge = wallT > 0 && wallT < 1 ? (k - Math.floor(k) < 0.5 ? 1 : 0) : 0
     const top = wallT >= 1 ? 1 : 0
-    const drape = Math.max(ledge * 0.7, top * 0.85, pileT > 0 && wallT <= 0 ? 0.35 : 0)
+    const cover = Math.max(ledge * 0.35, top * 0.15, pileT > 0 && wallT <= 0 ? 0.12 : 0)
     const foot = smooth(0, 0.18, Math.max(wallT, pileT))
     const keep: Rgb = [c[0], c[1], c[2]]
-    rock(c, x, y, seed, drape)
+    reef(c, x, y, seed, cover)
     c[0] = keep[0] + (c[0] - keep[0]) * foot
     c[1] = keep[1] + (c[1] - keep[1]) * foot
     c[2] = keep[2] + (c[2] - keep[2]) * foot
   } else {
-    traces(c, x, y, seed)
+    strand(c, x, y, seed, calmAt(x, y, seed))
     if (RE.lip < 0) slope(c, LC.a, -RE.lip, seed)
-    else life(c, x, y, seed)
-    // 壁脚、堆脚下一溜碎石
+    else seagrass(c, x, y, seed, grassAt(x, y, seed))
+    // 礁墙脚、礁石堆脚下一溜珊瑚碎块
     const talus = Math.min(RE.low, RE.high, RE.rubble)
     if (talus < 1.1) {
       scatter(x, y, 0.4, 0.17, seed + 51, 0.7 * (1 - talus / 1.1), (dx, dy, r) => {
@@ -542,7 +533,7 @@ function albedoAt(sc: PaintScene, x: number, y: number, c: Rgb): void {
         const s = 0.06 + 0.1 * r
         if (d < s) {
           const keep: Rgb = [c[0], c[1], c[2]]
-          rock(c, x, y, seed + 3, 0.2)
+          reef(c, x, y, seed + 3, 0.1)
           mixTo(c, keep[0], keep[1], keep[2], d / s)
         }
       })
@@ -551,8 +542,8 @@ function albedoAt(sc: PaintScene, x: number, y: number, c: Rgb): void {
   for (const s of plan.boulders) {
     const k = inBoulder(s, x, y)
     if (k > -0.12) {
-      if (k > 0) rock(c, x, y, s.seed, smooth(0.45, 0.8, k) * 0.8)
-      else scale(c, 0.78 + 0.22 * smooth(0, 0.12, -k))
+      if (k > 0) reef(c, x, y, s.seed, smooth(0.6, 0.95, k) * 0.2)
+      else scale(c, 0.85 + 0.15 * smooth(0, 0.12, -k))
     }
   }
   whaleSurrounds(c, sc.skeleton, x, y)
@@ -580,9 +571,32 @@ export function paintAlbedo(sc: PaintScene, ppu: number, out: Uint8ClampedArray,
   }
 }
 
-/** (x, y) 处地面的高（米）：海底的高加上骨头 */
+/** 沙纹有多高，米；一丛珊瑚鼓起多高，米 */
+const RIPPLE_M = 0.014
+const COLONY_M = 0.2
+
+/** 礁上一丛丛珊瑚鼓起来的高（米）：与 reef 画的是同一张细胞网格，丛心最高 */
+function colony(x: number, y: number, seed: number): number {
+  const cell = cellNearest(x * 1.1, y * 1.1, seed + 32)
+  const t = 1 - (Math.hypot(cell.dx, cell.dy) / 0.62) ** 2
+  return t > 0 ? COLONY_M * Math.sqrt(t) : 0
+}
+
+/** (x, y) 处地面的高（米）：海底的高加上沙纹与骨头 */
 export function groundM(sc: PaintScene, x: number, y: number): number {
-  let z = seabedM(sc.plan, x, y)
+  const plan = sc.plan
+  let z = seabedM(plan, x, y)
+  toLocal(plan.frame, x, y, LC)
+  reachOf(plan.edges, LC.a, LC.b, RE)
+  const calm = calmAt(x, y, plan.seed)
+  if (calm > 0) z += RIPPLE_M * calm * ripple(x, y, plan.seed)
+  const e = plan.edges
+  const reefT = smooth(0, 0.18, Math.max(-RE.low / e.wallU[0], -RE.high / e.wallU[1], -RE.rubble / e.rubbleU))
+  if (reefT > 0) z += reefT * colony(x, y, plan.seed)
+  for (const s of plan.boulders) {
+    const k = inBoulder(s, x, y)
+    if (k > 0) z += smooth(0, 0.25, k) * colony(x, y, s.seed)
+  }
   boneAt(sc.skeleton, x, y, BH)
   if (BH.kind > 0) z += BH.h
   return z

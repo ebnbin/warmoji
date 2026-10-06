@@ -10,7 +10,7 @@ self.onmessage = (e: MessageEvent<DeepJob>) => {
     setup = { scene: paintScene(job.plan, job.meterPerU), ppu: job.ppu, width: job.width }
     return
   }
-  if (!setup) throw new Error('画深海谷底的线程还没收到 setup')
+  if (!setup) throw new Error('画暖海礁湖的线程还没收到 setup')
   if (job.kind === 'relief') {
     const geo = new Uint8ClampedArray(job.size * 4)
     const norm = new Uint8ClampedArray(job.size * 4)

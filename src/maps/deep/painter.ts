@@ -2,7 +2,7 @@ import { paintAlbedo, paintRelief, paintScene } from './ground'
 import type { PaintScene } from './ground'
 import type { DeepPlan } from './layout'
 
-/** 发给画谷底的线程：先 setup 一次，再要高度图（relief）或一段段的地面（rows） */
+/** 发给画礁湖的线程：先 setup 一次，再要高度图（relief）或一段段的地面（rows） */
 export type DeepJob =
   | { readonly kind: 'setup'; readonly plan: DeepPlan; readonly meterPerU: number; readonly ppu: number; readonly width: number }
   | { readonly kind: 'relief'; readonly size: number }
@@ -21,7 +21,7 @@ const SLICE_MS = 40
 const nextTick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 /**
- * 画谷底：交给几个后台线程，一个线程先画高度图，其余一段段地画地面，画好一段交回一段；
+ * 画礁湖：交给几个后台线程，一个线程先画高度图，其余一段段地画地面，画好一段交回一段；
  * 开不了线程或线程出了错，剩下的活退回主线程画
  */
 export class DeepPainter {
@@ -122,11 +122,11 @@ export class DeepPainter {
         w.onerror = (e) => {
           e.preventDefault()
           this.settle = undefined
-          reject(new Error(e.message || '画深海谷底的线程出错'))
+          reject(new Error(e.message || '画暖海礁湖的线程出错'))
         }
         w.onmessageerror = () => {
           this.settle = undefined
-          reject(new Error('画深海谷底的线程发回的消息解不开'))
+          reject(new Error('画暖海礁湖的线程发回的消息解不开'))
         }
         if (k === 0) {
           const job: DeepJob = { kind: 'relief', size: reliefSize }
@@ -137,7 +137,7 @@ export class DeepPainter {
   }
 
   private fail(e: unknown): void {
-    console.error('画深海谷底的线程用不了，改在主线程画', e)
+    console.error('画暖海礁湖的线程用不了，改在主线程画', e)
     this.stop()
   }
 

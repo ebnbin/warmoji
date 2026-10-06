@@ -24,8 +24,8 @@ export const OBSTACLES = {
     dust: { name: '尘雾', phase: true, opaque: true, pierce: 0, strength: null },
     // 沙漠的标志物：只挡身体，弹体与视线从上面过去
     landmark: { name: '标志物', phase: true, opaque: false, pierce: 0, strength: null },
-    // 钢壳：深海潜艇的艇身
-    steel: { name: '钢壳', phase: true, opaque: true, pierce: null, strength: null },
+    // 铜壳：暖海潜水钟的钟身
+    bronze: { name: '铜壳', phase: true, opaque: true, pierce: null, strength: null },
     // 技能立的墙：看得穿，挡身体与弹体按它自己的规则
     barrier: { name: '技能墙', phase: true, opaque: false, pierce: null, strength: null },
     // 天枢的落地玻璃幕墙与培养皿的玻璃壁：看得穿，挡身体也挡弹体，穿墙的身体也出不去

@@ -7,18 +7,18 @@ import type { Landmark } from '../landmark'
 import type { DeepConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
-/** 能走的谷底按这么细的格子算距离场，格 */
+/** 能走的沙底按这么细的格子算距离场，格 */
 export const BASIN_CELL_U = 0.25
-/** 壁脚、堆脚、坎沿往里留出这么宽（格）不能走：身子不贴进岩壁、不悬在坎沿上 */
+/** 墙脚、堆脚、坎沿往里留出这么宽（格）不能走：身子不贴进礁墙、不悬在坎沿上 */
 const EDGE_CLEAR_U = 0.15
-/** 两侧壁脚与两头交汇的内角按这么大（格）磨圆 */
+/** 两侧墙脚与两头交汇的内角按这么大（格）磨圆 */
 const CORNER_U = 2.5
-/** 生成不出合格的谷底就换一组随机数重来，最多这么多次 */
+/** 生成不出合格的沙底就换一组随机数重来，最多这么多次 */
 const TRIES = 40
-/** 陡坎沿上、岩堆脚下每隔这么远（格）一处出怪的地标，口子的半径（格） */
+/** 陡坎沿上、礁石堆脚下每隔这么远（格）一处出怪的地标，口子的半径（格） */
 const MARK_STEP_U = 2.5
 const MARK_R_U = 1
-/** 地标往里这么远（格）还得能站：怪从那里落进谷底 */
+/** 地标往里这么远（格）还得能站：怪从那里落进沙底 */
 const MARK_IN_U = 1.2
 /** 鲸骨的头骨占鲸长的比例、头骨最宽处的半宽占鲸长的比例 */
 export const SKULL_FRAC = 0.24
@@ -36,7 +36,7 @@ export function swing(x: number, y: number, seed: number, octaves: number): numb
   return Math.max(-1, Math.min(1, (fbm(x, y, seed, octaves) - 0.5) * 2.6))
 }
 
-/** 种子打散：相邻的种子也生成很不一样的谷底 */
+/** 种子打散：相邻的种子也生成很不一样的沙底 */
 function scramble(seed: number): number {
   let h = Math.imul((seed ^ 0x5ea1d07b) >>> 0, 0x297a2d39)
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
@@ -48,7 +48,7 @@ function between(rng: Rng, r: readonly [number, number]): number {
   return r[0] + (r[1] - r[0]) * rng.next()
 }
 
-/** 本地坐标：a 横过峡谷、从一侧岩壁那条地图边量起，b 顺着峡谷、从上游岩堆那条地图边量起，都以格计、在 [0, size] 里。地图坐标 = o + a·n + b·t */
+/** 本地坐标：a 横过礁湖、从一侧礁墙那条地图边量起，b 顺着礁湖、从上游礁石堆那条地图边量起，都以格计、在 [0, size] 里。地图坐标 = o + a·n + b·t */
 export interface Frame {
   readonly ox: number
   readonly oy: number
@@ -63,7 +63,7 @@ export interface Local {
   b: number
 }
 
-/** 峡谷顺着哪条轴、往哪头下去（上、右、下、左），mirror 让两侧岩壁换个边；本地的 [0, size]² 落在方框正中 */
+/** 礁湖顺着哪条轴、往哪头下去（上、右、下、左），mirror 让两侧礁墙换个边；本地的 [0, size]² 落在方框正中 */
 function frameOf(dir: number, mirror: boolean, size: number): Frame {
   const t = [
     { x: 0, y: 1 },
@@ -97,8 +97,8 @@ export interface Edge {
 }
 
 /**
- * 峡谷的边，本地坐标，格：两侧壁脚（low 在 a 小的一边，high 在 a 大的一边）、上游的堆脚、下游的坎沿；
- * 两侧岩壁各多高（米）、从壁脚到壁顶多宽（格），岩堆多高、多宽、石块多大，坎下的坡起头每格降多少米；谷底的起伏
+ * 礁湖的边，本地坐标，格：两侧墙脚（low 在 a 小的一边，high 在 a 大的一边）、上游的堆脚、下游的坎沿；
+ * 两侧礁墙各多高（米）、从墙脚到墙顶多宽（格），礁石堆多高、多宽、礁块多大，坎下的坡起头每格降多少米；沙底的起伏
  */
 export interface Edges {
   readonly size: number
@@ -120,7 +120,7 @@ function bent(e: Edge, u: number): number {
   return e.inset + e.bend * swing(u / e.wave + 3.1, 1.7, e.seed, 3)
 }
 
-/** 本地 (a, b) 离四条边各有多远（格），往谷底里为正：low 壁脚、high 壁脚、上游堆脚、下游坎沿 */
+/** 本地 (a, b) 离四条边各有多远（格），往沙底里为正：low 墙脚、high 墙脚、上游堆脚、下游坎沿 */
 export interface Reach {
   low: number
   high: number
@@ -138,13 +138,13 @@ export function reachOf(e: Edges, a: number, b: number, out: Reach): Reach {
 
 const R: Reach = { low: 0, high: 0, rubble: 0, lip: 0 }
 
-/** 在谷底里多深，格，谷底里为正：四条边取平滑的最小，内角磨圆 */
+/** 在沙底里多深，格，沙底里为正：四条边取平滑的最小，内角磨圆 */
 export function floorDepth(e: Edges, a: number, b: number): number {
   reachOf(e, a, b, R)
   return smin(smin(R.low, R.high, CORNER_U), smin(R.rubble, R.lip, CORNER_U), CORNER_U)
 }
 
-/** 一块大石头：中心（地图坐标，格）、底半径（格）、多高（米）；轮廓按方位角起伏 */
+/** 一块珊瑚头：中心（地图坐标，格）、底半径（格）、多高（米）；轮廓按方位角起伏 */
 export interface Boulder {
   readonly x: number
   readonly y: number
@@ -153,13 +153,13 @@ export interface Boulder {
   readonly seed: number
 }
 
-/** 大石头在 (x, y) 那个方位上的半径，格 */
+/** 珊瑚头在 (x, y) 那个方位上的半径，格 */
 export function boulderRadius(s: Boulder, x: number, y: number): number {
   const a = Math.atan2(y - s.y, x - s.x)
   return s.r * (1 + 0.24 * (valueNoise(Math.cos(a) * 1.4 + 9, Math.sin(a) * 1.4 + 9, s.seed) - 0.5) * 2)
 }
 
-/** (x, y) 在大石头里多深，占它那个方位半径的比例，石头外为负 */
+/** (x, y) 在珊瑚头里多深，占它那个方位半径的比例，珊瑚头外为负 */
 export function inBoulder(s: Boulder, x: number, y: number): number {
   const far = s.r * 1.3
   if (Math.abs(x - s.x) > far || Math.abs(y - s.y) > far) return -1
@@ -209,7 +209,7 @@ export function inSkull(w: Whale, x: number, y: number): boolean {
   return Math.abs(UV.b) <= skullHalf(w, UV.a)
 }
 
-/** 一处冷泉：中心（地图坐标，格）、半径（格） */
+/** 一处涌泉：中心（地图坐标，格）、半径（格） */
 export interface Seep {
   readonly x: number
   readonly y: number
@@ -218,8 +218,8 @@ export interface Seep {
 }
 
 /**
- * 按种子生成的谷底，地图坐标以格计：地图是 size 见方的方形；边、能走的地面（像素）、开局站位（方框正中）；
- * 大石头、鲸骨、冷泉；出怪口用的地标（像素）：陡坎沿、岩堆脚、两头合起来、鲸骨边、冷泉
+ * 按种子生成的沙底，地图坐标以格计：地图是 size 见方的方形；边、能走的地面（像素）、开局站位（方框正中）；
+ * 珊瑚头、鲸骨、涌泉；出怪口用的地标（像素）：陡坎沿、礁石堆脚、两头合起来、鲸骨边、涌泉
  */
 export interface DeepPlan {
   readonly seed: number
@@ -236,7 +236,7 @@ export interface DeepPlan {
 
 const L0: Local = { a: 0, b: 0 }
 
-/** 地图坐标 (x, y)（格）能不能走：在谷底里、不在大石头里、不在头骨里 */
+/** 地图坐标 (x, y)（格）能不能走：在沙底里、不在珊瑚头里、不在头骨里 */
 function openAt(f: Frame, e: Edges, boulders: readonly Boulder[], whale: Whale | null, x: number, y: number): boolean {
   toLocal(f, x, y, L0)
   if (floorDepth(e, L0.a, L0.b) <= EDGE_CLEAR_U) return false
@@ -266,7 +266,7 @@ function edgesOf(cfg: DeepConfig, rng: Rng, seed: number): Edges {
   }
 }
 
-/** 大石头：一部分靠着壁脚（从岩壁上滚落的），其余散在谷底；离开局站位、彼此都隔开 */
+/** 珊瑚头：一部分靠着墙脚（从礁墙上塌落的），其余散在沙底；离开局站位、彼此都隔开 */
 function bouldersOf(cfg: DeepConfig, rng: Rng, f: Frame, e: Edges, start: Point): Boulder[] {
   const c = cfg.boulders
   const n = rng.int(c.count[0], c.count[1])
@@ -304,7 +304,7 @@ export function fromWhale(w: Whale, x: number, y: number): number {
   return Math.hypot(px - w.dx * u, py - w.dy * u)
 }
 
-/** 鲸骨：大致顺着峡谷躺在谷底里，整副骨头都在谷底以内；头骨离开局站位 clearU 格以上，骨头不压开局站位，也不压大石头 */
+/** 鲸骨：大致顺着礁湖躺在沙底里，整副骨头都在沙底以内；头骨离开局站位 clearU 格以上，骨头不压开局站位，也不压珊瑚头 */
 function whaleOf(cfg: DeepConfig, rng: Rng, f: Frame, e: Edges, start: Point, boulders: readonly Boulder[]): Whale | null {
   const L = between(rng, cfg.whale.lengthM) / cfg.meterPerU
   const along = Math.atan2(f.ty, f.tx)
@@ -350,7 +350,7 @@ function seepsOf(cfg: DeepConfig, rng: Rng, f: Frame, e: Edges, start: Point, bo
   return out
 }
 
-/** 沿一条边每隔 MARK_STEP_U 格取一处地标（像素）：边上那一点往谷底里 MARK_IN_U 格还得能站；朝谷底里 */
+/** 沿一条边每隔 MARK_STEP_U 格取一处地标（像素）：边上那一点往沙底里 MARK_IN_U 格还得能站；朝沙底里 */
 function edgeMarks(f: Frame, basin: Basin, size: number, along: (u: number) => Local | null, inward: Local): Landmark[] {
   const out: Landmark[] = []
   const n = { x: f.nx * inward.a + f.tx * inward.b, y: f.ny * inward.a + f.ty * inward.b }
@@ -386,7 +386,7 @@ function boneMarks(w: Whale, basin: Basin): Landmark[] {
   return out
 }
 
-/** 生成一次：边、大石头、鲸骨、冷泉、能走的地面与地标；不合格返回 null */
+/** 生成一次：边、珊瑚头、鲸骨、涌泉、能走的地面与地标；不合格返回 null */
 function attempt(cfg: DeepConfig, seed: number): DeepPlan | null {
   const rng = new Rng(seed)
   const size = cfg.sizeU
@@ -433,16 +433,16 @@ function attempt(cfg: DeepConfig, seed: number): DeepPlan | null {
   }
 }
 
-/** 按种子生成谷底：不合格就换一组随机数，一直不合格是参数写错了 */
+/** 按种子生成沙底：不合格就换一组随机数，一直不合格是参数写错了 */
 export function deepPlan(cfg: DeepConfig, seed: number): DeepPlan {
   for (let k = 0; k < TRIES; k++) {
     const plan = attempt(cfg, scramble(seed + k * 7919))
     if (plan) return plan
   }
-  throw new Error(`深海的谷底按种子 ${seed} 换了 ${TRIES} 组随机数都生成不出来`)
+  throw new Error(`暖海的礁湖按种子 ${seed} 换了 ${TRIES} 组随机数都生成不出来`)
 }
 
-/** 壁面的剖面：出了壁脚、占壁宽 t 处升到壁高的多少；中间一级级的岩架，壁顶以外的台地再慢慢往上 */
+/** 墙面的剖面：出了墙脚、占墙宽 t 处升到墙高的多少；中间一级级的礁台，墙顶以外的台地再慢慢往上 */
 function wallShape(t: number): number {
   if (t <= 0) return 0
   if (t >= 1) return 1 + (t - 1) * 0.08
@@ -452,7 +452,7 @@ function wallShape(t: number): number {
   return s * 0.55 + terrace * 0.45
 }
 
-/** 岩堆里一块块石头：最近的那块石头顶在这里多高，占石块高的比例 */
+/** 礁石堆里一块块礁石：最近的那块礁石顶在这里多高，占礁块高的比例 */
 function blocks(x: number, y: number, size: number, seed: number): number {
   const gx = x / size
   const gy = y / size
@@ -474,8 +474,8 @@ function blocks(x: number, y: number, size: number, seed: number): number {
 }
 
 /**
- * (x, y)（地图坐标，格）处的海底高出开局站位多少米：谷底按噪声起伏、往下游慢慢低下去；出了壁脚是岩壁、壁顶外是台地，
- * 出了堆脚是一块块石头堆起的岩堆，出了坎沿是越来越陡、没进黑暗的坡；大石头鼓起一块。鲸骨、冷泉这类细节由画地面的另算
+ * (x, y)（地图坐标，格）处的海底高出开局站位多少米：沙底按噪声起伏、往下游慢慢低下去；出了墙脚是礁墙、墙顶外是台地，
+ * 出了堆脚是一块块礁石堆起的礁石堆，出了坎沿是越来越陡、沉进深蓝的坡；珊瑚头鼓起一块。鲸骨、涌泉这类细节由画地面的另算
  */
 export function seabedM(plan: DeepPlan, x: number, y: number): number {
   const e = plan.edges

@@ -77,10 +77,10 @@ import { callSquad, streamInterval } from './fight/spawns'
 import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseMs, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
-import { subCountdown } from '../maps/deep/sub'
+import { bellCountdown } from '../maps/deep/bell'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { BellSnapshot, ClockSnapshot, HudSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -531,7 +531,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       glow: burstEmitter(this, [0xd1c4e9, 0x80deea, 0xffffff, 0xb388ff], 150, 800, { blendMode: Phaser.BlendModes.ADD }),
       petals: burstEmitter(this, [0xffc1d9, 0xffe4ee, 0xf8bbd0, 0xffffff], 100, 1200, { gravityY: 55, rotate: { min: 0, max: 360 } }),
       sand: burstEmitter(this, [0xe8c27a, 0xd9a85b, 0xf3dca5, 0xc8954a], 120, 700, { gravityY: 160 }),
-      silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
+      silt: burstEmitter(this, [0xe6e1cf, 0xd6d0bb, 0xf3efe2, 0xc5bea6], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
     }
@@ -609,7 +609,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       })),
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
-      submarine: sim ? submarineSnapshot(sim) : null,
+      bell: sim ? bellSnapshot(sim) : null,
     }
   }
 
@@ -1052,12 +1052,12 @@ function tiltSnapshot(sim: Sim): TiltSnapshot | null {
 }
 
 /** 溶洞里的一局：太阳与月亮此刻的时角、月相，以及离天黑（太阳落到时间放慢的那个高度）或天亮还有几秒 */
-/** 在深海打的一局：潜艇的倒计时 */
-function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
+/** 在暖海打的一局：潜水钟的倒计时 */
+function bellSnapshot(sim: Sim): BellSnapshot | null {
   const deep = sim.worldState.deep
   const cfg = MAPS[sim.mapId].deep
   if (!deep || !cfg) return null
-  const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
+  const c = bellCountdown(deep.bell, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
 }
 
