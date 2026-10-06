@@ -1348,10 +1348,10 @@ export interface PetriConfig {
 export type WarpShape = 'hall' | 'pillars' | 'cloister' | 'narrow'
 export interface WarpConfig {
   /**
-   * 方框切成 2×2 四间房，每间是方框的四分之一。平台离方框边 rimU 格，离十字缝的中线 gapU 格；靠外的两边是 wallU 格宽的墙沿，
-   * 朝缝的两边是 lipU 格宽的台沿；狭长的那间只有 narrowU 格宽，其余铺成机柜台。能走的地方都落在整格上
+   * 方框切成 2×2 四间房，每间是方框的四分之一，画面上整块往四周平铺。平台摆在那一格正中，四边离格边都是 gapU 格（平铺后房与房之间都隔两倍的虚空），
+   * 四边一圈 lipU 格宽的台沿；狭长的那间只有 narrowU 格宽，其余铺成机柜台。能走的地方都落在整格上
    */
-  readonly room: { readonly rimU: number; readonly wallU: number; readonly lipU: number; readonly gapU: number; readonly narrowU: number }
+  readonly room: { readonly lipU: number; readonly gapU: number; readonly narrowU: number }
   /** 窄过两倍 neckU 的缝不能走 */
   readonly neckU: number
   /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着传送台 padClearU 格以内的不立 */

@@ -10,7 +10,7 @@ import type { WarpConfig } from '../../types/maps'
 export const FACE_U = 0.62
 /** 平台落在远处底下的影子往哪边偏、偏多远（格），影子边多软（格） */
 const SHADOW = { x: 0.9, y: 1.3, soft: 0.7, alpha: 0.6 } as const
-/** 墙沿朝地面那一侧露出的立面多高，格 */
+/** 机柜台朝地面那一侧露出的立面多高，格 */
 const WALL_FACE_U = 0.34
 /** 凹槽往下看得见的那一截内壁多高，格 */
 const PIT_FACE_U = 1.5
@@ -18,7 +18,7 @@ const PIT_FACE_U = 1.5
 const TILE = [214, 236, 242] as const
 const SEAM = [128, 152, 168] as const
 const SEAM_U = 0.045
-/** 墙沿、台沿、机柜与传送台的金属 */
+/** 台沿、机柜与传送台的金属 */
 const GRAPHITE = [27, 35, 50] as const
 const STEEL = [92, 108, 128] as const
 const DEEP = [8, 13, 26] as const
@@ -112,26 +112,7 @@ function face(out: Rgb, color: Rgb, x: number, t: number, aa: number): void {
   for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.35 * seam * (1 - strip))
 }
 
-/** 墙沿的顶面：石墨色的面板、一格一格的接缝与通风口，朝地面那一边的边上一道房间颜色的灯带 */
-function wall(out: Rgb, color: Rgb, x: number, y: number, edge: number, aa: number): void {
-  const n = valueNoise(x * 3.1, y * 3.1, 17)
-  set(out, GRAPHITE, 0.92 + 0.12 * n)
-  const px = ((x % 2) + 2) % 2
-  const py = ((y % 2) + 2) % 2
-  const seam = 1 - smooth(0.025, 0.025 + aa, Math.min(px, 2 - px, py, 2 - py))
-  for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.45 * seam) + 30 * seam * 0.3
-  const vx = ((x + 0.5) % 2) - 1
-  const vy = ((y + 0.5) % 2) - 1
-  if (Math.abs(vx) < 0.42 && Math.abs(vy) < 0.24 && edge > 0.9) {
-    const slot = Math.abs(((vy + 0.24) % 0.12) - 0.06) < 0.025 ? 0.55 : 1
-    for (let i = 0; i < 3; i++) out[i] = out[i]! * slot
-  }
-  const strip = Math.exp(-(((edge - 0.16) / 0.06) ** 2))
-  addGlow(out, color, 1.1 * strip)
-  addGlow(out, color, 0.18 * Math.exp(-edge / 0.5))
-}
-
-/** 墙沿朝地面的立面：从墙顶往下暗下去 */
+/** 机柜台朝地面的立面：从台顶往下暗下去 */
 function wallFace(out: Rgb, color: Rgb, t: number): void {
   set(out, GRAPHITE, 1.35 - 0.7 * t)
   addGlow(out, color, 0.12 * (1 - t))
@@ -287,7 +268,6 @@ function faceAt(plan: WarpPlan, x: number, y: number): { room: WarpRoom; t: numb
 function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: number, aa: number, out: Rgb): void {
   const color = prep.colors[room.index]!
   const f = room.floor
-  const mid = 24
   const pad = room.pad
   const pr = sc.cfg.pad.radiusU
   const pd = Math.hypot(x - pad.x, y - pad.y)
@@ -311,9 +291,6 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
     ao = Math.max(ao, Math.exp(-Math.max(0, pd - pr) / 0.18) * 0.4)
     tile(out, x, y, ao, aa)
     if (room.shape === 'hall') emblem(out, color, room, x, y)
-    // 墙沿在地面北边时，地上靠墙的一窄条落在墙的影子里
-    const wallNorth = f.y0 > room.slab.y0 + 0.5 && f.y0 < mid
-    if (wallNorth && y - f.y0 < 0.4) for (let i = 0; i < 3; i++) out[i] = out[i]! * (0.72 + 0.28 * ((y - f.y0) / 0.4))
     return
   }
   if (room.deck && sdBox(room.deck, x, y) < 0) {
@@ -324,21 +301,14 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
     addGlow(out, color, 0.9 * Math.exp(-(((toFloor - 0.1) / 0.05) ** 2)))
     return
   }
-  // 墙沿还是台沿：朝方框外的两边是墙沿，朝十字缝的两边是台沿
-  const outerX = x < f.x0 ? f.x0 < mid : x >= f.x1 ? f.x1 > mid : false
-  const outerY = y < f.y0 ? f.y0 < mid : y >= f.y1 ? f.y1 > mid : false
   const toFloor = sdBox(f, x, y)
-  if (outerX || outerY) {
-    if (y < f.y0 && f.y0 - y < WALL_FACE_U && x >= f.x0 - 0.01 && x < f.x1 + 0.01 && outerY) return wallFace(out, color, 1 - (f.y0 - y) / WALL_FACE_U)
-    return wall(out, color, x, y, toFloor, aa)
-  }
   const along = x < f.x0 || x >= f.x1 ? y : x
   return lip(out, color, along, clamp01(toFloor / sc.cfg.room.lipU), aa)
 }
 
 /**
- * 跃迁站的地面：虚空透明，留给底下的着色器；四块平台的顶面是一格一块的冷白地砖，靠外两边是石墨色的墙沿、朝缝的两边是护栏台沿，
- * 都镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与传送台的台座也画在这里
+ * 跃迁站的地面：虚空透明，留给底下的着色器；四块平台的顶面是一格一块的冷白地砖，四边一圈护栏台沿，
+ * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与传送台的台座也画在这里
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const plan = sc.plan
@@ -368,8 +338,8 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           let gc: Rgb = [0, 0, 0]
           for (const r of plan.rooms) {
             const s = { x0: r.slab.x0, y0: r.slab.y0, x1: r.slab.x1, y1: r.slab.y1 + FACE_U }
-            const d = sdBox(s, x - SHADOW.x, y - SHADOW.y)
-            shadow = Math.max(shadow, 1 - smooth(-SHADOW.soft, SHADOW.soft, d))
+            // 画面四周平铺：贴着方框边的影子要接上那一头平台落下来的
+            for (const ox of [-FRAME_U, 0, FRAME_U]) for (const oy of [-FRAME_U, 0, FRAME_U]) shadow = Math.max(shadow, 1 - smooth(-SHADOW.soft, SHADOW.soft, sdBox(s, x - SHADOW.x - ox, y - SHADOW.y - oy)))
             const under = y - (r.slab.y1 + FACE_U)
             if (x >= r.slab.x0 - 0.3 && x < r.slab.x1 + 0.3 && under >= 0 && under < 1.2) {
               const k = Math.exp(-under / 0.35) * (1 - smooth(r.slab.x1 - 0.2, r.slab.x1 + 0.3, x)) * smooth(r.slab.x0 - 0.3, r.slab.x0 + 0.2, x)

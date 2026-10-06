@@ -715,7 +715,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 跃迁：四间房的平台、墙沿、台沿与能走的方块都落在整格上，能走的方块放得下开局的空地，狭长的那间横竖都装得下传送台；
+ * 跃迁：四间房的平台、台沿与能走的方块都落在整格上，能走的方块放得下开局的空地，狭长的那间横竖都装得下传送台；
  * 传送台站得下队长和跟在身后的队员，充能、冷却、发车的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与核心柱；
  * 抽一批种子真的生成一遍：开局站位四周空着，每间房的传送台与出怪板都落在那间能走的地方上，四间各有会亮的瓷砖
  */
@@ -727,7 +727,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const { room: r, pad, pillars: pl, emitters: em } = c
   const f = roomFrame(c)
   const whole = (v: number): boolean => Math.abs(v - Math.round(v)) < 1e-9
-  need(r.rimU > 0 && r.wallU > 0 && r.lipU > 0 && r.gapU > 0 && c.neckU > 0, `${at}.room 的边距、墙沿、台沿、缝宽与窄缝须为正`)
+  need(r.lipU > 0 && r.gapU > 0 && c.neckU > 0, `${at}.room 的台沿、缝宽与窄缝须为正`)
   need(whole(f.f0) && whole(f.f1) && whole(r.narrowU), `${at}.room 的能走的方块与狭长那间的宽须落在整格上`)
   need(f.f1 - f.f0 >= SPAWN_CLEAR_U * 2 + 2 && r.narrowU >= 2 * pad.radiusU + 2 && r.narrowU < f.f1 - f.f0, `${at}.room 的能走的方块放不下开局的空地，或狭长那间放不下传送台`)
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul

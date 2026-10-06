@@ -29,8 +29,6 @@ const MASK_KEY = 'warp-mask'
 const TINT_KEY = 'warp-tint'
 const PAINT_THREADS = 4
 const STRIP_PX = 64
-/** 虚空比方框四边各多铺这么多格：横屏竖屏都盖得满 */
-const VOID_PAD_U = 40
 /** 刚踩上那一脚的方框扩到四边要多久，毫秒 */
 const FLASH_MS = 260
 /** 送走一个身体时它散成多少个光块，个头每大一格多几个 */
@@ -132,7 +130,7 @@ interface Uniforms {
 }
 
 /**
- * 跃迁：底下是望得见底的虚空，网格上流着数据光流，正中的核心柱一路照进深处；四块平台的地面、墙沿、台沿与平台的影子是开局在后台线程画好的贴图。
+ * 跃迁：底下是望得见底的虚空，网格上流着数据光流，正中的核心柱一路照进深处；镜头跟着队长走，整块方框在画面上往四周平铺。四块平台的地面、台沿与平台的影子是开局在后台线程画好的贴图。
  * 地砖按谁踩过亮起信号蓝或信号红、慢慢暗下去，闲着时按各间的律动透出房间的主色；传送台、光桥、核心柱、出怪板上凝成形的敌人、
  * 被送过虚空的身体散成的光块都每帧现画
  */
@@ -166,7 +164,7 @@ export class WarpView implements MapView {
     const u = this.u
     const plan = this.planOf(v)
     const seed = (v.run.decorSeed % 997) + 0.5
-    const rect = [-VOID_PAD_U, -VOID_PAD_U, FRAME_U + VOID_PAD_U * 2, FRAME_U + VOID_PAD_U * 2]
+    const rect = [0, 0, FRAME_U, FRAME_U]
     this.visuals.push(
       v.scene.add
         .shader(
@@ -191,9 +189,9 @@ export class WarpView implements MapView {
     )
   }
 
-  /** 镜头一直看全局：四间房同时在屏幕上 */
+  /** 镜头跟着队长走，方框在画面上往四周平铺：往哪边看都有房间，只是画，不是世界 */
   framing(): Framing {
-    return { map: FRAME, edge: 'frame', fit: true }
+    return { map: FRAME, edge: 'wrap', tile: true }
   }
 
   decor(_v: ViewCtx, _atlas: EcsAtlas): void {}
@@ -651,7 +649,7 @@ export class WarpView implements MapView {
         if (s <= 0) continue
         const r = spread * (1 - ease(s)) + 0.1 * UNIT
         const lifted = (1 - s) * 0.9 * UNIT
-        const size = (0.18 + 0.12 * h2) * UNIT * (boss ? 1.5 : 1)
+        const size = (0.12 + 0.08 * h2) * UNIT * (boss ? 1.5 : 1)
         g.fillStyle(j % 3 === 0 ? 0xffffff : FOE_GLOW, 0.35 + 0.55 * s)
         g.fillRect(x + Math.cos(ang) * r - size / 2, y + Math.sin(ang) * r * 0.7 - lifted - size / 2, size, size)
       }
@@ -683,7 +681,7 @@ export class WarpView implements MapView {
       const ang = a * Math.PI * 2
       const off = h.r * (0.4 + 0.8 * b)
       const lag = c * 0.25
-      const size = (0.26 + 0.22 * b) * UNIT
+      const size = (0.14 + 0.14 * b) * UNIT
       let x: number
       let y: number
       let al: number

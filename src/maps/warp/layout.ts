@@ -29,7 +29,7 @@ export interface Plate {
 
 /**
  * 一间房，格：在环上排第 index，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状、签名（主色与地板的待机律动）、敌人配方（cfg.recipes 的第几种）；
- * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；out 是房间朝外的两个方向（墙沿那两边），toward 是传送台朝下一间的方向
+ * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；toward 是传送台朝下一间的方向
  */
 export interface WarpRoom {
   readonly index: number
@@ -112,9 +112,9 @@ export function roomFrame(cfg: WarpConfig): { readonly slab0: number; readonly s
   const slab1 = MID - r.gapU
   const f1 = slab1 - r.lipU
   return {
-    slab0: r.rimU,
+    slab0: r.gapU,
     slab1,
-    f0: r.rimU + r.wallU,
+    f0: r.gapU + r.lipU,
     f1,
     pad: { x: f1 - cfg.pad.edgeU - cfg.pad.radiusU, y: f1 - cfg.pad.cornerU },
   }

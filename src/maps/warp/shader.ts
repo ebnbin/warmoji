@@ -24,7 +24,7 @@ float hash1(vec2 p) {
 /**
  * 虚空：平台底下望得见底的深处。深蓝的底上铺着一张淡淡的网格，每隔几格一道粗一点的线；
  * 有的线上一节节数据光流缓缓流过去；正中的核心柱往深处一路照下去，越深越暗，四周罩着它的一团光。
- * 线多细按屏幕上的像素定（uPx 是一个设备像素合几格）；uRect 是镜头拍到的范围（格）
+ * 只铺满方框，画面上和地图一起往四周平铺，所以网格、光流与核心柱的光都按方框的周期接得上；线多细按屏幕上的像素定（uPx 是一个设备像素合几格）；uRect 是铺的范围（格）
  */
 export const VOID_FRAG = `${HEADER}
 uniform vec4 uRect;
@@ -33,6 +33,7 @@ uniform float uSeed;
 uniform vec2 uCore;
 uniform float uPx;
 ${NOISE}
+const float N = ${FRAME_U.toFixed(1)};
 const vec3 DEEP = vec3(0.008, 0.02, 0.05);
 const vec3 HAZE = vec3(0.03, 0.08, 0.17);
 const vec3 LINE = vec3(0.12, 0.3, 0.5);
@@ -47,7 +48,7 @@ float lineDist(float v, float g) {
 
 /** 一个方向上的数据光流：间距 g 的线里约三成在流，一节节亮光沿 along 流过去，各条线快慢、方向不一 */
 float stream(float across, float along, float g, float salt) {
-  float id = floor(across / g + 0.5);
+  float id = mod(floor(across / g + 0.5), N / g);
   float h = hash1(vec2(id, salt + uSeed));
   if (h > 0.32) return 0.0;
   float w = exp(-pow(lineDist(across, g) / (uPx * 1.6 + 0.02), 2.0));
@@ -63,7 +64,9 @@ void main ()
 {
   vec2 tc = outTexCoord;
   vec2 p = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
+  // 画面四周平铺：离核心柱按最近的那一份算，方框边上接得上
   vec2 c = p - uCore;
+  c -= N * floor((c + N * 0.5) / N);
   float r = length(c);
   vec3 col = DEEP + HAZE * (0.35 + 0.65 * exp(-r / 16.0));
   float fine = min(lineDist(p.x, 2.0), lineDist(p.y, 2.0));
@@ -75,7 +78,7 @@ void main ()
   col += DATA * pulse * 0.55;
   // 核心柱往深处照下去：一根直立的光柱，越往下越暗
   float down = max(0.0, c.y);
-  float shaft = exp(-pow(c.x / 1.1, 2.0)) * exp(-down / 13.0) * step(0.0, c.y);
+  float shaft = exp(-pow(c.x / 1.1, 2.0)) * exp(-down / 13.0) * step(0.0, c.y) * (1.0 - smoothstep(16.0, 23.0, c.y));
   col += CORE * shaft * 0.5;
   col += CORE * 0.55 * exp(-r * r / 9.0);
   col += vec3(0.25, 0.6, 0.9) * 0.18 * exp(-r / 7.0);

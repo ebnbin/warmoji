@@ -13,12 +13,13 @@ export type { Rect } from '../maps/frame'
 /**
  * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；
  * clamp 跟随时镜头停在地图外 cameraMargin 格再加设备安全区；open 不设边；wrap 四边回绕、一圈就是地图矩形；
- * fit 的图平时就整张放进一屏、不跟随
+ * fit 的图平时就整张放进一屏、不跟随；tile 的图跟随时也把地图矩形四周平铺出一圈副本（只画，不是世界），只用在 wrap 的图上
  */
 export interface Framing {
   readonly map: Rect
   readonly edge: 'frame' | 'clamp' | 'open' | 'wrap'
   readonly fit?: boolean
+  readonly tile?: boolean
 }
 
 /** follow 跟着锚点走；map 固定把地图矩形整张放进一屏 */
@@ -47,7 +48,7 @@ export interface Screen {
   sees(x: number, y: number, pad?: number): boolean
 }
 
-/** 环面固定取景时，八台镜像镜头各比主镜头偏几圈 */
+/** 环面固定取景、或平铺的图跟随时，八台镜像镜头各比主镜头偏几圈 */
 const MIRRORS = [
   [-1, -1],
   [0, -1],
@@ -77,7 +78,7 @@ interface Quake {
 }
 
 /**
- * 战斗镜头：只有它摆镜头。每帧按模式定下拍哪里、拍多大；环面固定取景时另开八台镜像镜头，把一圈外的东西画回框里。
+ * 战斗镜头：只有它摆镜头。每帧按模式定下拍哪里、拍多大；环面固定取景、或平铺的图跟随时另开八台镜像镜头，把一圈外的东西画回框里、把地图四周平铺出副本。
  * 震屏所有镜头一起震，屏幕上的幅度按跟随时的缩放算；盖满屏幕的底色与遮罩随缩放保持铺满
  */
 export class Lens {
@@ -158,6 +159,7 @@ export class Lens {
         cx = clampSpan(cx, b.x, b.w, W / zoom)
         cy = clampSpan(cy, b.y, b.h, H / zoom)
       }
+      wrap = f.edge === 'wrap' && f.tile === true
     } else if (f.edge === 'wrap') {
       const r = f.fit ? f.map : cellOf(f.map, anchor)
       port = fitIn(area, r.w, r.h)

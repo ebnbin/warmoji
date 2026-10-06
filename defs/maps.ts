@@ -1401,7 +1401,7 @@ export const MAPS = {
     },
     finalWaveSub: '失控核心从核心柱里冲了出来——它落在哪间，就把哪间变成战场！',
     warp: {
-      room: { rimU: 0.5, wallU: 2.5, lipU: 1, gapU: 2, narrowU: 8 },
+      room: { lipU: 1, gapU: 2, narrowU: 8 },
       neckU: 0.4,
       pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
       pitU: 8,
