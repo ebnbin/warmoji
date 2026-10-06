@@ -27,8 +27,8 @@ const MENISCUS_U = 0.4
 const MENISCUS_RISE = 0.9
 const MENISCUS_LENS = 0.06
 /** 营养琼脂每单位厚度透过多少光（红、绿、蓝）：灯箱的光透过它就是看到的颜色；另加琼脂表面漫反射回来的室内光 */
-const AGAR_T = [0.91, 0.827, 0.616] as const
-const AGAR_BACK = [12, 9, 4] as const
+const AGAR_T = [0.943, 0.891, 0.792] as const
+const AGAR_BACK = [10, 9, 6] as const
 /** 透过钠钙玻璃看灯箱的颜色倍率：玻璃边带一点青 */
 const GLASS_TINT = [0.8, 0.88, 0.88] as const
 /** 灯箱：中心的颜色，到方框四角暗下去多少；网格线的颜色 */

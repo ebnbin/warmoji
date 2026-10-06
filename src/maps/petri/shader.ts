@@ -13,7 +13,7 @@ export function encodeColony(f: ColonyField, matureS: number, out: Uint8ClampedA
 }
 
 /**
- * 菌落：按数据图画在琼脂上。密度过 uEdge 的地方是奶白、不透光的菌落，边缘按噪声扭得高低不齐，别处什么都不画、露出干净的琼脂；
+ * 菌落：按数据图画在琼脂上。密度过 uEdge 的地方是白色、不透光的菌落，边缘按噪声扭得高低不齐，贴着边一道细细的暗边，别处什么都不画、露出干净的琼脂；
  * 厚度是密度乘熟度，熟的地方表面起皱，按厚度的梯度朝着灯打光，圆顶上一点湿亮的高光
  */
 export const COLONY_FRAG = `
@@ -78,9 +78,10 @@ void main ()
   vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
   float dif = max(dot(n, l), 0.0);
   float spec = pow(max(dot(n, h), 0.0), 24.0);
-  vec3 cream = mix(vec3(0.97, 0.945, 0.89), vec3(0.935, 0.9, 0.81), mature);
-  vec3 shade = vec3(0.84, 0.77, 0.65);
+  vec3 cream = mix(vec3(0.98, 0.976, 0.957), vec3(0.949, 0.937, 0.902), mature);
+  vec3 shade = vec3(0.84, 0.82, 0.77);
   vec3 col = mix(shade, cream, clamp(0.8 + (dif - 0.52) * 1.2, 0.0, 1.0)) + vec3(1.0, 0.99, 0.95) * spec * 0.45;
+  col *= 1.0 - 0.14 * (1.0 - smoothstep(uEdge + 0.02, uEdge + 0.16, u + ragged));
 
   float inDish = 1.0 - smoothstep(uDish.z - 0.6, uDish.z, length(cell - uDish.xy));
   a *= inDish;
