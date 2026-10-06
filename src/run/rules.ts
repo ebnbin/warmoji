@@ -15,6 +15,7 @@ export interface ActiveRules {
   readonly surprise: boolean
   readonly skills: boolean
   readonly vision: number
+  readonly harmless: boolean
   readonly mods: readonly StatMods[]
 }
 
@@ -44,6 +45,7 @@ export function activeRules(run: RunRules | undefined, fight: FightRules | undef
     surprise: fight?.surprise ?? run?.surprise ?? false,
     skills: fight?.skills ?? run?.skills ?? true,
     vision: fight?.vision ?? run?.vision ?? Infinity,
+    harmless: fight?.harmless ?? run?.harmless ?? false,
     mods: present([run?.mods, fight?.mods]),
   }
   return mutators.reduce(harden, base)

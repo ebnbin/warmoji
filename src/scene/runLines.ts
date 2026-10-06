@@ -1,5 +1,6 @@
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
+import { HAZARD_KILLS, HAZARD_NAMES } from '../data/maps'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
@@ -43,7 +44,7 @@ export function endText(e: EndRule): string {
     case 'cleared':
       return '清空所有敌人'
     case 'kills':
-      return `击杀 ${e.count} 只${e.enemy ? ENEMIES[e.enemy].name : ''}`
+      return e.by ? `让 ${e.count} 只敌人被${HAZARD_KILLS[e.by]}` : `击杀 ${e.count} 只${e.enemy ? ENEMIES[e.enemy].name : ''}`
     case 'bounty':
       return '击倒全部悬赏目标'
     case 'hold':
@@ -68,13 +69,23 @@ function phaseGoalText(p: { readonly ends: readonly Gated<EndRule>[]; readonly n
   return [wins.length === 0 ? '不会结束' : wins.join(p.need === 'all' ? '，并且' : '，或'), ...lose].join(' · ')
 }
 
+/** 一场自己的规则：我方规则、敌人都盯着队长、过关奖励 */
+export function fightRuleLines(f: FightDef): string[] {
+  const out = ruleLines(f.rules)
+  if (f.chaseLeader) out.push('敌人都盯着队长')
+  const reward = rewardText(f.reward)
+  if (reward) out.push(reward)
+  return out
+}
+
 /** 一场怎么赢、怎么输：分阶段的按先后连起来，外加这一场的特别规则与过关奖励 */
 export function fightGoalText(f: FightDef): string {
-  const parts = [phasesOf(f).map(phaseGoalText).join(' → '), ...ruleLines(f.rules)]
-  if (f.chaseLeader) parts.push('敌人都盯着队长')
-  const reward = rewardText(f.reward)
-  if (reward) parts.push(reward)
-  return parts.join(' · ')
+  return [phasesOf(f).map(phaseGoalText).join(' → '), ...fightRuleLines(f)].join(' · ')
+}
+
+/** 一场的各个阶段一行一个：开场横幅的标题，怎么达成、怎么输 */
+export function phaseLines(f: FightDef): string[] {
+  return phasesOf(f).map((p) => `${p.intro ? `${p.intro.title}：` : ''}${phaseGoalText(p)}`)
 }
 
 /** 我方规则的说法 */
@@ -89,6 +100,7 @@ function ruleLines(r: FightRules | undefined): string[] {
   if (r.surprise) out.push('敌人现身没有预兆')
   if (r.skills === false) out.push('不能放主动技能')
   if (r.vision !== undefined) out.push(`只看得见队长身边 ${r.vision} 格`)
+  if (r.harmless) out.push('我方伤不了敌人，击退与控制照常，敌人只能死于地图上的危害')
   if (r.mods) out.push(`全队${modTexts(r.mods).join('、')}`)
   return out
 }
@@ -139,6 +151,10 @@ export function starText(s: StarRule): string {
       return `击杀至少 ${s.count} 只`
     case 'lives':
       return `至少还剩 ${s.count} 次起来的机会`
+    case 'hazard':
+      return s.damage === 0 ? `没被${HAZARD_NAMES[s.by]}伤到` : `受到的${HAZARD_NAMES[s.by]}伤害不超过 ${s.damage}`
+    case 'coins':
+      return `捡到至少 ${s.count} 金币`
   }
 }
 

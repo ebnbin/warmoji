@@ -9,6 +9,7 @@ import { DIFFICULTY } from '../defs/difficulty.ts'
 import { ECONOMY } from '../defs/economy.ts'
 import { EDITOR_DRAFT } from '../defs/editor.ts'
 import { ENEMIES } from '../defs/enemies.ts'
+import { EXPERIMENTS } from '../defs/experiments.ts'
 import { FEEL } from '../defs/feel.ts'
 import { ITEMS } from '../defs/items.ts'
 import { LEVEL_STATS } from '../defs/levels.ts'
@@ -59,7 +60,7 @@ import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef, NebulaOldConfig } from '../src/types/maps'
-import type { MutatorDef, RunDef } from '../src/types/runs'
+import type { ExperimentDef, MutatorDef, RunDef } from '../src/types/runs'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -833,6 +834,8 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   report(`runs.${id}`, CHECKS.run(r))
 }
 
+for (const [id, e] of Object.entries<ExperimentDef>(EXPERIMENTS)) need(PACK.has(e.emoji), `experiments.${id} 的 emoji 不在表情包里：${e.emoji}`)
+
 need(PACK.has(EDITOR_DRAFT.emoji), `editor 的 emoji 不在表情包里：${EDITOR_DRAFT.emoji}`)
 report('editor', CHECKS.run(EDITOR_DRAFT))
 
@@ -1040,6 +1043,7 @@ write('difficulty', DIFFICULTY)
 write('economy', ECONOMY)
 write('editor', EDITOR_DRAFT)
 write('enemies', ENEMIES)
+write('experiments', EXPERIMENTS)
 write('feel', FEEL)
 write('items', ITEMS)
 write('levels', LEVEL_STATS)

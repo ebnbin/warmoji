@@ -196,9 +196,36 @@ function leech(sim: Sim, src: Source, atk: Offense, dmg: number, tags: number): 
   Leech.hp[b] = Leech.hp[b]! + amount
 }
 
-/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands 与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、暴击，只在最后取整；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
+/** 击退的冲量：出手处给的击退乘出手方的击退倍率，从出手处推向目标 */
+function knockOf(sim: Sim, atk: Offense, target: number, o: HitOpts): Point {
+  const kb = (o.knockback ?? 0) * atk.knockback
+  if (kb <= 0 || !o.from) return { x: 0, y: 0 }
+  const d = sim.hooks.worldDelta(sim, o.from.x, o.from.y, Transform.x[target]!, Transform.y[target]!)
+  const dir = norm(d.x, d.y)
+  return { x: dir.x * kb, y: dir.y * kb }
+}
+
+/** 这一场我方伤不了敌人：我方出手打在敌人身上 */
+function harmless(sim: Sim, src: Source, target: number): boolean {
+  return sim.fight.rules.harmless && src.faction === FACTION.team && Faction.v[target] === FACTION.enemy
+}
+
+/** 伤不了的一下：只闪一下、照样击退 */
+function shove(sim: Sim, src: Source, target: number, o: HitOpts): void {
+  Flash.until[target] = sim.elapsedMs + 70
+  Tint.effect[target] = 1
+  Tint.color[target] = 0xffffff
+  const j = knockOf(sim, attackOf(sim, src), target, o)
+  if (j.x !== 0 || j.y !== 0) displace(sim, target, { kind: 'push', x: j.x, y: j.y }, FORCED)
+}
+
+/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、暴击，只在最后取整；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (!lands(sim, src, target, o, true)) return false
+  if (harmless(sim, src, target)) {
+    shove(sim, src, target, o)
+    return true
+  }
   const tags = hitTags(src.tags ?? 0, o.tags ?? 0, o.tick === true)
   if (dodged(sim, target, tags)) {
     spawnMissText(sim, Transform.x[target]!, Transform.y[target]!)
@@ -234,15 +261,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   }
   gearHurt(sim, src, target, dmg, o.tick === true)
   if (team) sim.characterHitCount++
-  let jx = 0
-  let jy = 0
-  const kb = (o.knockback ?? 0) * atk.knockback
-  if (kb > 0 && o.from) {
-    const d = sim.hooks.worldDelta(sim, o.from.x, o.from.y, Transform.x[target]!, Transform.y[target]!)
-    const dir = norm(d.x, d.y)
-    jx = dir.x * kb
-    jy = dir.y * kb
-  }
+  const { x: jx, y: jy } = knockOf(sim, atk, target, o)
   const at = { x: Transform.x[target]!, y: Transform.y[target]! }
   const uid = Uid.v[target]!
   let hp = mounted(sim, target, dmg) ? Hp.v[target]! : Hp.v[target]! - dmg

@@ -201,7 +201,8 @@ export function runChecks(cat: RunCatalog): RunChecks {
   /** 星级条件：次数不为负，用时为正，击杀至少一只；剩下几次起来的机会须在命数以内 */
   const checkStar = (s: StarRule, lives: number | undefined, path: Path): void => {
     if (s.kind === 'time') need(s.ms > 0, path, '用时须为正')
-    else if (s.kind === 'kills') need(s.count >= 1, path, '击杀数至少为 1')
+    else if (s.kind === 'hazard') need(s.damage >= 0, path, '伤害不为负')
+    else if (s.kind === 'kills' || s.kind === 'coins') need(s.count >= 1, path, '数目至少为 1')
     else if (s.kind === 'lives') need(lives !== undefined && s.count >= 1 && s.count <= lives, path, '要剩下起来的机会，须有命数且不超过它')
     else need(s.count >= 0, path, '次数不为负')
   }
@@ -260,6 +261,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
       if (e.kind === 'hold') need(e.ms > 0 && e.radius > 0 && e.points.length > 0, ep, '据点须至少一处，时长与半径为正')
       if (e.kind === 'kills' || e.kind === 'coins' || e.kind === 'downs') need(e.count >= 1, ep, `${e.kind}数至少为 1`)
       if (e.kind === 'kills' && e.enemy !== undefined) need(cat.enemies[e.enemy] !== undefined && (kinds === null || kinds.has(e.enemy)), ep, `要击杀的${e.enemy}不在这一阶段出现`)
+      if (e.kind === 'kills') need(e.enemy === undefined || e.by === undefined, ep, '按死于哪种危害数，就不再按种类数')
     })
     return boss
   }

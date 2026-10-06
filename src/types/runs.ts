@@ -1,16 +1,18 @@
 import type runsJson from '../assets/runs.json'
 import type mutatorsJson from '../assets/mutators.json'
+import type experimentsJson from '../assets/experiments.json'
 import type { Polarity } from './battlefield'
 import type { CharacterId, CharacterTag } from './characters'
 import type { DriveDef, EnemyKind } from './enemies'
 import type { ItemRarity } from './items'
-import type { MapId } from './maps'
+import type { Hazard, MapId } from './maps'
 import type { StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
 import type { XpCurve } from './xp'
 
 export type RunId = keyof typeof runsJson
 export type MutatorId = keyof typeof mutatorsJson
+export type ExperimentId = keyof typeof experimentsJson
 
 /** 横幅：标题与一句提示 */
 export interface Banner {
@@ -146,7 +148,7 @@ export interface HoldPoint {
 
 /**
  * 一个阶段的结束规则，时刻与进度都从这一阶段开始时算，全灭永远是输。
- * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数。
+ * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种，写了 by 只数死于这种危害的），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数。
  * 失败：time 带 lose 时到点就输，downs 队员累计倒下到数就输。
  */
 export type EndRule =
@@ -154,7 +156,7 @@ export type EndRule =
   | { readonly kind: 'boss' }
   | { readonly kind: 'bossHp'; readonly below: number }
   | { readonly kind: 'cleared' }
-  | { readonly kind: 'kills'; readonly count: number; readonly enemy?: EnemyKind }
+  | { readonly kind: 'kills'; readonly count: number; readonly enemy?: EnemyKind; readonly by?: Hazard }
   | { readonly kind: 'bounty' }
   | { readonly kind: 'hold'; readonly ms: number; readonly radius: number; readonly points: readonly HoldPoint[] }
   | { readonly kind: 'coins'; readonly count: number }
@@ -165,6 +167,7 @@ export type EndRule =
  * revive 为假时倒下的队员不会自己起来；rescue 让活着的队长在倒下的队员身边 radius 格内连续站满 ms 毫秒把他扶起来；
  * leader 里 lock 不许手动换队长，critical 队长倒下就输，switchCdMs 是手动换队长的冷却；
  * surprise 为真时敌人现身不打预兆；skills 为假时不能放主动技能；vision 是队长看得见的半径（格），外面一片漆黑；
+ * harmless 为真时我方伤不了敌人：出手照样命中，击退、控制与附带的效果照常，只是不掉血，敌人只能死于地图上的危害；
  * mods 是给队伍的常驻修正，一局与一场写的叠加。
  */
 export interface FightRules {
@@ -174,6 +177,7 @@ export interface FightRules {
   readonly surprise?: boolean
   readonly skills?: boolean
   readonly vision?: number
+  readonly harmless?: boolean
   readonly mods?: StatMods
 }
 
@@ -195,7 +199,7 @@ export interface RunRules extends FightRules {
   readonly maxLevel?: number
 }
 
-/** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会 */
+/** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会，hazard 全队受到 by 这种危害的伤害不超过 damage，coins 捡到的金币至少 count */
 export type StarRule =
   | { readonly kind: 'downs'; readonly count: number }
   | { readonly kind: 'time'; readonly ms: number }
@@ -203,6 +207,8 @@ export type StarRule =
   | { readonly kind: 'skills'; readonly count: number }
   | { readonly kind: 'kills'; readonly count: number }
   | { readonly kind: 'lives'; readonly count: number }
+  | { readonly kind: 'hazard'; readonly by: Hazard; readonly damage: number }
+  | { readonly kind: 'coins'; readonly count: number }
 
 /** 词缀对我方规则的改动，只能往难里改 */
 export interface MutatorRules {
@@ -338,4 +344,18 @@ export interface RunDef {
   readonly record?: boolean
   readonly stars?: readonly [StarRule, StarRule]
   readonly steps: readonly (StepDef | RepeatDef)[]
+}
+
+/**
+ * 实验：一种新玩法的最小单位，就是一场按阶段写的战斗，地图、阶段、刷怪、目标与这一场的我方规则都写在 fight 里，放进哪一局的步骤里都照样能打。
+ * 单独试玩时按 team 组队打这一场，stars 是赢下后再各得一星的两条条件；name、desc 与 note 同一局
+ */
+export interface ExperimentDef {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly note: string
+  readonly team: TeamDef
+  readonly stars: readonly [StarRule, StarRule]
+  readonly fight: StageDef
 }

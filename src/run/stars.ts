@@ -17,5 +17,9 @@ export function starMet(run: RunState, s: StarRule): boolean {
       return run.kills >= s.count
     case 'lives':
       return run.lives >= s.count
+    case 'hazard':
+      return (run.stats.hazardDamage[s.by] ?? 0) <= s.damage
+    case 'coins':
+      return run.stats.coinsTaken >= s.count
   }
 }

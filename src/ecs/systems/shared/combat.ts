@@ -44,7 +44,7 @@ export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy
   const anchored = hasComponent(sim.world, eid, Anchored)
   const at = { x: Transform.x[eid]!, y: Transform.y[eid]! }
   const hostile = Faction.v[eid] === FACTION.enemy
-  killBody(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
+  killBody(sim, eid, src, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
   if (hostile) gearKill(sim, src, at)
 }
 
@@ -120,14 +120,15 @@ function down(sim: Sim, eid: number): void {
   if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
 }
 
-/** 死亡移除：战利品、击杀计数与 Boss 倒下只算敌方阵营的身体；亡语、巢穴、携带物、碎片敌我同一条 */
-function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, flingVy: number): void {
+/** 死亡移除：战利品、击杀计数（连同死于哪种危害）与 Boss 倒下只算敌方阵营的身体；亡语、巢穴、携带物、碎片敌我同一条 */
+function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
   sim.hooks.died?.(sim, eid)
   const hostile = Faction.v[eid] === FACTION.enemy
   const st = sim.run.stats
   if (hostile) {
     sim.run.kills++
-    if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
+    if (src.slot >= 0 && src.slot < st.kills.length) st.kills[src.slot] = (st.kills[src.slot] ?? 0) + 1
+    if (src.hazard) st.hazardKills[src.hazard] = (st.hazardKills[src.hazard] ?? 0) + 1
   }
   playSfx('kill')
   const def = enemyDef[eid]

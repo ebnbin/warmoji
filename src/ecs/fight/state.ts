@@ -1,10 +1,12 @@
 import { query, removeEntity } from 'bitecs'
 import { ENEMIES } from '../../data/enemies'
+import { HAZARD_KILLS } from '../../data/maps'
 import { phasesOf, timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { Polarity } from '../../types/battlefield'
 import type { EnemyDef, EnemyKind, EnemyMixEntry } from '../../types/enemies'
+import type { Hazard } from '../../types/maps'
 import type { BossRule, CarrierRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyWavesRule, Loot, MixEntry, SpawnAt, StreamRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
@@ -126,6 +128,7 @@ export interface FightState {
 interface PhaseBase {
   readonly kills: number
   readonly enemyKills: Partial<Record<EnemyKind, number>>
+  readonly hazardKills: Partial<Record<Hazard, number>>
   readonly coins: number
   readonly downs: number
 }
@@ -135,7 +138,7 @@ function downsOf(run: RunState): number {
 }
 
 function baseOf(run: RunState): PhaseBase {
-  return { kills: run.kills, enemyKills: { ...run.stats.enemyKills }, coins: run.coins, downs: downsOf(run) }
+  return { kills: run.kills, enemyKills: { ...run.stats.enemyKills }, hazardKills: { ...run.stats.hazardKills }, coins: run.coins, downs: downsOf(run) }
 }
 
 /** 阶段自己的状态：刷怪、配比与据点换成这一阶段的，进度从 at 这一刻、run 此刻的计数算起 */
@@ -316,11 +319,12 @@ function bossBelow(sim: Sim, below: number): boolean {
   return livingBosses(sim).some((eid) => Hp.v[eid]! < Hp.max[eid]! * below)
 }
 
-/** 这一阶段里击杀了几只：写了种类就只数这一种 */
-function killsOf(sim: Sim, enemy: EnemyKind | undefined): number {
+/** 这一阶段里击杀了几只：写了种类就只数这一种，写了危害就只数死于它的 */
+function killsOf(sim: Sim, e: Extract<EndRule, { kind: 'kills' }>): number {
   const f = sim.fight
-  if (enemy === undefined) return sim.run.kills - f.base.kills
-  return (sim.run.stats.enemyKills[enemy] ?? 0) - (f.base.enemyKills[enemy] ?? 0)
+  if (e.by !== undefined) return (sim.run.stats.hazardKills[e.by] ?? 0) - (f.base.hazardKills[e.by] ?? 0)
+  if (e.enemy !== undefined) return (sim.run.stats.enemyKills[e.enemy] ?? 0) - (f.base.enemyKills[e.enemy] ?? 0)
+  return sim.run.kills - f.base.kills
 }
 
 /** 还活着或还没放出的悬赏目标 */
@@ -339,7 +343,7 @@ function won(sim: Sim, e: EndRule): boolean {
     case 'cleared':
       return !streaming(sim) && foesLeft(sim) === 0
     case 'kills':
-      return killsOf(sim, e.enemy) >= e.count
+      return killsOf(sim, e) >= e.count
     case 'bounty':
       return f.bounties > 0 && bountiesLeft(sim) === 0
     case 'hold':
@@ -397,7 +401,7 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
         break
       }
       case 'kills':
-        out.push({ text: `击杀${e.enemy ? ENEMIES[e.enemy].name : ''} ${Math.min(e.count, killsOf(sim, e.enemy))}/${e.count}`, warn: false })
+        out.push({ text: `${e.by ? HAZARD_KILLS[e.by] : `击杀${e.enemy ? ENEMIES[e.enemy].name : ''}`} ${Math.min(e.count, killsOf(sim, e))}/${e.count}`, warn: false })
         break
       case 'bossHp':
         out.push({ text: `把头目打到 ${Math.round(e.below * 100)}% 血`, warn: false })
