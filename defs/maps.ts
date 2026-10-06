@@ -1413,6 +1413,8 @@ export const MAPS = {
         benches: [1, 3],
         bench: { lengthU: 2.4, depthU: 0.7, heightM: 0.8 },
         kiosk: { radiusU: 0.55, heightM: 0.95 },
+        vending: { count: [1, 2], lengthU: 1.3, depthU: 0.75, heightM: 1.9 },
+        bin: { radiusU: 0.24, heightM: 0.9 },
       },
       edges: { lanes: [4, 6], laneU: 1, lifts: [1, 2], liftU: 2.2, escalators: [1, 2], escalatorU: 1.8 },
     },

@@ -14,6 +14,8 @@ const NECK_U = 0.3
 const MID = FRAME_U / 2
 /** 柱子、座椅离站台边的警示带外沿、离站厅两头至少空出这么多格，走得过去 */
 const WALK_U = 1.3
+/** 站台上摆设施的那一条深色石材多宽，格 */
+const STRIP_U = 1.5
 /** 开局站的地方四周空出这么多格，设施不摆进来 */
 const PLAZA_U = 4.6
 /** 检票口两边的闸机柜多宽，格 */
@@ -59,6 +61,14 @@ export type Fixture =
   | { readonly kind: 'pillar'; readonly u: number; readonly v: number; readonly r: number; readonly h: number }
   | { readonly kind: 'bench'; readonly u: number; readonly v: number; readonly len: number; readonly dep: number; readonly back: 1 | -1 | 0; readonly h: number }
   | { readonly kind: 'kiosk'; readonly u: number; readonly v: number; readonly r: number; readonly h: number; readonly tracks: readonly number[] }
+  | { readonly kind: 'vending'; readonly u: number; readonly v: number; readonly len: number; readonly dep: number; readonly back: 1 | -1; readonly h: number; readonly hue: number }
+  | { readonly kind: 'bin'; readonly u: number; readonly v: number; readonly r: number; readonly h: number }
+
+/** 站台上摆设施的那一条：横过轨道的中线与宽（格），铺着深一点的石材 */
+export interface Strip {
+  readonly v: number
+  readonly w: number
+}
 
 /** 站厅边上的一个口子，局部坐标（格）：沿轨道的中点与宽 */
 export interface Opening {
@@ -80,6 +90,7 @@ export interface TransitPlan {
   readonly tracks: readonly Track[]
   readonly platforms: readonly Platform[]
   readonly fixtures: readonly Fixture[]
+  readonly strips: readonly Strip[]
   readonly gateSide: 0 | 1
   readonly lanes: readonly Opening[]
   readonly lifts: readonly Opening[]
@@ -152,7 +163,7 @@ function bands(cfg: TransitConfig, rng: Rng, width: number, n: number): { kind: 
 
 /** 设施的占地，局部坐标（格）：在里面为正、外面为负的大致距离 */
 export function fixtureRoom(f: Fixture, u: number, v: number): number {
-  if (f.kind === 'bench') {
+  if (f.kind === 'bench' || f.kind === 'vending') {
     const du = Math.abs(u - f.u) - f.len / 2
     const dv = Math.abs(v - f.v) - f.dep / 2
     const out = Math.hypot(Math.max(du, 0), Math.max(dv, 0))
@@ -197,6 +208,7 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
   const expressTrack = (near[Math.floor(rng.next() * near.length)] ?? tracks[0]!).index
 
   const fixtures: Fixture[] = []
+  const strips: Strip[] = []
   const f = cfg.fixtures
   const clearOf = (u: number, v: number, r: number): boolean => Math.hypot(u - start.u, v - start.v) >= PLAZA_U + r && fixtures.every((o) => fixtureRoom(o, u, v) < -(r + WALK_U))
   for (const p of platforms) {
@@ -207,6 +219,7 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
     const every = between(rng, f.pillarEveryU)
     const phase = rng.next() * every
     const pv = p.outer === -1 ? mid : p.outer === 0 ? p.v0 + f.pillarU + 0.9 : p.v1 - f.pillarU - 0.9
+    strips.push({ v: pv, w: p.outer === -1 ? Math.min(STRIP_U, wide - 2 * edge - 2 * WALK_U) : STRIP_U })
     if (room(pv) >= f.pillarU + WALK_U && wide >= f.pillarU * 2 + WALK_U * 2) {
       for (let u = u0 + 1.5 + phase; u <= u1 - 1.5; u += every) {
         if (clearOf(u, pv, f.pillarU)) fixtures.push({ kind: 'pillar', u, v: pv, r: f.pillarU, h: Infinity })
@@ -221,6 +234,20 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
         const u = u0 + END_KEEP_U + b.lengthU / 2 + rng.next() * (L - 2 * END_KEEP_U - b.lengthU)
         if (!clearOf(u, bv, b.lengthU / 2)) continue
         fixtures.push({ kind: 'bench', u, v: bv, len: b.lengthU, dep: b.depthU, back, h: b.heightM })
+        k++
+        const bu = u + (rng.next() < 0.5 ? -1 : 1) * (b.lengthU / 2 + f.bin.radiusU + 0.35)
+        if (rng.next() < 0.6 && bu > u0 + END_KEEP_U && bu < u1 - END_KEEP_U && clearOf(bu, bv, f.bin.radiusU)) fixtures.push({ kind: 'bin', u: bu, v: bv, r: f.bin.radiusU, h: f.bin.heightM })
+      }
+    }
+    if (p.outer !== -1) {
+      const vm = f.vending
+      const side: 1 | -1 = p.outer === 0 ? -1 : 1
+      const vv = p.outer === 0 ? p.v0 + vm.depthU / 2 : p.v1 - vm.depthU / 2
+      const count = Math.round(between(rng, [vm.count[0] - 0.49, vm.count[1] + 0.49]))
+      for (let k = 0, tries = 0; k < count && tries < 40; tries++) {
+        const u = u0 + END_KEEP_U + vm.lengthU / 2 + rng.next() * (L - 2 * END_KEEP_U - vm.lengthU)
+        if (!clearOf(u, vv, vm.lengthU / 2)) continue
+        fixtures.push({ kind: 'vending', u, v: vv, len: vm.lengthU, dep: vm.depthU, back: side, h: vm.heightM, hue: rng.next() })
         k++
       }
     }
@@ -293,6 +320,7 @@ export function transitPlan(cfg: TransitConfig, seed: number, horiz: boolean): T
     tracks,
     platforms,
     fixtures,
+    strips,
     gateSide,
     lanes,
     lifts,

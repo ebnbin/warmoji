@@ -716,7 +716,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(range(hit.flingU) && hit.liftU >= 0 && hit.flingMs > 0 && hit.immuneMs > 0 && hit.heavyU > 0, `${at}.hit 的撞飞距离、时长与免撞时间须为正`)
   need(range(f.pillarEveryU) && f.pillarU > 0 && ints(f.benches, 0) && f.bench.lengthU > 0 && f.bench.depthU > 0 && f.kiosk.radiusU > 0, `${at}.fixtures 的尺寸须为正，座椅张数为非负整数`)
   const clearM = (OBSTACLES.body.heightM / OBSTACLES.body.layers) * Math.floor(OBSTACLES.body.layers * OBSTACLES.body.step)
-  need(f.bench.heightM > clearM && f.kiosk.heightM > clearM && Math.max(f.bench.heightM, f.kiosk.heightM) < (OBSTACLES.body.layers - 0.5) * (OBSTACLES.body.heightM / OBSTACLES.body.layers), `${at}.fixtures 的座椅与底座须挡得住标准身体、又矮过平射的子弹`)
+  need(f.bench.heightM > clearM && f.kiosk.heightM > clearM && f.bin.heightM > clearM && Math.max(f.bench.heightM, f.kiosk.heightM, f.bin.heightM) < (OBSTACLES.body.layers - 0.5) * (OBSTACLES.body.heightM / OBSTACLES.body.layers), `${at}.fixtures 的座椅、垃圾桶与底座须挡得住标准身体、又矮过平射的子弹`)
+  need(ints(f.vending.count, 0) && f.vending.lengthU > 0 && f.vending.depthU > 0 && f.vending.heightM > OBSTACLES.body.heightM && f.bin.radiusU > 0, `${at}.fixtures 的售货机须比人高、尺寸为正，垃圾桶半径为正`)
   need(ints(edges.lanes, 1) && ints(edges.lifts, 1) && ints(edges.escalators, 1) && edges.laneU >= 2 * Math.max(...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0)) && edges.liftU > 0 && edges.escalatorU > 0, `${at}.edges 至少各一处，检票通道走得过最大的身体`)
   for (let s = 0; s < 24; s++) {
     const plan = transitPlan(c, s * 7919 + 13, s % 2 === 0)

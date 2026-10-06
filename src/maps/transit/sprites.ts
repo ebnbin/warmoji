@@ -73,7 +73,7 @@ export function drawRoof(ctx: CanvasRenderingContext2D, spec: TrainSpec, livery:
   ctx.clip(body)
   const g = ctx.createLinearGradient(0, m.y(-hw), 0, m.y(hw))
   const base = express ? [214, 220, 228] : [246, 248, 250]
-  const edge = express ? [150, 158, 170] : [196, 204, 214]
+  const edge = express ? [140, 148, 160] : [178, 188, 200]
   g.addColorStop(0, `rgb(${edge.join(',')})`)
   g.addColorStop(0.24, `rgb(${base.join(',')})`)
   g.addColorStop(0.5, '#ffffff')
@@ -104,8 +104,7 @@ export function drawRoof(ctx: CanvasRenderingContext2D, spec: TrainSpec, livery:
   for (const off of doorOffsets(spec)) {
     for (const side of [-1, 1]) {
       ctx.fillStyle = 'rgba(20, 26, 34, 0.9)'
-      for (const e of [-1, 1]) ctx.fillRect(m.x(off + (e * spec.doorU) / 2) - 0.02 * ppu, Math.min(m.y(side * hw), m.y(side * (hw - 0.55))), 0.04 * ppu, 0.55 * ppu)
-      ctx.fillRect(m.x(off) - 0.012 * ppu, Math.min(m.y(side * hw), m.y(side * (hw - 0.5))), 0.024 * ppu, 0.5 * ppu)
+      for (const e of [-1, 1]) ctx.fillRect(m.x(off + (e * spec.doorU) / 2) - 0.018 * ppu, Math.min(m.y(side * hw), m.y(side * (hw - 0.34))), 0.036 * ppu, 0.34 * ppu)
     }
   }
   // 节间的风挡与每节车顶的空调罩

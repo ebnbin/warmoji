@@ -47,15 +47,17 @@ const GLOW_DEPTH = 22
 const HOLO_DEPTH = 24
 /** 站台边的灯隔多远一盏、多长多宽（格） */
 const LAMP_STEP_U = 0.5
-const LAMP_LEN_U = 0.3
-const LAMP_W_U = 0.07
+const LAMP_LEN_U = 0.42
+const LAMP_W_U = 0.09
+/** 灯光晕在站台面上往外铺多宽（格） */
+const HALO_U = 0.34
 /** 灯槽中线离道床边多远（格），与地面上画的灯槽对齐 */
 const SLOT_AT_U = 0.12
 /** 预警时流过站台边的光：一串隔多远（格），起头与最后流得多快（格/秒） */
 const CHASE_GAP_U = 2.6
 const CHASE_SPEED = [5, 22] as const
 /** 颜色：平时的灯、预警与行车的琥珀、开门的绿、关门的红、全息的青 */
-const IDLE = 0xbfe9ff
+const IDLE = 0x8fdcff
 const AMBER = 0xffaa2c
 const GREEN = 0x4dea8a
 const RED = 0xff4d4d
@@ -176,7 +178,7 @@ export class TransitView implements MapView {
     const span = (size.w / GROUND_PPU) * UNIT
     this.visuals.push(scene.add.image(0, 0, GROUND_KEY).setOrigin(0, 0).setDisplaySize(span, span).setDepth(-1))
     this.visuals.push(scene.add.image(0, 0, COVER_KEY).setOrigin(0, 0).setDisplaySize(span, span).setDepth(COVER_DEPTH))
-    this.lights = scene.add.graphics().setDepth(LIGHTS_DEPTH).setBlendMode(Phaser.BlendModes.ADD)
+    this.lights = scene.add.graphics().setDepth(LIGHTS_DEPTH)
     this.visuals.push(this.lights)
     for (const t of st.plan.tracks) this.trains.push(this.trainArt(v, t))
     for (const f of st.plan.fixtures) if (f.kind === 'kiosk') this.holos.push(this.holo(v, st.plan, f))
@@ -331,16 +333,20 @@ export class TransitView implements MapView {
           alpha = closing ? 0.45 : 0.4
         }
       }
-      g.fillStyle(color, alpha)
-      for (const side of [-1, 1]) this.lamp(plan, u, t.v + side * half)
+      for (const side of [-1, 1]) {
+        g.fillStyle(color, alpha * 0.22)
+        this.lamp(plan, u, t.v + side * (half + HALO_U / 2), LAMP_STEP_U, HALO_U)
+        g.fillStyle(color, Math.min(1, 0.35 + alpha))
+        this.lamp(plan, u, t.v + side * half, LAMP_LEN_U, LAMP_W_U)
+      }
     }
   }
 
-  /** 站台边的一盏灯：沿着轨道的一小段亮条 */
-  private lamp(plan: TransitPlan, u: number, v: number): void {
+  /** 站台边的一盏灯：沿着轨道 len 格长、横过 wide 格宽的一小段亮条 */
+  private lamp(plan: TransitPlan, u: number, v: number, len: number, wide: number): void {
     const c = toWorld(plan, u, v)
-    const w = (plan.horiz ? LAMP_LEN_U : LAMP_W_U) * UNIT
-    const h = (plan.horiz ? LAMP_W_U : LAMP_LEN_U) * UNIT
+    const w = (plan.horiz ? len : wide) * UNIT
+    const h = (plan.horiz ? wide : len) * UNIT
     this.lights!.fillRect(c.x * UNIT - w / 2, c.y * UNIT - h / 2, w, h)
   }
 

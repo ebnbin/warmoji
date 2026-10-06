@@ -3,13 +3,17 @@ import { GROUND_PPU } from '../../data/texel'
 import { fbm, valueNoise } from '../../util/noise'
 import { FRAME_U, UNIT } from '../../util/units'
 import { roomAt } from '../basin'
-import { fixtureRoom, toLocal } from './layout'
+import { doorOffsets, fixtureRoom, toLocal, trainLength } from './layout'
 import type { Fixture, Track, TransitPlan } from './layout'
 import type { TransitConfig } from '../../types/maps'
 
 /** 站台的石材：沿轨道多长、横过多宽（格），缝多宽 */
-const TILE_U = { u: 1.6, v: 0.8 } as const
-const SEAM_U = 0.035
+const TILE_U = { u: 2, v: 2 } as const
+const SEAM_U = 0.03
+/** 顶棚的主梁沿轨道隔多远、错开多少，檩条横过轨道隔多远（格） */
+const BEAM_U = 5.5
+const BEAM_PHASE_U = 1.3
+const PURLIN_U = 1.85
 /** 站台边：车边的金属包边、灯槽、盲道多宽（格），盲道上的圆点隔多远、多大 */
 const LIP_U = 0.07
 const SLOT_U = 0.1
@@ -180,20 +184,71 @@ function ink(list: readonly Numeral[], x: number, y: number, aa: number): { k: n
 const SL = Math.hypot(SUN.x, SUN.y, SUN.z)
 const L = { x: SUN.x / SL, y: SUN.y / SL, z: SUN.z / SL } as const
 
-/** 一块石材的颜色：冷白，每块深浅略有不同，带一点淡淡的石纹；缝是浅灰的 */
+/** 一块石材的颜色：冷白的大块亮面石材，每块深浅略有不同，石面上细细的浅灰斑点；缝是浅灰的细线 */
 function stone(u: number, v: number, aa: number, o: Rgb): void {
-  const row = Math.floor(v / TILE_U.v)
-  const su = u + (row % 2 === 0 ? 0 : TILE_U.u / 2)
-  const col = Math.floor(su / TILE_U.u)
-  const fu = su - col * TILE_U.u
-  const fv = v - row * TILE_U.v
-  const tone = 1 + (valueNoise(col * 7.13, row * 3.71, 17) - 0.5) * 0.035
-  const vein = fbm(u * 0.9 + col * 3.1, v * 2.6 + row, 41, 3)
-  const streak = smooth(0.62, 0.7, vein) * (1 - smooth(0.7, 0.78, vein)) * 0.05
-  set(o, 236 * tone, 239 * tone, 242 * tone)
-  scale(o, 1 - streak)
+  const cu = Math.floor(u / TILE_U.u)
+  const cv = Math.floor(v / TILE_U.v)
+  const fu = u - cu * TILE_U.u
+  const fv = v - cv * TILE_U.v
+  const tone = 1 + (valueNoise(cu * 7.13, cv * 3.71, 17) - 0.5) * 0.028
+  set(o, 238 * tone, 240 * tone, 243 * tone)
+  const speck = valueNoise(u * 26, v * 26, 5)
+  if (speck > 0.82) mixTo(o, 196, 202, 210, (speck - 0.82) * 2.2)
+  const cloud = fbm(u * 0.35 + cu, v * 0.35 + cv, 41, 3)
+  scale(o, 1 - 0.025 * smooth(0.45, 0.8, cloud))
   const seam = Math.min(fu, TILE_U.u - fu, fv, TILE_U.v - fv)
-  mixTo(o, 204, 209, 215, 1 - smooth(SEAM_U / 2 - aa, SEAM_U / 2 + aa, seam))
+  mixTo(o, 214, 219, 225, 1 - smooth(SEAM_U / 2 - aa, SEAM_U / 2 + aa, seam))
+}
+
+/** 站台上摆设施的那一条：深一点的暖灰花岗岩，一米一块，两边各嵌一道金属细条 */
+function granite(u: number, d: number, half: number, aa: number, o: Rgb): void {
+  const cover = 1 - smooth(half - aa, half + aa, d)
+  const cu = Math.floor(u / 1.2)
+  const tone = 1 + (valueNoise(cu * 3.3, 11, 23) - 0.5) * 0.05
+  const c: Rgb = [206 * tone, 206 * tone, 204 * tone]
+  const speck = valueNoise(u * 30, d * 30 + cu, 8)
+  if (speck > 0.78) mixTo(c, 150, 152, 156, (speck - 0.78) * 1.6)
+  const fu = u - cu * 1.2
+  mixTo(c, 184, 186, 190, 1 - smooth(0.015 - aa, 0.015 + aa, Math.min(fu, 1.2 - fu)))
+  mixTo(c, 150, 160, 172, 1 - smooth(0.025 - aa, 0.025 + aa, Math.abs(d - half + 0.05)))
+  mixTo(o, c[0], c[1], c[2], cover)
+}
+
+/** 候车标线里朝着车门的箭头：两笔的 V，尖朝道床 */
+const CHEV_A: Seg = { ax: -0.14, ay: 0.1, bx: 0, by: -0.08 }
+const CHEV_B: Seg = { ax: 0, ay: -0.08, bx: 0.14, by: 0.1 }
+
+/** 候车标线：列车停稳后车门对着的地方，站台边里侧画一块线路色的框，框里两道朝着车门的箭头；d 是离警示带内沿多远（格） */
+function boarding(cfg: TransitConfig, berth: number, t: Track, u: number, d: number, aa: number, o: Rgb): void {
+  if (d < 0.08 || d > 0.95) return
+  const spec = cfg.train
+  const len = trainLength(spec)
+  for (const off of doorOffsets(spec)) {
+    const du = Math.abs(u - (berth + off))
+    const hu = spec.doorU / 2 + 0.05
+    if (du > hu + aa || Math.abs(off) > len / 2) continue
+    const [r, g, b] = rgbOf(t.color)
+    const inside = 1 - smooth(hu - aa, hu + aa, du)
+    mixTo(o, r, g, b, inside * 0.14)
+    const frame = Math.min(hu - du, d - 0.08, 0.95 - d)
+    mixTo(o, r, g, b, inside * (1 - smooth(0.035 - aa, 0.035 + aa, frame)) * 0.95)
+    for (const side of [-1, 1]) {
+      const x = u - (berth + off) - side * hu * 0.42
+      const y = d - 0.52
+      const k = Math.min(segDist(CHEV_A, x, y), segDist(CHEV_B, x, y))
+      mixTo(o, r, g, b, (1 - smooth(0.035 - aa, 0.035 + aa, k)) * 0.9)
+    }
+    return
+  }
+}
+
+/** 玻璃顶棚的钢梁投在站厅地上的影子：横过轨道的主梁一道道、顺着轨道的檩条细一些，影子边缘柔和 */
+function canopy(u: number, v: number): number {
+  const bu = ((u - BEAM_PHASE_U) % BEAM_U + BEAM_U) % BEAM_U
+  const beam = Math.exp(-(((Math.min(bu, BEAM_U - bu)) / 0.22) ** 2))
+  const pv = ((v % PURLIN_U) + PURLIN_U) % PURLIN_U
+  const purlin = Math.exp(-(((Math.min(pv, PURLIN_U - pv)) / 0.07) ** 2))
+  return 0.1 * beam + 0.045 * purlin
 }
 
 /** 站台边，d 是离道床边多远（格）：车边一道金属包边、一条灯槽，再往里是一道盲道，凸起的圆点朝着太阳的一侧亮 */
@@ -303,6 +358,41 @@ function kiosk(f: Extract<Fixture, { kind: 'kiosk' }>, du: number, dv: number, a
   return true
 }
 
+/** 售货机的几种外壳色 */
+const VENDING_SHELLS: readonly Rgb[] = [
+  [86, 186, 196],
+  [238, 136, 112],
+  [242, 244, 247],
+  [74, 82, 94],
+]
+
+/** 自动售货机：从上往下看是一只方盒，顶面浅一圈，朝站台的一面一道亮着的屏 */
+function vending(f: Extract<Fixture, { kind: 'vending' }>, du: number, dv: number, aa: number, o: Rgb): boolean {
+  const hu = f.len / 2
+  const hv = f.dep / 2
+  if (Math.abs(du) > hu + aa || Math.abs(dv) > hv + aa) return false
+  const cover = (1 - smooth(hu - aa, hu + aa, Math.abs(du))) * (1 - smooth(hv - aa, hv + aa, Math.abs(dv)))
+  const shell = VENDING_SHELLS[Math.floor(f.hue * VENDING_SHELLS.length)]!
+  const rim = Math.min(hu - Math.abs(du), hv - Math.abs(dv))
+  const c: Rgb = [shell[0], shell[1], shell[2]]
+  if (rim > 0.07) mixTo(c, 255, 255, 255, 0.18)
+  const front = -f.back * dv
+  if (front > hv - 0.12) mixTo(c, 230, 248, 255, 0.85)
+  if (rim > 0.07 && Math.abs(du) < hu * 0.5 && Math.abs(dv) < hv * 0.4) mixTo(c, 40, 46, 56, 0.55)
+  mixTo(o, c[0], c[1], c[2], cover)
+  return true
+}
+
+/** 垃圾桶：一只不锈钢的圆桶，顶上一圈深色的投口 */
+function bin(f: Extract<Fixture, { kind: 'bin' }>, du: number, dv: number, aa: number, o: Rgb): boolean {
+  const r = Math.hypot(du, dv)
+  if (r > f.r + aa) return false
+  mixTo(o, 186, 194, 202, 1 - smooth(f.r - aa, f.r + aa, r))
+  mixTo(o, 50, 56, 64, (1 - smooth(f.r * 0.55 - aa, f.r * 0.55 + aa, r)) * 0.9)
+  mixTo(o, 250, 252, 255, Math.exp(-(((r - f.r * 0.8) / 0.02) ** 2)) * 0.5)
+  return true
+}
+
 /** 设施投在地上的影子：柱子顺着太阳拖出长影，矮的座椅与底座只在背光一侧压一点 */
 function fixtureShadow(f: Fixture, u: number, v: number, horiz: boolean): number {
   const ax = horiz ? AWAY.x : AWAY.y
@@ -314,6 +404,11 @@ function fixtureShadow(f: Fixture, u: number, v: number, horiz: boolean): number
     if (along < 0 || along > PILLAR_SHADOW_U + f.r) return 0
     const side = Math.abs(-du * ay + dv * ax)
     return (1 - smooth(f.r * 0.7, f.r * 1.3, side)) * (1 - along / (PILLAR_SHADOW_U + f.r)) * 0.2
+  }
+  if (f.kind === 'vending') {
+    let best = 0
+    for (let k = 1; k <= 6; k++) best = Math.max(best, smooth(-0.2, 0.15, fixtureRoom(f, u - ax * k * 0.28, v - ay * k * 0.28)) * (1 - k / 7))
+    return best * 0.26
   }
   const off = f.kind === 'bench' ? 0.28 : 0.3
   const d = fixtureRoom(f, u - ax * off, v - ay * off)
@@ -333,6 +428,31 @@ function skylight(plan: TransitPlan, cfg: TransitConfig, u: number, v: number): 
   return 0
 }
 
+/** 站厅外地上的花坛：每 4.5 格一格里按种子挑一些摆一只圆花坛，s 至少离站厅边 from 格；一圈浅灰的混凝土沿，里面是一丛丛的绿叶 */
+function planter(u: number, s: number, from: number, aa: number, o: Rgb): void {
+  const G = 4.5
+  if (s < from) return
+  const cu = Math.floor(u / G)
+  const cs = Math.floor((s - from) / G)
+  const pick = valueNoise(cu * 5.7 + 0.5, cs * 9.3 + 0.5, 211)
+  if (pick > 0.5) return
+  const cx = (cu + 0.5) * G + (pick - 0.25) * 1.2
+  const cy = from + (cs + 0.5) * G
+  const R = 0.75 + pick * 0.4
+  const d = Math.hypot(u - cx, s - cy)
+  if (d > R + 0.15 + aa) {
+    if (d < R + 0.45) scale(o, 1 - 0.12 * (1 - (d - R - 0.15) / 0.3))
+    return
+  }
+  mixTo(o, 196, 200, 206, 1 - smooth(R + 0.15 - aa, R + 0.15 + aa, d))
+  if (d < R) {
+    const leaf = fbm(u * 3.2, s * 3.2, 19, 3)
+    const lit = clamp01(0.5 + ((u - cx) * L.x + (s - cy) * L.y) / R * -0.5)
+    set(o, 58 + 50 * leaf + 30 * lit, 104 + 56 * leaf + 30 * lit, 62 + 30 * leaf + 10 * lit)
+    scale(o, 1 - 0.3 * smooth(R * 0.75, R, d))
+  }
+}
+
 /** 检票口那一侧站厅边外面，s 是离站厅边多远（格）：一道白墙，墙上开着一排闸机通道和几部玻璃电梯，墙外是付费区暖灰的大块地砖 */
 function gateSide(plan: TransitPlan, u: number, s: number, aa: number, o: Rgb): void {
   const big = 2
@@ -342,6 +462,13 @@ function gateSide(plan: TransitPlan, u: number, s: number, aa: number, o: Rgb): 
   set(o, 228 * tone, 224 * tone, 218 * tone)
   mixTo(o, 200, 196, 190, 1 - smooth(0.02 - aa, 0.02 + aa, Math.min(fu, big - fu, fs, big - fs)))
   scale(o, 1 - 0.18 * Math.exp(-Math.max(0, s - WALL_U) / 0.8))
+  if (s > 2.1 && s < 2.75) {
+    plan.tracks.forEach((t, k) => {
+      const [r, g, b] = rgbOf(t.color)
+      mixTo(o, r, g, b, (1 - smooth(0.045 - aa, 0.045 + aa, Math.abs(s - 2.25 - k * 0.2))) * 0.8)
+    })
+  }
+  planter(u, s, 3.4, aa, o)
   const lift = plan.lifts.find((l) => Math.abs(u - l.u) < l.w / 2 + 0.15)
   if (lift) {
     const du = Math.abs(u - lift.u)
@@ -391,6 +518,7 @@ function escalatorSide(plan: TransitPlan, u: number, s: number, aa: number, o: R
   const lfu = (((u + 0.5) % 2.2) + 2.2) % 2.2
   const lfs = (((s + 0.3) % 2.2) + 2.2) % 2.2
   mixTo(o, 116, 126, 138, (1 - smooth(0.03, 0.06, Math.min(lfu, 2.2 - lfu, lfs, 2.2 - lfs))) * 0.6)
+  planter(u, s, 2.6, aa, o)
   scale(o, 1 - 0.32 * Math.exp(-s / 1.4))
   const esc = plan.escalators.find((e) => Math.abs(u - e.u) < e.w / 2 + 0.12)
   if (esc && s < STAIR_U + 0.4) {
@@ -419,6 +547,39 @@ function escalatorSide(plan: TransitPlan, u: number, s: number, aa: number, o: R
     mixTo(o, 168, 176, 186, 1 - smooth(0.03 - aa, 0.03 + aa, s))
     mixTo(o, 255, 255, 255, Math.exp(-(((s - RAIL_U * 0.6) / 0.02) ** 2)) * 0.8)
   }
+}
+
+/** 站房顶的一格，e 是离站厅边多远、v 是横过轨道的位置（格）：白色的顶板，有的格是映着天光的玻璃天窗，有的格上蹲着一台空调外机 */
+function roofPanel(e: number, v: number, aa: number, o: Rgb): void {
+  const PW = 2.2
+  const PH = 3
+  const ce = Math.floor((e - 0.6) / PW)
+  const cv = Math.floor(v / PH)
+  const fe = e - 0.6 - ce * PW
+  const fv = v - cv * PH
+  const kind = valueNoise(ce * 13.7 + 0.5, cv * 7.1 + 0.5, 61)
+  set(o, 240, 243, 246)
+  if (ce >= 1 && kind < 0.38) {
+    const t = clamp01((fv + fe * 0.4) / (PH + PW * 0.4))
+    set(o, 168 + 60 * t, 196 + 40 * t, 222 + 24 * t)
+    const mull = Math.min(fe, PW - fe, Math.abs(fv - PH / 2), fv, PH - fv)
+    mixTo(o, 226, 232, 238, 1 - smooth(0.05 - aa, 0.05 + aa, mull))
+  } else if (ce >= 1 && kind > 0.86) {
+    const bx = Math.abs(fe - PW / 2)
+    const by = Math.abs(fv - PH / 2)
+    if (bx < 0.8 && by < 1.1) {
+      set(o, 120, 128, 138)
+      const fan = Math.hypot(fe - PW / 2, Math.abs(fv - PH / 2) - 0.5)
+      if (fan < 0.38) {
+        set(o, 64, 70, 80)
+        mixTo(o, 150, 158, 168, (1 - smooth(0.03, 0.05, Math.abs(fan - 0.3))) * 0.8)
+        const blade = Math.sin(Math.atan2(Math.abs(fv - PH / 2) - 0.5, fe - PW / 2) * 3)
+        mixTo(o, 110, 118, 128, smooth(0.4, 0.6, blade) * 0.7 * smooth(0.06, 0.12, fan))
+      }
+      mixTo(o, 180, 188, 196, 1 - smooth(0.03 - aa, 0.03 + aa, Math.min(0.8 - bx, 1.1 - by)))
+    }
+  }
+  mixTo(o, 214, 220, 226, 1 - smooth(0.03 - aa, 0.03 + aa, Math.min(fe, PW - fe, fv, PH - fv)))
 }
 
 /** 两头站房的地面（大都被站房顶盖住）：隧道里是暗的，别处是墙 */
@@ -474,6 +635,11 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           stone(u, v, aa, o)
           const sky = skylight(plan, cfg, u, v)
           mixTo(o, 255, 255, 255, sky)
+          for (const st of plan.strips) {
+            const d = Math.abs(v - st.v)
+            if (d < st.w / 2 + aa) granite(u, d, st.w / 2, aa, o)
+          }
+          if (near) boarding(cfg, plan.berth, near, u, Math.abs(dv) - half - edge, aa, o)
         }
         let shadow = 0
         let drawn = false
@@ -483,7 +649,9 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           if (!drawn) {
             if (f.kind === 'pillar') drawn = pillar(f, du, dvf, plan.horiz, aa, o)
             else if (f.kind === 'bench') drawn = bench(f, du, dvf, aa, o)
-            else drawn = kiosk(f, du, dvf, aa, o)
+            else if (f.kind === 'kiosk') drawn = kiosk(f, du, dvf, aa, o)
+            else if (f.kind === 'vending') drawn = vending(f, du, dvf, aa, o)
+            else drawn = bin(f, du, dvf, aa, o)
             if (drawn) continue
           }
           shadow = Math.max(shadow, fixtureShadow(f, u, v, plan.horiz))
@@ -491,7 +659,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const room = roomAt(plan.basin, x * UNIT, y * UNIT) / UNIT
         const ao = room > 0 ? 1 - 0.13 * Math.exp(-room / 0.28) : 1
         const wall = 0.16 * Math.exp(-(y - hall.y0) / WALL_SHADOW_U) + 0.16 * Math.exp(-(x - hall.x0) / WALL_SHADOW_U)
-        if (!drawn) scale(o, (1 - shadow) * (1 - Math.min(0.3, wall)))
+        if (!drawn) scale(o, (1 - shadow) * (1 - Math.min(0.3, wall)) * (1 - canopy(u, v)))
         scale(o, ao)
       } else if (inU) {
         const s = v < plan.v0 ? plan.v0 - v : v - plan.v1
@@ -539,15 +707,7 @@ export function paintCover(sc: PaintScene, prep: Prepared, out: Uint8ClampedArra
         set(o, 16, 20, 26)
         a = smooth(0, MOUTH_U, e) * 0.94
       } else {
-        const pu = ((e % 2.2) + 2.2) % 2.2
-        const pv = ((v % 3) + 3) % 3
-        set(o, 240, 243, 246)
-        mixTo(o, 214, 220, 226, 1 - smooth(0.03 - aa, 0.03 + aa, Math.min(pu, 2.2 - pu, pv, 3 - pv)))
-        const vent = Math.abs(((v + 1.5) % 6 + 6) % 6 - 3) < 0.8 && e > 3.2 && e < 4.6
-        if (vent) {
-          const sl = ((e * 6) % 1 + 1) % 1
-          mixTo(o, 150, 158, 168, smooth(0.5, 0.6, sl) * 0.7)
-        }
+        roofPanel(e, v, aa, o)
         mixTo(o, 150, 158, 168, Math.exp(-e / 0.08) * 0.8)
         if (t && e < MOUTH_U + 0.45) {
           const [r, g, b] = rgbOf(t.color)

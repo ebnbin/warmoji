@@ -4,6 +4,8 @@ import { doorOffsets, trainLength } from './layout.ts'
 import type { Track, TransitPlan } from './layout'
 import type { TrainSpec, TransitConfig } from '../../types/maps'
 
+/** 门洞往车里车外各让出这么深（格）：门洞里离车壁多远只按离门框多远算 */
+const DOOR_DEPTH_U = 1.2
 /** 车头起步时离方框边多远（格）：从隧道深处开出来；开走时车尾出了方框这么远才算走完 */
 const OFF_U = 1
 
@@ -201,7 +203,7 @@ export function solidSd(tr: TrainNow, u: number, v: number): number {
   let hole = Infinity
   for (const off of doorOffsets(s)) {
     const du = Math.abs(u - (tr.mid + off)) - half
-    const dv = across - w
+    const dv = across - w / 2 - DOOR_DEPTH_U
     hole = Math.min(hole, Math.hypot(Math.max(du, 0), Math.max(dv, 0)) + Math.min(Math.max(du, dv), 0))
   }
   wall = Math.max(wall, -hole)

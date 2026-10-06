@@ -1393,7 +1393,8 @@ export interface TransitConfig {
     readonly immuneMs: number
   }
   /**
-   * 站台上的设施：顶到天花板的圆柱每隔 pillarEveryU 格一根、半径 pillarU 格；每块站台几张候车座椅（长、深，格；高，米）；岛式站台上的全息时刻表底座（半径格、高米）
+   * 站台上的设施：顶到天花板的圆柱每隔 pillarEveryU 格一根、半径 pillarU 格；每块站台几张候车座椅（长、深，格；高，米），座椅边上有时一只垃圾桶；
+   * 岛式站台上的全息时刻表底座（半径格、高米）；侧式站台贴墙几台自动售货机，比人高
    */
   readonly fixtures: {
     readonly pillarEveryU: readonly [number, number]
@@ -1401,6 +1402,8 @@ export interface TransitConfig {
     readonly benches: readonly [number, number]
     readonly bench: { readonly lengthU: number; readonly depthU: number; readonly heightM: number }
     readonly kiosk: { readonly radiusU: number; readonly heightM: number }
+    readonly vending: { readonly count: readonly [number, number]; readonly lengthU: number; readonly depthU: number; readonly heightM: number }
+    readonly bin: { readonly radiusU: number; readonly heightM: number }
   }
   /** 站厅边上的口子：一侧是检票口（每组几条通道、通道宽格）与几部电梯，另一侧是玻璃栏板与几部下到换乘层的自动扶梯（宽格） */
   readonly edges: {

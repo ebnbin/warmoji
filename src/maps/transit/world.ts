@@ -17,7 +17,7 @@ import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { alongWall, awayFromWall, keepOut, makeBasin, roomAt } from '../basin'
 import { roomFor } from '../landmark'
 import { doorOffsets, fixtureRoom, toLocal, toWorld, transitPlan } from './layout'
-import { callExpress, hullSd, inCabin, nextStart, present, solidSd, trackClocks, trainNow } from './timetable'
+import { callExpress, hullSd, inCabin, nextStart, present, solidSd, trackClocks, trainNow, trainOf } from './timetable'
 import type { TrackClock, TrainNow } from './timetable'
 import type { TransitPlan } from './layout'
 import type { Basin } from '../basin'
@@ -37,6 +37,8 @@ const TRAIN_TINT = 0xffc857
 const SKIRT_U = 0.4
 /** 开门的列车在门开到几成以上才往车厢里出怪 */
 const SPILL_DOORS = 0.6
+/** 车身挤开身体后身体贴着车身外这么近（格）以内也算撞上：挤开在撞车之前结算，这一帧车身扫过的那一段都算 */
+const CONTACT_U = 0.2
 /** 能走的地面上的格子边长：只围站厅、不算设施的那张距离场 */
 const HALL_CELL_U = 0.25
 
@@ -83,7 +85,7 @@ function solidsOf(cfg: TransitConfig, plan: TransitPlan): Solids {
     if (inside) {
       for (const f of plan.fixtures) {
         if (fixtureRoom(f, L.u, L.v) < 0) continue
-        return f.kind === 'pillar' ? { topM: Infinity, material: 'structure' } : { topM: f.h, material: 'fixture' }
+        return f.kind === 'pillar' ? { topM: Infinity, material: 'structure' } : { topM: f.h, material: f.kind === 'vending' ? 'structure' : 'fixture' }
       }
       return null
     }
@@ -336,11 +338,15 @@ function ram(sim: Sim, s: TransitState, cfg: TransitConfig): void {
     const spec = tr.shape.spec
     const tv = tr.track.v
     const pace = Math.max(0.5, Math.min(1, tr.speed / cfg.timetable.inU))
+    const was = trainOf(cfg, s.plan, tr.track, tr.start, tr.express, now - sim.wdtMs)
+    const half = tr.shape.len / 2
+    const lo = Math.min(tr.mid, was.mid) - half
+    const hi = Math.max(tr.mid, was.mid) + half
     for (const b of bodies) {
       if (!Alive.v[b] || inTransit(b) || Motion.kind[b] === MOTION.arc || phases(sim.world, b, 'train')) continue
       const l = local(s.plan, Transform.x[b]!, Transform.y[b]!)
       const r = Radius.v[b]! / UNIT
-      if (hullSd(tr, l.u, l.v) >= r) continue
+      if (hullSd(tr, l.u, l.v) >= r + CONTACT_U && (Math.abs(l.v - tv) > spec.widthU / 2 + r + CONTACT_U || l.u < lo - r || l.u > hi + r)) continue
       const key = Uid.v[b]!
       const last = s.hits.get(key)
       if (last && last.track === tr.track.index && now - last.at < h.immuneMs) continue
