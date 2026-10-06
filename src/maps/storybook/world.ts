@@ -2,7 +2,9 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Radius, Transform } from '../../ecs/components'
+import { query } from 'bitecs'
+import { Alive, Phys, Radius, Transform, Uid } from '../../ecs/components'
+import { displace } from '../../ecs/systems/shared/displace'
 import { clockSec } from '../../ecs/fight/clock'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { leaderPoint } from '../../ecs/utils/team'
@@ -10,7 +12,7 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { BASIN_CELL_U, clockAt, laid, makeBook, pageOf, slabOf, slabSd, standing } from './model'
+import { BASIN_CELL_U, clockAt, laid, leafEdge, makeBook, pageOf, slabOf, slabSd, standing } from './model'
 import type { Basin } from '../basin'
 import type { Landmark } from '../landmark'
 import type { Book, BookClock, Page, Piece, Slab } from './model'
@@ -33,6 +35,14 @@ const GUTTER_END_U = 1.6
 /** 布景后面的出怪口：离背面多远，离布景的一头多远，格 */
 const WINGS_BACK_U = 0.75
 const WINGS_END_U = 0.55
+/**
+ * 翻页时被书页扬起来的身体：书页的自由边扫到它前 TOSS_LEAD 格就抛起来，腾空 TOSS_MS 毫秒、最高 TOSS_U 格，
+ * 落回原地附近，顺着书页翻的方向被风带出 TOSS_DRIFT_U 格之间
+ */
+const TOSS_LEAD_U = 0.5
+const TOSS_MS = 900
+const TOSS_U = 1.4
+const TOSS_DRIFT_U = [0.3, 0.9] as const
 /** 一件布景弹起来时沿底边冒几团碎纸 */
 const POP_PUFFS = 3
 
@@ -68,6 +78,9 @@ export interface StorybookState {
   readonly gutter: readonly Landmark[]
   wings: Landmark[]
   wingsKey: string
+  /** 这一次翻页已经扬起来的身体：翻到第几页时记的，记的是实体与它的编号 */
+  tossPage: number
+  readonly tossed: Set<string>
 }
 
 function cfgOf(sim: Sim): StorybookConfig {
@@ -119,6 +132,8 @@ export function storybookOf(sim: Sim): StorybookState {
       gutter,
       wings: [],
       wingsKey: '',
+      tossPage: -1,
+      tossed: new Set(),
     }
     sim.worldState.storybook = s
     refresh(s, cfg)
@@ -193,6 +208,30 @@ function wingsOf(s: StorybookState): Landmark[] {
     }
   }
   return out
+}
+
+/**
+ * 书页翻过去时不会盖在谁身上：书页从右往左扫，自由边快扫到谁，谁就被托起、扇起来抛到半空，
+ * 书页从他脚下翻过去，他落在新的一页上。敌我、掉落物一样，锚定的、霸体的也一样
+ */
+function toss(sim: Sim, s: StorybookState): void {
+  const edge = leafEdge(s.clock, s.book)
+  if (edge === null) return
+  if (s.tossPage !== s.clock.page) {
+    s.tossPage = s.clock.page
+    s.tossed.clear()
+  }
+  for (const eid of query(sim.world, [Phys, Transform, Radius])) {
+    if (!Alive.v[eid]) continue
+    const x = Transform.x[eid]!
+    if (edge > x / UNIT + TOSS_LEAD_U) continue
+    const key = `${eid}:${Uid.v[eid]}`
+    if (s.tossed.has(key)) continue
+    s.tossed.add(key)
+    const drift = (TOSS_DRIFT_U[0] + (TOSS_DRIFT_U[1] - TOSS_DRIFT_U[0]) * sim.rng.next()) * UNIT
+    const y = Transform.y[eid]!
+    displace(sim, eid, { kind: 'arc', x: x - drift, y: y + (sim.rng.next() - 0.5) * 0.4 * UNIT, ms: TOSS_MS, height: TOSS_U * UNIT }, { self: false, free: true })
+  }
 }
 
 /** 跨得过矮布景的身体按高的那张距离场 */
@@ -506,11 +545,12 @@ export const storybook: WorldHooks = {
   onStart(sim) {
     storybookOf(sim)
   },
-  /** 按难度时钟翻页；立着的布景一变就重铺距离场，刚弹起来的沿底边冒碎纸 */
+  /** 按难度时钟翻页；书页扫过的身体扬起来落到新的一页上；立着的布景一变就重铺距离场，刚弹起来的沿底边冒碎纸 */
   tick(sim) {
     const cfg = cfgOf(sim)
     const s = storybookOf(sim)
     s.clock = bookClock(sim, cfg, s.book)
+    toss(sim, s)
     const popped = refresh(s, cfg)
     const wings = s.clock.phase === 'stand' ? s.key : ''
     if (wings !== s.wingsKey) {

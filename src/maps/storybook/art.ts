@@ -202,240 +202,6 @@ type Draw = (ctx: Ctx, W: number, H: number, rng: Rng) => void
 
 const LW = 2.2
 
-/** 一棵阔叶树：树干，几团叠着的树冠，偶尔挂几个果子 */
-function drawTree(ctx: Ctx, W: number, H: number, rng: Rng, x0 = 0, w = W, top = 0): void {
-  const cx = x0 + w / 2
-  const tw = w * 0.16
-  const trunk: Pt[] = [[cx - tw * 0.6, H], [cx - tw * 0.4, H * 0.55], [cx - tw, H * 0.42], [cx, H * 0.5], [cx + tw, H * 0.4], [cx + tw * 0.4, H * 0.55], [cx + tw * 0.65, H]]
-  ink(ctx, poly(trunk), { fill: INK.bark, lo: INK.barkLo, line: LW }, w, H)
-  const crownTop = top + 4
-  const ch = (H - top) * 0.62
-  const cy = crownTop + ch / 2
-  const main = lumpy(rng, cx, cy, w * 0.44, ch / 2 - 2, 5 + Math.floor(rng.next() * 3), 0.1)
-  ink(ctx, curve(main), { fill: INK.leaf, hi: INK.leafHi, lo: INK.leafLo, line: LW }, w, H - top)
-  ctx.save()
-  ctx.beginPath()
-  smoothPath(ctx, main)
-  ctx.clip()
-  strokes(
-    ctx,
-    Array.from({ length: 4 }, () => {
-      const x = cx + (rng.next() - 0.5) * w * 0.55
-      const y = cy + (rng.next() - 0.3) * ch * 0.5
-      return [[x - w * 0.06, y], [x, y + ch * 0.07], [x + w * 0.06, y]] as Pt[]
-    }),
-    1.4,
-    INK.leafLo,
-  )
-  if (rng.next() < 0.5) {
-    for (let i = 0; i < 5; i++) {
-      ctx.beginPath()
-      ctx.arc(cx + (rng.next() - 0.5) * w * 0.6, cy + (rng.next() - 0.4) * ch * 0.6, w * 0.035, 0, Math.PI * 2)
-      ctx.fillStyle = INK.red
-      ctx.fill()
-    }
-  }
-  ctx.restore()
-}
-
-/** 一棵松：三层越往上越窄的三角 */
-function drawPine(ctx: Ctx, W: number, H: number, rng: Rng, x0 = 0, w = W, top = 0): void {
-  const cx = x0 + w / 2
-  ink(ctx, rect(cx - w * 0.07, H * 0.8, w * 0.14, H * 0.2), { fill: INK.bark, line: LW }, w, H)
-  const tiers = 3
-  for (let i = 0; i < tiers; i++) {
-    const t0 = top + 3 + ((H - top) * 0.82 * i) / tiers
-    const t1 = top + 3 + ((H - top) * 0.82 * (i + 1.35)) / tiers
-    const half = w * (0.24 + 0.24 * ((i + 1) / tiers))
-    const sag = (rng.next() - 0.5) * w * 0.03
-    const tri: Pt[] = [[cx + sag, t0], [cx + half, t1], [cx + half * 0.5, t1 - (t1 - t0) * 0.08], [cx, t1 + (t1 - t0) * 0.04], [cx - half * 0.5, t1 - (t1 - t0) * 0.08], [cx - half, t1]]
-    ink(ctx, poly(tri), { fill: INK.pine, lo: INK.pineLo, line: LW }, w, H)
-  }
-}
-
-const drawGrove: Draw = (ctx, W, H, rng) => {
-  const n = Math.max(2, Math.round(W / (FACE_PPU * 1.3)))
-  const slots = Array.from({ length: n }, (_, i) => i).sort(() => rng.next() - 0.5)
-  for (const i of slots.sort((a, b) => (a % 2) - (b % 2))) {
-    const w = (W / n) * 1.45
-    const x0 = Math.min(W - w, Math.max(0, (W / n) * i - (w - W / n) / 2))
-    const top = (i % 2 === 0 ? 0.0 : 0.16) * H + rng.next() * H * 0.08
-    if (rng.next() < 0.4) drawPine(ctx, W, H, rng, x0, w * 0.85, top)
-    else drawTree(ctx, W, H, rng, x0, w, top)
-  }
-}
-
-const drawBush: Draw = (ctx, W, H, rng) => {
-  const n = Math.max(2, Math.round(W / (FACE_PPU * 0.7)))
-  const pts: Pt[] = [[W - 3, H]]
-  for (let i = n; i >= 0; i--) {
-    const x = 3 + ((W - 6) * i) / n
-    const y = 4 + rng.next() * H * 0.25
-    pts.push([x, y])
-    if (i > 0) pts.push([x - (W - 6) / n / 2, H * 0.32 + rng.next() * H * 0.1])
-  }
-  pts.push([3, H])
-  ink(ctx, curve(pts), { fill: INK.leaf, hi: INK.leafHi, lo: INK.leafLo, line: LW }, W, H)
-  for (let i = 0; i < Math.round(W / 22); i++) {
-    const x = 8 + rng.next() * (W - 16)
-    const y = H * (0.3 + rng.next() * 0.5)
-    const c = [INK.white, INK.gold, '#e98aa6'][Math.floor(rng.next() * 3)]!
-    for (let k = 0; k < 5; k++) {
-      ctx.beginPath()
-      ctx.arc(x + Math.cos((k / 5) * 6.28) * 2.6, y + Math.sin((k / 5) * 6.28) * 2.6, 2, 0, 6.28)
-      ctx.fillStyle = c
-      ctx.fill()
-    }
-    ctx.beginPath()
-    ctx.arc(x, y, 1.4, 0, 6.28)
-    ctx.fillStyle = INK.gold
-    ctx.fill()
-  }
-}
-
-const drawLog: Draw = (ctx, W, H, rng) => {
-  const r = H * 0.42
-  const body = rect(r, H - 2 * r - 2, W - 2 * r - 6, 2 * r)
-  ink(ctx, body, { fill: INK.wood, lo: INK.woodLo, line: LW }, W, H)
-  strokes(
-    ctx,
-    Array.from({ length: Math.round(W / 26) }, () => {
-      const x = r + rng.next() * (W - 3 * r)
-      const y = H - r - 2 + (rng.next() - 0.5) * r
-      return [[x, y], [x + W * 0.08, y + (rng.next() - 0.5) * 3]] as Pt[]
-    }),
-    1.3,
-    INK.woodLo,
-  )
-  const ex = W - r - 6
-  ink(ctx, ellipse(ex, H - r - 2, r * 0.55, r), { fill: '#e8c78f', line: LW }, W, H)
-  ctx.strokeStyle = INK.woodLo
-  ctx.lineWidth = 1
-  for (const k of [0.35, 0.65]) {
-    ctx.beginPath()
-    ctx.ellipse(ex, H - r - 2, r * 0.55 * k, r * k, 0, 0, 6.28)
-    ctx.stroke()
-  }
-  ink(ctx, ellipse(r * 1.6, H - 2 * r + 2, r * 0.7, r * 0.3), { fill: INK.leafHi, line: 1.2 }, W, H)
-}
-
-/** 带山墙的一座小房子的正面：墙、门、窗，山墙尖顶着上沿 */
-function house(ctx: Ctx, W: number, H: number, rng: Rng, wall: Inked, roof: Inked, logs: boolean): void {
-  const eave = H * (1 - EAVE)
-  const tri: Pt[] = [[-1, eave + 4], [W / 2, 3], [W + 1, eave + 4]]
-  ink(ctx, rect(4, eave, W - 8, H - eave), wall, W, H)
-  if (logs) {
-    const rows = 5
-    strokes(ctx, Array.from({ length: rows }, (_, i) => [[6, eave + ((H - eave) * (i + 1)) / (rows + 1)], [W - 6, eave + ((H - eave) * (i + 1)) / (rows + 1)]] as Pt[]), 1.4, INK.woodLo)
-  } else {
-    strokes(ctx, [[[4, eave + 6], [W - 4, eave + 6]], [[W * 0.33, eave], [W * 0.33, H]], [[W * 0.66, eave], [W * 0.66, H]], [[4, eave + 6], [W * 0.33, H * 0.78]], [[W - 4, eave + 6], [W * 0.66, H * 0.78]]], 3, INK.woodLo)
-  }
-  ink(ctx, poly(tri), roof, W, eave)
-  strokes(ctx, Array.from({ length: 4 }, (_, i) => [[W / 2 - (W / 2) * ((i + 1) / 5), 3 + eave * ((i + 1) / 5)], [W / 2 + (W / 2) * ((i + 1) / 5), 3 + eave * ((i + 1) / 5)]] as Pt[]), 1.2, roof.lo ?? INK.line)
-  const dw = W * 0.2
-  const doorX = rng.next() < 0.5 ? W * 0.18 : W * 0.62
-  ink(ctx, (c) => {
-    c.moveTo(doorX, H)
-    c.lineTo(doorX, H - (H - eave) * 0.55)
-    c.arc(doorX + dw / 2, H - (H - eave) * 0.55, dw / 2, Math.PI, 0)
-    c.lineTo(doorX + dw, H)
-    c.closePath()
-  }, { fill: INK.woodLo, line: LW }, W, H)
-  const wx = doorX < W / 2 ? W * 0.6 : W * 0.2
-  const wy = eave + (H - eave) * 0.22
-  ink(ctx, rect(wx, wy, W * 0.2, (H - eave) * 0.32), { fill: INK.window, line: LW }, W, H)
-  strokes(ctx, [[[wx + W * 0.1, wy], [wx + W * 0.1, wy + (H - eave) * 0.32]], [[wx, wy + (H - eave) * 0.16], [wx + W * 0.2, wy + (H - eave) * 0.16]]], 1.6)
-  ink(ctx, rect(wx - 3, wy + (H - eave) * 0.32, W * 0.2 + 6, 5), { fill: INK.red, line: 1.2 }, W, H)
-}
-
-const drawHut: Draw = (ctx, W, H, rng) => {
-  ink(ctx, rect(W * 0.7, H * 0.06, W * 0.1, H * 0.25), { fill: INK.stone, line: LW }, W, H)
-  house(ctx, W, H, rng, { fill: INK.wood, lo: INK.woodLo, line: LW }, { fill: INK.hay, lo: INK.hayLo, line: LW }, true)
-}
-
-const drawCottage: Draw = (ctx, W, H, rng) => {
-  house(ctx, W, H, rng, { fill: INK.plaster, lo: INK.stone, line: LW }, { fill: INK.tile, lo: INK.tileLo, line: LW }, false)
-}
-
-const drawWindmill: Draw = (ctx, W, H, rng) => {
-  const top = H * 0.16
-  const tower: Pt[] = [[W * 0.06, H], [W * 0.24, top + 6], [W * 0.76, top + 6], [W * 0.94, H]]
-  ink(ctx, poly(tower), { fill: INK.plaster, lo: INK.stone, line: LW }, W, H)
-  strokes(ctx, [0.35, 0.55, 0.75].map((k) => [[W * (0.06 + 0.18 * (1 - k)), top + (H - top) * k], [W * (0.94 - 0.18 * (1 - k)), top + (H - top) * k]] as Pt[]), 1.2, INK.stoneLo)
-  ink(ctx, (c) => {
-    c.moveTo(W * 0.16, top + 10)
-    c.quadraticCurveTo(W * 0.5, -top * 0.4, W * 0.84, top + 10)
-    c.closePath()
-  }, { fill: INK.tile, lo: INK.tileLo, line: LW }, W, H)
-  const dw = W * 0.22
-  ink(ctx, (c) => {
-    c.moveTo(W / 2 - dw / 2, H)
-    c.lineTo(W / 2 - dw / 2, H * 0.82)
-    c.arc(W / 2, H * 0.82, dw / 2, Math.PI, 0)
-    c.lineTo(W / 2 + dw / 2, H)
-    c.closePath()
-  }, { fill: INK.woodLo, line: LW }, W, H)
-  ink(ctx, ellipse(W / 2, H * 0.52, W * 0.07, W * 0.07), { fill: INK.window, line: LW }, W, H)
-  void rng
-}
-
-/** 风车的叶片：四片格栅，红边，画在正方形里，中心是转轴 */
-export function drawSails(ctx: Ctx, S: number): void {
-  const c = S / 2
-  for (let k = 0; k < 4; k++) {
-    ctx.save()
-    ctx.translate(c, c)
-    ctx.rotate((k * Math.PI) / 2)
-    const L = c - 4
-    const w = S * 0.11
-    ink(ctx, rect(S * 0.05, -w * 0.15, L - S * 0.05, w), { fill: INK.cream, line: 2 }, S, S)
-    strokes(ctx, Array.from({ length: 5 }, (_, i) => [[S * 0.05 + ((L - S * 0.05) * (i + 1)) / 6, -w * 0.15], [S * 0.05 + ((L - S * 0.05) * (i + 1)) / 6, w * 0.85]] as Pt[]), 1.2, INK.woodLo)
-    strokes(ctx, [[[0, 0], [L, 0]]], 3.2, INK.red)
-    ctx.restore()
-  }
-  ink(ctx, ellipse(c, c, S * 0.06, S * 0.06), { fill: INK.woodLo, line: 2 }, S, S)
-}
-
-const drawFence: Draw = (ctx, W, H, rng) => {
-  const n = Math.max(3, Math.round(W / (FACE_PPU * 0.32)))
-  const gap = (W - 6) / n
-  ink(ctx, rect(3, H * 0.38, W - 6, H * 0.12), { fill: INK.white, lo: INK.stone, line: 1.6 }, W, H)
-  ink(ctx, rect(3, H * 0.7, W - 6, H * 0.12), { fill: INK.white, lo: INK.stone, line: 1.6 }, W, H)
-  for (let i = 0; i < n; i++) {
-    const x = 3 + gap * i + gap * 0.18
-    const pw = gap * 0.64
-    const lean = (rng.next() - 0.5) * 2
-    const top = 4 + rng.next() * H * 0.06
-    ink(ctx, poly([[x + lean, top + pw * 0.5], [x + pw / 2 + lean, top], [x + pw + lean, top + pw * 0.5], [x + pw, H], [x, H]]), { fill: INK.white, lo: INK.stone, line: 1.6 }, W, H)
-  }
-}
-
-const drawHaystack: Draw = (ctx, W, H, rng) => {
-  const pts: Pt[] = [[2, H], [W * 0.08, H * 0.4], [W * 0.3, 6], [W * 0.7, 6], [W * 0.92, H * 0.4], [W - 2, H]]
-  ink(ctx, curve(pts), { fill: INK.hay, hi: '#f3d987', lo: INK.hayLo, line: LW }, W, H)
-  ctx.save()
-  ctx.beginPath()
-  smoothPath(ctx, pts)
-  ctx.clip()
-  strokes(
-    ctx,
-    Array.from({ length: Math.round(W / 6) }, () => {
-      const x = rng.next() * W
-      const y = rng.next() * H
-      return [[x, y], [x + (rng.next() - 0.5) * 8, y + 8 + rng.next() * 6]] as Pt[]
-    }),
-    1,
-    INK.hayLo,
-  )
-  ctx.restore()
-}
-
-const drawWell: Draw = (ctx, W, H, rng) => {
-  ink(ctx, rect(3, H * 0.15, W - 6, H * 0.85), { fill: INK.stone, lo: INK.stoneLo, line: LW }, W, H)
-  stones(ctx, 3, H * 0.15, W - 6, H * 0.85, 3, rng)
-  ink(ctx, rect(1, 3, W - 2, H * 0.16), { fill: INK.stoneHi, line: LW }, W, H)
-}
-
 /** 一面砌石：按行错缝描出石块的缝 */
 function stones(ctx: Ctx, x: number, y: number, w: number, h: number, rows: number, rng: Rng): void {
   ctx.save()
@@ -454,93 +220,6 @@ function stones(ctx: Ctx, x: number, y: number, w: number, h: number, rows: numb
   }
   strokes(ctx, lines, 1.2, INK.stoneLo)
   ctx.restore()
-}
-
-/** 城墙：齿状的垛口，石块，箭窗，偶尔挂一面旗、爬一片常春藤 */
-function battlement(ctx: Ctx, W: number, H: number, rng: Rng, merlon: number): void {
-  const crenH = H * 0.16
-  const pts: Pt[] = [[2, H]]
-  const n = Math.max(2, Math.round((W - 4) / merlon))
-  const mw = (W - 4) / n
-  pts.push([2, 3])
-  for (let i = 0; i < n; i++) {
-    const x = 2 + i * mw
-    pts.push([x + mw * 0.62, 3], [x + mw * 0.62, crenH], [x + mw, crenH])
-    if (i < n - 1) pts.push([x + mw, 3])
-  }
-  pts.push([W - 2, 3], [W - 2, H])
-  ink(ctx, poly(pts), { fill: INK.stone, hi: INK.stoneHi, lo: INK.stoneLo, line: LW }, W, H)
-  stones(ctx, 3, crenH, W - 6, H - crenH, 5, rng)
-}
-
-const drawWall: Draw = (ctx, W, H, rng) => {
-  battlement(ctx, W, H, rng, FACE_PPU * 0.55)
-  for (let i = 0; i < Math.max(1, Math.round(W / (FACE_PPU * 1.6))); i++) {
-    const x = W * (0.15 + 0.7 * rng.next())
-    ink(ctx, rect(x, H * 0.4, W * 0.02 + 4, H * 0.2), { fill: INK.dark, line: 1.4 }, W, H)
-  }
-  if (rng.next() < 0.7) {
-    const x = W * (0.25 + 0.5 * rng.next())
-    const c = rng.next() < 0.5 ? INK.red : INK.blue
-    ink(ctx, poly([[x, H * 0.2], [x + W * 0.08, H * 0.2], [x + W * 0.08, H * 0.7], [x + W * 0.04, H * 0.62], [x, H * 0.7]]), { fill: c, lo: INK.line, line: 1.6 }, W, H)
-    ink(ctx, (c2) => c2.arc(x + W * 0.04, H * 0.4, W * 0.018, 0, 6.28), { fill: INK.gold, line: 1 }, W, H)
-  }
-  if (rng.next() < 0.6) {
-    const x = rng.next() < 0.5 ? W * 0.05 : W * 0.75
-    for (let i = 0; i < 9; i++) ink(ctx, ellipse(x + rng.next() * W * 0.2, H * (0.5 + rng.next() * 0.45), 5, 4), { fill: i % 2 ? INK.leaf : INK.leafLo, line: 1 }, W, H)
-  }
-}
-
-const drawTower: Draw = (ctx, W, H, rng) => {
-  battlement(ctx, W, H, rng, FACE_PPU * 0.45)
-  const ww = W * 0.22
-  ink(ctx, (c) => {
-    c.moveTo(W / 2 - ww / 2, H * 0.55)
-    c.lineTo(W / 2 - ww / 2, H * 0.36)
-    c.arc(W / 2, H * 0.36, ww / 2, Math.PI, 0)
-    c.lineTo(W / 2 + ww / 2, H * 0.55)
-    c.closePath()
-  }, { fill: INK.window, line: LW }, W, H)
-  strokes(ctx, [[[W / 2, H * 0.3], [W / 2, H * 0.55]]], 1.6)
-}
-
-const drawKeep: Draw = (ctx, W, H, rng) => {
-  battlement(ctx, W, H, rng, FACE_PPU * 0.5)
-  const gw = W * 0.3
-  ink(ctx, (c) => {
-    c.moveTo(W / 2 - gw / 2, H)
-    c.lineTo(W / 2 - gw / 2, H * 0.62)
-    c.arc(W / 2, H * 0.62, gw / 2, Math.PI, 0)
-    c.lineTo(W / 2 + gw / 2, H)
-    c.closePath()
-  }, { fill: INK.dark, line: LW }, W, H)
-  ctx.save()
-  ctx.beginPath()
-  ctx.moveTo(W / 2 - gw / 2, H)
-  ctx.lineTo(W / 2 - gw / 2, H * 0.62)
-  ctx.arc(W / 2, H * 0.62, gw / 2, Math.PI, 0)
-  ctx.lineTo(W / 2 + gw / 2, H)
-  ctx.clip()
-  const bars: Pt[][] = []
-  for (let i = 1; i < 6; i++) bars.push([[W / 2 - gw / 2 + (gw * i) / 6, H * 0.4], [W / 2 - gw / 2 + (gw * i) / 6, H]])
-  for (let i = 1; i < 6; i++) bars.push([[W / 2 - gw / 2, H * 0.5 + H * 0.1 * i], [W / 2 + gw / 2, H * 0.5 + H * 0.1 * i]])
-  strokes(ctx, bars, 2, INK.goldLo)
-  ctx.restore()
-  for (const x of [0.2, 0.8]) ink(ctx, rect(W * x - 5, H * 0.32, 10, H * 0.16), { fill: INK.window, line: 1.6 }, W, H)
-}
-
-const drawTopiary: Draw = (ctx, W, H, rng) => {
-  ink(ctx, rect(3, H * 0.3, W - 6, H * 0.7), { fill: INK.pine, lo: INK.pineLo, line: LW }, W, H)
-  const n = Math.max(1, Math.round(W / (FACE_PPU * 0.9)))
-  for (let i = 0; i < n; i++) {
-    const x = ((i + 0.5) / n) * W
-    ink(ctx, ellipse(x, H * 0.24, Math.min(H * 0.22, W / n / 2.4), H * 0.2), { fill: INK.pine, hi: INK.leaf, lo: INK.pineLo, line: LW }, W, H)
-  }
-  strokes(ctx, Array.from({ length: Math.round(W / 14) }, () => {
-    const x = 6 + rng.next() * (W - 12)
-    const y = H * (0.45 + rng.next() * 0.45)
-    return [[x - 3, y], [x, y - 3], [x + 3, y]] as Pt[]
-  }), 1, INK.pineLo)
 }
 
 /** 一块嶙峋的岩柱：顶上高低不平，两侧往下微微张开，一层层的岩层，脚下压暗 */
@@ -570,176 +249,513 @@ function rock(ctx: Ctx, H: number, rng: Rng, x0: number, w: number, top: number,
   }), 1.4)
 }
 
-const drawPillar: Draw = (ctx, W, H, rng) => {
-  rock(ctx, H, rng, 2, W - 4, 3, INK.rock, INK.rockLo)
-  if (rng.next() < 0.6) for (let i = 0; i < 6; i++) ink(ctx, ellipse(W * (0.2 + rng.next() * 0.6), H * (0.55 + rng.next() * 0.4), 3, 3), { fill: '#9ee6c9', line: 0.8 }, W, H)
+/** 一棵阔叶树：树干，几团叠着的树冠；樱树、枫树换树冠的颜色，樱树撒花瓣，绿树偶尔挂果 */
+interface Crown {
+  readonly fill: string
+  readonly hi: string
+  readonly lo: string
+  readonly dots?: string
 }
 
-const drawSpire: Draw = (ctx, W, H, rng) => {
-  const pts: Pt[] = [[2, H], [W * 0.3, H * 0.5], [W * 0.46, 3], [W * 0.6, H * 0.45], [W - 2, H]]
-  ink(ctx, poly(pts), { fill: INK.rock, hi: '#b9adb4', lo: INK.rockLo, line: LW }, W, H)
-  strokes(ctx, [0.3, 0.55, 0.78].map((k) => [[W * (0.5 - 0.42 * k), H * k + 4], [W * (0.5 + 0.42 * k), H * k]] as Pt[]), 1.2, INK.rockLo)
-  void rng
-}
+const GREEN: Crown = { fill: INK.leaf, hi: INK.leafHi, lo: INK.leafLo, dots: INK.red }
+const BLOSSOM: Crown = { fill: '#f2a7c3', hi: '#fde0ea', lo: '#b25c80', dots: '#ffffff' }
+const AUTUMN: Crown = { fill: '#dd5a2c', hi: '#f6a34b', lo: '#8a2a18', dots: '#f2c14e' }
 
-const drawCrystal: Draw = (ctx, W, H, rng) => {
-  const shards = 4
-  for (let i = 0; i < shards; i++) {
-    const cx = W * (0.2 + 0.6 * ((i + rng.next() * 0.5) / shards))
-    const hw = W * (0.1 + 0.05 * rng.next())
-    const top = H * (i === 1 ? 0.02 : 0.15 + 0.35 * rng.next())
-    const lean = (cx - W / 2) * 0.3
-    const pts: Pt[] = [[cx - hw, H], [cx - hw + lean, top + hw], [cx + lean, top], [cx + hw + lean, top + hw], [cx + hw, H]]
-    ink(ctx, poly(pts), { fill: i % 2 ? INK.violet : INK.teal, hi: INK.violetHi, lo: INK.line, line: LW }, W, H)
-    strokes(ctx, [[[cx + lean, top], [cx, H]]], 1, '#ffffff')
-  }
-}
-
-const drawHoard: Draw = (ctx, W, H, rng) => {
-  const pts: Pt[] = [[2, H], [W * 0.12, H * 0.4], [W * 0.4, 5], [W * 0.62, H * 0.15], [W * 0.9, H * 0.5], [W - 2, H]]
-  ink(ctx, curve(pts), { fill: INK.gold, hi: '#f8dd7b', lo: INK.goldLo, line: LW }, W, H)
+function drawTree(ctx: Ctx, W: number, H: number, rng: Rng, crown: Crown): void {
+  const cx = W / 2
+  const tw = W * 0.16
+  const trunk: Pt[] = [[cx - tw * 0.6, H], [cx - tw * 0.4, H * 0.55], [cx - tw, H * 0.42], [cx, H * 0.5], [cx + tw, H * 0.4], [cx + tw * 0.4, H * 0.55], [cx + tw * 0.65, H]]
+  ink(ctx, poly(trunk), { fill: INK.bark, lo: INK.barkLo, line: LW }, W, H)
+  const ch = H * 0.62
+  const cy = 4 + ch / 2
+  const main = lumpy(rng, cx, cy, W * 0.44, ch / 2 - 2, 5 + Math.floor(rng.next() * 3), 0.1)
+  ink(ctx, curve(main), { fill: crown.fill, hi: crown.hi, lo: crown.lo, line: LW }, W, H)
   ctx.save()
   ctx.beginPath()
-  smoothPath(ctx, pts)
+  smoothPath(ctx, main)
   ctx.clip()
-  for (let i = 0; i < W / 4; i++) {
-    const x = rng.next() * W
-    const y = rng.next() * H
-    ctx.beginPath()
-    ctx.ellipse(x, y, 4.5, 3, 0, 0, 6.28)
-    ctx.strokeStyle = INK.goldLo
-    ctx.lineWidth = 1
-    ctx.stroke()
+  strokes(
+    ctx,
+    Array.from({ length: 4 }, () => {
+      const x = cx + (rng.next() - 0.5) * W * 0.55
+      const y = cy + (rng.next() - 0.3) * ch * 0.5
+      return [[x - W * 0.06, y], [x, y + ch * 0.07], [x + W * 0.06, y]] as Pt[]
+    }),
+    1.4,
+    crown.lo,
+  )
+  if (crown.dots && (crown !== GREEN || rng.next() < 0.5)) {
+    for (let i = 0; i < (crown === GREEN ? 5 : 14); i++) {
+      ctx.beginPath()
+      ctx.arc(cx + (rng.next() - 0.5) * W * 0.7, cy + (rng.next() - 0.45) * ch * 0.7, W * (crown === GREEN ? 0.035 : 0.022), 0, Math.PI * 2)
+      ctx.fillStyle = crown.dots
+      ctx.fill()
+    }
   }
   ctx.restore()
-  const cx = W * (rng.next() < 0.5 ? 0.25 : 0.62)
-  ink(ctx, rect(cx, H * 0.45, W * 0.22, H * 0.55), { fill: INK.wood, lo: INK.woodLo, line: LW }, W, H)
-  ink(ctx, rect(cx - 1, H * 0.45, W * 0.22 + 2, H * 0.12), { fill: INK.gold, line: 1.6 }, W, H)
-  ink(ctx, rect(cx + W * 0.09, H * 0.6, W * 0.04, H * 0.1), { fill: INK.gold, line: 1.2 }, W, H)
-  ink(ctx, poly([[W * 0.8, H * 0.55], [W * 0.84, H * 0.42], [W * 0.88, H * 0.55], [W * 0.84, H * 0.62]]), { fill: INK.red, hi: '#ff9f9f', line: 1.2 }, W, H)
 }
 
-/** 睡着的巨龙：盘起来的尾巴在一头，头搁在前爪上在另一头，背上一排尖刺，翅膀收着，鼻孔冒着烟圈 */
-const drawDragon: Draw = (ctx, W, H, rng) => {
+/** 一棵松：三层越往上越窄的三角；落了雪的每层顶上压一道白 */
+function drawPine(ctx: Ctx, W: number, H: number, rng: Rng, snow: boolean): void {
+  const cx = W / 2
+  ink(ctx, rect(cx - W * 0.07, H * 0.8, W * 0.14, H * 0.2), { fill: INK.bark, line: LW }, W, H)
+  const tiers = 3
+  for (let i = 0; i < tiers; i++) {
+    const t0 = 3 + (H * 0.82 * i) / tiers
+    const t1 = 3 + (H * 0.82 * (i + 1.35)) / tiers
+    const half = W * (0.24 + 0.24 * ((i + 1) / tiers))
+    const sag = (rng.next() - 0.5) * W * 0.03
+    const tri: Pt[] = [[cx + sag, t0], [cx + half, t1], [cx + half * 0.5, t1 - (t1 - t0) * 0.08], [cx, t1 + (t1 - t0) * 0.04], [cx - half * 0.5, t1 - (t1 - t0) * 0.08], [cx - half, t1]]
+    ink(ctx, poly(tri), { fill: INK.pine, lo: INK.pineLo, line: LW }, W, H)
+    if (snow) {
+      const k = 0.42
+      const cap: Pt[] = [[cx + sag, t0], [cx + half * k, t0 + (t1 - t0) * k], [cx + half * k * 0.5, t0 + (t1 - t0) * k * 0.82], [cx, t0 + (t1 - t0) * k * 1.05], [cx - half * k * 0.5, t0 + (t1 - t0) * k * 0.82], [cx - half * k, t0 + (t1 - t0) * k]]
+      ink(ctx, poly(cap), { fill: INK.white, lo: '#a9c4dc', line: 1.4 }, W, H)
+    }
+  }
+}
+
+const drawBush: Draw = (ctx, W, H, rng) => {
+  const n = Math.max(2, Math.round(W / (FACE_PPU * 0.7)))
+  const pts: Pt[] = [[W - 3, H]]
+  for (let i = n; i >= 0; i--) {
+    const x = 3 + ((W - 6) * i) / n
+    const y = 4 + rng.next() * H * 0.25
+    pts.push([x, y])
+    if (i > 0) pts.push([x - (W - 6) / n / 2, H * 0.32 + rng.next() * H * 0.1])
+  }
+  pts.push([3, H])
+  ink(ctx, curve(pts), { fill: INK.leaf, hi: INK.leafHi, lo: INK.leafLo, line: LW }, W, H)
+  for (let i = 0; i < Math.round(W / 22); i++) flower(ctx, 8 + rng.next() * (W - 16), H * (0.3 + rng.next() * 0.5), [INK.white, INK.gold, '#e98aa6'][Math.floor(rng.next() * 3)]!)
+}
+
+/** 五瓣的小花 */
+function flower(ctx: Ctx, x: number, y: number, c: string): void {
+  for (let k = 0; k < 5; k++) {
+    ctx.beginPath()
+    ctx.arc(x + Math.cos((k / 5) * 6.28) * 2.6, y + Math.sin((k / 5) * 6.28) * 2.6, 2, 0, 6.28)
+    ctx.fillStyle = c
+    ctx.fill()
+  }
+  ctx.beginPath()
+  ctx.arc(x, y, 1.4, 0, 6.28)
+  ctx.fillStyle = INK.gold
+  ctx.fill()
+}
+
+/** 牧场的木栅栏：一根根立柱，两道横杆 */
+const drawRail: Draw = (ctx, W, H, rng) => {
+  for (const y of [0.22, 0.58]) ink(ctx, rect(3, H * y, W - 6, H * 0.14), { fill: INK.wood, lo: INK.woodLo, line: 1.6 }, W, H)
+  const n = Math.max(2, Math.round(W / (FACE_PPU * 0.9)))
+  for (let i = 0; i <= n; i++) {
+    const x = 3 + ((W - 6 - W * 0.06) * i) / n
+    ink(ctx, rect(x + (rng.next() - 0.5) * 2, 3 + rng.next() * 3, W * 0.06, H), { fill: INK.wood, lo: INK.woodLo, line: 1.6 }, W, H)
+  }
+  strokes(ctx, Array.from({ length: Math.round(W / 16) }, () => {
+    const x = 6 + rng.next() * (W - 12)
+    return [[x - 4, H], [x, H - 5 - rng.next() * 5], [x + 4, H]] as Pt[]
+  }), 1.2, INK.leafLo)
+}
+
+/** 一只吃草的羊：一团白绒，黑脸黑腿 */
+const drawSheep: Draw = (ctx, W, H, rng) => {
   const left = rng.next() < 0.5
   ctx.save()
   if (left) {
     ctx.translate(W, 0)
     ctx.scale(-1, 1)
   }
-  const back: Pt[] = [
-    [W * 0.04, H], [W * 0.03, H * 0.72], [W * 0.1, H * 0.52], [W * 0.2, H * 0.58], [W * 0.18, H * 0.76], [W * 0.12, H * 0.74],
-    [W * 0.15, H * 0.66], [W * 0.24, H * 0.5], [W * 0.38, H * 0.3], [W * 0.56, H * 0.26], [W * 0.7, H * 0.4], [W * 0.76, H * 0.56],
-    [W * 0.86, H * 0.5], [W * 0.97, H * 0.62], [W * 0.98, H * 0.8], [W * 0.92, H * 0.9], [W * 0.78, H * 0.92], [W * 0.74, H],
-  ]
-  const spikes: Pt[] = []
-  for (let i = 0; i < 9; i++) {
-    const t = 0.26 + i * 0.05
-    const x = W * t
-    const y = H * (0.5 - 0.24 * Math.sin(((t - 0.22) / 0.5) * Math.PI))
-    spikes.push([x, y + 6])
-    spikes.push([x + W * 0.02, y - H * 0.12])
-    spikes.push([x + W * 0.04, y + 6])
+  for (const x of [0.28, 0.4, 0.62, 0.74]) ink(ctx, rect(W * x, H * 0.72, W * 0.06, H * 0.28), { fill: INK.dark, line: 1.2 }, W, H)
+  const body = lumpy(rng, W * 0.48, H * 0.44, W * 0.36, H * 0.34, 7, 0.14)
+  ink(ctx, curve(body), { fill: INK.white, lo: '#b7b0a2', line: LW }, W, H)
+  ink(ctx, ellipse(W * 0.85, H * 0.52, W * 0.1, H * 0.2), { fill: INK.dark, line: LW }, W, H)
+  ink(ctx, ellipse(W * 0.82, H * 0.36, W * 0.06, H * 0.06), { fill: INK.white, line: 1 }, W, H)
+  ctx.beginPath()
+  ctx.arc(W * 0.88, H * 0.48, 1.6, 0, 6.28)
+  ctx.fillStyle = INK.white
+  ctx.fill()
+  ctx.restore()
+}
+
+/** 寺院的一段土墙：白墙，墙头压一溜灰瓦，木柱隔开，开一扇圆窗 */
+const drawTemple: Draw = (ctx, W, H, rng) => {
+  const cap = H * 0.26
+  ink(ctx, rect(3, cap, W - 6, H - cap), { fill: INK.plaster, lo: '#bfb39a', line: LW }, W, H)
+  const posts = Math.max(2, Math.round(W / (FACE_PPU * 1.2)))
+  for (let i = 0; i <= posts; i++) ink(ctx, rect(3 + ((W - 6 - 8) * i) / posts, cap, 8, H - cap), { fill: '#8a3b2a', line: 1.4 }, W, H)
+  strokes(ctx, [[[3, H - H * 0.14], [W - 3, H - H * 0.14]]], 2.4, '#8a3b2a')
+  ink(ctx, poly([[0, cap + 4], [W * 0.04, 4], [W * 0.96, 4], [W, cap + 4]]), { fill: '#6d6f78', lo: '#33353b', line: LW }, W, H)
+  strokes(ctx, Array.from({ length: Math.round(W / 9) }, (_, i) => [[6 + i * 9, 6], [4 + i * 9, cap]] as Pt[]), 1.1, '#33353b')
+  const wx = W * (0.3 + rng.next() * 0.4)
+  ink(ctx, ellipse(wx, cap + (H - cap) * 0.45, (H - cap) * 0.22, (H - cap) * 0.22), { fill: '#2e2a2a', line: LW }, W, H)
+  strokes(ctx, [-0.12, 0, 0.12].map((k) => [[wx + k * (H - cap), cap + (H - cap) * 0.25], [wx + k * (H - cap), cap + (H - cap) * 0.65]] as Pt[]), 1.6, '#8a3b2a')
+}
+
+/** 石灯笼：底座、灯柱、开着暖窗的灯室、宽宽的笠顶 */
+const drawLantern: Draw = (ctx, W, H) => {
+  ink(ctx, rect(W * 0.2, H * 0.84, W * 0.6, H * 0.16), { fill: INK.stone, lo: INK.stoneLo, line: LW }, W, H)
+  ink(ctx, rect(W * 0.38, H * 0.55, W * 0.24, H * 0.3), { fill: INK.stone, lo: INK.stoneLo, line: LW }, W, H)
+  ink(ctx, rect(W * 0.26, H * 0.32, W * 0.48, H * 0.24), { fill: INK.stone, line: LW }, W, H)
+  ink(ctx, rect(W * 0.38, H * 0.36, W * 0.24, H * 0.16), { fill: INK.window, line: 1.4 }, W, H)
+  ink(ctx, poly([[W * 0.04, H * 0.33], [W * 0.5, H * 0.1], [W * 0.96, H * 0.33]]), { fill: INK.stone, lo: INK.stoneLo, line: LW }, W, H)
+  ink(ctx, ellipse(W * 0.5, H * 0.08, W * 0.07, H * 0.06), { fill: INK.stone, line: 1.4 }, W, H)
+}
+
+/** 仙人掌：一根主干、一两条举起来的胳膊，竖着的棱，零星的刺；顶上偶尔开朵花 */
+const drawCactus: Draw = (ctx, W, H, rng) => {
+  const cx = W / 2
+  const tw = W * 0.18
+  const arm = (side: number, y0: number, up: number): void => {
+    const x0 = cx + side * tw * 0.8
+    const x1 = cx + side * W * 0.38
+    ink(ctx, (c) => {
+      c.moveTo(x0, y0)
+      c.lineTo(x1 - side * W * 0.06, y0)
+      c.quadraticCurveTo(x1 + side * W * 0.04, y0, x1 + side * W * 0.04, y0 - H * 0.08)
+      c.lineTo(x1 + side * W * 0.04, y0 - up)
+      c.arc(x1 - side * W * 0.04, y0 - up, W * 0.08, 0, Math.PI, true)
+      c.lineTo(x1 - side * W * 0.12, y0 - H * 0.1)
+      c.lineTo(x0, y0 - H * 0.1)
+      c.closePath()
+    }, { fill: '#5e9a4a', lo: '#2e5a2a', line: LW }, W, H)
   }
-  for (let i = 0; i + 2 < spikes.length; i += 3) ink(ctx, poly([spikes[i]!, spikes[i + 1]!, spikes[i + 2]!]), { fill: INK.red, line: 1.6 }, W, H)
-  ink(ctx, curve(back), { fill: INK.teal, hi: '#6fc0a8', lo: INK.tealLo, line: LW }, W, H)
-  ink(ctx, curve([[W * 0.22, H], [W * 0.3, H * 0.74], [W * 0.5, H * 0.66], [W * 0.68, H * 0.74], [W * 0.72, H]]), { fill: INK.belly, lo: INK.hayLo, line: 1.6 }, W, H)
-  strokes(ctx, [0.32, 0.4, 0.48, 0.56, 0.64].map((t) => [[W * t, H * 0.72], [W * (t + 0.01), H]] as Pt[]), 1.2, INK.hayLo)
-  ink(ctx, curve([[W * 0.36, H * 0.42], [W * 0.46, H * 0.18], [W * 0.62, H * 0.12], [W * 0.6, H * 0.34], [W * 0.5, H * 0.46]]), { fill: '#2f7a6e', lo: INK.tealLo, line: LW }, W, H)
-  strokes(ctx, [[[W * 0.46, H * 0.2], [W * 0.5, H * 0.42]], [[W * 0.54, H * 0.15], [W * 0.55, H * 0.4]]], 1.4, INK.tealLo)
-  ink(ctx, curve([[W * 0.84, H * 0.86], [W * 0.82, H * 0.64], [W * 0.9, H * 0.56], [W * 0.97, H * 0.66], [W * 0.95, H * 0.86]]), { fill: INK.teal, lo: INK.tealLo, line: LW }, W, H)
-  strokes(ctx, [[[W * 0.885, H * 0.7], [W * 0.92, H * 0.72], [W * 0.95, H * 0.7]]], 2)
-  ink(ctx, poly([[W * 0.86, H * 0.6], [W * 0.84, H * 0.44], [W * 0.88, H * 0.57]]), { fill: INK.belly, line: 1.4 }, W, H)
-  ink(ctx, poly([[W * 0.92, H * 0.58], [W * 0.93, H * 0.42], [W * 0.95, H * 0.6]]), { fill: INK.belly, line: 1.4 }, W, H)
-  ctx.lineWidth = 1.6
-  ctx.strokeStyle = '#9b9298'
-  for (let i = 0; i < 3; i++) {
-    ctx.beginPath()
-    ctx.arc(W * (0.96 + i * 0.012), H * (0.62 - i * 0.12), 3 + i * 1.6, 0, 6.28)
-    ctx.stroke()
+  arm(-1, H * (0.55 + rng.next() * 0.1), H * 0.25)
+  if (rng.next() < 0.7) arm(1, H * (0.45 + rng.next() * 0.1), H * 0.22)
+  ink(ctx, (c) => {
+    c.moveTo(cx - tw, H)
+    c.lineTo(cx - tw, H * 0.12)
+    c.arc(cx, H * 0.12, tw, Math.PI, 0)
+    c.lineTo(cx + tw, H)
+    c.closePath()
+  }, { fill: '#5e9a4a', hi: '#8cc06a', lo: '#2e5a2a', line: LW }, W, H)
+  strokes(ctx, [-0.5, 0, 0.5].map((k) => [[cx + k * tw, H * 0.1], [cx + k * tw, H]] as Pt[]), 1.2, '#2e5a2a')
+  if (rng.next() < 0.6) flower(ctx, cx, H * 0.04 + 4, '#f26b8a')
+}
+
+/** 沙漠里的石堆：一块压一块，越往上越小 */
+const drawCairn: Draw = (ctx, W, H, rng) => {
+  let y = H
+  let w = W * 0.92
+  for (let i = 0; i < 4 && y > H * 0.15; i++) {
+    const h = H * (0.32 - i * 0.04)
+    const x = W / 2 + (rng.next() - 0.5) * W * 0.08
+    ink(ctx, ellipse(x, y - h / 2, w / 2, h / 2), { fill: ['#c99a62', '#b58a5a', '#d3ab72', '#a8794e'][i]!, lo: '#6b4a2a', line: LW }, W, H)
+    y -= h * 0.88
+    w *= 0.72
   }
+}
+
+/** 椰子树：一节节弯着的树干，顶上一蓬羽叶，挂着椰子 */
+const drawPalm: Draw = (ctx, W, H, rng) => {
+  const lean = (rng.next() < 0.5 ? -1 : 1) * W * 0.18
+  const top: Pt = [W / 2 + lean, H * 0.24]
+  const segs = 7
+  for (let i = 0; i < segs; i++) {
+    const t0 = i / segs
+    const t1 = (i + 1) / segs
+    const x0 = W / 2 + lean * t0 * t0
+    const x1 = W / 2 + lean * t1 * t1
+    const y0 = H - (H - top[1]) * t0
+    const y1 = H - (H - top[1]) * t1
+    const r = W * (0.07 - 0.02 * t0)
+    ink(ctx, poly([[x0 - r, y0], [x1 - r * 0.9, y1], [x1 + r * 0.9, y1], [x0 + r, y0]]), { fill: '#a87a4a', lo: '#6b4a2a', line: 1.4 }, W, H)
+  }
+  for (let k = 0; k < 6; k++) {
+    const a = Math.PI + (k / 5) * Math.PI + (rng.next() - 0.5) * 0.2
+    const len = W * (0.38 + rng.next() * 0.1)
+    const ex = top[0] + Math.cos(a) * len
+    const ey = top[1] + Math.sin(a) * len * 0.5 + H * 0.12 * Math.abs(Math.cos(a))
+    const mx = (top[0] + ex) / 2
+    const my = Math.min(top[1], ey) - H * 0.08
+    ink(ctx, (c) => {
+      c.moveTo(top[0], top[1])
+      c.quadraticCurveTo(mx, my - H * 0.04, ex, ey)
+      c.quadraticCurveTo(mx, my + H * 0.06, top[0], top[1])
+      c.closePath()
+    }, { fill: '#4f9a52', lo: '#255a2c', line: 1.6 }, W, H)
+  }
+  for (let k = 0; k < 3; k++) ink(ctx, ellipse(top[0] + (k - 1) * W * 0.05, top[1] + H * 0.05, W * 0.035, W * 0.035), { fill: '#7a4a24', line: 1 }, W, H)
+}
+
+/** 一件布景的岩石：岩柱、礁石、黑岩换颜色 */
+const drawReef: Draw = (ctx, W, H, rng) => {
+  rock(ctx, H, rng, 2, W - 4, 3, '#7d8f99', '#3b4a52')
+  for (let i = 0; i < 7; i++) ink(ctx, ellipse(W * (0.15 + rng.next() * 0.7), H * (0.4 + rng.next() * 0.5), 3.2, 2.4), { fill: '#e8e2d2', line: 0.8 }, W, H)
+  strokes(ctx, Array.from({ length: 3 }, () => {
+    const x = W * (0.1 + rng.next() * 0.8)
+    return [[x, H], [x - 4, H * 0.75], [x + 3, H * 0.55], [x - 2, H * 0.4]] as Pt[]
+  }), 2.4, '#3f7a52')
+}
+
+/** 潜艇的侧影：长圆的艇身、背上的指挥塔与潜望镜、一排舷窗，艇尾一副螺旋桨 */
+const drawSub: Draw = (ctx, W, H, rng) => {
+  const left = rng.next() < 0.5
+  ctx.save()
+  if (left) {
+    ctx.translate(W, 0)
+    ctx.scale(-1, 1)
+  }
+  const top = H * 0.42
+  ink(ctx, rect(W * 0.62, H * 0.06, W * 0.02, H * 0.2), { fill: INK.dark, line: 1.2 }, W, H)
+  ink(ctx, (c) => c.roundRect(W * 0.48, H * 0.18, W * 0.2, top - H * 0.16, 6), { fill: '#e2a33a', lo: '#9a6418', line: LW }, W, H)
+  ink(ctx, (c) => c.roundRect(W * 0.06, top, W * 0.86, H - top - 3, (H - top) / 2), { fill: '#e8b443', hi: '#f6d585', lo: '#9a6418', line: LW }, W, H)
+  ink(ctx, poly([[W * 0.08, top + (H - top) * 0.2], [W * 0.0, top + (H - top) * 0.05], [W * 0.0, H - 3], [W * 0.08, top + (H - top) * 0.8]]), { fill: INK.dark, line: 1.4 }, W, H)
+  for (let i = 0; i < 4; i++) ink(ctx, ellipse(W * (0.3 + i * 0.13), top + (H - top) * 0.45, (H - top) * 0.13, (H - top) * 0.13), { fill: '#bfe6f2', lo: '#3c7a96', line: 1.6 }, W, H)
+  strokes(ctx, [[[W * 0.1, H - (H - top) * 0.25], [W * 0.9, H - (H - top) * 0.25]]], 1.2, '#9a6418')
+  ctx.restore()
+}
+
+/** 海带：两三根从底下飘起来的长带子 */
+const drawKelp: Draw = (ctx, W, H, rng) => {
+  for (let k = 0; k < 3; k++) {
+    const x0 = W * (0.25 + k * 0.25)
+    const pts: Pt[] = []
+    const n = 6
+    const ph = rng.next() * 6
+    const top = H * (0.02 + rng.next() * 0.25)
+    for (let i = 0; i <= n; i++) pts.push([x0 + Math.sin(ph + i * 1.2) * W * 0.1, H - ((H - top) * i) / n])
+    const right = pts.map(([x, y]) => [x + W * 0.07, y] as Pt).reverse()
+    ink(ctx, poly(pts.concat(right)), { fill: k % 2 ? '#5f8a3a' : '#7a9a3e', lo: '#2f4a1e', line: 1.6 }, W, H)
+  }
+}
+
+/** 珊瑚：一丛分叉的枝，旁边一面扇子 */
+const drawCoral: Draw = (ctx, W, H, rng) => {
+  ink(ctx, (c) => {
+    c.moveTo(W * 0.55, H)
+    c.arc(W * 0.72, H * 0.6, W * 0.22, Math.PI * 0.85, Math.PI * 0.15, false)
+    c.closePath()
+  }, { fill: '#e8865a', lo: '#9a4a2a', line: LW }, W, H)
+  const branch = (x: number, y: number, a: number, len: number, d: number): void => {
+    const ex = x + Math.cos(a) * len
+    const ey = y + Math.sin(a) * len
+    strokes(ctx, [[[x, y], [ex, ey]]], 6 - d, INK.line)
+    strokes(ctx, [[[x, y], [ex, ey]]], 4 - d, '#f27a9e')
+    if (d < 3) {
+      branch(ex, ey, a - 0.45 - rng.next() * 0.2, len * 0.72, d + 1)
+      branch(ex, ey, a + 0.45 + rng.next() * 0.2, len * 0.72, d + 1)
+    }
+  }
+  branch(W * 0.3, H, -Math.PI / 2, H * 0.38, 0)
+}
+
+/** 塌了一半的石墙：砌石，顶上高低不平地塌下来，墙面爬着藤、落着红叶 */
+const drawRuin: Draw = (ctx, W, H, rng) => {
+  const pts: Pt[] = [[2, H], [2, H * 0.3]]
+  const n = 8
+  for (let i = 1; i < n; i++) {
+    const x = (W * i) / n
+    const k = Math.floor(rng.next() * 3)
+    pts.push([x - W * 0.04, H * (0.04 + k * 0.18)], [x + W * 0.02, H * (0.04 + k * 0.18)])
+  }
+  pts.push([W - 2, H * 0.35], [W - 2, H])
+  ink(ctx, poly(pts), { fill: '#b4a48c', hi: '#d2c4aa', lo: '#6b5a44', line: LW }, W, H)
   ctx.save()
   ctx.beginPath()
-  smoothPath(ctx, back)
+  poly(pts)(ctx)
   ctx.clip()
-  for (let i = 0; i < W / 9; i++) {
-    const x = W * (0.1 + 0.8 * rng.next())
-    const y = H * (0.3 + 0.6 * rng.next())
-    ctx.beginPath()
-    ctx.arc(x, y, 3, Math.PI * 0.1, Math.PI * 0.9)
-    ctx.strokeStyle = INK.tealLo
-    ctx.lineWidth = 1
-    ctx.stroke()
+  stones(ctx, 0, 0, W, H, 6, rng)
+  ctx.restore()
+  for (let i = 0; i < 10; i++) ink(ctx, ellipse(W * (0.05 + rng.next() * 0.9), H * (0.35 + rng.next() * 0.6), 4, 3), { fill: ['#dd5a2c', '#f2a03a', '#a82a1a'][i % 3]!, line: 0.8 }, W, H)
+}
+
+/** 断了头的石柱：柱础、带凹槽的柱身，柱头斜着断开 */
+const drawColumn: Draw = (ctx, W, H, rng) => {
+  const br = H * (0.04 + rng.next() * 0.12)
+  ink(ctx, rect(W * 0.08, H * 0.9, W * 0.84, H * 0.1), { fill: '#cfc2a8', lo: '#6b5a44', line: LW }, W, H)
+  ink(ctx, poly([[W * 0.2, H * 0.9], [W * 0.2, br + H * 0.08], [W * 0.8, br], [W * 0.8, H * 0.9]]), { fill: '#d8ccb2', hi: '#efe6d2', lo: '#7a6a52', line: LW }, W, H)
+  strokes(ctx, [0.35, 0.5, 0.65].map((k) => [[W * k, br + H * 0.1], [W * k, H * 0.88]] as Pt[]), 1.2, '#7a6a52')
+  ink(ctx, ellipse(W * 0.3, H * 0.97, W * 0.18, H * 0.03), { fill: '#dd5a2c', line: 0.8 }, W, H)
+}
+
+/** 一堆落叶：红的、橙的、黄的 */
+const drawLeaves: Draw = (ctx, W, H, rng) => {
+  const pts: Pt[] = [[2, H], [W * 0.15, H * 0.4], [W * 0.4, 4], [W * 0.65, H * 0.18], [W * 0.88, H * 0.45], [W - 2, H]]
+  ink(ctx, curve(pts), { fill: '#c9502a', hi: '#f29a4a', lo: '#7a2414', line: LW }, W, H)
+  ctx.save()
+  ctx.beginPath()
+  smoothPath(ctx, pts)
+  ctx.clip()
+  for (let i = 0; i < W / 4; i++) {
+    ctx.save()
+    ctx.translate(rng.next() * W, rng.next() * H)
+    ctx.rotate(rng.next() * 6.28)
+    ink(ctx, poly([[0, -5], [3, 0], [0, 5], [-3, 0]]), { fill: ['#dd5a2c', '#f2a03a', '#f2c14e', '#a82a1a'][i % 4]!, line: 0.8 }, 6, 10)
+    ctx.restore()
   }
   ctx.restore()
+}
+
+const drawPillar: Draw = (ctx, W, H, rng) => {
+  rock(ctx, H, rng, 2, W - 4, 3, INK.rock, INK.rockLo)
+  for (let i = 0; i < 6; i++) ink(ctx, ellipse(W * (0.2 + rng.next() * 0.6), H * (0.55 + rng.next() * 0.4), 3, 3), { fill: '#9ee6c9', line: 0.8 }, W, H)
+}
+
+const drawSpire: Draw = (ctx, W, H) => {
+  const pts: Pt[] = [[2, H], [W * 0.3, H * 0.5], [W * 0.46, 3], [W * 0.6, H * 0.45], [W - 2, H]]
+  ink(ctx, poly(pts), { fill: INK.rock, hi: '#b9adb4', lo: INK.rockLo, line: LW }, W, H)
+  strokes(ctx, [0.3, 0.55, 0.78].map((k) => [[W * (0.5 - 0.42 * k), H * k + 4], [W * (0.5 + 0.42 * k), H * k]] as Pt[]), 1.2, INK.rockLo)
+}
+
+/** 一丛荧光蘑菇：青绿的菌盖，外面一圈网点的光 */
+const drawShroom: Draw = (ctx, W, H, rng) => {
+  for (let k = 0; k < 4; k++) {
+    const x = W * (0.18 + k * 0.22 + (rng.next() - 0.5) * 0.06)
+    const top = H * (0.1 + rng.next() * 0.4)
+    const r = W * (0.09 + rng.next() * 0.05)
+    ctx.beginPath()
+    ctx.arc(x, top + r * 0.4, r * 1.8, 0, 6.28)
+    ctx.fillStyle = dots(ctx, '#6fe6d0', 0.35)
+    ctx.fill()
+    ink(ctx, rect(x - r * 0.25, top + r * 0.4, r * 0.5, H - top - r * 0.4), { fill: '#e8e2d2', line: 1.4 }, W, H)
+    ink(ctx, (c) => {
+      c.moveTo(x - r, top + r * 0.5)
+      c.quadraticCurveTo(x, top - r * 1.1, x + r, top + r * 0.5)
+      c.closePath()
+    }, { fill: '#3fc7b0', hi: '#a6f2e4', line: 1.6 }, W, H)
+  }
+}
+
+/** 火把架：一根木杆，顶上铁盆里烧着火 */
+const drawTorch: Draw = (ctx, W, H) => {
+  ink(ctx, rect(W * 0.42, H * 0.34, W * 0.16, H * 0.66), { fill: INK.wood, lo: INK.woodLo, line: LW }, W, H)
+  ink(ctx, poly([[W * 0.2, H * 0.3], [W * 0.8, H * 0.3], [W * 0.66, H * 0.42], [W * 0.34, H * 0.42]]), { fill: INK.dark, line: LW }, W, H)
+  ink(ctx, curve([[W * 0.26, H * 0.3], [W * 0.36, H * 0.1], [W * 0.5, 4], [W * 0.64, H * 0.12], [W * 0.74, H * 0.3]]), { fill: '#f28a2a', hi: '#ffd76a', line: 1.6 }, W, H)
+  ink(ctx, curve([[W * 0.4, H * 0.3], [W * 0.5, H * 0.14], [W * 0.6, H * 0.3]]), { fill: '#ffe9a0', line: 0 }, W, H)
+}
+
+/** 火山：宽宽的山体，熔岩顺着沟淌下来，口上发红，顶上一串烟圈 */
+const drawCone: Draw = (ctx, W, H, rng) => {
+  const top = H * 0.3
+  const lip = W * 0.12
+  const pts: Pt[] = [[2, H], [W * 0.2, H * 0.68], [W / 2 - lip, top], [W / 2 + lip, top], [W * 0.8, H * 0.66], [W - 2, H]]
+  ink(ctx, poly(pts), { fill: '#5a4642', hi: '#7a625c', lo: '#2a1f1d', line: LW }, W, H)
+  ctx.save()
+  ctx.beginPath()
+  poly(pts)(ctx)
+  ctx.clip()
+  for (let k = 0; k < 4; k++) {
+    let x = W / 2 + (rng.next() - 0.5) * lip * 1.6
+    let y = top
+    const line: Pt[] = [[x, y]]
+    const dir = x < W / 2 ? -1 : 1
+    while (y < H) {
+      y += H * 0.08
+      x += dir * W * (0.02 + rng.next() * 0.03)
+      line.push([x, y])
+    }
+    strokes(ctx, [line], 6, '#2a1f1d')
+    strokes(ctx, [line], 3.4, '#f26a2a')
+  }
   ctx.restore()
+  ink(ctx, ellipse(W / 2, top + 1, lip, H * 0.035), { fill: '#f2a03a', hi: '#ffe08a', line: 1.6 }, W, H)
+  for (let k = 0; k < 4; k++) ink(ctx, ellipse(W / 2 + (k - 1.5) * W * 0.03 + k * k * 2, top - H * (0.07 + k * 0.065), W * (0.035 + k * 0.012), H * (0.035 + k * 0.01)), { fill: '#d9d2cf', lo: '#8f8784', line: 1.4 }, W, H)
+}
+
+/** 黑曜石的崖：黑的岩体，裂缝里透着暗红 */
+const drawCrag: Draw = (ctx, W, H, rng) => {
+  rock(ctx, H, rng, 2, W - 4, 3, '#3d3438', '#141012')
+  strokes(ctx, Array.from({ length: 3 }, () => {
+    const x = W * (0.2 + rng.next() * 0.6)
+    const y = H * (0.3 + rng.next() * 0.3)
+    return [[x, y], [x + W * 0.05, y + H * 0.14], [x - W * 0.02, y + H * 0.3]] as Pt[]
+  }), 2.2, '#e8552a')
+}
+
+/** 冰山：几个斜面拼成的尖，亮面白、背面青 */
+const drawBerg: Draw = (ctx, W, H, rng) => {
+  const peaks = 2 + Math.floor(rng.next() * 2)
+  const pts: Pt[] = [[2, H]]
+  for (let i = 0; i < peaks; i++) {
+    const x0 = (W * i) / peaks
+    const x1 = (W * (i + 1)) / peaks
+    pts.push([x0 + (x1 - x0) * 0.2, H * (0.3 + rng.next() * 0.2)], [x0 + (x1 - x0) * (0.4 + rng.next() * 0.2), 3 + rng.next() * H * 0.25], [x1 - (x1 - x0) * 0.1, H * (0.35 + rng.next() * 0.2)])
+  }
+  pts.push([W - 2, H])
+  ink(ctx, poly(pts), { fill: '#e6f3fb', hi: '#ffffff', lo: '#6fa6c8', line: LW }, W, H)
+  ctx.save()
+  ctx.beginPath()
+  poly(pts)(ctx)
+  ctx.clip()
+  for (let i = 2; i < pts.length - 1; i += 3) {
+    const p = pts[i]!
+    ctx.beginPath()
+    ctx.moveTo(p[0], p[1])
+    ctx.lineTo(p[0] + W * 0.18, H)
+    ctx.lineTo(p[0] + W * 0.02, H)
+    ctx.closePath()
+    ctx.fillStyle = 'rgba(111,166,200,0.45)'
+    ctx.fill()
+  }
+  ctx.restore()
+  strokes(ctx, [[[2, H * 0.92], [W - 2, H * 0.92]]], 1.4, '#6fa6c8')
+}
+
+/** 雪堆：一道起伏的白，背光处压淡蓝的网点 */
+const drawDrift: Draw = (ctx, W, H, rng) => {
+  const pts: Pt[] = [[2, H]]
+  const n = 4
+  for (let i = 0; i <= n; i++) pts.push([3 + ((W - 6) * i) / n, H * (0.15 + rng.next() * 0.3)])
+  pts.push([W - 2, H])
+  ink(ctx, curve(pts), { fill: INK.white, lo: '#9cc2dc', line: LW }, W, H)
+  for (let i = 0; i < W / 30; i++) ink(ctx, ellipse(W * (0.1 + rng.next() * 0.8), H * (0.55 + rng.next() * 0.3), 2, 2), { fill: '#d6eaf6', line: 0 }, W, H)
 }
 
 const DRAW: Record<PieceKind, Draw> = {
-  tree: (ctx, W, H, rng) => drawTree(ctx, W, H, rng),
-  pine: (ctx, W, H, rng) => drawPine(ctx, W, H, rng),
-  grove: drawGrove,
+  pine: (ctx, W, H, rng) => drawPine(ctx, W, H, rng, false),
+  rail: drawRail,
+  sheep: drawSheep,
   bush: drawBush,
-  log: drawLog,
-  hut: drawHut,
-  windmill: drawWindmill,
-  cottage: drawCottage,
-  fence: drawFence,
-  haystack: drawHaystack,
-  well: drawWell,
-  wall: drawWall,
-  tower: drawTower,
-  keep: drawKeep,
-  topiary: drawTopiary,
-  pillar: drawPillar,
+  sakura: (ctx, W, H, rng) => drawTree(ctx, W, H, rng, BLOSSOM),
+  temple: drawTemple,
+  bamboo: (ctx, W, H, rng) => {
+    const n = Math.max(3, Math.round(W / (FACE_PPU * 0.22)))
+    for (let i = 0; i < n; i++) {
+      const x = 3 + ((W - 6) * i) / n
+      const w = (W - 6) / n - 1
+      const top = 4 + rng.next() * H * 0.12
+      ink(ctx, poly([[x, top + w * 0.6], [x + w, top], [x + w, H], [x, H]]), { fill: '#7fae4a', lo: '#3f6a2a', line: 1.4 }, w, H)
+      strokes(ctx, [0.4, 0.7].map((k) => [[x, H * k], [x + w, H * k]] as Pt[]), 1.4, '#3f6a2a')
+    }
+    strokes(ctx, [[[2, H * 0.55], [W - 2, H * 0.55]]], 3, '#8a5a35')
+  },
+  lantern: drawLantern,
+  cactus: drawCactus,
+  cairn: drawCairn,
+  palm: drawPalm,
+  reef: drawReef,
+  sub: drawSub,
+  kelp: drawKelp,
+  coral: drawCoral,
+  ruin: drawRuin,
+  column: drawColumn,
+  maple: (ctx, W, H, rng) => drawTree(ctx, W, H, rng, AUTUMN),
+  leaves: drawLeaves,
   spire: drawSpire,
-  crystal: drawCrystal,
-  hoard: drawHoard,
-  dragon: drawDragon,
+  pillar: drawPillar,
+  shroom: drawShroom,
+  torch: drawTorch,
+  cone: drawCone,
+  crag: drawCrag,
+  berg: drawBerg,
+  snowpine: (ctx, W, H, rng) => drawPine(ctx, W, H, rng, true),
+  drift: drawDrift,
 }
 
-/** 盒子顶面的颜色与纹样：屋顶、塔顶、草垛顶 */
+/** 盒子的顶面：寺墙顶上的灰瓦，残墙顶上的乱石 */
 const ROOF: Partial<Record<PieceKind, (ctx: Ctx, W: number, H: number, rng: Rng) => void>> = {
-  hut: (ctx, W, H) => {
-    ink(ctx, rect(0, 0, W, H), { fill: INK.hay, line: LW }, W, H)
-    strokes(ctx, Array.from({ length: 6 }, (_, i) => [[0, (H * (i + 1)) / 7], [W, (H * (i + 1)) / 7]] as Pt[]), 1.2, INK.hayLo)
-    strokes(ctx, [[[0, H / 2], [W, H / 2]]], 3, INK.woodLo)
-  },
-  cottage: (ctx, W, H) => {
-    ink(ctx, rect(0, 0, W, H), { fill: INK.tile, line: LW }, W, H)
+  temple: (ctx, W, H) => {
+    ink(ctx, rect(0, 0, W, H), { fill: '#6d6f78', line: LW }, W, H)
     const lines: Pt[][] = []
-    for (let i = 1; i < 7; i++) lines.push([[0, (H * i) / 7], [W, (H * i) / 7]])
-    for (let x = 6; x < W; x += 10) lines.push([[x, 0], [x, H]])
-    strokes(ctx, lines, 1, INK.tileLo)
-    strokes(ctx, [[[0, H / 2], [W, H / 2]]], 3, INK.tileLo)
+    for (let x = 5; x < W; x += 9) lines.push([[x, 0], [x, H]])
+    strokes(ctx, lines, 1.1, '#33353b')
+    strokes(ctx, [[[0, H / 2], [W, H / 2]]], 3.2, '#33353b')
   },
-
-
-  well: (ctx, W, H) => {
-    ink(ctx, rect(0, 0, W, H), { fill: INK.stoneHi, line: LW }, W, H)
-    ink(ctx, ellipse(W / 2, H / 2, W * 0.32, H * 0.32), { fill: '#2a4a6e', hi: '#5d87b8', line: LW }, W, H)
+  ruin: (ctx, W, H, rng) => {
+    ink(ctx, rect(0, 0, W, H), { fill: '#b4a48c', lo: '#6b5a44', line: LW }, W, H)
+    stones(ctx, 0, 0, W, H, 2, rng)
+    for (let i = 0; i < W / 10; i++) ink(ctx, ellipse(rng.next() * W, rng.next() * H, 4, 3), { fill: ['#dd5a2c', '#f2a03a', '#a82a1a'][i % 3]!, line: 0.8 }, W, H)
   },
-  tower: (ctx, W, H, rng) => {
-    ink(ctx, rect(0, 0, W, H), { fill: INK.stone, lo: INK.stoneLo, line: LW }, W, H)
-    stones(ctx, W * 0.15, H * 0.15, W * 0.7, H * 0.7, 4, rng)
-    strokes(ctx, [[[W * 0.15, H * 0.15], [W * 0.85, H * 0.15], [W * 0.85, H * 0.85], [W * 0.15, H * 0.85], [W * 0.15, H * 0.15]]], 1.6)
-    strokes(ctx, [[[W / 2, H / 2], [W / 2, H * 0.2]]], 2.4, INK.woodLo)
-    ink(ctx, poly([[W / 2, H * 0.2], [W * 0.8, H * 0.26], [W / 2, H * 0.32]]), { fill: INK.red, line: 1.2 }, W, H)
-  },
-  keep: (ctx, W, H, rng) => {
-    ink(ctx, rect(0, 0, W, H), { fill: INK.stone, lo: INK.stoneLo, line: LW }, W, H)
-    stones(ctx, W * 0.1, H * 0.15, W * 0.8, H * 0.7, 4, rng)
-    strokes(ctx, [[[W * 0.1, H * 0.15], [W * 0.9, H * 0.15], [W * 0.9, H * 0.85], [W * 0.1, H * 0.85], [W * 0.1, H * 0.15]]], 1.6)
-  },
-
-}
-
-/** 带山墙的房子：檐口在正面高的这么多处，顶面画成从檐口坡到屋脊的两片屋顶 */
-export const EAVE = 0.58
-
-/** 这一种是带山墙的房子 */
-export function gabled(kind: PieceKind): boolean {
-  return kind === 'hut' || kind === 'cottage'
 }
 
 /** 一张布景的正面画多大，像素：宽是底边长，高是立起来时画面上的高 */

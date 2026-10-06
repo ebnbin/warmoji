@@ -20,41 +20,51 @@ const SMALL_U = 0.65
 const BIG_U = 1.15
 /** 左页左上角印字的那一块，格：离页角多远、多宽多高 */
 export const TEXT_BOX = { x: 0, y: 0, w: 9, h: 4.8 } as const
+/** 摆在两个景交界那一带的布景离界线最多多远，格 */
+const MID_U = 2.6
 /** 一页最多换几次种子重摆 */
 const PAGE_TRIES = 12
 /** 一件布景最多换几个地方试 */
 const PIECE_TRIES = 40
 
-/** 故事的四章：按这个次序轮下去 */
+/** 故事的四章：一章一个季节，按这个次序轮下去 */
 export const CHAPTERS = [
-  { key: 'forest', num: '一', name: '迷雾森林', text: ['从前，有一片很深很深的森林，', '小小的旅人走进林子，', '树影把来时的路都藏了起来。'] },
-  { key: 'mill', num: '二', name: '风车磨坊', text: ['穿过森林，是一座风车磨坊。', '风车慢悠悠地转着，', '可篱笆后面，好像有什么在喘气。'] },
-  { key: 'castle', num: '三', name: '城堡舞会', text: ['城堡里正在开舞会，', '钟声敲了十二下，', '城门却悄悄地关上了。'] },
-  { key: 'lair', num: '四', name: '巨龙山洞', text: ['山洞的最深处，', '睡着一条守着金子的巨龙。', '它慢慢睁开了一只眼睛。'] },
+  { key: 'spring', num: '一', name: '樱花溪', text: ['春天到了，小小的旅人们', '跟着小溪穿过草地，', '溪水流进了开满樱花的院子。'] },
+  { key: 'summer', num: '二', name: '沙与海', text: ['他们翻过滚烫的沙丘，', '一直走到大海边。', '海的深处，停着一艘小小的潜艇。'] },
+  { key: 'autumn', num: '三', name: '红叶洞', text: ['红叶落满了旧城墙，', '墙后面藏着一个山洞，', '洞里点着一盏盏火把。'] },
+  { key: 'winter', num: '四', name: '火与冰', text: ['冬天来了，雪落满了冰原，', '远处的火山还冒着烟。', '旅人们的故事，还在继续。'] },
 ] as const
 export type ChapterKey = (typeof CHAPTERS)[number]['key']
 
 export type PieceKind =
-  | 'tree'
   | 'pine'
-  | 'grove'
+  | 'rail'
+  | 'sheep'
   | 'bush'
-  | 'log'
-  | 'hut'
-  | 'windmill'
-  | 'cottage'
-  | 'fence'
-  | 'haystack'
-  | 'well'
-  | 'wall'
-  | 'tower'
-  | 'keep'
-  | 'topiary'
-  | 'pillar'
+  | 'sakura'
+  | 'temple'
+  | 'bamboo'
+  | 'lantern'
+  | 'cactus'
+  | 'cairn'
+  | 'palm'
+  | 'reef'
+  | 'sub'
+  | 'kelp'
+  | 'coral'
+  | 'ruin'
+  | 'column'
+  | 'maple'
+  | 'leaves'
   | 'spire'
-  | 'crystal'
-  | 'hoard'
-  | 'dragon'
+  | 'pillar'
+  | 'shroom'
+  | 'torch'
+  | 'cone'
+  | 'crag'
+  | 'berg'
+  | 'snowpine'
+  | 'drift'
 
 /**
  * 一件立起来的布景，格与米：正面的底边中点 (x, y)，底边朝 a 弧度（0 是横的，正面朝屏幕下方），底边长 w，往后厚 d（卡纸是 CARD_U，盒子按它自己的进深）；
@@ -76,12 +86,48 @@ export interface Piece {
   readonly seed: number
 }
 
-/** 一页：第几页（从开局那一页起数），哪一章，左右两页的页码，这一页的种子与立着的布景 */
+/**
+ * 一页上两个景过渡的那条界：line 是一条弯弯曲曲的线，过 (cx, cy)、法线 (nx, ny) 朝第二个景；ring 是围着 (cx, cy)、半径 r 的一圈，圈里是第一个景。
+ * 界线按波长 waveU、幅度 amp 起伏，phase 定起伏的相位；离界线 band 格以内是两个景渐变过去的那一带
+ */
+export interface Blend {
+  readonly kind: 'line' | 'ring'
+  readonly cx: number
+  readonly cy: number
+  readonly nx: number
+  readonly ny: number
+  readonly r: number
+  readonly amp: number
+  readonly waveU: number
+  readonly phase: number
+  readonly band: number
+}
+
+/** (x, y) 格离界线多远，格：第一个景那边为负，第二个景那边为正 */
+export function blendSd(b: Blend, x: number, y: number): number {
+  const dx = x - b.cx
+  const dy = y - b.cy
+  if (b.kind === 'ring') {
+    const ang = Math.atan2(dy, dx)
+    return Math.hypot(dx, dy) - b.r - b.amp * Math.sin(ang * Math.max(2, Math.round((b.r * 2 * Math.PI) / b.waveU)) + b.phase)
+  }
+  const along = -dx * b.ny + dy * b.nx
+  return dx * b.nx + dy * b.ny + b.amp * Math.sin((along / b.waveU) * Math.PI * 2 + b.phase)
+}
+
+/** (x, y) 格离第二个景有多近：0 是纯第一个景，1 是纯第二个景 */
+export function blendAt(b: Blend, x: number, y: number): number {
+  const t = Math.min(1, Math.max(0, (blendSd(b, x, y) / b.band + 1) / 2))
+  return t * t * (3 - 2 * t)
+}
+
+/** 一页：第几页（从开局那一页起数），哪一章，左右两页的页码，这一页的种子、两个景的分界与立着的布景 */
 export interface Page {
   readonly index: number
   readonly chapter: number
   readonly number: number
   readonly seed: number
+  readonly blend: Blend
   readonly pieces: readonly Piece[]
 }
 
@@ -199,64 +245,120 @@ interface Spec {
 
 const S = (kind: PieceKind, w: readonly [number, number], d: number, h: readonly [number, number] | 'low', tilt: number): Spec => ({ kind, w, d, h, tilt })
 
-const TREE = S('tree', [1.5, 2.1], 0, [3.2, 3.8], 0.4)
 const PINE = S('pine', [1.2, 1.6], 0, [3.6, 4.2], 0.4)
-const GROVE = S('grove', [3.6, 5.4], 0, [3.2, 3.7], 0.35)
-const BUSH = S('bush', [1.8, 3.4], 0, 'low', 0.5)
-const LOG = S('log', [2, 2.6], 0, 'low', 0.5)
-const HUT = S('hut', [2.3, 2.7], 1.6, [2.6, 2.9], 0.15)
-const WINDMILL = S('windmill', [2, 2.3], 0, [4.3, 4.6], 0.15)
-const COTTAGE = S('cottage', [2.2, 2.9], 1.6, [2.8, 3.1], 0.15)
-const FENCE = S('fence', [3, 5.2], 0, 'low', 0.3)
-const HAYSTACK = S('haystack', [1.4, 1.8], 0, 'low', 0.3)
-const WELL = S('well', [1.1, 1.2], 1.1, 'low', 0.1)
-const WALL = S('wall', [4, 6.4], 0, [2.7, 3], 0.12)
-const TOWER = S('tower', [1.7, 1.8], 1.7, [3.9, 4.3], 0)
-const KEEP = S('keep', [2.8, 3.3], 1.8, [3.4, 3.7], 0.08)
-const TOPIARY = S('topiary', [1.6, 3], 0, 'low', 0.3)
-const PILLAR = S('pillar', [2.2, 3.4], 0, [2.8, 3.4], 0.4)
+const RAIL = S('rail', [3, 5], 0, 'low', 0.3)
+const SHEEP = S('sheep', [1.3, 1.6], 0, 'low', 0.35)
+const BUSH = S('bush', [1.8, 3.2], 0, 'low', 0.5)
+const SAKURA = S('sakura', [1.7, 2.4], 0, [3.2, 3.8], 0.4)
+const TEMPLE = S('temple', [3.6, 5.2], 0.8, [2.6, 2.9], 0.12)
+const BAMBOO = S('bamboo', [2.6, 4.2], 0, 'low', 0.3)
+const LANTERN = S('lantern', [0.9, 1.1], 0, 'low', 0.2)
+const CACTUS = S('cactus', [1.2, 1.7], 0, [2.6, 3.2], 0.3)
+const CAIRN = S('cairn', [1, 1.4], 0, 'low', 0.3)
+const PALM = S('palm', [1.8, 2.4], 0, [3.4, 4], 0.4)
+const REEF = S('reef', [2, 3.2], 0, [2.6, 3], 0.4)
+const SUB = S('sub', [4.6, 5.4], 0, [2.4, 2.7], 0.15)
+const KELP = S('kelp', [1, 1.4], 0, [3, 3.8], 0.3)
+const CORAL = S('coral', [1.6, 2.6], 0, 'low', 0.4)
+const RUIN = S('ruin', [3.4, 5], 0.9, [2.6, 3.2], 0.15)
+const COLUMN = S('column', [0.9, 1.1], 0, [2.8, 3.6], 0.1)
+const MAPLE = S('maple', [1.7, 2.4], 0, [3.2, 3.8], 0.4)
+const LEAVES = S('leaves', [1.6, 2.6], 0, 'low', 0.4)
 const SPIRE = S('spire', [0.9, 1.3], 0, [2.7, 3.2], 0.3)
-const CRYSTAL = S('crystal', [1.2, 1.6], 0, [2.4, 2.8], 0.35)
-const HOARD = S('hoard', [1.8, 2.6], 0, 'low', 0.3)
-const DRAGON = S('dragon', [6.2, 7], 0, [3.1, 3.4], 0.15)
+const PILLAR = S('pillar', [2.2, 3.2], 0, [2.8, 3.4], 0.4)
+const SHROOM = S('shroom', [1.2, 1.8], 0, 'low', 0.4)
+const TORCH = S('torch', [0.7, 0.9], 0, 'low', 0.2)
+const CONE = S('cone', [6, 7], 0, [4, 4.6], 0.1)
+const CRAG = S('crag', [2, 3], 0, [2.8, 3.4], 0.4)
+const BERG = S('berg', [2.2, 3.4], 0, [2.8, 3.6], 0.4)
+const SNOWPINE = S('snowpine', [1.3, 1.7], 0, [3.6, 4.2], 0.4)
+const DRIFT = S('drift', [1.8, 3], 0, 'low', 0.4)
 
-/** 一章怎么摆：先摆的是大件，每一项是几件、可能的样子；组里的几件拼在一起 */
-type Item = { readonly n: readonly [number, number]; readonly specs: readonly Spec[]; readonly combo?: 'walled' | 'corner' }
+/** 一项摆在哪个景里：a 是第一个景，b 是第二个，mid 是两个景交界的那一带，any 哪都行 */
+type Where = 'a' | 'b' | 'mid' | 'any'
 
+/** 一章怎么摆：先摆的是大件，每一项是几件、可能的样子、摆在哪个景里 */
+type Item = { readonly n: readonly [number, number]; readonly specs: readonly Spec[]; readonly at: Where }
+
+/** 四章：春是草甸流进樱庭，夏是沙漠走到深海，秋是页角的溶洞通到外面的残垣，冬是页角的火山烧到冰原 */
 const LAYOUTS: Record<ChapterKey, readonly Item[]> = {
-  forest: [
-    { n: [2, 3], specs: [GROVE] },
-    { n: [0, 1], specs: [HUT] },
-    { n: [4, 6], specs: [TREE, TREE, PINE] },
-    { n: [4, 5], specs: [BUSH] },
-    { n: [1, 2], specs: [LOG] },
+  spring: [
+    { n: [1, 2], specs: [TEMPLE], at: 'b' },
+    { n: [3, 4], specs: [SAKURA], at: 'b' },
+    { n: [3, 4], specs: [PINE], at: 'a' },
+    { n: [2, 3], specs: [RAIL], at: 'a' },
+    { n: [1, 2], specs: [SHEEP], at: 'a' },
+    { n: [1, 2], specs: [BAMBOO], at: 'b' },
+    { n: [1, 2], specs: [LANTERN], at: 'b' },
+    { n: [1, 2], specs: [BUSH], at: 'mid' },
   ],
-  mill: [
-    { n: [1, 1], specs: [WINDMILL] },
-    { n: [2, 3], specs: [COTTAGE] },
-    { n: [1, 2], specs: [FENCE], combo: 'corner' },
-    { n: [2, 3], specs: [FENCE] },
-    { n: [2, 3], specs: [HAYSTACK] },
-    { n: [0, 1], specs: [WELL] },
-    { n: [1, 3], specs: [TREE] },
+  summer: [
+    { n: [1, 1], specs: [SUB], at: 'b' },
+    { n: [3, 4], specs: [CACTUS], at: 'a' },
+    { n: [2, 3], specs: [PALM], at: 'mid' },
+    { n: [1, 2], specs: [REEF], at: 'b' },
+    { n: [2, 3], specs: [KELP], at: 'b' },
+    { n: [2, 3], specs: [CAIRN], at: 'a' },
+    { n: [2, 3], specs: [CORAL], at: 'b' },
   ],
-  castle: [
-    { n: [2, 3], specs: [WALL], combo: 'walled' },
-    { n: [0, 1], specs: [KEEP] },
-    { n: [1, 2], specs: [WALL] },
-    { n: [4, 6], specs: [TOPIARY] },
-    { n: [1, 2], specs: [TOWER] },
+  autumn: [
+    { n: [2, 3], specs: [PILLAR], at: 'a' },
+    { n: [2, 3], specs: [SPIRE], at: 'a' },
+    { n: [2, 3], specs: [SHROOM], at: 'a' },
+    { n: [2, 3], specs: [RUIN], at: 'b' },
+    { n: [2, 3], specs: [COLUMN], at: 'b' },
+    { n: [2, 3], specs: [MAPLE], at: 'b' },
+    { n: [1, 2], specs: [LEAVES], at: 'b' },
+    { n: [1, 2], specs: [TORCH], at: 'mid' },
   ],
-  lair: [
-    { n: [1, 1], specs: [DRAGON] },
-    { n: [4, 5], specs: [PILLAR] },
-    { n: [3, 4], specs: [SPIRE, CRYSTAL] },
-    { n: [3, 4], specs: [HOARD] },
+  winter: [
+    { n: [1, 1], specs: [CONE], at: 'a' },
+    { n: [2, 3], specs: [CRAG], at: 'a' },
+    { n: [3, 4], specs: [BERG], at: 'b' },
+    { n: [2, 3], specs: [SNOWPINE], at: 'b' },
+    { n: [3, 4], specs: [DRIFT], at: 'b' },
   ],
 }
 
-/** 摆不满下限时拿来补的小件 */
-const FILLER: Record<ChapterKey, Spec> = { forest: BUSH, mill: HAYSTACK, castle: TOPIARY, lair: HOARD }
+/** 摆不满下限时拿来补的小件，哪都能摆 */
+const FILLER: Record<ChapterKey, Spec> = { spring: BUSH, summer: CORAL, autumn: LEAVES, winter: DRIFT }
+
+/** 这一章的两个景怎么分：春、夏是一道弯弯的线（小溪、海岸线）斜着穿过两页，秋、冬是围着页边一处的一圈（洞里、火山脚下） */
+function blendOf(book: Book, chapter: number, rng: Rng): Blend {
+  const key = CHAPTERS[chapter]!.key
+  const w = book.x1 - book.x0
+  const h = book.y1 - book.y0
+  if (key === 'spring' || key === 'summer') {
+    const a = rng.next() * Math.PI * 2
+    return {
+      kind: 'line',
+      cx: book.gx + (rng.next() - 0.5) * w * 0.3,
+      cy: book.cy + (rng.next() - 0.5) * h * 0.3,
+      nx: Math.cos(a),
+      ny: Math.sin(a),
+      r: 0,
+      amp: key === 'summer' ? 1.6 : 1.2,
+      waveU: 9 + rng.next() * 6,
+      phase: rng.next() * Math.PI * 2,
+      band: key === 'summer' ? 1.6 : 3.2,
+    }
+  }
+  // 圈心落在四个角或四条边的中段附近，圈不碰出生的地方
+  const spots: Point[] = [
+    { x: book.x0 + 2, y: book.y0 + 2 }, { x: book.x1 - 2, y: book.y0 + 2 }, { x: book.x0 + 2, y: book.y1 - 2 }, { x: book.x1 - 2, y: book.y1 - 2 },
+    { x: book.x0 + 1, y: book.cy }, { x: book.x1 - 1, y: book.cy }, { x: book.gx + w * 0.22, y: book.y0 }, { x: book.gx - w * 0.22, y: book.y1 },
+  ]
+  const at = spots[Math.floor(rng.next() * spots.length)]!
+  return { kind: 'ring', cx: at.x, cy: at.y, nx: 0, ny: 0, r: key === 'winter' ? 10 + rng.next() * 2.5 : 11 + rng.next() * 3, amp: 1, waveU: 6, phase: rng.next() * Math.PI * 2, band: key === 'winter' ? 1.8 : 3 }
+}
+
+/** 一件布景落在这一处合不合它的景 */
+function inWhere(b: Blend, where: Where, x: number, y: number): boolean {
+  if (where === 'any') return true
+  if (where === 'mid') return Math.abs(blendSd(b, x, y)) < Math.max(b.band, MID_U)
+  const t = blendAt(b, x, y)
+  return where === 'a' ? t < 0.25 : t > 0.75
+}
 
 /** 第几页是哪一章、种子是多少 */
 export function chapterOf(book: Book, index: number): number {
@@ -389,86 +491,52 @@ function spot(cfg: StorybookConfig, book: Book, rng: Rng, side: number): Point {
   return { x: lo + (hi - lo) * rng.next(), y: book.y0 + m + (book.y1 - book.y0 - 2 * m) * rng.next() }
 }
 
-/** 按一章的摆法摆一页：一组一组试，每一组摆下以后各种个子能站的地方都还连成一片；摆不到下限就换种子重来 */
-function arrange(cfg: StorybookConfig, book: Book, chapter: number, seed: number, plaza: boolean): Piece[] | null {
+/** 按一章的摆法摆一页：一件一件试，摆在它自己的景里，每摆下一件各种个子能站的地方都还连成一片；摆不到下限就换种子重来 */
+function arrange(cfg: StorybookConfig, book: Book, chapter: number, blend: Blend, seed: number, plaza: boolean): Piece[] | null {
   const key = CHAPTERS[chapter]!.key
   const rng = new Rng(seed)
   const reach = new Reach(book)
   const placed: Piece[] = []
   let group = 0
   let side = rng.next() < 0.5 ? -1 : 1
-  const tryGroup = (make: (at: Point) => Piece[]): boolean => {
+  const tryOne = (spec: Spec, where: Where): boolean => {
     for (let t = 0; t < PIECE_TRIES; t++) {
       if (placed.length >= cfg.pieces[1]) return false
       const at = spot(cfg, book, rng, side)
-      const list = make(at)
-      if (list.length === 0 || placed.length + list.length > cfg.pieces[1]) continue
-      if (!list.every((p) => fits(cfg, book, p, placed, plaza))) continue
+      if (!inWhere(blend, where, at.x, at.y)) {
+        side = -side
+        continue
+      }
+      const p = piece(spec, cfg, rng, at.x, at.y, (rng.next() * 2 - 1) * spec.tilt, group)
+      if (!fits(cfg, book, p, placed, plaza)) continue
       const keep = reach.copy()
-      for (const p of list) reach.add(p)
+      reach.add(p)
       if (!reach.connected()) {
         reach.restore(keep)
         continue
       }
-      placed.push(...list)
+      placed.push(p)
       group++
       side = -side
       return true
     }
     return false
   }
-  const single = (spec: Spec) => (at: Point): Piece[] => [piece(spec, cfg, rng, at.x, at.y, (rng.next() * 2 - 1) * spec.tilt, group)]
   for (const item of LAYOUTS[key]) {
     const n = rng.int(item.n[0], item.n[1])
-    for (let i = 0; i < n; i++) {
-      const spec = item.specs[Math.floor(rng.next() * item.specs.length)]!
-      if (item.combo === 'walled') tryGroup((at) => walled(cfg, rng, at, group))
-      else if (item.combo === 'corner') tryGroup((at) => corner(cfg, rng, at, group))
-      else tryGroup(single(spec))
-    }
+    for (let i = 0; i < n; i++) tryOne(item.specs[Math.floor(rng.next() * item.specs.length)]!, item.at)
   }
-  for (let t = 0; t < 8 && placed.length < cfg.pieces[0]; t++) tryGroup(single(FILLER[key]))
+  for (let t = 0; t < 8 && placed.length < cfg.pieces[0]; t++) tryOne(FILLER[key], 'any')
   return placed.length >= cfg.pieces[0] ? placed : null
-}
-
-/** 一段城墙，一头或两头立着塔楼：塔楼压着墙头 */
-function walled(cfg: StorybookConfig, rng: Rng, at: Point, group: number): Piece[] {
-  const a = (rng.next() * 2 - 1) * WALL.tilt
-  const wall = piece(WALL, cfg, rng, at.x, at.y, a, group)
-  const out = [wall]
-  const ends = rng.next() < 0.45 ? [-1, 1] : [rng.next() < 0.5 ? -1 : 1]
-  const tw = TOWER.w[0] + (TOWER.w[1] - TOWER.w[0]) * rng.next()
-  for (const e of ends) {
-    const along = e * (wall.w / 2)
-    const back = TOWER.d / 2 - CARD_U / 2
-    const tx = at.x + Math.cos(a) * along - Math.sin(a) * back
-    const ty = at.y + Math.sin(a) * along + Math.cos(a) * back
-    out.push(piece(TOWER, cfg, rng, tx, ty, a, group, tw))
-  }
-  return out
-}
-
-/** 一道拐了个直角的栅栏：两段在拐角处碰头 */
-function corner(cfg: StorybookConfig, rng: Rng, at: Point, group: number): Piece[] {
-  const a = (rng.next() * 2 - 1) * 0.12
-  const first = piece(FENCE, cfg, rng, at.x, at.y, a, group)
-  const e = rng.next() < 0.5 ? -1 : 1
-  const len = FENCE.w[0] + (FENCE.w[1] - FENCE.w[0]) * rng.next() * 0.6
-  // 拐过去那一段朝屏幕里伸：底边转到斜着，正面仍朝外
-  const turn = a - e * 1.0
-  const ex = at.x + Math.cos(a) * e * (first.w / 2)
-  const ey = at.y + Math.sin(a) * e * (first.w / 2)
-  const mx = ex - Math.cos(turn) * e * (len / 2)
-  const my = ey - Math.sin(turn) * e * (len / 2)
-  return [first, piece(FENCE, cfg, rng, mx, my, turn, group, len)]
 }
 
 /** 第几页：按种子摆好布景，排好弹起与折平的先后；开局那一页（index 0）不压着出生的空地 */
 export function pageOf(cfg: StorybookConfig, book: Book, index: number): Page {
   const chapter = chapterOf(book, index)
   const base = pageSeed(book, index)
+  const blend = blendOf(book, chapter, new Rng(base ^ 0x3b1e9d))
   let pieces: Piece[] | null = null
-  for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, book, chapter, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
+  for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, book, chapter, blend, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
   if (!pieces) throw new Error(`立体书第 ${index} 页摆不下 ${cfg.pieces[0]} 件布景`)
   const half = (book.x1 - book.x0) / 2
   const ordered = pieces.map((p): Piece => {
@@ -477,7 +545,7 @@ export function pageOf(cfg: StorybookConfig, book: Book, index: number): Page {
   })
   // 远的先摆在后面：画的时候按底边从屏幕里往外排
   ordered.sort((p, q) => p.y - q.y)
-  return { index, chapter, number: book.number0 + index * 2, seed: base, pieces: ordered }
+  return { index, chapter, number: book.number0 + index * 2, seed: base, blend, pieces: ordered }
 }
 
 /** 翻页的一段：stand 立着，warn 预兆，fold 折平，leaf 翻书页，rest 新一页平躺着，pop 弹起来 */
@@ -555,4 +623,11 @@ export function laid(cfg: StorybookConfig, c: BookClock, page: number, p: Piece)
 /** 倒下不到一半的布景挡路 */
 export function standing(lay: number): boolean {
   return lay < 0.5
+}
+
+/** 翻页时书页的自由边此刻在哪，格：从右页外沿转过书脊落到左页外沿；不在翻页时为 null */
+export function leafEdge(c: BookClock, book: Book): number | null {
+  if (c.phase !== 'leaf') return null
+  const th = Math.PI * easeInOut(clamp01(c.at / c.len))
+  return book.gx + (book.x1 - book.gx) * Math.cos(th)
 }

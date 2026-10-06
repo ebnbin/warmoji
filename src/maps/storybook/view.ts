@@ -9,7 +9,7 @@ import { Alive, Depth, ENEMY_SET, Transform } from '../../ecs/components'
 import { LYING_Z, UNDER_Z } from '../../ecs/render/bands'
 import { canvasTexture } from '../textures'
 import { FRAME, FRAME_MID } from '../frame'
-import { drawFace, drawRoof, drawSails, EAVE, faceSize, FLAT_U_PER_M, gabled, roofSize, STAND_U_PER_M } from './art'
+import { drawFace, drawRoof, faceSize, FLAT_U_PER_M, roofSize, STAND_U_PER_M } from './art'
 import { textureSize } from './backdrop'
 import { canvasUv, QuadLayer } from './layer'
 import { laid } from './model'
@@ -40,7 +40,8 @@ const SHADOW_DEPTH = -0.4
 const RIBBON_DEPTH = -0.5
 const CURL_DEPTH = -0.3
 const STAND_DEPTH = 2.7
-const LEAF_DEPTH = 34
+/** 翻过去的书页从扬到半空的身体脚下扫过：画在立着的布景之上、身体之下 */
+const LEAF_DEPTH = 2.95
 /** 影子的浓度，每米高的东西影子铺多长（格） */
 const SHADOW_ALPHA = 0.3
 const SHADOW_PER_M = STAND_U_PER_M * 0.75
@@ -51,14 +52,9 @@ const CARD_EDGE_U = 0.06
 const LEAF_LIFT = STAND_U_PER_M / FLAT_U_PER_M
 /** 翻页时书页上的光：迎着灯最亮、侧着最暗 */
 const LEAF_LIGHT = { min: 0.62, max: 1.04 } as const
-/** 翻起来的书页盖在战场上方：留一点透，底下打成什么样还隐约看得见 */
-const LEAF_ALPHA = 0.9
 /** 图集的宽，像素；每件之间空几像素 */
 const ATLAS_W = 2048
 const ATLAS_GAP = 4
-/** 风车叶片转多快，弧度/秒；叶片的半径是塔身宽的几倍 */
-const SAIL_SPIN = 0.7
-const SAIL_R = 0.95
 /** 页角翘起来最大多少格 */
 const CURL_U = 3.2
 
@@ -82,7 +78,6 @@ interface Sheet {
   readonly atlasKey: string
   readonly faces: Cell[]
   readonly roofs: (Cell | null)[]
-  readonly sails: (Cell | null)[]
   readonly white: Cell
 }
 
@@ -306,18 +301,13 @@ export class StorybookView implements MapView {
       ctx.drawImage(this.print, 0, 0)
       ctx.globalCompositeOperation = 'source-over'
     })
-    // 图集：左上角一小块纯白（填色用），再一排排放正面、顶面、风车叶片
+    // 图集：左上角一小块纯白（填色用），再一排排放正面与顶面
     const faces: Cell[] = []
     const roofs: (Cell | null)[] = []
-    const sails: (Cell | null)[] = []
     const want: { w: number; h: number }[] = []
     for (const p of page.pieces) {
       want.push(faceSize(p))
       if (p.box) want.push(roofSize(p))
-      if (p.kind === 'windmill') {
-        const s2 = Math.round(faceSize(p).w * SAIL_R * 2)
-        want.push({ w: s2, h: s2 })
-      }
     }
     let x = 16
     let y = 0
@@ -348,14 +338,6 @@ export class StorybookView implements MapView {
           roofs.push(r)
           drawRoof(ctx, p, r.x, r.y, r.w, r.h)
         } else roofs.push(null)
-        if (p.kind === 'windmill') {
-          const s2 = cells[k++]!
-          sails.push(s2)
-          ctx.save()
-          ctx.translate(s2.x, s2.y)
-          drawSails(ctx, s2.w)
-          ctx.restore()
-        } else sails.push(null)
       }
     })
     s = {
@@ -366,7 +348,6 @@ export class StorybookView implements MapView {
       atlasKey,
       faces,
       roofs,
-      sails,
       white: { x: 2, y: 2, w: 8, h: 8 },
     }
     this.sheets.set(index, s)
@@ -393,7 +374,7 @@ export class StorybookView implements MapView {
     if (c.phase === 'stand' ? c.at > 1500 : c.phase === 'warn' || c.phase === 'fold') this.sheet(v, st, c.page + 1)
     this.prune(v, c.page)
     this.ground(c, cur, old)
-    this.pieces(sim, cfg, c, cur, c.phase === 'leaf' ? old : null)
+    this.pieces(cfg, c, cur, c.phase === 'leaf' ? old : null)
     this.leafTurn(v, c, cur, old)
     this.warnings(c)
     this.sounds(cfg, c, cur)
@@ -416,7 +397,7 @@ export class StorybookView implements MapView {
   }
 
   /** 这一刻要画的布景：立着的、正在倒或正在弹的画在身体后面，平躺的贴着页面，都投影子 */
-  private pieces(sim: Sim, cfg: StorybookConfig, c: BookClock, cur: Sheet, old: Sheet | null): void {
+  private pieces(cfg: StorybookConfig, c: BookClock, cur: Sheet, old: Sheet | null): void {
     const flat: Quad[] = []
     const stand: Quad[] = []
     const shade: Quad[] = []
@@ -428,7 +409,7 @@ export class StorybookView implements MapView {
         // 预兆时立着的布景跟着页角一起抖
         if (c.phase === 'warn') lay += Math.sin(c.at / 55 + p.seed) * 0.025 * clamp01(c.at / c.len)
         const out = lay > 0.97 ? flat : stand
-        this.piece(sh, p, i, lay, sim.elapsedMs, out, shade)
+        this.piece(sh, p, i, lay, out, shade)
       })
     }
     if (old) {
@@ -440,8 +421,8 @@ export class StorybookView implements MapView {
     this.shadow!.quads = this.leafShadow ? shade.concat([this.leafShadow]) : shade
   }
 
-  /** 一件布景的几块：影子、卡纸的厚边、盒子的侧面与顶面、正面、风车叶片 */
-  private piece(sh: Sheet, p: Piece, i: number, lay: number, now: number, out: Quad[], shade: Quad[]): void {
+  /** 一件布景的几块：影子、卡纸的厚边、盒子的侧面与顶面、正面 */
+  private piece(sh: Sheet, p: Piece, i: number, lay: number, out: Quad[], shade: Quad[]): void {
     const tw = sh.atlas.width
     const th = sh.atlas.height
     const key = sh.atlasKey
@@ -464,16 +445,7 @@ export class StorybookView implements MapView {
     }
     // 迎着灯的面亮：立着的正面朝外偏一点就暗一点，平躺着最亮
     const lit = 0.84 + 0.16 * (1 - cos) + 0.05 * Math.max(0, -o.fx)
-    if (p.box && gabled(p.kind)) {
-      // 山墙房子：两片屋顶从前后檐口坡到进深正中的屋脊
-      const r = sh.roofs[i]!
-      const at = (q: Point, k: number, depth: number): Point => ({ x: q.x - o.fx * (o.back * k + depth), y: q.y - o.fy * (o.back * k + depth) - o.up * k })
-      const half = (p.d * UNIT) / 2
-      const ra = at(o.A, 1, half)
-      const rb = at(o.B, 1, half)
-      out.push(quad(key, at(o.A, EAVE, p.d * UNIT), ra, at(o.B, EAVE, p.d * UNIT), rb, r, tw, th, grey(0.8), 1))
-      out.push(quad(key, ra, at(o.A, EAVE, 0), rb, at(o.B, EAVE, 0), r, tw, th, grey(1.02), 1))
-    } else if (p.box) {
+    if (p.box) {
       const r = sh.roofs[i]!
       out.push(quad(key, o.TC, o.TA, o.TD, o.TB, r, tw, th, grey(1.02), 1))
       const right = o.fy > 0 && Math.sin(p.a) > 0.01
@@ -487,22 +459,6 @@ export class StorybookView implements MapView {
       out.push(quad(key, e(o.TA), e(o.A), e(o.TB), e(o.B), f, tw, th, 0xe9dcc0, 1, true))
     }
     out.push(quad(key, o.TA, o.A, o.TB, o.B, f, tw, th, grey(lit), 1))
-    const sails = sh.sails[i]
-    if (sails) {
-      // 叶片在正面所在的平面里转：按正面贴图的像素算，再经正面的仿射映到画面上
-      const W = f.w
-      const H = f.h
-      const map = (fx: number, fy: number): Point => ({
-        x: o.A.x + (o.B.x - o.A.x) * (fx / W) + (o.TA.x - o.A.x) * (1 - fy / H),
-        y: o.A.y + (o.B.y - o.A.y) * (fx / W) + (o.TA.y - o.A.y) * (1 - fy / H),
-      })
-      const cx = W / 2
-      const cy = H * 0.13
-      const R = sails.w / 2
-      const ang = (now / 1000) * SAIL_SPIN + p.seed
-      const corner = (sx: number, sy: number): Point => map(cx + (sx * Math.cos(ang) - sy * Math.sin(ang)) * R, cy + (sx * Math.sin(ang) + sy * Math.cos(ang)) * R)
-      out.push(quad(key, corner(-1, -1), corner(-1, 1), corner(1, -1), corner(1, 1), sails, tw, th, grey(lit), 1))
-    }
   }
 
   /** 翻过去的书页：前半程是旧右页的正面，过了竖直是新左页的背面；地上铺着它的影子 */
@@ -530,7 +486,7 @@ export class StorybookView implements MapView {
     const light = LEAF_LIGHT.min + (LEAF_LIGHT.max - LEAF_LIGHT.min) * clamp01(0.5 + 0.5 * (0.45 * -nx + 0.66 * nz) / 0.8)
     const key = front ? this.leafKeys.front : this.leafKeys.back
     const uv = front ? { u0: 0, uw: 1 } : { u0: 1, uw: -1 }
-    layer.quads = [{ key, x: [gx, gx, ex, ex], y: [y0, y1, y0 - lift, y1 - lift], u0: uv.u0, v0: 1, uw: uv.uw, vh: -1, color: grey(light), alpha: LEAF_ALPHA, fill: false }]
+    layer.quads = [{ key, x: [gx, gx, ex, ex], y: [y0, y1, y0 - lift, y1 - lift], u0: uv.u0, v0: 1, uw: uv.uw, vh: -1, color: grey(light), alpha: 1, fill: false }]
     const sl = W * Math.sin(th) * SHADOW_PER_M * 1.4
     this.leafShadow = { key: '__WHITE', x: [gx, gx, ex + AWAY.x * sl, ex + AWAY.x * sl], y: [y0, y1, y0 + AWAY.y * sl, y1 + AWAY.y * sl], u0: 0, v0: 0, uw: 1, vh: 1, color: SHADOW_COLOR, alpha: 1, fill: true }
   }
