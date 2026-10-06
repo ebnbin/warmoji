@@ -1254,6 +1254,55 @@ function buildTheater(): BgmScore {
   )
 }
 
+/** 跃迁：多利亚调式的电子乐，八分音符的八度低音一路往前推；方波琶音一级级往上爬、到小节末尾冲上去，像充能；铺底带一点失谐，三角波的主旋律隔着回声在虚空里回荡 */
+function buildWarp(): BgmScore {
+  const chords = [0, 0, 3, 3, 4, 4, 2, 6, 0, 0, 3, 3, 5, 4, 6, 6]
+  return track(
+    {
+      bpm: 118,
+      stepsPerBeat: 4,
+      stepsPerBar: 16,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 118) * 0.75, feedback: 0.38, level: 0.26 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sawtooth', vol: 0.07, attack: 0.004, release: 0.06, octave: -1 }
+      const pad: Voice = { wave: 'triangle', vol: 0.03, attack: 0.5, release: 1, octave: 0 }
+      const arp: Voice = { wave: 'square', vol: 0.03, attack: 0.002, release: 0.04, octave: 1, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.1, attack: 0.02, release: 0.18, octave: 1, echo: true }
+      const rise: Voice = { wave: 'sine', vol: 0.035, attack: 0.002, release: 0.05, octave: 2 }
+      b.bass(bass, chords, 'r.o.r.o.r.o.r.o.')
+      b.pad(pad, chords, [0, 1, 2], 0.008)
+      b.arp(arp, chords, [0, 1, 2, 3, 1, 2, 3, 4])
+      for (let bar = 1; bar < chords.length; bar += 2) for (let k = 0; k < 4; k++) b.note(rise, bar, 12 + k, chords[bar]! + k * 2, 1)
+      b.line(lead, [
+        [0, 0, 4, 6], [0, 6, 3, 2], [0, 8, 4, 8],
+        [1, 0, 6, 4], [1, 4, 7, 4], [1, 8, 4, 8],
+        [2, 0, 3, 6], [2, 6, 2, 2], [2, 8, 3, 4], [2, 12, 5, 4],
+        [3, 0, 4, 16],
+        [4, 0, 7, 4], [4, 4, 8, 4], [4, 8, 9, 8],
+        [5, 0, 8, 6], [5, 6, 7, 2], [5, 8, 6, 8],
+        [6, 0, 5, 4], [6, 4, 4, 4], [6, 8, 6, 8],
+        [7, 0, 7, 12], [7, 12, 6, 4],
+        [8, 0, 4, 6], [8, 6, 5, 2], [8, 8, 7, 8],
+        [9, 0, 9, 4], [9, 4, 8, 4], [9, 8, 7, 8],
+        [10, 0, 6, 6], [10, 6, 5, 2], [10, 8, 6, 4], [10, 12, 8, 4],
+        [11, 0, 7, 16],
+        [12, 0, 9, 4], [12, 4, 10, 4], [12, 8, 11, 8],
+        [13, 0, 10, 6], [13, 6, 9, 2], [13, 8, 8, 8],
+        [14, 0, 7, 4], [14, 4, 6, 4], [14, 8, 5, 4], [14, 12, 4, 4],
+        [15, 0, 4, 16],
+      ])
+      b.drums('kick', 'x.....x...x.....', 0, 16, 0.14)
+      b.drums('snare', '....x.......x...', 4, 16, 0.06)
+      b.drums('hat', '..o...o...o...o.', 0, 16, 0.035)
+      b.drums('tom', '..............o.', 8, 16, 0.04)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -1281,6 +1330,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   petri: buildPetri,
   dreamland: buildDreamland,
   theater: buildTheater,
+  warp: buildWarp,
 }
 
 const cache = new Map<BgmId, BgmScore>()

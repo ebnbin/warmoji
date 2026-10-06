@@ -11,6 +11,7 @@ import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
 import { NexusView } from '../maps/nexus/view'
 import { PetriView } from '../maps/petri/view'
+import { WarpView } from '../maps/warp/view'
 import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
 import { MapleView } from '../maps/maple/view'
@@ -46,6 +47,7 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   deep: () => new DeepView(),
   nexus: () => new NexusView(),
   petri: () => new PetriView(),
+  warp: () => new WarpView(),
   dreamland: () => new DreamlandView(),
   theater: () => new TheaterView(),
 }

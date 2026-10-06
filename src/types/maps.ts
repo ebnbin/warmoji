@@ -187,8 +187,8 @@ export interface NebulaConfig {
   readonly cameraU: number
 }
 /**
- * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
- * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
+ * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座积雪的火山背靠盆地边，山体谁也上不去。
+ * 火山隔很久从火山口喷发一次，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人，火山周围常年下着的雪再慢慢把岩石盖住
  */
 export interface VolcanoConfig {
   /** 地形格子的边长，高度与厚度也以格计；地形铺满方框 */
@@ -217,12 +217,10 @@ export interface VolcanoConfig {
     readonly footHeight: number
     readonly radiusU: number
     readonly craterDepth: number
-    /** 火山口里熔岩湖的液面比火山口底高多少 */
-    readonly lakeDepth: number
     /** 山坡上放射状冲沟的深度 */
     readonly gullyDepth: number
   }
-  /** 地势：朝地图里整体下倾的坡度，起伏的幅度与波长 */
+  /** 地势：以火山为心往四周整体下倾的坡度，起伏的幅度与波长 */
   readonly terrain: {
     readonly tilt: number
     readonly relief: number
@@ -239,9 +237,9 @@ export interface VolcanoConfig {
     readonly peakMs: number
     readonly waneMs: number
     readonly effuseMs: number
-    /** 每次喷发熔岩集中从口沿的几股漫出，股心落在朝盆地的方向两侧 lobeSpreadDeg 内，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
+    /** 每次喷发熔岩集中从口沿的几股漫出，股心绕口沿一圈均分、各自在均分的位置上下抖不超过 lobeJitter 倍间距，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
     readonly lobes: readonly [number, number]
-    readonly lobeSpreadDeg: number
+    readonly lobeJitter: number
     readonly lobeDeg: number
     readonly lobeFloor: number
     /** 开局前已经喷过几次，地图上留下旧熔岩 */
@@ -263,6 +261,19 @@ export interface VolcanoConfig {
     readonly teamDps: number
     readonly enemyDps: number
     readonly tickMs: number
+  }
+  /**
+   * 积雪，只是画面：火山周围一大片常年下雪，雪区的中心从火山口朝地图里挪 shiftU 格，半径 radiusU 按方位在 ±wobble 倍内起伏，最外 edgeU 格由厚变薄。
+   * 熔岩凝成的新岩石凉过 warmMs 雪才积得住，之后 coverMs 积满；喷发时落在雪上的灰，新雪 buryMs 盖得住
+   */
+  readonly snow: {
+    readonly radiusU: number
+    readonly edgeU: number
+    readonly wobble: number
+    readonly shiftU: number
+    readonly warmMs: number
+    readonly coverMs: number
+    readonly buryMs: number
   }
 }
 /** 一列涌浪：波高（米）、周期（秒）、相对船头往哪个方向传（度，0 为顺着船头、90 为从左舷推向右舷） */
@@ -1367,6 +1378,46 @@ export interface TheaterConfig {
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
 }
+/** 跃迁站的四间房各是什么样：空旷的大厅、立着几排柱子、绕着中央凹槽的回廊、狭长的一条 */
+export type WarpShape = 'hall' | 'pillars' | 'cloister' | 'narrow'
+export interface WarpConfig {
+  /**
+   * 方框切成 2×2 四间房，每间是方框的四分之一，画面上整块往四周平铺。平台摆在那一格正中，四边离格边都是 gapU 格（平铺后房与房之间都隔两倍的虚空），
+   * 四边一圈 lipU 格宽的台沿；狭长的那间只有 narrowU 格宽，其余铺成机柜台。能走的地方都落在整格上
+   */
+  readonly room: { readonly lipU: number; readonly gapU: number; readonly narrowU: number }
+  /** 窄过两倍 neckU 的缝不能走 */
+  readonly neckU: number
+  /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着传送台 padClearU 格以内的不立 */
+  readonly pillars: { readonly firstU: number; readonly stepU: number; readonly count: number; readonly sizeU: number; readonly heightM: number; readonly padClearU: number }
+  /** 回廊正中凹槽的边长，格 */
+  readonly pitU: number
+  /**
+   * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
+   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
+   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   */
+  readonly pad: {
+    readonly radiusU: number
+    readonly edgeU: number
+    readonly cornerU: number
+    readonly chargeMs: number
+    readonly drainMs: number
+    readonly transitMs: number
+    readonly cooldownMs: number
+    readonly shuttleMs: number
+    readonly warnMs: number
+    readonly spillU: number
+  }
+  /** 出怪板：一块长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
+  readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
+  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
+  readonly recipes: readonly [string, string, string, string]
+  /** 核心柱：半径（格），头目从这里被抛进队长所在的那间 */
+  readonly core: { readonly radiusU: number }
+  /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
+  readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1441,7 +1492,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'theater'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland' | 'theater' | 'warp'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1476,6 +1527,7 @@ export interface MapDef {
   readonly petri?: PetriConfig
   readonly dreamland?: DreamlandConfig
   readonly theater?: TheaterConfig
+  readonly warp?: WarpConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind

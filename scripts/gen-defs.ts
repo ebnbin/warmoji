@@ -48,6 +48,7 @@ import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -127,7 +128,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebulaOld.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
 }
 
-/** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束 */
+/** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束；整座山都积满雪 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'volcano') === (m.volcano !== undefined), `maps.${id} 是火山当且仅当写了 volcano`)
   const v = m.volcano
@@ -136,6 +137,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const e = v.eruption
   const l = v.lava
   const r = v.rim
+  const s = v.snow
   const side = Math.min(m.size?.w ?? MAP_DEFAULTS.width, m.size?.h ?? MAP_DEFAULTS.height)
   need(r.insetU[0] > 0 && r.insetU[0] <= r.insetU[1] && r.insetU[1] < side / 4, `maps.${id}.volcano.rim.insetU 须让盆地的边落在地图边以内、离中线足够远`)
   need(r.waveU > 0 && r.cornerU >= 0 && r.neckU > 0, `maps.${id}.volcano.rim 的波长、窄缝须为正，磨角不为负`)
@@ -148,17 +150,20 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(c.insetU[1] < c.blockU * (1 - c.blockJitter), `maps.${id}.volcano.cone 须让山体压过地图边：山后没有路，绕山总从朝地图里的那一侧`)
   need(c.craterU + v.cellU * 2 <= c.blockU && c.blockU < c.radiusU, `maps.${id}.volcano.cone 须火山口、熔岩漫出的那圈都在挡路圈里，缓坡铺到挡路圈外`)
   need(c.footHeight > 0 && c.footHeight < c.height, `maps.${id}.volcano.cone 的山脚须高于平地、低于口沿`)
-  need(c.craterDepth > 0 && c.lakeDepth > 0 && c.lakeDepth < c.craterDepth && c.gullyDepth >= 0, `maps.${id}.volcano.cone 的熔岩湖须低于火山口沿`)
+  need(c.craterDepth > 0 && c.gullyDepth >= 0, `maps.${id}.volcano.cone 的火山口须有深度、冲沟深度不为负`)
   need(v.terrain.tilt >= 0 && v.terrain.relief >= 0 && v.terrain.waveU > 0, `maps.${id}.volcano.terrain 的坡度、起伏不为负，波长为正`)
   need(e.firstMs >= 0 && e.warnMs > 0 && e.rate > 0 && e.waneMs > 0 && e.peakMs > 0 && e.peakMs < e.effuseMs, `maps.${id}.volcano.eruption 的时长与流量须为正，流量在停之前涨到顶`)
   need(e.intervalJitterMs >= 0 && e.intervalMs - e.intervalJitterMs > e.warnMs + e.effuseMs, `maps.${id}.volcano.eruption 的间隔减去抖动须长过预兆加出熔岩`)
   need(Number.isInteger(e.lobes[0]) && Number.isInteger(e.lobes[1]) && e.lobes[0] >= 1 && e.lobes[0] <= e.lobes[1], `maps.${id}.volcano.eruption.lobes 须为不小于 1 的整数范围`)
-  need(e.lobeDeg > 0 && e.lobeFloor >= 0 && e.lobeSpreadDeg >= 0 && e.lobeSpreadDeg <= 180, `maps.${id}.volcano.eruption 的股宽须为正、股外的比例不为负、股心的范围在 0 到 180 度之间`)
+  need(e.lobeDeg > 0 && e.lobeFloor >= 0 && e.lobeJitter >= 0 && e.lobeJitter < 0.5, `maps.${id}.volcano.eruption 的股宽须为正、股外的比例不为负、股心抖动不到半个间距`)
   need(Number.isInteger(e.history) && e.history >= 0, `maps.${id}.volcano.eruption.history 须为非负整数`)
   need(l.stepMs > 0 && l.mobility > 0 && l.mobilityPow >= 0 && l.cooling > 0 && l.coolRadiusU > 0, `maps.${id}.volcano.lava 的步长、流动与冷却须为正`)
   need(l.yieldHot >= 0 && l.yieldHot <= l.yieldCold, `maps.${id}.volcano.lava 的屈服强度须不为负且冷时不小于热时`)
   need(l.solidus > 0 && l.solidus < 1, `maps.${id}.volcano.lava.solidus 须在 0 到 1 之间`)
   need(l.teamDps >= 0 && l.enemyDps >= 0 && l.tickMs > 0, `maps.${id}.volcano.lava 的伤害不为负、结算间隔为正`)
+  need(s.edgeU > 0 && s.shiftU >= 0 && s.wobble >= 0 && s.wobble < 0.5, `maps.${id}.volcano.snow 的雪区边须有宽度、中心往地图里挪的距离不为负、半径起伏在 0 到 0.5 倍之间`)
+  need(s.radiusU * (1 - s.wobble) - s.edgeU > c.blockU * (1 + c.blockJitter) + s.shiftU, `maps.${id}.volcano.snow 须让整座山都落在积满雪的那片里`)
+  need(s.warmMs >= 0 && s.coverMs > 0 && s.buryMs > 0, `maps.${id}.volcano.snow 的回凉时间不为负，积满与盖灰的时间为正`)
 }
 
 /**
@@ -770,6 +775,50 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(belt.speedU < slowest, `${at}.belt.speedU 须慢过最慢的队员（${slowest} 格/秒），逆着传送带也走得动`)
   need(f.body.static >= f.body.kinetic && f.body.kinetic > 0 && f.coin.static >= f.coin.kinetic && f.coin.kinetic > 0, `${at}.friction 的静摩擦须不小于动摩擦、动摩擦为正`)
   need(gait.flatResistance > 0 && gait.downhillMax >= 1 && gait.effortMin > 0 && gait.effortMin <= 1, `${at}.gait 的平地阻力须为正、下坡倍率不小于 1、最少的费力在 (0, 1] 内`)
+}
+
+/**
+ * 跃迁：四间房的平台、台沿与能走的方块都落在整格上，能走的方块放得下开局的空地，狭长的那间横竖都装得下传送台；
+ * 传送台站得下队长和跟在身后的队员，充能、冷却、发车的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与核心柱；
+ * 抽一批种子真的生成一遍：开局站位四周空着，每间房的传送台与出怪板都落在那间能走的地方上，四间各有会亮的瓷砖
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'warp') === (m.warp !== undefined), `maps.${id} 是跃迁当且仅当写了 warp`)
+  const c = m.warp
+  if (!c) continue
+  const at = `maps.${id}.warp`
+  const { room: r, pad, pillars: pl, emitters: em } = c
+  const f = roomFrame(c)
+  const whole = (v: number): boolean => Math.abs(v - Math.round(v)) < 1e-9
+  need(r.lipU > 0 && r.gapU > 0 && c.neckU > 0, `${at}.room 的台沿、缝宽与窄缝须为正`)
+  need(whole(f.f0) && whole(f.f1) && whole(r.narrowU), `${at}.room 的能走的方块与狭长那间的宽须落在整格上`)
+  need(f.f1 - f.f0 >= SPAWN_CLEAR_U * 2 + 2 && r.narrowU >= 2 * pad.radiusU + 2 && r.narrowU < f.f1 - f.f0, `${at}.room 的能走的方块放不下开局的空地，或狭长那间放不下传送台`)
+  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(pad.radiusU >= squad * 0.75 && pad.edgeU >= 0 && pad.cornerU - pad.radiusU >= 0.5 && f.f1 - f.pad.y - pad.radiusU >= 0.5, `${at}.pad 的台面太小或贴到了内角`)
+  need(f.pad.x - pad.radiusU >= f.f1 - r.narrowU && f.pad.y - pad.radiusU >= f.f1 - r.narrowU, `${at}.pad 落出了狭长那间`)
+  need(pad.chargeMs > 0 && pad.drainMs > 0 && pad.transitMs > 0 && pad.cooldownMs > pad.chargeMs && pad.spillU >= 0, `${at}.pad 的充能、漏能与穿行的时长须为正，冷却比充能长`)
+  need(pad.shuttleMs > pad.warnMs + pad.transitMs && pad.warnMs > 0, `${at}.pad 发车的间隔须放得下预警与穿行`)
+  need(Number.isInteger(pl.count) && pl.count >= 1 && pl.sizeU > 0 && pl.stepU > pl.sizeU + 2 * c.neckU && pl.firstU + (pl.count - 1) * pl.stepU + pl.sizeU < f.f1 - f.f0 && pl.heightM > 0, `${at}.pillars 的根数、边长与间距说不通，或立出了能走的方块`)
+  need(c.pitU > 0 && c.pitU < f.f1 - f.f0 - 4, `${at}.pitU 的凹槽须为正，四周还留得下回廊`)
+  need(Number.isInteger(em.plateU) && em.plateU >= 1 && em.markU > 0 && em.clearU >= 0, `${at}.emitters 的板长须是正整数，凝成形的半径为正`)
+  need(c.core.radiusU > 0 && c.core.radiusU < r.gapU + r.lipU, `${at}.core 的核心柱须为正、立得进十字缝`)
+  need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
+  const g = m.gates
+  need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
+  need(g?.boss === 'core' && g.kinds.core?.at.kind === 'mark', `${at} 的头目须从核心柱（地标上的出怪口 core）出来`)
+  for (const [k, d] of Object.entries(g?.kinds ?? {})) need(d.at.kind !== 'mark' || k === 'core' || c.recipes.includes(k), `${at} 地标上的出怪口 ${k} 既不是配方也不是核心柱`)
+  for (let s = 0; s < 24; s++) {
+    const plan = warpPlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    need(roomAt(plan.basin, plan.start.x * UNIT, plan.start.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
+    plan.rooms.forEach((room, i) => {
+      const b = plan.basins[i]!
+      need(roomAt(b, room.pad.x * UNIT, room.pad.y * UNIT) >= pad.radiusU * UNIT * 0.9, `${where} 第 ${i} 间的传送台没落在能走的地方`)
+      need(room.plates.length > 0 && room.plates.every((p) => roomAt(b, p.x * UNIT, p.y * UNIT) >= em.markU * UNIT * 0.5), `${where} 第 ${i} 间的出怪板没落在能走的地方`)
+      need(plan.tiles.some((t) => t === i), `${where} 第 ${i} 间没有会亮的瓷砖`)
+    })
+    need(new Set(plan.rooms.map((x) => x.quad)).size === 4, `${where} 的四间房没占满四个象限`)
+  }
 }
 
 /**

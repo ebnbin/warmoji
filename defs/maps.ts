@@ -224,6 +224,21 @@ const THEATER_MIX: readonly EnemyMixRow[] = [
   { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
 ]
 
+const WARP_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 60, perWave: -2, min: 30, max: 60 },
+  { kind: 'ghost', sinceWave: 1, base: 18, perWave: 0.8, min: 14, max: 30 },
+  { kind: 'alien', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 30 },
+  { kind: 'crab', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
+  { kind: 'locust', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'gargoyle', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'blob', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ufo', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'turtle', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+]
+
 export const MAPS = {
   meadow: {
     emoji: '1f33c',
@@ -719,7 +734,7 @@ export const MAPS = {
   volcano: {
     emoji: '1f30b',
     name: '火山',
-    desc: '四周崖壁环绕的熔岩盆地，一座活火山背靠盆地边，陡峭的山体谁也上不去。它定期喷发：先冒烟发红、地动山摇，随后熔岩漫过火山口，往四面八方顺着地势流下来。熔岩盖住的地方敌我都受伤；离火山口越远凉得越快，凝成黑色的岩石后又能站人',
+    desc: '四周崖壁环绕的盆地，一座积雪的活火山背靠盆地边，陡峭的山体谁也上不去，火山周围一大片常年飘雪。它隔两分半钟上下喷发一次：先地动山摇、火山口透出红光，随后熔岩喷涌着漫过火山口，往四面八方顺着地势流下来，把雪烧化。熔岩盖住的地方敌我都受伤；离火山口越远凉得越快，凝成黑色的岩石后又能站人，雪再慢慢把岩石盖住',
     kind: 'volcano',
     size: { w: 32, h: 32 },
     stamina: { exertion: 0.5, regen: 0.9 },
@@ -755,19 +770,19 @@ export const MAPS = {
     volcano: {
       cellU: 0.5,
       rim: { insetU: [0.5, 2.5], waveU: 7, cornerU: 5, neckU: 1, cliffU: 1.1, cliffHeight: 2.6, backSlope: 0.12 },
-      cone: { insetU: [0.5, 1.5], craterU: 1.6, blockU: 4, blockJitter: 0.1, height: 4, footHeight: 0.9, radiusU: 9, craterDepth: 1.4, lakeDepth: 0.8, gullyDepth: 0.45 },
+      cone: { insetU: [0.5, 1.5], craterU: 1.6, blockU: 4, blockJitter: 0.1, height: 4, footHeight: 0.9, radiusU: 9, craterDepth: 1.4, gullyDepth: 0.45 },
       terrain: { tilt: 0.2, relief: 1.2, waveU: 7 },
       eruption: {
-        firstMs: 15000,
-        intervalMs: 60000,
-        intervalJitterMs: 6000,
-        warnMs: 5000,
-        rate: 5,
+        firstMs: 30000,
+        intervalMs: 150000,
+        intervalJitterMs: 50000,
+        warnMs: 10000,
+        rate: 10,
         peakMs: 1200,
         waneMs: 8000,
         effuseMs: 30000,
-        lobes: [4, 6],
-        lobeSpreadDeg: 110,
+        lobes: [8, 12],
+        lobeJitter: 0.3,
         lobeDeg: 16,
         lobeFloor: 0.08,
         history: 2,
@@ -785,6 +800,7 @@ export const MAPS = {
         enemyDps: 45,
         tickMs: 250,
       },
+      snow: { radiusU: 17, edgeU: 6.5, wobble: 0.2, shiftU: 2, warmMs: 8000, coverMs: 40000, buryMs: 45000 },
     },
     boss: 'rhino',
   },
@@ -1406,5 +1422,53 @@ export const MAPS = {
       reflowMs: 300,
     },
     boss: 'eclipse',
+  },  warp: {
+    emoji: '1f300',
+    name: '跃迁',
+    desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，立在朝向下一块的那条边上，四块连成单向的一圈。队长踏上传送台，台子充能、光圈扩满整间房，然后整支队伍连同召唤物一起被送到下一块平台的传送台上，不管队员在房间哪个角落；到的那座台子要冷却一阵。四间房同时在刷怪：队伍不在的房间，敌人往那间的传送台聚，传送台隔一阵发一趟车，台上站着谁就送谁，追兵就这样一批批从你身后的传送台涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去：哪间堆着多少敌人、往哪儿走，都写在地板上。四间房形状、颜色和出的敌人各不相同，选去哪间就是选和什么打',
+    kind: 'warp',
+    stamina: { exertion: 0.4, regen: 1.1 },
+    palette: {
+      bgFrom: 'hsl(222 52% 14%)',
+      bgTo: 'hsl(232 60% 4%)',
+      map: hslToInt(192, 0.36, 0.86),
+      shadow: 0x000000,
+    },
+    // 光从左上方的顶灯照下来，地砖与核心柱又从下面、从中间把身体照亮，背光面泛着冷蓝；影子淡
+    light: { sun: 0xf6fbff, shade: 0x7e93b8, shadow: { color: 0x07142a, alpha: 0.28, length: 0.55 } },
+    decor: {
+      emojis: ['1f300'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: WARP_MIX,
+    // 每间房的出怪板按那间的配方只放出那几种：一间幽灵、一间肉盾、一间成群的小东西、一间什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那间。头目从核心柱里被抛出来
+    gates: {
+      snapU: 60,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'core',
+      kinds: {
+        ghosts: { name: '幽灵间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
+        tanks: { name: '重甲间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
+        swarm: { name: '虫群间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
+        mixed: { name: '混编间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
+        core: { name: '核心柱', at: { kind: 'mark' }, enter: 'lob', look: 'glow', weight: 1, reachU: 40, only: ['mecha'] },
+      },
+    },
+    finalWaveSub: '失控核心从核心柱里冲了出来——它落在哪间，就把哪间变成战场！',
+    warp: {
+      room: { lipU: 1, gapU: 2, narrowU: 8 },
+      neckU: 0.4,
+      pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
+      pitU: 8,
+      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
+      emitters: { plateU: 2, markU: 0.6, clearU: 3 },
+      recipes: ['ghosts', 'tanks', 'swarm', 'mixed'],
+      core: { radiusU: 1.5 },
+      tiles: { teamFadeMs: 4500, foeFadeMs: 2600 },
+    },
+    boss: 'mecha',
   },
 } as const satisfies Record<string, MapDef>
