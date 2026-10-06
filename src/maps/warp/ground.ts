@@ -6,8 +6,8 @@ import { SEASONS } from './palette'
 import type { Box, Chamber, WarpPlan } from './layout'
 import type { WarpConfig } from '../../types/maps'
 
-/** 平台朝屏幕下方露出的那一截侧面多高，格 */
-export const FACE_U = 0.62
+/** 平台朝屏幕下方露出的那一截侧面多高，格：比平台下沿到格边的缝窄，舱与舱之间还留得出一线虚空 */
+export const FACE_U = 0.4
 /** 平台落在远处底下的影子往哪边偏、偏多远（格），影子边多软（格） */
 const SHADOW = { x: 0.9, y: 1.3, soft: 0.7, alpha: 0.6 } as const
 /** 凹槽往下看得见的那一截内壁多高，格 */

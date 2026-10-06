@@ -3,15 +3,16 @@ import { FRAME_U, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Alive, ENEMY_SET, FACTION, Faction, Minion, Mounted, Pet, Phys, Pickup, Radius, Transform, Uid } from '../../ecs/components'
+import { Alive, ENEMY_SET, FACTION, Faction, MARK, Minion, Mounted, Pet, Phys, Pickup, Radius, TAG, Transform, Uid } from '../../ecs/components'
 import { displace } from '../../ecs/systems/shared/displace'
 import type { Mover } from '../../ecs/systems/shared/displace'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
-import { inTransit } from '../../ecs/utils/marks'
+import { addMark, inTransit } from '../../ecs/utils/marks'
 import { grounded } from '../../ecs/utils/pass'
 import { leaderPoint } from '../../ecs/utils/team'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { bounded, wanderIn, ZERO } from '../../ecs/worlds/hooks'
+import { torusDelta, wrapPoint } from '../../ecs/worlds/torus'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
 import { inBox, roomIndexAt, warpPlan } from './layout'
@@ -43,8 +44,8 @@ const RINGS = [
   [0.75, 6],
   [1.3, 10],
 ] as const
-/** 平常的敌人有这么大的机会落在队伍所在的舱室，其余落在有门通进来的那几间 */
-const HOME_SPAWN = 0.5
+/** 暗着的舱室里敌人身上的静止每一拍续多久，毫秒：那间亮回来以后最多晚这么久才松开 */
+const HOLD_MARK_MS = 120
 /** 看守落在队伍那间的中心这么远（格）以内 */
 const WARDEN_U = 3
 
@@ -98,6 +99,7 @@ export interface Tiles {
 
 /**
  * 迷宫此刻：按种子定下的迷宫，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间、每间到过几次、上一次哪一刻从哪扇门到的；
+ * 亮着的舱室：队伍那间在前，接着是刚走过的几间，最多 cfg.light.levels 那么多间；
  * 每间舱室离队伍要过几道门（走不到为 −1）与该走哪扇门（steps 为 0 或走不到为 −1），按 routeRoom 那间算的；
  * 每扇门；寻路的底子、各扇门所在那间到门的步数场与到队长的步数场；地砖；画面要的送人与力场受击的记录
  */
@@ -109,6 +111,7 @@ export interface WarpState {
   readonly visits: number[]
   arrivedAt: number
   arrivedVia: number
+  trail: number[]
   readonly steps: Int16Array
   readonly via: Int16Array
   routeRoom: number
@@ -168,6 +171,7 @@ export function warpOf(sim: Sim): WarpState {
       visits: plan.rooms.map((_, i) => (i === plan.start ? 1 : 0)),
       arrivedAt: 0,
       arrivedVia: -1,
+      trail: [plan.start],
       steps: new Int16Array(n),
       via: new Int16Array(n),
       routeRoom: -1,
@@ -310,6 +314,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, door: Door, team: boole
       Transform.y[e] = Transform.y[e]! + dy
     }
     s.teamRoom = to.index
+    enter(s, cfg, to.index)
     s.visits[to.index]!++
     s.arrivedAt = now + ms
     s.arrivedVia = door.index
@@ -347,14 +352,23 @@ function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
   }
 }
 
-/** 门：队长站在队伍那间的一扇门上攒能、走开就漏，满了整队出发；每扇门到点发一趟车 */
+/** 队伍进了第 room 间：它排到亮着的舱室最前面，亮着的多出来的那间（最早走过的）熄掉 */
+function enter(s: WarpState, cfg: WarpConfig, room: number): void {
+  if (s.trail[0] === room) return
+  s.trail = [room, ...s.trail.filter((r) => r !== room)].slice(0, cfg.light.levels.length)
+}
+
+/** 门：队长站在队伍那间的一扇门上攒能、走开就漏，满了整队出发；每扇门到点发一趟车，暗着的舱室里的门不发 */
 function stepDoors(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
   const now = sim.elapsedMs
   const lead = sim.leader
   const lx = Transform.x[lead]!
   const ly = Transform.y[lead]!
   const ready = Alive.v[lead] === 1 && !inTransit(lead)
-  if (ready) s.teamRoom = roomOf(s, lx, ly)
+  if (ready) {
+    s.teamRoom = roomOf(s, lx, ly)
+    enter(s, cfg, s.teamRoom)
+  }
   if (s.teamRoom !== s.routeRoom) route(s)
   for (const d of s.plan.doors) {
     const p = s.doors[d.index]!
@@ -367,9 +381,21 @@ function stepDoors(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void
     }
     if (now >= p.shuttleAt) {
       p.shuttleAt += cfg.pad.shuttleMs
+      if (!live(s, d.room)) continue
       p.shuttled = depart(sim, s, cfg, d, false)
       p.shuttledAt = now
     }
+  }
+}
+
+/** 暗着的舱室里的敌人定在原地：静止一拍一拍地续着，那间亮回来就松开 */
+function stepDark(sim: Sim, s: WarpState): void {
+  const until = sim.elapsedMs + HOLD_MARK_MS
+  for (const e of query(sim.world, ENEMY_SET)) {
+    if (!Alive.v[e] || inTransit(e) || live(s, roomOf(s, Transform.x[e]!, Transform.y[e]!))) continue
+    addMark(e, MARK.stasis, TAG.world, until)
+    Phys.vx[e] = 0
+    Phys.vy[e] = 0
   }
 }
 
@@ -441,19 +467,26 @@ function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
   return p
 }
 
-/** 这间舱室此刻出不出怪：队伍那间，与有门直通队伍那间的几间 */
+/** 这间舱室此刻亮着：队伍那间与刚走过的几间，只有它们出怪、里面的敌人会动 */
 function live(s: WarpState, room: number): boolean {
-  const k = s.steps[room]!
-  return k === 0 || k === 1
+  return s.trail.includes(room)
 }
 
 /**
- * 迷宫：一间间悬在虚空里的舱室，舱与舱之间是虚空，身体只能在自己那间里走；平台四周的力场挡弹体也挡视线。
- * 舱室之间只靠门来往：队长站上一扇门充满能，整支队伍连同召唤物落到它通往的那间的入口上；每扇门定期发车，台上的敌人一起送走。
- * 敌人只在队伍那间和有门直通进来的几间出；离队伍不远的敌人顺着门一间间追过来
+ * 迷宫：一间间悬在虚空里的舱室铺满方框，方框四边首尾相接，舱与舱之间是一道虚空的缝，身体只能在自己那间里走；平台四周的力场挡弹体也挡视线。
+ * 舱室之间只靠门来往：队长站上一扇门充满能，整支队伍连同召唤物从最近的那条路穿过虚空，落到它通往的那间的入口上；每扇门定期发车，台上的敌人一起送走。
+ * 只有队伍那间与刚走过的几间亮着：敌人只在这几间出，这几间里的敌人顺着门一间间追过来；别的舱室暗着，敌人定在原地
  */
 export const warp: WorldHooks = {
   ...bounded,
+  /** 两点之间按方框平铺开以后最近的那一份算 */
+  worldDelta(sim, fromX, fromY, toX, toY) {
+    return torusDelta({ x: fromX, y: fromY }, { x: toX, y: toY }, sim.mapW, sim.mapH)
+  },
+  /** 穿过虚空的身体从方框的一边出去、从另一边回来 */
+  wrap(sim, x, y) {
+    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
+  },
   constrainBody(sim, eid, from, next) {
     const s = warpOf(sim)
     const room = s.crossing ? roomOf(s, next.x, next.y) : roomOf(s, from.x, from.y)
@@ -480,12 +513,11 @@ export const warp: WorldHooks = {
   solidAt(sim, x, y) {
     return solidOf(warpOf(sim).solids, x, y)
   },
-  /** 离队伍没几道门的舱室里，没事做的敌人往通向队伍的那扇门去 */
+  /** 亮着的别的舱室里，没事做的敌人往通向队伍的那扇门去 */
   wanderDir(sim, eid, dx, dy) {
     const s = warpOf(sim)
     const room = roomOf(s, Transform.x[eid]!, Transform.y[eid]!)
-    const k = s.steps[room]!
-    if (Faction.v[eid] === FACTION.enemy && k > 0 && k <= cfgOf(sim).chaseHops) {
+    if (Faction.v[eid] === FACTION.enemy && room !== s.teamRoom && live(s, room)) {
       const d = towardDoor(s, cfgOf(sim), room, eid, dx, dy)
       if (d) return d
     }
@@ -503,13 +535,14 @@ export const warp: WorldHooks = {
     const w = FRAME_U * UNIT
     return x < -m || x > w + m || y < -m || y > w + m
   },
-  /** 平常的敌人一半落在队伍那间，一半落在有门直通进来的几间；出怪口再按种类挑那几间里配方接它的出怪板。头目落在队伍那间、离队长远的地方 */
+  /** 平常的敌人落在亮着的几间里，按各间的亮度分；出怪口再按种类挑那几间里配方接它的出怪板。头目落在队伍那间、离队长远的地方 */
   spawnPoint(sim, boss) {
     const s = warpOf(sim)
     if (!boss) {
-      const near = s.plan.rooms.filter((r) => s.steps[r.index] === 1)
-      const room = near.length === 0 || sim.rng.next() < HOME_SPAWN ? s.teamRoom : near[Math.floor(sim.rng.next() * near.length)]!.index
-      return randomIn(sim, s, room, UNIT)
+      const levels = cfgOf(sim).light.levels
+      let left = sim.rng.next() * s.trail.reduce((sum, _, k) => sum + levels[k]!, 0)
+      const k = Math.max(0, s.trail.findIndex((_, j) => (left -= levels[j]!) < 0))
+      return randomIn(sim, s, s.trail[k]!, UNIT)
     }
     const lead = leaderPoint(sim)
     const far = SPAWN.minPlayerDist * UNIT * 1.6
@@ -564,6 +597,7 @@ export const warp: WorldHooks = {
     const cfg = cfgOf(sim)
     const s = warpOf(sim)
     stepDoors(sim, s, cfg, delta)
+    stepDark(sim, s)
     spill(sim, s, cfg)
     stepTiles(sim, s)
     stepNav(sim, s)

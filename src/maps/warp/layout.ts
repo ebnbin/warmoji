@@ -9,6 +9,8 @@ import type { Point } from '../../util/vec'
 const BASIN_CELL_U = 0.25
 /** 方框正中，格：四个象限各归一季 */
 const MID = FRAME_U / 2
+/** 方框竖着切成几列 */
+export const COLS = 3
 
 /** 四季各拿前面两张图里的一件东西装进标本罐：草甸的小花、樱庭的樱花；沙漠的驼骨、深海的气泡；残垣的枫叶、紫水晶；浮冰的冰块、火山 */
 export const TOKENS: readonly (readonly [string, string])[] = [
@@ -135,19 +137,32 @@ function spans(parts: readonly number[]): [number, number][] {
   })
 }
 
-/** 舱室的格切法：列宽、每列的行高 */
+/** 三列各切成 cfg.maze.rows 的哪一种（按列排），加起来正好 total 间的所有搭法 */
+export function stacks(cfg: WarpConfig, total: number): number[][] {
+  const out: number[][] = []
+  const walk = (left: number, acc: number[]): void => {
+    if (acc.length === COLS) {
+      if (left === 0) out.push(acc)
+      return
+    }
+    cfg.maze.rows.forEach((r, k) => walk(left - r.n, [...acc, k]))
+  }
+  walk(total, [])
+  return out
+}
+
+/** 舱室的格切法：先定一共几间，再定每列切成哪一种、列宽与每列的行高；切出来的格铺满整个方框 */
 function cells(cfg: WarpConfig, rng: Rng): Box[] {
   const m = cfg.maze
-  const cols = splits(FRAME_U, 3, m.colU[0], m.colU[1])
-  const rows = splits(FRAME_U, 3, m.rowU[0], m.rowU[1])
-  const small = Array.from({ length: FRAME_U / m.smallU }, () => m.smallU)
+  const [lo, hi] = rng.next() < m.fewP ? m.few : m.rooms
+  const options = stacks(cfg, lo + Math.floor(rng.next() * (hi - lo + 1)))
+  const pick = options[Math.floor(rng.next() * options.length)]!
+  const cols = splits(FRAME_U, COLS, m.colU[0], m.colU[1])
   const out: Box[] = []
-  const widths = cols[Math.floor(rng.next() * cols.length)]!
-  // 至少一列切成三间：开局那间要放得下
-  const tight = Math.floor(rng.next() * widths.length)
-  spans(widths).forEach(([x0, x1], c) => {
-    const heights = c !== tight && rng.next() < m.smallP ? small : rows[Math.floor(rng.next() * rows.length)]!
-    for (const [y0, y1] of spans(heights)) out.push({ x0, y0, x1, y1 })
+  spans(cols[Math.floor(rng.next() * cols.length)]!).forEach(([x0, x1], c) => {
+    const r = m.rows[pick[c]!]!
+    const rows = splits(FRAME_U, r.n, r.u[0], r.u[1])
+    for (const [y0, y1] of spans(rows[Math.floor(rng.next() * rows.length)]!)) out.push({ x0, y0, x1, y1 })
   })
   return out
 }
@@ -176,24 +191,24 @@ function corner(f: Box, k: number): { x: number; y: number; sx: number; sy: numb
 }
 
 /**
- * 每间舱室的去处：先把所有舱室打乱排成一圈，每间的「出口」通往圈上的下一间；再给每间添一两扇别的门，去处随手挑，
- * 不通回自己、不重复，也不和对面的门互相通着——从哪扇门来，那间都没有门通回去
+ * 每间舱室的去处：先把所有舱室打乱排成一圈，每间的「出口」通往圈上的下一间；再给每间添一两扇别的门，沿圈往前跳 2 到 (n − 1) / 2 间，跳几间随手挑。
+ * 所有的门都只往前通、往前跳不过半圈，两扇门往前跳的间数加起来到不了一整圈，所以没有两间舱室的门互相通着——从哪扇门来，那间都没有门通回去
  */
 function wire(n: number, extraP: number, rng: Rng): { loop: number[]; out: number[][] } {
   const loop = shuffled(
     rng,
     Array.from({ length: n }, (_, i) => i),
   )
+  const reach = Math.floor((n - 1) / 2)
   const out: number[][] = Array.from({ length: n }, () => [])
-  loop.forEach((c, i) => out[c]!.push(loop[(i + 1) % n]!))
-  for (const c of shuffled(rng, loop)) {
-    const want = rng.next() < extraP ? 2 : 1
-    for (const t of shuffled(rng, loop)) {
-      if (out[c]!.length > want) break
-      if (t === c || out[c]!.includes(t) || out[t]!.includes(c)) continue
-      out[c]!.push(t)
-    }
-  }
+  loop.forEach((c, i) => {
+    out[c]!.push(loop[(i + 1) % n]!)
+    const jumps = shuffled(
+      rng,
+      Array.from({ length: reach - 1 }, (_, k) => k + 2),
+    )
+    for (const k of jumps.slice(0, rng.next() < extraP ? 2 : 1)) out[c]!.push(loop[(i + k) % n]!)
+  })
   return { loop, out }
 }
 

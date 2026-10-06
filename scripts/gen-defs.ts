@@ -47,7 +47,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
-import { splits, warpPlan } from '../src/maps/warp/layout.ts'
+import { COLS, splits, stacks, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -594,9 +594,10 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 跃迁：舱室的格切得出来、能走的方块落在整格上，最小的舱室也放得下入口与三扇门、开局那间放得下开局的空地；
- * 门与入口站得下队长和跟在身后的队员、不压着墙角的出怪板，充能、发车的时长说得通；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与看守；
- * 抽一批种子真的生成一遍：开局站位四周空着；每间舱室的入口、门与出怪板都落在那间能走的地方上、台子互不相压，各有会亮的瓷砖；
+ * 跃迁：舱室的格切得出来、要的每种间数都搭得出来、能走的方块落在整格上，最小的舱室也放得下入口与三扇门、开局那间放得下开局的空地；
+ * 每间至少五间，门才都往前跳得开；门与入口站得下队长和跟在身后的队员、不压着墙角的出怪板，充能、发车的时长说得通；
+ * 亮着的几间从全亮往下排、都比暗着的亮；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与看守；
+ * 抽一批种子真的生成一遍：间数在要的范围里，分到的格正好铺满方框；开局站位四周空着；每间舱室的入口、门与出怪板都落在那间能走的地方上、台子互不相压，各有会亮的瓷砖；
  * 每间两三扇门、不通回自己、不重复、没有两间互相通着；顺着出口走恰好走遍所有舱室绕回原处；四季都分到了舱室
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
@@ -604,14 +605,18 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const c = m.warp
   if (!c) continue
   const at = `maps.${id}.warp`
-  const { maze: z, pad, racks: rk, emitters: em } = c
+  const { maze: z, pad, racks: rk, emitters: em, light: li } = c
   const edge = z.gapU + z.lipU
   need(z.gapU > 0 && z.lipU > 0 && Number.isInteger(edge) && c.neckU > 0, `${at}.maze 的缝宽、台沿须为正、加起来是整格，窄缝须为正`)
-  need(splits(FRAME_U, 3, z.colU[0], z.colU[1]).length > 0 && splits(FRAME_U, 3, z.rowU[0], z.rowU[1]).length > 0, `${at}.maze 的列宽、行高切不出 ${FRAME_U} 格的三段`)
-  need(Number.isInteger(z.smallU) && FRAME_U % z.smallU === 0 && z.smallP >= 0 && z.smallP <= 1 && z.extraP >= 0 && z.extraP <= 1, `${at}.maze 的小舱须整除方框，机会在 0 到 1 之间`)
-  const tight = Math.min(z.colU[0], z.rowU[0], z.smallU) - edge * 2
+  need(splits(FRAME_U, COLS, z.colU[0], z.colU[1]).length > 0, `${at}.maze 的列宽切不出 ${FRAME_U} 格的 ${COLS} 列`)
+  need(z.rows.length > 0 && z.rows.every((r) => Number.isInteger(r.n) && r.n >= 1 && splits(FRAME_U, r.n, r.u[0], r.u[1]).length > 0), `${at}.maze.rows 的每一种都须切得出 ${FRAME_U} 格`)
+  const counts = (r: readonly [number, number]): number[] => Array.from({ length: Math.max(0, r[1] - r[0] + 1) }, (_, k) => r[0] + k)
+  need(z.rooms[0] <= z.rooms[1] && z.few[0] <= z.few[1] && Math.min(z.rooms[0], z.few[0]) >= 5, `${at}.maze 的间数范围须是正的、至少五间`)
+  need([...counts(z.rooms), ...counts(z.few)].every((n) => stacks(c, n).length > 0), `${at}.maze 有的间数用 rows 搭不出来`)
+  need(z.fewP >= 0 && z.fewP <= 1 && z.extraP >= 0 && z.extraP <= 1, `${at}.maze 的机会须在 0 到 1 之间`)
+  const tight = Math.min(z.colU[0], ...z.rows.map((r) => r.u[0])) - edge * 2
   need(tight / 2 - pad.radiusU >= em.plateU + 0.5 && tight >= 2 * (pad.insetU + 2 * pad.radiusU) + 1, `${at}.maze 最小的舱室放不下入口与门`)
-  need(Math.max(z.colU[0], ...splits(FRAME_U, 3, z.rowU[0], z.rowU[1]).map((p) => Math.max(...p))) - edge * 2 >= SPAWN_CLEAR_U * 2 + 2, `${at}.maze 放不下开局的空地`)
+  need(Math.min(z.colU[0], ...z.rows.map((r) => Math.ceil(FRAME_U / r.n))) - edge * 2 >= SPAWN_CLEAR_U * 2 + 2, `${at}.maze 放不下开局的空地`)
   const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
   need(pad.radiusU >= squad * 0.75 && pad.insetU >= 0 && pad.cornerU - pad.radiusU >= em.plateU + 0.5, `${at}.pad 的台面太小，或压着墙角的出怪板`)
   need(pad.chargeMs > 0 && pad.drainMs > 0 && pad.transitMs > 0 && pad.spillU >= 0, `${at}.pad 的充能、漏能与穿行的时长须为正`)
@@ -620,7 +625,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(c.pit.minU - 2 * c.pit.marginU >= 2 && c.pit.marginU >= pad.insetU + 2 * pad.radiusU + 1, `${at}.pit 的凹槽太小，或四周的回廊压着门`)
   need(Number.isInteger(em.plateU) && em.plateU >= 1 && em.markU > 0 && em.clearU >= 0, `${at}.emitters 的板长须是正整数，凝成形的半径为正`)
   need(c.jar.sizeU > 0 && c.jar.sizeU + 0.3 < Math.min(pad.cornerU, tight / 2) - pad.radiusU, `${at}.jar 的标本罐须为正、不压着门`)
-  need(c.hopU > 0 && Number.isInteger(c.chaseHops) && c.chaseHops >= 1, `${at} 过一道门折合的路程须为正，追过来的门数须是正整数`)
+  need(c.hopU > 0, `${at} 过一道门折合的路程须为正`)
+  need(li.levels.length >= 1 && li.levels[0] === 1 && li.darkest >= 0 && li.levels.every((v, k) => v > li.darkest && v <= (k === 0 ? 1 : li.levels[k - 1]!)) && li.wakeMs > 0 && li.dimMs > 0, `${at}.light 的亮度须从全亮往下排、都比暗着的亮，亮起来、暗下去的时间须为正`)
   need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
   const g = m.gates
   need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
@@ -629,6 +635,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (let s = 0; s < 24; s++) {
     const plan = warpPlan(c, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
+    const n = plan.rooms.length
+    need((n >= z.rooms[0] && n <= z.rooms[1]) || (n >= z.few[0] && n <= z.few[1]), `${where} 切出了 ${n} 间`)
+    need(plan.rooms.reduce((sum, r) => sum + (r.cell.x1 - r.cell.x0) * (r.cell.y1 - r.cell.y0), 0) === FRAME_U * FRAME_U, `${where} 的舱室没有正好铺满方框`)
     const home = plan.rooms[plan.start]!
     need(roomAt(plan.basins[plan.start]!, home.center.x * UNIT, home.center.y * UNIT) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位离边不到 ${SPAWN_CLEAR_U} 格`)
     plan.rooms.forEach((room, i) => {

@@ -54,6 +54,9 @@ const ARRIVE_MS = 1600
 const TEXT_RES = 2
 /** 字底下垫的深色牌子：白地砖上也看得清 */
 const PLATE = 0x0b1c2a
+/** 舱室暗下去时盖上的那一层：盖住舱室里的一切；飞过虚空的光块在它上面 */
+const DARK_DEPTH = 65
+const DARK = 0x01040b
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const ease = (t: number): number => t * t * (3 - 2 * t)
@@ -152,10 +155,24 @@ function nearestImage(from: Point, x: number, y: number): Point {
   return { x: x - w * Math.round((x - from.x) / w), y: y - w * Math.round((y - from.y) / w) }
 }
 
+/** 收回方框里的那一份：方框外画的东西会被平铺的副本盖住，画在方框里才四周都看得见 */
+function wrapPx(v: number): number {
+  const w = FRAME_U * UNIT
+  return v - w * Math.floor(v / w)
+}
+
+/** 从 a 到 b 的一段越出了方框的哪几边：要整段平移回来再画一遍的那几份 */
+function shifts(a: Point, b: Point): Point[] {
+  const w = FRAME_U * UNIT
+  const one = (lo: number, hi: number): number[] => [0, ...(hi > w ? [-w] : []), ...(lo < 0 ? [w] : [])]
+  return one(Math.min(a.x, b.x), Math.max(a.x, b.x)).flatMap((x) => one(Math.min(a.y, b.y), Math.max(a.y, b.y)).map((y) => ({ x, y })))
+}
+
 /**
  * 迷宫：底下是望得见底的虚空，网格上流着数据光流，一道扫描线隔一阵从上往下扫过；镜头跟着队长走，整块方框在画面上往四周平铺，往哪边看都是舱室。
  * 舱室的地面、台沿与平台的影子是开局在后台线程画好的贴图；地砖按谁踩过亮起信号蓝或信号红、慢慢暗下去，闲着时按那一季的律动透出主色。
- * 门牌、门上写的去处、「出口」的绿牌与「第几次」是字；门、入口、光桥、监控、标本罐的玻璃、出怪板上凝成形的敌人、被送过虚空的身体散成的光块都每帧现画
+ * 门牌、门上写的去处、「出口」的绿牌与「第几次」是字；门、入口、光桥、监控、标本罐的玻璃、出怪板上凝成形的敌人、被送过虚空的身体散成的光块都每帧现画。
+ * 队伍那间与刚走过的几间按各自的亮度亮着，别的舱室暗下去，舱室里的一切都盖在暗里；只有飞过虚空的光块不被盖住
  */
 export class WarpView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -167,6 +184,10 @@ export class WarpView implements MapView {
   private floorFx?: Phaser.GameObjects.Graphics
   private glowFx?: Phaser.GameObjects.Graphics
   private airFx?: Phaser.GameObjects.Graphics
+  private shadeFx?: Phaser.GameObjects.Graphics
+  private flyFx?: Phaser.GameObjects.Graphics
+  /** 每间舱室此刻亮到几成：朝它该有的亮度慢慢亮起来、暗下去 */
+  private power: number[] = []
   private texts: RoomText[] = []
   private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1 }
   private jumpsSeen = 0
@@ -250,9 +271,12 @@ export class WarpView implements MapView {
     this.floorFx = scene.add.graphics().setDepth(-0.8)
     this.glowFx = scene.add.graphics().setDepth(-0.75).setBlendMode(Phaser.BlendModes.ADD)
     this.airFx = scene.add.graphics().setDepth(9.5).setBlendMode(Phaser.BlendModes.ADD)
-    this.visuals.push(this.floorFx, this.glowFx, this.airFx)
+    this.shadeFx = scene.add.graphics().setDepth(DARK_DEPTH)
+    this.flyFx = scene.add.graphics().setDepth(DARK_DEPTH + 1).setBlendMode(Phaser.BlendModes.ADD)
+    this.visuals.push(this.floorFx, this.glowFx, this.airFx, this.shadeFx, this.flyFx)
     this.labels(v, plan, cfg)
     const st = sim.worldState.warp
+    this.power = plan.rooms.map((r) => (st ? this.lit(st, cfg, r.index) : r.index === plan.start ? cfg.light.levels[0]! : cfg.light.darkest))
     this.jumpsSeen = st?.jumps ?? 0
     this.shuttleSeen = st ? st.doors.map((p) => p.shuttledAt) : []
     v.lens.screen.vignette(0.9, 0.12, 0x020610)
@@ -348,10 +372,10 @@ export class WarpView implements MapView {
     })
   }
 
-  step(v: ViewCtx, sim: Sim, _delta: number): void {
+  step(v: ViewCtx, sim: Sim, delta: number): void {
     const st = sim.worldState.warp
     const cfg = this.cfg
-    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx) return
+    if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx || !this.shadeFx || !this.flyFx) return
     this.state = st
     const now = sim.elapsedMs
     const t = sim.fxMs / 1000
@@ -363,6 +387,8 @@ export class WarpView implements MapView {
     this.floorFx.clear()
     this.glowFx.clear()
     this.airFx.clear()
+    this.flyFx.clear()
+    this.shade(st, cfg, delta)
     this.chargeRing(st, cfg)
     this.sounds(v, st)
     this.visits(st, now)
@@ -375,6 +401,28 @@ export class WarpView implements MapView {
     this.forming(sim, st, cfg, now)
     for (const f of st.flights) this.voxels(f, cfg, now)
     this.ripples(st, now)
+  }
+
+  /** 第 i 间舱室该亮到几成：亮着的按它在亮着的几间里排第几，别的暗着 */
+  private lit(st: WarpState, cfg: WarpConfig, i: number): number {
+    const k = st.trail.indexOf(i)
+    return k < 0 ? cfg.light.darkest : cfg.light.levels[k]!
+  }
+
+  /** 每间舱室朝它该有的亮度亮起来或暗下去，没全亮的盖上一层暗，盖住整块分到的格 */
+  private shade(st: WarpState, cfg: WarpConfig, delta: number): void {
+    const g = this.shadeFx!
+    g.clear()
+    st.plan.rooms.forEach((room, i) => {
+      const want = this.lit(st, cfg, i)
+      const p = this.power[i]!
+      const next = want > p ? Math.min(want, p + delta / cfg.light.wakeMs) : Math.max(want, p - delta / cfg.light.dimMs)
+      this.power[i] = next
+      if (next >= 1) return
+      const c = room.cell
+      g.fillStyle(DARK, 1 - next)
+      g.fillRect(c.x0 * UNIT, c.y0 * UNIT, (c.x1 - c.x0) * UNIT, (c.y1 - c.y0) * UNIT)
+    })
   }
 
   /** 入口边的「第几次」：到过才写；刚到的那一间，门牌和这一行放大亮一下 */
@@ -460,36 +508,41 @@ export class WarpView implements MapView {
       const len = Math.hypot(end.x - src.x, end.y - src.y) || 1
       const ux = (end.x - src.x) / len
       const uy = (end.y - src.y) / len
-      const a = { x: src.x + ux * R, y: src.y + uy * R }
-      const b = { x: end.x - ux * R, y: end.y - uy * R }
-      const span = Math.hypot(b.x - a.x, b.y - a.y)
+      const a0 = { x: src.x + ux * R, y: src.y + uy * R }
+      const b0 = { x: end.x - ux * R, y: end.y - uy * R }
+      const span = Math.hypot(b0.x - a0.x, b0.y - a0.y)
       const color = d.exit ? EXIT_GREEN : SEASONS[to.season]!.color
       const charge = p.charge / cfg.pad.chargeMs
-      if (mine) {
-        const step = 0.9 * UNIT
-        const speed = (0.7 + 3.5 * charge) * UNIT
-        for (let s = ((t * speed) % step) - step; s < span; s += step) {
-          if (s < 0) continue
-          const fade = Math.sqrt(Math.sin((Math.PI * s) / span))
-          g.lineStyle(0.07 * UNIT, color, (0.16 + 0.7 * charge) * fade)
-          g.lineBetween(a.x + ux * s, a.y + uy * s, a.x + ux * (s + 0.35 * UNIT), a.y + uy * (s + 0.35 * UNIT))
+      // 越出方框的那一截从方框另一边接着画
+      for (const o of shifts(a0, b0)) {
+        const a = { x: a0.x + o.x, y: a0.y + o.y }
+        const b = { x: b0.x + o.x, y: b0.y + o.y }
+        if (mine) {
+          const step = 0.9 * UNIT
+          const speed = (0.7 + 3.5 * charge) * UNIT
+          for (let s = ((t * speed) % step) - step; s < span; s += step) {
+            if (s < 0) continue
+            const fade = Math.sqrt(Math.sin((Math.PI * s) / span))
+            g.lineStyle(0.07 * UNIT, color, (0.16 + 0.7 * charge) * fade)
+            g.lineBetween(a.x + ux * s, a.y + uy * s, a.x + ux * (s + 0.35 * UNIT), a.y + uy * (s + 0.35 * UNIT))
+          }
         }
-      }
-      for (const [hot, glow] of [
-        [teamHot, TEAM_GLOW],
-        [foeHot, FOE_GLOW],
-      ] as const) {
-        if (hot <= 0) continue
-        for (const [w, al] of [
-          [1.2, 0.1],
-          [0.6, 0.22],
-          [0.25, 0.5],
+        for (const [hot, glow] of [
+          [teamHot, TEAM_GLOW],
+          [foeHot, FOE_GLOW],
         ] as const) {
-          g.lineStyle(w * UNIT * (0.6 + 0.4 * hot), glow, al * hot)
+          if (hot <= 0) continue
+          for (const [w, al] of [
+            [1.2, 0.1],
+            [0.6, 0.22],
+            [0.25, 0.5],
+          ] as const) {
+            g.lineStyle(w * UNIT * (0.6 + 0.4 * hot), glow, al * hot)
+            g.lineBetween(a.x, a.y, b.x, b.y)
+          }
+          g.lineStyle(0.05 * UNIT, 0xffffff, hot)
           g.lineBetween(a.x, a.y, b.x, b.y)
         }
-        g.lineStyle(0.05 * UNIT, 0xffffff, hot)
-        g.lineBetween(a.x, a.y, b.x, b.y)
       }
     }
   }
@@ -754,13 +807,14 @@ export class WarpView implements MapView {
   }
 
   /**
-   * 一个被送过虚空的身体：出发时散成一格格光块往上飘开，飞向它要去的那间入口（画面上平铺的最近那一份），在入口聚拢；队伍是信号蓝，敌人是信号红，夹着几块白
+   * 一个被送过虚空的身体：出发时散成一格格光块往上飘开，顺着身体走的那条最近的路飞向它要去的那间入口，越过方框的边就从另一边接着飞，在入口聚拢；
+   * 队伍是信号蓝，敌人是信号红，夹着几块白；画在暗下去的舱室上面
    */
   private voxels(h: Flight, cfg: WarpConfig, now: number): void {
     const ms = cfg.pad.transitMs
     const d = now - h.at
     if (d < 0 || d > ms + GATHER_MS) return
-    const g = this.airFx!
+    const g = this.flyFx!
     const color = h.foe ? FOE_GLOW : TEAM_GLOW
     const n = VOXELS + Math.round((h.r / UNIT) * VOXELS_PER_U)
     const seed = Math.floor(h.at) ^ Math.floor(h.fx * 7) ^ Math.floor(h.ty * 3)
@@ -801,7 +855,7 @@ export class WarpView implements MapView {
         al = 1 - s
       }
       g.fillStyle(k % 4 === 0 ? 0xffffff : color, al)
-      g.fillRect(x - size / 2, y - size / 2, size, size)
+      g.fillRect(wrapPx(x) - size / 2, wrapPx(y) - size / 2, size, size)
     }
   }
 
@@ -862,6 +916,9 @@ export class WarpView implements MapView {
     this.floorFx = undefined
     this.glowFx = undefined
     this.airFx = undefined
+    this.shadeFx = undefined
+    this.flyFx = undefined
+    this.power = []
     this.state = undefined
     for (const key of [GROUND_KEY, TILES_KEY, MASK_KEY, TINT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }

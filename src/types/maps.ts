@@ -1032,15 +1032,17 @@ export interface TheaterConfig {
 export type WarpShape = 'hall' | 'racks' | 'pit'
 export interface WarpConfig {
   /**
-   * 迷宫：方框先竖着切成三列，列宽在 colU 以内；每列再横着切成三间，高在 rowU 以内，有 smallP 的机会改切成四间边长 smallU 的小舱。
-   * 每间舱室的平台四边离格边 gapU 格（平铺后舱与舱之间隔两倍的虚空），四边一圈 lipU 格宽的台沿，能走的方块落在整格上。
+   * 迷宫：舱室分到的格铺满整个方框。方框先竖着切成三列，列宽在 colU 以内；每列再横着切成 rows 里的某一种：n 间、每间高在 u 以内。
+   * 一般一共切出 rooms 间，有 fewP 的机会只切 few 间、每间更大。
+   * 每间舱室的平台四边离格边 gapU 格（平铺后舱与舱之间、贴着方框边的舱与方框另一头的舱之间都隔两倍的虚空），四边一圈 lipU 格宽的台沿，能走的方块落在整格上。
    * 每间舱室一扇标着「出口」的门，顺着出口一路走会走遍所有舱室再回到原处；另有一扇别的门，有 extraP 的机会两扇；没有两间舱室的门互相通着
    */
   readonly maze: {
     readonly colU: readonly [number, number]
-    readonly rowU: readonly [number, number]
-    readonly smallP: number
-    readonly smallU: number
+    readonly rows: readonly { readonly n: number; readonly u: readonly [number, number] }[]
+    readonly rooms: readonly [number, number]
+    readonly fewP: number
+    readonly few: readonly [number, number]
     readonly gapU: number
     readonly lipU: number
     readonly extraP: number
@@ -1073,9 +1075,13 @@ export interface WarpConfig {
   readonly recipes: readonly [string, string, string, string]
   /** 标本罐：每间舱室一角立一只，边长 sizeU 格，挡人不挡子弹 */
   readonly jar: { readonly sizeU: number }
-  /** 敌人认路：除了眼前那道门，每多过一道门在路程上折合多少格；离队伍 chaseHops 道门以内的敌人闲着时也往通向队伍的那扇门去 */
+  /** 敌人认路：除了眼前那道门，每多过一道门在路程上折合多少格 */
   readonly hopU: number
-  readonly chaseHops: number
+  /**
+   * 灯：队伍所在那间与刚走过的几间亮着，亮度依次是 levels（第一项是队伍那间），只有这几间出怪（按亮度分），里面的敌人照常动、顺着门追向队伍；
+   * 别的舱室暗到 darkest，敌人定在原地。从全暗到全亮要 wakeMs，从全亮到全暗要 dimMs
+   */
+  readonly light: { readonly levels: readonly number[]; readonly darkest: number; readonly wakeMs: number; readonly dimMs: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
 }
