@@ -1,6 +1,8 @@
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { HAZARD_KILLS, HAZARD_NAMES } from '../data/maps'
+import { isLose } from '../data/ends'
+import { signalName } from '../data/signals'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
@@ -27,11 +29,6 @@ export function fightUnit(def: RunDef): string {
   return def.record ? '波' : '场'
 }
 
-/** 失败条件：到点就输的时限，倒下的次数 */
-function isLose(e: EndRule): boolean {
-  return (e.kind === 'time' && e.lose === true) || e.kind === 'downs'
-}
-
 /** 一条结束规则的说法：达成条件说怎么算赢，失败条件说怎么算输 */
 export function endText(e: EndRule): string {
   switch (e.kind) {
@@ -47,12 +44,31 @@ export function endText(e: EndRule): string {
       return e.by ? `让 ${e.count} 只敌人被${HAZARD_KILLS[e.by]}` : `击杀 ${e.count} 只${e.enemy ? ENEMIES[e.enemy].name : ''}`
     case 'bounty':
       return '击倒全部悬赏目标'
-    case 'hold':
-      return e.points.length > 1 ? `队长在 ${e.points.length} 处据点里依次各站满 ${sec(e.ms / e.points.length)}` : `队长在据点里累计站满 ${sec(e.ms)}`
+    case 'hold': {
+      const marks = new Set(e.points.map((p) => ('mark' in p ? p.mark : null)))
+      const [only] = marks
+      const where = marks.size === 1 && typeof only === 'string' ? signalName('marks', only) : '据点'
+      return e.points.length > 1 ? `队长在 ${e.points.length} 处${where}里依次各站满 ${sec(e.ms / e.points.length)}` : `队长在${where}累计站满 ${sec(e.ms)}`
+    }
     case 'coins':
       return `捡到 ${e.count} 金币`
     case 'downs':
       return e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`
+    case 'event': {
+      const name = signalName('events', e.event)
+      if (e.lose) return e.count === 1 ? `${name}就输` : `${name} ×${e.count} 就输`
+      return e.count === 1 ? `等到${name}` : `${name} ×${e.count}`
+    }
+    case 'gauge': {
+      const name = signalName('gauges', e.gauge)
+      const pct = (v: number): string => `${Math.round(v * 100)}%`
+      if (e.above !== undefined) return e.lose ? `${name}到 ${pct(e.above)} 就输` : `${name}升到 ${pct(e.above)}`
+      return e.lose ? `${name}低于 ${pct(e.below ?? 0)} 就输` : `${name}降到 ${pct(e.below ?? 0)}`
+    }
+    case 'visit':
+      return `到访${e.count === undefined ? '每一处' : ` ${e.count} 处`}${signalName('marks', e.mark)}，每处站 ${sec(e.ms)}`
+    case 'leak':
+      return `朝${signalName('marks', e.mark)}行进的敌人放过去 ${e.count} 只就输`
   }
 }
 
@@ -101,6 +117,7 @@ function ruleLines(r: FightRules | undefined): string[] {
   if (r.skills === false) out.push('不能放主动技能')
   if (r.vision !== undefined) out.push(`只看得见队长身边 ${r.vision} 格`)
   if (r.harmless) out.push('我方伤不了敌人，击退与控制照常，敌人只能死于地图上的危害')
+  if (r.relay !== undefined) out.push(`每 ${sec(r.relay)}自动换下一名队员当队长`)
   if (r.mods) out.push(`全队${modTexts(r.mods).join('、')}`)
   return out
 }

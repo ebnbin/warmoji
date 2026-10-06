@@ -4,8 +4,12 @@ import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { ItemRarity } from '../types/items'
 import type { FightDef, FightRules, GroupTraits, LegacyPhaseDef, LegacySquad, LevelPick, MixEntry, RepeatDef, Rounds, RunDef, SpawnAt, StarRule, StepDef, TeamDef } from '../types/runs'
 import type { DifficultyCurve } from '../types/waves'
+import type { MapKind } from '../types/maps'
+import type { MapSignals } from './signals.ts'
 // 构建脚本也跑这些检查，本地模块写全扩展名
 import { cycleOf, roundPicks, roundsOf } from './rounds.ts'
+import { isLose } from './ends.ts'
+import { hasSignal } from './signals.ts'
 
 /** 定义里的位置：一层层的属性名与下标 */
 export type Path = readonly (string | number)[]
@@ -19,8 +23,8 @@ export interface Issue {
 /** 查关卡要用到的资料：构建期取自 defs，运行时取自生成的 assets */
 export interface RunCatalog {
   readonly enemies: Readonly<Record<string, EnemyDef>>
-  /** 地图：只看它的名字与有哪几种出怪口 */
-  readonly maps: Readonly<Record<string, { readonly name: string; readonly gates?: { readonly kinds: Readonly<Record<string, unknown>> } }>>
+  /** 地图：只看它的名字、种类（定下它给关卡哪些信号）与有哪几种出怪口、各只出哪几种敌人 */
+  readonly maps: Readonly<Record<string, { readonly name: string; readonly kind: MapKind; readonly gates?: { readonly kinds: Readonly<Record<string, { readonly name: string; readonly only?: readonly string[] }>> } }>>
   readonly pools: Readonly<Record<string, readonly { readonly polarity: Polarity }[]>>
   readonly characters: Readonly<Record<string, { readonly tags: readonly CharacterTag[] }>>
   readonly maxCharLevel: number
@@ -127,8 +131,21 @@ export function runChecks(cat: RunCatalog): RunChecks {
   /** 查一批敌人时的上下文：在哪张图上打（一场、一局都没写是 undefined），这一场是不是按阶段写的，这一阶段的配比 */
   type Where = { readonly map: string | undefined; readonly staged: boolean; readonly mix: readonly MixEntry[] | undefined }
 
-  /** 站位的距离与散开范围；指定出怪口的，这一场得定下地图、那张图有这种出怪口 */
-  const checkAt = (at: SpawnAt | undefined, where: Where, path: Path): void => {
+  /** 读地图信号的写法：这一场得定下地图，那张图有这个信号 */
+  const checkSignal = (where: Where, field: keyof MapSignals, name: string, path: Path): void => {
+    if (where.map === undefined) {
+      need(false, path, '读地图信号的一场须定下地图')
+      return
+    }
+    const map = cat.maps[where.map]
+    need(map !== undefined && hasSignal(map.kind, field, name), path, `${where.map} 没有这个地图信号：${field}.${name}`)
+  }
+
+  /**
+   * 站位的距离与散开范围；指定出怪口的，这一场得定下地图、那张图有这种出怪口，
+   * 这一批会放出的敌人 kinds（说不准的是 null）那种出怪口都接得住：接不住的会悄悄改从别处出来
+   */
+  const checkAt = (at: SpawnAt | undefined, kinds: readonly string[] | null, where: Where, path: Path): void => {
     if (at?.kind === 'ring' || at?.kind === 'behind') need(at.dist > 0, path, '站位距离须为正')
     if (at?.kind === 'point') need((at.spread ?? 0) >= 0, path, '散开范围不为负')
     if (at?.kind !== 'gate') return
@@ -136,7 +153,18 @@ export function runChecks(cat: RunCatalog): RunChecks {
       need(false, path, '指定出怪口的一场须定下地图')
       return
     }
-    need(cat.maps[where.map]?.gates?.kinds[at.gate] !== undefined, path, `${where.map} 没有这种出怪口：${at.gate}`)
+    const gate = cat.maps[where.map]?.gates?.kinds[at.gate]
+    need(gate !== undefined, path, `${where.map} 没有这种出怪口：${at.gate}`)
+    const only = gate?.only
+    const off = only && kinds ? kinds.filter((k) => !only.includes(k)) : []
+    need(off.length === 0, path, `${where.map} 的出怪口 ${at.gate} 接不住 ${off.join('、')}`)
+  }
+
+  /** 一批敌人会放出哪几种：指定的那一种，或这一批、这一阶段的配比里的；都没写（按地图抽）是 null */
+  const groupKinds = (t: GroupTraits, where: Where): string[] | null => {
+    if (t.enemy) return [t.enemy]
+    const mix = t.mix ?? where.mix
+    return mix ? mix.map((m) => m.kind) : null
   }
 
   /** 一批敌人的特征：指定的敌人存在，指定了就不再写配比；按阶段写的一场里没指定敌人的得有配比可抽；换走法须指定敌人；几率与倍率在范围内；要带的效果这张图的效果池里有 */
@@ -146,6 +174,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
     if (t.mix) checkMix(t.mix, [...path, 'mix'])
     need(!where.staged || t.enemy !== undefined || (t.mix ?? where.mix) !== undefined, path, '没指定敌人，这一批和这一阶段都没写配比')
     need(t.drive === undefined || t.enemy !== undefined, path, '换走法须指定敌人')
+    if (t.drive?.kind === 'march') checkSignal(where, 'marks', t.drive.mark, path)
     need(inUnit(t.eliteChance), path, '精英几率须在 [0, 1] 内')
     need((t.stats?.mul?.maxHp ?? 1) > 0, path, '血量倍率须为正')
     need((t.loot?.xp ?? 0) >= 0 && (t.loot?.coins ?? 0) >= 0, path, '战利品倍率不为负')
@@ -161,7 +190,8 @@ export function runChecks(cat: RunCatalog): RunChecks {
     checkTraits(sq, where, path)
     const e = sq.escort
     need(e === undefined || (cat.enemies[e.enemy] !== undefined && !isBoss(e.enemy) && e.count >= 1 && (e.stats?.mul?.maxHp ?? 1) > 0), [...path, 'escort'], '护卫须引用非头目的敌人、至少一只，血量倍率为正')
-    checkAt(sq.at, where, path)
+    const kinds = groupKinds(sq, where)
+    checkAt(sq.at, kinds && sq.escort ? [...kinds, sq.escort.enemy] : kinds, where, path)
   }
 
   /** 这一阶段可能出现的敌人种类，连同巢穴生出的与死后分裂出的；有按地图抽的就说不准，是 null */
@@ -195,6 +225,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
     need(r?.rescue === undefined || r.rescue.ms > 0, path, '救援时长须为正')
     need(r?.rescue === undefined || (r.rescue.radius > touch && r.rescue.radius < cat.fanDistance), path, `救援范围须在 ${touch} 到 ${cat.fanDistance} 格之间`)
     need((r?.leader?.switchCdMs ?? 1) > 0, path, '换队长冷却须为正')
+    need((r?.relay ?? 1) > 0, path, '轮换队长的间隔须为正')
     need((r?.vision ?? Infinity) > squadReach, path, `视野须大于 ${squadReach} 格，看得见跟在身后的队员`)
   }
 
@@ -215,7 +246,10 @@ export function runChecks(cat: RunCatalog): RunChecks {
     const at: Where = { ...where, mix: p.mix }
     const squads = p.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
     const endless = p.spawns.some(
-      (s) => s.kind === 'knobs' || (s.kind === 'stream' && s.untilMs === undefined && s.total === undefined) || (s.kind === 'batch' && s.every !== undefined && s.times === undefined),
+      (s) =>
+        s.kind === 'knobs' ||
+        (s.kind === 'stream' && s.untilMs === undefined && s.total === undefined) ||
+        (s.kind === 'batch' && ((s.every !== undefined && s.times === undefined) || s.on !== undefined)),
     )
     const boss = p.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs') || squads.some((sq) => isBoss(sq.enemy))
     if (p.mix) checkMix(p.mix, [...path, 'mix'])
@@ -230,9 +264,13 @@ export function runChecks(cat: RunCatalog): RunChecks {
         need((s.cap ?? 1) >= 1, sp, '连续刷怪上限至少为 1')
         need(!isBoss(s.enemy), sp, '连续刷怪不能刷头目，头目按一队放出')
         checkTraits(s, at, sp)
-        checkAt(s.at, at, sp)
+        checkAt(s.at, groupKinds(s, at), at, sp)
       } else if (s.kind === 'batch') {
         need(s.atMs >= 0, sp, '一队敌人登场时刻不为负')
+        if (s.on !== undefined) {
+          checkSignal(at, 'events', s.on, sp)
+          need(s.every === undefined, sp, '按地图事件放出的一队不再写间隔')
+        }
         need(s.every === undefined || s.every > 0, sp, '一再放出的间隔须为正')
         need(s.times === undefined || (Number.isInteger(s.times) && s.times >= 1 && (s.times === 1 || s.every !== undefined)), sp, '放出的次数须是正整数，多于一次要写间隔')
         checkSquad(s.squad, at, [...sp, 'squad'])
@@ -246,9 +284,20 @@ export function runChecks(cat: RunCatalog): RunChecks {
         need(s.buff >= 0 && s.debuff >= 0 && s.atMs >= 0 && s.spanMs >= 0, sp, '带光圈敌人数与时刻不为负')
       }
     })
+    p.cues?.forEach((c, i) => {
+      const cp = [...path, 'cues', i]
+      checkSignal(at, 'cues', c.cue, cp)
+      need(c.atMs >= 0 && (c.every === undefined || c.every > 0), cp, '指令的时刻不为负，间隔为正')
+      need(c.times === undefined || (Number.isInteger(c.times) && c.times >= 1 && (c.times === 1 || c.every !== undefined)), cp, '指令的次数须是正整数，多于一次要写间隔')
+    })
+    const marching = new Set(
+      p.spawns
+        .flatMap((s): readonly GroupTraits[] => (s.kind === 'stream' ? [s] : s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
+        .flatMap((g) => (g.drive?.kind === 'march' ? [g.drive.mark] : [])),
+    )
     need(p.ends.filter((e) => e.kind === 'time').length <= 1, path, '最多一条时限')
     need(p.ends.length > 0 || last, path, '不是最后一个阶段，须有结束规则')
-    need(p.ends.length === 0 || p.ends.some((e) => e.kind !== 'downs' && !(e.kind === 'time' && e.lose)), path, '有结束规则就得有达成条件')
+    need(p.ends.length === 0 || p.ends.some((e) => !isLose(e)), path, '有结束规则就得有达成条件')
     need(p.need !== 'all' || !p.ends.some((e) => e.kind === 'time' && !e.lose), path, '要全部达成时，时限只能是到点就输的')
     const kinds = phaseKinds(p)
     p.ends.forEach((e, i) => {
@@ -258,7 +307,31 @@ export function runChecks(cat: RunCatalog): RunChecks {
       if (e.kind === 'bossHp') need(e.below > 0 && e.below < 1, ep, '头目血量的比例须在 (0, 1) 内')
       if (e.kind === 'bounty') need(squads.some((sq) => sq.bounty), ep, '要击倒悬赏目标，须有悬赏目标登场')
       if (e.kind === 'cleared') need(!endless, ep, '要清场，刷怪须有停下的时刻')
-      if (e.kind === 'hold') need(e.ms > 0 && e.radius > 0 && e.points.length > 0, ep, '据点须至少一处，时长与半径为正')
+      if (e.kind === 'hold') {
+        need(e.ms > 0 && e.radius > 0 && e.points.length > 0, ep, '据点须至少一处，时长与半径为正')
+        for (const pt of e.points) {
+          if (!('mark' in pt)) continue
+          checkSignal(at, 'marks', pt.mark, ep)
+          need(pt.nth === undefined || (Number.isInteger(pt.nth) && pt.nth >= 0), ep, '地标的序号须是非负整数')
+        }
+      }
+      if (e.kind === 'event') {
+        checkSignal(at, 'events', e.event, ep)
+        need(Number.isInteger(e.count) && e.count >= 1, ep, '地图事件的次数须是正整数')
+      }
+      if (e.kind === 'gauge') {
+        checkSignal(at, 'gauges', e.gauge, ep)
+        need((e.above === undefined) !== (e.below === undefined) && [e.above, e.below].every((v) => v === undefined || (v > 0 && v < 1)), ep, '地图读数的线写 above 或 below 其中一条，在 (0, 1) 内')
+      }
+      if (e.kind === 'visit') {
+        checkSignal(at, 'marks', e.mark, ep)
+        need(e.radius > 0 && e.ms > 0 && (e.count === undefined || (Number.isInteger(e.count) && e.count >= 1)), ep, '到访的圈与时长为正，处数是正整数')
+      }
+      if (e.kind === 'leak') {
+        checkSignal(at, 'marks', e.mark, ep)
+        need(e.radius > 0 && Number.isInteger(e.count) && e.count >= 1, ep, '漏怪的圈为正，只数是正整数')
+        need(marching.has(e.mark), ep, `要数漏过去的，须有朝 ${e.mark} 行进的敌人`)
+      }
       if (e.kind === 'kills' || e.kind === 'coins' || e.kind === 'downs') need(e.count >= 1, ep, `${e.kind}数至少为 1`)
       if (e.kind === 'kills' && e.enemy !== undefined) need(cat.enemies[e.enemy] !== undefined && (kinds === null || kinds.has(e.enemy)), ep, `要击杀的${e.enemy}不在这一阶段出现`)
       if (e.kind === 'kills') need(e.enemy === undefined || e.by === undefined, ep, '按死于哪种危害数，就不再按种类数')

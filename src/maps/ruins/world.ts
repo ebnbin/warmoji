@@ -9,6 +9,7 @@ import { hit } from '../../ecs/systems/shared/damage'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { hazardSource } from '../../ecs/utils/source'
 import { leaderPoint } from '../../ecs/utils/team'
+import { mapEvent } from '../../ecs/fight/events'
 import { canSee, clearM, eyeM, LAYER_M, layerZ, overOf, phases, STANDARD } from '../../ecs/utils/pass'
 import { awayFromWall, keepOut, roomAt } from '../basin'
 import { makeMasonry, ruinsPlan, toLocal, toWorld } from './layout'
@@ -97,6 +98,10 @@ export interface RuinsState {
   /** 粗格子在不在台地上 */
   readonly onSite: Uint8Array
   version: number
+  /** 开局时砌体一共几层石块；残墙是此刻比开局剩几成、按第几版砌体数的 */
+  readonly courses: number
+  walls: number
+  wallsAt: number
   dustAt: number
   readonly pending: Pending[]
   readonly changed: number[]
@@ -127,10 +132,26 @@ export function ruinsOf(sim: Sim): RuinsState {
         onSite[j * dust.cols + i] = roomAt(plan.basin, w.x * UNIT, w.y * UNIT) >= FLOW_CLEAR_U * UNIT ? 1 : 0
       }
     }
-    s = { plan, marks: ruinsMarks(plan, walkLevel(cfg)), m, dust, fields: new Array(LEVELS).fill(null), flows: new Array(LEVELS).fill(null), onSite, version: 0, dustAt: 0, pending: [], changed: [], collapses: [], impacts: [] }
+    s = { plan, marks: ruinsMarks(plan, walkLevel(cfg)), m, dust, fields: new Array(LEVELS).fill(null), flows: new Array(LEVELS).fill(null), onSite, version: 0, courses: coursesOf(m.n), walls: 1, wallsAt: 0, dustAt: 0, pending: [], changed: [], collapses: [], impacts: [] }
     sim.worldState.ruins = s
   }
   return s
+}
+
+/** 每格的石块层数加起来 */
+function coursesOf(n: Uint8Array): number {
+  let t = 0
+  for (let i = 0; i < n.length; i++) t += n[i]!
+  return t
+}
+
+/** 残墙还剩开局的几成：砌体变了才重数 */
+function wallsLeft(s: RuinsState): number {
+  if (s.wallsAt !== s.version) {
+    s.walls = s.courses > 0 ? coursesOf(s.m.n) / s.courses : 0
+    s.wallsAt = s.version
+  }
+  return s.walls
 }
 
 /** 过得去 m 米高的障碍的身体过得去几层石块 */
@@ -409,6 +430,7 @@ function collapsed(sim: Sim, s: RuinsState, falls: readonly Fall[], at: { u: num
   const g = m.grid
   const f = s.plan.frame
   const landings: Landing[] = spill(m, falls, at, () => sim.rng.next())
+  mapEvent(sim, 'collapse')
   s.version++
   s.fields.fill(null)
   let stone = 0
@@ -465,6 +487,26 @@ function collapsed(sim: Sim, s: RuinsState, falls: readonly Fall[], at: { u: num
     stones.push({ x0: src.x * UNIT, y0: src.y * UNIT, x: w.x * UNIT, y: w.y * UNIT, drop: l.drop, volume: l.volume * step })
   }
   capped(s.collapses, { x: c.x * UNIT, y: c.y * UNIT, volume: stone, top, stones, timber: wood })
+}
+
+/** 余震从多高处打、使多大的劲：照暴龙冲锋撞墙的量 */
+const QUAKE = { heightFrac: 0.5, amount: 2.4, nearU: 2, farU: 9, tries: 32 }
+
+/** 余震：在队长身边 nearU 到 farU 格里找一处还立着、标准身高跨不过的墙，从半腰打塌；落石敌我通吃 */
+function quake(sim: Sim, s: RuinsState): void {
+  const lead = leaderPoint(sim)
+  const walk = walkLevel(cfgOf(sim))
+  for (let k = 0; k < QUAKE.tries; k++) {
+    const a = sim.rng.next() * Math.PI * 2
+    const d = (QUAKE.nearU + sim.rng.next() * (QUAKE.farU - QUAKE.nearU)) * UNIT
+    const l = local(s, lead.x + Math.cos(a) * d, lead.y + Math.sin(a) * d)
+    const i = cellAt(s.m.grid, l.u, l.v)
+    if (i < 0 || s.m.n[i]! <= walk) continue
+    const falls: Fall[] = []
+    carve(s.m, STRENGTH, l.u, l.v, s.m.n[i]! * s.m.courseM * QUAKE.heightFrac, QUAKE.amount, falls)
+    if (falls.length > 0) collapsed(sim, s, falls, l)
+    return
+  }
 }
 
 /** 塌下 volume 立方米扬起的尘雾：摊在局部 (u, v) 格附近半径 spreadU 的一团里，中间浓 */
@@ -708,6 +750,12 @@ export const ruins: WorldHooks = {
   },
   landmarks(sim) {
     return ruinsOf(sim).marks
+  },
+  gauge(sim, g) {
+    return g === 'walls' ? wallsLeft(ruinsOf(sim)) : 0
+  },
+  cue(sim, c) {
+    if (c === 'quake') quake(sim, ruinsOf(sim))
   },
   lean() {
     return ZERO

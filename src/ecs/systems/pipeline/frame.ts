@@ -12,7 +12,12 @@ import { refreshTargets } from '../refreshTargets'
 import { runDeathEffects } from '../runDeathEffects'
 import { spawnStep } from '../spawnStep'
 import { tickHold } from '../tickHold'
+import { tickLeaks } from '../tickLeaks'
+import { tickRelay } from '../tickRelay'
 import { tickRescue } from '../tickRescue'
+import { tickVisits } from '../tickVisits'
+import { fireCues } from '../fireCues'
+import { fireTriggers } from '../fireTriggers'
 import { updateAnims } from '../updateAnims'
 import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
@@ -40,11 +45,16 @@ const FRAME_PIPELINE = pipeline([
   { run: reapCollected, after: [grantCoins, grantMods, grantFlash, playPickupFx] },
   { run: capCoins, after: [reapCollected] },
   updateSpawners,
-  fireCalls,
+  { run: fireCues, after: [stepSim] },
+  { run: fireTriggers, after: [stepSim] },
+  { run: fireCalls, after: [fireTriggers] },
   { run: fireOrders, after: [fireCalls] },
   fireCarriers,
   { run: spawnStep, after: [fireOrders, fireCarriers] },
   { run: tickHold, after: [stepSim] },
+  { run: tickVisits, after: [stepSim] },
+  { run: tickLeaks, after: [stepSim] },
+  { run: tickRelay, after: [stepSim] },
   { run: tickRescue, after: [stepSim] },
   settleFloors,
 ])

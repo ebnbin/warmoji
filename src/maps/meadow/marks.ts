@@ -16,10 +16,12 @@ const FOOT_FRONT_U = 0.95
 /** 坡顶的口子沿坡每隔这么远一处、在坡顶往外多远，格 */
 const BANK_STEP_U = 3.5
 const BANK_BACK_U = 0.5
+/** 栅栏门的地标在门里这么远的草地上，格 */
+const GATE_IN_U = 0.8
 
 /**
  * 草甸的地标，像素，按地图一次定下：bare 是坡脚、栅栏一线与林间小路的路口（林子里的口子躲开它们）；
- * log 是堵着小路的倒木，朝草地；fence 是每一档栅栏的正中，朝草地；bank 是陡坡顶上，朝草地
+ * log 是堵着小路的倒木，朝草地；fence 是每一档栅栏的正中，朝草地；bank 是陡坡顶上，朝草地；gate 是闩着的栅栏门里头，朝草地
  */
 export function meadowMarks(plan: MeadowPlan): Record<string, Landmark[]> {
   const f = plan.frame
@@ -69,5 +71,7 @@ export function meadowMarks(plan: MeadowPlan): Record<string, Landmark[]> {
     if (room(front.x, front.y) < 0.5 * UNIT) continue
     bank.push(px(toMap(f, foot - bankWidth(e, b) - BANK_BACK_U, b), 0, f.nx, f.ny))
   }
-  return { bare, log, fence, bank }
+  const g = plan.gate
+  const gate = [px({ x: g.x - g.ox * GATE_IN_U, y: g.y - g.oy * GATE_IN_U }, 0, -g.ox, -g.oy)]
+  return { bare, log, fence, bank, gate }
 }

@@ -12,6 +12,7 @@ import { grounded } from '../../ecs/utils/pass'
 import { leaderPoint } from '../../ecs/utils/team'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { bounded, wanderIn, ZERO } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
 import { inBox, nextRoom, roomIndexAt, warpPlan } from './layout'
@@ -278,6 +279,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, i: number, team: boolea
     s.pads[to.index]!.coolUntil = now + ms + cfg.pad.cooldownMs
     s.pads[i]!.jumpedAt = now
     s.jumps++
+    mapEvent(sim, 'jump')
   }
   let foes = 0
   for (const e of query(sim.world, ENEMY_SET)) {
@@ -479,6 +481,10 @@ export const warp: WorldHooks = {
   },
   landmarks(sim) {
     return warpOf(sim).marks
+  },
+  /** 关卡锁住传送台：四座台一直冷却，队伍走不了，班车照常发 */
+  cue(sim, c) {
+    if (c === 'lock') for (const p of warpOf(sim).pads) p.coolUntil = Infinity
   },
   lean() {
     return ZERO

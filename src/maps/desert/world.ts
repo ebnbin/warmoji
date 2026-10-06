@@ -10,7 +10,8 @@ import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import type { Crossing, Probe } from '../../ecs/utils/pass'
 import type { LandmarkKind } from './landmarks'
 import type { ObstacleId } from '../../types/obstacles'
-import { leaderX, leaderY } from '../../ecs/utils/team'
+import { leaderPoint, leaderX, leaderY } from '../../ecs/utils/team'
+import { mapEvent } from '../../ecs/fight/events'
 import { gridAt, makePlan, slopeAt, solidAt, sunAt, wrapU } from './terrain'
 import { desertMarks } from './marks'
 import { paceOf } from './gait'
@@ -41,6 +42,9 @@ export interface DesertState {
   readonly plan: DesertPlan
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly tracks: Tracks
+  /** 这一场队长从哪出发（队长自己的坐标从不回绕），还没走过是 null；离开它沿横竖哪个方向走满了几圈 */
+  origin: Point | null
+  laps: number
 }
 
 function cfgOf(sim: Sim): DesertConfig {
@@ -52,7 +56,7 @@ export function desertOf(sim: Sim): DesertState {
   if (!s) {
     const cfg = cfgOf(sim)
     const plan = makePlan(cfg, sim.run.decorSeed)
-    s = { plan, marks: desertMarks(plan), tracks: newTracks(plan.sizeU) }
+    s = { plan, marks: desertMarks(plan), tracks: newTracks(plan.sizeU), origin: null, laps: 0 }
     sim.worldState.desert = s
   }
   return s
@@ -364,11 +368,15 @@ export const desert: WorldHooks = {
   onStart(sim) {
     desertOf(sim)
   },
-  /** 先把一切挪到离队长最近的那一份上，再按这一帧走过的路落印子 */
+  /** 先把一切挪到离队长最近的那一份上，再按这一帧走过的路落印子；队长离出发点又沿横竖哪个方向多走满一圈就记一次 */
   tick(sim, delta) {
     const cfg = cfgOf(sim)
     const s = desertOf(sim)
     rewrap(sim)
+    const lead = leaderPoint(sim)
+    s.origin ??= lead
+    const laps = Math.floor(Math.max(Math.abs(lead.x - s.origin.x) / sim.mapW, Math.abs(lead.y - s.origin.y) / sim.mapH))
+    for (; s.laps < laps; s.laps++) mapEvent(sim, 'lap')
     s.tracks.now = sim.elapsedMs / 1000
     const plan = s.plan
     stepTracks(sim, s.tracks, cfg, plan.sizeU, (x, y) => gridAt(plan, plan.soft, x / UNIT, y / UNIT), delta / 1000)

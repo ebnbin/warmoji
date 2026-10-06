@@ -56,7 +56,7 @@ function bankMarks(r: Reach, basin: Basin, from: number, skip: (x: number, y: nu
 
 /**
  * 樱庭的地标，像素，按地图一次定下：ports 是寺墙、上游石组与下游竹栅一线（林子里的口子躲开它们）；wall 是寺墙朝空地的那一面，
- * bank 是溪两岸的水边（石槛与桥两边不摆），都朝空地；rocks 是石组下游那一面，朝下游
+ * bank 是溪两岸的水边（石槛与桥两边不摆），都朝空地；rocks 是石组下游那一面，朝下游；bridge 是桥面正中
  */
 export function sakuraMarks(cfg: SakuraConfig, plan: SakuraPlan): Record<string, Landmark[]> {
   const at = (x: number, y: number, r: number, nx: number, ny: number): Landmark => ({ x: x * UNIT, y: y * UNIT, r: r * UNIT, nx, ny })
@@ -83,5 +83,5 @@ export function sakuraMarks(cfg: SakuraConfig, plan: SakuraPlan): Record<string,
   const bank = bankMarks(plan.stream, plan.basin, 0, (x, y) => weirLocal(plan.weir, x, y).along > -cfg.sill.rampU || Math.abs(bridgeLocal(b, x, y).t) < b.width + BRIDGE_CLEAR_U)
   const rk = plan.rocks
   const rocks = [at(rk.x + rk.tx * (ROCK_FACE_U + ROCKS_OFF_U), rk.y + rk.ty * (ROCK_FACE_U + ROCKS_OFF_U), 0, rk.tx, rk.ty)]
-  return { ports, wall, bank, rocks }
+  return { ports, wall, bank, rocks, bridge: [at(b.x, b.y, 0, 0, 0)] }
 }

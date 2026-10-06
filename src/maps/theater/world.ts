@@ -14,6 +14,7 @@ import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { leaderPoint } from '../../ecs/utils/team'
 import { clearM, passCost, phases, probeZ, topOf } from '../../ecs/utils/pass'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
 import { BASIN_CELL_U, clockAt, hoisted, lifted, makeStage, actOf, slabOf, slabSd, slid, standing, trapsOf, turnLen } from './model'
@@ -215,6 +216,7 @@ function hoist(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
   const c = s.clock
   if (c.phase === 'change' && s.hoistAct !== c.act) {
     s.hoistAct = c.act
+    mapEvent(sim, 'act')
     for (const m of sim.characters) {
       if (!Alive.v[m] || inTransit(m)) continue
       if (displace(sim, m, { kind: 'transit', x: Transform.x[m]!, y: Transform.y[m]!, ms: turnLen(cfg) * 2, look: 'hoist', color: 0 }, { self: false, free: true })) s.hung.add(m)

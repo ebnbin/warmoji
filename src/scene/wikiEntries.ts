@@ -27,6 +27,7 @@ const DRIVE_LABEL: Record<EnemyDef['drive']['kind'], string> = {
   coinThief: '偷金币',
   standoff: '定距吐弹',
   orbit: '护巢环绕',
+  march: '朝某处行进',
 }
 
 const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {

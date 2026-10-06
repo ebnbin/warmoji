@@ -13,6 +13,7 @@ import { hazardSource } from '../../ecs/utils/source'
 import { leaderPoint } from '../../ecs/utils/team'
 import { passCost, phases, probeZ } from '../../ecs/utils/pass'
 import { bounded } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { alongWall, awayFromWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
@@ -286,8 +287,16 @@ export const deep: WorldHooks = {
     const s = deepOf(sim)
     return roomFor(s.plan.basin, x, y, radius) && (!grounded(s.sub) || hullGap(s.hull, s.sub, x, y) >= radius + 0.2 * UNIT)
   },
+  /** 出怪口的地标之外再给关卡一处潜艇门口：停着时是门口，开走时是新落点的门口 */
   landmarks(sim) {
-    return deepOf(sim).plan.marks
+    const s = deepOf(sim)
+    const door = doorMid(s.hull, cfgOf(sim).sub, subTarget(s.sub))
+    return { ...s.plan.marks, door: [{ x: door.x, y: door.y, r: 0, nx: 0, ny: 0 }] }
+  },
+  /** 关卡要潜艇开走：停着时立刻起预兆，已经在走的照旧 */
+  cue(sim, c) {
+    const s = deepOf(sim)
+    if (c === 'depart' && s.sub.phase === 'down') s.sub.next = sim.elapsedMs
   },
   onStart(sim) {
     deepOf(sim)
@@ -305,7 +314,11 @@ export const deep: WorldHooks = {
       () => c.intervalMs + (sim.rng.next() * 2 - 1) * c.jitterMs,
     )
     if (s.sub.phase !== s.seen) {
-      if (s.sub.phase === 'rise' || (s.sub.phase === 'down' && s.seen === 'settle')) stir(sim, s)
+      const departed = s.sub.phase === 'rise'
+      const docked = s.sub.phase === 'down' && s.seen === 'settle'
+      if (departed) mapEvent(sim, 'depart')
+      if (docked) mapEvent(sim, 'dock')
+      if (departed || docked) stir(sim, s)
       s.seen = s.sub.phase
     }
     drown(sim, s, cfg)

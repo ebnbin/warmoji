@@ -52,6 +52,8 @@ import { roomFrame, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
+import { SIGNALS } from '../src/data/signals.ts'
+import type { MapSignals } from '../src/data/signals.ts'
 import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
@@ -810,6 +812,21 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 const PACK = new Set(readFileSync('scripts/emoji/ordering.txt', 'utf8').split(/\s+/))
+
+/** 地图信号：同一个名字在哪种地图上说法都一样，关卡的说明按名字找说法 */
+{
+  const said = new Map<string, string>()
+  for (const s of Object.values<MapSignals>(SIGNALS)) {
+    for (const field of ['events', 'gauges', 'cues', 'marks'] as const) {
+      for (const [name, label] of Object.entries(s[field] ?? {})) {
+        const key = `${field}.${name}`
+        const was = said.get(key)
+        need(was === undefined || was === label, `signals 的 ${key} 在不同地图上说法不一样：${was} / ${label}`)
+        said.set(key, label)
+      }
+    }
+  }
+}
 
 const CHECKS = runChecks({
   enemies: ENEMIES,

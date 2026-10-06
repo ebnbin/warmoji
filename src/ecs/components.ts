@@ -632,6 +632,9 @@ export const Standoff = { detectRange: f32(), standoffDist: f32() }
 /** 环绕 Nest 里的身体：spin 为 0 时全速绕行；aggro 为 0 时看见目标就扑，否则目标须在锚点 aggro 内；seek 是自己的索敌距离；fresh 优先扑还没中毒的 */
 export const Orbit = { radius: f32(), spin: f32(), aggro: f32(), seek: f32(), fresh: u8() }
 
+/** 行进：朝这张图 marchMark 那一组地标里最近的一处走，不理会队伍 */
+export const March = {}
+
 /** 接触载荷：碰到敌方身体就打一下；vanish 的身体打中即消散 */
 export const Contact = { damage: f32(), knockback: f32(), vanish: u8() }
 

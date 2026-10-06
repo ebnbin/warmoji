@@ -11,6 +11,7 @@ import { solidOf, solidsTrace, wallsOf } from '../../ecs/worlds/solids'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
+import type { Landmark } from '../landmark'
 import { colonyAt, dropLysin, makeColony, petriPlan, stepColony } from './model'
 import type { ColonyField, PetriPlan } from './model'
 import type { Solids } from '../../ecs/worlds/solids'
@@ -23,13 +24,46 @@ import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 const PLAN_SEED = 0x9e7a1d
 const FIELD_SEED = 0x51c0b7
 
-/** 培养皿此刻：按种子定下的皿与接种，玻璃壁（挡弹体与视线的实心），菌落场与它变过几次；积分攒下的时间 */
+/** 培养皿此刻：按种子定下的皿与接种，玻璃壁（挡弹体与视线的实心），给关卡的地标，菌落场与它变过几次；积分攒下的时间；菌落盖住了琼脂面的几成、是按哪一次的菌落场算的 */
 export interface PetriState {
   readonly plan: PetriPlan
   readonly solids: Solids
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly field: ColonyField
   version: number
   stepAcc: number
+  cover: number
+  coverAt: number
+}
+
+/** 分区的中心离皿心是半径的几成 */
+const SECTOR_AT = 0.55
+
+/** 给关卡的地标：sector 是按区号 1 到 4 排的四个分区的中心 */
+function petriMarks(plan: PetriPlan): Record<string, Landmark[]> {
+  const sector = [...plan.quadrants]
+    .sort((a, b) => a.label - b.label)
+    .map((q): Landmark => {
+      const a = (q.a0 + q.a1) / 2
+      return { x: (plan.cx + Math.cos(a) * plan.radius * SECTOR_AT) * UNIT, y: (plan.cy + Math.sin(a) * plan.radius * SECTOR_AT) * UNIT, r: 0, nx: 0, ny: 0 }
+    })
+  return { sector }
+}
+
+/** 菌落盖住了琼脂面的几成：菌落场变了才重数 */
+function coverOf(s: PetriState, edge: number): number {
+  if (s.coverAt === s.version) return s.cover
+  const f = s.field
+  let all = 0
+  let grown = 0
+  for (let i = 0; i < f.u.length; i++) {
+    if (!f.inside[i]) continue
+    all++
+    if (f.u[i]! >= edge) grown++
+  }
+  s.cover = all > 0 ? grown / all : 0
+  s.coverAt = s.version
+  return s.cover
 }
 
 function cfgOf(sim: Sim): PetriConfig {
@@ -49,9 +83,12 @@ export function petriOf(sim: Sim): PetriState {
     s = {
       plan,
       solids: wallsOf(plan.basin, 'glass'),
+      marks: petriMarks(plan),
       field: makeColony(plan, cfg, (sim.run.decorSeed ^ FIELD_SEED) >>> 0),
       version: 0,
       stepAcc: 0,
+      cover: 0,
+      coverAt: -1,
     }
     sim.worldState.petri = s
   }
@@ -165,6 +202,12 @@ export const petri: WorldHooks = {
   },
   covers(sim, x, y) {
     return inColony(sim, x, y)
+  },
+  landmarks(sim) {
+    return petriOf(sim).marks
+  },
+  gauge(sim, g) {
+    return g === 'colony' ? coverOf(petriOf(sim), cfgOf(sim).edge) : 0
   },
   onStart(sim) {
     petriOf(sim)

@@ -10,6 +10,7 @@ import {
   Drive,
   Flee,
   GrantCoins,
+  March,
   Nest,
   Orbit,
   Phys,
@@ -23,6 +24,7 @@ import {
   Transform,
 } from '../components'
 import { freshFoe, nearestFoe, wanderDir } from './shared/steer'
+import { marchMark } from '../store'
 import { moveSpeed } from '../utils/stats'
 import { leaderPoint } from '../utils/team'
 import type { Sim } from '../sim'
@@ -226,6 +228,35 @@ function coinThief(sim: Sim): void {
   }
 }
 
+/** 朝那一组地标里离自己最近的一处走，按地图的走法绕开障碍；那一组此刻没有就慢速游荡 */
+function march(sim: Sim): void {
+  const marchers = query(sim.world, [March, Ctl, Transform, Phys, Stats])
+  if (marchers.length === 0) return
+  const marks = sim.hooks.landmarks(sim)
+  for (const eid of marchers) {
+    if (!Ctl.move[eid]) continue
+    const sp = moveSpeed(eid)
+    const ex = Transform.x[eid]!
+    const ey = Transform.y[eid]!
+    let target: { x: number; y: number } | null = null
+    let bestD = Infinity
+    for (const m of marks[marchMark[eid]!] ?? []) {
+      const w = sim.hooks.worldDelta(sim, ex, ey, m.x, m.y)
+      const d = w.x * w.x + w.y * w.y
+      if (d < bestD) {
+        bestD = d
+        target = { x: ex + w.x, y: ey + w.y }
+      }
+    }
+    if (!target) {
+      stroll(sim, eid, sp * AI.idleSpeedMul.chase)
+      continue
+    }
+    const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
+    drive(eid, dir.x, dir.y, sp)
+  }
+}
+
 /** 驱动：每种走法把期望速度写进 Drive，积分交给 moveBodies；Ctl.move 为 0 的身体这一帧不自己走 */
 export function steerBodies(sim: Sim): void {
   chase(sim)
@@ -234,4 +265,5 @@ export function steerBodies(sim: Sim): void {
   standoff(sim)
   orbit(sim)
   coinThief(sim)
+  march(sim)
 }

@@ -242,6 +242,16 @@ export const nebula: WorldHooks = {
       horizon: [{ x: L.hx + away.x * clear, y: L.hy + away.y * clear, r: 0, nx: away.x, ny: away.y }],
     }
   },
+  /** 黑洞从开局的质量长到上限走了几成 */
+  gauge(sim, g) {
+    const h = nebulaCfg(sim).hole
+    return g === 'mass' ? Math.min(1, Math.max(0, (nebulaOf(sim).gm - h.gm) / (h.maxGm - h.gm))) : 0
+  },
+  /** 关卡要一颗流星：空中没有流星就立刻在内壁上起预兆，有就照旧 */
+  cue(sim, c) {
+    const s = nebulaOf(sim)
+    if (c === 'meteor' && !s.meteor) s.meteorAt = sim.elapsedMs
+  },
   onStart(sim) {
     nebulaOf(sim)
   },

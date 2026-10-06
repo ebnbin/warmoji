@@ -3,7 +3,7 @@ import type { Span } from './obstacles'
 import type { StatBase, StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
 
-/** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
+/** 驱动：身体没事时怎么走，march 是朝这张图那一组地标里最近的一处行进，不理会队伍；蓄力突刺、自爆这类"动作"是能力，不在这里 */
 export type DriveDef =
   | { readonly kind: 'chase'; readonly at?: 'leader' }
   | { readonly kind: 'wander' }
@@ -12,6 +12,7 @@ export type DriveDef =
   | { readonly kind: 'coinThief' }
   | { readonly kind: 'standoff'; readonly detectRange: number; readonly standoffDist: number }
   | { readonly kind: 'orbit'; readonly radius: number; readonly aggroRange: number }
+  | { readonly kind: 'march'; readonly mark: string }
 export interface SplitEffect {
   readonly kind: 'split'
   readonly into: EnemyDef
