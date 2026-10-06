@@ -1,8 +1,8 @@
 import { cellEdge, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
-import { INK, smoothPath } from './art'
+import { mapleLeaf, smoothPath } from './art'
 import { blendSd, CHAPTERS } from './model'
-import type { Blend, Stage, ChapterKey, Act } from './model'
+import type { Blend, Stage, ChapterKey, Act, Piece, PieceKind } from './model'
 
 /** 地布与天幕上的画每格多少像素 */
 export const PAINT_PPU = 32
@@ -149,23 +149,6 @@ function band(ctx: Ctx, mid: readonly Pt[], w: number, fill: string, edge: strin
   }
 }
 
-function flower(ctx: Ctx, x: number, y: number, s: number, petal: string): void {
-  ctx.fillStyle = petal
-  for (let k = 0; k < 5; k++) {
-    ctx.beginPath()
-    ctx.arc(x + Math.cos((k / 5) * 6.28) * s, y + Math.sin((k / 5) * 6.28) * s, s * 0.75, 0, 6.28)
-    ctx.fill()
-  }
-  ctx.beginPath()
-  ctx.arc(x, y, s * 0.55, 0, 6.28)
-  ctx.fillStyle = INK.gold
-  ctx.fill()
-}
-
-function tuft(ctx: Ctx, x: number, y: number, s: number, color: string): void {
-  for (const a of [-0.5, 0, 0.5]) line(ctx, [[x, y], [x + Math.sin(a) * s, y - Math.cos(a) * s]], color, 0.05, [], false)
-}
-
 /** 随机撒 n 个点，躲开 avoid 返回真的地方 */
 function scatter(rng: Rng, n: number, w: number, h: number, each: (x: number, y: number, i: number) => void): void {
   for (let i = 0; i < n; i++) each(0.6 + rng.next() * (w - 1.2), 0.6 + rng.next() * (h - 1.2), i)
@@ -174,7 +157,19 @@ function scatter(rng: Rng, n: number, w: number, h: number, each: (x: number, y:
 type Rgba = readonly [number, number, number, number]
 /** 一幕地布上的一处离两个景的分界多远，格：第一个景那边为负 */
 type Sd = (x: number, y: number) => number
-type Painter = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd) => void
+/**
+ * 画一个景时知道的：离分界多远、分界本身、地布左上角在台上的位置（格），这一幕的布景（台上的坐标）；
+ * 冬天还有从火山脚下淌出来的几道熔岩（地布上的坐标）
+ */
+interface Env {
+  readonly sd: Sd
+  readonly blend: Blend
+  readonly ox: number
+  readonly oy: number
+  readonly pieces: readonly Piece[]
+  readonly lava: readonly (readonly Pt[])[]
+}
+type Painter = (ctx: Ctx, w: number, h: number, rng: Rng, env: Env) => void
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function smooth(e0: number, e1: number, x: number): number {
@@ -271,40 +266,6 @@ function sow(rng: Rng, n: number, w: number, h: number, keep: (x: number, y: num
   }
 }
 
-function petal(ctx: Ctx, rng: Rng, x: number, y: number, s: number): void {
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.rotate(rng.next() * 6.28)
-  ctx.beginPath()
-  ctx.ellipse(0, 0, s, s * 0.6, 0, 0, 6.28)
-  ctx.fillStyle = pick(rng, ['#f2a7bd', '#f7c6d3', '#ec8fac'])
-  ctx.fill()
-  ctx.restore()
-}
-
-/** 一片落叶：五个尖的枫叶或一片椭圆的叶 */
-function leaf(ctx: Ctx, rng: Rng, x: number, y: number, s: number, line: string): void {
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.rotate(rng.next() * 6.28)
-  ctx.beginPath()
-  if (rng.next() < 0.6) {
-    for (let k = 0; k < 10; k++) {
-      const a = (k / 10) * Math.PI * 2 - Math.PI / 2
-      const r = k % 2 === 0 ? s : s * 0.45
-      if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
-      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r)
-    }
-    ctx.closePath()
-  } else ctx.ellipse(0, 0, s, s * 0.5, 0, 0, 6.28)
-  ctx.fillStyle = pick(rng, ['#d9502e', '#e8892c', '#e9b632', '#b8332a'])
-  ctx.fill()
-  ctx.lineWidth = 0.025
-  ctx.strokeStyle = line
-  ctx.stroke()
-  ctx.restore()
-}
-
 function stone(ctx: Ctx, rng: Rng, x: number, y: number, r: number, fill: string, line: string): void {
   patch(ctx, blob(rng, x, y, r, r * 0.75, 7, 0.18), fill, { line, lw: 0.035 })
 }
@@ -342,185 +303,408 @@ function ripples(ctx: Ctx, rng: Rng, w: number, h: number, ang: number, gap: num
   }
 }
 
-/** 春的第一个景：草甸 */
-const meadow: Painter = (ctx, w, h, rng) => {
-  ctx.fillStyle = '#e0edbf'
-  ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 16; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 2 + rng.next() * 4, 1.5 + rng.next() * 3), '#a9c97e', { alpha: 0.5, shade: '#4f7a3a', cover: 0.16 })
-  scatter(rng, 26, w, h, (x, y) => {
-    ctx.fillStyle = '#7fae55'
-    for (let k = 0; k < 3; k++) {
-      ctx.beginPath()
-      ctx.arc(x + Math.cos(k * 2.09) * 0.09, y + Math.sin(k * 2.09) * 0.09, 0.08, 0, 6.28)
-      ctx.fill()
-    }
-  })
-  scatter(rng, 130, w, h, (x, y) => tuft(ctx, x, y, 0.2 + rng.next() * 0.14, rng.next() < 0.5 ? '#4f7a3a' : '#2f3a26'))
-  scatter(rng, 70, w, h, (x, y) => flower(ctx, x, y, 0.07 + rng.next() * 0.04, pick(rng, ['#ffffff', '#f6d36b', '#9fc4ec'])))
-  scatter(rng, 10, w, h, (x, y) => {
-    ctx.strokeStyle = '#8a8a7a'
-    ctx.lineWidth = 0.02
-    ctx.beginPath()
-    for (let k = 0; k < 12; k++) {
-      ctx.moveTo(x, y)
-      ctx.lineTo(x + Math.cos(k * 0.52) * 0.16, y + Math.sin(k * 0.52) * 0.16)
-    }
-    ctx.stroke()
-  })
+/** 这一幕某几种布景落在地布上的位置（地布上的坐标，格）与底边长 */
+function spots(env: Env, kinds: readonly PieceKind[]): { x: number; y: number; w: number; a: number }[] {
+  return env.pieces.filter((p) => kinds.includes(p.kind)).map((p) => ({ x: p.x - env.ox, y: p.y - env.oy, w: p.w, a: p.a }))
 }
 
-/** 春的第二个景：樱花庭院 */
-const garden: Painter = (ctx, w, h, rng, sd) => {
-  ctx.fillStyle = '#f6e6e2'
-  ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 12; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 1.6 + rng.next() * 3, 1.2 + rng.next() * 2), '#cfe0b0', { alpha: 0.6, shade: '#7fa65a', cover: 0.14 })
-  // 耙过的白沙：一块里一两块石头，沙纹一圈圈绕着石头
-  for (let i = 0; i < 4; i++) {
-    const cx = 2 + rng.next() * (w - 4)
-    const cy = 2 + rng.next() * (h - 4)
-    if (sd(cx, cy) < 3) continue
-    const outline = blob(rng, cx, cy, 2.4 + rng.next(), 1.6 + rng.next() * 0.8, 9, 0.12)
-    patch(ctx, outline, '#efe9de', { line: '#9b8f80', lw: 0.04 })
-    ctx.save()
+/** 灯从左上方照下来：朝着灯的方向 */
+const TO_LIGHT: Pt = [-0.6, -0.8]
+
+/** 一片野花：一种花占大头，掺几朵别的 */
+const WILDFLOWERS: readonly (readonly [string, string])[] = [
+  ['#fffff6', '#ffd448'],
+  ['#ffdf40', '#efba36'],
+  ['#968ad6', '#7062b6'],
+  ['#e4a8c0', '#f4d6e2'],
+  ['#d6568a', '#f0a0be'],
+]
+
+function wildflower(ctx: Ctx, x: number, y: number, r: number, c: readonly [string, string]): void {
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, 6.28)
+  ctx.fillStyle = c[0]
+  ctx.fill()
+  ctx.lineWidth = 0.018
+  ctx.strokeStyle = '#3a4a26'
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(x, y, r * 0.4, 0, 6.28)
+  ctx.fillStyle = c[1]
+  ctx.fill()
+}
+
+/** 草叶：被风吹得往一边斜的短道道 */
+function blades(ctx: Ctx, rng: Rng, n: number, w: number, h: number, ang: number, colors: readonly string[], keep: (x: number, y: number) => boolean = () => true): void {
+  ctx.lineWidth = 0.035
+  ctx.lineCap = 'round'
+  for (let i = 0; i < n; i++) {
+    const x = rng.next() * w
+    const y = rng.next() * h
+    if (!keep(x, y)) continue
+    const l = 0.16 + rng.next() * 0.16
+    const a = ang + (rng.next() - 0.5) * 0.5
+    ctx.strokeStyle = colors[i % colors.length]!
     ctx.beginPath()
-    smoothPath(ctx, outline)
-    ctx.clip()
-    ctx.strokeStyle = '#b9ae9e'
-    ctx.lineWidth = 0.03
-    for (let y = cy - 4; y < cy + 4; y += 0.2) {
-      ctx.beginPath()
-      ctx.moveTo(cx - 5, y)
-      ctx.lineTo(cx + 5, y)
-      ctx.stroke()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x + Math.sin(a) * l, y - Math.cos(a) * l)
+    ctx.stroke()
+  }
+}
+
+/**
+ * 春的第一个景：草甸。草色按噪声在青绿、浓绿、枯黄之间变，一片片野花各有一种花占大头；
+ * 背着樱庭的那条台边是一道陡坡上去的上一层草甸：坡顶干黄发亮，坡面朝灯的亮、背灯的暗，坡脚一道洼下去的暗影
+ */
+const meadow: Painter = (ctx, w, h, rng, env) => {
+  const seed = rng.int(0, 1 << 20)
+  field(ctx, w, h, 2, (x, y) => {
+    const lush = fbm(x * 0.18, y * 0.18, seed, 3)
+    const dry = fbm(x * 0.12 + 40, y * 0.12, seed + 1, 2)
+    const base: Rgba = [168, 206, 128, 1]
+    const c = mix(mix(base, [128, 186, 110, 1], smooth(0.45, 0.7, lush)), [214, 212, 150, 1], smooth(0.55, 0.75, dry) * 0.7)
+    return c
+  })
+  // 上一层草甸：挑一条离樱庭最远的台边
+  const sides = [
+    { nx: -1, ny: 0, dist: (x: number) => x, len: h, at: (s: number, d: number): Pt => [d, s] },
+    { nx: 1, ny: 0, dist: (x: number) => w - x, len: h, at: (s: number, d: number): Pt => [w - d, s] },
+    { nx: 0, ny: -1, dist: (_x: number, y: number) => y, len: w, at: (s: number, d: number): Pt => [s, d] },
+    { nx: 0, ny: 1, dist: (_x: number, y: number) => h - y, len: w, at: (s: number, d: number): Pt => [s, h - d] },
+  ]
+  const side = sides.reduce((a, b) => (b.nx * -env.blend.nx + b.ny * -env.blend.ny > a.nx * -env.blend.nx + a.ny * -env.blend.ny ? b : a))
+  const T = 4.6 + rng.next() * 1.4
+  const SL = 1.5
+  const ph = rng.next() * 6.28
+  const wob = (s: number): number => T + 0.9 * Math.sin(s / 3.7 + ph) + 0.4 * Math.sin(s / 1.7 + ph * 2)
+  const rim = (off: number): Pt[] => {
+    const out: Pt[] = []
+    for (let s = -0.5; s <= side.len + 0.5; s += 0.2) out.push(side.at(s, wob(s) + off))
+    return out
+  }
+  const shoulder = rim(-SL / 2)
+  const foot = rim(SL / 2)
+  const lit = -side.nx * TO_LIGHT[0] - side.ny * TO_LIGHT[1]
+  const edge0 = side.at(side.len + 0.5, -1)
+  const edge1 = side.at(-0.5, -1)
+  // 坡脚洼下去的暗影，背灯时还拖出坡的影子
+  const shade = rim(SL / 2 + (lit < 0 ? 1.4 : 0.7))
+  patch(ctx, [...foot, ...shade.reverse()], '#1f3a1e', { alpha: 0.3, shade: '#1f3a1e', cover: 0.25 })
+  // 坡顶：干一点、亮一点的草，网点压一层浅黄
+  const upper: Pt[] = [...shoulder, edge0, edge1]
+  patch(ctx, upper, '#eeeaa8', { alpha: 0.5 })
+  // 坡面：上亮下暗的一道，朝灯的偏黄、背灯的压暗，竖着一簇簇草
+  const face: Pt[] = [...shoulder, ...[...foot].reverse()]
+  const fa = side.at(side.len / 2, wob(side.len / 2) - SL / 2)
+  const fb = side.at(side.len / 2, wob(side.len / 2) + SL / 2)
+  const fg = ctx.createLinearGradient(fa[0], fa[1], fb[0], fb[1])
+  fg.addColorStop(0, lit > 0 ? '#d8e09a' : '#5a8a4a')
+  fg.addColorStop(1, lit > 0 ? '#8aae5a' : '#24462a')
+  ctx.save()
+  ctx.beginPath()
+  smoothPath(ctx, face)
+  ctx.fillStyle = fg
+  ctx.fill()
+  ctx.clip()
+  ctx.fillStyle = dots(ctx, '#1f3a1e', lit > 0 ? 0.12 : 0.35)
+  ctx.fill()
+  for (let s = 0; s < side.len; s += 0.45) {
+    const at = side.at(s + rng.next() * 0.3, wob(s) + (rng.next() - 0.3) * SL * 0.7)
+    tuft(ctx, at[0], at[1], 0.22, lit > 0 ? '#6a8a3e' : '#14301a')
+  }
+  ctx.restore()
+  line2(ctx, shoulder, '#fbf6c8', 0.16)
+  line2(ctx, shoulder, LINE.spring, 0.05)
+  line2(ctx, foot, LINE.spring, 0.04)
+  // 野花一片一片：一片里一种花占大头
+  for (let i = 0; i < 9; i++) {
+    const cx = rng.next() * w
+    const cy = rng.next() * h
+    const r = 1.4 + rng.next() * 1.6
+    const main = pick(rng, WILDFLOWERS)
+    for (let k = 0; k < 34; k++) {
+      const a = rng.next() * 6.28
+      const d = Math.sqrt(rng.next()) * r
+      wildflower(ctx, cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.8, 0.07 + rng.next() * 0.04, rng.next() < 0.72 ? main : pick(rng, WILDFLOWERS))
     }
-    const rx = cx + (rng.next() - 0.5) * 1.2
-    const ry = cy + (rng.next() - 0.5) * 0.6
-    ctx.fillStyle = '#efe9de'
-    ctx.beginPath()
-    ctx.arc(rx, ry, 0.95, 0, 6.28)
-    ctx.fill()
-    for (let r = 0.45; r < 1; r += 0.2) {
+  }
+  blades(ctx, rng, 900, w, h, 0.5, ['#5a8a3e', '#3e6a32', '#7aa452'])
+  // 松树脚下一圈褐色的针叶，几颗松果
+  for (const p of spots(env, ['pine'])) {
+    patch(ctx, blob(rng, p.x, p.y - 0.2, p.w * 0.7, p.w * 0.45, 9, 0.2), '#7a6a52', { alpha: 0.5, shade: '#3a3020', cover: 0.2 })
+    for (let k = 0; k < 4; k++) stone(ctx, rng, p.x + (rng.next() - 0.5) * p.w, p.y + (rng.next() - 0.5) * 0.6, 0.07, '#70523a', '#3a2a1a')
+  }
+  // 羊走出来的小路：一道发白的踩实的土
+  const sheep = spots(env, ['sheep', 'rail'])
+  if (sheep.length >= 2) {
+    const a = sheep[0]!
+    const b = sheep[1]!
+    band(ctx, meander(rng, [a.x, a.y + 0.3], [b.x, b.y + 0.3], 4, 0.8), 0.32, '#c8bc88', 'rgba(120,100,60,0.4)')
+  }
+}
+
+/** 一簇草：三根往上岔开的草叶 */
+function tuft(ctx: Ctx, x: number, y: number, s: number, color: string): void {
+  for (const a of [-0.5, 0, 0.5]) line(ctx, [[x, y], [x + Math.sin(a) * s, y - Math.cos(a) * s]], color, 0.045, [], false)
+}
+
+/** 一串点连成的一道线，不平滑 */
+function line2(ctx: Ctx, pts: readonly Pt[], color: string, w: number, dash: number[] = []): void {
+  line(ctx, pts, color, w, dash, false)
+}
+
+/** 一片樱花瓣：带个小缺口的椭圆 */
+function sakuraPetal(ctx: Ctx, rng: Rng, x: number, y: number, s: number): void {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(rng.next() * 6.28)
+  ctx.beginPath()
+  ctx.moveTo(s, 0)
+  ctx.quadraticCurveTo(s * 0.4, -s * 0.75, -s, 0)
+  ctx.quadraticCurveTo(s * 0.4, s * 0.75, s, 0)
+  ctx.lineTo(s * 0.7, 0)
+  ctx.closePath()
+  ctx.fillStyle = rng.next() < 0.06 ? '#cc9c98' : pick(rng, ['#fae2ea', '#f6cede', '#f0b8ce', '#e4a0ba'])
+  ctx.fill()
+  ctx.restore()
+}
+
+/**
+ * 春的第二个景：樱庭。青灰的草上落满了花瓣：树冠底下厚厚一层铺成粉色的毯子，风把别处的花瓣吹成一溜溜的堆；
+ * 寺墙脚下一片耙过的白砂，一串踏脚石
+ */
+const garden: Painter = (ctx, w, h, rng, env) => {
+  const seed = rng.int(0, 1 << 20)
+  const trees = spots(env, ['sakura'])
+  const walls = spots(env, ['temple', 'lantern'])
+  const density = (x: number, y: number): number => {
+    let d = 0.25 + 0.55 * smooth(0.5, 0.75, fbm(x / 6.5, y / 6.5, seed + 3, 2)) + 0.3 * smooth(0.6, 0.8, fbm(x / 2.2, y / 2.2, seed + 4, 2))
+    for (const t of trees) {
+      const r = Math.hypot((x - t.x) / 1.2, y - t.y + 0.4)
+      d = Math.max(d, 1 - smooth(t.w * 0.55, t.w * 1.25, r))
+    }
+    for (const t of walls) d = Math.max(d, 0.75 * (1 - smooth(0.3, 1.4, Math.hypot((x - t.x) / Math.max(1, t.w / 2), y - t.y))))
+    return Math.min(1, d)
+  }
+  field(ctx, w, h, 2, (x, y) => {
+    const g = fbm(x * 0.2, y * 0.2, seed, 2)
+    const grass = mix([150, 154, 102, 1], [124, 134, 90, 1], g)
+    const mottle = fbm(x * 0.9, y * 0.9, seed + 5, 2)
+    const t = smooth(0.32, 0.8, density(x, y) + (mottle - 0.5) * 0.25) * 0.92
+    return mix(grass, [240, 196, 212, 1], t)
+  })
+  // 寺墙前耙过的白砂：一条条平行于墙的耙纹
+  for (const t of spots(env, ['temple'])) {
+    ctx.save()
+    ctx.translate(t.x, t.y)
+    ctx.rotate(t.a)
+    const hw = t.w / 2 + 0.6
+    patch(ctx, [[-hw, 0.1], [hw, 0.1], [hw, 1.8], [-hw, 1.8]], '#ded8cc', { line: '#9b8f80', lw: 0.03 })
+    ctx.strokeStyle = '#b9ae9e'
+    ctx.lineWidth = 0.025
+    for (let y = 0.3; y < 1.75; y += 0.16) {
       ctx.beginPath()
-      ctx.arc(rx, ry, r, 0, 6.28)
+      ctx.moveTo(-hw + 0.1, y)
+      ctx.lineTo(hw - 0.1, y)
       ctx.stroke()
     }
     ctx.restore()
-    stone(ctx, rng, rx, ry, 0.38, '#a7a0b8', '#4a4458')
   }
   // 一串踏脚石
   let x = rng.next() * w
   let y = rng.next() * h
   let a = rng.next() * 6.28
   for (let k = 0; k < 14; k++) {
-    stone(ctx, rng, x, y, 0.28, '#dcd5ca', '#6f6658')
+    stone(ctx, rng, x, y, 0.28, '#d0c8bc', '#6f6658')
     a += (rng.next() - 0.5) * 0.7
     x += Math.cos(a) * 0.75
     y += Math.sin(a) * 0.75
   }
-  scatter(rng, 170, w, h, (px, py) => petal(ctx, rng, px, py, 0.09 + rng.next() * 0.04))
+  sow(rng, 1800, w, h, (px, py) => density(px, py), (px, py) => sakuraPetal(ctx, rng, px, py, 0.08 + rng.next() * 0.04))
 }
 
-/** 春的接缝：一条小溪从草地流过界线，进了院子里的小池塘；过界的地方架一座红木小桥，界线两边花瓣与草混着 */
-const brook = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd, b: Blend, ox: number, oy: number): void => {
+/**
+ * 春的接缝：一条小溪从草甸那边的台边流进来，过界的地方架一座红木桥，穿过樱庭从另一边的台边流出去；
+ * 上游从几块长青苔的大石头缝里涌进来，下游漫过一道低石槛，水面上漂着花瓣，石槛前堆了一层
+ */
+const brook: Painter = (ctx, w, h, rng, env) => {
+  const b = env.blend
   const tx = -b.ny
   const ty = b.nx
-  let pond: Pt | null = null
-  let start: Pt = [0, 0]
-  for (let t = 0; t < 24 && !pond; t++) {
-    const s = (rng.next() - 0.5) * 10
-    const d = -b.amp * Math.sin((s / b.waveU) * Math.PI * 2 + b.phase)
-    const p: Pt = [b.cx + tx * s + b.nx * d - ox, b.cy + ty * s + b.ny * d - oy]
-    const reach = 4.5 + t * 0.05
-    const q: Pt = [p[0] + b.nx * reach, p[1] + b.ny * reach]
-    if (q[0] < 3 || q[0] > w - 3 || q[1] < 2.6 || q[1] > h - 2.6) continue
+  const s0 = (rng.next() - 0.5) * 6
+  const d0 = -b.amp * Math.sin((s0 / b.waveU) * Math.PI * 2 + b.phase)
+  const cross: Pt = [b.cx + tx * s0 + b.nx * d0 - env.ox, b.cy + ty * s0 + b.ny * d0 - env.oy]
+  const out = (dir: number): Pt => {
+    const sk = (rng.next() - 0.5) * 0.8
+    const dx = b.nx * dir + tx * sk
+    const dy = b.ny * dir + ty * sk
     let u = 0
-    while (u < 40 && p[0] - b.nx * u > -1 && p[0] - b.nx * u < w + 1 && p[1] - b.ny * u > -1 && p[1] - b.ny * u < h + 1) u += 0.5
-    if (u < 3) continue
-    pond = q
-    start = [p[0] - b.nx * u, p[1] - b.ny * u]
+    while (u < 60 && cross[0] + dx * u > -0.5 && cross[0] + dx * u < w + 0.5 && cross[1] + dy * u > -0.5 && cross[1] + dy * u < h + 0.5) u += 0.25
+    return [cross[0] + dx * u, cross[1] + dy * u]
   }
-  if (pond) {
-    const P = pond
-    const mid = meander(rng, start, P, Math.max(3, Math.round(Math.hypot(P[0] - start[0], P[1] - start[1]) / 2.2)), 0.9)
-    band(ctx, mid, 0.95, '#a9d4e6', '#2d5a74', { shade: '#5b93b5' })
-    const water = blob(rng, P[0], P[1], 2.2, 1.6, 10, 0.14)
-    patch(ctx, water, '#a9d4e6', { shade: '#4d88ad', cover: 0.3, line: '#2d5a74', lw: 0.05 })
-    for (let i = 0; i < 4; i++) {
-      const lx = P[0] + (rng.next() - 0.5) * 2.6
-      const ly = P[1] + (rng.next() - 0.5) * 1.6
-      ctx.beginPath()
-      ctx.moveTo(lx, ly)
-      ctx.arc(lx, ly, 0.22, 0.4, 6.0)
-      ctx.closePath()
-      ctx.fillStyle = '#7fae55'
-      ctx.fill()
-      ctx.strokeStyle = '#2f3a26'
-      ctx.lineWidth = 0.03
-      ctx.stroke()
-    }
-    for (let i = 0; i < 3; i++) {
-      const kx = P[0] + (rng.next() - 0.5) * 2
-      const ky = P[1] + (rng.next() - 0.5) * 1
-      ctx.save()
-      ctx.translate(kx, ky)
-      ctx.rotate(rng.next() * 6.28)
-      patch(ctx, [[-0.26, 0], [-0.05, -0.1], [0.2, 0], [-0.05, 0.1]], i === 1 ? '#ffffff' : '#e8892c', { line: '#7a3a14', lw: 0.025 })
-      patch(ctx, [[-0.26, 0], [-0.38, -0.09], [-0.38, 0.09]], '#e8892c', { line: '#7a3a14', lw: 0.02 })
-      ctx.restore()
-    }
-    for (let i = 0; i < 26; i++) {
-      const q = mid[Math.floor(mid.length / 2 + rng.next() * (mid.length / 2 - 1))]!
-      petal(ctx, rng, q[0] + (rng.next() - 0.5) * 0.6, q[1] + (rng.next() - 0.5) * 0.6, 0.08)
-    }
-    for (let i = 0; i < 14; i++) petal(ctx, rng, P[0] + (rng.next() - 0.5) * 3.4, P[1] + (rng.next() - 0.5) * 2.4, 0.08)
-    // 桥架在溪水过界的地方，横跨水面
-    let best = 0
-    for (let i = 1; i < mid.length; i++) if (Math.abs(sd(mid[i]![0], mid[i]![1])) < Math.abs(sd(mid[best]![0], mid[best]![1]))) best = i
-    const q0 = mid[Math.max(0, best - 1)]!
-    const q1 = mid[Math.min(mid.length - 1, best + 1)]!
-    const cx = mid[best]![0]
-    const cy = mid[best]![1]
+  const start = out(-1)
+  const end = out(1)
+  const up = meander(rng, start, cross, Math.max(2, Math.round(Math.hypot(cross[0] - start[0], cross[1] - start[1]) / 2.4)), 0.7)
+  const down = meander(rng, cross, end, Math.max(2, Math.round(Math.hypot(end[0] - cross[0], end[1] - cross[1]) / 2.4)), 0.7)
+  const mid = [...up, ...down.slice(1)]
+  // 湿土的岸、水、水里一道深一点的流心、顺着水流的白线
+  line(ctx, mid, '#7a6a4a', 1.35)
+  band(ctx, mid, 1.1, '#76ad99', '#1f4a46', { shade: '#2a6a66' })
+  line(ctx, mid, 'rgba(15,71,82,0.35)', 0.4)
+  for (let k = 0; k < 3; k++) {
+    const off = (k - 1) * 0.28
+    const pts: Pt[] = mid.map((p, i) => {
+      const q = mid[Math.min(mid.length - 1, i + 1)]!
+      const r = mid[Math.max(0, i - 1)]!
+      const l = Math.hypot(q[0] - r[0], q[1] - r[1]) || 1
+      return [p[0] - ((q[1] - r[1]) / l) * off, p[1] + ((q[0] - r[0]) / l) * off]
+    })
+    line(ctx, pts, 'rgba(248,246,238,0.7)', 0.03, [0.3 + rng.next() * 0.3, 0.5 + rng.next() * 0.4])
+  }
+  // 上游的大石头：花岗岩，长着青苔，水从缝里冒白
+  for (let k = 0; k < 4; k++) {
+    const q = up[Math.min(up.length - 1, 1)]!
+    const sx = start[0] + (q[0] - start[0]) * 0.3 + (rng.next() - 0.5) * 1.6
+    const sy = start[1] + (q[1] - start[1]) * 0.3 + (rng.next() - 0.5) * 1.6
+    stone(ctx, rng, sx, sy, 0.4 + rng.next() * 0.25, '#a8a49a', '#4a4840')
+    ctx.beginPath()
+    ctx.arc(sx - 0.1, sy - 0.12, 0.13, 0, 6.28)
+    ctx.fillStyle = '#6c7e50'
+    ctx.fill()
+  }
+  // 下游的石槛：一排方石横着拦过水面，水漫过去冒白
+  const wi = Math.max(1, down.length - 2)
+  const wp = down[wi]!
+  const wq = down[Math.max(0, wi - 1)]!
+  const wa = Math.atan2(wp[1] - wq[1], wp[0] - wq[0]) + Math.PI / 2
+  for (let k = -3; k <= 3; k++) {
+    const cx = wp[0] + Math.cos(wa) * k * 0.28
+    const cy = wp[1] + Math.sin(wa) * k * 0.28
     ctx.save()
     ctx.translate(cx, cy)
-    ctx.rotate(Math.atan2(q1[1] - q0[1], q1[0] - q0[0]))
-    patch(ctx, [[-0.42, -0.95], [0.42, -0.95], [0.42, 0.95], [-0.42, 0.95]], '#e0b48a', { line: '#4f321d', lw: 0.04 })
-    ctx.strokeStyle = '#8a5a35'
-    ctx.lineWidth = 0.025
-    for (let v = -0.8; v < 0.9; v += 0.2) {
-      ctx.beginPath()
-      ctx.moveTo(-0.38, v)
-      ctx.lineTo(0.38, v)
-      ctx.stroke()
-    }
-    for (const s of [-0.46, 0.46]) {
-      patch(ctx, [[s - 0.07, -1.05], [s + 0.07, -1.05], [s + 0.07, 1.05], [s - 0.07, 1.05]], '#c8433a', { line: '#4f1a14', lw: 0.03 })
-      for (const v of [-1.05, 0, 1.05]) {
-        ctx.beginPath()
-        ctx.arc(s, v, 0.1, 0, 6.28)
-        ctx.fillStyle = '#c8433a'
-        ctx.fill()
-        ctx.stroke()
-      }
-    }
+    ctx.rotate(wa)
+    patch(ctx, [[-0.13, -0.16], [0.13, -0.16], [0.13, 0.16], [-0.13, 0.16]], '#a8a094', { line: '#4a4438', lw: 0.025 })
     ctx.restore()
   }
-  sow(rng, 160, w, h, (x, y) => (sd(x, y) < 0 && sd(x, y) > -4.5 ? 1 + sd(x, y) / 4.5 : 0), (x, y) => petal(ctx, rng, x, y, 0.08))
-  sow(rng, 90, w, h, (x, y) => (sd(x, y) > 0 && sd(x, y) < 3.5 ? 1 - sd(x, y) / 3.5 : 0), (x, y) => tuft(ctx, x, y, 0.2, '#4f7a3a'))
+  line(ctx, [[wp[0] + Math.cos(wa) * -0.9 + (wp[0] - wq[0]) * 0.15, wp[1] + Math.sin(wa) * -0.9 + (wp[1] - wq[1]) * 0.15], [wp[0] + Math.cos(wa) * 0.9 + (wp[0] - wq[0]) * 0.15, wp[1] + Math.sin(wa) * 0.9 + (wp[1] - wq[1]) * 0.15]], 'rgba(250,250,246,0.85)', 0.1, [0.12, 0.08], false)
+  // 水上的花瓣：过了界往下游越漂越多，石槛前堆了一层
+  for (let i = 0; i < 160; i++) {
+    const t = Math.sqrt(rng.next())
+    const k = Math.floor(up.length - 1 + t * (down.length - 1))
+    const q = mid[Math.min(mid.length - 1, k)]!
+    sakuraPetal(ctx, rng, q[0] + (rng.next() - 0.5) * 0.9, q[1] + (rng.next() - 0.5) * 0.9, 0.07)
+  }
+  for (let i = 0; i < 40; i++) sakuraPetal(ctx, rng, wq[0] + (wp[0] - wq[0]) * 0.8 + (rng.next() - 0.5) * 1.1, wq[1] + (wp[1] - wq[1]) * 0.8 + (rng.next() - 0.5) * 1.1, 0.07)
+  // 桥架在溪水过界的地方，横跨水面：拱起的木板，红漆的扶手，铜顶的望柱
+  const cx = cross[0]
+  const cy = cross[1]
+  const q0 = mid[Math.max(0, up.length - 2)]!
+  const q1 = mid[Math.min(mid.length - 1, up.length)]!
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(Math.atan2(q1[1] - q0[1], q1[0] - q0[0]))
+  ctx.fillStyle = 'rgba(31,74,70,0.4)'
+  ctx.fillRect(-0.3, -1.2, 0.9, 2.5)
+  patch(ctx, [[-0.45, -1.3], [0.45, -1.3], [0.45, 1.3], [-0.45, 1.3]], '#b08056', { line: '#4f321d', lw: 0.04 })
+  ctx.strokeStyle = '#6e4a30'
+  ctx.lineWidth = 0.025
+  for (let v = -1.2; v < 1.25; v += 0.18) {
+    ctx.beginPath()
+    ctx.moveTo(-0.42, v)
+    ctx.lineTo(0.42, v)
+    ctx.stroke()
+  }
+  for (const s of [-0.5, 0.5]) {
+    patch(ctx, [[s - 0.07, -1.4], [s + 0.07, -1.4], [s + 0.07, 1.4], [s - 0.07, 1.4]], '#c8433a', { line: '#4f1a14', lw: 0.03 })
+    for (const v of [-1.4, 0, 1.4]) {
+      ctx.beginPath()
+      ctx.arc(s, v, 0.11, 0, 6.28)
+      ctx.fillStyle = v === 0 ? '#c8433a' : '#d2a85a'
+      ctx.fill()
+      ctx.strokeStyle = '#4f1a14'
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
+  // 界线两边草与花瓣混着
+  const sd = env.sd
+  sow(rng, 260, w, h, (px, py) => (sd(px, py) < 0 && sd(px, py) > -4.5 ? 1 + sd(px, py) / 4.5 : 0), (px, py) => sakuraPetal(ctx, rng, px, py, 0.08))
 }
 
-/** 夏的第一个景：沙漠 */
+/**
+ * 夏的第一个景：沙漠。金黄的沙，丘间实一点的沙偏红；沙丘一个个月牙，迎风的一面亮，背风的一面压一片琥珀色的影，
+ * 横着风一道道细细的沙纹；半埋着一副骆驼骨，一块风蚀的砂岩
+ */
 const desert: Painter = (ctx, w, h, rng) => {
-  ctx.fillStyle = '#f1d79c'
-  ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 9; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 3 + rng.next() * 4, 1.4 + rng.next() * 1.6, 7, 0.25), '#e6c27a', { alpha: 0.7, shade: '#c99a50', cover: 0.2 })
-  const ang = rng.next() * 6.28
-  ripples(ctx, rng, w, h, ang, 0.55, '#cfa45a', 0.05, () => true)
-  scatter(rng, 40, w, h, (x, y) => stone(ctx, rng, x, y, 0.08 + rng.next() * 0.07, '#c8a879', '#6f5530'))
-  scatter(rng, 14, w, h, (x, y) => tuft(ctx, x, y, 0.22, '#9a7a3a'))
+  const seed = rng.int(0, 1 << 20)
+  field(ctx, w, h, 2, (x, y) => {
+    const t = fbm(x * 0.15, y * 0.15, seed, 2)
+    return mix([250, 199, 145, 1], [237, 179, 128, 1], smooth(0.4, 0.7, t))
+  })
+  const wind = rng.next() * 6.28
+  // 月牙沙丘：亮的一面朝着风来的方向，背风一面一道琥珀色的影
+  for (let i = 0; i < 6; i++) {
+    const cx = 1.5 + rng.next() * (w - 3)
+    const cy = 1.5 + rng.next() * (h - 3)
+    const r = 1.4 + rng.next() * 1.2
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate(wind)
+    patch(ctx, blob(rng, -r * 0.2, 0, r * 1.1, r * 0.8, 9, 0.1), '#ffdbad', { alpha: 0.8 })
+    ctx.beginPath()
+    ctx.moveTo(0, -r)
+    ctx.quadraticCurveTo(r * 0.75, 0, 0, r)
+    ctx.quadraticCurveTo(r * 0.35, 0, 0, -r)
+    ctx.fillStyle = 'rgba(160,110,70,0.55)'
+    ctx.fill()
+    ctx.lineWidth = 0.04
+    ctx.strokeStyle = LINE.summer
+    ctx.beginPath()
+    ctx.moveTo(0, -r)
+    ctx.quadraticCurveTo(r * 0.35, 0, 0, r)
+    ctx.stroke()
+    ctx.restore()
+  }
+  ripples(ctx, rng, w, h, wind + Math.PI / 2, 0.5, 'rgba(128,97,77,0.45)', 0.04, () => true)
+  // 骆驼骨：一根弯弯的脊梁，一个头骨，几对肋骨
+  const bx = 2 + rng.next() * (w - 4)
+  const by = 2 + rng.next() * (h - 4)
+  ctx.save()
+  ctx.translate(bx, by)
+  ctx.rotate(rng.next() * 6.28)
+  line(ctx, [[-1, 0], [-0.3, 0.1], [0.4, 0.05], [1, -0.05]], '#ede6d1', 0.1)
+  for (let k = 0; k < 5; k++) {
+    const x = -0.6 + k * 0.28
+    for (const s of [-1, 1]) line(ctx, [[x, 0.03], [x + 0.08, s * 0.32], [x + 0.02, s * 0.5]], '#ede6d1', 0.06)
+  }
+  patch(ctx, [[1, -0.2], [1.5, -0.12], [1.55, 0.08], [1, 0.16]], '#ede6d1', { line: '#6a5a40', lw: 0.025 })
+  for (const s of [-0.06, 0.08]) {
+    ctx.beginPath()
+    ctx.arc(1.2, s, 0.04, 0, 6.28)
+    ctx.fillStyle = '#4a3420'
+    ctx.fill()
+  }
+  ctx.restore()
+  // 风蚀的砂岩：顺风拉长，一头钝一头尖，一层层红白相间
+  const rx = 2 + rng.next() * (w - 4)
+  const ry = 2 + rng.next() * (h - 4)
+  ctx.save()
+  ctx.translate(rx, ry)
+  ctx.rotate(wind)
+  const slab: Pt[] = [[-0.9, -0.4], [0.2, -0.45], [1.2, 0], [0.2, 0.42], [-0.9, 0.38], [-1.05, 0]]
+  patch(ctx, slab, '#b8734f', { line: LINE.summer, lw: 0.04 })
+  ctx.save()
+  ctx.beginPath()
+  smoothPath(ctx, slab)
+  ctx.clip()
+  for (let k = -3; k <= 3; k++) line(ctx, [[-1.2, k * 0.14], [1.3, k * 0.14 + 0.04]], k % 2 ? '#dbab80' : '#a0603e', 0.06, [], false)
+  ctx.restore()
+  ctx.restore()
+  scatter(rng, 30, w, h, (x, y) => stone(ctx, rng, x, y, 0.07 + rng.next() * 0.06, '#9e8c78', '#664f40'))
 }
 
 /** 夏的第二个景：海，越往外越深，按深浅分成一圈圈色带 */
-const sea: Painter = (ctx, w, h, rng, sd) => {
+const sea: Painter = (ctx, w, h, rng, { sd }) => {
   const BANDS: readonly Rgba[] = [
     [168, 226, 216, 1],
     [126, 204, 208, 1],
@@ -574,7 +758,7 @@ const sea: Painter = (ctx, w, h, rng, sd) => {
 }
 
 /** 夏的接缝：沙漠走到海边是一片沙滩，湿沙一条，浪花两道；滩上贝壳、海星、一把遮阳伞，一串脚印从沙漠一直走到水边 */
-const shore = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd, b: Blend, ox: number, oy: number): void => {
+const shore: Painter = (ctx, w, h, rng, { sd, blend: b, ox, oy }) => {
   const seed = rng.int(0, 1 << 20)
   field(ctx, w, h, 2, (x, y) => {
     const d = sd(x, y)
@@ -671,259 +855,635 @@ const shore = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd, b: Blend, ox: n
   }
 }
 
-/** 秋的第一个景：溶洞的地面（圈里） */
-const cavern: Painter = (ctx, w, h, rng) => {
-  ctx.fillStyle = '#b4adbf'
-  ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 14; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 1.5 + rng.next() * 3, 1.2 + rng.next() * 2, 8, 0.3), '#948ca3', { alpha: 0.65, shade: '#5f5872', cover: 0.22 })
-  scatter(rng, 7, w, h, (x, y) => {
-    const pool = blob(rng, x, y, 0.8 + rng.next() * 0.8, 0.5 + rng.next() * 0.4, 8, 0.2)
-    patch(ctx, pool, '#8fbfcf', { shade: '#4d7d9a', cover: 0.25, line: '#3a3450', lw: 0.04 })
-    line(ctx, [[x - 0.3, y - 0.1], [x + 0.1, y - 0.1]], '#ffffff', 0.05, [], false)
-  })
-  // 石笋从上面看：一圈套一圈
-  scatter(rng, 18, w, h, (x, y) => {
-    const r = 0.18 + rng.next() * 0.2
-    for (const [k, c] of [[1, '#a39bb2'], [0.6, '#c3bccf'], [0.25, '#ddd8e4']] as const) {
-      ctx.beginPath()
-      ctx.arc(x, y, r * k, 0, 6.28)
-      ctx.fillStyle = c
-      ctx.fill()
-      ctx.strokeStyle = '#3a3450'
-      ctx.lineWidth = 0.025
-      ctx.stroke()
-    }
-  })
-  scatter(rng, 9, w, h, (x, y) => {
-    for (let k = 0; k < 4; k++) {
-      const a = rng.next() * 6.28
-      const l = 0.18 + rng.next() * 0.16
-      ctx.save()
-      ctx.translate(x + Math.cos(a) * 0.12, y + Math.sin(a) * 0.12)
-      ctx.rotate(a)
-      patch(ctx, [[0, -0.06], [l, 0], [0, 0.06], [-0.04, 0]], pick(rng, ['#9ad7e0', '#c8a6e8', '#b8e8d8']), { line: '#3a3450', lw: 0.025 })
-      ctx.restore()
-    }
-  })
-  scatter(rng, 50, w, h, (x, y) => {
-    ctx.beginPath()
-    ctx.arc(x, y, 0.035, 0, 6.28)
-    ctx.fillStyle = '#ecf6c8'
-    ctx.fill()
-  })
+
+/** 离分界越来越远的方向（地布上的单位向量）：圈里往圈外，线的一边往另一边 */
+function outward(sd: Sd, x: number, y: number): Pt {
+  const e = 0.05
+  const gx = sd(x + e, y) - sd(x - e, y)
+  const gy = sd(x, y + e) - sd(x, y - e)
+  const l = Math.hypot(gx, gy) || 1
+  return [gx / l, gy / l]
 }
 
-/** 秋的第二个景：落满红叶的旧城址 */
-const ruins: Painter = (ctx, w, h, rng) => {
-  ctx.fillStyle = '#f2dcb0'
-  ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 12; i++) patch(ctx, blob(rng, rng.next() * w, rng.next() * h, 2 + rng.next() * 3.5, 1.4 + rng.next() * 2.4), '#d9c48a', { alpha: 0.6, shade: '#a8833a', cover: 0.16 })
-  // 旧院子的石板地：一块块不规则的方石，缺了几块
-  for (let i = 0; i < 3; i++) {
-    const cx = 3 + rng.next() * (w - 6)
-    const cy = 3 + rng.next() * (h - 6)
-    const out = blob(rng, cx, cy, 2.4 + rng.next() * 1.4, 1.8 + rng.next() * 1, 9, 0.22)
+/** 从上往下看的一根晶体：根部近白、往尖上越来越紫的长菱形，中间一道亮棱，ang 朝尖 */
+function prism(ctx: Ctx, x: number, y: number, len: number, wid: number, ang: number, deep: number): void {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(ang)
+  const g = ctx.createLinearGradient(0, 0, len, 0)
+  g.addColorStop(0, '#e2d4f4')
+  g.addColorStop(1, `rgb(${Math.round(226 - 108 * deep)},${Math.round(212 - 158 * deep)},${Math.round(244 - 40 * deep)})`)
+  ctx.beginPath()
+  ctx.moveTo(0, -wid / 2)
+  ctx.lineTo(len * 0.72, -wid / 2)
+  ctx.lineTo(len, 0)
+  ctx.lineTo(len * 0.72, wid / 2)
+  ctx.lineTo(0, wid / 2)
+  ctx.closePath()
+  ctx.fillStyle = g
+  ctx.fill()
+  ctx.lineWidth = 0.025
+  ctx.strokeStyle = '#2a1238'
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(0.04, -wid * 0.08)
+  ctx.lineTo(len * 0.95, -wid * 0.04)
+  ctx.lineWidth = 0.025
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** 一点闪光：四个尖的小星 */
+function glint(ctx: Ctx, x: number, y: number, s: number, color = '#ffffff'): void {
+  ctx.beginPath()
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2
+    const r = k % 2 === 0 ? s : s * 0.22
+    if (k === 0) ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r)
+    else ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r)
+  }
+  ctx.closePath()
+  ctx.fillStyle = color
+  ctx.fill()
+}
+
+/**
+ * 秋的第一个景：紫水晶洞的洞底（圈里）。紫色的晶砂，一块块深色的斑，一片片细小的晶皮；地上半埋着几个小晶洞，一圈玛瑙纹里朝心长着晶；
+ * 塌开的洞顶漏下一两束光，照到的地方亮白，碎晶散了一地闪着
+ */
+const geode: Painter = (ctx, w, h, rng, env) => {
+  const seed = rng.int(0, 1 << 20)
+  field(ctx, w, h, 2, (x, y) => {
+    const n = fbm(x * 0.3, y * 0.3, seed, 3)
+    const dark = smooth(0.55, 0.7, fbm(x * 0.12, y * 0.12, seed + 2, 2))
+    const c = mix(mix([104, 60, 130, 1], [130, 76, 160, 1], n), [62, 42, 90, 1], dark * 0.8)
+    return c
+  })
+  // 晶皮：一小片密密的小尖
+  for (let i = 0; i < 10; i++) {
+    const cx = rng.next() * w
+    const cy = rng.next() * h
+    if (env.sd(cx, cy) > -0.8) continue
+    for (let k = 0; k < 24; k++) {
+      const a = rng.next() * 6.28
+      const d = Math.sqrt(rng.next()) * 0.8
+      prism(ctx, cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.12 + rng.next() * 0.08, 0.06, rng.next() * 6.28, 0.6 + rng.next() * 0.4)
+    }
+  }
+  // 半埋的小晶洞
+  for (let i = 0; i < 5; i++) {
+    const cx = 1 + rng.next() * (w - 2)
+    const cy = 1 + rng.next() * (h - 2)
+    if (env.sd(cx, cy) > -1.4) continue
+    const r = 0.5 + rng.next() * 0.25
+    ctx.beginPath()
+    ctx.arc(cx, cy + 0.04, r + 0.1, 0, 6.28)
+    ctx.fillStyle = 'rgba(30,14,44,0.55)'
+    ctx.fill()
+    for (const [k, c] of [[1, '#5a4868'], [0.86, '#ded6ec'], [0.74, '#9684ba'], [0.64, '#c4bade']] as const) {
+      ctx.beginPath()
+      ctx.arc(cx, cy, r * k, 0, 6.28)
+      ctx.fillStyle = c
+      ctx.fill()
+    }
+    ctx.beginPath()
+    ctx.arc(cx, cy, r * 0.56, 0, 6.28)
+    ctx.fillStyle = '#221034'
+    ctx.fill()
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * 6.28 + rng.next() * 0.2
+      prism(ctx, cx + Math.cos(a) * r * 0.58, cy + Math.sin(a) * r * 0.58, r * 0.42, r * 0.16, a + Math.PI, 0.9)
+    }
+    ctx.lineWidth = 0.03
+    ctx.strokeStyle = '#1a0a26'
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, 6.28)
+    ctx.stroke()
+  }
+  // 洞顶漏下来的光：照到的地方亮，碎晶闪着
+  for (let i = 0; i < 2; i++) {
+    let cx = 0
+    let cy = 0
+    for (let t = 0; t < 30; t++) {
+      cx = 1 + rng.next() * (w - 2)
+      cy = 1 + rng.next() * (h - 2)
+      if (env.sd(cx, cy) < -2.5) break
+    }
+    const r = 1.4 + rng.next() * 0.8
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+    g.addColorStop(0, 'rgba(255,246,255,0.75)')
+    g.addColorStop(0.6, 'rgba(232,210,255,0.35)')
+    g.addColorStop(1, 'rgba(220,196,255,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, r * 1.15, r, 0, 0, 6.28)
+    ctx.fill()
+    for (let k = 0; k < 16; k++) {
+      const a = rng.next() * 6.28
+      const d = rng.next() * r
+      prism(ctx, cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.2 + rng.next() * 0.15, 0.08, rng.next() * 6.28, 0.5 + rng.next() * 0.5)
+    }
+    for (let k = 0; k < 7; k++) glint(ctx, cx + (rng.next() - 0.5) * r * 1.5, cy + (rng.next() - 0.5) * r * 1.2, 0.12 + rng.next() * 0.08)
+  }
+  scatter(rng, 140, w, h, (x, y) => {
+    ctx.beginPath()
+    ctx.arc(x, y, 0.025 + rng.next() * 0.02, 0, 6.28)
+    ctx.fillStyle = '#c4acec'
+    ctx.fill()
+  })
+  scatter(rng, 18, w, h, (x, y) => glint(ctx, x, y, 0.08, '#efe2ff'))
+  // 晶簇脚下的一圈碎晶
+  for (const p of spots(env, ['cluster', 'beam', 'druse'])) {
+    for (let k = 0; k < 10; k++) prism(ctx, p.x + (rng.next() - 0.5) * p.w * 1.2, p.y + (rng.next() - 0.3) * 0.8, 0.14 + rng.next() * 0.12, 0.06, rng.next() * 6.28, 0.8)
+  }
+}
+
+/** 秋天的落叶：朱红、橙红、深红为主，夹着几片黄的、褐的 */
+const FALL_LEAF = ['#e63c22', '#e63c22', '#f06224', '#f06224', '#d62a2e', '#d62a2e', '#f48628', '#ecac36', '#ac5c36', '#b85830'] as const
+
+/**
+ * 秋的第二个景：残垣。秋草上一处塌了的石砌院子：错缝的灰石板铺地，缺了几块，一角铺着红陶方砖，倒了的墙只剩齐地的墙基；
+ * 四下里落满了红叶：到处都铺着一层，风吹成一溜溜的堆，枫树底下、墙脚下最厚，厚的地方底下一层烂成了褐红；墙脚爬着红地锦
+ */
+const ruins: Painter = (ctx, w, h, rng, env) => {
+  const seed = rng.int(0, 1 << 20)
+  field(ctx, w, h, 2, (x, y) => {
+    const n = fbm(x * 0.2, y * 0.2, seed, 2)
+    return mix(mix([128, 112, 66, 1], [96, 108, 54, 1], smooth(0.5, 0.75, n)), [150, 128, 78, 1], smooth(0.5, 0.25, n))
+  })
+  // 院子：转一个角的网格上铺几间屋的地面
+  const rot = (rng.next() < 0.5 ? 1 : -1) * (0.14 + rng.next() * 0.28)
+  const cr = Math.cos(rot)
+  const sr = Math.sin(rot)
+  const ox = w / 2
+  const oy = h / 2
+  const rooms: { x: number; y: number; w: number; h: number; tile: boolean }[] = []
+  for (let i = 0; i < 4; i++) rooms.push({ x: (rng.next() - 0.5) * w * 0.8, y: (rng.next() - 0.5) * h * 0.8, w: 3 + rng.next() * 3, h: 2.6 + rng.next() * 2.6, tile: i === 3 })
+  ctx.save()
+  ctx.translate(ox, oy)
+  ctx.rotate(rot)
+  for (const r of rooms) {
     ctx.save()
     ctx.beginPath()
-    smoothPath(ctx, out)
+    ctx.rect(r.x, r.y, r.w, r.h)
     ctx.clip()
-    for (let y = cy - 4; y < cy + 4; y += 0.6) {
-      const off = (Math.round(y / 0.6) % 2) * 0.35
-      for (let x = cx - 5 + off; x < cx + 5; x += 0.72) {
-        if (rng.next() < 0.15) continue
+    const sw = r.tile ? 0.5 : 0.85
+    const sh = r.tile ? 0.5 : 0.62
+    for (let y = r.y; y < r.y + r.h; y += sh) {
+      const off = r.tile ? 0 : (Math.round(y / sh) % 2) * sw * 0.5
+      for (let x = r.x - off; x < r.x + r.w; x += sw) {
+        if (rng.next() < 0.14) continue
         ctx.beginPath()
-        ctx.roundRect(x + 0.04, y + 0.04, 0.64, 0.52, 0.08)
-        ctx.fillStyle = pick(rng, ['#e3d6c0', '#d8cab0', '#ebe0cc'])
+        ctx.rect(x + 0.03, y + 0.03, sw - 0.06, sh - 0.06)
+        ctx.fillStyle = r.tile ? pick(rng, ['#86624f', '#7a5a4a', '#926a56', '#725446']) : pick(rng, ['#9ea0a0', '#929698', '#a8aaa8', '#8a8e92'])
         ctx.fill()
-        ctx.strokeStyle = '#8a7a62'
+        ctx.strokeStyle = '#5a6036'
         ctx.lineWidth = 0.03
         ctx.stroke()
       }
     }
     ctx.restore()
-  }
-  // 倒掉的墙只剩墙基：一截截断开的粗线
-  for (let i = 0; i < 4; i++) {
-    const x0 = 2 + rng.next() * (w - 8)
-    const y0 = 2 + rng.next() * (h - 6)
-    const bw = 3 + rng.next() * 3
-    const bh = 2 + rng.next() * 2
-    const pts: Pt[] = [[x0, y0], [x0 + bw, y0], [x0 + bw, y0 + bh], [x0, y0 + bh], [x0, y0]]
-    for (let k = 0; k < 4; k++) {
-      const a = pts[k]!
-      const c = pts[k + 1]!
-      const t0 = rng.next() * 0.3
-      const t1 = 0.5 + rng.next() * 0.5
-      const seg: Pt[] = [[a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0], [a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1]]
-      line(ctx, seg, '#5e5040', 0.32, [], false)
-      line(ctx, seg, '#c9bba2', 0.22, [], false)
+    // 墙基：一圈齐地的石头，断断续续
+    for (const [a, b] of [[[r.x, r.y], [r.x + r.w, r.y]], [[r.x + r.w, r.y], [r.x + r.w, r.y + r.h]], [[r.x + r.w, r.y + r.h], [r.x, r.y + r.h]], [[r.x, r.y + r.h], [r.x, r.y]]] as const) {
+      const t0 = rng.next() * 0.25
+      const t1 = 0.55 + rng.next() * 0.45
+      const seg: Pt[] = [[a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0], [a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1]]
+      line(ctx, seg, '#4a4e52', 0.42, [], false)
+      line(ctx, seg, '#b4b6b8', 0.32, [0.34, 0.05], false)
     }
   }
-  scatter(rng, 90, w, h, (x, y) => tuft(ctx, x, y, 0.2, '#8a7a3a'))
-  scatter(rng, 150, w, h, (x, y) => leaf(ctx, rng, x, y, 0.1 + rng.next() * 0.06, '#3a2a20'))
-  scatter(rng, 10, w, h, (x, y) => {
-    ctx.beginPath()
-    ctx.ellipse(x, y + 0.04, 0.08, 0.1, 0, 0, 6.28)
-    ctx.fillStyle = '#b8823a'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.ellipse(x, y - 0.06, 0.1, 0.05, 0, 0, 6.28)
-    ctx.fillStyle = '#6f4528'
-    ctx.fill()
-  })
-}
-
-/** 秋的接缝：洞口一圈乱石，往洞里阴影一层层加深；红叶被风吹进洞口 */
-const cavemouth = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd, b: Blend, ox: number, oy: number): void => {
+  ctx.restore()
+  // 落叶的厚薄
+  const maples = spots(env, ['maple'])
+  const walls = spots(env, ['ruin', 'tower', 'column', 'boards'])
+  const inRoom = (x: number, y: number): boolean => {
+    const lx = (x - ox) * cr + (y - oy) * sr
+    const ly = -(x - ox) * sr + (y - oy) * cr
+    return rooms.some((r) => lx > r.x && lx < r.x + r.w && ly > r.y && ly < r.y + r.h)
+  }
+  const density = (x: number, y: number): number => {
+    let d = 0.34 + 0.5 * smooth(0.45, 0.7, fbm(x / 5, y / 5, seed + 7, 2))
+    for (const t of maples) d = Math.max(d, 1 - smooth(t.w * 0.5, t.w * 1.3, Math.hypot((x - t.x) / 1.2, y - t.y + 0.4)))
+    for (const t of walls) d = Math.max(d, 0.85 * (1 - smooth(0.2, 1.4, Math.hypot((x - t.x) / Math.max(1, t.w / 2), (y - t.y) * 1.4))))
+    return inRoom(x, y) ? d * 0.55 : d
+  }
   field(ctx, w, h, 2, (x, y) => {
-    const d = sd(x, y)
-    if (d > 0) return null
-    const k = Math.floor(smooth(0, -6, d) * 4) / 4
-    return [60, 48, 84, k * 0.32]
+    const d = density(x, y) + (fbm(x * 0.8, y * 0.8, seed + 9, 2) - 0.5) * 0.3
+    const t = smooth(0.35, 0.8, d)
+    return t > 0 ? [176, 80, 44, t * 0.9] : null
   })
-  for (const off of [-0.7, -1.6]) {
-    for (const run of contour(b, ox, oy, w, h, off)) {
+  // 墙脚的红地锦
+  for (const t of walls) {
+    for (let k = 0; k < 18; k++) {
       ctx.save()
-      ctx.beginPath()
-      smoothPath(ctx, run, false)
-      ctx.lineWidth = 0.9
-      ctx.strokeStyle = dots(ctx, '#3a3050', 0.3)
-      ctx.stroke()
+      ctx.translate(t.x + (rng.next() - 0.5) * t.w, t.y + rng.next() * 0.6)
+      ctx.rotate(rng.next() * 6.28)
+      mapleLeaf(ctx, 0.09, pick(rng, ['#b6301e', '#d24a2a', '#8e2618']), 0.015)
       ctx.restore()
     }
   }
-  along(contour(b, ox, oy, w, h, 0), 0.55, (x, y) => {
-    const r = 0.22 + rng.next() * 0.28
-    stone(ctx, rng, x + (rng.next() - 0.5) * 0.4, y + (rng.next() - 0.5) * 0.4, r, pick(rng, ['#a7a0b8', '#8c7f86', '#cbc6d6']), '#3a3050')
+  sow(rng, 3600, w, h, density, (x, y) => {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(rng.next() * 6.28)
+    mapleLeaf(ctx, 0.17 + rng.next() * 0.1, pick(rng, FALL_LEAF), 0.02)
+    ctx.restore()
   })
-  sow(rng, 140, w, h, (x, y) => {
-    const d = sd(x, y)
-    return d < -4.5 || d > 2 ? 0 : d > 0 ? 1 - d / 2 : 1 + d / 4.5
-  }, (x, y) => leaf(ctx, rng, x, y, 0.1, '#3a2a20'))
 }
 
-/** 冬的第一个景：火山脚下（圈里），玄武岩一格格裂开，岩浆从圈心那边淌过来 */
-const volcano: Painter = (ctx, w, h, rng, sd) => {
+/**
+ * 秋的接缝：晶洞的洞壁。从洞里往外：一排朝着洞心长的大晶、后面一排小的，再是一道道玛瑙纹，最外是发紫的黑玄武岩；
+ * 洞壁外红叶被风吹进来，堆在岩脚
+ */
+const geodeRim: Painter = (ctx, w, h, rng, env) => {
+  const b = env.blend
   const seed = rng.int(0, 1 << 20)
+  // 玛瑙纹与玄武岩：离洞壁越远越暗，外沿按噪声淡进残垣
+  const AGATE: readonly Rgba[] = [[160, 148, 186, 1], [134, 118, 166, 1], [150, 138, 180, 1], [122, 104, 154, 1], [140, 124, 172, 1], [154, 142, 184, 1]]
   field(ctx, w, h, 2, (x, y) => {
-    const e = cellEdge(x * 0.9, y * 0.9, seed)
-    const tone = 0.85 + (valueNoise(x * 0.4, y * 0.4, seed + 1) - 0.5) * 0.2
-    const crack = e < 0.07 ? 0.62 : 1
-    return [141 * tone * crack, 127 * tone * crack, 120 * tone * crack, 1]
+    const d = env.sd(x, y) + (valueNoise(x * 0.8, y * 0.8, seed) - 0.5) * 0.3
+    if (d < -0.25 || d > 2.4) return null
+    if (d < 0.9) {
+      const q = Math.max(0, (d + 0.1) / 1)
+      const k = Math.min(AGATE.length - 1, Math.floor(q * AGATE.length))
+      const f = q * AGATE.length - Math.floor(q * AGATE.length)
+      const c = AGATE[k]!
+      const seam = 1 - 0.3 * (1 - smooth(0.06, 0.18, f))
+      return [c[0] * seam, c[1] * seam, c[2] * seam, smooth(-0.25, -0.05, d)]
+    }
+    const pit = valueNoise(x * 4, y * 4, seed + 3) > 0.82 ? 0.6 : 1
+    const fade = 1 - smooth(1.6 + (fbm(x * 0.5, y * 0.5, seed + 1, 2) - 0.5) * 1.2, 2.4, d)
+    const t = valueNoise(x * 1.2, y * 1.2, seed + 2)
+    return [(36 + 12 * t) * pit, (26 + 8 * t) * pit, (50 + 14 * t) * pit, fade]
   })
-  scatter(rng, 70, w, h, (x, y) => {
-    ctx.beginPath()
-    ctx.arc(x, y, 0.05 + rng.next() * 0.04, 0, 6.28)
-    ctx.fillStyle = '#4d403a'
-    ctx.fill()
+  for (const run of contour(b, env.ox, env.oy, w, h, 0.95)) line(ctx, run, '#1a0e26', 0.05)
+  // 两排晶体：后面一排小的，前面一排大的，尖朝洞心
+  for (const [off, gap, len, wid] of [[-0.05, 0.22, 0.45, 0.13], [-0.25, 0.32, 0.85, 0.22]] as const) {
+    along(contour(b, env.ox, env.oy, w, h, off), gap, (x, y) => {
+      const o = outward(env.sd, x, y)
+      const a = Math.atan2(-o[1], -o[0]) + (rng.next() - 0.5) * 0.7
+      prism(ctx, x - o[0] * 0.05, y - o[1] * 0.05, len * (0.7 + rng.next() * 0.5), wid * (0.8 + rng.next() * 0.4), a, 0.7 + rng.next() * 0.3)
+    })
+  }
+  along(contour(b, env.ox, env.oy, w, h, -0.6), 1.3, (x, y) => glint(ctx, x, y, 0.1, '#f4ecff'))
+  // 岩外吹进来的红叶
+  sow(rng, 220, w, h, (x, y) => {
+    const d = env.sd(x, y)
+    return d > 1.6 && d < 3.4 ? 1 : d > -0.6 && d < 0.4 ? 0.35 : 0
+  }, (x, y) => {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(rng.next() * 6.28)
+    mapleLeaf(ctx, 0.13, pick(rng, FALL_LEAF), 0.018)
+    ctx.restore()
   })
-  // 岩浆沟：从最深处往外淌，淌到快出圈就凝住
-  let deepest: Pt = [0, 0]
-  let low = 0
-  for (let y = 0.5; y < h; y += 1) for (let x = 0.5; x < w; x += 1) if (sd(x, y) < low) [low, deepest] = [sd(x, y), [x, y]]
-  for (let i = 0; i < 4; i++) {
-    let x = deepest[0] + (rng.next() - 0.5) * 2
-    let y = deepest[1] + (rng.next() - 0.5) * 2
+}
+
+/** 冬天从火山脚下淌出来的熔岩：从火山布景的底边起，顺着离火山口越来越远的方向弯弯曲曲往外流，一直淌进海里 */
+function lavaPaths(sd: Sd, cone: { x: number; y: number; w: number; a: number } | undefined, w: number, h: number, rng: Rng): Pt[][] {
+  const out: Pt[][] = []
+  let from: Pt[]
+  if (cone) {
+    const ux = Math.cos(cone.a)
+    const uy = Math.sin(cone.a)
+    from = [-0.3, 0, 0.3].map((k): Pt => [cone.x + ux * cone.w * k, cone.y + uy * cone.w * k + 0.2])
+  } else {
+    let best: Pt = [w / 2, h / 2]
+    let low = Infinity
+    for (let y = 0.5; y < h; y += 1) for (let x = 0.5; x < w; x += 1) if (sd(x, y) < low) [low, best] = [sd(x, y), [x, y]]
+    from = [best, best, best]
+  }
+  for (const [i, f] of from.entries()) {
+    let [x, y] = f
     const pts: Pt[] = [[x, y]]
-    let a = rng.next() * 6.28
-    for (let k = 0; k < 40 && sd(x, y) < -1.6; k++) {
-      const gx = sd(x + 0.1, y) - sd(x - 0.1, y)
-      const gy = sd(x, y + 0.1) - sd(x, y - 0.1)
+    const g0 = gradOf(sd, x, y)
+    let a = Math.atan2(g0[1], g0[0]) + (i - 1) * 0.7
+    for (let k = 0; k < 90 && sd(x, y) < 1.4; k++) {
+      const [gx, gy] = gradOf(sd, x, y)
       const want = Math.atan2(gy, gx)
       const turn = Math.atan2(Math.sin(want - a), Math.cos(want - a))
-      a += Math.sign(turn) * 0.25
-      a += (rng.next() - 0.5) * 0.5
-      x += Math.cos(a) * 0.5
-      y += Math.sin(a) * 0.5
+      a += Math.sign(turn) * Math.min(Math.abs(turn), 0.18) + (rng.next() - 0.5) * 0.45
+      x += Math.cos(a) * 0.35
+      y += Math.sin(a) * 0.35
+      if (x < 0.3 || x > w - 0.3 || y < 0.3 || y > h - 0.3) break
       pts.push([x, y])
     }
-    if (pts.length < 3) continue
+    if (pts.length > 4) out.push(pts)
+  }
+  return out
+}
+
+function gradOf(sd: Sd, x: number, y: number): Pt {
+  const e = 0.05
+  return [sd(x + e, y) - sd(x - e, y), sd(x, y + e) - sd(x, y - e)]
+}
+
+/** 一道熔岩：外圈一层光，边上一圈黑壳，里面橙红，流心黄白；壳上浮着几块黑的硬皮，裂缝透着红 */
+function lavaFlow(ctx: Ctx, rng: Rng, pts: readonly Pt[], wid: number): void {
+  ctx.save()
+  ctx.globalAlpha = 0.35
+  line(ctx, pts, '#ff5c14', wid * 2.6)
+  ctx.globalAlpha = 1
+  line(ctx, pts, '#1c120f', wid * 1.15)
+  line(ctx, pts, '#9e1a0a', wid * 0.95)
+  line(ctx, pts, '#e6420d', wid * 0.72)
+  line(ctx, pts, '#ff7814', wid * 0.48)
+  line(ctx, pts, '#ffad33', wid * 0.26)
+  line(ctx, pts, '#ffe085', wid * 0.09, [0.5, 0.35])
+  ctx.restore()
+  for (let i = 2; i < pts.length - 1; i += 3) {
+    if (rng.next() < 0.4) continue
+    const p = pts[i]!
+    const q = pts[i + 1]!
+    const a = Math.atan2(q[1] - p[1], q[0] - p[0])
     ctx.save()
-    ctx.translate(0.035, 0.025)
-    line(ctx, pts, '#e85d2a', 0.55)
+    ctx.translate(p[0] + (rng.next() - 0.5) * wid * 0.4, p[1] + (rng.next() - 0.5) * wid * 0.4)
+    ctx.rotate(a)
+    patch(ctx, blob(rng, 0, 0, wid * 0.22, wid * 0.13, 6, 0.3), '#2e1a12', { line: '#e6420d', lw: 0.02 })
     ctx.restore()
-    line(ctx, pts, '#f6d36b', 0.2)
-    line(ctx, pts, 'rgba(60,30,20,0.8)', 0.04, [0.5, 0.4])
-    const end = pts[pts.length - 1]!
-    patch(ctx, blob(rng, end[0], end[1], 0.45, 0.35, 7, 0.2), '#5a4038', { line: '#2a1a14', lw: 0.03 })
   }
 }
 
-/** 冬的第二个景：冰原，积雪里露出一块块冰，冰上有裂纹；小企鹅走过留下一串脚印 */
-const tundra: Painter = (ctx, w, h, rng) => {
-  ctx.fillStyle = '#eef3f7'
-  ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 12; i++) {
+/**
+ * 冬的第一个景：雪火山脚下（圈里）。灰黑的火山灰，一格格泥裂；一大片积雪一块块盖在上面，背光处泛着淡紫蓝；
+ * 老熔岩凝成的黑玄武岩一条条，上面有绳子一样的波纹；火山脚下几道熔岩正淌下来，把雪烧开；硫气孔周围一圈黄斑
+ */
+const volcano: Painter = (ctx, w, h, rng, env) => {
+  const seed = rng.int(0, 1 << 20)
+  field(ctx, w, h, 2, (x, y) => {
+    const e = cellEdge(x * 0.7, y * 0.7, seed)
+    const tone = valueNoise(x * 0.5, y * 0.5, seed + 1)
+    const crack = e < 0.05 ? 0.82 : 1
+    const ash: Rgba = [(64 + 26 * tone) * crack, (69 + 26 * tone) * crack, (73 + 26 * tone) * crack, 1]
+    const snow = smooth(0.36, 0.44, fbm(x * 0.22, y * 0.22, seed + 2, 3) + (valueNoise(x * 1.6, y * 1.6, seed + 3) - 0.5) * 0.08)
+    const lo = smooth(0.3, 0.7, fbm(x * 0.6 + 7, y * 0.6, seed + 4, 2))
+    return mix(ash, mix([237, 241, 247, 1], [176, 190, 218, 1], lo * 0.6), snow)
+  })
+  // 老熔岩：凝住的黑玄武岩舌头，一道道绳纹
+  for (let i = 0; i < 3; i++) {
     const cx = rng.next() * w
     const cy = rng.next() * h
-    const out = blob(rng, cx, cy, 1.4 + rng.next() * 2.6, 1 + rng.next() * 1.8, 8, 0.25)
-    patch(ctx, out, '#cfe3ef', { shade: '#8fb3cc', cover: 0.16, line: '#5b7f98', lw: 0.035 })
-    let x = cx
-    let y = cy
-    const pts: Pt[] = [[x, y]]
-    for (let k = 0; k < 4; k++) {
-      x += (rng.next() - 0.5) * 1.2
-      y += (rng.next() - 0.5) * 1.2
-      pts.push([x, y])
-    }
-    line(ctx, pts, '#ffffff', 0.04, [], false)
-  }
-  scatter(rng, 50, w, h, (x, y) => {
-    ctx.strokeStyle = '#a9c4d8'
-    ctx.lineWidth = 0.025
+    if (env.sd(cx, cy) > -1.5) continue
+    const tongue = blob(rng, cx, cy, 1.4 + rng.next(), 0.8 + rng.next() * 0.5, 9, 0.28)
+    patch(ctx, tongue, '#22272b', { line: '#0e1012', lw: 0.04 })
+    ctx.save()
     ctx.beginPath()
-    for (let k = 0; k < 3; k++) {
-      const a = (k / 3) * Math.PI
-      ctx.moveTo(x - Math.cos(a) * 0.12, y - Math.sin(a) * 0.12)
-      ctx.lineTo(x + Math.cos(a) * 0.12, y + Math.sin(a) * 0.12)
+    smoothPath(ctx, tongue)
+    ctx.clip()
+    ctx.strokeStyle = '#3a4046'
+    ctx.lineWidth = 0.035
+    for (let k = -4; k <= 4; k++) {
+      ctx.beginPath()
+      ctx.arc(cx - 2.5, cy + k * 0.25, 2.4, -0.5, 0.5)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+  // 硫气孔：一圈黄斑，地上冒着汽
+  for (const p of spots(env, ['vent'])) {
+    patch(ctx, blob(rng, p.x, p.y + 0.3, p.w * 0.9, 0.8, 8, 0.25), '#c4aa3a', { alpha: 0.85, shade: '#7a6a1a', cover: 0.3 })
+  }
+  // 熔岩把一路的雪烧开，露出湿黑的地，再淌过去
+  for (const pts of env.lava) {
+    ctx.save()
+    ctx.globalAlpha = 0.7
+    line(ctx, pts, '#3a3c3e', 1.6)
+    ctx.restore()
+  }
+  for (const pts of env.lava) lavaFlow(ctx, rng, pts, 0.75)
+  scatter(rng, 70, w, h, (x, y) => {
+    ctx.beginPath()
+    ctx.arc(x, y, 0.04 + rng.next() * 0.04, 0, 6.28)
+    ctx.fillStyle = '#2a2c2e'
+    ctx.fill()
+  })
+}
+
+/** 冬天的风从哪边来：沙脊、雪纹都顺着它 */
+function windOf(rng: Rng): number {
+  return rng.next() * 6.28
+}
+
+/**
+ * 冬的第二个景：冻海与浮冰。深青黑的冷水，浪尖一道道白；离岸远处浮着一大块浮冰，边缘一道道折断的直边，
+ * 冰下一圈青绿的冰脚，断口透着青光；冰面上积雪顺着风拉成长条，没雪处是发蓝的老冰与白色的裂纹网，
+ * 几道重新冻上的裂缝是深灰的新冰，上面开着霜花；冰边水里漂着碎冰
+ */
+const floe: Painter = (ctx, w, h, rng, env) => {
+  const seed = rng.int(0, 1 << 20)
+  const wind = windOf(rng)
+  field(ctx, w, h, 2, (x, y) => {
+    const n = fbm(x * 0.2, y * 0.2, seed, 3)
+    return mix([9, 29, 36, 1], [28, 71, 82, 1], n)
+  })
+  // 浪：顺着风的一道道浪尖
+  ripples(ctx, rng, w, h, wind, 0.55, 'rgba(120,170,180,0.35)', 0.04, () => true)
+  sow(rng, 160, w, h, () => 1, (x, y) => {
+    ctx.beginPath()
+    ctx.ellipse(x, y, 0.22, 0.04, wind, 0, 6.28)
+    ctx.fillStyle = 'rgba(220,232,236,0.7)'
+    ctx.fill()
+  })
+  // 浮冰：圈外离岸 band + FLOE_GAP_U 格起，按折断的直边围出来
+  const b = env.blend
+  const poly = floeEdge(b, env.ox, env.oy, b.band + FLOE_GAP_U, rng)
+  const ice = (c: Ctx): void => {
+    c.beginPath()
+    c.rect(-2, -2, w + 4, h + 4)
+    c.moveTo(poly[0]![0], poly[0]![1])
+    for (const p of poly) c.lineTo(p[0], p[1])
+    c.closePath()
+  }
+  // 冰脚：水下一圈青绿
+  ctx.save()
+  ctx.beginPath()
+  ctx.moveTo(poly[0]![0], poly[0]![1])
+  for (const p of poly) ctx.lineTo(p[0], p[1])
+  ctx.closePath()
+  ctx.lineWidth = 0.9
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = 'rgba(31,120,128,0.7)'
+  ctx.stroke()
+  ctx.lineWidth = 0.35
+  ctx.strokeStyle = 'rgba(230,242,245,0.8)'
+  ctx.setLineDash([0.4, 0.3])
+  ctx.stroke()
+  ctx.restore()
+  ctx.save()
+  ice(ctx)
+  ctx.clip('evenodd')
+  field(ctx, w, h, 2, (x, y) => {
+    const m = fbm(x * 0.35, y * 0.35, seed + 5, 3)
+    return mix([112, 153, 171, 1], [189, 207, 217, 1], smooth(0.35, 0.65, m))
+  })
+  // 白色的裂纹网
+  ctx.strokeStyle = 'rgba(230,237,242,0.75)'
+  ctx.lineWidth = 0.025
+  for (let i = 0; i < 40; i++) {
+    let x = rng.next() * w
+    let y = rng.next() * h
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    for (let k = 0; k < 4; k++) {
+      x += (rng.next() - 0.5) * 1.4
+      y += (rng.next() - 0.5) * 1.4
+      ctx.lineTo(x, y)
     }
     ctx.stroke()
-  })
-  for (let t = 0; t < 2; t++) {
+  }
+  // 新冰：横穿浮冰的几道折线，深灰，开着霜花
+  for (let i = 0; i < 2; i++) {
+    const pts: Pt[] = []
     let x = rng.next() * w
     let y = rng.next() * h
     let a = rng.next() * 6.28
-    for (let k = 0; k < 28; k++) {
-      const side = k % 2 === 0 ? 1 : -1
-      ctx.save()
-      ctx.translate(x - Math.sin(a) * side * 0.08, y + Math.cos(a) * side * 0.08)
-      ctx.rotate(a)
-      ctx.fillStyle = 'rgba(90,120,150,0.5)'
-      ctx.beginPath()
-      ctx.moveTo(0.08, 0)
-      ctx.lineTo(-0.04, -0.06)
-      ctx.lineTo(-0.04, 0.06)
-      ctx.fill()
-      ctx.restore()
-      a += (rng.next() - 0.5) * 0.4
-      x += Math.cos(a) * 0.22
-      y += Math.sin(a) * 0.22
+    for (let k = 0; k < 7; k++) {
+      pts.push([x, y])
+      a += (rng.next() - 0.5) * 1.2
+      x += Math.cos(a) * 2.2
+      y += Math.sin(a) * 2.2
+    }
+    line(ctx, pts, '#5a7480', 0.38, [], false)
+    line(ctx, pts, 'rgba(40,58,66,0.5)', 0.03, [], false)
+    for (let k = 0; k < 18; k++) {
+      const s = pts[Math.floor(rng.next() * (pts.length - 1))]!
+      const t = pts[pts.indexOf(s) + 1]!
+      const u = rng.next()
+      const fx = s[0] + (t[0] - s[0]) * u + (rng.next() - 0.5) * 0.35
+      const fy = s[1] + (t[1] - s[1]) * u + (rng.next() - 0.5) * 0.35
+      for (let j = 0; j < 5; j++) {
+        ctx.beginPath()
+        ctx.arc(fx + Math.cos((j / 5) * 6.28) * 0.04, fy + Math.sin((j / 5) * 6.28) * 0.04, 0.03, 0, 6.28)
+        ctx.fillStyle = '#eef5fa'
+        ctx.fill()
+      }
     }
   }
+  // 积雪：顺着风拉长的一片片，盖住一半冰面，背风一侧泛淡蓝；冰边一圈没有雪
+  const cw = Math.cos(wind)
+  const sw = Math.sin(wind)
+  field(ctx, w, h, 2, (x, y) => {
+    const u = x * cw + y * sw
+    const v = -x * sw + y * cw
+    const n = fbm(u * 0.12, v * 0.38, seed + 6, 3)
+    const edge = smooth(b.band + FLOE_GAP_U + 0.4, b.band + FLOE_GAP_U + 1.8, env.sd(x, y))
+    const t = smooth(0.46, 0.52, n) * edge
+    if (t <= 0) return null
+    const lee = smooth(0.52, 0.62, fbm(u * 0.12 + 0.6, v * 0.38, seed + 6, 3))
+    return [247 - 40 * (1 - lee), 249 - 30 * (1 - lee), 252 - 10 * (1 - lee), t]
+  })
+  ripples(ctx, rng, w, h, wind, 0.3, 'rgba(200,214,232,0.5)', 0.025, (x, y) => env.sd(x, y) > b.band + FLOE_GAP_U + 1)
+  ctx.restore()
+  // 断口：一道透着青光的边，外面一溜湿冰
+  ctx.beginPath()
+  ctx.moveTo(poly[0]![0], poly[0]![1])
+  for (const p of poly) ctx.lineTo(p[0], p[1])
+  ctx.closePath()
+  ctx.lineJoin = 'miter'
+  ctx.lineWidth = 0.14
+  ctx.strokeStyle = '#6ba8c7'
+  ctx.stroke()
+  ctx.lineWidth = 0.04
+  ctx.strokeStyle = LINE.winter
+  ctx.stroke()
+  // 冰边的碎冰：一块块棱角分明的小冰片，越靠冰边越密
+  sow(rng, 260, w, h, (x, y) => {
+    const d = env.sd(x, y) - b.band - FLOE_GAP_U
+    return d < 0 && d > -2.4 ? 1 + d / 2.4 : 0
+  }, (x, y) => {
+    const r = 0.18 + rng.next() * 0.22
+    const pts: Pt[] = []
+    const n = 5 + Math.floor(rng.next() * 2)
+    const ph = rng.next() * 6.28
+    for (let k = 0; k < n; k++) {
+      const a = ph + (k / n) * 6.28
+      const rr = r * (0.7 + rng.next() * 0.5)
+      pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr])
+    }
+    ctx.beginPath()
+    ctx.moveTo(pts[0]![0], pts[0]![1])
+    for (const p of pts) ctx.lineTo(p[0], p[1])
+    ctx.closePath()
+    ctx.fillStyle = pick(rng, ['#e6f0f4', '#a8c9d6', '#80a8b3'])
+    ctx.fill()
+    ctx.lineWidth = 0.02
+    ctx.strokeStyle = '#2a4a58'
+    ctx.stroke()
+  })
 }
 
-/** 冬的接缝：岩浆碰到冰雪的地方化成一圈泥泞的融水，冒着一团团白汽 */
-const thaw = (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd, b: Blend, ox: number, oy: number): void => {
+/** 浮冰离岸多远起，格（再加上分界的渐变带） */
+const FLOE_GAP_U = 2.6
+
+/** 浮冰的边：沿着圈外 off 格那一圈，每隔两三格折一下，断口是直的，再加一点锯齿 */
+function floeEdge(b: Blend, ox: number, oy: number, off: number, rng: Rng): Pt[] {
+  const pts: Pt[] = []
+  if (b.kind === 'ring') {
+    const k = Math.max(2, Math.round((b.r * 2 * Math.PI) / b.waveU))
+    let a = -Math.PI
+    while (a < Math.PI) {
+      const r = b.r + off + b.amp * Math.sin(a * k + b.phase) + (rng.next() - 0.5) * 0.7
+      pts.push([b.cx + Math.cos(a) * r - ox, b.cy + Math.sin(a) * r - oy])
+      a += (1.8 + rng.next() * 1.4) / Math.max(1, b.r + off)
+    }
+  } else {
+    const tx = -b.ny
+    const ty = b.nx
+    for (let s = -60; s <= 60; s += 1.8 + rng.next() * 1.4) {
+      const d = off - b.amp * Math.sin((s / b.waveU) * Math.PI * 2 + b.phase) + (rng.next() - 0.5) * 0.7
+      pts.push([b.cx + tx * s + b.nx * d - ox, b.cy + ty * s + b.ny * d - oy])
+    }
+    pts.push([b.cx + b.nx * 200 - ox, b.cy + b.ny * 200 - oy])
+  }
+  // 折线每段中间加一个小锯齿
+  const out: Pt[] = []
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!
+    const q = pts[(i + 1) % pts.length]!
+    out.push(p)
+    out.push([(p[0] + q[0]) / 2 + (rng.next() - 0.5) * 0.3, (p[1] + q[1]) / 2 + (rng.next() - 0.5) * 0.3])
+  }
+  return out
+}
+
+/**
+ * 冬的接缝：火山与冻海之间一道黑玄武岩的岸，积着几块雪；熔岩淌到岸边落进海里，冒起一大团白汽，水面上一圈烫红；
+ * 岸边别处也零星冒着汽
+ */
+const steamShore: Painter = (ctx, w, h, rng, env) => {
   const seed = rng.int(0, 1 << 20)
   field(ctx, w, h, 2, (x, y) => {
-    const d = sd(x, y) + (valueNoise(x * 0.7, y * 0.7, seed) - 0.5) * 0.8
-    const a = 1 - smooth(0.3, 1.1, Math.abs(d - 0.2))
+    const d = env.sd(x, y) + (valueNoise(x * 0.9, y * 0.9, seed) - 0.5) * 0.7
+    const a = smooth(-1.05, -0.8, d) * (1 - smooth(0.55, 0.8, d))
     if (a <= 0) return null
-    return [150, 178, 192, a * 0.85]
+    const t = valueNoise(x * 2, y * 2, seed + 1)
+    const snow = smooth(0.64, 0.72, valueNoise(x * 0.8, y * 0.8, seed + 2)) * (1 - smooth(0.1, 0.3, d))
+    return mix([24 + 16 * t, 26 + 16 * t, 30 + 16 * t, a], [232, 238, 246, a], snow)
   })
-  for (const run of contour(b, ox, oy, w, h, 0.2)) line(ctx, run, '#5b7f98', 0.04, [0.3, 0.2])
-  along(contour(b, ox, oy, w, h, 0.4), 1.6, (x, y) => {
-    if (rng.next() < 0.3) return
-    const puff = (px: number, py: number, r: number): void => {
-      ctx.beginPath()
-      ctx.arc(px, py, r, 0, 6.28)
-      ctx.fillStyle = '#ffffff'
-      ctx.fill()
-      ctx.strokeStyle = '#8a9aa8'
-      ctx.lineWidth = 0.03
-      ctx.stroke()
-    }
-    for (let k = 0; k < 4; k++) puff(x + (rng.next() - 0.5) * 0.7, y + (rng.next() - 0.5) * 0.5 - k * 0.12, 0.16 + rng.next() * 0.14)
+  for (const run of contour(env.blend, env.ox, env.oy, w, h, 0.55)) line(ctx, run, 'rgba(230,240,244,0.75)', 0.06, [0.3, 0.2])
+  const puff = (px: number, py: number, r: number): void => {
+    ctx.beginPath()
+    ctx.arc(px, py, r, 0, 6.28)
+    ctx.fillStyle = '#ffffff'
+    ctx.fill()
+    ctx.strokeStyle = '#8a9aa8'
+    ctx.lineWidth = 0.03
+    ctx.stroke()
+  }
+  for (const pts of env.lava) {
+    const end = pts[pts.length - 1]!
+    lavaFlow(ctx, rng, pts.slice(Math.max(0, pts.length - 6)), 0.75)
+    const g = ctx.createRadialGradient(end[0], end[1], 0, end[0], end[1], 1.6)
+    g.addColorStop(0, 'rgba(255,120,40,0.55)')
+    g.addColorStop(1, 'rgba(255,120,40,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(end[0] - 1.6, end[1] - 1.6, 3.2, 3.2)
+    for (let k = 0; k < 9; k++) puff(end[0] + (rng.next() - 0.5) * 1.6, end[1] + (rng.next() - 0.5) * 1.2 - k * 0.1, 0.2 + rng.next() * 0.25)
+  }
+  along(contour(env.blend, env.ox, env.oy, w, h, 0.2), 2.4, (x, y) => {
+    if (rng.next() < 0.5) return
+    for (let k = 0; k < 3; k++) puff(x + (rng.next() - 0.5) * 0.6, y + (rng.next() - 0.5) * 0.4 - k * 0.12, 0.12 + rng.next() * 0.12)
   })
 }
 
@@ -934,14 +1494,14 @@ interface Season {
   readonly mask: (d: number) => number
   /** 界线上的抖动，格 */
   readonly wob: number
-  readonly seam: (ctx: Ctx, w: number, h: number, rng: Rng, sd: Sd, b: Blend, ox: number, oy: number) => void
+  readonly seam: Painter
 }
 
 const SEASONS: Record<ChapterKey, Season> = {
   spring: { a: meadow, b: garden, mask: (d) => smooth(-2.4, 2.4, d), wob: 1.4, seam: brook },
   summer: { a: desert, b: sea, mask: (d) => smooth(-0.05, 0.25, d), wob: 0, seam: shore },
-  autumn: { a: cavern, b: ruins, mask: (d) => smooth(-1.2, 1.2, d), wob: 0.8, seam: cavemouth },
-  winter: { a: volcano, b: tundra, mask: (d) => smooth(-0.8, 0.8, d), wob: 0.6, seam: thaw },
+  autumn: { a: geode, b: ruins, mask: (d) => smooth(-0.15, 0.15, d), wob: 0, seam: geodeRim },
+  winter: { a: volcano, b: floe, mask: (d) => smooth(-0.3, 0.3, d), wob: 0.3, seam: steamShore },
 }
 
 /** 地布四周画的一道双线框，四角卷一个小涡 */
@@ -966,20 +1526,19 @@ function frame(ctx: Ctx, x0: number, x1: number, h: number, color: string): void
   }
 }
 
-
 /** 天幕上一季的天色：天顶、天边，远处的山、近一点的山 */
 const SKY: Record<ChapterKey, { readonly top: string; readonly low: string; readonly far: string; readonly near: string }> = {
   spring: { top: '#9fd0ec', low: '#f8dfe6', far: '#b9d89a', near: '#86b865' },
-  summer: { top: '#4f9fdc', low: '#bfe6f2', far: '#e9c98a', near: '#5fb3c9' },
+  summer: { top: '#4f9fdc', low: '#bfe6f2', far: '#e9c98a', near: '#2f6a9a' },
   autumn: { top: '#e98a4a', low: '#f8d79a', far: '#c66a3a', near: '#8a4a2e' },
-  winter: { top: '#8aa3bf', low: '#e6eef5', far: '#c9d6e3', near: '#f4f8fb' },
+  winter: { top: '#6a83a8', low: '#dfe8f2', far: '#c9d6e3', near: '#163a48' },
 }
 
-/** 远远近近一道起伏的山脊，底下填满 */
-function ridge(ctx: Ctx, rng: Rng, w: number, base: number, amp: number, n: number, fill: string, line: string): void {
-  const pts: Pt[] = [[-1, base + 5]]
-  for (let i = 0; i <= n; i++) pts.push([(w * i) / n, base - amp * (0.4 + 0.6 * rng.next())])
-  pts.push([w + 1, base + 5])
+/** 远远近近一道起伏的山脊，底下填满；返回山脊上的点 */
+function ridge(ctx: Ctx, rng: Rng, w: number, base: number, amp: number, n: number, fill: string, line: string): Pt[] {
+  const top: Pt[] = []
+  for (let i = 0; i <= n; i++) top.push([(w * i) / n, base - amp * (0.4 + 0.6 * rng.next())])
+  const pts: Pt[] = [[-1, base + 5], ...top, [w + 1, base + 5]]
   ctx.beginPath()
   smoothPath(ctx, pts)
   ctx.fillStyle = fill
@@ -987,6 +1546,7 @@ function ridge(ctx: Ctx, rng: Rng, w: number, base: number, amp: number, n: numb
   ctx.lineWidth = 0.05
   ctx.strokeStyle = line
   ctx.stroke()
+  return top
 }
 
 function cloud(ctx: Ctx, x: number, y: number, s: number, line: string): void {
@@ -999,9 +1559,28 @@ function cloud(ctx: Ctx, x: number, y: number, s: number, line: string): void {
   ctx.stroke()
 }
 
+/** 天幕上的一棵树：一团圆圆的树冠 */
+function puffTree(ctx: Ctx, x: number, y: number, r: number, fill: string, line: string): void {
+  line2(ctx, [[x, y + r * 1.6], [x, y + r * 0.4]], '#6a4a30', r * 0.25)
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, 6.28)
+  ctx.fillStyle = fill
+  ctx.fill()
+  ctx.lineWidth = 0.04
+  ctx.strokeStyle = line
+  ctx.stroke()
+}
+
+/** 天幕上的一棵云杉：三层三角 */
+function spruce(ctx: Ctx, x: number, y: number, s: number, fill: string, line: string): void {
+  for (let k = 0; k < 3; k++) patch(ctx, [[x, y - s * (1.3 - k * 0.35)], [x + s * (0.35 + k * 0.12), y - s * (0.55 - k * 0.3)], [x - s * (0.35 + k * 0.12), y - s * (0.55 - k * 0.3)]], fill, { line, lw: 0.035 })
+}
+
 /**
- * 天幕：挂在台后的一大块画布，画着这一季的天和远处的景——春天粉蓝的天、绿山上开着樱花，夏天大太阳、一边沙丘一边海，
- * 秋天橘红的晚霞、山上的红叶与城墙，冬天灰蓝的天、雪山和远处冒烟的火山；上边一根吊杆，下边一道压脚
+ * 天幕：挂在台后的一大块画布，画着这一季的天和远处的景，上半截藏在帷幔后面，景都画在下半截——
+ * 春天绿山一边是黑压压的云杉林、一边是开满樱花的山坡和寺院的瓦顶；夏天一边沙丘一边深蓝的海；
+ * 秋天橘红的晚霞下满山红枫，山头一座塌了一半的塔楼，另一边一座黑岩山，洞口透出紫光；
+ * 冬天一座积雪的火山正冒着烟、山口发红，另一边是黑青的冻海，海上漂着冰山；上边一根吊杆，下边一道压脚
  */
 export function paintDrop(chapter: number, seed: number, w: number, h: number, canvas: HTMLCanvasElement): void {
   const ch = CHAPTERS[chapter]!
@@ -1014,89 +1593,98 @@ export function paintDrop(chapter: number, seed: number, w: number, h: number, c
   const ctx = canvas.getContext('2d')!
   ctx.setTransform(k, 0, 0, k, 0, 0)
   const rng = new Rng(seed ^ 0xd209)
-  const g = ctx.createLinearGradient(0, 0, 0, h)
+  const g = ctx.createLinearGradient(0, h * 0.3, 0, h)
   g.addColorStop(0, S.top)
-  g.addColorStop(0.75, S.low)
+  g.addColorStop(0.85, S.low)
   ctx.fillStyle = g
   ctx.fillRect(0, 0, w, h)
   ctx.fillStyle = dots(ctx, S.top, 0.12)
-  ctx.fillRect(0, 0, w, h * 0.45)
-  const sunX = w * (0.15 + 0.7 * rng.next())
-  if (key === 'summer') {
-    ctx.strokeStyle = '#f6c84a'
-    ctx.lineWidth = 0.12
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2
-      ctx.beginPath()
-      ctx.moveTo(sunX + Math.cos(a) * 1.4, h * 0.3 + Math.sin(a) * 1.4)
-      ctx.lineTo(sunX + Math.cos(a) * 2, h * 0.3 + Math.sin(a) * 2)
-      ctx.stroke()
-    }
-  }
+  ctx.fillRect(0, 0, w, h * 0.6)
+  const left = rng.next() < 0.5
+  const side = (t: number): number => (left ? t : 1 - t) * w
+  const sunX = side(0.55 + 0.3 * rng.next())
   if (key !== 'winter') {
     ctx.beginPath()
-    ctx.arc(sunX, h * 0.3, key === 'autumn' ? 1.6 : 1.1, 0, 6.28)
+    ctx.arc(sunX, h * 0.6, key === 'autumn' ? 1.3 : 0.9, 0, 6.28)
     ctx.fillStyle = key === 'autumn' ? '#f6c060' : key === 'spring' ? '#fff3c4' : '#ffd84a'
     ctx.fill()
   }
-  for (let i = 0; i < (key === 'summer' ? 3 : 5); i++) cloud(ctx, rng.next() * w, h * (0.12 + 0.3 * rng.next()), 0.6 + rng.next() * 0.6, key === 'autumn' ? '#c97a4a' : '#9ab3c8')
-  if (key === 'winter') {
-    // 雪山一排，远处一座火山冒着烟
-    const vx = rng.next() < 0.5 ? w * 0.2 : w * 0.8
-    for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) cloud(ctx, rng.next() * w, h * (0.55 + 0.12 * rng.next()), 0.5 + rng.next() * 0.4, key === 'autumn' ? '#c97a4a' : '#9ab3c8')
+  if (key === 'spring') {
+    const far = ridge(ctx, rng, w, h * 0.86, 1.8, 7, S.far, L)
+    // 一边是黑压压的云杉林
+    for (const [x, y] of far) {
+      if ((left ? x / w : 1 - x / w) > 0.45) continue
+      for (let j = 0; j < 3; j++) spruce(ctx, x + (j - 1) * 0.55 + (rng.next() - 0.5) * 0.3, y + 0.35 + rng.next() * 0.2, 0.75 + rng.next() * 0.3, '#2f5a4a', L)
+    }
+    // 一边是樱花山坡和寺院的瓦顶
+    for (let i = 0; i < 12; i++) puffTree(ctx, side(0.55 + rng.next() * 0.45), h * (0.74 + rng.next() * 0.1), 0.45 + rng.next() * 0.25, pick(rng, ['#fcdae4', '#f6b4cc', '#f2a7c3']), L)
+    const tx = side(0.72)
+    patch(ctx, [[tx - 2, h * 0.86], [tx - 1.6, h * 0.78], [tx + 1.6, h * 0.78], [tx + 2, h * 0.86]], '#6d6f78', { line: L, lw: 0.04 })
+    patch(ctx, [[tx - 1.5, h * 0.86], [tx + 1.5, h * 0.86], [tx + 1.5, h * 0.95], [tx - 1.5, h * 0.95]], '#f0e6cf', { line: L, lw: 0.04 })
+    ridge(ctx, rng, w, h * 0.98, 0.5, 8, S.near, L)
+    for (let i = 0; i < 50; i++) sakuraPetal(ctx, rng, side(0.4 + rng.next() * 0.6), h * (0.5 + rng.next() * 0.5), 0.07)
+  } else if (key === 'summer') {
+    // 一边是沙丘，一边是深蓝的海
+    ctx.fillStyle = S.near
+    ctx.fillRect(0, h * 0.78, w, h)
+    for (let y = h * 0.81; y < h; y += 0.35) line(ctx, [[0, y], [w, y]], 'rgba(255,255,255,0.35)', 0.035, [0.3, 0.5], false)
+    const dunes: Pt[] = left ? [[-1, h + 1], [-1, h * 0.62], [w * 0.2, h * 0.66], [w * 0.38, h * 0.8], [w * 0.47, h + 1]] : [[w + 1, h + 1], [w + 1, h * 0.62], [w * 0.8, h * 0.66], [w * 0.62, h * 0.8], [w * 0.53, h + 1]]
+    patch(ctx, dunes, S.far, { shade: '#c99a50', cover: 0.2, line: L, lw: 0.05 })
+    const cx = side(0.2)
+    line2(ctx, [[cx, h * 0.86], [cx, h * 0.7]], '#2e4e26', 0.3)
+    line2(ctx, [[cx, h * 0.78], [cx + 0.45, h * 0.78], [cx + 0.45, h * 0.7]], '#2e4e26', 0.18)
+  } else if (key === 'autumn') {
+    const far = ridge(ctx, rng, w, h * 0.84, 2, 6, S.far, L)
+    // 满山红枫
+    for (const [x, y] of far) for (let j = 0; j < 4; j++) puffTree(ctx, x + (rng.next() - 0.5) * 2.4, y + 0.3 + rng.next() * 0.9, 0.4 + rng.next() * 0.25, pick(rng, ['#e63c22', '#f06224', '#d62a2e', '#f48628']), L)
+    // 山头一座塌了一半的塔楼
+    const tx = side(0.7)
+    patch(ctx, [[tx - 0.8, h * 0.8], [tx - 0.8, h * 0.56], [tx - 0.5, h * 0.56], [tx - 0.5, h * 0.53], [tx - 0.2, h * 0.53], [tx - 0.2, h * 0.58], [tx + 0.3, h * 0.6], [tx + 0.8, h * 0.66], [tx + 0.8, h * 0.8]], '#9a9ea4', { line: L, lw: 0.04 })
+    patch(ctx, [[tx - 0.2, h * 0.62], [tx, h * 0.62], [tx, h * 0.68], [tx - 0.2, h * 0.68]], '#2a2220', {})
+    // 另一边一座黑岩山，洞口透着紫光
+    const cx = side(0.16)
+    patch(ctx, [[cx - 3, h + 1], [cx - 2.2, h * 0.7], [cx - 0.6, h * 0.58], [cx + 1, h * 0.64], [cx + 2.4, h * 0.8], [cx + 3, h + 1]], '#3a2a46', { line: L, lw: 0.05 })
+    patch(ctx, [[cx - 0.9, h * 0.98], [cx - 0.7, h * 0.82], [cx, h * 0.76], [cx + 0.7, h * 0.82], [cx + 0.9, h * 0.98]], '#9a6ae0', { line: '#2a1238', lw: 0.04 })
+    for (let i = 0; i < 6; i++) glint(ctx, cx + (rng.next() - 0.5) * 1.3, h * (0.8 + rng.next() * 0.15), 0.12, '#efe2ff')
+    ridge(ctx, rng, w, h * 0.99, 0.4, 8, S.near, L)
+    for (let i = 0; i < 40; i++) {
+      ctx.save()
+      ctx.translate(rng.next() * w, h * (0.5 + rng.next() * 0.5))
+      ctx.rotate(rng.next() * 6.28)
+      mapleLeaf(ctx, 0.12, pick(rng, FALL_LEAF), 0.02)
+      ctx.restore()
+    }
+  } else {
+    // 一边是黑青的冻海，海上漂着冰山；一边是积雪的火山，山口发红，灰烟一柱顺风斜过去
+    ctx.fillStyle = S.near
+    ctx.fillRect(0, h * 0.8, w, h)
+    for (let y = h * 0.83; y < h; y += 0.3) line(ctx, [[0, y], [w, y]], 'rgba(200,225,235,0.3)', 0.03, [0.3, 0.6], false)
+    for (let i = 0; i < 5; i++) {
+      const x = side(0.45 + rng.next() * 0.55)
+      const s = 0.4 + rng.next() * 0.7
+      patch(ctx, [[x - s * 1.4, h * 0.82], [x - s * 0.5, h * 0.82 - s * 1.1], [x + s * 0.2, h * 0.82 - s * 0.7], [x + s * 0.8, h * 0.82 - s * 1.3], [x + s * 1.5, h * 0.82]], '#eef6fb', { shade: '#6fa6c8', cover: 0.35, line: L, lw: 0.04 })
+    }
+    const vx = side(0.22)
+    for (let i = 0; i < 7; i++) {
       ctx.beginPath()
-      ctx.moveTo(vx - 0.5 + i * 0.3, h * 0.42)
-      ctx.quadraticCurveTo(vx + (rng.next() - 0.3) * 3, h * 0.25 - i * 0.6, vx + 1 + i * 0.6, h * 0.05 - i * 0.2)
-      ctx.lineWidth = 0.5 - i * 0.05
-      ctx.strokeStyle = 'rgba(120,120,130,0.35)'
-      ctx.stroke()
+      ctx.ellipse(vx + i * i * 0.12 + i * 0.3, h * (0.48 - i * 0.05), 0.5 + i * 0.25, 0.35 + i * 0.12, 0, 0, 6.28)
+      ctx.fillStyle = i < 2 ? '#5f6367' : 'rgba(140,144,148,0.85)'
+      ctx.fill()
     }
-    patch(ctx, [[vx - 4, h * 0.85], [vx - 0.7, h * 0.42], [vx + 0.7, h * 0.42], [vx + 4, h * 0.85]], '#6d5f5a', { line: L, lw: 0.05 })
-    line(ctx, [[vx - 0.5, h * 0.44], [vx - 0.2, h * 0.55], [vx + 0.1, h * 0.5]], '#e85d2a', 0.15)
-    for (let x = -1; x < w + 2; x += 3 + rng.next() * 3) {
-      if (Math.abs(x - vx) < 4.5) continue
-      const top = h * (0.3 + 0.2 * rng.next())
-      patch(ctx, [[x - 3, h * 0.9], [x, top], [x + 3, h * 0.9]], S.far, { line: L, lw: 0.04 })
-      patch(ctx, [[x - 0.9, top + 1.2], [x, top], [x + 0.9, top + 1.2], [x + 0.3, top + 0.9], [x - 0.3, top + 1.1]], '#ffffff', {})
-    }
-    ridge(ctx, rng, w, h * 0.9, 0.6, 10, S.near, L)
+    patch(ctx, [[vx - 5, h * 1.02], [vx - 0.7, h * 0.52], [vx + 0.7, h * 0.52], [vx + 5, h * 1.02]], '#56423a', { line: L, lw: 0.05 })
+    patch(ctx, [[vx - 2.6, h * 0.78], [vx - 0.7, h * 0.52], [vx + 0.7, h * 0.52], [vx + 2.6, h * 0.78], [vx + 1.4, h * 0.72], [vx + 0.4, h * 0.8], [vx - 0.6, h * 0.71], [vx - 1.5, h * 0.79]], '#eef2f8', { shade: '#8a9cc0', cover: 0.3 })
+    line(ctx, [[vx - 0.3, h * 0.53], [vx - 0.6, h * 0.66], [vx - 0.4, h * 0.8], [vx - 0.9, h * 0.95]], '#ff7814', 0.16)
+    ctx.beginPath()
+    ctx.ellipse(vx, h * 0.52, 0.7, 0.12, 0, 0, 6.28)
+    ctx.fillStyle = '#ffad33'
+    ctx.fill()
     for (let i = 0; i < 70; i++) {
       ctx.beginPath()
-      ctx.arc(rng.next() * w, rng.next() * h, 0.05 + rng.next() * 0.05, 0, 6.28)
+      ctx.arc(rng.next() * w, rng.next() * h, 0.04 + rng.next() * 0.05, 0, 6.28)
       ctx.fillStyle = '#ffffff'
       ctx.fill()
     }
-  } else if (key === 'summer') {
-    // 一边是沙丘，一边是海天一线
-    const left = rng.next() < 0.5
-    ctx.fillStyle = S.near
-    ctx.fillRect(0, h * 0.62, w, h)
-    for (let y = h * 0.66; y < h; y += 0.45) line(ctx, [[0, y], [w, y]], 'rgba(255,255,255,0.5)', 0.04, [0.3, 0.5], false)
-    const dunes: Pt[] = left ? [[-1, h + 1], [-1, h * 0.5], [w * 0.2, h * 0.55], [w * 0.38, h * 0.7], [w * 0.45, h + 1]] : [[w + 1, h + 1], [w + 1, h * 0.5], [w * 0.8, h * 0.55], [w * 0.62, h * 0.7], [w * 0.55, h + 1]]
-    patch(ctx, dunes, S.far, { shade: '#c99a50', cover: 0.2, line: L, lw: 0.05 })
-  } else if (key === 'spring') {
-    ridge(ctx, rng, w, h * 0.72, 1.6, 6, S.far, L)
-    ridge(ctx, rng, w, h * 0.9, 1.2, 8, S.near, L)
-    for (let i = 0; i < 9; i++) {
-      const x = rng.next() * w
-      const y = h * (0.62 + 0.25 * rng.next())
-      ctx.beginPath()
-      ctx.arc(x, y, 0.45 + rng.next() * 0.3, 0, 6.28)
-      ctx.fillStyle = '#f2a7bd'
-      ctx.fill()
-      ctx.lineWidth = 0.04
-      ctx.strokeStyle = L
-      ctx.stroke()
-    }
-  } else {
-    ridge(ctx, rng, w, h * 0.7, 2, 5, S.far, L)
-    // 山上一截城墙，山脚一个洞口
-    const wx = w * (0.2 + 0.6 * rng.next())
-    for (let i = 0; i < 6; i++) patch(ctx, [[wx + i * 0.7, h * 0.6], [wx + i * 0.7 + 0.6, h * 0.6], [wx + i * 0.7 + 0.6, h * 0.48 - (i % 2) * 0.25], [wx + i * 0.7, h * 0.48 - (i % 2) * 0.25]], '#c9bba2', { line: L, lw: 0.04 })
-    ridge(ctx, rng, w, h * 0.92, 1.1, 8, S.near, L)
-    const cx = wx < w / 2 ? w * 0.78 : w * 0.18
-    patch(ctx, [[cx - 1.4, h * 0.95], [cx - 1, h * 0.72], [cx, h * 0.66], [cx + 1, h * 0.72], [cx + 1.4, h * 0.95]], '#2a1e24', { line: L, lw: 0.05 })
-    for (let i = 0; i < 40; i++) leaf(ctx, rng, rng.next() * w, rng.next() * h, 0.12, L)
   }
   // 画布的褶：几道竖着的淡影；上边的吊杆，下边的压脚
   for (let x = 2; x < w; x += 3.4) {
@@ -1113,9 +1701,10 @@ export function paintDrop(chapter: number, seed: number, w: number, h: number, c
   ctx.fillRect(0, h - 0.25, w, 0.25)
 }
 
-/** 台框上挂的帷幔多高、一个弧多宽，格；两边大幕从台边往里盖住多少、外边留出台框金柱多宽、一道褶多宽，格 */
-const VALANCE_U = 2.4
-const SWAG_U = 4.2
+/** 台框上挂的帷幔连垂下来的弧多高、上面的平幔多高、一个弧多宽，格；两边大幕从台边往里盖住多少、外边留出台框金柱多宽、一道褶多宽，格 */
+const VALANCE_U = 5.4
+const HEAD_U = 3.3
+const SWAG_U = 4.6
 const DRAPE_IN_U = 0.45
 const PILLAR_U = 1.3
 const FOLD_U = 0.9
@@ -1175,50 +1764,95 @@ export function paintMasking(stage: Stage, size: number, part: 'legs' | 'valance
     ctx.stroke()
   }
   if (part === 'legs') return
-  // 帷幔：一道底边，下面一个个弧，金穗子
-  const left = 1.3
-  const right = size - 1.3
-  ctx.fillStyle = '#7a0e18'
-  ctx.fillRect(left, 0, right - left, VALANCE_U * 0.45)
+  // 帷幔：上面一道打褶的平幔压住天幕的上半，底下一道金边与流苏，再往下一个个弧垂下来，弧与弧之间挂着金穗子
+  const left = PILLAR_U
+  const right = size - PILLAR_U
+  const pleat = ctx.createLinearGradient(left, 0, right, 0)
+  const pn = Math.round((right - left) / 0.7)
+  for (let f = 0; f <= pn; f++) pleat.addColorStop(f / pn, f % 2 === 0 ? '#7a0e18' : '#a8182a')
+  ctx.fillStyle = pleat
+  ctx.fillRect(left, 0, right - left, HEAD_U)
+  const shade = ctx.createLinearGradient(0, 0, 0, HEAD_U)
+  shade.addColorStop(0, 'rgba(20,0,4,0.55)')
+  shade.addColorStop(0.5, 'rgba(20,0,4,0)')
+  shade.addColorStop(1, 'rgba(20,0,4,0.25)')
+  ctx.fillStyle = shade
+  ctx.fillRect(left, 0, right - left, HEAD_U)
   const n = Math.max(3, Math.round((right - left) / SWAG_U))
   const sw = (right - left) / n
+  const y0 = HEAD_U - 0.3
   for (let i = 0; i < n; i++) {
     const a = left + i * sw
-    const gr = ctx.createLinearGradient(0, 0, 0, VALANCE_U)
+    const gr = ctx.createLinearGradient(0, y0, 0, VALANCE_U)
     gr.addColorStop(0, '#a3182a')
     gr.addColorStop(0.7, '#c4283a')
     gr.addColorStop(1, '#6e0c16')
     ctx.beginPath()
-    ctx.moveTo(a, 0)
-    ctx.lineTo(a + sw, 0)
-    ctx.lineTo(a + sw, VALANCE_U * 0.45)
-    ctx.quadraticCurveTo(a + sw / 2, VALANCE_U * 1.25, a, VALANCE_U * 0.45)
+    ctx.moveTo(a, y0)
+    ctx.lineTo(a + sw, y0)
+    ctx.quadraticCurveTo(a + sw / 2, VALANCE_U + (VALANCE_U - y0) * 0.6, a, y0)
     ctx.closePath()
     ctx.fillStyle = gr
     ctx.fill()
     for (let f = 1; f < 4; f++) {
       ctx.beginPath()
-      ctx.moveTo(a + sw * 0.08 * f, VALANCE_U * 0.45)
-      ctx.quadraticCurveTo(a + sw / 2, VALANCE_U * (0.5 + 0.17 * f), a + sw * (1 - 0.08 * f), VALANCE_U * 0.45)
-      ctx.lineWidth = 0.06
+      ctx.moveTo(a + sw * 0.08 * f, y0)
+      ctx.quadraticCurveTo(a + sw / 2, y0 + (VALANCE_U - y0) * (0.35 + 0.3 * f), a + sw * (1 - 0.08 * f), y0)
+      ctx.lineWidth = 0.07
       ctx.strokeStyle = 'rgba(60,4,10,0.5)'
       ctx.stroke()
     }
     ctx.beginPath()
-    ctx.moveTo(a, VALANCE_U * 0.45)
-    ctx.quadraticCurveTo(a + sw / 2, VALANCE_U * 1.25, a + sw, VALANCE_U * 0.45)
-    ctx.lineWidth = 0.16
+    ctx.moveTo(a, y0)
+    ctx.quadraticCurveTo(a + sw / 2, VALANCE_U + (VALANCE_U - y0) * 0.6, a + sw, y0)
+    ctx.lineWidth = 0.18
     ctx.setLineDash([0.08, 0.06])
     ctx.strokeStyle = '#e2b25a'
     ctx.stroke()
     ctx.setLineDash([])
+  }
+  // 平幔底边的金边与一排短流苏
+  ctx.fillStyle = '#e2b25a'
+  ctx.fillRect(left, HEAD_U - 0.42, right - left, 0.2)
+  ctx.fillRect(left, 0, right - left, 0.22)
+  ctx.strokeStyle = '#c8963e'
+  ctx.lineWidth = 0.05
+  ctx.beginPath()
+  for (let x = left; x < right; x += 0.16) {
+    ctx.moveTo(x, HEAD_U - 0.22)
+    ctx.lineTo(x, HEAD_U - 0.02)
+  }
+  ctx.stroke()
+  // 金穗子：一根绳，一个结，一把穗
+  for (let i = 0; i <= n; i++) {
+    const x = left + i * sw
+    ctx.strokeStyle = '#e2b25a'
+    ctx.lineWidth = 0.06
     ctx.beginPath()
-    ctx.ellipse(a, VALANCE_U * 0.55, 0.16, 0.42, 0, 0, 6.28)
+    ctx.moveTo(x, y0)
+    ctx.lineTo(x, y0 + 0.9)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.ellipse(x, y0 + 1, 0.2, 0.2, 0, 0, 6.28)
     ctx.fillStyle = '#e2b25a'
     ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo(x - 0.12, y0 + 1.1)
+    ctx.lineTo(x - 0.24, y0 + 1.9)
+    ctx.lineTo(x + 0.24, y0 + 1.9)
+    ctx.lineTo(x + 0.12, y0 + 1.1)
+    ctx.closePath()
+    ctx.fillStyle = '#c8963e'
+    ctx.fill()
+    ctx.strokeStyle = '#8a5a1a'
+    ctx.lineWidth = 0.03
+    ctx.beginPath()
+    for (let k = -2; k <= 2; k++) {
+      ctx.moveTo(x + k * 0.04, y0 + 1.15)
+      ctx.lineTo(x + k * 0.09, y0 + 1.88)
+    }
+    ctx.stroke()
   }
-  ctx.fillStyle = '#e2b25a'
-  ctx.fillRect(left, 0, right - left, 0.18)
 }
 
 /** 白色聚光灯的光斑：中间发白，往外软软地淡掉 */
@@ -1251,12 +1885,14 @@ export function paintFloor(act: Act, stage: Stage, canvas: HTMLCanvasElement): v
   const S = SEASONS[key]
   const sd: Sd = (x, y) => blendSd(act.blend, x + stage.x0, y + stage.y0)
   const seed = act.seed ^ 0x9a1e7
+  const base = { sd, blend: act.blend, ox: stage.x0, oy: stage.y0, pieces: act.pieces, lava: [] }
+  const env: Env = key === 'winter' ? { ...base, lava: lavaPaths(sd, spots(base, ['cone'])[0], w, h, new Rng(seed ^ 0x1a4a)) } : base
   ctx.setTransform(PAINT_PPU, 0, 0, PAINT_PPU, 0, 0)
-  S.a(ctx, w, h, new Rng(seed), sd)
+  S.a(ctx, w, h, new Rng(seed), env)
   const top = Object.assign(document.createElement('canvas'), { width: W, height: H })
   const tc = top.getContext('2d')!
   tc.setTransform(PAINT_PPU, 0, 0, PAINT_PPU, 0, 0)
-  S.b(tc, w, h, new Rng(seed ^ 0x51a7), sd)
+  S.b(tc, w, h, new Rng(seed ^ 0x51a7), env)
   // 第二个景只留界线这边的：按离界线的远近淡出，界线随噪声抖一抖
   const m = document.createElement('canvas')
   const mc = m.getContext('2d')!
@@ -1270,6 +1906,6 @@ export function paintFloor(act: Act, stage: Stage, canvas: HTMLCanvasElement): v
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.drawImage(top, 0, 0)
   ctx.setTransform(PAINT_PPU, 0, 0, PAINT_PPU, 0, 0)
-  S.seam(ctx, w, h, new Rng(seed ^ 0x2c3), sd, act.blend, stage.x0, stage.y0)
+  S.seam(ctx, w, h, new Rng(seed ^ 0x2c3), env)
   frame(ctx, 0, w, h, LINE[key])
 }

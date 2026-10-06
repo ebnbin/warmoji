@@ -20,6 +20,8 @@ const SMALL_U = 0.65
 const BIG_U = 1.15
 /** 摆在两个景交界那一带的布景离界线最多多远，格 */
 const MID_U = 2.6
+/** 摆在第二个景远处的布景离界线至少再远多少，格：冬天岸边那一圈是冷水，浮冰从这里起 */
+export const FAR_U = 3.6
 /** 台中线上的活门离台中心多远，格 */
 const TRAP_DY = [-11, -6.5, 6.5, 11] as const
 /** 一幕最多换几次种子重摆 */
@@ -40,30 +42,36 @@ export type PieceKind =
   | 'pine'
   | 'rail'
   | 'sheep'
+  | 'log'
   | 'bush'
   | 'sakura'
   | 'temple'
   | 'bamboo'
   | 'lantern'
   | 'cactus'
+  | 'acacia'
   | 'cairn'
+  | 'post'
   | 'palm'
   | 'reef'
   | 'sub'
   | 'kelp'
   | 'coral'
   | 'ruin'
+  | 'tower'
   | 'column'
+  | 'boards'
   | 'maple'
   | 'leaves'
-  | 'spire'
-  | 'pillar'
-  | 'shroom'
+  | 'cluster'
+  | 'beam'
+  | 'druse'
   | 'torch'
   | 'cone'
-  | 'crag'
+  | 'basalt'
+  | 'vent'
   | 'berg'
-  | 'snowpine'
+  | 'ridge'
   | 'drift'
 
 /**
@@ -145,10 +153,10 @@ export interface Stage {
 /** 台面摆在方框正中，台中线竖着；开局演到哪一章按种子定 */
 export function makeStage(cfg: TheaterConfig, seed: number): Stage {
   const c = FRAME_U / 2
-  const x0 = c - cfg.size.wU
-  const x1 = c + cfg.size.wU
-  const y0 = c - cfg.size.hU / 2
-  const y1 = c + cfg.size.hU / 2
+  const x0 = c - cfg.sizeU / 2
+  const x1 = c + cfg.sizeU / 2
+  const y0 = c - cfg.sizeU / 2
+  const y1 = c + cfg.sizeU / 2
   const pad = BASIN_PAD_U
   const cell = BASIN_CELL_U * UNIT
   const bx0 = (x0 - pad) * UNIT
@@ -244,82 +252,102 @@ const S = (kind: PieceKind, w: readonly [number, number], d: number, h: readonly
 const PINE = S('pine', [1.2, 1.6], 0, [3.6, 4.2], 0.4)
 const RAIL = S('rail', [3, 5], 0, 'low', 0.3)
 const SHEEP = S('sheep', [1.3, 1.6], 0, 'low', 0.35)
+const LOG = S('log', [2.6, 3.6], 0, 'low', 0.5)
 const BUSH = S('bush', [1.8, 3.2], 0, 'low', 0.5)
-const SAKURA = S('sakura', [1.7, 2.4], 0, [3.2, 3.8], 0.4)
+const SAKURA = S('sakura', [1.9, 2.6], 0, [3.4, 4], 0.4)
 const TEMPLE = S('temple', [3.6, 5.2], 0.8, [2.6, 2.9], 0.12)
 const BAMBOO = S('bamboo', [2.6, 4.2], 0, 'low', 0.3)
 const LANTERN = S('lantern', [0.9, 1.1], 0, 'low', 0.2)
 const CACTUS = S('cactus', [1.2, 1.7], 0, [2.6, 3.2], 0.3)
+const ACACIA = S('acacia', [2.2, 3], 0, [3, 3.6], 0.4)
 const CAIRN = S('cairn', [1, 1.4], 0, 'low', 0.3)
+const POST = S('post', [0.9, 1.2], 0, 'low', 0.2)
 const PALM = S('palm', [1.8, 2.4], 0, [3.4, 4], 0.4)
 const REEF = S('reef', [2, 3.2], 0, [2.6, 3], 0.4)
 const SUB = S('sub', [4.6, 5.4], 0, [2.4, 2.7], 0.15)
 const KELP = S('kelp', [1, 1.4], 0, [3, 3.8], 0.3)
 const CORAL = S('coral', [1.6, 2.6], 0, 'low', 0.4)
 const RUIN = S('ruin', [3.4, 5], 0.9, [2.6, 3.2], 0.15)
+const TOWER = S('tower', [2.4, 2.8], 1.6, [3.6, 4.2], 0.1)
 const COLUMN = S('column', [0.9, 1.1], 0, [2.8, 3.6], 0.1)
-const MAPLE = S('maple', [1.7, 2.4], 0, [3.2, 3.8], 0.4)
+const BOARDS = S('boards', [1.8, 2.4], 0, [2.4, 2.8], 0.2)
+const MAPLE = S('maple', [2, 2.7], 0, [3.4, 4], 0.4)
 const LEAVES = S('leaves', [1.6, 2.6], 0, 'low', 0.4)
-const SPIRE = S('spire', [0.9, 1.3], 0, [2.7, 3.2], 0.3)
-const PILLAR = S('pillar', [2.2, 3.2], 0, [2.8, 3.4], 0.4)
-const SHROOM = S('shroom', [1.2, 1.8], 0, 'low', 0.4)
+const CLUSTER = S('cluster', [1.4, 2.2], 0, [2.8, 3.4], 0.4)
+const BEAM = S('beam', [2.6, 3.4], 0, [2.6, 3.2], 0.3)
+const DRUSE = S('druse', [1.2, 1.8], 0, 'low', 0.4)
 const TORCH = S('torch', [0.7, 0.9], 0, 'low', 0.2)
-const CONE = S('cone', [6, 7], 0, [4, 4.6], 0.1)
-const CRAG = S('crag', [2, 3], 0, [2.8, 3.4], 0.4)
+const CONE = S('cone', [6.4, 7.4], 0, [5.4, 6], 0.1)
+const BASALT = S('basalt', [1.8, 2.6], 0, [2.8, 3.4], 0.4)
+const VENT = S('vent', [1.2, 1.6], 0, 'low', 0.3)
 const BERG = S('berg', [2.2, 3.4], 0, [2.8, 3.6], 0.4)
-const SNOWPINE = S('snowpine', [1.3, 1.7], 0, [3.6, 4.2], 0.4)
+const RIDGE = S('ridge', [2.4, 3.6], 0, 'low', 0.4)
 const DRIFT = S('drift', [1.8, 3], 0, 'low', 0.4)
 
-/** 一项摆在哪个景里：a 是第一个景，b 是第二个，mid 是两个景交界的那一带，any 哪都行 */
-type Where = 'a' | 'b' | 'mid' | 'any'
+/** 一项摆在哪个景里：a 是第一个景，b 是第二个，far 是第二个景里离界线远的那一片，mid 是两个景交界的那一带，any 哪都行 */
+type Where = 'a' | 'b' | 'far' | 'mid' | 'any'
 
 /** 一章怎么摆：先摆的是大件，每一项是几件、可能的样子、摆在哪个景里 */
 type Item = { readonly n: readonly [number, number]; readonly specs: readonly Spec[]; readonly at: Where }
 
-/** 四章：春是草甸流进樱庭，夏是沙漠走到深海，秋是页角的溶洞通到外面的残垣，冬是页角的火山烧到冰原 */
+/**
+ * 四章：春是草甸流进樱庭，夏是沙漠走到深海，秋是台角的紫水晶洞通到外面落满红叶的残垣，冬是台角的雪火山流下熔岩、淌进漂着浮冰的冻海；
+ * 冬天的冰山、冰脊、雪堆都立在浮冰上，离岸边的冷水远一点
+ */
 const LAYOUTS: Record<ChapterKey, readonly Item[]> = {
   spring: [
     { n: [1, 2], specs: [TEMPLE], at: 'b' },
     { n: [3, 4], specs: [SAKURA], at: 'b' },
     { n: [3, 4], specs: [PINE], at: 'a' },
-    { n: [2, 3], specs: [RAIL], at: 'a' },
+    { n: [1, 2], specs: [RAIL], at: 'a' },
+    { n: [1, 2], specs: [LOG], at: 'a' },
     { n: [1, 2], specs: [SHEEP], at: 'a' },
-    { n: [1, 2], specs: [BAMBOO], at: 'b' },
+    { n: [1, 1], specs: [BAMBOO], at: 'b' },
     { n: [1, 2], specs: [LANTERN], at: 'b' },
     { n: [1, 2], specs: [BUSH], at: 'mid' },
   ],
   summer: [
     { n: [1, 1], specs: [SUB], at: 'b' },
-    { n: [3, 4], specs: [CACTUS], at: 'a' },
+    { n: [2, 3], specs: [CACTUS], at: 'a' },
+    { n: [1, 1], specs: [ACACIA], at: 'a' },
     { n: [2, 3], specs: [PALM], at: 'mid' },
     { n: [1, 2], specs: [REEF], at: 'b' },
     { n: [2, 3], specs: [KELP], at: 'b' },
-    { n: [2, 3], specs: [CAIRN], at: 'a' },
+    { n: [1, 2], specs: [CAIRN], at: 'a' },
+    { n: [1, 1], specs: [POST], at: 'a' },
     { n: [2, 3], specs: [CORAL], at: 'b' },
   ],
   autumn: [
-    { n: [2, 3], specs: [PILLAR], at: 'a' },
-    { n: [2, 3], specs: [SPIRE], at: 'a' },
-    { n: [2, 3], specs: [SHROOM], at: 'a' },
+    { n: [1, 1], specs: [TOWER], at: 'b' },
+    { n: [2, 3], specs: [CLUSTER], at: 'a' },
+    { n: [1, 2], specs: [BEAM], at: 'a' },
+    { n: [2, 3], specs: [DRUSE], at: 'a' },
     { n: [2, 3], specs: [RUIN], at: 'b' },
-    { n: [2, 3], specs: [COLUMN], at: 'b' },
-    { n: [2, 3], specs: [MAPLE], at: 'b' },
+    { n: [3, 4], specs: [MAPLE], at: 'b' },
+    { n: [1, 2], specs: [COLUMN], at: 'b' },
+    { n: [1, 1], specs: [BOARDS], at: 'b' },
     { n: [1, 2], specs: [LEAVES], at: 'b' },
     { n: [1, 2], specs: [TORCH], at: 'mid' },
   ],
   winter: [
     { n: [1, 1], specs: [CONE], at: 'a' },
-    { n: [2, 3], specs: [CRAG], at: 'a' },
-    { n: [3, 4], specs: [BERG], at: 'b' },
-    { n: [2, 3], specs: [SNOWPINE], at: 'b' },
-    { n: [3, 4], specs: [DRIFT], at: 'b' },
+    { n: [1, 2], specs: [BASALT], at: 'a' },
+    { n: [1, 2], specs: [VENT], at: 'a' },
+    { n: [3, 4], specs: [BERG], at: 'far' },
+    { n: [2, 3], specs: [RIDGE], at: 'far' },
+    { n: [2, 3], specs: [DRIFT], at: 'far' },
   ],
 }
 
-/** 摆不满下限时拿来补的小件，哪都能摆 */
-const FILLER: Record<ChapterKey, Spec> = { spring: BUSH, summer: CORAL, autumn: LEAVES, winter: DRIFT }
+/** 摆不满下限时拿来补的小件与它摆在哪 */
+const FILLER: Record<ChapterKey, { readonly spec: Spec; readonly at: Where }> = {
+  spring: { spec: BUSH, at: 'any' },
+  summer: { spec: CORAL, at: 'b' },
+  autumn: { spec: LEAVES, at: 'b' },
+  winter: { spec: DRIFT, at: 'far' },
+}
 
-/** 这一章的两个景怎么分：春、夏是一道弯弯的线（小溪、海岸线）斜着穿过两页，秋、冬是围着页边一处的一圈（洞里、火山脚下） */
+/** 这一章的两个景怎么分：春、夏是一道弯弯的线（小溪、海岸线）斜着穿过两页，秋、冬是围着台边一处的一圈（晶洞里、火山脚下） */
 function blendOf(stage: Stage, chapter: number, rng: Rng): Blend {
   const key = CHAPTERS[chapter]!.key
   const w = stage.x1 - stage.x0
@@ -345,13 +373,14 @@ function blendOf(stage: Stage, chapter: number, rng: Rng): Blend {
     { x: stage.x0 + 1, y: stage.cy }, { x: stage.x1 - 1, y: stage.cy }, { x: stage.cx + w * 0.22, y: stage.y0 }, { x: stage.cx - w * 0.22, y: stage.y1 },
   ]
   const at = spots[Math.floor(rng.next() * spots.length)]!
-  return { kind: 'ring', cx: at.x, cy: at.y, nx: 0, ny: 0, r: key === 'winter' ? 10 + rng.next() * 2.5 : 11 + rng.next() * 3, amp: 1, waveU: 6, phase: rng.next() * Math.PI * 2, band: key === 'winter' ? 1.8 : 3 }
+  return { kind: 'ring', cx: at.x, cy: at.y, nx: 0, ny: 0, r: 11.5 + rng.next() * 2.5, amp: 1, waveU: 6, phase: rng.next() * Math.PI * 2, band: key === 'winter' ? 1.8 : 3 }
 }
 
 /** 一件布景落在这一处合不合它的景 */
 function inWhere(b: Blend, where: Where, x: number, y: number): boolean {
   if (where === 'any') return true
   if (where === 'mid') return Math.abs(blendSd(b, x, y)) < Math.max(b.band, MID_U)
+  if (where === 'far') return blendSd(b, x, y) > b.band + FAR_U
   const t = blendAt(b, x, y)
   return where === 'a' ? t < 0.25 : t > 0.75
 }
@@ -518,7 +547,7 @@ function arrange(cfg: TheaterConfig, stage: Stage, chapter: number, blend: Blend
     const n = rng.int(item.n[0], item.n[1])
     for (let i = 0; i < n; i++) tryOne(item.specs[Math.floor(rng.next() * item.specs.length)]!, item.at)
   }
-  for (let t = 0; t < 8 && placed.length < cfg.pieces[0]; t++) tryOne(FILLER[key], 'any')
+  for (let t = 0; t < 8 && placed.length < cfg.pieces[0]; t++) tryOne(FILLER[key].spec, FILLER[key].at)
   return placed.length >= cfg.pieces[0] ? placed : null
 }
 
