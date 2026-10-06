@@ -85,7 +85,7 @@ export class PetriView implements MapView {
     const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.colonyLayer(v, st)
-    v.lens.screen.vignette(0.78, 0.15, 0x1c252c)
+    v.lens.screen.vignette(0.78, 0.08, 0x1c252c)
   }
 
   /** 菌落层：菌落场编成数据图，着色器铺满菌落场的范围画 */

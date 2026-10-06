@@ -20,15 +20,15 @@ const QUAD_TEXT_U = 1.3
 const LABEL_TEXT_U = 0.9
 const QUAD_AT = 0.88
 const CROSS_TO = 0.95
-/** 皿底的标签：血琼脂平板，37 度培养 */
-const LABEL = 'BAP 37°C'
+/** 皿底的标签：营养琼脂平板，37 度培养 */
+const LABEL = 'NA 37°C'
 /** 弯月面：琼脂沿皿壁往上爬的那一圈按这么宽（格）衰减，贴壁处厚出几倍；像透镜把底下的网格往外推多少 */
 const MENISCUS_U = 0.4
 const MENISCUS_RISE = 0.9
 const MENISCUS_LENS = 0.06
-/** 血琼脂每单位厚度透过多少光（红、绿、蓝）：灯箱的光透过它就是看到的颜色；另加琼脂表面漫反射回来的室内光 */
-const AGAR_T = [0.64, 0.11, 0.16] as const
-const AGAR_BACK = [32, 6, 10] as const
+/** 营养琼脂每单位厚度透过多少光（红、绿、蓝）：灯箱的光透过它就是看到的颜色；另加琼脂表面漫反射回来的室内光 */
+const AGAR_T = [0.943, 0.891, 0.792] as const
+const AGAR_BACK = [10, 9, 6] as const
 /** 透过钠钙玻璃看灯箱的颜色倍率：玻璃边带一点青 */
 const GLASS_TINT = [0.8, 0.88, 0.88] as const
 /** 灯箱：中心的颜色，到方框四角暗下去多少；网格线的颜色 */
@@ -206,7 +206,7 @@ function inkAt(prep: Prepared, x: number, y: number, aa: number): number {
 /**
  * 培养皿的地面：皿外是灯箱，白亮的面上画着计数网格；皿壁外贴着一圈被玻璃折开的暗边与一线亮的焦散；
  * 玻璃壁的截面当成一段圆弧打光，迎着灯的一侧外缘与背着灯的一侧内缘各亮一道，两条边缘发暗；
- * 琼脂是灯箱的光透过血琼脂的颜色，贴壁的弯月面更厚更暗、像透镜把底下的网格往外推，背着灯那侧的弯月面亮一线；
+ * 琼脂是灯箱的光透过营养琼脂的颜色，贴壁的弯月面更厚更暗、像透镜把底下的网格往外推，背着灯那侧的弯月面亮一线；
  * 透过琼脂看得到灯箱的网格与皿底的记号笔，琼脂里有几个小气泡，表面一片室内灯的湿光
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
@@ -270,7 +270,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
         const thick = 1 + MENISCUS_RISE * climb
         const mag = 1 + MENISCUS_LENS * climb
         const line = gridLine(plan.cx + dx * mag - gx, plan.cy + dy * mag - gy, pitch, aa)
-        const light = lit * (1 - 0.45 * line)
+        const light = lit * (1 - 0.3 * line)
         const mottle = 1 + 0.14 * (fbm(x * 1.1, y * 1.1, 77, 3) - 0.5)
         for (let c = 0; c < 3; c++) tmp[c] = LIGHTBOX[c]! * light * Math.pow(AGAR_T[c]!, thick) * mottle + AGAR_BACK[c]!
         const ink = inkAt(prep, x, y, aa)
