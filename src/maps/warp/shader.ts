@@ -22,9 +22,9 @@ float hash1(vec2 p) {
 `
 
 /**
- * 虚空：平台底下望得见底的深处。深蓝的底上铺着一张淡淡的网格，每隔几格一道粗一点的线；
- * 有的线上一节节数据光流缓缓流过去；正中的核心柱往深处一路照下去，越深越暗，四周罩着它的一团光。
- * 只铺满方框，画面上和地图一起往四周平铺，所以网格、光流与核心柱的光都按方框的周期接得上；线多细按屏幕上的像素定（uPx 是一个设备像素合几格）；uRect 是铺的范围（格）
+ * 实验台：缸底下的台面。暗青灰的台面上印着一张淡青的刻度网格，每隔几格一道粗一点的线，像一张垫在缸底下的坐标纸；
+ * 有的线上一节节数据光流缓缓流过去，台面底下是一整台在跑的机器；正中的给料塔四周一团冷光，每只缸底下各罩着一片无影灯的光。
+ * 只铺满方框，画面上和地图一起往四周平铺，所以网格、光流与灯光都按方框的周期接得上；线多细按屏幕上的像素定（uPx 是一个设备像素合几格）；uRect 是铺的范围（格）
  */
 export const VOID_FRAG = `${HEADER}
 uniform vec4 uRect;
@@ -34,8 +34,8 @@ uniform vec2 uCore;
 uniform float uPx;
 ${NOISE}
 const float N = ${FRAME_U.toFixed(1)};
-const vec3 DEEP = vec3(0.0, 0.012, 0.035);
-const vec3 HAZE = vec3(0.0, 0.06, 0.12);
+const vec3 BENCH = vec3(0.025, 0.06, 0.075);
+const vec3 LAMP = vec3(0.03, 0.09, 0.1);
 const vec3 LINE = vec3(0.0, 1.0, 1.0);
 const vec3 DATA = vec3(0.35, 1.0, 1.0);
 const vec3 CORE = vec3(0.6, 1.0, 1.0);
@@ -64,34 +64,33 @@ void main ()
 {
   vec2 tc = outTexCoord;
   vec2 p = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
-  // 画面四周平铺：离核心柱按最近的那一份算，方框边上接得上
+  // 画面四周平铺：离给料塔按最近的那一份算，方框边上接得上
   vec2 c = p - uCore;
   c -= N * floor((c + N * 0.5) / N);
   float r = length(c);
-  vec3 col = DEEP + HAZE * (0.35 + 0.65 * exp(-r / 16.0));
+  // 每只缸底下罩着一片灯光：缸心按方框的四分之一周期排
+  vec2 q = mod(p, N * 0.5) - N * 0.25;
+  vec3 col = BENCH + LAMP * exp(-dot(q, q) / 120.0);
+  col *= 0.94 + 0.06 * hash1(floor(p * 3.0));
   float fine = min(lineDist(p.x, 2.0), lineDist(p.y, 2.0));
   float major = min(lineDist(p.x, 8.0), lineDist(p.y, 8.0));
   float aa = uPx * 1.2;
-  col += LINE * 0.22 * (1.0 - smoothstep(0.0, aa, fine));
-  col += LINE * 0.38 * (1.0 - smoothstep(0.0, aa * 1.4, major));
+  col += LINE * 0.1 * (1.0 - smoothstep(0.0, aa, fine));
+  col += LINE * 0.22 * (1.0 - smoothstep(0.0, aa * 1.4, major));
   float pulse = stream(p.x, p.y, 2.0, 1.0) + stream(p.y, p.x, 2.0, 2.0);
-  col += DATA * pulse * 0.9;
-  // 核心柱往深处照下去：一根直立的光柱，越往下越暗
-  float down = max(0.0, c.y);
-  float shaft = exp(-pow(c.x / 1.1, 2.0)) * exp(-down / 13.0) * step(0.0, c.y) * (1.0 - smoothstep(16.0, 23.0, c.y));
-  col += CORE * shaft * 0.5;
-  col += CORE * 0.55 * exp(-r * r / 9.0);
-  col += vec3(0.0, 1.0, 1.0) * 0.22 * exp(-r / 7.0);
+  col += DATA * pulse * 0.55;
+  col += CORE * 0.3 * exp(-r * r / 6.0);
+  col += vec3(0.0, 1.0, 1.0) * 0.12 * exp(-r / 6.0);
   col = vec3(1.0) - exp(-col * 1.6);
   gl_FragColor = vec4(col, 1.0);
 }
 `
 
 /**
- * 地砖：每块瓷砖按掩码知道自己是不是会亮的瓷砖、属于哪间房、那间房的待机律动与它在律动里的相位，按着色图知道那间房的主色。
- * 闲着时缝里透着房间的主色，按律动明灭：从中心一圈圈往外的脉冲、顺着一个方向扫过的光波、棋盘式明灭、几乎不动的微光。
+ * 感应地板：每块瓷砖按掩码知道自己是不是会亮的瓷砖、属于哪只缸、那只缸的待机律动与它在律动里的相位，按着色图知道那只缸的灯色。
+ * 闲着时缝里透着缸的灯色，按律动明灭：从中心一圈圈往外的脉冲、从进口往出口扫过的光波、棋盘式明灭、几乎不动的微光。
  * 被队伍踩过亮信号蓝、被敌人踩过亮信号红：四边一道亮线、往里一道细线、块面淡淡染一层，光渗到隔壁；刚踩上的一脚从中心扩一圈方框。
- * 队长在传送台上充能时，一圈光从台心扩到整间房，扫过的瓷砖亮起来，圈里的都染上一层。输出按预乘透明度
+ * 队长在出口上充能时，一圈光从管口扩到整只缸，扫过的瓷砖亮起来，圈里的都染上一层。输出按预乘透明度
  */
 export const TILES_FRAG = `${HEADER}
 uniform sampler2D uData;
@@ -151,7 +150,7 @@ void main ()
   float seam = 1.0 - smoothstep(aa * 0.5, aa * 2.2, edge);
   float inset = exp(-abs(edge - 0.12) / max(aa * 0.7, 0.01));
   float rim = exp(-edge / 0.06);
-  // 闲着：缝里透着房间的主色，按律动明灭
+  // 闲着：缝里透着缸的灯色，按律动明灭
   float b = idle(kind, m.b, cell);
   vec3 col = tint * b * (0.55 * seam + 0.22 * rim + 0.05);
   float a = b * (0.5 * seam + 0.16 * rim + 0.04);
@@ -171,7 +170,7 @@ void main ()
   float ring = exp(-abs(cheb - (1.0 - d.b) * 0.5) / 0.035) * d.b;
   add += mix(lit, vec3(1.0), 0.4) * ring * 0.9;
   a += ring * 0.3;
-  // 充能：一圈光从台心扩到整间房
+  // 充能：一圈光从管口扩到整只缸
   if (uCharge.w > 0.0 && abs(room - uChargeRoom) < 0.5) {
     float dc = length(cell + 0.5 - uCharge.xy);
     float front = exp(-pow((dc - uCharge.z) / 0.9, 2.0));

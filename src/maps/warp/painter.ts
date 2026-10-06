@@ -7,7 +7,7 @@ const SLICE_MS = 50
 const nextTick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 /**
- * 画跃迁站的地面：交给几个后台线程一块一块地分着画，画好一块交回一块；
+ * 画实验台的地面：交给几个后台线程一块一块地分着画，画好一块交回一块；
  * 开不了线程或线程出了错，剩下的活退回主线程画
  */
 export class WarpPainter {
@@ -91,11 +91,11 @@ export class WarpPainter {
         w.onerror = (e) => {
           e.preventDefault()
           this.settle = undefined
-          reject(new Error(e.message || '画跃迁站的线程出错'))
+          reject(new Error(e.message || '画实验台的线程出错'))
         }
         w.onmessageerror = () => {
           this.settle = undefined
-          reject(new Error('画跃迁站的线程发回的消息解不开'))
+          reject(new Error('画实验台的线程发回的消息解不开'))
         }
         feed(w)
       }
@@ -103,7 +103,7 @@ export class WarpPainter {
   }
 
   private fail(e: unknown): void {
-    console.error('画跃迁站的线程用不了，改在主线程画', e)
+    console.error('画实验台的线程用不了，改在主线程画', e)
     this.stop()
   }
 

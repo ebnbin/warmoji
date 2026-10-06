@@ -2,28 +2,29 @@ import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { valueNoise } from '../../util/noise'
 import { FRAME_U } from '../../util/units'
+import { FEEDER_U } from './layout'
 import { SIGNS } from './palette'
-import type { Box, WarpPlan, WarpRoom } from './layout'
+import type { Box, Ornament, WarpPlan, WarpRoom } from './layout'
 import type { WarpConfig } from '../../types/maps'
 
-/** 平台朝屏幕下方露出的那一截侧面多高，格 */
-export const FACE_U = 0.62
-/** 平台落在远处底下的影子往哪边偏、偏多远（格），影子边多软（格） */
-const SHADOW = { x: 0.9, y: 1.3, soft: 0.7, alpha: 0.6 } as const
-/** 机柜台朝地面那一侧露出的立面多高，格 */
-const WALL_FACE_U = 0.34
-/** 凹槽往下看得见的那一截内壁多高，格 */
-const PIT_FACE_U = 1.5
-/** 地砖：底色（冷白偏青）、缝的颜色、缝宽（格） */
-const TILE = [236, 252, 255] as const
-const SEAM = [40, 215, 235] as const
+/** 缸朝屏幕下方露出的那一截玻璃正面多高，格：标签贴在这里 */
+export const FACE_U = 0.9
+/** 缸落在实验台上的影子往哪边偏、偏多远（格），影子边多软（格） */
+const SHADOW = { x: 0.7, y: 1.1, soft: 0.6, alpha: 0.55 } as const
+/** 摆件落在缸底的影子往哪边偏，格 */
+const DROP = { x: 0.22, y: 0.32 } as const
+/** 投料碗多大，格 */
+const BOWL_U = 0.55
+/** 感应地板：底色（冷白偏青）、缝的颜色、缝宽（格） */
+const TILE = [232, 246, 250] as const
+const SEAM = [60, 200, 220] as const
 const SEAM_U = 0.045
-/** 台沿、机柜与传送台的金属 */
-const GRAPHITE = [10, 24, 38] as const
-const STEEL = [56, 106, 130] as const
-const DEEP = [0, 10, 22] as const
-/** 全站的主题色：台沿与平台侧面的灯带 */
-const CYAN = [0, 255, 255] as const
+/** 管口的金属 */
+const STEEL = [96, 128, 146] as const
+const DARK = [14, 24, 34] as const
+/** 玻璃：底下透出来的那层冷青、边上的高光 */
+const GLASS = [150, 235, 245] as const
+const GLINT = [235, 255, 255] as const
 
 type Rgb = [number, number, number]
 
@@ -70,7 +71,7 @@ export function textureSize(): { w: number; h: number } {
   return { w: Math.round(FRAME_U * GROUND_PPU), h: Math.round(FRAME_U * GROUND_PPU) }
 }
 
-/** 画之前一次算好的：每间房的主色（0 到 255） */
+/** 画之前一次算好的：每只缸的灯色（0 到 255） */
 export interface Prepared {
   readonly colors: readonly Rgb[]
 }
@@ -84,10 +85,6 @@ function sdBox(b: Box, x: number, y: number): number {
   const dx = Math.max(b.x0 - x, x - b.x1)
   const dy = Math.max(b.y0 - y, y - b.y1)
   return dx > 0 || dy > 0 ? Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) : Math.max(dx, dy)
-}
-
-function grow(b: Box, d: number): Box {
-  return { x0: b.x0 - d, y0: b.y0 - d, x1: b.x1 + d, y1: b.y1 + d }
 }
 
 function set(out: Rgb, c: readonly number[], k = 1): void {
@@ -104,213 +101,345 @@ function addGlow(out: Rgb, c: readonly number[], k: number): void {
   for (let i = 0; i < 3; i++) out[i] = out[i]! + c[i]! * k
 }
 
-/** 平台朝屏幕下方的侧面：上沿一道高光，往下暗下去，一条房间颜色的灯带，隔一段一道竖缝 */
-function face(out: Rgb, color: readonly number[], x: number, t: number, aa: number): void {
-  set(out, STEEL, 0.62 - 0.38 * t)
-  mixIn(out, [190, 255, 255], 0.55 * Math.exp(-t / 0.06))
-  const strip = Math.exp(-(((t - 0.32) / 0.07) ** 2))
-  addGlow(out, color, 0.85 * strip)
-  const seam = 1 - smooth(0.02, 0.02 + aa, Math.abs(((x + 0.75) % 1.5) - 0.75))
-  for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.35 * seam * (1 - strip))
+function scale(out: Rgb, k: number): void {
+  for (let i = 0; i < 3; i++) out[i] = out[i]! * k
 }
 
-/** 机柜台朝地面的立面：从台顶往下暗下去 */
-function wallFace(out: Rgb, color: Rgb, t: number): void {
-  set(out, GRAPHITE, 1.35 - 0.7 * t)
-  addGlow(out, color, 0.12 * (1 - t))
+/** 摆件的朝向：按圆心打散出一个角度 */
+function headingOf(o: Ornament): number {
+  return valueNoise(o.x * 3.1, o.y * 2.7, 77) * Math.PI * 2
 }
 
-/** 台沿：亮一点的金属护栏，贴着虚空的那一边一道房间颜色的亮线，隔一段一根矮柱 */
-function lip(out: Rgb, color: readonly number[], along: number, edge: number, aa: number): void {
-  set(out, STEEL, 0.72 + 0.25 * smooth(0.2, 0.9, edge))
-  const post = 1 - smooth(0.08, 0.08 + aa, Math.abs(((along + 0.75) % 1.5) - 0.75))
-  mixIn(out, [180, 250, 255], 0.6 * post * smooth(0.3, 0.5, edge))
-  const rail = Math.exp(-(((edge - 0.86) / 0.05) ** 2))
-  addGlow(out, color, 1.2 * rail)
-  const inner = Math.exp(-(((edge - 0.1) / 0.05) ** 2))
-  for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.35 * inner)
+/** 圆顶的迎光：r 是离中心几成（0 到 1），(ux, uy) 是这一点朝外的方向 */
+function dome(r: number, ux: number, uy: number): number {
+  const z = Math.sqrt(Math.max(0, 1 - r * r))
+  return clamp01(0.35 + 0.65 * (ux * SUN.x * r + uy * SUN.y * r + z * SUN.z))
 }
 
-/** 机柜台：一排排机柜顶，顶上一列列指示灯；朝地面那边露出立面 */
-function deck(out: Rgb, color: Rgb, b: Box, x: number, y: number, aa: number): void {
-  const u = x - b.x0
-  const v = y - b.y0
-  const cell = ((u % 2.25) + 2.25) % 2.25
-  const row = ((v % 1.5) + 1.5) % 1.5
-  const gap = Math.min(cell, 2.25 - cell) < 0.08 || Math.min(row, 1.5 - row) < 0.08
-  set(out, GRAPHITE, gap ? 0.55 : 1.05 + 0.1 * valueNoise(Math.floor(u / 2.25) * 3.3, Math.floor(v / 1.5) * 5.1, 41))
-  if (!gap) {
-    const top = smooth(0.06, 0.06 + aa, Math.min(cell, row))
-    mixIn(out, [70, 84, 104], 0.4 * (1 - top))
-    const lx = ((cell - 0.3) % 0.28 + 0.28) % 0.28
-    const ly = Math.abs(row - 1.12)
-    if (cell > 0.3 && cell < 1.95 && ly < 0.06 && Math.abs(lx - 0.14) < 0.05) {
-      const on = valueNoise(Math.floor(u / 0.28) * 1.7, Math.floor(v / 1.5) * 2.9, 9)
-      addGlow(out, on > 0.62 ? color : [70, 255, 170], on > 0.3 ? 0.9 : 0.15)
+/** 花盆：一圈陶土的盆沿，盆里是土 */
+function pot(out: Rgb, d: number, R: number, ux: number, uy: number): boolean {
+  if (d > R) return false
+  const t = d / R
+  if (t > 0.8) {
+    set(out, [176, 92, 56], 0.8 + 0.4 * dome((t - 0.8) / 0.2, ux, uy))
+    return true
+  }
+  set(out, [62, 42, 30], 0.85 + 0.25 * valueNoise(d * 30 + ux * 9, uy * 30, 5))
+  return true
+}
+
+/**
+ * 一件摆件的顶面，(dx, dy) 是这一点离圆心多远，格；画到了就返回 true。
+ * 都是水族箱里那种小摆件：缩小了、塑料或陶瓷做的、摆得端端正正
+ */
+function ornament(out: Rgb, o: Ornament, dx: number, dy: number): boolean {
+  const d = Math.hypot(dx, dy)
+  const ux = d > 1e-6 ? dx / d : 0
+  const uy = d > 1e-6 ? dy / d : 0
+  const ang = Math.atan2(dy, dx)
+  const h = headingOf(o)
+  switch (o.kind) {
+    case 'daisy': {
+      // 雏菊：一圈白花瓣、黄花心，盆里露出几片叶子
+      const petal = 0.62 * (0.72 + 0.28 * Math.abs(Math.cos(((ang - h) * 13) / 2)))
+      if (d < 0.17) {
+        set(out, [250, 196, 40], 0.75 + 0.35 * dome(d / 0.17, ux, uy))
+        if (valueNoise(dx * 40, dy * 40, 3) > 0.6) scale(out, 0.85)
+        return true
+      }
+      if (d < petal) {
+        set(out, [250, 250, 244], 0.86 + 0.14 * Math.cos(((ang - h) * 13) / 2) ** 2)
+        mixIn(out, [255, 220, 120], 0.25 * (1 - smooth(0.17, 0.3, d)))
+        return true
+      }
+      const leaf = Math.abs(Math.sin((ang - h - 0.4) * 2)) > 0.86 && d < 0.78
+      if (leaf) {
+        set(out, [74, 150, 64], 0.9 + 0.2 * (1 - d))
+        return true
+      }
+      return pot(out, d, 0.88, ux, uy)
+    }
+    case 'bonsai': {
+      // 樱花盆景：一团粉色的花冠，几簇深一点的花团，边上露出一截深蓝的釉盆
+      const wob = 1.05 + 0.12 * Math.sin((ang - h) * 5) + 0.06 * Math.sin((ang + h) * 9)
+      if (d < wob) {
+        const n = valueNoise(dx * 5 + 7, dy * 5 + 3, 11)
+        const cluster = valueNoise(dx * 2.4, dy * 2.4, 13)
+        set(out, [248, 178, 204], 0.72 + 0.4 * dome(d / wob, ux, uy))
+        if (cluster > 0.62) mixIn(out, [222, 110, 150], 0.45)
+        if (n > 0.72) mixIn(out, [255, 240, 246], 0.6)
+        scale(out, 1 - 0.25 * smooth(0.82, 1, d / wob))
+        return true
+      }
+      const c = Math.cos(h)
+      const s = Math.sin(h)
+      const px = dx * c + dy * s
+      const py = -dx * s + dy * c
+      if (Math.abs(px) < 1.28 && Math.abs(py) < 0.7) {
+        set(out, [40, 66, 120], 0.9 + 0.25 * (Math.abs(py) > 0.6 ? 1 : 0))
+        return true
+      }
+      return false
+    }
+    case 'cactus': {
+      // 仙人掌：一圈陶盆，盆里一个带棱的绿球，顶上开一朵小粉花
+      if (d < 0.62) {
+        const rib = 0.5 + 0.5 * Math.cos((ang - h) * 12)
+        set(out, [64, 150, 82], (0.6 + 0.5 * dome(d / 0.62, ux, uy)) * (0.82 + 0.22 * rib))
+        const spine = rib > 0.96 && Math.abs(((d * 9) % 1) - 0.5) < 0.12
+        if (spine) mixIn(out, [246, 240, 210], 0.8)
+        if (d < 0.14) set(out, [246, 110, 150], 0.9 + 0.2 * dome(d / 0.14, ux, uy))
+        return true
+      }
+      return pot(out, d, 0.98, ux, uy)
+    }
+    case 'submarine': {
+      // 玩具潜艇：黄色的胶囊、正中一座指挥塔、两侧舷窗，尾巴上一副螺旋桨
+      const c = Math.cos(h)
+      const s = Math.sin(h)
+      const px = dx * c + dy * s
+      const py = -dx * s + dy * c
+      const half = 1.15
+      const w = 0.42
+      const along = Math.max(0, Math.abs(px) - (half - w))
+      const body = Math.hypot(along, py)
+      if (body < w) {
+        const k = body / w
+        const nx = (along * Math.sign(px)) / (body || 1)
+        const ny = py / (body || 1)
+        const wx = nx * c - ny * s
+        const wy = nx * s + ny * c
+        set(out, [250, 200, 40], 0.62 + 0.5 * dome(k, wx, wy))
+        if (Math.abs(px + 0.25) < 0.22 && Math.abs(py) < 0.18) set(out, [210, 150, 30], 1.05)
+        for (const ox of [0.35, 0.72]) if (Math.hypot(px - ox, Math.abs(py) - 0.28) < 0.07) set(out, [40, 90, 130], 1)
+        return true
+      }
+      if (px < -half && px > -half - 0.28 && Math.abs(py) < 0.32 * Math.abs(Math.cos((py / 0.32) * Math.PI * 1.5))) {
+        set(out, [150, 150, 150], 1)
+        return true
+      }
+      return false
+    }
+    case 'column': {
+      // 断柱：一截有凹槽的柱身，顶上是断开的毛面，脚下一块方的柱础
+      if (d < 0.72) {
+        const flute = 0.5 + 0.5 * Math.cos((ang - h) * 16)
+        const rough = valueNoise(dx * 9 + 3, dy * 9, 21)
+        set(out, [236, 214, 172], 0.72 + 0.32 * rough)
+        if (d > 0.6) scale(out, 0.82 + 0.18 * flute)
+        if (rough < 0.3) scale(out, 0.8)
+        return true
+      }
+      const c = Math.cos(h)
+      const s = Math.sin(h)
+      const px = dx * c + dy * s
+      const py = -dx * s + dy * c
+      if (Math.max(Math.abs(px), Math.abs(py)) < 0.98) {
+        const e = 0.98 - Math.max(Math.abs(px), Math.abs(py))
+        const nx = Math.abs(px) > Math.abs(py) ? Math.sign(px) : 0
+        const ny = nx === 0 ? Math.sign(py) : 0
+        const lit = -(nx * c - ny * s) * LX - (nx * s + ny * c) * LY
+        set(out, [214, 184, 136], 0.9 + (e < 0.12 ? 0.35 * lit : 0))
+        return true
+      }
+      return false
+    }
+    case 'geode': {
+      // 晶洞：粗糙的石壳剖开，里面一圈白石英、再往里是紫水晶，夹着几粒黄水晶
+      const shell = 1.15 + 0.1 * valueNoise(ang * 2.5 + 9, h, 31)
+      if (d > shell) return false
+      const t = d / shell
+      if (t > 0.78) {
+        set(out, [120, 104, 96], 0.7 + 0.45 * dome((t - 0.78) / 0.22, ux, uy) * (0.8 + 0.4 * valueNoise(dx * 8, dy * 8, 33)))
+        return true
+      }
+      if (t > 0.66) {
+        set(out, [240, 236, 246], 0.92)
+        return true
+      }
+      const facet = valueNoise(dx * 7 + 1, dy * 7 + 5, 35)
+      const shine = Math.max(0, Math.cos(ang * 6 + facet * 9))
+      set(out, [150, 84, 214], 0.45 + 0.5 * t + 0.35 * shine * facet)
+      if (valueNoise(dx * 3.2 + 11, dy * 3.2, 37) > 0.78) set(out, [250, 196, 70], 0.75 + 0.4 * shine)
+      return true
+    }
+    case 'ice': {
+      // 冰块：一块方的冰，边上的斜面迎光亮，里面几道裂纹
+      const c = Math.cos(h)
+      const s = Math.sin(h)
+      const px = dx * c + dy * s
+      const py = -dx * s + dy * c
+      const e = 0.8 - Math.max(Math.abs(px), Math.abs(py))
+      if (e < 0) return false
+      set(out, [200, 238, 252], 0.92)
+      if (e < 0.14) {
+        const nx = Math.abs(px) > Math.abs(py) ? Math.sign(px) : 0
+        const ny = nx === 0 ? Math.sign(py) : 0
+        const lit = -(nx * c - ny * s) * LX - (nx * s + ny * c) * LY
+        mixIn(out, lit > 0 ? [255, 255, 255] : [120, 180, 220], 0.6 * Math.abs(lit))
+      }
+      const crack = Math.abs(valueNoise(px * 3 + 2, py * 3, 41) - 0.5) < 0.03
+      if (crack) mixIn(out, [255, 255, 255], 0.8)
+      mixIn(out, [255, 255, 255], 0.4 * Math.exp(-(((px + py + 0.4) / 0.12) ** 2)))
+      return true
+    }
+    case 'volcano': {
+      // 冒泡的小火山：棕色的锥，顶上一口发红的火口，几道熔岩顺着坡淌下来
+      if (d > 1.4) return false
+      const t = d / 1.4
+      if (t < 0.2) {
+        set(out, [255, 110, 40], 0.7 + 0.5 * (1 - t / 0.2))
+        return true
+      }
+      const slope = clamp01(0.5 + 0.5 * (ux * LX + uy * LY) * 1.4)
+      set(out, [120, 74, 52], 0.55 + 0.6 * slope)
+      if (t < 0.27) set(out, [70, 40, 32], 1)
+      const flow = Math.abs(((ang - h) / (Math.PI * 2)) * 5 - Math.round(((ang - h) / (Math.PI * 2)) * 5))
+      if (flow < 0.05 * (1 - t) + 0.01 && t < 0.85) mixIn(out, [255, 96, 32], 0.9 * (1 - t))
+      return true
     }
   }
 }
 
-/** 凹槽：沿口一道亮线，远处那一面内壁从沿口往下暗进深处，槽底是房间颜色的细网格和一道往上透的光 */
-function pit(out: Rgb, color: Rgb, b: Box, x: number, y: number, aa: number): void {
-  const d = -sdBox(b, x, y)
-  const down = y - b.y0
-  set(out, DEEP)
-  const gx = Math.abs(((x - b.x0) % 0.5) - 0.25)
-  const gy = Math.abs(((y - b.y0) % 0.5) - 0.25)
-  const grid = Math.max(1 - smooth(0.2, 0.25, gx), 1 - smooth(0.2, 0.25, gy))
-  addGlow(out, color, 0.16 * grid)
-  const cx = (b.x0 + b.x1) / 2
-  const cy = (b.y0 + b.y1) / 2
-  addGlow(out, color, 0.32 * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / 4))
-  if (down < PIT_FACE_U) {
-    const t = down / PIT_FACE_U
-    set(out, GRAPHITE, 1.25 - 0.95 * t)
-    const band = Math.abs(((down + 0.1) % 0.38) - 0.19) < 0.02
-    if (band) addGlow(out, color, 0.25 * (1 - t))
+/** 这一点落在哪件摆件上，没有为 null */
+function ornamentAt(room: WarpRoom, x: number, y: number, out: Rgb): boolean {
+  for (const o of room.ornaments) {
+    const dx = x - o.x
+    const dy = y - o.y
+    if (dx * dx + dy * dy > (o.r + 0.2) ** 2) continue
+    if (ornament(out, o, dx, dy)) return true
   }
-  const rim = Math.exp(-((d / 0.05) ** 2))
-  addGlow(out, color, 1.1 * rim)
-  mixIn(out, [200, 255, 255], 0.35 * (1 - smooth(0, aa * 2, d)))
+  return false
 }
 
-/** 立柱的底座：方的金属墩子，四边斜面迎光亮、背光暗，顶上一圈房间颜色的灯 */
-function plinth(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
-  const d = -sdBox(b, x, y)
-  set(out, STEEL, 0.55)
-  const bev = 1 - smooth(0.05, 0.16, d)
-  if (bev > 0) {
-    const cx = (b.x0 + b.x1) / 2
-    const cy = (b.y0 + b.y1) / 2
-    const ax = Math.abs(x - cx) > Math.abs(y - cy) ? Math.sign(x - cx) : 0
-    const ay = ax === 0 ? Math.sign(y - cy) : 0
-    const lit = -(ax * LX + ay * LY)
-    for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 + 0.7 * lit * bev)
+/** 管口：一圈钢的箍，出口是往下抽的栅格口，进口是光面的落脚盘，盘上几道往缸里指的刻线 */
+function mouth(out: Rgb, d: number, R: number, ang: number, exit: boolean, dir: { x: number; y: number }, aa: number): void {
+  const t = d / R
+  if (t > 0.84) {
+    const bev = (t - 0.84) / 0.16
+    set(out, STEEL, 0.85 + 0.35 * Math.exp(-(((bev - 0.3) / 0.25) ** 2)))
+    return
   }
-  const ring = Math.exp(-(((d - 0.24) / 0.04) ** 2))
-  addGlow(out, color, 1.1 * ring)
-  if (d > 0.3) mixIn(out, [24, 30, 44], 0.7)
+  if (exit) {
+    set(out, DARK, 1 + 0.6 * t)
+    const bars = Math.abs(((ang / (Math.PI * 2)) * 10) % 1 - 0.5) > 0.4
+    const ring = Math.abs(t - 0.45) < 0.05 + aa / R
+    if ((bars && t > 0.18) || ring) set(out, STEEL, 0.55 + 0.3 * t)
+    return
+  }
+  set(out, [176, 198, 208], 0.92 - 0.18 * t)
+  const groove = Math.abs(t - 0.62) < 0.03 + aa / R
+  if (groove) scale(out, 0.75)
+  const along = -(Math.cos(ang) * dir.x + Math.sin(ang) * dir.y) * t
+  if (t < 0.55 && Math.abs(((along * 3 + 10) % 1) - 0.5) < 0.06) scale(out, 0.8)
 }
 
-/** 出怪板：嵌进地面的暗槽，一根根栅条，四边一圈房间颜色的灯 */
-function plate(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
-  const d = -sdBox(b, x, y)
-  set(out, DEEP, 1.4)
-  const across = b.x1 - b.x0 > b.y1 - b.y0 ? x - b.x0 : y - b.y0
-  const bar = Math.abs(((across + 0.1) % 0.2) - 0.1) < 0.035
-  if (bar && d > 0.12) set(out, STEEL, 0.45)
-  addGlow(out, color, 0.9 * Math.exp(-(((d - 0.05) / 0.04) ** 2)))
-  addGlow(out, [255, 70, 90], 0.12 * smooth(0.1, 0.4, d))
+/** 投料口落饲料的小钢碗 */
+function bowl(out: Rgb, d: number, ux: number, uy: number): boolean {
+  if (d > BOWL_U) return false
+  const t = d / BOWL_U
+  if (t > 0.78) set(out, STEEL, 0.9 + 0.4 * dome((t - 0.78) / 0.22, ux, uy))
+  else set(out, [150, 170, 182], 0.7 + 0.3 * (1 - dome(t, ux, uy)))
+  return true
 }
 
-/** 传送台的台座：钢的外圈与斜面，暗色的台面上两道刻槽、一圈刻度，正中一块镜面 */
-function padBase(out: Rgb, r: number, R: number, ang: number, aa: number): void {
-  const t = r / R
-  set(out, [16, 24, 38])
-  if (t > 0.86) {
-    set(out, STEEL, 0.8)
-    const bev = (t - 0.86) / 0.14
-    mixIn(out, [220, 232, 245], 0.4 * Math.exp(-(((bev - 0.15) / 0.15) ** 2)))
-  }
-  for (const g of [0.36, 0.62]) {
-    const groove = Math.exp(-(((t - g) / (0.02 + aa / R)) ** 2))
-    for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.6 * groove) + 40 * groove * 0.2
-  }
-  if (t > 0.7 && t < 0.82) {
-    const tick = Math.abs(((ang / (Math.PI * 2)) * 24) % 1 - 0.5) > 0.42
-    if (tick) mixIn(out, [120, 140, 165], 0.5)
-  }
-  if (t < 0.2) mixIn(out, [60, 78, 102], 0.6 * (1 - t / 0.2))
-}
-
-/** 地砖：一格一块，冷白偏青，块与块之间一道缝，迎光的两边一线亮、背光的两边一线暗，块面有一点不匀；离墙、立柱与凹槽近的地方暗一点 */
-function tile(out: Rgb, x: number, y: number, ao: number, aa: number): void {
+/** 感应地板：一格一块，冷白里带一点这只缸的灯色，块与块之间一道缝，迎光的两边一线亮、背光的两边一线暗；离缸壁、摆件近的地方暗一点 */
+function tile(out: Rgb, color: Rgb, x: number, y: number, ao: number, aa: number): void {
   const fx = x - Math.floor(x)
   const fy = y - Math.floor(y)
   const h = valueNoise(Math.floor(x) * 1.37, Math.floor(y) * 1.91, 3)
-  set(out, TILE, 0.95 + 0.06 * h + 0.03 * (valueNoise(x * 6, y * 6, 5) - 0.5))
+  set(out, TILE, 0.95 + 0.05 * h + 0.03 * (valueNoise(x * 6, y * 6, 5) - 0.5))
+  mixIn(out, color, 0.07)
   const edge = Math.min(fx, 1 - fx, fy, 1 - fy)
   const seam = 1 - smooth(SEAM_U / 2, SEAM_U / 2 + aa, edge)
   const lit = (fx < 0.08 ? -LX : fx > 0.92 ? LX : 0) + (fy < 0.08 ? -LY : fy > 0.92 ? LY : 0)
   const bevel = Math.exp(-edge / 0.035)
-  for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.12 * bevel * Math.sign(lit)) * (1 - 0.32 * ao)
+  scale(out, (1 - 0.12 * bevel * Math.sign(lit)) * (1 - 0.32 * ao))
   mixIn(out, SEAM, seam)
 }
 
-/** 大厅地上嵌的一枚圆徽：两道同心圆，四个缺口对着四面 */
-function emblem(out: Rgb, color: Rgb, room: WarpRoom, x: number, y: number): void {
-  const dx = x - room.center.x
-  const dy = y - room.center.y
-  const r = Math.hypot(dx, dy)
-  const ang = Math.atan2(dy, dx)
-  const notch = Math.abs(((ang / (Math.PI / 2)) % 1 + 1) % 1 - 0.5) > 0.44
-  for (const [rr, w] of [
-    [2.6, 0.05],
-    [3.1, 0.12],
-  ] as const) {
-    const k = Math.exp(-(((r - rr) / w) ** 2)) * (notch ? 0 : 1)
-    mixIn(out, [40, 220, 240], 0.55 * k)
-    addGlow(out, color, 0.08 * k)
-  }
-}
-
-/** 这一点落在哪块平台的顶面上 */
+/** 这一点落在哪只缸的外沿里 */
 function slabAt(plan: WarpPlan, x: number, y: number): WarpRoom | null {
   for (const r of plan.rooms) if (x >= r.slab.x0 && x < r.slab.x1 && y >= r.slab.y0 && y < r.slab.y1) return r
   return null
 }
 
-/** 这一点落在哪块平台朝下的侧面上，从侧面上沿往下走到几成 */
+/** 这一点落在哪只缸朝下的玻璃正面上，从上沿往下走到几成 */
 function faceAt(plan: WarpPlan, x: number, y: number): { room: WarpRoom; t: number } | null {
   for (const r of plan.rooms) if (x >= r.slab.x0 && x < r.slab.x1 && y >= r.slab.y1 && y < r.slab.y1 + FACE_U) return { room: r, t: (y - r.slab.y1) / FACE_U }
   return null
 }
 
-/** 平台顶面上的一点：按落在哪一块画 */
-function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: number, aa: number, out: Rgb): void {
-  const color = prep.colors[room.index]!
+/**
+ * 缸壁的玻璃：半透明，底下的实验台透上来；里外两条边各一线高光，正中一道这只缸的灯色，斜着一道反光。返回透明度
+ */
+function glass(out: Rgb, color: Rgb, room: WarpRoom, x: number, y: number, aa: number): number {
   const f = room.floor
-  const pad = room.pad
-  const pr = sc.cfg.pad.radiusU
-  const pd = Math.hypot(x - pad.x, y - pad.y)
-  if (pd < pr) {
-    padBase(out, pd, pr, Math.atan2(y - pad.y, x - pad.x), aa)
-    return
-  }
-  const inFloor = x >= f.x0 && x < f.x1 && y >= f.y0 && y < f.y1
-  if (inFloor) {
-    if (room.pit && sdBox(room.pit, x, y) < 0) return pit(out, color, room.pit, x, y, aa)
-    for (const b of room.pillars) if (sdBox(grow(b, 0.12), x, y) < 0) return plinth(out, color, grow(b, 0.12), x, y)
-    for (const p of room.plates) if (sdBox(p.box, x, y) < 0) return plate(out, color, p.box, x, y)
-    let ao = 0
-    ao = Math.max(ao, Math.exp(-Math.max(0, -sdBox(f, x, y)) / 0.35) * 0.55)
-    if (room.pit) ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(room.pit, x, y)) / 0.3) * 0.25)
-    for (const b of room.pillars) {
-      const sx = x - 0.25
-      const sy = y - 0.35
-      ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(grow(b, 0.12), sx, sy)) / 0.25) * 0.55)
+  const s = room.slab
+  const inner = sdBox(f, x, y)
+  const outer = -sdBox(s, x, y)
+  set(out, GLASS, 0.7)
+  let a = 0.32
+  const edge = Math.max(1 - smooth(0, aa * 2.5, inner), 1 - smooth(0, aa * 2.5, outer))
+  mixIn(out, GLINT, edge)
+  a = Math.max(a, 0.9 * edge)
+  const mid = Math.exp(-(((inner - outer) / 0.12) ** 2))
+  addGlow(out, color, 0.35 * mid)
+  a = Math.max(a, 0.5 * mid)
+  const streak = Math.exp(-((((((x + y) % 7) - 3.5) / 0.35)) ** 2))
+  mixIn(out, GLINT, 0.4 * streak)
+  a = Math.max(a, 0.55 * streak)
+  return a
+}
+
+/** 缸的玻璃正面：上沿一线亮，往下透出实验台；返回透明度 */
+function face(out: Rgb, color: Rgb, x: number, t: number): number {
+  set(out, GLASS, 0.55)
+  mixIn(out, GLINT, 0.8 * Math.exp(-t / 0.06))
+  addGlow(out, color, 0.25 * Math.exp(-(((t - 0.85) / 0.08) ** 2)))
+  const streak = Math.exp(-((((((x * 0.9) % 5) - 2.5) / 0.3)) ** 2))
+  mixIn(out, GLINT, 0.35 * streak)
+  return Math.max(0.26 + 0.6 * Math.exp(-t / 0.06), 0.5 * streak, 0.7 * Math.exp(-(((t - 0.97) / 0.03) ** 2)))
+}
+
+/** 缸里的一点：缸底、管口、投料碗、出怪板与摆件；返回透明度 */
+function inside(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: number, aa: number, out: Rgb): number {
+  const color = prep.colors[room.index]!
+  const R = sc.cfg.pad.radiusU
+  if (ornamentAt(room, x, y, out)) return 1
+  for (const [p, exit, dir] of [
+    [room.exit, true, room.exitDir],
+    [room.entry, false, room.entryDir],
+  ] as const) {
+    const d = Math.hypot(x - p.x, y - p.y)
+    if (d < R) {
+      mouth(out, d, R, Math.atan2(y - p.y, x - p.x), exit, dir, aa)
+      return 1
     }
-    ao = Math.max(ao, Math.exp(-Math.max(0, pd - pr) / 0.18) * 0.4)
-    tile(out, x, y, ao, aa)
-    if (room.shape === 'hall') emblem(out, color, room, x, y)
-    return
   }
-  if (room.deck && sdBox(room.deck, x, y) < 0) {
-    const toFloor = -sdBox(room.deck, x, y)
-    const facing = room.deck.y1 <= f.y0 + 0.01 && room.deck.y1 - y < WALL_FACE_U
-    if (facing) return wallFace(out, color, 1 - (room.deck.y1 - y) / WALL_FACE_U)
-    deck(out, color, room.deck, x, y, aa)
-    addGlow(out, color, 0.9 * Math.exp(-(((toFloor - 0.1) / 0.05) ** 2)))
-    return
+  const bx = room.entry.x - room.entryDir.x * FEEDER_U
+  const by = room.entry.y - room.entryDir.y * FEEDER_U
+  const bd = Math.hypot(x - bx, y - by)
+  if (bowl(out, bd, bd > 1e-6 ? (x - bx) / bd : 0, bd > 1e-6 ? (y - by) / bd : 0)) return 1
+  for (const p of room.plates) {
+    if (sdBox(p.box, x, y) >= 0) continue
+    const d = -sdBox(p.box, x, y)
+    set(out, DARK, 1.4)
+    const across = p.box.x1 - p.box.x0 > p.box.y1 - p.box.y0 ? x - p.box.x0 : y - p.box.y0
+    if (Math.abs(((across + 0.1) % 0.2) - 0.1) < 0.035 && d > 0.12) set(out, STEEL, 0.45)
+    addGlow(out, color, 0.9 * Math.exp(-(((d - 0.05) / 0.04) ** 2)))
+    return 1
   }
-  const toFloor = sdBox(f, x, y)
-  const along = x < f.x0 || x >= f.x1 ? y : x
-  return lip(out, CYAN, along, clamp01(toFloor / sc.cfg.room.lipU), aa)
+  let ao = Math.exp(-Math.max(0, -sdBox(room.floor, x, y)) / 0.35) * 0.45
+  for (const o of room.ornaments) ao = Math.max(ao, 0.6 * (1 - smooth(o.r * 0.7, o.r + 0.25, Math.hypot(x - DROP.x - o.x, y - DROP.y - o.y))))
+  for (const p of [room.exit, room.entry]) ao = Math.max(ao, Math.exp(-Math.max(0, Math.hypot(x - p.x, y - p.y) - R) / 0.18) * 0.4)
+  tile(out, color, x, y, ao, aa)
+  return 1
 }
 
 /**
- * 跃迁站的地面：虚空透明，留给底下的着色器；四块平台的顶面是一格一块的冷白地砖，四边一圈护栏台沿，
- * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与传送台的台座也画在这里
+ * 实验台上的四只饲养缸：缸外的实验台透明，留给底下的着色器；缸底是一格一块的感应地板，四边一圈半透明的玻璃缸壁，
+ * 缸朝屏幕下方露出一截玻璃正面，在实验台上落下一片软影。管口、投料碗、出怪板与摆件也画在这里
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const plan = sc.plan
@@ -326,34 +455,22 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
       let alpha = 1
       const room = slabAt(plan, x, y)
       if (room) {
-        slabTop(sc, prep, room, x, y, aa, col)
-        // 平台的四条边缘：贴着虚空的那一圈一线亮
-        const e = -sdBox(room.slab, x, y)
-        mixIn(col, [170, 255, 255], 0.4 * (1 - smooth(0, aa * 2.5, e)))
+        const f = room.floor
+        if (x >= f.x0 && x < f.x1 && y >= f.y0 && y < f.y1) alpha = inside(sc, prep, room, x, y, aa, col)
+        else alpha = glass(col, prep.colors[room.index]!, room, x, y, aa)
       } else {
         const f = faceAt(plan, x, y)
         if (f) {
-          face(col, CYAN, x, f.t, aa)
+          alpha = face(col, prep.colors[f.room.index]!, x, f.t)
         } else {
           let shadow = 0
-          let glow = 0
-          let gc: Rgb = [0, 0, 0]
           for (const r of plan.rooms) {
             const s = { x0: r.slab.x0, y0: r.slab.y0, x1: r.slab.x1, y1: r.slab.y1 + FACE_U }
-            // 画面四周平铺：贴着方框边的影子要接上那一头平台落下来的
+            // 画面四周平铺：贴着方框边的影子要接上那一头的缸落下来的
             for (const ox of [-FRAME_U, 0, FRAME_U]) for (const oy of [-FRAME_U, 0, FRAME_U]) shadow = Math.max(shadow, 1 - smooth(-SHADOW.soft, SHADOW.soft, sdBox(s, x - SHADOW.x - ox, y - SHADOW.y - oy)))
-            const under = y - (r.slab.y1 + FACE_U)
-            if (x >= r.slab.x0 - 0.3 && x < r.slab.x1 + 0.3 && under >= 0 && under < 1.2) {
-              const k = Math.exp(-under / 0.35) * (1 - smooth(r.slab.x1 - 0.2, r.slab.x1 + 0.3, x)) * smooth(r.slab.x0 - 0.3, r.slab.x0 + 0.2, x)
-              if (k > glow) {
-                glow = k
-                gc = prep.colors[r.index]!
-              }
-            }
           }
-          set(col, [0, 4, 12])
-          alpha = Math.max(shadow * SHADOW.alpha, glow * 0.4)
-          if (glow * 0.4 > shadow * SHADOW.alpha) set(col, gc, 0.6)
+          set(col, [0, 6, 10])
+          alpha = shadow * SHADOW.alpha
         }
       }
       out[o] = col[0]

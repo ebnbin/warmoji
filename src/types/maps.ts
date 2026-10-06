@@ -1028,29 +1028,27 @@ export interface TheaterConfig {
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
 }
-/** 跃迁站的四间房各是什么样：空旷的大厅、立着几排柱子、绕着中央凹槽的回廊、狭长的一条 */
-export type WarpShape = 'hall' | 'pillars' | 'cloister' | 'narrow'
+/** 饲养缸里摆的小摆件，各借前面一张图里的一样东西：草甸的雏菊、樱庭的樱花盆景、沙漠的仙人掌、深海的玩具潜艇、残垣的断柱、紫水晶洞的晶洞、浮冰的冰块、火山的冒泡火山 */
+export type WarpOrnament = 'daisy' | 'bonsai' | 'cactus' | 'submarine' | 'column' | 'geode' | 'ice' | 'volcano'
 export interface WarpConfig {
   /**
-   * 方框切成 2×2 四间房，每间是方框的四分之一，画面上整块往四周平铺。平台摆在那一格正中，四边离格边都是 gapU 格（平铺后房与房之间都隔两倍的虚空），
-   * 四边一圈 lipU 格宽的台沿；狭长的那间只有 narrowU 格宽，其余铺成机柜台。能走的地方都落在整格上
+   * 方框切成 2×2 四只饲养缸，每只占方框的四分之一，画面上整块往四周平铺。缸摆在那一格正中，四边离格边都是 gapU 格（平铺后缸与缸之间都隔两倍的实验台），
+   * 四边一圈 lipU 格厚的玻璃缸壁；能走的缸底落在整格上
    */
-  readonly room: { readonly lipU: number; readonly gapU: number; readonly narrowU: number }
+  readonly room: { readonly lipU: number; readonly gapU: number }
   /** 窄过两倍 neckU 的缝不能走 */
   readonly neckU: number
-  /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着传送台 padClearU 格以内的不立 */
-  readonly pillars: { readonly firstU: number; readonly stepU: number; readonly count: number; readonly sizeU: number; readonly heightM: number; readonly padClearU: number }
-  /** 回廊正中凹槽的边长，格 */
-  readonly pitU: number
   /**
-   * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
-   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
-   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   * 管口：每只缸一个进口、一个出口，都是半径 radiusU 格的圆，圆心离缸壁 insetU 格；管子沿着同一条横线或竖线连起前一只缸的出口与后一只缸的进口，
+   * 离缸角至少 cornerU 格，同一只缸的进口与出口隔至少 apartU 格。
+   * 队长站在出口上充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起顺着管子滑 transitMs 到下一只缸的进口，那只缸的出口关上 cooldownMs。
+   * 出口每隔 shuttleMs（各缸错开）抽一次，站在上面的敌人一起送走，抽之前 warnMs 亮起来；送到的敌人以 spillU 格/秒往进口外涌
    */
   readonly pad: {
     readonly radiusU: number
-    readonly edgeU: number
+    readonly insetU: number
     readonly cornerU: number
+    readonly apartU: number
     readonly chargeMs: number
     readonly drainMs: number
     readonly transitMs: number
@@ -1059,13 +1057,20 @@ export interface WarpConfig {
     readonly warnMs: number
     readonly spillU: number
   }
-  /** 出怪板：一块长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
-  readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
-  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
+  /**
+   * 投喂：队伍每从管子里滑进一只缸，进口边的投料口落下一把金币当饲料、整队回 healFrac 的血；第 n 次（从 1 数）落 min(maxCoins, coins + perJump·(n − 1)) 枚，
+   * 每绕完一圈（第 4、8……次）再多落 lapCoins 枚
+   */
+  readonly feed: { readonly coins: number; readonly perJump: number; readonly maxCoins: number; readonly lapCoins: number; readonly healFrac: number }
+  /** 摆件：每只缸按它分到的季节摆 count 件（种子在范围里挑），半径见 layout 的 ORNAMENTS；离缸壁、管口、出怪板、开局站位与别的摆件至少 clearU 格 */
+  readonly ornaments: { readonly count: readonly [number, number]; readonly clearU: number }
+  /** 出怪板：每只缸沿缸壁 count 块，长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
+  readonly emitters: { readonly count: number; readonly plateU: number; readonly markU: number; readonly clearU: number }
+  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每只缸按种子分到一种 */
   readonly recipes: readonly [string, string, string, string]
-  /** 核心柱：半径（格），头目从这里被抛进队长所在的那间 */
+  /** 正中的给料塔：半径（格），头目从这里被投进队伍所在的那只缸 */
   readonly core: { readonly radiusU: number }
-  /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
+  /** 缸底的感应地板被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
 }
 export interface TorusConfig {
