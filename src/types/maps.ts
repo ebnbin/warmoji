@@ -187,8 +187,8 @@ export interface NebulaConfig {
   readonly cameraU: number
 }
 /**
- * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
- * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
+ * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座积雪的火山背靠盆地边，山体谁也上不去。
+ * 火山隔很久从火山口喷发一次，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人，火山周围常年下着的雪再慢慢把岩石盖住
  */
 export interface VolcanoConfig {
   /** 地形格子的边长，高度与厚度也以格计；地形铺满方框 */
@@ -217,8 +217,6 @@ export interface VolcanoConfig {
     readonly footHeight: number
     readonly radiusU: number
     readonly craterDepth: number
-    /** 火山口里熔岩湖的液面比火山口底高多少 */
-    readonly lakeDepth: number
     /** 山坡上放射状冲沟的深度 */
     readonly gullyDepth: number
   }
@@ -263,6 +261,19 @@ export interface VolcanoConfig {
     readonly teamDps: number
     readonly enemyDps: number
     readonly tickMs: number
+  }
+  /**
+   * 积雪，只是画面：火山周围一大片常年下雪，雪区的中心从火山口朝地图里挪 shiftU 格，半径 radiusU 按方位在 ±wobble 倍内起伏，最外 edgeU 格由厚变薄。
+   * 熔岩凝成的新岩石凉过 warmMs 雪才积得住，之后 coverMs 积满；喷发时落在雪上的灰，新雪 buryMs 盖得住
+   */
+  readonly snow: {
+    readonly radiusU: number
+    readonly edgeU: number
+    readonly wobble: number
+    readonly shiftU: number
+    readonly warmMs: number
+    readonly coverMs: number
+    readonly buryMs: number
   }
 }
 /** 一列涌浪：波高（米）、周期（秒）、相对船头往哪个方向传（度，0 为顺着船头、90 为从左舷推向右舷） */

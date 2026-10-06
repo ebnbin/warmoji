@@ -26,9 +26,8 @@ export interface LavaField {
   readonly heat: Float32Array
   /** 凝固成岩的时刻，毫秒；从没凝固过是 -Infinity */
   readonly rockAt: Float32Array
-  /** 火山口里常年不凝的熔岩湖：液面由岩浆通道撑着，流进来的熔岩也从通道里回落 */
-  readonly lake: Uint8Array
-  readonly lakeFloor: Float32Array
+  /** 火山口底的岩浆通道：流进来的熔岩从这里回落，口里不存熔岩 */
+  readonly conduit: Uint8Array
   /** 每格每秒降多少温度：离火山口越远冷得越快 */
   readonly cool: Float32Array
   readonly craterX: number
@@ -125,7 +124,7 @@ function edgeDepthU(x: number, y: number, map: Rect, cornerU: number): number {
 }
 
 /** 噪声拉开对比度落到 [0, 1]：分形噪声大多挤在中间 */
-function spread01(n: number): number {
+export function spread01(n: number): number {
   return Math.min(1, Math.max(0, (n - 0.5) * 2.4 + 0.5))
 }
 
@@ -151,7 +150,7 @@ function rimRise(cfg: VolcanoConfig, depthU: number, tall: number): number {
 
 /**
  * 按种子生成地形：先定下能走的盆地（地图矩形里起伏的边，扣掉山体，出生点四周总空着），再铺高度：火山加上朝地图里的整体下倾与起伏，
- * 盆地边外立起崖壁与高地（靠近火山处让给山体）；火山口里灌上熔岩湖，再补上开局前那几次喷发留下的岩石。格子铺满方框
+ * 盆地边外立起崖壁与高地（靠近火山处让给山体）；再补上开局前那几次喷发留下的岩石。格子铺满方框
  */
 export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point): LavaField {
   const cell = cfg.cellU * UNIT
@@ -176,8 +175,7 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
     lava: new Float32Array(n),
     heat: new Float32Array(n),
     rockAt: new Float32Array(n).fill(-Infinity),
-    lake: new Uint8Array(n),
-    lakeFloor: new Float32Array(n),
+    conduit: new Uint8Array(n),
     cool: new Float32Array(n),
     craterX: c.x,
     craterY: c.y,
@@ -188,7 +186,6 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
     nextHeat: new Float32Array(n),
   }
   const t = cfg.terrain
-  const lakeLevel = cone.height - cone.craterDepth + cone.lakeDepth
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       const i = cy * cols + cx
@@ -207,12 +204,7 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, map: Rect, spawn: Point)
         coneHeight(cfg, dCone) - gully(cfg, seed, dx, dy, dCone) + (relief * Math.min(1, dU / cone.radiusU) - t.tilt * (dx * c.inX + dy * c.inY)) * outside + bank
       f.ground[i] = g
       f.cool[i] = cfg.lava.cooling * (1 + (dU / cfg.lava.coolRadiusU) ** 2)
-      if (dU < cone.craterU * 0.8) {
-        f.lake[i] = 1
-        f.lakeFloor[i] = Math.max(EPS * 2, lakeLevel - g)
-        f.lava[i] = f.lakeFloor[i]!
-        f.heat[i] = 1
-      }
+      if (dU < cone.craterU * 0.8) f.conduit[i] = 1
     }
   }
   for (let k = 0; k < cfg.eruption.history; k++) runEruption(f, cfg, spillOf(f, cfg, rng), -1e9)
@@ -309,7 +301,7 @@ function runEruption(f: LavaField, cfg: VolcanoConfig, spill: Spill, at: number)
 }
 
 function hasFlow(f: LavaField): boolean {
-  for (let i = 0; i < f.lava.length; i++) if (f.lava[i]! > 0 && !f.lake[i]) return true
+  for (let i = 0; i < f.lava.length; i++) if (f.lava[i]! > 0) return true
   return false
 }
 
@@ -317,10 +309,10 @@ function hasFlow(f: LavaField): boolean {
  * 积分一步。熔岩按宾汉流体流动：朝一个邻格流，厚度要超过屈服强度除以那个方向的坡度，坡越缓要堆得越厚；
  * 超出的部分乘坡度作为分量，按分量分给更低的邻格，一步最多流走一半高差。越冷屈服强度越大、流得越慢，
  * 离火山口越远冷得越快，低于凝固温度就把厚度加进地面变成岩石；陡坡上流干的地方也留下一层岩壳。
- * 熔岩湖一直是热的，液面不变。
+ * 流进火山口底通道的熔岩回落下去。
  */
 export function stepLava(f: LavaField, c: VolcanoConfig['lava'], dt: number, now: number, spill: Spill, volume: number): void {
-  const { cols, rows, ground, lava, heat, nextLava, nextHeat, lake } = f
+  const { cols, rows, ground, lava, heat, nextLava, nextHeat, conduit } = f
   const cellU = f.cell / UNIT
   for (let i = 0; i < lava.length; i++) {
     nextLava[i] = lava[i]!
@@ -379,9 +371,9 @@ export function stepLava(f: LavaField, c: VolcanoConfig['lava'], dt: number, now
     }
   }
   for (let i = 0; i < lava.length; i++) {
-    if (lake[i]) {
-      lava[i] = f.lakeFloor[i]!
-      heat[i] = 1
+    if (conduit[i]) {
+      lava[i] = 0
+      heat[i] = 0
       continue
     }
     const l = nextLava[i]!
@@ -405,12 +397,17 @@ export function stepLava(f: LavaField, c: VolcanoConfig['lava'], dt: number, now
   }
 }
 
-/** 这一点脚下是不是还没凝固的熔岩 */
-export function moltenAt(f: LavaField, x: number, y: number): boolean {
+/** (x, y) 像素落在哪一格，场外是 -1 */
+export function cellAt(f: Pick<LavaField, 'cols' | 'rows' | 'cell' | 'x0' | 'y0'>, x: number, y: number): number {
   const cx = Math.floor((x - f.x0) / f.cell)
   const cy = Math.floor((y - f.y0) / f.cell)
-  if (cx < 0 || cy < 0 || cx >= f.cols || cy >= f.rows) return false
-  return f.lava[cy * f.cols + cx]! > 0
+  return cx < 0 || cy < 0 || cx >= f.cols || cy >= f.rows ? -1 : cy * f.cols + cx
+}
+
+/** 这一点脚下是不是还没凝固的熔岩 */
+export function moltenAt(f: LavaField, x: number, y: number): boolean {
+  const i = cellAt(f, x, y)
+  return i >= 0 && f.lava[i]! > 0
 }
 
 /**

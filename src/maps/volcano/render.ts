@@ -10,6 +10,9 @@ import type { Point } from '../../util/vec'
 /** 刚凝固的岩石裂缝里透出的红光多久褪尽 */
 export const EMBER_MS = 11000
 
+/** 风把烟、灰和雪往哪吹，像素/秒 */
+export const WIND = { x: 22, y: -9 } as const
+
 /** 画面上算作有熔岩的最薄厚度 */
 const LAVA_THIN = 0.005
 
@@ -37,14 +40,14 @@ export function lavaShown(f: LavaField, now: number): LavaShown {
   return s
 }
 
-const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
-function smooth(e0: number, e1: number, x: number): number {
+export const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
+export function smooth(e0: number, e1: number, x: number): number {
   const t = clamp01((x - e0) / (e1 - e0))
   return t * t * (3 - 2 * t)
 }
 
 /** 场里 (u, v) 处按格心双线性取值，u、v 以格计、格心在整数处 */
-function bilinear(a: ArrayLike<number>, f: Pick<LavaField, 'cols' | 'rows'>, u: number, v: number): number {
+export function bilinear(a: ArrayLike<number>, f: Pick<LavaField, 'cols' | 'rows'>, u: number, v: number): number {
   const x = Math.min(f.cols - 1.001, Math.max(0, u))
   const y = Math.min(f.rows - 1.001, Math.max(0, v))
   const ix = Math.floor(x)
@@ -81,7 +84,7 @@ const LIGHT_Y = SUN.y
 const LIGHT_Z = SUN.z
 
 /** 往光源方向看这么远（格）找挡光的地形 */
-const SHADOW_STEPS = [0.4, 0.9, 1.5, 2.3] as const
+export const SHADOW_STEPS = [0.4, 0.9, 1.5, 2.3] as const
 
 /** 岩石的遮罩：凝固过的格子与开局后才凝固的格子，都平滑过一遍 */
 export interface RockMasks {
@@ -118,7 +121,7 @@ export interface GroundMarks {
 }
 
 /** 洞往崖里伸进去多深，格 */
-const CAVE_DEPTH_U = 1
+export const CAVE_DEPTH_U = 1
 
 /** 发给画地面的线程：先 setup 一次，每批活先给 state（当下的地形与岩石），再一块一块要 paint */
 export type GroundJob =
@@ -139,7 +142,7 @@ export interface GroundPiece {
 }
 
 /**
- * 地表：盆地里是灰黑的火山灰地面，火山是红褐色的火山渣，凝固的熔岩是偏冷的黑色玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
+ * 地表：盆地里是灰黑的火山灰地面，火山是深褐的火山渣，口沿一圈被灰染得发灰，凝固的熔岩是偏冷的黑色玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
  * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺；崖脚的洞口黑洞洞的，深处透着熔岩的暗红。
  * ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子，out 里按这块的范围逐行排。
  */
@@ -206,13 +209,13 @@ export function paintGround(
       }
       if (dU < cone.blockU + 3) {
         const cinder = smooth(cone.blockU + 3, cone.blockU - 0.5, dU) * (0.8 + grain * 0.35)
-        r += (118 - r) * cinder
-        g += (58 - g) * cinder
-        b += (40 - b) * cinder
+        r += (86 - r) * cinder
+        g += (66 - g) * cinder
+        b += (58 - b) * cinder
         const summit = smooth(cone.craterU + 1.6, cone.craterU + 0.1, dU) * 0.6
-        r += (131 - r) * summit
-        g += (136 - g) * summit
-        b += (141 - b) * summit
+        r += (84 - r) * summit
+        g += (84 - g) * summit
+        b += (86 - b) * summit
         if (steep > 0) {
           const a = Math.atan2(oy, ox)
           const scree = fbm(Math.cos(a) * 14 + 5, Math.sin(a) * 14 + dU * 0.35, seed + 81, 2)
@@ -222,11 +225,11 @@ export function paintGround(
           b *= k
         }
         const lip = Math.exp(-(((dU - cone.craterU) / 0.28) ** 2))
-        r += (150 - r) * lip * 0.55
-        g += (80 - g) * lip * 0.55
-        b += (56 - b) * lip * 0.55
+        r += (104 - r) * lip * 0.55
+        g += (74 - g) * lip * 0.55
+        b += (62 - b) * lip * 0.55
         if (dU < cone.craterU) {
-          const pit = smooth(cone.craterU * 0.95, cone.craterU * 0.5, dU)
+          const pit = smooth(cone.craterU, cone.craterU * 0.6, dU)
           r += (19 - r) * pit
           g += (24 - g) * pit
           b += (28 - b) * pit
@@ -441,12 +444,8 @@ function blur(a: Float32Array, cols: number, rows: number, r: number): void {
   }
 }
 
-/**
- * 熔岩的片元着色器，四边形盖住整块场地，坐标以格计、y 朝下。四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。熔岩按温度从白黄到暗红，冷下来结出暗色硬壳，壳块之间的缝透出熔岩；
- * 壳块与热熔岩上漂着的硬壳按流向图顺坡往下漂，火山口里的熔岩湖打着转，喷发时湖面随流量涨到口沿；按扭曲过的坐标采样，边缘不顺着格子走。
- * 输出按预乘透明度：熔岩盖在地上，辉光、余烬叠加发亮。
- */
-export const LAVA_FRAG = `
+/** 画在场地上的着色器都从这里开头：Phaser 的模板与精度，共用的哈希、值噪声与细胞噪声里次近与最近特征点的距离差 */
+export const FRAG_PRELUDE = `
 #pragma phaserTemplate(shaderName)
 #pragma phaserTemplate(extensions)
 #pragma phaserTemplate(features)
@@ -459,13 +458,6 @@ precision mediump float;
 varying vec2 outTexCoord;
 #pragma phaserTemplate(outVariables)
 #pragma phaserTemplate(fragmentHeader)
-uniform sampler2D uLava;
-uniform sampler2D uAux;
-uniform float uTime;
-uniform vec2 uGrid;
-uniform vec3 uCrater;
-uniform float uWarn;
-uniform float uErupt;
 
 vec2 hash2(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -503,6 +495,22 @@ float plates(vec2 p) {
   }
   return d2 - d1;
 }
+`
+
+/**
+ * 熔岩的片元着色器，四边形盖住整块场地，坐标以格计、y 朝下。四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。熔岩按温度从白黄到暗红，冷下来结出暗色硬壳，壳块之间的缝透出熔岩；
+ * 壳块与热熔岩上漂着的硬壳按流向图顺坡往下漂；按扭曲过的坐标采样，边缘不顺着格子走。
+ * 火山口里的熔岩按 uPool 画：x 漫到口沿的几成（不到两成半时淡出），y 温度，z 喷涌的劲，w 口底裂缝透出的红光。
+ * 预兆时口底的裂缝先透出红光，熔岩从通道里涌上来；喷发时熔岩从口底中心往上翻、往外漫过参差的口沿，涌口白热、不结壳；喷完熔岩往下回落，结壳变暗。
+ * 输出按预乘透明度：熔岩盖在地上，辉光、余烬叠加发亮。
+ */
+export const LAVA_FRAG = `${FRAG_PRELUDE}
+uniform sampler2D uLava;
+uniform sampler2D uAux;
+uniform float uTime;
+uniform vec2 uGrid;
+uniform vec3 uCrater;
+uniform vec4 uPool;
 
 vec3 ramp(float t) {
   vec3 c0 = vec3(0.30, 0.05, 0.03);
@@ -529,22 +537,25 @@ void main ()
   float shape = lv.r;
   float heat = lv.g;
   float ember = lv.b;
-  vec3 add = vec3(1.0, 0.36, 0.08) * ax.r * (0.3 + 0.3 * uErupt);
+  float vigor = uPool.z;
+  vec3 add = vec3(1.0, 0.36, 0.08) * ax.r * (0.3 + 0.3 * vigor);
   vec3 col = vec3(0.0);
   float alpha = 0.0;
   float ragged = (vnoise(cell * 1.9) - 0.5) * 0.22 + (vnoise(cell * 4.3 + 11.0) - 0.5) * 0.1;
   float cover = smoothstep(0.42, 0.52, shape + ragged * smoothstep(0.0, 0.2, shape));
   vec2 rc = cell - uCrater.xy;
-  float lake = 1.0 - smoothstep(uCrater.z * 0.6, uCrater.z * 0.95, length(rc));
-  float brim = uCrater.z * (0.8 + 0.32 * uErupt) + ragged * 0.6;
-  float swell = 1.0 - smoothstep(brim - 0.12, brim, length(rc));
-  cover = max(cover, swell);
-  heat = max(heat, swell);
+  float rr = length(rc);
+  vec2 outward = rc / max(rr, 0.001);
+  float bulge = vnoise(outward * 1.6 + vec2(uTime * 0.05, 5.0)) * 0.6 + vnoise(outward * 4.1 + vec2(2.0, uTime * 0.08)) * 0.4;
+  float lip = uCrater.z * uPool.x * (0.78 + 0.4 * bulge) + ragged * 0.8;
+  float filled = smoothstep(0.0, 0.25, uPool.x);
+  float pool = (1.0 - smoothstep(lip - 0.35, lip, rr)) * filled;
+  float gush = (1.0 - smoothstep(0.0, uCrater.z * 0.42, rr)) * pool * vigor;
+  cover = max(cover, pool);
+  heat = mix(heat, max(heat, uPool.y), pool);
   if (cover > 0.001) {
-    vec2 dir = ax.gb * 2.0 - 1.0;
-    vec2 swirl = vec2(-rc.y, rc.x) / max(length(rc), 0.001);
-    dir = mix(dir, swirl, lake);
-    float speed = (0.3 + 0.8 * heat) * 2.1 * (1.0 - lake * 0.8);
+    vec2 dir = mix(ax.gb * 2.0 - 1.0, outward * smoothstep(0.0, uCrater.z * 0.35, rr), pool);
+    float speed = (0.3 + 0.8 * heat) * 2.1 * mix(1.0, 0.1 + 0.9 * vigor, pool);
     float ph = fract(uTime / 2.2);
     float ph2 = fract(ph + 0.5);
     float w = abs(1.0 - 2.0 * ph);
@@ -554,19 +565,26 @@ void main ()
     float e = mix(plates(a), plates(b), w);
     float fine = mix(plates(a * 2.3), plates(b * 2.3 + 1.7), w);
     float churn = mix(vnoise(a * 1.3), vnoise(b * 1.3 + 3.1), w);
-    float hot = clamp(heat * (0.64 + 0.42 * churn), 0.0, 1.0);
+    float hot = clamp(max(heat * (0.64 + 0.42 * churn), gush * (0.85 + 0.15 * churn)), 0.0, 1.0);
     vec3 molten = ramp(hot);
     molten += vec3(0.25, 0.22, 0.12) * smoothstep(0.78, 0.95, churn) * smoothstep(0.85, 1.0, heat);
-    float rafts = smoothstep(0.6, 0.72, churn) * (1.0 - lake) * (1.0 - swell);
-    float skin = max(max(1.0 - smoothstep(0.4, 1.02, heat), lake * (0.92 - 0.55 * uErupt)), rafts * 0.9);
-    float seam = mix(0.025 + 0.2 * heat * heat, 0.05 + 0.04 * sin(uTime * 1.3 + churn * 5.0), lake);
+    float rafts = smoothstep(0.6, 0.72, churn) * (1.0 - pool);
+    float skin = max(1.0 - smoothstep(0.4, 1.02, heat), rafts * 0.9) * (1.0 - gush);
+    float seam = 0.025 + 0.2 * heat * heat;
     float crust = skin * smoothstep(seam, seam + 0.06, e) * smoothstep(0.02, 0.07 + 0.1 * heat, fine + 0.05);
-    float rim = (1.0 - smoothstep(0.55, 0.8, shape)) * (1.0 - lake) * (1.0 - swell);
+    float rim = (1.0 - smoothstep(0.55, 0.8, shape)) * (1.0 - pool) * (1.0 - (1.0 - smoothstep(lip, lip + 1.5, rr)) * filled);
     crust = max(crust, rim * 0.85);
     vec3 crustCol = vec3(0.12, 0.075, 0.065) + vec3(0.08, 0.025, 0.0) * churn + vec3(0.25, 0.05, 0.0) * (1.0 - smoothstep(0.0, 0.08, e)) * heat;
     col = mix(molten, crustCol, crust);
     alpha = cover;
-    add += molten * (1.0 - crust) * cover * hot * (0.05 + 0.25 * lake * max(uWarn, uErupt));
+    add += molten * (1.0 - crust) * cover * hot * (0.05 + 0.3 * gush + 0.1 * pool * vigor);
+  }
+  float bed = 1.0 - smoothstep(uCrater.z * 0.55, uCrater.z * 0.95, rr);
+  if (uPool.w > 0.001 && bed > 0.0) {
+    vec2 warp = cell * 1.4 + vec2(vnoise(cell * 0.9 + 4.0), vnoise(cell * 0.9 + 13.0)) * 1.2;
+    float crack = 1.0 - smoothstep(0.0, 0.07, plates(warp + 2.7));
+    float pulse = 0.7 + 0.3 * sin(uTime * 2.1 + vnoise(cell * 0.6) * 6.0);
+    add += vec3(1.0, 0.24, 0.05) * (crack * 0.85 + 0.2) * bed * uPool.w * pulse * (1.0 - pool);
   }
   if (ember > 0.004) {
     vec2 warp = cell * 0.8 + vec2(vnoise(cell * 0.7), vnoise(cell * 0.7 + 9.0)) * 1.3;
