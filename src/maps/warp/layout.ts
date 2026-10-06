@@ -7,10 +7,16 @@ import type { Point } from '../../util/vec'
 
 /** 能走的地面按这么细的格子算距离场，格 */
 const BASIN_CELL_U = 0.25
-/** 方框正中，格：四间房绕着它，核心柱立在这里 */
+/** 方框正中，格：四个象限各归一季 */
 const MID = FRAME_U / 2
 
-export const SHAPES: readonly WarpShape[] = ['hall', 'pillars', 'cloister', 'narrow']
+/** 四季各拿前面两张图里的一件东西装进标本罐：草甸的小花、樱庭的樱花；沙漠的驼骨、深海的气泡；残垣的枫叶、紫水晶；浮冰的冰块、火山 */
+export const TOKENS: readonly (readonly [string, string])[] = [
+  ['1f33c', '1f338'],
+  ['1f9b4', '1fae7'],
+  ['1f341', '1f48e'],
+  ['1f9ca', '1f30b'],
+]
 
 /** 格上的一块方形：[x0, x1) × [y0, y1) */
 export interface Box {
@@ -27,65 +33,66 @@ export interface Plate {
   readonly y: number
 }
 
-/**
- * 一间房，格：在环上排第 index，方框里的象限 quad（0 左上、1 右上、2 右下、3 左下）；形状、签名（主色与地板的待机律动）、敌人配方（cfg.recipes 的第几种）；
- * 平台与能走的方块；中心；传送台的圆心；出怪板；立柱、凹槽与机柜台；toward 是传送台朝下一间的方向
- */
-export interface WarpRoom {
+/** 一扇门，格：全图第 index 扇，在第 room 间舱室、靠第 wall 面墙（0 上 1 右 2 下 3 左），台心与朝屋里的方向；通往第 to 间舱室的入口；exit 为真是标着「出口」的那扇 */
+export interface Door {
   readonly index: number
-  readonly quad: number
-  readonly shape: WarpShape
-  readonly sign: number
+  readonly room: number
+  readonly wall: number
+  readonly x: number
+  readonly y: number
+  readonly nx: number
+  readonly ny: number
+  readonly to: number
+  readonly exit: boolean
+}
+
+/** 墙边一处圆台：台心、靠哪面墙、朝屋里的方向 */
+interface Spot {
+  readonly wall: number
+  readonly x: number
+  readonly y: number
+  readonly nx: number
+  readonly ny: number
+}
+
+/**
+ * 一间舱室，格：第 index 间，门牌 code；季节、敌人配方（cfg.recipes 的第几种）、标本罐里装的东西；里面的样子；
+ * 分到的格、平台与能走的方块、中心；入口（只进不出）与它靠的墙；门；出怪板；机柜、凹槽与标本罐；两台监控装在平台的哪两个角上
+ */
+export interface Chamber {
+  readonly index: number
+  readonly code: number
+  readonly season: number
   readonly recipe: number
+  readonly token: string
+  readonly shape: WarpShape
+  readonly cell: Box
   readonly slab: Box
   readonly floor: Box
   readonly center: Point
-  readonly pad: Point
+  readonly entry: Point
+  readonly entryWall: number
+  readonly doors: readonly Door[]
   readonly plates: readonly Plate[]
-  readonly pillars: readonly Box[]
+  readonly racks: readonly Box[]
   readonly pit: Box | null
-  readonly deck: Box | null
-  readonly toward: Point
+  readonly jar: Box
+  readonly cams: readonly Point[]
 }
 
 /**
- * 这一局的跃迁站，格：四间房按环排（第 i 间的传送台送到第 i + 1 间），mirror 为真时环逆时针；队伍从开局那间的中心出发；
- * 能走的地面；每块瓷砖属于哪间房（不会亮的为 −1）；核心柱在正中
+ * 这一局的迷宫，格：舱室、全图的门（按 index 排）；队伍从 start 那间的中心出发；顺着「出口」走一圈的次序 loop；
+ * 能走的地面，每间舱室自己能走的地面；每块瓷砖属于哪间舱室（不会亮的为 −1）；每一格属于哪间舱室分到的格
  */
 export interface WarpPlan {
-  readonly mirror: boolean
-  readonly rooms: readonly WarpRoom[]
-  readonly start: Point
+  readonly rooms: readonly Chamber[]
+  readonly doors: readonly Door[]
+  readonly start: number
+  readonly loop: readonly number[]
   readonly basin: Basin
-  /** 每间房自己能走的地面，按环的次序：身体只在自己那间里挪 */
   readonly basins: readonly Basin[]
   readonly tiles: Int8Array
-  readonly core: Point
-}
-
-/** 一间房局部的坐标（左上那间、内角朝右下）转到方框里：绕方框中心顺时针转 turn 个直角，再按 mirror 左右翻 */
-function place(turn: number, mirror: boolean, u: number, v: number): Point {
-  let x = u
-  let y = v
-  for (let k = 0; k < turn; k++) {
-    const nx = FRAME_U - y
-    y = x
-    x = nx
-  }
-  return { x: mirror ? FRAME_U - x : x, y }
-}
-
-function placeBox(turn: number, mirror: boolean, b: Box): Box {
-  const a = place(turn, mirror, b.x0, b.y0)
-  const c = place(turn, mirror, b.x1, b.y1)
-  return { x0: Math.min(a.x, c.x), y0: Math.min(a.y, c.y), x1: Math.max(a.x, c.x), y1: Math.max(a.y, c.y) }
-}
-
-/** 方向只转不平移 */
-function placeDir(turn: number, mirror: boolean, dx: number, dy: number): Point {
-  const a = place(turn, mirror, MID, MID)
-  const b = place(turn, mirror, MID + dx, MID + dy)
-  return { x: b.x - a.x, y: b.y - a.y }
+  readonly owner: Int8Array
 }
 
 export function inBox(b: Box, x: number, y: number): boolean {
@@ -97,6 +104,10 @@ export function boxDist(b: Box, x: number, y: number): number {
   return Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1))
 }
 
+function shrink(b: Box, d: number): Box {
+  return { x0: b.x0 + d, y0: b.y0 + d, x1: b.x1 - d, y1: b.y1 - d }
+}
+
 function shuffled<T>(rng: Rng, list: readonly T[]): T[] {
   const out = [...list]
   for (let i = out.length - 1; i > 0; i--) {
@@ -106,154 +117,226 @@ function shuffled<T>(rng: Rng, list: readonly T[]): T[] {
   return out
 }
 
-/** 一间房局部的尺寸：平台、能走的方块的两条边、传送台的圆心，格 */
-export function roomFrame(cfg: WarpConfig): { readonly slab0: number; readonly slab1: number; readonly f0: number; readonly f1: number; readonly pad: Point } {
-  const r = cfg.room
-  const slab1 = MID - r.gapU
-  const f1 = slab1 - r.lipU
-  return {
-    slab0: r.gapU,
-    slab1,
-    f0: r.gapU + r.lipU,
-    f1,
-    pad: { x: f1 - cfg.pad.edgeU - cfg.pad.radiusU, y: f1 - cfg.pad.cornerU },
-  }
+/** total 拆成 n 段、每段是 [lo, hi] 里的整数的所有拆法 */
+export function splits(total: number, n: number, lo: number, hi: number): number[][] {
+  if (n === 1) return total >= lo && total <= hi ? [[total]] : []
+  const out: number[][] = []
+  for (let a = lo; a <= hi; a++) for (const rest of splits(total - a, n - 1, lo, hi)) out.push([a, ...rest])
+  return out
 }
 
-/** 一块沿墙的出怪板：板心在 (u, v)，沿 u（along 为 0）或沿 v 摆，局部坐标 */
-function plate(cfg: WarpConfig, u: number, v: number, along: 0 | 1): Box {
-  const h = cfg.emitters.plateU / 2
-  return along === 0 ? { x0: u - h, y0: v - 0.5, x1: u + h, y1: v + 0.5 } : { x0: u - 0.5, y0: v - h, x1: u + 0.5, y1: v + h }
+/** 一段一段排开，返回各段的起点与终点 */
+function spans(parts: readonly number[]): [number, number][] {
+  let at = 0
+  return parts.map((p) => {
+    const s: [number, number] = [at, at + p]
+    at += p
+    return s
+  })
 }
 
-/** 一间房局部的布置：能走的方块，立柱、凹槽、机柜台与出怪板 */
-function localRoom(cfg: WarpConfig, shape: WarpShape, tall: boolean): { floor: Box; pillars: Box[]; pit: Box | null; deck: Box | null; plates: Box[] } {
-  const { f0, f1, pad } = roomFrame(cfg)
-  const full: Box = { x0: f0, y0: f0, x1: f1, y1: f1 }
-  const mid = (f0 + f1) / 2
-  const near = cfg.emitters.plateU / 2 + 2
-  const far = Math.round(f1 - (f1 - f0) * 0.38)
-  const walls = [plate(cfg, f0 + near + 1, f0 + 0.5, 0), plate(cfg, far, f0 + 0.5, 0), plate(cfg, f0 + 0.5, f0 + near + 1, 1), plate(cfg, f0 + 0.5, far, 1)]
-  if (shape === 'narrow') {
-    const n = cfg.room.narrowU
-    const cut = f1 - n
-    if (tall) {
-      return {
-        floor: { x0: cut, y0: f0, x1: f1, y1: f1 },
-        pillars: [],
-        pit: null,
-        deck: { x0: f0, y0: f0, x1: cut, y1: f1 },
-        plates: [plate(cfg, cut + n / 2, f0 + 0.5, 0), plate(cfg, cut + 0.5, f0 + near + 1, 1), plate(cfg, cut + 0.5, far - 1, 1)],
-      }
-    }
-    return {
-      floor: { x0: f0, y0: cut, x1: f1, y1: f1 },
-      pillars: [],
-      pit: null,
-      deck: { x0: f0, y0: f0, x1: f1, y1: cut },
-      plates: [plate(cfg, f0 + 0.5, cut + n / 2, 1), plate(cfg, f0 + near + 1, cut + 0.5, 0), plate(cfg, far - 1, cut + 0.5, 0)],
-    }
-  }
-  if (shape === 'cloister') {
-    const h = cfg.pitU / 2
-    return { floor: full, pillars: [], pit: { x0: mid - h, y0: mid - h, x1: mid + h, y1: mid + h }, deck: null, plates: walls }
-  }
-  if (shape === 'pillars') {
-    const p = cfg.pillars
-    const list: Box[] = []
-    for (let i = 0; i < p.count; i++) {
-      for (let j = 0; j < p.count; j++) {
-        const b: Box = { x0: f0 + p.firstU + i * p.stepU, y0: f0 + p.firstU + j * p.stepU, x1: f0 + p.firstU + i * p.stepU + p.sizeU, y1: f0 + p.firstU + j * p.stepU + p.sizeU }
-        if (boxDist(b, pad.x, pad.y) < cfg.pad.radiusU + p.padClearU) continue
-        list.push(b)
-      }
-    }
-    return { floor: full, pillars: list, pit: null, deck: null, plates: walls }
-  }
-  return { floor: full, pillars: [], pit: null, deck: null, plates: walls }
+/** 舱室的格切法：列宽、每列的行高 */
+function cells(cfg: WarpConfig, rng: Rng): Box[] {
+  const m = cfg.maze
+  const cols = splits(FRAME_U, 3, m.colU[0], m.colU[1])
+  const rows = splits(FRAME_U, 3, m.rowU[0], m.rowU[1])
+  const small = Array.from({ length: FRAME_U / m.smallU }, () => m.smallU)
+  const out: Box[] = []
+  const widths = cols[Math.floor(rng.next() * cols.length)]!
+  // 至少一列切成三间：开局那间要放得下
+  const tight = Math.floor(rng.next() * widths.length)
+  spans(widths).forEach(([x0, x1], c) => {
+    const heights = c !== tight && rng.next() < m.smallP ? small : rows[Math.floor(rng.next() * rows.length)]!
+    for (const [y0, y1] of spans(heights)) out.push({ x0, y0, x1, y1 })
+  })
+  return out
 }
 
-/** 半径 rad 格的身体在 (x, y) 能不能站：落在这间能走的方块里、不碰立柱与凹槽 */
-function openIn(room: Pick<WarpRoom, 'floor' | 'pillars' | 'pit'>, x: number, y: number): boolean {
-  if (!inBox(room.floor, x, y)) return false
-  if (room.pit && inBox(room.pit, x, y)) return false
-  return !room.pillars.some((b) => inBox(b, x, y))
+/** 能走的方块里靠第 wall 面墙、沿墙偏 off 格的圆台 */
+function wallSpot(cfg: WarpConfig, f: Box, wall: number, off: number): Spot {
+  const d = cfg.pad.insetU + cfg.pad.radiusU
+  const mx = (f.x0 + f.x1) / 2 + off
+  const my = (f.y0 + f.y1) / 2 + off
+  if (wall === 0) return { wall, x: mx, y: f.y0 + d, nx: 0, ny: 1 }
+  if (wall === 1) return { wall, x: f.x1 - d, y: my, nx: -1, ny: 0 }
+  if (wall === 2) return { wall, x: mx, y: f.y1 - d, nx: 0, ny: -1 }
+  return { wall, x: f.x0 + d, y: my, nx: 1, ny: 0 }
+}
+
+/** 第 wall 面墙有多长 */
+function wallLen(f: Box, wall: number): number {
+  return wall % 2 === 0 ? f.x1 - f.x0 : f.y1 - f.y0
+}
+
+/** 第 k 个角（0 左上 1 右上 2 右下 3 左下）上的 (x, y) 与往屋里的两个方向 */
+function corner(f: Box, k: number): { x: number; y: number; sx: number; sy: number } {
+  const right = k === 1 || k === 2
+  const low = k === 2 || k === 3
+  return { x: right ? f.x1 : f.x0, y: low ? f.y1 : f.y0, sx: right ? -1 : 1, sy: low ? -1 : 1 }
 }
 
 /**
- * 按种子摆一座跃迁站：环的方向；四种形状、四种签名、四种配方各自打乱分给四间房（狭长那间横竖也按种子）；
- * 队伍从大厅出发。能走的地面四间各算一遍距离场，取最大合成一张
+ * 每间舱室的去处：先把所有舱室打乱排成一圈，每间的「出口」通往圈上的下一间；再给每间添一两扇别的门，去处随手挑，
+ * 不通回自己、不重复，也不和对面的门互相通着——从哪扇门来，那间都没有门通回去
+ */
+function wire(n: number, extraP: number, rng: Rng): { loop: number[]; out: number[][] } {
+  const loop = shuffled(
+    rng,
+    Array.from({ length: n }, (_, i) => i),
+  )
+  const out: number[][] = Array.from({ length: n }, () => [])
+  loop.forEach((c, i) => out[c]!.push(loop[(i + 1) % n]!))
+  for (const c of shuffled(rng, loop)) {
+    const want = rng.next() < extraP ? 2 : 1
+    for (const t of shuffled(rng, loop)) {
+      if (out[c]!.length > want) break
+      if (t === c || out[c]!.includes(t) || out[t]!.includes(c)) continue
+      out[c]!.push(t)
+    }
+  }
+  return { loop, out }
+}
+
+/** 半径 rad 格的身体在 (x, y) 能不能站：落在这间能走的方块里、不碰机柜、凹槽与标本罐 */
+function openIn(room: Pick<Chamber, 'floor' | 'racks' | 'pit' | 'jar'>, x: number, y: number): boolean {
+  if (!inBox(room.floor, x, y)) return false
+  if (room.pit && inBox(room.pit, x, y)) return false
+  if (inBox(room.jar, x, y)) return false
+  return !room.racks.some((b) => inBox(b, x, y))
+}
+
+/**
+ * 按种子摆一座迷宫：切格；按象限分四季，每季一种配方、两件东西轮着装进标本罐；门牌号打乱；
+ * 连线（见 wire）；每间舱室的入口与门各占一面墙，两个空角放出怪板，剩下的一角立标本罐；最大的那间做开局的空舱，其余按大小挑样子。
+ * 能走的地面每间各算一遍距离场，取最大合成一张
  */
 export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
   const rng = new Rng(seed)
-  const mirror = rng.next() < 0.5
-  const shapes = shuffled(rng, SHAPES)
-  const signs = shuffled(rng, [0, 1, 2, 3])
-  const recipes = shuffled(rng, [0, 1, 2, 3])
-  const tall = rng.next() < 0.5
-  const frame = roomFrame(cfg)
-  const quads = [0, 1, 2, 3].map((i) => {
-    const p = place(i, mirror, MID / 2, MID / 2)
-    return (p.x < MID ? 0 : 1) + (p.y < MID ? 0 : 1) * 2
+  const boxes = cells(cfg, rng)
+  const n = boxes.length
+  const seasonOf = shuffled(rng, [0, 1, 2, 3])
+  const recipeOf = shuffled(rng, [0, 1, 2, 3])
+  const codes = shuffled(
+    rng,
+    Array.from({ length: 90 }, (_, i) => i + 10),
+  )
+  const { loop, out } = wire(n, cfg.maze.extraP, rng)
+  const edge = cfg.maze.gapU + cfg.maze.lipU
+  const floors = boxes.map((b) => shrink(b, edge))
+  const span = (f: Box): number => Math.min(f.x1 - f.x0, f.y1 - f.y0)
+  let start = 0
+  floors.forEach((f, i) => {
+    if (span(f) > span(floors[start]!)) start = i
   })
-  const rooms: WarpRoom[] = shapes.map((shape, i) => {
-    const l = localRoom(cfg, shape, tall)
-    const at = (b: Box): Box => placeBox(i, mirror, b)
-    const floor = at(l.floor)
-    const plates = l.plates.map((b) => {
-      const box = at(b)
+  const turns = [0, 0, 0, 0]
+  const doors: Door[] = []
+  const rooms: Chamber[] = boxes.map((cell, i) => {
+    const floor = floors[i]!
+    const center = { x: (floor.x0 + floor.x1) / 2, y: (floor.y0 + floor.y1) / 2 }
+    const season = seasonOf[(center.x < MID ? 0 : 1) + (center.y < MID ? 0 : 2)]!
+    const token = TOKENS[season]![(turns[season]!++ + (seed & 1)) % 2]!
+    const walls = shuffled(rng, [0, 1, 2, 3])
+    const spot = (wall: number): Spot => {
+      const room = Math.max(0, wallLen(floor, wall) / 2 - cfg.pad.cornerU)
+      return wallSpot(cfg, floor, wall, (rng.next() * 2 - 1) * room)
+    }
+    const entry = spot(walls[0]!)
+    const mine = out[i]!.map((to, k): Door => {
+      const s = spot(walls[k + 1]!)
+      return { index: doors.length + k, room: i, wall: s.wall, x: s.x, y: s.y, nx: s.nx, ny: s.ny, to, exit: k === 0 }
+    })
+    doors.push(...mine)
+    const pads: Point[] = [entry, ...mine]
+    const corners = shuffled(rng, [0, 1, 2, 3])
+    const plates = corners.slice(0, 2).map((k): Plate => {
+      const c = corner(floor, k)
+      const h = cfg.emitters.plateU
+      const along = rng.next() < 0.5
+      const x0 = along ? c.x + c.sx * 0.5 : c.x
+      const y0 = along ? c.y : c.y + c.sy * 0.5
+      const x1 = along ? x0 + c.sx * h : x0 + c.sx
+      const y1 = along ? y0 + c.sy : y0 + c.sy * h
+      const box = { x0: Math.min(x0, x1), y0: Math.min(y0, y1), x1: Math.max(x0, x1), y1: Math.max(y0, y1) }
       return { box, x: (box.x0 + box.x1) / 2, y: (box.y0 + box.y1) / 2 }
     })
+    const jc = corner(floor, corners[2]!)
+    const js = cfg.jar.sizeU
+    const jx = jc.x + jc.sx * 0.3
+    const jy = jc.y + jc.sy * 0.3
+    const jar: Box = { x0: Math.min(jx, jx + jc.sx * js), y0: Math.min(jy, jy + jc.sy * js), x1: Math.max(jx, jx + jc.sx * js), y1: Math.max(jy, jy + jc.sy * js) }
+    const cams = [corners[2]!, corners[3]!].map((k) => {
+      const c = corner(cell, k)
+      return { x: c.x + c.sx * (cfg.maze.gapU + cfg.maze.lipU * 0.5), y: c.y + c.sy * (cfg.maze.gapU + cfg.maze.lipU * 0.5) }
+    })
+    const w = floor.x1 - floor.x0
+    const h = floor.y1 - floor.y0
+    const roll = rng.next()
+    const racks: Box[] = []
+    if (i !== start && Math.min(w, h) >= cfg.racks.minU && roll >= 0.35 && roll < 0.75) {
+      const r = cfg.racks
+      const inner = shrink(floor, cfg.pad.insetU + 2 * cfg.pad.radiusU + cfg.racks.clearU)
+      const iw = inner.x1 - inner.x0
+      const ih = inner.y1 - inner.y0
+      // 机柜排成一两排长条，顺着舱室长的那一边，排与排、排与墙之间都留着过道
+      const along = iw >= ih
+      const n = Math.max(1, Math.floor(((along ? ih : iw) - r.sizeU) / r.stepU) + 1)
+      const o = ((along ? ih : iw) - (n - 1) * r.stepU - r.sizeU) / 2
+      for (let k = 0; k < n; k++) {
+        const box = along
+          ? { x0: inner.x0, y0: inner.y0 + o + k * r.stepU, x1: inner.x1, y1: inner.y0 + o + k * r.stepU + r.sizeU }
+          : { x0: inner.x0 + o + k * r.stepU, y0: inner.y0, x1: inner.x0 + o + k * r.stepU + r.sizeU, y1: inner.y1 }
+        if (pads.some((p) => boxDist(box, p.x, p.y) < cfg.pad.radiusU + r.clearU - 1e-6)) continue
+        racks.push(box)
+      }
+    }
+    const shape: WarpShape = i !== start && Math.min(w, h) >= cfg.pit.minU && roll < 0.35 ? 'pit' : racks.length > 0 ? 'racks' : 'hall'
+    const pit = shape === 'pit' ? shrink(floor, cfg.pit.marginU) : null
     return {
       index: i,
-      quad: quads[i]! === 2 ? 3 : quads[i]! === 3 ? 2 : quads[i]!,
+      code: codes[i]!,
+      season,
+      recipe: recipeOf[season]!,
+      token,
       shape,
-      sign: signs[i]!,
-      recipe: recipes[i]!,
-      slab: at({ x0: frame.slab0, y0: frame.slab0, x1: frame.slab1, y1: frame.slab1 }),
+      cell,
+      slab: shrink(cell, cfg.maze.gapU),
       floor,
-      center: { x: (floor.x0 + floor.x1) / 2, y: (floor.y0 + floor.y1) / 2 },
-      pad: place(i, mirror, frame.pad.x, frame.pad.y),
+      center,
+      entry: { x: entry.x, y: entry.y },
+      entryWall: entry.wall,
+      doors: mine,
       plates,
-      pillars: l.pillars.map(at),
-      pit: l.pit && at(l.pit),
-      deck: l.deck && at(l.deck),
-      toward: placeDir(i, mirror, 1, 0),
+      racks,
+      pit,
+      jar,
+      cams,
     }
   })
-  const hall = rooms.find((r) => r.shape === 'hall')!
   const cell = BASIN_CELL_U * UNIT
-  const n = Math.round(FRAME_U / BASIN_CELL_U)
-  const parts = rooms.map((room) => {
-    const keep = room.pit ? { x: (room.floor.x0 + 0.5) * UNIT, y: (room.floor.y0 + 0.5) * UNIT } : { x: room.center.x * UNIT, y: room.center.y * UNIT }
-    const q = room.pillars.some((b) => inBox(b, keep.x / UNIT, keep.y / UNIT)) ? { x: (room.floor.x0 + 0.5) * UNIT, y: (room.floor.y0 + 0.5) * UNIT } : keep
-    return makeBasin((x, y) => openIn(room, x / UNIT, y / UNIT), 0, 0, n, n, cell, q, cfg.neckU * UNIT)
-  })
-  const room = new Float32Array(n * n)
-  for (let i = 0; i < room.length; i++) room[i] = Math.max(...parts.map((b) => b.room[i]!))
+  const g = Math.round(FRAME_U / BASIN_CELL_U)
+  const basins = rooms.map((room) => makeBasin((x, y) => openIn(room, x / UNIT, y / UNIT), 0, 0, g, g, cell, { x: room.entry.x * UNIT, y: room.entry.y * UNIT }, cfg.neckU * UNIT))
+  const merged = new Float32Array(g * g)
+  for (let i = 0; i < merged.length; i++) merged[i] = Math.max(...basins.map((b) => b.room[i]!))
+  const owner = new Int8Array(FRAME_U * FRAME_U)
   const tiles = new Int8Array(FRAME_U * FRAME_U).fill(-1)
   for (const r of rooms) {
-    for (let j = Math.floor(r.floor.y0); j < Math.ceil(r.floor.y1); j++) {
-      for (let i = Math.floor(r.floor.x0); i < Math.ceil(r.floor.x1); i++) {
+    for (let j = r.cell.y0; j < r.cell.y1; j++) for (let i = r.cell.x0; i < r.cell.x1; i++) owner[j * FRAME_U + i] = r.index
+    for (let j = r.floor.y0; j < r.floor.y1; j++) {
+      for (let i = r.floor.x0; i < r.floor.x1; i++) {
         const x = i + 0.5
         const y = j + 0.5
         if (!openIn(r, x, y) || r.plates.some((p) => inBox(p.box, x, y))) continue
-        if (Math.hypot(x - r.pad.x, y - r.pad.y) < cfg.pad.radiusU + 0.25) continue
+        if ([r.entry, ...r.doors].some((p) => Math.hypot(x - p.x, y - p.y) < cfg.pad.radiusU + 0.25)) continue
         tiles[j * FRAME_U + i] = r.index
       }
     }
   }
-  return { mirror, rooms, start: hall.center, basin: { cols: n, rows: n, cell, x0: 0, y0: 0, room }, basins: parts, tiles, core: { x: MID, y: MID } }
+  return { rooms, doors, start, loop, basin: { cols: g, rows: g, cell, x0: 0, y0: 0, room: merged }, basins, tiles, owner }
 }
 
-/** (x, y)（格）落在哪间房的象限里：在环上的次序 */
+/** (x, y)（格）落在哪间舱室分到的格里 */
 export function roomIndexAt(plan: WarpPlan, x: number, y: number): number {
-  const quad = (x < MID ? 0 : 1) + (y < MID ? 0 : 1) * 2
-  const q = quad === 2 ? 3 : quad === 3 ? 2 : quad
-  return plan.rooms.find((r) => r.quad === q)!.index
-}
-
-/** 第 i 间的下一间：它的传送台送到那里 */
-export function nextRoom(plan: WarpPlan, i: number): WarpRoom {
-  return plan.rooms[(i + 1) % plan.rooms.length]!
+  const i = Math.min(FRAME_U - 1, Math.max(0, Math.floor(x)))
+  const j = Math.min(FRAME_U - 1, Math.max(0, Math.floor(y)))
+  return plan.owner[j * FRAME_U + i]!
 }

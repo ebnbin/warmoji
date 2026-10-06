@@ -748,7 +748,7 @@ export const MAPS = {
   warp: {
     emoji: '1f300',
     name: '跃迁',
-    desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，立在朝向下一块的那条边上，四块连成单向的一圈。队长踏上传送台，台子充能、光圈扩满整间房，然后整支队伍连同召唤物一起被送到下一块平台的传送台上，不管队员在房间哪个角落；到的那座台子要冷却一阵。四间房同时在刷怪：队伍不在的房间，敌人往那间的传送台聚，传送台隔一阵发一趟车，台上站着谁就送谁，追兵就这样一批批从你身后的传送台涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去：哪间堆着多少敌人、往哪儿走，都写在地板上。四间房形状、颜色和出的敌人各不相同，选去哪间就是选和什么打',
+    desc: '一座悬在虚空里的实验迷宫：九到十二间舱室，舱与舱之间隔着望得见底的虚空，只能靠门来往。每间舱室的地上漆着门牌号，墙边一个入口、两三扇门，每扇门上写着它通往哪一间；队长踏上一扇门，门充满能，整支队伍连同召唤物一起落到那一间的入口上。路是单向的：从哪扇门来，那一间都没有门通回去。每间都有一扇挂着绿色「出口」牌的门，顺着出口一直走，会走遍所有舱室，再回到原来那间——入口边记着你到过这里几次。敌人只在队伍那间和有门直通进来的几间出，离得不远的敌人顺着门一间间追过来；每扇门隔一阵发一趟车，台上站着的敌人一起送走。舱室按四季分成四片，颜色、出的敌人不同，每间的标本罐里泡着那一季的一件东西；角上的监控一直盯着你',
     kind: 'warp',
     stamina: { exertion: 0.4, regen: 1.1 },
     palette: {
@@ -757,39 +757,42 @@ export const MAPS = {
       map: hslToInt(192, 0.36, 0.86),
       shadow: 0x000000,
     },
-    // 光从左上方的顶灯照下来，地砖与核心柱又从下面、从中间把身体照亮，背光面泛着冷蓝；影子淡
+    // 光从左上方的顶灯照下来，地砖与门又从下面把身体照亮，背光面泛着冷蓝；影子淡
     light: { sun: 0xf6fbff, shade: 0x7e93b8, shadow: { color: 0x07142a, alpha: 0.28, length: 0.55 } },
+    // 标本罐里泡着的东西：草甸的小花、樱庭的樱花、沙漠的驼骨、深海的气泡、残垣的枫叶、紫水晶、浮冰的冰块、火山
     decor: {
-      emojis: ['1f300'],
+      emojis: ['1f33c', '1f338', '1f9b4', '1fae7', '1f341', '1f48e', '1f9ca', '1f30b'],
       sizeU: [0.3, 0.5],
       alpha: [0, 0],
       density: [0, 0],
     },
     mix: WARP_MIX,
-    // 每间房的出怪板按那间的配方只放出那几种：一间幽灵、一间肉盾、一间成群的小东西、一间什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那间。头目从核心柱里被抛出来
+    // 每间舱室的出怪板按那一季的配方只放出那几种：一季幽灵、一季肉盾、一季成群的小东西、一季什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那几间。头目从队伍那间的天花板上落下来
     gates: {
       snapU: 60,
       fallback: 'rise',
       look: 'glow',
-      boss: 'core',
+      boss: 'warden',
       kinds: {
-        ghosts: { name: '幽灵间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
-        tanks: { name: '重甲间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
-        swarm: { name: '虫群间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
-        mixed: { name: '混编间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
-        core: { name: '核心柱', at: { kind: 'mark' }, enter: 'lob', look: 'glow', weight: 1, reachU: 40, only: ['mecha'] },
+        ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
+        tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
+        swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
+        mixed: { name: '混编舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
+        warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha'] },
       },
     },
-    finalWaveSub: '失控核心从核心柱里冲了出来——它落在哪间，就把哪间变成战场！',
+    finalWaveSub: '看守从天花板上落了下来——这一间就是出口？',
     warp: {
-      room: { lipU: 1, gapU: 2, narrowU: 8 },
+      maze: { colU: [14, 18], rowU: [12, 20], smallP: 0.3, smallU: 12, gapU: 1.25, lipU: 0.75, extraP: 0.5 },
       neckU: 0.4,
-      pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
-      pitU: 8,
-      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
+      racks: { minU: 11, sizeU: 1, heightM: 2.2, stepU: 4, clearU: 1.2 },
+      pit: { minU: 12, marginU: 4 },
+      pad: { radiusU: 1.4, insetU: 0.2, cornerU: 4.5, chargeMs: 1300, drainMs: 700, transitMs: 650, shuttleMs: 4000, warnMs: 900, spillU: 3.5 },
       emitters: { plateU: 2, markU: 0.6, clearU: 3 },
       recipes: ['ghosts', 'tanks', 'swarm', 'mixed'],
-      core: { radiusU: 1.5 },
+      jar: { sizeU: 1.4 },
+      hopU: 8,
+      chaseHops: 2,
       tiles: { teamFadeMs: 4500, foeFadeMs: 2600 },
     },
     boss: 'mecha',
