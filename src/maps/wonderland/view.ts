@@ -43,8 +43,8 @@ const FLOOR_DEPTH = -0.5
 const TREAT_DEPTH = 2
 const TREAT_HIDDEN_DEPTH = 0.6
 /** 茶点的样子：多大（格），蛋糕暖金、药水冰蓝 */
-const TREAT_U = 0.78
-const CAKE_TINT = 0xffb648
+const TREAT_U = 1
+const CAKE_TINT = 0xffc23d
 const BOTTLE_TINT = 0x62d8ff
 /** 被挡住的队员四周把立着的东西掏淡多大一圈（格）、淡到多少 */
 const REVEAL_U = 1.25
@@ -376,9 +376,13 @@ export class WonderlandView implements MapView {
       const blink = left < sv.warnMs && Math.floor(now / 160) % 2 === 0 ? 0.35 : 1
       const bob = Math.sin(now / 420 + fx.phase) * 0.06 * UNIT
       fx.img.setAlpha(blink).setPosition(t.x, t.y - s * 0.42 + bob)
-      fx.glow.setAlpha((0.55 + 0.2 * Math.sin(now / 300 + fx.phase)) * blink)
+      fx.glow.setAlpha((0.8 + 0.2 * Math.sin(now / 300 + fx.phase)) * blink)
       g.fillStyle(0x0c0614, 0.28)
       g.fillEllipse(t.x + 0.12 * UNIT, t.y + 0.04 * UNIT, s * 0.7, s * 0.28)
+      // 地上一圈一圈往外漾的光，远远就看得见那里摆着茶点
+      const wave = ((now + fx.phase * 1000) % 1400) / 1400
+      g.lineStyle(0.05 * UNIT, tint, 0.7 * (1 - wave) * blink)
+      g.strokeEllipse(t.x, t.y, s * (0.8 + 1.2 * wave), s * (0.48 + 0.72 * wave))
     }
     for (const [id, fx] of this.treats) {
       if (live.has(id)) continue

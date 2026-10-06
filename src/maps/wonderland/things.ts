@@ -185,8 +185,11 @@ function rose(o: Surf, dx: number, dy: number, r: number, kind: number, k: numbe
   if (d > r) return false
   const a = Math.atan2(dy, dx)
   const t = d / r
+  // 一圈圈裹着的花瓣：瓣缘一道暗线，瓣尖亮，越往花心越暗
   const petal = 0.5 + 0.5 * Math.sin(a * 5 + t * 9 + k * 6)
-  const fold = 0.62 + 0.38 * smooth(0.05, 0.9, t) * (0.55 + 0.45 * petal) - 0.25 * smooth(0.82, 1, t)
+  const ring = (t * 3.4 + 0.18 * Math.sin(a * 3 + k * 5) + a / (Math.PI * 2)) % 1
+  const edge = smooth(0, 0.16, ring) * (0.75 + 0.25 * smooth(0.6, 1, ring))
+  const fold = (0.5 + 0.5 * smooth(0.02, 0.85, t)) * (0.7 + 0.3 * petal) * (0.62 + 0.38 * edge) - 0.2 * smooth(0.85, 1, t)
   let red = kind === 0
   if (kind === 2) {
     // 刷漆的那一半：沿一条歪的线，线上挂着几道往下淌的漆
@@ -224,6 +227,9 @@ export interface Grids {
 const GRID_U = 1 / 16
 /** 树篱顶上叶簇的密度：每格几个 */
 const CLUMP = 1.8
+/** 兔子洞口多宽（半宽，格）、多高（米） */
+const HOLE_U = 1.05
+const HOLE_M = 1.5
 
 export function makeGrids(plan: WonderPlan, cfg: WonderlandConfig): Grids {
   const n = Math.round(FRAME_U / GRID_U)
@@ -289,8 +295,10 @@ class Hedge extends Thing {
     s.lo = 0
     s.hi = sampleGrid(this.g, this.g.hedge, x, y)
     const h = this.plan.hole
-    const hd = Math.hypot(x - h.x, y - h.y)
-    if (hd < 0.95) s.lo = Math.max(0, 1.25 * Math.sqrt(Math.max(0, 1 - (hd / 0.95) ** 2)) * smooth(-0.2, 0.6, (x - h.x) * h.nx + (y - h.y) * h.ny + 0.6))
+    // 兔子洞：树篱脚下拱出一个洞，往里伸进去一截
+    const along = (x - h.x) * -h.ny + (y - h.y) * h.nx
+    const into = -((x - h.x) * h.nx + (y - h.y) * h.ny)
+    if (Math.abs(along) < HOLE_U && into < 1.6) s.lo = Math.max(0, HOLE_M * Math.sqrt(Math.max(0, 1 - (along / HOLE_U) ** 2)))
     return true
   }
 
@@ -302,6 +310,15 @@ class Hedge extends Thing {
     o.r *= 1 - 0.4 * low
     o.g *= 1 - 0.32 * low
     o.b *= 1 - 0.2 * low
+    // 零星几朵比人还大的玫瑰从树篱里探出来
+    const g = cellNearest(h.x * 0.32, vy * 0.32, 151)
+    if (g.h < 0.22) {
+      const kh = (g.h * 31.7) % 1
+      if (rose(o, g.dx, g.dy, 0.34 + 0.08 * kh, kh < 0.55 ? 0 : kh < 0.8 ? 2 : 1, g.h * 11.3)) {
+        o.spec = 0.3
+        return
+      }
+    }
     // 玫瑰一片片地开：疏密跟着一层大的起伏
     const patch = fbm(h.x * 0.35, vy * 0.35, 191, 2)
     const q = cellNearest(h.x * 1.25, vy * 1.25, 97)
@@ -311,12 +328,12 @@ class Hedge extends Thing {
       const kind = kh < 0.58 ? 0 : kh < 0.82 ? 1 : 2
       if (rose(o, q.dx, q.dy, r, kind, q.h * 7.3) && h.top) o.spec = 0.3
     }
+    // 洞口一圈露着树根和土
     const hole = this.plan.hole
-    const hd = Math.hypot(h.x - hole.x, h.y - hole.y)
-    if (hd < 1.1 && h.z < 1.4) {
-      // 洞口里黑洞洞的，边上露着土
-      const deep = smooth(1.05, 0.6, hd) * smooth(1.4, 0.4, h.z)
-      mix(o, 0.05, 0.035, 0.03, deep)
+    const along = Math.abs((h.x - hole.x) * -hole.ny + (h.y - hole.y) * hole.nx)
+    if (along < HOLE_U + 0.25 && h.z < HOLE_M + 0.3) {
+      const rim = smooth(HOLE_U + 0.25, HOLE_U, along) * smooth(HOLE_M + 0.3, HOLE_M - 0.1, h.z)
+      mix(o, 0.22, 0.15, 0.1, rim * 0.8)
     }
   }
 }

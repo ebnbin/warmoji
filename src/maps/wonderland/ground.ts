@@ -290,6 +290,22 @@ function lawnSurf(sc: PaintScene, g: Grids, x: number, y: number, o: Surf): void
     o.g += (dn * 0.85 - o.g) * dirt
     o.b += (dn * 0.7 - o.b) * dirt
   }
+  // 兔子洞：洞口外刨出一摊土，洞里黑洞洞的
+  const h = plan.hole
+  const hd = Math.hypot(x - h.x, y - h.y)
+  if (hd < 2.2) {
+    const into = (x - h.x) * h.nx + (y - h.y) * h.ny
+    const heap = smooth(2.2, 1.1, hd + (valueNoise(x * 6, y * 6, 41) - 0.5) * 0.5) * smooth(-0.6, 0.4, into)
+    const dn = 0.24 + 0.08 * valueNoise(x * 14, y * 14, 43)
+    o.r += (dn * 1.15 - o.r) * heap
+    o.g += (dn * 0.82 - o.g) * heap
+    o.b += (dn * 0.62 - o.b) * heap
+    const side = Math.abs((x - h.x) * -h.ny + (y - h.y) * h.nx)
+    const mouth = smooth(1.05, 0.7, side) * smooth(0.35, -0.35, into)
+    o.r *= 1 - 0.92 * mouth
+    o.g *= 1 - 0.92 * mouth
+    o.b *= 1 - 0.92 * mouth
+  }
   // 树篱脚下与花坛边落着玫瑰花瓣
   const near = smooth(-2.2, -0.3, d)
   const pq = cellNearest(x * 4, y * 4, 133)
