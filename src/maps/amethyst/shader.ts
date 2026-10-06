@@ -73,6 +73,8 @@ const SHAFT_MAX = 0.38
 const SHINE = 56.0
 /** 直射查遮挡时沿光线取几个点 */
 const MARCH = 12
+/** 洞顶贴着洞壁往下弯成拱：离洞顶不到 VAULT_M 米的那截洞壁照不到斜射进来的直射光 */
+const VAULT_M = 1.5
 /** 火光在晶壁之间来回反射回来的光：离火把水平 d 格处照到 TORCH_BOUNCE·I/(TORCH_ROOM² + d²)，被挡住的地方也照进去三成 */
 const TORCH_BOUNCE = 0.35
 const TORCH_ROOM = 2.5
@@ -135,6 +137,8 @@ vec3 normalOf(vec4 f) {
   return normalize(vec3(xy, sqrt(max(0.02, 1.0 - dot(xy, xy)))));
 }
 float through(vec2 p, float z, vec4 body, int steps) {
+  float vault = 1.0 - smoothstep(uCeil - ${VAULT_M.toFixed(2)}, uCeil - ${(VAULT_M / 2).toFixed(2)}, z);
+  if (vault <= 0.0) return 0.0;
   float run = (uCeil - z) * body.z;
   vec2 dir = body.xy * run * uUnit;
   float open = skyAt(p + dir);
@@ -148,7 +152,7 @@ float through(vec2 p, float z, vec4 body, int steps) {
     lit = min(lit, clamp((ray - heightAt(p + dir * t)) / 0.3 + 0.5, 0.0, 1.0));
     if (lit <= 0.0) break;
   }
-  return open * lit;
+  return open * lit * vault;
 }
 float shadeOf(int k, vec2 d, float dist) {
   float a = atan(-d.y, -d.x);
