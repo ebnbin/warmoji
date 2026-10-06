@@ -12,6 +12,7 @@ import { meadow } from '../../maps/meadow/world'
 import { nexus } from '../../maps/nexus/world'
 import { nebula } from '../../maps/nebula/world'
 import { petri } from '../../maps/petri/world'
+import { swamp } from '../../maps/swamp/world'
 import { ruins } from '../../maps/ruins/world'
 import { sakura } from '../../maps/sakura/world'
 import { maple } from '../../maps/maple/world'
@@ -42,6 +43,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   deep,
   nexus,
   petri,
+  swamp,
   dreamland,
 }
 

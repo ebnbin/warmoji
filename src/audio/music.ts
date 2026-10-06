@@ -1164,6 +1164,61 @@ function buildPetri(): BgmScore {
   )
 }
 
+/**
+ * 泥潭：清晨雾里的沼泽，慢慢摇的三拍子多利亚调式；低音软软地落在每小节头上，像泥里冒上来的一个泡，三角波的铺底湿漉漉地铺满，
+ * 竖笛似的主旋律懒懒地吹，高处几滴露水的叮咚带着长长的回声，低处青蛙咕呱两声；刷子似的轻鼓
+ */
+function buildSwamp(): BgmScore {
+  const chords = [0, 0, 3, 3, 4, 4, 0, 6, 0, 0, 3, 3, 5, 4, 0, 0]
+  return track(
+    {
+      bpm: 72,
+      stepsPerBeat: 2,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 72) * 1.5, feedback: 0.42, level: 0.34 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.15, attack: 0.04, release: 0.5, octave: -1 }
+      const pad: Voice = { wave: 'triangle', vol: 0.024, attack: 0.7, release: 1.1, octave: 0 }
+      const pluck: Voice = { wave: 'triangle', vol: 0.045, attack: 0.004, release: 0.25, octave: 0 }
+      const flute: Voice = { wave: 'sine', vol: 0.09, attack: 0.08, release: 0.35, octave: 1 }
+      const dew: Voice = { wave: 'sine', vol: 0.028, attack: 0.002, release: 0.5, octave: 3, echo: true }
+      const frog: Voice = { wave: 'triangle', vol: 0.05, attack: 0.005, release: 0.06, octave: -1 }
+      b.bass(bass, chords, 'r--o..')
+      b.pad(pad, chords, [0, 1, 2], 0.003)
+      b.arp(pluck, chords, [0, 1, 2, 4, 2, 1], 4, 16)
+      b.line(flute, [
+        [0, 0, 4, 3], [0, 3, 3, 2], [0, 5, 2, 1],
+        [1, 0, 1, 4], [1, 4, 2, 2],
+        [2, 0, 3, 3], [2, 3, 5, 3],
+        [3, 0, 4, 6],
+        [4, 0, 6, 2], [4, 2, 5, 2], [4, 4, 4, 2],
+        [5, 0, 3, 4], [5, 4, 2, 2],
+        [6, 0, 1, 3], [6, 3, 2, 3],
+        [7, 0, 0, 6],
+        [8, 0, 7, 3], [8, 3, 6, 2], [8, 5, 5, 1],
+        [9, 0, 4, 4], [9, 4, 5, 2],
+        [10, 0, 6, 3], [10, 3, 8, 3],
+        [11, 0, 7, 6],
+        [12, 0, 5, 2], [12, 2, 4, 2], [12, 4, 3, 2],
+        [13, 0, 4, 4], [13, 4, 3, 2],
+        [14, 0, 1, 3], [14, 3, 2, 3],
+        [15, 0, 0, 6],
+      ])
+      b.line(dew, [[1, 3, 11, 1], [3, 5, 9, 1], [5, 2, 12, 1], [7, 4, 10, 1], [9, 1, 11, 1], [11, 5, 13, 1], [13, 3, 9, 1], [15, 2, 11, 1]])
+      for (let bar = 2; bar < chords.length; bar += 4) {
+        b.note(frog, bar, 4, chords[bar]!, 1)
+        b.note(frog, bar, 5, chords[bar]! - 1, 1)
+      }
+      b.drums('hat', '..o..o', 4, 16, 0.016)
+      b.drums('tom', 'x.....', 8, 16, 0.035)
+    },
+  )
+}
+
 /** 梦幻乐园：旋转木马的圆舞曲，大调三拍子；低音只踩每小节头一下，方波的和弦在二三拍上“嚓嚓”，汽笛风琴似的方波领奏，钟琴在乐句开头叮一声，回声短短的 */
 function buildDreamland(): BgmScore {
   const chords = [0, 0, 4, 4, 3, 3, 0, 4, 0, 0, 4, 4, 3, 4, 0, 0]
@@ -1234,6 +1289,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   nexus: buildNexus,
   deep: buildDeep,
   petri: buildPetri,
+  swamp: buildSwamp,
   dreamland: buildDreamland,
 }
 

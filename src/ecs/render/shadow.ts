@@ -12,6 +12,8 @@ import { bottomAt, footY } from '../utils/ground'
 import { UNDER_Z } from './bands'
 import { EcsLayer, LayerType } from './layer'
 import { packTint, TINT_FILL } from './tint'
+import { ART } from '../utils/ground'
+import type { SunkAt } from './sprites'
 
 /** 压在地面、水面与地上的 emoji 之上，所有身体之下 */
 const SHADOW_DEPTH = 2.5
@@ -49,8 +51,11 @@ export class EcsShadowBatch extends EcsLayer {
     multiTexturing: true,
   } as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions
 
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, shadow: NonNullable<UnitLight['shadow']>) {
+  private readonly sunkAt: SunkAt | undefined
+
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, shadow: NonNullable<UnitLight['shadow']>, sunkAt: SunkAt | undefined) {
     super(scene, LayerType.Shadow, SHADOW_DEPTH)
+    this.sunkAt = sunkAt
     this.world = world
     this.atlas = atlas
     this.color = shadow.color
@@ -89,7 +94,7 @@ export class EcsShadowBatch extends EcsLayer {
     for (const eid of query(w, PICKUPS)) self.cast(node, drawingContext, eid, bottomAt(eid, Transform.y[eid]!))
   }
 
-  /** 一张精灵的影子：ground 是它脚下那块地在平地上的画面纵坐标，两者都按脚下的地面抬起；精灵上的一点比地面高多少，影子就顺着太阳的方位往外铺多远、淡多少 */
+  /** 一张精灵的影子：ground 是它脚下那块地在平地上的画面纵坐标，两者都按脚下的地面抬起；精灵上的一点比地面高多少，影子就顺着太阳的方位往外铺多远、淡多少；陷进地面的只投露在外面的那一截 */
   private cast(node: Phaser.Renderer.WebGL.RenderNodes.BatchHandlerQuad, drawingContext: Phaser.Renderer.WebGL.DrawingContext, eid: number, flat: number): void {
     const frame = Sprite.frame[eid]!
     const alpha = Tint.alpha[eid]!
@@ -98,14 +103,19 @@ export class EcsShadowBatch extends EcsLayer {
     const ground = flat - lift
     const hh = Transform.h[eid]! * 0.5
     const hw = (Sprite.flipX[eid] ? -1 : 1) * Transform.w[eid]! * 0.5
+    const sink = this.sunkAt ? this.sunkAt(eid) * Transform.h[eid]! * ART : 0
+    // 陷进去的：整张沉下 sink，画框下沿以下截掉，只留到原来的脚下
+    const cut = hh * ART - sink
+    if (cut <= -hh) return
+    const bottom = sink > 0 ? cut : hh
     const m = this.spriteMatrix
-    m.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - lift, Transform.rot[eid]!, 1, 1)
+    m.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - lift + sink, Transform.rot[eid]!, 1, 1)
     const xy = this.xy
     const tints = this.tints
     // 四个角按 TL、BL、TR、BR
     for (let i = 0; i < 4; i++) {
       const lx = i < 2 ? -hw : hw
-      const ly = i % 2 === 0 ? -hh : hh
+      const ly = i % 2 === 0 ? -hh : bottom
       const up = ground - m.getY(lx, ly)
       const gx = m.getX(lx, ly) + this.kx * up
       const gy = ground + this.ky * up
@@ -116,11 +126,12 @@ export class EcsShadowBatch extends EcsLayer {
     this.atlas.uvInto(frame, this.uv)
     const u0 = this.uv[0]!
     const v0 = this.uv[1]!
+    const kept = (bottom + hh) / (2 * hh)
     node.batch(
       drawingContext,
       this.atlas.pageGlTexture(this.atlas.page(frame)),
       xy[0]!, xy[1]!, xy[2]!, xy[3]!, xy[4]!, xy[5]!, xy[6]!, xy[7]!,
-      u0, v0, this.uv[2]! - u0, this.uv[3]! - v0,
+      u0, v0, this.uv[2]! - u0, (this.uv[3]! - v0) * kept,
       TINT_FILL,
       tints[0]!, tints[1]!, tints[2]!, tints[3]!,
       this.renderOptions,

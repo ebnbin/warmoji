@@ -41,6 +41,9 @@ export interface SpriteCut {
 /** 地图按身体在地上的位置 (x, y) 与精灵的半宽半高把它切成几份画：份数写进 out 并返回，0 是照常整张画 */
 export type CutAt = (x: number, y: number, hw: number, hh: number, out: SpriteCut[]) => number
 
+/** 地图说这个实体陷进地面多深：按精灵画框高的比例，0 是没陷 */
+export type SunkAt = (eid: number) => number
+
 /** 画的时候只留一侧：at 是相对精灵中心的坐标，像素 */
 export interface LocalCut {
   axis: 0 | 1

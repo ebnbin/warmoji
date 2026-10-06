@@ -1333,6 +1333,74 @@ export interface PetriConfig {
     readonly lysePerS: number
   }
 }
+/**
+ * 泥潭：清晨的一片沼泽，四周是开阔的水面，谁也蹚不过去；能走的地面分两种：实地（木栈道、落羽杉盘根的土台、草墩）与大片的泥潭。
+ * 身体踩进泥里就往下陷，站着不动陷得快、走着陷得慢，越重陷得越快；陷得越深走得越慢、越不容易被击退；陷过一截就被困住，
+ * 朝一个方向一直使劲才拔得出来，队员还要费体力；陷到最深呛泥掉血。回到实地慢慢拔干净。个子特别大的蹚泥如走平地，悬空的不沾泥。
+ * 落在泥里的掉落物慢慢沉下去，沉没了就捡不到了
+ */
+export interface SwampConfig {
+  readonly meterPerU: number
+  /** 沼泽的岸线：离方框正中 radiusU 格之间起伏；窄过两倍 neckU 的缝与尖角不能走 */
+  readonly shore: { readonly radiusU: readonly [number, number]; readonly neckU: number }
+  /** 开局站的那块土台：半径（格），边缘按噪声起伏多少（占半径的比例） */
+  readonly plaza: { readonly radiusU: number; readonly wobble: number }
+  /** 水洼：沼泽中间几处开阔的水面，谁也过不去；几处、半径（格），离开局土台与岸至少多远（格） */
+  readonly ponds: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly clearU: number }
+  /**
+   * 落羽杉：长在盘根的土台上，树干挡人挡子弹；几棵、土台半径与树干半径（格），树高（米）；
+   * 离开局土台多远（格）之间，土台彼此至少隔 gapU 格；岸边水里另外再长几棵（只有树冠）
+   */
+  readonly cypress: {
+    readonly count: readonly [number, number]
+    readonly moundU: readonly [number, number]
+    readonly trunkU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly ringU: readonly [number, number]
+    readonly gapU: number
+    readonly shoreCount: readonly [number, number]
+  }
+  /** 草墩：泥里一个个小土墩，几个、半径（格），彼此与别的实地至少隔 gapU 格 */
+  readonly tussocks: { readonly count: readonly [number, number]; readonly radiusU: readonly [number, number]; readonly gapU: number }
+  /** 木栈道：从开局土台通往几座落羽杉土台与一处伸进水里的栈桥；宽（格），木板多宽（格）；每条有几处朽断、断开多长（格） */
+  readonly walks: {
+    readonly count: readonly [number, number]
+    readonly widthU: number
+    readonly plankU: number
+    readonly breaks: readonly [number, number]
+    readonly breakU: readonly [number, number]
+  }
+  /** 香蒲丛：长在岸边水里，几丛；泥眼：泥里冒泡的地方，几处，离实地至少多远（格） */
+  readonly reeds: readonly [number, number]
+  readonly vents: { readonly count: readonly [number, number]; readonly clearU: number }
+  /**
+   * 下陷：深度从 0（刚沾泥）到 1（陷到最深）。标准身体站着不动 sinkS 秒陷到最深，动起来（快过 walkU 格/秒）按 walkMul 倍；越重陷得越快（体重倍数夹在 weight 之间）；
+   * 半径不小于 wadeU 格的蹚泥如走平地。陷过 trap 就被困住，拔到 free 以下才脱身；陷过 choke 呛泥，满血的标准身体 chokeSec 秒呛死，每 tickMs 结算一次；
+   * 站上实地 recoverS 秒拔干净
+   */
+  readonly sink: {
+    readonly sinkS: number
+    readonly walkMul: number
+    readonly walkU: number
+    readonly weight: readonly [number, number]
+    readonly wadeU: number
+    readonly trap: number
+    readonly free: number
+    readonly choke: number
+    readonly chokeSec: number
+    readonly tickMs: number
+    readonly recoverS: number
+  }
+  /** 泥里的黏度：刚沾泥是 viscosity[0]，陷到 trap 时到 viscosity[1]，被困住时是 stuck；实地上带着的泥按深度留下 caked 倍的拖累；泥里每走一格多耗 exertion 点 */
+  readonly drag: { readonly viscosity: readonly [number, number]; readonly stuck: number; readonly caked: number; readonly exertion: number }
+  /**
+   * 挣脱：朝哪使劲按 tauS 秒的时间常数记着，方向来回换就攒不起来；朝一个方向使满劲，标准身体 pullS 秒从最深拔到脱身，越重越慢（按体重的平方根）；
+   * 队员挣的时候每秒耗 stamina 点体力，体力见底只剩 tired 倍的劲
+   */
+  readonly heave: { readonly tauS: number; readonly pullS: number; readonly stamina: number; readonly tired: number }
+  /** 掉落物落在泥里 sinkS 秒沉没 */
+  readonly loot: { readonly sinkS: number }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -1341,8 +1409,8 @@ export interface TorusConfig {
 }
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
-/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡 */
-export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 红叶，silt 水底扬起的泥，bubbles 一串气泡，mud 溅起的泥浆，mist 一团晨雾 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow' | 'petals' | 'sand' | 'maple' | 'silt' | 'bubbles' | 'mud' | 'mist'
 
 /** 离某一组地标至少多远 */
 export interface GateAway {
@@ -1407,7 +1475,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'dreamland'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave' | 'desert' | 'meadow' | 'sakura' | 'maple' | 'circuit' | 'nexus' | 'deep' | 'petri' | 'swamp' | 'dreamland'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1440,6 +1508,7 @@ export interface MapDef {
   readonly nexus?: NexusConfig
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
+  readonly swamp?: SwampConfig
   readonly dreamland?: DreamlandConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
@@ -1447,7 +1516,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'shock' | 'arc' | 'drown' | 'mire'
 
 export interface DecorInstance {
   emoji: string

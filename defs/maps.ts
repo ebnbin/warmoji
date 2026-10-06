@@ -177,6 +177,18 @@ const PETRI_MIX: readonly EnemyMixRow[] = [
   { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
+const SWAMP_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'snake', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'slime', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'locust', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'ghost', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'mushroom', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'chameleon', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 const NEXUS_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
   { kind: 'invader', sinceWave: 1, base: 15, perWave: 0.6, min: 10, max: 28 },
@@ -1295,6 +1307,59 @@ export const MAPS = {
       lysis: { radiusU: 2, holdS: 12, halfLifeS: 4, lysePerS: 4 },
     },
     boss: 'treant',
+  },
+  swamp: {
+    emoji: '1fab7',
+    name: '泥潭',
+    desc: '清晨的一片沼泽：雾贴着水面，落羽杉的膝根从泥里顶出来，枝上垂着松萝，水面映着淡金色的天光。四周是开阔的水面，谁也蹚不过去；脚下除了木栈道、落羽杉盘根的土台和草墩这些实地，就是大片的泥潭。踩进泥里就往下陷：站着不动陷得快，走着陷得慢，身子越重陷得越快；陷得越深走得越慢，也越不容易被击退；陷过一截就被困住，得朝一个方向一直使劲才拔得出来，还费体力；陷到最深就呛泥掉血。回到实地慢慢拔干净。敌人一样会陷，泥潭既是陷阱也是护城河；个子特别大的蹚泥如走平地，飘着的不沾泥。掉在泥里的金币会慢慢沉下去，沉没了就捡不到了',
+    kind: 'swamp',
+    stamina: { exertion: 0.4, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(48 34% 78%)',
+      bgTo: 'hsl(168 22% 30%)',
+      map: hslToInt(96, 0.3, 0.32),
+      shadow: 0x000000,
+    },
+    // 清晨的太阳低低地从雾里照过来，光偏暖、背光面泛着雾的青灰，影子被雾冲得淡
+    light: { sun: 0xfff1d6, shade: 0x93a39f, shadow: { color: 0x17241c, alpha: 0.3, length: 0.8 } },
+    decor: {
+      emojis: ['1fab7'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: SWAMP_MIX,
+    // 从水里爬上岸、从香蒲丛里游出来、从水洼里爬出来、从冒泡的泥眼里钻出来；飘着的从雾里显出来；巨鳄从水里爬上岸
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'mud',
+      boss: 'shore',
+      kinds: {
+        shore: { name: '水边', at: { kind: 'rim', segU: 3, away: { mark: 'reeds', minU: 1.5 } }, enter: 'climb', look: 'splash', weight: 3, perSec: 1.5, only: ['zombie', 'slime', 'boar', 'croc'] },
+        reeds: { name: '香蒲丛', at: { kind: 'mark' }, enter: 'walk', look: 'leaves', snapU: 4, weight: 3, perSec: 1.2, only: ['snake', 'chameleon', 'locust', 'rat', 'zombie'] },
+        pond: { name: '水洼', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 2, perSec: 1, only: ['zombie', 'slime', 'snake'] },
+        bog: { name: '泥眼', at: { kind: 'mark' }, enter: 'rise', look: 'mud', snapU: 4, weight: 2, perSec: 1, only: ['zombie', 'slime', 'mushroom'] },
+        mist: { name: '雾里', at: { kind: 'ground' }, enter: 'rise', look: 'mist', weight: 1, only: ['ghost'] },
+      },
+    },
+    finalWaveSub: '巨鳄从水里爬上了岸——它个头大，蹚泥如走平地，泥潭拦不住它！',
+    swamp: {
+      meterPerU: 0.5,
+      shore: { radiusU: [15, 17.8], neckU: 0.4 },
+      plaza: { radiusU: 5.2, wobble: 0.07 },
+      ponds: { count: [1, 2], radiusU: [1.3, 2.2], clearU: 1.4 },
+      cypress: { count: [3, 5], moundU: [1.6, 2.3], trunkU: [0.4, 0.55], heightM: [14, 22], ringU: [9.8, 12.6], gapU: 1.8, shoreCount: [4, 7] },
+      tussocks: { count: [9, 14], radiusU: [0.55, 0.95], gapU: 1.3 },
+      walks: { count: [2, 3], widthU: 1.15, plankU: 0.22, breaks: [0, 1], breakU: [0.9, 1.4] },
+      reeds: [7, 11],
+      vents: { count: [5, 8], clearU: 1.4 },
+      sink: { sinkS: 4, walkMul: 0.18, walkU: 0.25, weight: [0.55, 1.8], wadeU: 0.9, trap: 0.5, free: 0.4, choke: 0.88, chokeSec: 12, tickMs: 250, recoverS: 2.2 },
+      drag: { viscosity: [1.6, 4], stuck: 16, caked: 0.8, exertion: 0.6 },
+      heave: { tauS: 0.45, pullS: 1.5, stamina: 16, tired: 0.45 },
+      loot: { sinkS: 9 },
+    },
+    boss: 'croc',
   },
   dreamland: {
     emoji: '1f3a0',

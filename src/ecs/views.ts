@@ -70,6 +70,8 @@ export interface MapView {
   lightAt?(x: number, y: number, out: LocalLight): void
   /** 身体在地上的 (x, y)、精灵半宽半高 hw×hh：要切成几份画（正穿过传送门的一份在门这边、一份在门那边），写进 out 返回份数，0 是整张画 */
   cutAt?(x: number, y: number, hw: number, hh: number, out: SpriteCut[]): number
+  /** 这个实体陷进地面多深，按它精灵的画框高的比例（0 是没陷）：画的时候整张往下沉这么多，没进地面的那一截不画，影子也只投露在外面的；不写就都不陷 */
+  sunkAt?(eid: number): number
   resize(v: ViewCtx): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void

@@ -50,6 +50,7 @@ import type { RuinsState } from '../../maps/ruins/world'
 import type { NexusState } from '../../maps/nexus/world'
 import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
+import type { SwampState } from '../../maps/swamp/world'
 import type { DreamlandWorld } from '../../maps/dreamland/world'
 
 export const ZERO: Point = { x: 0, y: 0 }
@@ -107,12 +108,13 @@ export interface WorldState {
   nexus: NexusState | null
   deep: DeepState | null
   petri: PetriState | null
+  swamp: SwampState | null
   dreamland: DreamlandWorld | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, dreamland: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, ruins: null, nebula: null, floe: null, cave: null, desert: null, meadow: null, sakura: null, maple: null, circuit: null, nexus: null, deep: null, petri: null, swamp: null, dreamland: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}

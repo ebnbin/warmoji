@@ -78,9 +78,10 @@ import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhas
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
+import { inMud, mireOf } from '../maps/swamp/world'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { ClockSnapshot, HudSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { ClockSnapshot, HudSnapshot, MireSnapshot, SubmarineSnapshot, TiltSnapshot } from '../run/hudHost'
 import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../maps/cave/sky'
 import { deckTilt } from '../maps/ship/model'
 import { fullSlope, openSide, tiltOf } from '../maps/dreamland/model'
@@ -507,10 +508,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
     const cutAt = this.map.cutAt?.bind(this.map)
+    const sunkAt = this.map.sunkAt?.bind(this.map)
     // 布景躺在地上，和躺着的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt)
-    if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt, sunkAt)
+    if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow, sunkAt)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
@@ -534,6 +536,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
       maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
+      mud: burstEmitter(this, [0x5d4330, 0x6f5238, 0x4a3526, 0x86684a], 150, 650, { gravityY: 480, scale: { start: 0.55, end: 0.35 } }),
+      mist: burstEmitter(this, [0xe8eee9, 0xd6e0db, 0xf4f1e6], 40, 1800, { gravityY: -12, scale: { start: 0.9, end: 2.4 }, alpha: { start: 0.42, end: 0 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.ctx.portrait, settings.damageNumbers, this.fightDef)
@@ -610,6 +614,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       tilt: sim ? tiltSnapshot(sim) : null,
       clock: sim ? clockSnapshot(sim) : null,
       submarine: sim ? submarineSnapshot(sim) : null,
+      mire: sim ? mireSnapshot(sim) : null,
     }
   }
 
@@ -1059,6 +1064,26 @@ function submarineSnapshot(sim: Sim): SubmarineSnapshot | null {
   if (!deep || !cfg) return null
   const c = subCountdown(deep.sub, cfg, sim.elapsedMs)
   return { phase: c.phase, ratio: c.ratio, inSec: c.leftMs / 1000 }
+}
+
+/** 在泥潭打的一局：队长与每个队员陷了多深 */
+function mireSnapshot(sim: Sim): MireSnapshot | null {
+  const s = sim.worldState.swamp
+  const cfg = MAPS[sim.mapId].swamp
+  if (!s || !cfg) return null
+  const lead = mireOf(s, sim.leader)
+  return {
+    lead: lead?.d ?? 0,
+    trapped: lead?.trapped ?? false,
+    effort: lead?.effort ?? 0,
+    firm: !inMud(s.plan, leaderX(sim), leaderY(sim)),
+    trap: cfg.sink.trap,
+    choke: cfg.sink.choke,
+    members: sim.characters.map((m) => {
+      const r = mireOf(s, m)
+      return { d: r?.d ?? 0, trapped: r?.trapped ?? false, leader: m === sim.leader, down: Alive.v[m] !== 1 }
+    }),
+  }
 }
 
 function clockSnapshot(sim: Sim): ClockSnapshot | null {

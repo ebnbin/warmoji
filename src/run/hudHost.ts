@@ -28,6 +28,8 @@ export interface HudSnapshot {
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
+  /** 在泥潭打的一局才有：队长与每个队员陷了多深 */
+  mire: MireSnapshot | null
 }
 
 /**
@@ -58,6 +60,20 @@ export interface SubmarineSnapshot {
   readonly phase: 'down' | 'warn' | 'away'
   readonly ratio: number
   readonly inSec: number
+}
+
+/**
+ * 陷在泥里的样子：lead 是队长陷的深度（0 到 1），trapped、effort 是队长困没困住、此刻挣了几成劲，firm 是队长脚下是不是实地；
+ * trap、choke 是被困住与呛泥的深度；members 按队伍的次序是每个队员
+ */
+export interface MireSnapshot {
+  readonly lead: number
+  readonly trapped: boolean
+  readonly effort: number
+  readonly firm: boolean
+  readonly trap: number
+  readonly choke: number
+  readonly members: readonly { readonly d: number; readonly trapped: boolean; readonly leader: boolean; readonly down: boolean }[]
 }
 
 export interface WaveSummary {

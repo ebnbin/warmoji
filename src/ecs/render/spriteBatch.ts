@@ -2,12 +2,13 @@ import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { Depth, Floor, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
 import { LIFT_PER_M } from '../../util/units'
+import { ART } from '../utils/ground'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
 import { LayerType } from './layer'
 import { quadNode, SpriteBatch } from './sprites'
-import type { CutAt, LightAt, LocalCut, PaintSprite, SpriteCut } from './sprites'
+import type { CutAt, LightAt, LocalCut, PaintSprite, SpriteCut, SunkAt } from './sprites'
 export { SPRITE_BANDS } from './bands'
 
 /** 一张精灵最多切成这么多份 */
@@ -15,21 +16,23 @@ const MAX_CUTS = 2
 const CUTS: SpriteCut[] = Array.from({ length: MAX_CUTS }, (): SpriteCut => ({ dx: 0, dy: 0, axis: 0, at: 0, keep: 1 }))
 const LOCAL: LocalCut = { axis: 0, at: 0, keep: 1 }
 
-/** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画；站在高处的按脚下的地面抬起来，地图要切的精灵（正穿过传送门的）按份画 */
+/** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画；站在高处的按脚下的地面抬起来，地图要切的精灵（正穿过传送门的）按份画，陷进地面的往下沉、只画露在地面上的那一截 */
 export class EcsSpriteBatch extends SpriteBatch {
   private readonly world: EcsWorld
   private order: number[] = []
   private readonly zMin: number
   private readonly zMax: number
   private readonly cutAt: CutAt | undefined
+  private readonly sunkAt: SunkAt | undefined
 
   /** paint 须按 z 从小到大排好 */
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight | undefined, lightAt: LightAt | undefined, cutAt: CutAt | undefined) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight | undefined, lightAt: LightAt | undefined, cutAt: CutAt | undefined, sunkAt: SunkAt | undefined) {
     super(scene, LayerType.Sprite, depth, atlas, paint, light, lightAt)
     this.world = world
     this.zMin = zMin
     this.zMax = zMax
     this.cutAt = cutAt
+    this.sunkAt = sunkAt
   }
 
   renderWebGL(
@@ -67,7 +70,18 @@ export class EcsSpriteBatch extends SpriteBatch {
       const w = Transform.w[eid]!
       const h = Transform.h[eid]!
       const lift = Floor.z[eid]! * LIFT_PER_M
-      const n = self.cutAt ? self.cutAt(gx, gy, w * 0.5, h * 0.5, CUTS) : 0
+      let n = self.cutAt ? self.cutAt(gx, gy, w * 0.5, h * 0.5, CUTS) : 0
+      const sunk = n === 0 && self.sunkAt ? self.sunkAt(eid) : 0
+      if (sunk > 0) {
+        // 整张往下沉 sunk 个画框高，脚下那条线以下的不画：落在地上的位置不动
+        const c = CUTS[0]!
+        c.dx = 0
+        c.dy = sunk * h * ART
+        c.axis = 1
+        c.at = gy + (h * ART) / 2 - c.dy
+        c.keep = -1
+        n = 1
+      }
       for (let k = 0; k < Math.max(1, n); k++) {
         const c = n > 0 ? CUTS[k]! : null
         if (c) {

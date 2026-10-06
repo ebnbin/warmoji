@@ -47,6 +47,7 @@ import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { nexusPlan, warpApart } from '../src/maps/nexus/layout.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { cornersOf, dreamlandPlan } from '../src/maps/dreamland/layout.ts'
+import { blobDist, inPond, inShore, swampPlan } from '../src/maps/swamp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -672,6 +673,60 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(plan.seeds.length > 0, `${where} 一个菌落也没接种上`)
     need(plan.seeds.every((d) => Math.hypot(d.x - plan.cx, d.y - plan.cy) - d.r >= p.plazaU), `${where} 有菌落落进了皿心的空地`)
     need(roomAt(plan.basin, plan.cx * UNIT, plan.cy * UNIT) >= (p.plazaU - 0.5) * UNIT, `${where} 的开局站位四周不够空`)
+  }
+}
+
+/**
+ * 泥潭：岸线放得进安全区，开局土台起伏到最小也空得出出生点；数目都是整数范围，深度的几条线由浅到深：困住、脱身、呛泥；
+ * 蹚泥的门槛比配比里的敌人都大、比头目小，头目才蹚得过去；朝一个方向使满劲，最重的身体也拔得出来，走着比站着陷得慢；
+ * 抽一批种子真的生成一遍：落羽杉土台、水洼与栈道都摆上了，栈道铺在能走的地上，开局站在实地上、四周空得开，每座土台都走得到
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'swamp') === (m.swamp !== undefined), `maps.${id} 是泥潭当且仅当写了 swamp`)
+  const c = m.swamp
+  if (!c) continue
+  const at = `maps.${id}.swamp`
+  const range = (v: readonly [number, number], min: number, int: boolean): boolean => v[0] >= min && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  const { shore, plaza, ponds, cypress, tussocks, walks, vents, sink, drag, heave, loot } = c
+  need(c.meterPerU > 0 && shore.neckU > 0, `${at} 的米每格与缝宽须为正`)
+  need(range(shore.radiusU, 1, false) && shore.radiusU[1] <= FRAME_U / 2 - SAFE_U, `${at}.shore.radiusU 须是放得进安全区的半径范围`)
+  need(plaza.radiusU * (1 - plaza.wobble * (1 + 1 / 2 + 1 / 3)) >= SPAWN_CLEAR_U + 0.5, `${at}.plaza 的土台起伏到最小处离正中不到 ${SPAWN_CLEAR_U + 0.5} 格`)
+  need(range(ponds.count, 0, true) && range(ponds.radiusU, 0.5, false) && ponds.clearU > 0, `${at}.ponds 的个数是整数范围、半径与留空为正`)
+  need(range(cypress.count, 1, true) && range(cypress.shoreCount, 0, true) && range(cypress.moundU, 0.5, false) && range(cypress.trunkU, 0.1, false) && range(cypress.heightM, 1, false) && range(cypress.ringU, 0, false) && cypress.gapU > 0, `${at}.cypress 的参数须是合理的范围`)
+  need(cypress.trunkU[1] < cypress.moundU[0] * 0.5, `${at}.cypress 的树干须比土台小得多，树干四周留得出站的地方`)
+  need(range(tussocks.count, 0, true) && range(tussocks.radiusU, OBSTACLES.body.refRadiusU, false) && tussocks.gapU > 0, `${at}.tussocks 的草墩须站得下标准身体`)
+  need(range(walks.count, 1, true) && walks.widthU >= 2 * OBSTACLES.body.refRadiusU && walks.plankU > 0 && range(walks.breaks, 0, true) && range(walks.breakU, 0.3, false), `${at}.walks 的栈道须走得过标准身体`)
+  need(range(c.reeds, 0, true) && range(vents.count, 1, true) && vents.clearU > 0, `${at} 的香蒲与泥眼须是整数范围，至少一处泥眼`)
+  need(sink.sinkS > 0 && sink.walkMul > 0 && sink.walkMul < 1 && sink.walkU > 0, `${at}.sink 的下陷时间、走着的倍数（须在 (0, 1) 内）与算作在走的速度须为正`)
+  need(range(sink.weight, 0.05, false), `${at}.sink.weight 须是正的范围`)
+  need(sink.free > 0 && sink.free < sink.trap && sink.trap < sink.choke && sink.choke <= 1, `${at}.sink 的深度须由浅到深：脱身 < 困住 < 呛泥 ≤ 1`)
+  need(sink.chokeSec > 0 && sink.tickMs > 0 && sink.recoverS > 0, `${at}.sink 的呛死时间、结算间隔与拔干净的时间须为正`)
+  const mixR = Math.max(...m.mix.map((row) => ENEMIES[row.kind]?.radius ?? 0))
+  need(sink.wadeU > mixR && sink.wadeU <= ENEMIES[m.boss].radius, `${at}.sink.wadeU 须大过配比里的敌人（${mixR} 格）、不大过头目，只有头目蹚得过泥`)
+  need(drag.viscosity[0] > 1 && drag.viscosity[0] <= drag.viscosity[1] && drag.viscosity[1] < drag.stuck && drag.caked >= 0 && drag.exertion >= 0, `${at}.drag 的黏度须越陷越大、被困住时最大，带着的泥与多耗的体力不为负`)
+  need(heave.tauS > 0 && heave.pullS > 0 && heave.stamina >= 0 && heave.tired > 0 && heave.tired <= 1, `${at}.heave 的参数须为正，没力气时的劲在 (0, 1] 内`)
+  const wMax = sink.weight[1]
+  need((1 - sink.free) / (heave.pullS * Math.sqrt(wMax)) * heave.tired > 0.02, `${at}.heave 最重的身体没了力气就拔不出来`)
+  need(loot.sinkS > 0, `${at}.loot.sinkS 须为正`)
+  for (let s = 0; s < 16; s++) {
+    const plan = swampPlan(c, s * 7919 + 13)
+    const where = `${at} 第 ${s} 个样本`
+    const mounds = plan.hummocks.filter((h) => h.kind === 'mound')
+    need(mounds.length >= cypress.count[0] && plan.ponds.length >= ponds.count[0] && plan.walks.length >= walks.count[0] + 1, `${where} 的土台、水洼或栈道没摆够`)
+    need(plan.vents.length >= 1, `${where} 一处泥眼也没有`)
+    const st = { x: plan.start.x * UNIT, y: plan.start.y * UNIT }
+    const home = plan.hummocks[0]!
+    need(home.kind === 'plaza' && blobDist(home.x, home.y, home.r, home.wob, plan.start.x, plan.start.y) >= SPAWN_CLEAR_U && roomAt(plan.basin, st.x, st.y) >= SPAWN_CLEAR_U * UNIT, `${where} 的开局站位四周空不开`)
+    for (const h of mounds) {
+      const p = { x: h.x + (plan.start.x - h.x) / Math.hypot(plan.start.x - h.x, plan.start.y - h.y) * h.r * 0.75, y: h.y + (plan.start.y - h.y) / Math.hypot(plan.start.x - h.x, plan.start.y - h.y) * h.r * 0.75 }
+      need(roomAt(plan.basin, p.x * UNIT, p.y * UNIT) > 0, `${where} 有一座落羽杉土台走不到`)
+    }
+    for (const w of plan.walks) {
+      const end = w.pts[w.pts.length - 1]!
+      need(roomAt(plan.basin, end.x * UNIT, end.y * UNIT) > 0, `${where} 有一条栈道的尽头不在能走的地上`)
+      for (const p of w.pts) need(inPond(plan, p.x, p.y) < 0, `${where} 有一条栈道铺进了水洼`)
+    }
+    for (const h of plan.hummocks) need(h.kind === 'plaza' || (inShore(plan, h.x, h.y) > h.r && inPond(plan, h.x, h.y) < -h.r * 0.5 && blobDist(h.x, h.y, h.r, h.wob, h.x, h.y) > 0), `${where} 有土墩落在了水里`)
   }
 }
 
