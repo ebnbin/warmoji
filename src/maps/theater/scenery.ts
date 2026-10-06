@@ -4,12 +4,10 @@ import { INK, smoothPath } from './art'
 import { blendSd, CHAPTERS } from './model'
 import type { Blend, Stage, ChapterKey, Act } from './model'
 
-/** 地布、天幕与幕牌上的画每格多少像素 */
+/** 地布与天幕上的画每格多少像素 */
 export const PAINT_PPU = 32
 /** 网点的格距，像素 */
 const DOT_PX = 4.5
-/** 印字用的字体：宋体一类有衬线的 */
-const SERIF = '"Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif'
 
 type Ctx = CanvasRenderingContext2D
 type Pt = readonly [number, number]
@@ -968,42 +966,6 @@ function frame(ctx: Ctx, x0: number, x1: number, h: number, color: string): void
   }
 }
 
-/** 幕牌：立在台口一角的一块米色牌子，镶双线边，写着第几幕、幕名与几行故事 */
-export function paintCard(chapter: number, canvas: HTMLCanvasElement): void {
-  const ch = CHAPTERS[chapter]!
-  const color = LINE[ch.key]
-  const k = PAINT_PPU
-  canvas.width = Math.round(CARD_W_U * k)
-  canvas.height = Math.round(CARD_H_U * k)
-  const ctx = canvas.getContext('2d')!
-  ctx.setTransform(k, 0, 0, k, 0, 0)
-  ctx.beginPath()
-  ctx.roundRect(0.05, 0.05, CARD_W_U - 0.1, CARD_H_U - 0.1, 0.3)
-  ctx.fillStyle = '#fbf3df'
-  ctx.fill()
-  for (const [inset, lw] of [[0.05, 0.08], [0.22, 0.03]] as const) {
-    ctx.beginPath()
-    ctx.roundRect(inset, inset, CARD_W_U - inset * 2, CARD_H_U - inset * 2, 0.3 - inset * 0.5)
-    ctx.lineWidth = lw
-    ctx.strokeStyle = color
-    ctx.stroke()
-  }
-  ctx.setTransform(1, 0, 0, 1, 0, 0)
-  ctx.fillStyle = color
-  ctx.textBaseline = 'top'
-  ctx.textAlign = 'left'
-  const x = 0.55
-  ctx.font = `${Math.round(0.42 * k)}px ${SERIF}`
-  ctx.fillText(`第${ch.num}幕`, x * k, 0.45 * k)
-  ctx.font = `bold ${Math.round(0.82 * k)}px ${SERIF}`
-  ctx.fillText(ch.name, x * k, 1.0 * k)
-  ctx.font = `${Math.round(0.36 * k)}px ${SERIF}`
-  ch.text.forEach((t, i) => ctx.fillText(t, x * k, (2.1 + i * 0.5) * k))
-}
-
-/** 幕牌多宽多高，格 */
-export const CARD_W_U = 7.4
-export const CARD_H_U = 3.9
 
 /** 天幕上一季的天色：天顶、天边，远处的山、近一点的山 */
 const SKY: Record<ChapterKey, { readonly top: string; readonly low: string; readonly far: string; readonly near: string }> = {
@@ -1151,15 +1113,17 @@ export function paintDrop(chapter: number, seed: number, w: number, h: number, c
   ctx.fillRect(0, h - 0.25, w, 0.25)
 }
 
-/** 台框上挂的帷幔多高、一个弧多宽，格；侧幕从台边往里盖住多少、往外多宽，格 */
+/** 台框上挂的帷幔多高、一个弧多宽，格；两边大幕从台边往里盖住多少、外边留出台框金柱多宽、一道褶多宽，格 */
 const VALANCE_U = 2.4
 const SWAG_U = 4.2
-const LEG_IN_U = 0.45
-const LEG_OUT_U = 1.1
+const DRAPE_IN_U = 0.45
+const PILLAR_U = 1.3
+const FOLD_U = 0.9
 
 /**
- * 台框前挂着的东西，盖在地布、天幕上面：legs 是台两边各一道黑丝绒侧幕，压住地布与天幕的两边，往台上投一道影子——
- * 推景时新景从右边侧幕后面推出来，旧景推进左边侧幕后面；valance 是顶上一道红丝绒帷幔，一个个弧垂下来，镶金穗子，吊上去的布景收进它后面
+ * 台框前挂着的东西，盖在地布、天幕上面：legs 是台两边的红丝绒大幕，从台框的金柱一直垂到台边，压住地布与天幕的两边，
+ * 一道道竖褶，靠台的一边镶金边、往台上投影子——推景时新景从右边大幕后面推出来，旧景推进左边大幕后面；
+ * valance 是顶上一道红丝绒帷幔，一个个弧垂下来，镶金穗子，吊上去的布景收进它后面
  */
 export function paintMasking(stage: Stage, size: number, part: 'legs' | 'valance', canvas: HTMLCanvasElement): void {
   const k = PAINT_PPU / 2
@@ -1167,20 +1131,48 @@ export function paintMasking(stage: Stage, size: number, part: 'legs' | 'valance
   canvas.height = Math.round(size * k)
   const ctx = canvas.getContext('2d')!
   ctx.setTransform(k, 0, 0, k, 0, 0)
-  // 侧幕：竖着的褶，靠台的一边往台上投影子
+  const bottom = stage.y1 + 2.3
   for (const side of part === 'legs' ? [-1, 1] : []) {
-    const edge = side < 0 ? stage.x0 : stage.x1
-    const x0 = side < 0 ? edge - LEG_OUT_U : edge - LEG_IN_U
-    const w = LEG_OUT_U + LEG_IN_U
-    const sh = ctx.createLinearGradient(edge - side * LEG_IN_U, 0, edge - side * (LEG_IN_U + 1.2), 0)
-    sh.addColorStop(0, 'rgba(10,6,8,0.45)')
-    sh.addColorStop(1, 'rgba(10,6,8,0)')
+    const edge = side < 0 ? stage.x0 + DRAPE_IN_U : stage.x1 - DRAPE_IN_U
+    const outer = side < 0 ? PILLAR_U : size - PILLAR_U
+    const x0 = Math.min(edge, outer)
+    const w = Math.abs(edge - outer)
+    // 往台上投的影子
+    const sh = ctx.createLinearGradient(edge, 0, edge - side * 1.4, 0)
+    sh.addColorStop(0, 'rgba(30,4,8,0.5)')
+    sh.addColorStop(1, 'rgba(30,4,8,0)')
     ctx.fillStyle = sh
-    ctx.fillRect(side < 0 ? edge + LEG_IN_U : edge - LEG_IN_U - 1.2, VALANCE_U * 0.6, 1.2, stage.y1 + 0.6 - VALANCE_U * 0.6)
+    ctx.fillRect(side < 0 ? edge : edge - 1.4, VALANCE_U * 0.6, 1.4, bottom - VALANCE_U * 0.6)
+    // 一道道竖褶：亮的褶脊、暗的褶沟
     const g = ctx.createLinearGradient(x0, 0, x0 + w, 0)
-    for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, i % 2 === 0 ? '#121016' : '#2c2832')
+    const n = Math.max(2, Math.round(w / FOLD_U))
+    for (let f = 0; f <= n * 2; f++) g.addColorStop(f / (n * 2), f % 2 === 0 ? '#6a0a14' : '#c4283a')
     ctx.fillStyle = g
-    ctx.fillRect(x0, 0, w, stage.y1 + 0.6)
+    ctx.beginPath()
+    ctx.moveTo(x0, 0)
+    ctx.lineTo(x0 + w, 0)
+    ctx.lineTo(x0 + w, bottom)
+    // 下摆拖在台口上，微微起伏
+    for (let f = n; f >= 0; f--) ctx.lineTo(x0 + (w * f) / n, bottom + (f % 2 === 0 ? 0.25 : 0))
+    ctx.closePath()
+    ctx.fill()
+    // 上头压暗一点，像是从台框里垂下来
+    const top = ctx.createLinearGradient(0, 0, 0, VALANCE_U * 2)
+    top.addColorStop(0, 'rgba(20,0,4,0.45)')
+    top.addColorStop(1, 'rgba(20,0,4,0)')
+    ctx.fillStyle = top
+    ctx.fillRect(x0, 0, w, VALANCE_U * 2)
+    // 靠台的一边：金边与流苏
+    ctx.fillStyle = '#e2b25a'
+    ctx.fillRect(side < 0 ? edge - 0.16 : edge, 0, 0.16, bottom)
+    ctx.strokeStyle = '#e2b25a'
+    ctx.lineWidth = 0.05
+    ctx.beginPath()
+    for (let y = 0.3; y < bottom; y += 0.22) {
+      ctx.moveTo(edge, y)
+      ctx.lineTo(edge + side * 0.18, y + 0.1)
+    }
+    ctx.stroke()
   }
   if (part === 'legs') return
   // 帷幔：一道底边，下面一个个弧，金穗子

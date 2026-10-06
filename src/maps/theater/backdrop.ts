@@ -72,15 +72,12 @@ const APRON = [74, 40, 26] as const
 const HALL = [30, 14, 12] as const
 const SEAT = [120, 26, 32] as const
 const SEAT_HI = [168, 46, 50] as const
-/** 两边的侧幕（黑丝绒）、再往外的红丝绒大幕、台框两边的金柱 */
-const LEG_LO = [10, 8, 12] as const
-const LEG_HI = [46, 40, 50] as const
+/** 两边的红丝绒大幕、台框两边的金柱 */
 const VELVET_LO = [92, 10, 18] as const
 const VELVET_HI = [190, 34, 42] as const
 const GILT = [222, 178, 92] as const
 const GILT_LO = [120, 84, 34] as const
-/** 侧幕多宽、台框的金柱多宽，格 */
-const LEGS_U = 2.2
+/** 台框的金柱多宽，格 */
 const PILLAR_U = 1.3
 /** 台后的墙 */
 const WALL = [34, 24, 22] as const
@@ -140,7 +137,7 @@ function front(sc: PaintScene, x: number, y: number): Rgb {
   return lerp3(HALL, c, 0.35 + 0.65 * fade)
 }
 
-/** 台两边：紧挨着台板是黑丝绒的侧幕，再往外是收拢的红丝绒大幕，最外是台框的金柱 */
+/** 台两边：红丝绒大幕，最外是台框的金柱 */
 function sides(sc: PaintScene, x: number, y: number): Rgb {
   const left = x < sc.x0
   const inner = left ? sc.x0 - BOARD_U - x : x - sc.x1 - BOARD_U
@@ -149,10 +146,6 @@ function sides(sc: PaintScene, x: number, y: number): Rgb {
     const u = outer / PILLAR_U
     const flute = 0.5 + 0.5 * Math.cos(u * Math.PI * 6)
     return lerp3(GILT_LO, GILT, 0.35 + 0.5 * flute * Math.sin(u * Math.PI))
-  }
-  if (inner < LEGS_U) {
-    const fold = 0.5 + 0.5 * Math.sin(inner * 5 + fbm(inner, y * 0.08, sc.seed + 35, 2) * 2)
-    return lerp3(LEG_LO, LEG_HI, fold * 0.8)
   }
   const fold = 0.5 + 0.5 * Math.sin(inner * 3.4 + fbm(inner * 0.5, y * 0.05, sc.seed + 31, 2) * 3)
   let c = lerp3(VELVET_LO, VELVET_HI, Math.pow(fold, 1.6) * (0.75 + 0.25 * valueNoise(x * 0.4, y * 0.2, sc.seed + 33)))

@@ -29,10 +29,10 @@ const PIECE_TRIES = 40
 
 /** 故事的四章：一章一个季节，按这个次序轮下去 */
 export const CHAPTERS = [
-  { key: 'spring', num: '一', name: '樱花溪', text: ['春天到了，小小的旅人们', '跟着小溪穿过草地，', '溪水流进了开满樱花的院子。'] },
-  { key: 'summer', num: '二', name: '沙与海', text: ['他们翻过滚烫的沙丘，', '一直走到大海边。', '海的深处，停着一艘小小的潜艇。'] },
-  { key: 'autumn', num: '三', name: '红叶洞', text: ['红叶落满了旧城墙，', '墙后面藏着一个山洞，', '洞里点着一盏盏火把。'] },
-  { key: 'winter', num: '四', name: '火与冰', text: ['冬天来了，雪落满了冰原，', '远处的火山还冒着烟。', '旅人们的故事，还在继续。'] },
+  { key: 'spring', num: '一', name: '樱花溪' },
+  { key: 'summer', num: '二', name: '沙与海' },
+  { key: 'autumn', num: '三', name: '红叶洞' },
+  { key: 'winter', num: '四', name: '火与冰' },
 ] as const
 export type ChapterKey = (typeof CHAPTERS)[number]['key']
 
@@ -535,7 +535,7 @@ export function actOf(cfg: TheaterConfig, stage: Stage, index: number): Act {
   return { index, chapter, seed: base, blend, pieces: ordered }
 }
 
-/** 换幕的一段：stand 演着，change 换幕——台上暗下来只留追光，角色被吊绳吊起，旧布景依次吊上去，地布与天幕连同台上的一切从右往左推过去换成新的，新布景依次吊下来，角色原地放下，灯亮回来 */
+/** 换幕的一段：stand 演着，change 换幕——台上暗下来、每个角色头上留一束追光，角色被吊绳吊起，旧布景依次吊上去，地布与天幕连同台上的一切从右往左推过去换成新的，新布景依次吊下来，角色原地放下，灯亮回来 */
 export type Phase = 'stand' | 'change'
 
 /** 此刻演到哪：act 是正演着或正换上的那一幕（change 时旧的是 act - 1），phase 是哪一段，在这一段里过了 at 毫秒、这一段长 len；next 是下一次换幕在几时（毫秒） */

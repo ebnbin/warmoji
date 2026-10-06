@@ -38,7 +38,7 @@ const WINGS_BACK_U = 0.75
 const WINGS_END_U = 0.55
 /** 角色被吊起来在画面上抬多高，格 */
 export const HOIST_U = 3
-/** 推景时离台左边沿不到这么远（格，算上身体半径）的就算推进了侧幕，退场 */
+/** 推景时离台左边沿不到这么远（格，算上身体半径）的就算推进了大幕，退场 */
 const EXIT_U = 0.3
 /** 一件布景落到台上时沿底边扬起几团灰 */
 const POP_PUFFS = 3
@@ -233,7 +233,7 @@ function hoist(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
   }
 }
 
-/** 推景：地布从右往左推过去时，地上的东西——敌人（头目除外）、掉落物、碎屑——都跟着地布一起往左挪，吊着的角色与飞在半空的不动；推进左边侧幕的退场，不算打倒、不掉东西 */
+/** 推景：地布从右往左推过去时，地上的东西——敌人（头目除外）、掉落物、碎屑——都跟着地布一起往左挪，吊着的角色与飞在半空的不动；推进左边大幕的退场，不算打倒、不掉东西 */
 function carry(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
   const u = slid(cfg, s.clock)
   const du = u - s.slidAt
