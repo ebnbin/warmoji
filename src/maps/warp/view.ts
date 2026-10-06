@@ -6,7 +6,6 @@ import { playSfx } from '../../audio/sfx'
 import { Alive, Due, ENEMY_SET, Telegraph, Transform } from '../../ecs/components'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
-import { nextRoom } from './layout'
 import { WarpPainter } from './painter'
 import { CORE_GLOW, FOE_GLOW, lift, rgb, shade, SIGNS, TEAM_GLOW, VOID_DEEP } from './palette'
 import { encodeTiles, TILES_FRAG, VOID_FRAG } from './shader'
@@ -146,7 +145,8 @@ export class WarpView implements MapView {
   private airFx?: Phaser.GameObjects.Graphics
   private readonly u: Uniforms = { time: 0, px: 0.05, charge: [0, 0, 0, 0], chargeRoom: -1 }
   private jumpsSeen = 0
-  private shuttleSeen: number[] = []
+  private shuttleSeen = -1e9
+  private phaseSeen = ''
   private charging = false
 
   private planOf(v: ViewCtx): WarpPlan {
@@ -223,7 +223,8 @@ export class WarpView implements MapView {
     this.visuals.push(this.floorFx, this.glowFx, this.airFx)
     const st = sim.worldState.warp
     this.jumpsSeen = st?.jumps ?? 0
-    this.shuttleSeen = st ? st.pads.map((p) => p.shuttledAt) : []
+    this.shuttleSeen = st?.portal.shuttledAt ?? -1e9
+    this.phaseSeen = st?.portal.phase ?? ''
     v.lens.screen.vignette(0.9, 0.12, 0x020610)
   }
 
@@ -288,7 +289,7 @@ export class WarpView implements MapView {
     this.airFx.clear()
     this.chargeRing(st, cfg)
     this.sounds(v, st, cfg)
-    st.plan.rooms.forEach((room) => this.bridge(st, cfg, room, now, t))
+    this.bridge(st, cfg, now, t)
     st.plan.rooms.forEach((room) => this.pad(sim, st, cfg, room, now, t))
     this.core(sim, st, t)
     this.pillars(st, cfg, t)
@@ -299,10 +300,9 @@ export class WarpView implements MapView {
 
   /** 着色器里那圈扩满整间房的充能光：半径随充能从台边扩到房间最远的角 */
   private chargeRing(st: WarpState, cfg: WarpConfig): void {
-    const i = st.teamRoom
-    const p = st.pads[i]
-    const room = st.plan.rooms[i]!
-    const k = p ? p.charge / cfg.pad.chargeMs : 0
+    const p = st.portal
+    const room = st.plan.rooms[p.from]!
+    const k = p.phase === 'open' ? p.charge / cfg.pad.chargeMs : 0
     if (k <= 0) {
       this.u.charge = [0, 0, 0, 0]
       this.u.chargeRoom = -1
@@ -312,74 +312,103 @@ export class WarpView implements MapView {
     const reach = Math.max(...[f.x0, f.x1].flatMap((x) => [f.y0, f.y1].map((y) => Math.hypot(x - room.pad.x, y - room.pad.y))))
     const r = cfg.pad.radiusU + (reach + 1 - cfg.pad.radiusU) * ease(k)
     this.u.charge = [room.pad.x, room.pad.y, r, 0.4 + 0.6 * k]
-    this.u.chargeRoom = i
+    this.u.chargeRoom = p.from
   }
 
-  /** 开始充能、整队出发、送来一批敌人：在镜头里才响 */
+  /** 传送门预告、打开，开始充能、整队出发、送来一批敌人：在镜头里才响 */
   private sounds(v: ViewCtx, st: WarpState, cfg: WarpConfig): void {
-    const p = st.pads[st.teamRoom]
-    const charging = !!p && p.charge > 0 && p.charge < cfg.pad.chargeMs
+    const p = st.portal
+    const charging = p.phase === 'open' && p.charge > 0 && p.charge < cfg.pad.chargeMs
     if (charging && !this.charging && p.charge < 200) playSfx('charge')
     this.charging = charging
+    if (p.phase !== this.phaseSeen) {
+      if (p.phase === 'warn') playSfx('surge')
+      if (p.phase === 'open') playSfx('warp')
+      this.phaseSeen = p.phase
+    }
     if (st.jumps !== this.jumpsSeen) {
       this.jumpsSeen = st.jumps
       playSfx('jump')
     }
-    st.pads.forEach((pad, i) => {
-      if (pad.shuttledAt === this.shuttleSeen[i]) return
-      this.shuttleSeen[i] = pad.shuttledAt
-      const to = nextRoom(st.plan, i)
-      if (pad.shuttled > 0 && v.lens.screen.sees(to.pad.x * UNIT, to.pad.y * UNIT, 2 * UNIT)) playSfx('warp')
-    })
+    if (p.shuttledAt !== this.shuttleSeen) {
+      this.shuttleSeen = p.shuttledAt
+      const to = st.plan.rooms[p.to]!
+      if (p.shuttled > 0 && v.lens.screen.sees(to.pad.x * UNIT, to.pad.y * UNIT, 2 * UNIT)) playSfx('warp')
+    }
+  }
+
+  /** 传送门这一段走到几成（0 到 1），离关上还剩多少毫秒 */
+  private progress(st: WarpState, now: number): { k: number; left: number } {
+    const p = st.portal
+    return { k: clamp01((now - p.since) / Math.max(1, p.until - p.since)), left: p.until - now }
+  }
+
+  /** 快关上时一闪一闪：最后两秒越闪越快 */
+  private flicker(left: number, now: number): number {
+    if (left > 2000) return 1
+    const rate = 70 + (left / 2000) * 160
+    return noise(Math.floor(now / rate), 7) > 0.35 ? 1 : 0.25
   }
 
   /**
-   * 光桥：第 i 间的传送台与下一间的传送台之间一道光。平时只是一串淡淡的人字纹往下一间流；队长充能时越来越亮，
-   * 整队出发、一趟车送人过去的那一阵整条桥亮起来，队伍是信号蓝、敌人是信号红
+   * 光桥：传送门预告、开着时，入口与出口两座台子之间一道光，颜色是出口那间的主色。预告时是一串往出口流的虚线，越到开门越实；
+   * 开着时人字纹往出口流，队长充能时越来越亮，快关时一闪一闪；整队出发、一趟车送人过去的那一阵整条桥亮起来，一团光沿桥冲过去
    */
-  private bridge(st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number, t: number): void {
-    const to = nextRoom(st.plan, room.index)
+  private bridge(st: WarpState, cfg: WarpConfig, now: number, t: number): void {
+    const p = st.portal
+    if (p.phase === 'closed') return
+    const from = st.plan.rooms[p.from]!
+    const to = st.plan.rooms[p.to]!
     const color = SIGNS[to.sign]!.color
     const R = cfg.pad.radiusU
-    const ax = room.pad.x
-    const ay = room.pad.y
-    const dx = to.pad.x - ax
-    const dy = to.pad.y - ay
+    const dx = to.pad.x - from.pad.x
+    const dy = to.pad.y - from.pad.y
     const len = Math.hypot(dx, dy)
     const ux = dx / len
     const uy = dy / len
-    const a = { x: (ax + ux * R) * UNIT, y: (ay + uy * R) * UNIT }
+    const a = { x: (from.pad.x + ux * R) * UNIT, y: (from.pad.y + uy * R) * UNIT }
     const b = { x: (to.pad.x - ux * R) * UNIT, y: (to.pad.y - uy * R) * UNIT }
     const span = Math.hypot(b.x - a.x, b.y - a.y)
-    const pad = st.pads[room.index]!
-    const charge = pad.charge / cfg.pad.chargeMs
-    const sinceJump = now - pad.jumpedAt
-    const sinceShuttle = now - pad.shuttledAt
-    const live = cfg.pad.transitMs + 250
-    const teamHot = sinceJump >= 0 && sinceJump < live ? 1 - sinceJump / live : 0
-    const foeHot = pad.shuttled > 0 && sinceShuttle >= 0 && sinceShuttle < live ? 1 - sinceShuttle / live : 0
     const g = this.glowFx!
     const f = this.floorFx!
-    // 桥身：一道暗的底，上面同色的细线
-    f.lineStyle(0.22 * UNIT, shade(color, 0.22), 0.55)
-    f.lineBetween(a.x, a.y, b.x, b.y)
-    g.lineStyle(0.07 * UNIT, color, 0.35 + 0.5 * charge)
-    g.lineBetween(a.x, a.y, b.x, b.y)
-    // 人字纹往下一间流，充能时流得快、亮得多
-    const step = 0.9 * UNIT
-    const speed = (0.7 + 3.5 * charge) * UNIT
+    const { k, left } = this.progress(st, now)
     const nx = -uy
     const ny = ux
-    for (let s = ((t * speed) % step) - step; s < span; s += step) {
-      if (s < 0) continue
-      const fade = Math.sin((Math.PI * s) / span)
-      const c = { x: a.x + ux * s, y: a.y + uy * s }
+    if (p.phase === 'warn') {
+      // 预告：一段段虚线往出口流，越来越密、越来越亮
+      const dash = 0.35 * UNIT
+      const al = 0.25 + 0.6 * k
+      g.lineStyle(0.06 * UNIT, color, al)
+      for (let s0 = ((t * 2.5 * UNIT) % (dash * 2)) - dash * 2; s0 < span; s0 += dash * 2) {
+        const e0 = Math.max(0, s0)
+        const e1 = Math.min(span, s0 + dash * (0.4 + 0.6 * k))
+        if (e1 > e0) g.lineBetween(a.x + ux * e0, a.y + uy * e0, a.x + ux * e1, a.y + uy * e1)
+      }
+      return
+    }
+    const charge = p.charge / cfg.pad.chargeMs
+    const on = this.flicker(left, now)
+    f.lineStyle(0.24 * UNIT, shade(color, 0.22), 0.6 * on)
+    f.lineBetween(a.x, a.y, b.x, b.y)
+    g.lineStyle(0.07 * UNIT, color, (0.45 + 0.5 * charge) * on)
+    g.lineBetween(a.x, a.y, b.x, b.y)
+    const step = 0.9 * UNIT
+    const speed = (1 + 3.5 * charge) * UNIT
+    for (let s0 = ((t * speed) % step) - step; s0 < span; s0 += step) {
+      if (s0 < 0) continue
+      const fade = Math.sin((Math.PI * s0) / span)
+      const c = { x: a.x + ux * s0, y: a.y + uy * s0 }
       const w = 0.24 * UNIT
       const back = 0.22 * UNIT
-      g.lineStyle(0.09 * UNIT, color, (0.45 + 0.55 * charge) * fade)
+      g.lineStyle(0.09 * UNIT, color, (0.5 + 0.5 * charge) * fade * on)
       g.lineBetween(c.x - ux * back + nx * w, c.y - uy * back + ny * w, c.x, c.y)
       g.lineBetween(c.x - ux * back - nx * w, c.y - uy * back - ny * w, c.x, c.y)
     }
+    const live = cfg.pad.transitMs + 250
+    const sinceJump = now - p.jumpedAt
+    const sinceShuttle = now - p.shuttledAt
+    const teamHot = sinceJump >= 0 && sinceJump < live ? 1 - sinceJump / live : 0
+    const foeHot = p.shuttled > 0 && sinceShuttle >= 0 && sinceShuttle < live ? 1 - sinceShuttle / live : 0
     for (const [hot, glow] of [
       [teamHot, TEAM_GLOW],
       [foeHot, FOE_GLOW],
@@ -397,14 +426,13 @@ export class WarpView implements MapView {
       g.lineStyle(0.06 * UNIT, 0xffffff, hot)
       g.lineBetween(a.x, a.y, b.x, b.y)
     }
-    // 一团光沿桥从这头冲到那头，和穿行的身体一起到
-    for (const [since, glow, on] of [
+    for (const [since, glow, go] of [
       [sinceJump, TEAM_GLOW, true],
-      [sinceShuttle, FOE_GLOW, pad.shuttled > 0],
+      [sinceShuttle, FOE_GLOW, p.shuttled > 0],
     ] as const) {
-      if (!on || since < 0 || since > cfg.pad.transitMs) continue
-      const k = ease(since / cfg.pad.transitMs)
-      const q = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }
+      if (!go || since < 0 || since > cfg.pad.transitMs) continue
+      const e = ease(since / cfg.pad.transitMs)
+      const q = { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e }
       g.lineStyle(0.3 * UNIT, glow, 0.5)
       g.lineBetween(a.x, a.y, q.x, q.y)
       for (const [r, al, c] of [
@@ -419,43 +447,60 @@ export class WarpView implements MapView {
   }
 
   /**
-   * 一座传送台：外圈是下一间房的颜色。能用时台面上三道人字纹朝下一间滑过去；刚到站、还在冷却时外圈发灰，一段弧随冷却走满；
-   * 队长站上来充能，台面一层层亮成信号蓝、往里收的圈越收越快；发车前台面上亮起一圈圈往里收的红；出发、到站时亮一下
+   * 一座传送台。传送门关着时外圈发灰、微微呼吸。是入口时外圈亮成出口那间的颜色：预告时一闪一闪、一段弧随预告走满；开着时三道人字纹朝出口滑过去，
+   * 一段弧随剩下的时间缩短，快关时一闪一闪；队长站上来充能，台面一层层亮成信号蓝、往里收的圈越收越快，队员头顶各一道光柱；发车前台面上亮起一圈圈往里收的红。
+   * 是出口时外圈亮成入口那间的颜色，台面上一圈圈往外扩的波纹。出发、到站时亮一下、冲起一道光柱；门关上时两座台子各收一圈光
    */
   private pad(sim: Sim, st: WarpState, cfg: WarpConfig, room: WarpRoom, now: number, t: number): void {
-    const to = nextRoom(st.plan, room.index)
-    const color = SIGNS[to.sign]!.color
-    const p = st.pads[room.index]!
+    const p = st.portal
     const R = cfg.pad.radiusU * UNIT
     const x = room.pad.x * UNIT
     const y = room.pad.y * UNIT
     const f = this.floorFx!
     const g = this.glowFx!
-    const cooling = now < p.coolUntil
-    const charge = p.charge / cfg.pad.chargeMs
-    const rimColor = cooling ? 0x5d6878 : color
+    const live = p.phase !== 'closed'
+    const entry = live && p.from === room.index
+    const exit = live && p.to === room.index
+    const { k, left } = this.progress(st, now)
+    const other = st.plan.rooms[entry ? p.to : p.from]!
+    const color = SIGNS[other.sign]!.color
+    const on = p.phase === 'warn' ? (Math.sin(t * 14) > -0.2 ? 1 : 0.35) : this.flicker(left, now)
+    const rimColor = entry || exit ? color : 0x5d6878
     f.lineStyle(0.1 * UNIT, shade(rimColor, 0.5), 1)
     f.strokeCircle(x, y, R * 0.93)
-    g.lineStyle(0.06 * UNIT, rimColor, cooling ? 0.5 : 0.85 + 0.15 * Math.sin(t * 3))
+    g.lineStyle(0.06 * UNIT, rimColor, entry || exit ? 0.9 * on : 0.25 + 0.1 * Math.sin(t * 1.5 + room.index))
     g.strokeCircle(x, y, R * 0.93)
-    if (cooling) {
-      const k = clamp01(1 - (p.coolUntil - now) / cfg.pad.cooldownMs)
+    if (entry || exit) {
+      // 预告时一段弧走满，开着时一段弧随剩下的时间缩短
       const a0 = -Math.PI / 2
-      g.lineStyle(0.1 * UNIT, color, 0.9)
+      const span = p.phase === 'warn' ? k : 1 - k
+      g.lineStyle(0.1 * UNIT, lift(color, 0.3), 0.9 * on)
       g.beginPath()
-      g.arc(x, y, R * 0.93, a0, a0 + k * Math.PI * 2, false)
+      g.arc(x, y, R * 1.08, a0, a0 + span * Math.PI * 2, false)
       g.strokePath()
-    } else {
-      // 朝下一间滑过去的人字纹
-      const ux = room.toward.x
-      const uy = room.toward.y
+    }
+    if (exit) {
+      for (let j = 0; j < 3; j++) {
+        const s0 = (t * 0.7 + j / 3) % 1
+        g.lineStyle(0.06 * UNIT, color, 0.6 * (1 - s0) * on * (p.phase === 'warn' ? k : 1))
+        g.strokeCircle(x, y, R * (0.2 + 0.75 * s0))
+      }
+    }
+    const charge = entry && p.phase === 'open' ? p.charge / cfg.pad.chargeMs : 0
+    if (entry) {
+      // 朝出口滑过去的人字纹
+      const dx = other.pad.x - room.pad.x
+      const dy = other.pad.y - room.pad.y
+      const len = Math.hypot(dx, dy)
+      const ux = dx / len
+      const uy = dy / len
       const nx = -uy
       const ny = ux
-      for (let k = 0; k < 3; k++) {
-        const s = ((t * 0.8 + k / 3) % 1) * 1.4 - 0.7
-        const al = Math.sin(((s + 0.7) / 1.4) * Math.PI) * (0.55 + 0.45 * charge)
-        const cx = x + ux * s * R
-        const cy = y + uy * s * R
+      for (let j = 0; j < 3; j++) {
+        const s0 = ((t * 0.8 + j / 3) % 1) * 1.4 - 0.7
+        const al = Math.sin(((s0 + 0.7) / 1.4) * Math.PI) * (0.55 + 0.45 * charge) * on * (p.phase === 'warn' ? 0.4 : 1)
+        const cx = x + ux * s0 * R
+        const cy = y + uy * s0 * R
         const w = 0.42 * R
         const back = 0.32 * R
         g.lineStyle(0.08 * UNIT, color, al)
@@ -466,10 +511,10 @@ export class WarpView implements MapView {
     if (charge > 0) {
       g.fillStyle(TEAM_GLOW, 0.18 + 0.4 * charge)
       g.fillCircle(x, y, R * 0.86)
-      for (let k = 0; k < 3; k++) {
-        const s = 1 - ((t * (1 + 3 * charge) + k / 3) % 1)
-        g.lineStyle(0.07 * UNIT, lift(TEAM_GLOW, 0.4), 0.8 * charge * (1 - s * 0.5))
-        g.strokeCircle(x, y, R * (0.15 + 0.75 * s))
+      for (let j = 0; j < 3; j++) {
+        const s0 = 1 - ((t * (1 + 3 * charge) + j / 3) % 1)
+        g.lineStyle(0.07 * UNIT, lift(TEAM_GLOW, 0.4), 0.8 * charge * (1 - s0 * 0.5))
+        g.strokeCircle(x, y, R * (0.15 + 0.75 * s0))
       }
       // 队伍里每个人头上一道光柱：整队都锁上了
       for (const m of sim.characters) {
@@ -483,51 +528,59 @@ export class WarpView implements MapView {
         this.airFx!.fillRect(mx - 0.035 * UNIT, my - h, 0.07 * UNIT, h)
       }
     }
-    // 发车前：台面上一圈圈往里收的红
+    // 发车前：入口台面上一圈圈往里收的红
     const warn = p.shuttleAt - now
-    if (warn > 0 && warn < cfg.pad.warnMs) {
-      const k = 1 - warn / cfg.pad.warnMs
+    if (entry && p.phase === 'open' && warn > 0 && warn < cfg.pad.warnMs) {
+      const kk = 1 - warn / cfg.pad.warnMs
       const al = this.crowd(sim, cfg, room) ? 0.7 : 0.18
       for (let j = 0; j < 2; j++) {
-        const s = 1 - ((k * 2 + j / 2) % 1)
-        g.lineStyle(0.06 * UNIT, FOE_GLOW, al * k)
-        g.strokeCircle(x, y, R * (0.2 + 0.7 * s))
+        const s0 = 1 - ((kk * 2 + j / 2) % 1)
+        g.lineStyle(0.06 * UNIT, FOE_GLOW, al * kk)
+        g.strokeCircle(x, y, R * (0.2 + 0.7 * s0))
       }
     }
-    // 出发与到站
-    const flash = (at: number, c: number, strength: number, px: number, py: number): void => {
-      const d = now - at
-      if (d < 0 || d > BURST_MS || strength <= 0) return
-      const k = d / BURST_MS
-      g.fillStyle(c, 0.5 * (1 - k) * strength)
-      g.fillCircle(px, py, R * (0.7 + 0.5 * k))
-      g.lineStyle(0.08 * UNIT, lift(c, 0.5), (1 - k) * strength)
-      g.strokeCircle(px, py, R * (0.9 + 1.4 * k))
+    // 门关上：两座台子各收一圈光
+    if (p.phase === 'closed' && (p.from === room.index || p.to === room.index) && now - p.since < BURST_MS) {
+      const kk = (now - p.since) / BURST_MS
+      g.lineStyle(0.08 * UNIT, 0xffffff, 0.8 * (1 - kk))
+      g.strokeCircle(x, y, R * (1.6 - 0.9 * kk))
     }
-    const column = (at: number, c: number, strength: number, px: number, py: number, rising: boolean): void => {
+    const flash = (at: number, c: number, strength: number): void => {
       const d = now - at
       if (d < 0 || d > BURST_MS || strength <= 0) return
-      const k = d / BURST_MS
-      const h = 3.2 * UNIT * (rising ? 0.4 + 0.6 * ease(k) : 1 - 0.6 * ease(k))
+      const kk = d / BURST_MS
+      g.fillStyle(c, 0.5 * (1 - kk) * strength)
+      g.fillCircle(x, y, R * (0.7 + 0.5 * kk))
+      g.lineStyle(0.08 * UNIT, lift(c, 0.5), (1 - kk) * strength)
+      g.strokeCircle(x, y, R * (0.9 + 1.4 * kk))
+    }
+    const column = (at: number, c: number, strength: number, rising: boolean): void => {
+      const d = now - at
+      if (d < 0 || d > BURST_MS || strength <= 0) return
+      const kk = d / BURST_MS
+      const h = 3.2 * UNIT * (rising ? 0.4 + 0.6 * ease(kk) : 1 - 0.6 * ease(kk))
       for (const [w, al] of [
         [1, 0.16],
         [0.6, 0.3],
         [0.22, 0.7],
       ] as const) {
-        this.airFx!.fillStyle(w < 0.3 ? 0xffffff : c, al * (1 - k) * strength)
-        this.airFx!.fillRect(px - R * w, py - h, R * w * 2, h)
+        this.airFx!.fillStyle(w < 0.3 ? 0xffffff : c, al * (1 - kk) * strength)
+        this.airFx!.fillRect(x - R * w, y - h, R * w * 2, h)
       }
     }
-    column(p.jumpedAt, TEAM_GLOW, 1, x, y, true)
-    column(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0, x, y, true)
-    column(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, to.pad.x * UNIT, to.pad.y * UNIT, false)
-    column(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, to.pad.x * UNIT, to.pad.y * UNIT, false)
-    flash(p.jumpedAt, TEAM_GLOW, 1, x, y)
-    flash(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0.25, x, y)
-    const tx = to.pad.x * UNIT
-    const ty = to.pad.y * UNIT
-    flash(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, tx, ty)
-    flash(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, p.shuttled > 0 ? 1 : 0, tx, ty)
+    const foes = p.shuttled > 0 ? 1 : 0
+    if (p.from === room.index) {
+      flash(p.jumpedAt, TEAM_GLOW, 1)
+      flash(p.shuttledAt, FOE_GLOW, p.shuttled > 0 ? 1 : 0.25)
+      column(p.jumpedAt, TEAM_GLOW, 1, true)
+      column(p.shuttledAt, FOE_GLOW, foes, true)
+    }
+    if (p.to === room.index) {
+      flash(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1)
+      flash(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, foes)
+      column(p.jumpedAt + cfg.pad.transitMs, TEAM_GLOW, 1, false)
+      column(p.shuttledAt + cfg.pad.transitMs, FOE_GLOW, foes, false)
+    }
   }
 
   /** 此刻有没有敌人站在这座台上 */
@@ -733,7 +786,7 @@ export class WarpView implements MapView {
     }
   }
 
-  /** 传送台给身边的身体打一层下一间颜色的补光；核心柱四周的身体迎着柱子那一面亮一点 */
+  /** 传送门开着、预告着时，入口与出口的台子给身边的身体打一层对面那间颜色的补光；核心柱四周的身体迎着柱子那一面亮一点 */
   lightAt(x: number, y: number, out: LocalLight): void {
     const st = this.state
     const cfg = this.cfg
@@ -746,11 +799,12 @@ export class WarpView implements MapView {
       if (d >= best) continue
       best = d
       const l = d || 1
-      const p = st.pads[room.index]!
+      const p = st.portal
+      const live = p.phase !== 'closed' && (p.from === room.index || p.to === room.index)
       out.fx = (room.pad.x - px) / l
       out.fy = (room.pad.y - py) / l
-      out.color = p.charge > 0 ? TEAM_GLOW : SIGNS[nextRoom(st.plan, room.index).sign]!.color
-      out.fill = PAD_FILL * (1 - d / PAD_LIGHT_U)
+      out.color = p.phase === 'open' && p.charge > 0 && p.from === room.index ? TEAM_GLOW : SIGNS[st.plan.rooms[p.from === room.index ? p.to : p.from]!.sign]!.color
+      out.fill = live ? PAD_FILL * (1 - d / PAD_LIGHT_U) : 0
     }
     if (best < PAD_LIGHT_U) return
     const d = Math.hypot(x / UNIT - st.plan.core.x, y / UNIT - st.plan.core.y)

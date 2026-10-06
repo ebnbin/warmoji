@@ -1359,9 +1359,9 @@ export interface WarpConfig {
   /** 回廊正中凹槽的边长，格 */
   readonly pitU: number
   /**
-   * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
-   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
-   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   * 传送台：每间一座，圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格。
+   * 传送门的入口开在哪间，队长站上那间的台子就充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到出口那间的传送台。
+   * 门开着时入口每隔 shuttleMs 发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
    */
   readonly pad: {
     readonly radiusU: number
@@ -1370,11 +1370,15 @@ export interface WarpConfig {
     readonly chargeMs: number
     readonly drainMs: number
     readonly transitMs: number
-    readonly cooldownMs: number
     readonly shuttleMs: number
     readonly warnMs: number
     readonly spillU: number
   }
+  /**
+   * 传送门：全图同一时刻只有一个，单向。关上 closedMs 之后预告 warnMs——入口定在队伍此刻所在的那间，出口在另外三间里抽——再打开 openMs，到点关上；
+   * 时长都在范围里抽
+   */
+  readonly portal: { readonly closedMs: readonly [number, number]; readonly warnMs: number; readonly openMs: readonly [number, number] }
   /** 出怪板：一块长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
   readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
   /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
