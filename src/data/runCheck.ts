@@ -247,11 +247,10 @@ export function runChecks(cat: RunCatalog): RunChecks {
     const squads = p.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
     const endless = p.spawns.some(
       (s) =>
-        s.kind === 'knobs' ||
         (s.kind === 'stream' && s.untilMs === undefined && s.total === undefined) ||
         (s.kind === 'batch' && (s.every !== undefined || s.on !== undefined) && s.times === undefined),
     )
-    const boss = p.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs') || squads.some((sq) => isBoss(sq.enemy))
+    const boss = p.spawns.some((s) => s.kind === 'boss') || squads.some((sq) => isBoss(sq.enemy))
     if (p.mix) checkMix(p.mix, [...path, 'mix'])
     p.spawns.forEach((s, i) => {
       const sp = [...path, 'spawns', i]

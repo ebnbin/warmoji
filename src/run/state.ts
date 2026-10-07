@@ -11,6 +11,7 @@ import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
 import type { SceneKey } from '../scene/keys'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
+import { sandboxRun } from './sandbox'
 
 /** 无敌时的生命上限 */
 export const INVINCIBLE_HP = 10_000_000
@@ -99,9 +100,14 @@ function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
   return out
 }
 
-/** 开一局内置关卡，带上玩家选的地图与自选的词缀 */
-export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readonly MutatorId[] = []): RunState {
-  return openRun(RUNS[id], { runId: id, mapId, mutators })
+/** 开一局内置关卡，带上自选的词缀 */
+export function beginRun(id: RunId, mutators: readonly MutatorId[] = []): RunState {
+  return openRun(RUNS[id], { runId: id, mutators })
+}
+
+/** 在这张图上开一局沙盒 */
+export function beginSandbox(map: MapId): RunState {
+  return openRun(sandboxRun(map), {})
 }
 
 /** 按一份关卡数据开一局，离开时回到 origin */
@@ -186,12 +192,10 @@ export function currentRun(): RunState | undefined {
   return current
 }
 
+/** 进行中的一局：只有开了局才进得了要它的页面 */
 export function getRun(): RunState {
-  if (current) return current
-  const run = beginRun('classic')
-  addMember(run, ROSTER_IDS[0]!)
-  skipFilled(run)
-  return run
+  if (!current) throw new Error('没有进行中的一局')
+  return current
 }
 
 export function endRun(): void {

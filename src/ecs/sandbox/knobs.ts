@@ -180,7 +180,7 @@ export function sandboxStarters(): CharacterId[] {
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 
-/** 试炼场开局的队伍：名单、等级与无敌都看旋钮 */
+/** 沙盒开局的队伍：名单、等级与无敌都看旋钮 */
 export function sandboxTeam(): { readonly ids: readonly CharacterId[]; readonly level: number; readonly invincible: boolean } {
   return { ids: sandboxStarters(), level: level + 1, invincible }
 }

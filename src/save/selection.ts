@@ -4,20 +4,19 @@ import { MUTATOR_IDS } from '../data/mutators'
 import type { MapId } from '../types/maps'
 import type { MutatorId } from '../types/runs'
 
-type MapKey = StorageKey.Map | StorageKey.BoxMap
-
-export function loadMap(storage: StringStorage | undefined, key: MapKey, maps: readonly MapId[]): MapId {
+/** 沙盒上次挑的地图 */
+export function loadMap(storage: StringStorage | undefined, maps: readonly MapId[]): MapId {
   try {
-    const id = storage?.getItem(key)
+    const id = storage?.getItem(StorageKey.BoxMap)
     return maps.find((m) => m === id) ?? maps[0]!
   } catch {
     return maps[0]!
   }
 }
 
-export function saveMap(storage: StringStorage | undefined, key: MapKey, id: MapId): void {
+export function saveMap(storage: StringStorage | undefined, id: MapId): void {
   try {
-    storage?.setItem(key, id)
+    storage?.setItem(StorageKey.BoxMap, id)
   } catch {
   }
 }

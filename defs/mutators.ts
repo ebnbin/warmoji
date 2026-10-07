@@ -1,6 +1,6 @@
 import type { MutatorDef } from '../src/types/runs'
 
-/** 实验关开局前可以自选叠加的词缀，按热度从低到高 */
+/** 冒险与实验开局前可以自选叠加的词缀，按热度从低到高 */
 export const MUTATORS = {
   sudden: { emoji: '1f977', name: '突袭', heat: 1, rules: { surprise: true } },
   swift: { emoji: '1f4a8', name: '迅捷', heat: 1, enemyMods: { mul: { moveSpeed: 1.25 } } },

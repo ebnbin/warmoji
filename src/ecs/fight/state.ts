@@ -131,7 +131,7 @@ export interface FightState {
   phaseAt: number
   streams: StreamState[]
   waves: WavesState[]
-  /** 试炼场按旋钮刷怪的冷却；没有这条规则是 null */
+  /** 沙盒按旋钮刷怪的冷却；不是沙盒是 null */
   knobs: { cooldownMs: number } | null
   /** 这一阶段的配比；不写就按地图 */
   mix: EnemyMixEntry[] | null
@@ -191,7 +191,7 @@ function phaseState(
     phaseAt: at,
     streams: p.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, foe: foeOf(rule), cooldownMs: FIRST_SPAWN_MS, spawned: 0 }] : [])),
     waves: p.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
-    knobs: p.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
+    knobs: runDef(run).team === 'knobs' ? { cooldownMs: FIRST_SPAWN_MS } : null,
     mix: p.mix ? mixOf(p.mix) : null,
     hold: hold?.kind === 'hold' ? { rule: hold, point: 0, heldMs: 0, inside: false } : null,
     goals: p.ends.map(() => ({ done: new Set<number>(), at: -1, ms: 0, leaked: 0 })),
@@ -269,7 +269,7 @@ export function markFightBase(sim: Sim): void {
   sim.fight.base = baseOf(sim.run, sim.fight.events)
 }
 
-/** 这一场给一方身体的常驻修正：我方规则写的，加上试炼场的攻速旋钮给队伍；敌人的写在这一场上，都算上词缀 */
+/** 这一场给一方身体的常驻修正：我方规则写的，加上沙盒的攻速旋钮给队伍；敌人的写在这一场上，都算上词缀 */
 export function fightMods(f: FightState, faction: number): StatMods[] {
   if (faction === FACTION.team) return [...f.rules.mods, ...(f.knobs ? sandboxTeamMods() : [])]
   if (faction === FACTION.enemy) return [...f.enemyMods]

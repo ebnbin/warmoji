@@ -772,7 +772,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.fillCircle(ex, ey, 10)
   }
 
-  /** 队伍由试炼场的旋钮给出 */
+  /** 队伍由沙盒的旋钮给出 */
   get knobs(): boolean {
     return runDef(this.run).team === 'knobs'
   }

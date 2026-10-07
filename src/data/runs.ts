@@ -3,8 +3,7 @@ import { CURVE } from './enemies'
 import { fromJson } from './json'
 import { planOf } from './rounds'
 import { keysOf } from '../util/record'
-import type { MapId } from '../types/maps'
-import type { FightDef, LegacyPhaseDef, RepeatDef, RunDef, RunId, StepDef } from '../types/runs'
+import type { FightDef, LegacyPhaseDef, RunDef, RunId } from '../types/runs'
 import type { DifficultyCurve } from '../types/waves'
 
 export const RUNS = fromJson<Record<RunId, RunDef>>(runsJson)
@@ -36,36 +35,4 @@ export function phasesOf(f: FightDef): readonly LegacyPhaseDef[] {
 export function timeLimitMs(p: LegacyPhaseDef): number | undefined {
   for (const e of p.ends) if (e.kind === 'time') return e.ms
   return undefined
-}
-
-/** 一章：同一张地图上连着打的几场，连同它们前面的招募与商店；index 是步骤在一局里的序号 */
-export interface Chapter {
-  readonly map: MapId
-  readonly steps: readonly { readonly step: StepDef | RepeatDef; readonly index: number }[]
-}
-
-/** 这一步在哪张地图上打：一场看它自己，重复的一段看它的第一场，招募与商店不算 */
-function stepMap(step: StepDef | RepeatDef): MapId | undefined {
-  if (step.kind === 'fight') return step.fight.map
-  if (step.kind === 'repeat') return step.steps.flatMap((b) => (b.kind === 'fight' ? [b.fight.map] : []))[0]
-  return undefined
-}
-
-/** 各场都写了地图的一局按地图分章：招募与商店归到后面那一场的章，最后一场之后的归到最后一章，重复的一段按它的第一场归章 */
-export function chaptersOf(def: RunDef): Chapter[] {
-  const out: { map: MapId; steps: { step: StepDef | RepeatDef; index: number }[] }[] = []
-  let pending: { step: StepDef | RepeatDef; index: number }[] = []
-  def.steps.forEach((step, index) => {
-    const map = stepMap(step)
-    if (map === undefined) {
-      pending.push({ step, index })
-      return
-    }
-    const last = out[out.length - 1]
-    if (last && last.map === map) last.steps.push(...pending, { step, index })
-    else out.push({ map, steps: [...pending, { step, index }] })
-    pending = []
-  })
-  out[out.length - 1]?.steps.push(...pending)
-  return out
 }

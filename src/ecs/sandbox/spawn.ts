@@ -7,7 +7,7 @@ import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
 import { sandboxDifficulty, sandboxEnemySet, spawnParams } from './knobs'
 import type { Sim } from '../sim'
 
-/** 试炼场按旋钮刷怪：每隔一阵来一批，种类、规模与血量都看旋钮，场上满了就不刷 */
+/** 沙盒按旋钮刷怪：每隔一阵来一批，种类、规模与血量都看旋钮，场上满了就不刷 */
 export function runKnobs(sim: Sim, st: { cooldownMs: number }, deltaMs: number): void {
   st.cooldownMs -= deltaMs
   if (st.cooldownMs > 0) return

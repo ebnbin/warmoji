@@ -1,13 +1,10 @@
 import Phaser from 'phaser'
 import { CHARACTERS } from '../data/characters'
 import { ENEMY_DEFS } from '../data/enemies'
-import { loadHighScore } from '../save/highscore'
-import type { HighScore } from '../save/highscore'
 import { Rng } from '../util/rng'
-import { browserStorage } from '../util/storage'
 import { preloadEmojis } from '../emoji/hold'
 import type { EmojiRef } from '../emoji/hold'
-import { beginPage, Button, Icon, IconButton, pageFrame, Pill, RichLabel } from '../ui'
+import { beginPage, Button, Icon, IconButton, pageFrame, RichLabel } from '../ui'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
 
@@ -44,18 +41,15 @@ const NAV: readonly { readonly icon: string; readonly scene: SceneKey }[] = [
 export class MenuScene extends Phaser.Scene {
   private preserveOnRestart = false
   private decorSeed = 0
-  private best!: HighScore
 
   constructor() {
     super(SceneKey.Menu)
   }
 
   preload(): void {
-    this.best = loadHighScore(browserStorage())
     const cast = vignetteCast()
     preloadEmojis(this, [
       ...[...NAV.map((n) => n.icon), '2694'].map((id) => ({ id })),
-      ...(this.best.bestWave > 0 ? [{ id: '1f3c6' }] : []),
       ...backdropDecor(),
       ...cast.heroes.map((id) => ({ id, outline: 'player' as const })),
       ...cast.foes.map((id) => ({ id, outline: 'enemy' as const })),
@@ -74,14 +68,6 @@ export class MenuScene extends Phaser.Scene {
     this.createBackdrop(new Rng(this.decorSeed))
     this.createLogo(frame.centerX, content.y + content.h * 0.24)
     this.createVignette(frame.centerX, content.y + content.h * 0.52)
-
-    if (this.best.bestWave > 0) {
-      new Pill(this, frame.centerX, frame.footerY - 100, {
-        icon: '1f3c6',
-        text: `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
-        color: 'accent',
-      })
-    }
 
     NAV.forEach((n, i) => {
       new IconButton(this, frame.right - 32 - i * 84, frame.headerY, { icon: n.icon, onTap: () => this.scene.start(n.scene) })

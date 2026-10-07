@@ -139,11 +139,7 @@ export interface CarrierRule {
   readonly atMs: number
   readonly spanMs: number
 }
-/** 试炼场：按旋钮刷怪 */
-export interface KnobRule {
-  readonly kind: 'knobs'
-}
-export type LegacySpawnRule = StreamRule | LegacyBatchRule | LegacyWavesRule | BossRule | CarrierRule | KnobRule
+export type LegacySpawnRule = StreamRule | LegacyBatchRule | LegacyWavesRule | BossRule | CarrierRule
 
 /** 据点的一处：地图中心起偏 dx、dy 格，或这张图那一组地标里的第 nth 处（从 0 算，不写是第一处），地标会动的圈跟着动 */
 export type HoldPoint = { readonly dx: number; readonly dy: number } | { readonly mark: string; readonly nth?: number }

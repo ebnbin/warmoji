@@ -24,11 +24,6 @@ function gatedText(text: string, r: Rounds | undefined): string {
   return r ? `${text}（${roundsText(r)}）` : text
 }
 
-/** 记最高分的一局按波数排名，一场就叫一波，别的叫场 */
-export function fightUnit(def: RunDef): string {
-  return def.record ? '波' : '场'
-}
-
 /** 一条结束规则的说法：达成条件说怎么算赢，失败条件说怎么算输 */
 export function endText(e: EndRule): string {
   switch (e.kind) {
@@ -194,7 +189,7 @@ export function stepText(s: StepDef): string {
 }
 
 /** 一步的说法：重复的一段头一行说重复几轮，后面一行一步是每一轮要走的，只在某几轮才有的注明轮次 */
-export function stepLines(s: StepDef | RepeatDef): string[] {
+function stepLines(s: StepDef | RepeatDef): string[] {
   if (s.kind !== 'repeat') return [stepText(s)]
   return [s.times === undefined ? '一直重复下面几步：' : `重复 ${s.times} 轮下面几步：`, ...s.steps.map((b) => `· ${gatedText(stepText(b), b.rounds)}`)]
 }
