@@ -1,6 +1,6 @@
 import type { RunDef } from '../src/types/runs'
 
-/** 关卡编辑器打开时的草稿：最简单的可玩一局，三人预设队伍在黑森林撑过一分钟 */
+/** 关卡编辑器打开时的草稿：最简单的可玩一局，三人预设队伍在草甸撑过一分钟 */
 export const EDITOR_DRAFT = {
   emoji: '1f6e0',
   name: '自定义关卡',
@@ -11,12 +11,12 @@ export const EDITOR_DRAFT = {
       kind: 'fight',
       fight: {
         name: '第 1 场',
-        map: 'forest',
+        map: 'meadow',
         phases: [
           {
             mix: [
               { kind: 'zombie', weight: 3 },
-              { kind: 'ghost', weight: 1 },
+              { kind: 'locust', weight: 1 },
             ],
             spawns: [{ kind: 'stream' }],
             ends: [{ kind: 'time', ms: 60_000 }],

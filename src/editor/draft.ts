@@ -54,9 +54,19 @@ export function defaultTeam(): Draft['team'] {
   return fresh().team
 }
 
+/** 默认那一局的图标 */
+export function defaultEmoji(): string {
+  return fresh().emoji
+}
+
 /** 丢掉改动，回到默认的一局 */
 export function resetDraft(): void {
   draft = fresh()
+}
+
+/** 丢掉改动，从这一局改起 */
+export function loadDraft(def: RunDef): void {
+  draft = structuredClone(def) as Draft
 }
 
 /** 草稿眼下的问题：和构建期查内置关卡的是同一套检查 */

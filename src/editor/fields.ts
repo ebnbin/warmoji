@@ -1,7 +1,8 @@
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { BOSSES, CURVE, ENEMIES, ENEMY_DEFS } from '../data/enemies'
-import { MAP_IDS, MAPS } from '../data/maps'
+import { BOX_MAPS } from '../data/boxMaps'
+import { MAPS } from '../data/maps'
 import type { Path } from '../data/runCheck'
 import { TAGS } from '../data/tags'
 import { WAVE } from '../data/waves'
@@ -211,7 +212,7 @@ function newPhase(from: Phase | undefined): Phase {
 function newFight(d: Draft): Step {
   const stages = d.steps.flatMap((s) => (s.kind === 'fight' && isStage(s.fight) ? [s.fight] : []))
   const last = stages.at(-1)
-  return { kind: 'fight', fight: { name: `第 ${stages.length + 1} 场`, map: last?.map ?? MAP_IDS[0]!, phases: [newPhase(last?.phases.at(-1))] } }
+  return { kind: 'fight', fight: { name: `第 ${stages.length + 1} 场`, map: last?.map ?? BOX_MAPS[0]!, phases: [newPhase(last?.phases.at(-1))] } }
 }
 
 /** 新的招募：比眼下最多的人数再多一人 */
@@ -333,7 +334,7 @@ function stageRows(f: Stage, node: Node): Row[] {
       value: map.name,
       title: '选地图',
       icon: map.emoji,
-      options: MAP_IDS.map((id): Option => ({ emoji: MAPS[id].emoji, label: MAPS[id].name, chosen: id === f.map, run: () => (f.map = id) })),
+      options: BOX_MAPS.map((id): Option => ({ emoji: MAPS[id].emoji, label: MAPS[id].name, chosen: id === f.map, run: () => (f.map = id) })),
     }),
     flag('定难度时钟', f.clockSec !== undefined, (on) => put(f, 'clockSec', on ? 0 : undefined), { hint: '开打时难度时钟从第几秒走起；不定就接着这一局累计打过的时长' }),
     ...(f.clockSec !== undefined ? [num('难度时钟', f.clockSec, { min: 0, max: 1_800, step: 10, format: moment }, (v) => (f.clockSec = v), { sub: true })] : []),
