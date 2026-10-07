@@ -88,7 +88,7 @@ function hll(hl: number, ul: number, vl: number, hr: number, ur: number, vr: num
 }
 
 /**
- * 樱庭的水流：河床取地形；石组那一溜垫高挡死，水按流量从石组下游带着设计流速冒出来；石槛下比槛顶低过 SINK_M 的格子是汇；
+ * 樱花的水流：河床取地形；石组那一溜垫高挡死，水按流量从石组下游带着设计流速冒出来；石槛下比槛顶低过 SINK_M 的格子是汇；
  * 从按设计水位铺好的静水起算，解到稳态
  */
 export function solveSakura(cfg: SakuraConfig, plan: SakuraPlan): Water {

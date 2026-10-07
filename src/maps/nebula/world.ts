@@ -169,7 +169,7 @@ function nebulaMeteors(sim: Sim, s: NebulaState, cfg: NebulaConfig, delta: numbe
 }
 
 /**
- * 星云：一团空心星云的空腔，没有墙。黑洞（Paczyński–Wiita 势）与壳层（牛顿壳层定理）的万有引力作用于一切，走进壳层的都被拉回空腔；
+ * 视界：一团空心星云的空腔，没有墙。黑洞（Paczyński–Wiita 势）与壳层（牛顿壳层定理）的万有引力作用于一切，走进壳层的都被拉回空腔；
  * 中心进了视界的被吞掉，黑洞随吞下的质量长大；壳层不时甩出流星横穿空腔。敌人只顾着追人，头目会绕开自己走不出来的那一圈
  */
 export const nebula: WorldHooks = {

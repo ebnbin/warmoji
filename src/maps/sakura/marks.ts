@@ -55,7 +55,7 @@ function bankMarks(r: Reach, basin: Basin, from: number, skip: (x: number, y: nu
 }
 
 /**
- * 樱庭的地标，像素，按地图一次定下：ports 是寺墙、上游石组与下游竹栅一线（林子里的口子躲开它们）；wall 是寺墙朝空地的那一面，
+ * 樱花的地标，像素，按地图一次定下：ports 是寺墙、上游石组与下游竹栅一线（林子里的口子躲开它们）；wall 是寺墙朝空地的那一面，
  * bank 是溪两岸的水边（石槛与桥两边不摆），都朝空地；rocks 是石组下游那一面，朝下游；bridge 是桥面正中
  */
 export function sakuraMarks(cfg: SakuraConfig, plan: SakuraPlan): Record<string, Landmark[]> {

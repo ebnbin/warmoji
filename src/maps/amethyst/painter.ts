@@ -21,7 +21,7 @@ const SLICE_MS = 40
 const yieldNow = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 /**
- * 画紫水晶洞穴的地面：一个线程先画高度图，其余线程一段段地画地面，谁交回一段就再给它一段；
+ * 画紫晶洞的地面：一个线程先画高度图，其余线程一段段地画地面，谁交回一段就再给它一段；
  * 开不了线程或线程出了错，剩下的活退回主线程画
  */
 export class AmethystPainter {
@@ -123,11 +123,11 @@ export class AmethystPainter {
         w.onerror = (e) => {
           e.preventDefault()
           this.release = undefined
-          reject(new Error(e.message || '画紫水晶洞穴地面的线程出错'))
+          reject(new Error(e.message || '画紫晶洞地面的线程出错'))
         }
         w.onmessageerror = () => {
           this.release = undefined
-          reject(new Error('画紫水晶洞穴地面的线程发回的消息解不开'))
+          reject(new Error('画紫晶洞地面的线程发回的消息解不开'))
         }
         if (k === 0) {
           const job: PaintJob = { kind: 'relief', size: reliefSize }
@@ -138,7 +138,7 @@ export class AmethystPainter {
   }
 
   private giveUp(e: unknown): void {
-    console.error('画紫水晶洞穴地面的线程用不了，改在主线程画', e)
+    console.error('画紫晶洞地面的线程用不了，改在主线程画', e)
     this.stop()
   }
 

@@ -1,4 +1,4 @@
-/** 樱庭的花瓣：从上往下看、尖头朝贴图的右边（x 正向），用 Canvas 画一次 */
+/** 樱花的花瓣：从上往下看、尖头朝贴图的右边（x 正向），用 Canvas 画一次 */
 
 /** 一片樱花瓣：倒卵形，尖头那端有一道小缺口；花瓣根部带一点粉，往外渐白。白底，着色得到深浅不同的粉 */
 export function drawPetal(ctx: CanvasRenderingContext2D, size: number): void {

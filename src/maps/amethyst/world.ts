@@ -52,7 +52,7 @@ export interface Torch {
   at: number
 }
 
-/** 一局的紫水晶洞穴：地形由布景种子定下，画面从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
+/** 一局的紫晶洞：地形由布景种子定下，画面从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
 export interface AmethystState {
   readonly layout: AmethystLayout
   readonly solids: Solids
@@ -78,7 +78,7 @@ function cfgOf(sim: Sim): AmethystConfig {
 }
 
 /**
- * 紫水晶洞穴的地标，像素：tunnel 是暗道尽头的小晶洞，朝洞道往外；passage 是暗道洞道上一路的点（晶缝躲开它们）；
+ * 紫晶洞的地标，像素：tunnel 是暗道尽头的小晶洞，朝洞道往外；passage 是暗道洞道上一路的点（晶缝躲开它们）；
  * geode 是地上半埋的晶洞，rift 是顶缝，breach 是主晶洞上的塌顶，这三组只在入夜后出怪
  */
 function marksOf(L: AmethystLayout): Record<string, Landmark[]> {
@@ -250,7 +250,7 @@ function darkSpawn(sim: Sim, boss: boolean): Point {
   return best
 }
 
-/** 洞里此刻天上的样子给时辰盘：太阳与月亮的时角、月相，离日落或日出还有几秒；不在紫水晶洞穴里为 null */
+/** 洞里此刻天上的样子给时辰盘：太阳与月亮的时角、月相，离日落或日出还有几秒；不在紫晶洞里为 null */
 export function amethystClock(sim: Sim): ClockSnapshot | null {
   const s = sim.worldState.amethyst
   const cfg = MAPS[sim.mapId].amethyst
@@ -264,7 +264,7 @@ export function amethystClock(sim: Sim): ClockSnapshot | null {
 }
 
 /**
- * 紫水晶洞穴：能走的是几个晶洞连成的洞厅与拐进岩体的暗道，洞壁、晶簇与巨晶是硬边界，挡人也挡子弹；矮晶丛与地上的晶洞只挡矮个子；
+ * 紫晶洞：能走的是几个晶洞连成的洞厅与拐进岩体的暗道，洞壁、晶簇与巨晶是硬边界，挡人也挡子弹；矮晶丛与地上的晶洞只挡矮个子；
  * 绕不过去的按路程场绕。光照随真实的太阳月亮走，队员天暗了点起火把；怪物只从暗处出来；碎晶坡上走得慢、更累
  */
 export const amethyst: WorldHooks = {

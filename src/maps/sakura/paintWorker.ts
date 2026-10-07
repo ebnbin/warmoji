@@ -11,7 +11,7 @@ self.onmessage = (e: MessageEvent<PaintJob>) => {
     prep = prepare(scene)
     return
   }
-  if (!scene || !prep) throw new Error('画樱庭的线程还没收到 setup')
+  if (!scene || !prep) throw new Error('画樱花的线程还没收到 setup')
   const pixels = pixelBuffer(job.rect)
   PAINT[job.layer](scene, prep, pixels, job.rect)
   const piece: PaintPiece = { index: job.index, layer: job.layer, rect: job.rect, pixels }

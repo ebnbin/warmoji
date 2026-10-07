@@ -11,7 +11,7 @@ self.onmessage = (e: MessageEvent<PaintJob>) => {
     prep = prepare(scene)
     return
   }
-  if (!scene || !prep) throw new Error('画跃迁站的线程还没收到 setup')
+  if (!scene || !prep) throw new Error('画出口的线程还没收到 setup')
   const pixels = pixelBuffer(job.rect)
   paintGround(scene, prep, pixels, job.rect)
   const piece: PaintPiece = { index: job.index, rect: job.rect, pixels }

@@ -8,7 +8,7 @@ import { FloeView } from '../maps/floe/view'
 import { MeadowView } from '../maps/meadow/view'
 import { NebulaView } from '../maps/nebula/view'
 import { PetriView } from '../maps/petri/view'
-import { WarpView } from '../maps/warp/view'
+import { ExitView } from '../maps/exit/view'
 import { RuinsView } from '../maps/ruins/view'
 import { SakuraView } from '../maps/sakura/view'
 import { VolcanoView } from '../maps/volcano/view'
@@ -38,6 +38,6 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   desert: () => new DesertView(),
   deep: () => new DeepView(),
   petri: () => new PetriView(),
-  warp: () => new WarpView(),
+  exit: () => new ExitView(),
   theater: () => new TheaterView(),
 }

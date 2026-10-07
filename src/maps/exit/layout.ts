@@ -2,7 +2,7 @@ import { FRAME_U, UNIT } from '../../util/units.ts'
 import { Rng } from '../../util/rng.ts'
 import { makeBasin } from '../basin.ts'
 import type { Basin } from '../basin'
-import type { WarpConfig, WarpShape } from '../../types/maps'
+import type { ExitConfig, ExitShape } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
 /** 能走的地面按这么细的格子算距离场，格 */
@@ -12,12 +12,12 @@ const MID = FRAME_U / 2
 /** 方框竖着切成几列 */
 export const COLS = 3
 
-/** 四季各拿前面两张图里的一件东西装进标本罐：草甸的小花、樱庭的樱花；沙漠的驼骨、深海的气泡；残垣的枫叶、紫水晶；浮冰的冰块、火山 */
+/** 四季各拿前面两张图里的一件东西装进标本罐：草甸的小花、樱花图的樱花；沙漠的驼骨、深海的气泡；残垣的枫叶、紫水晶；火山、浮冰的冰块 */
 export const TOKENS: readonly (readonly [string, string])[] = [
   ['1f33c', '1f338'],
   ['1f9b4', '1fae7'],
   ['1f341', '1f48e'],
-  ['1f9ca', '1f30b'],
+  ['1f30b', '1f9ca'],
 ]
 
 /** 格上的一块方形：[x0, x1) × [y0, y1) */
@@ -72,7 +72,7 @@ export interface Chamber {
   readonly season: number
   readonly recipe: number
   readonly token: string
-  readonly shape: WarpShape
+  readonly shape: ExitShape
   readonly cell: Box
   readonly slab: Box
   readonly floor: Box
@@ -91,7 +91,7 @@ export interface Chamber {
  * 这一局的迷宫，格：舱室、全图的门（按 index 排）；队伍从 start 那间的中心出发；顺着「出口」走一圈的次序 loop；
  * 能走的地面，每间舱室自己能走的地面；每块瓷砖属于哪间舱室（不会亮的为 −1）；每一格属于哪间舱室分到的格
  */
-export interface WarpPlan {
+export interface ExitPlan {
   readonly rooms: readonly Chamber[]
   readonly doors: readonly Door[]
   readonly start: number
@@ -143,7 +143,7 @@ function spans(parts: readonly number[]): [number, number][] {
 }
 
 /** 三列各切成 cfg.maze.rows 的哪一种（按列排），加起来正好 total 间的所有搭法 */
-export function stacks(cfg: WarpConfig, total: number): number[][] {
+export function stacks(cfg: ExitConfig, total: number): number[][] {
   const out: number[][] = []
   const walk = (left: number, acc: number[]): void => {
     if (acc.length === COLS) {
@@ -157,7 +157,7 @@ export function stacks(cfg: WarpConfig, total: number): number[][] {
 }
 
 /** 舱室的格切法：先定一共几间，再定每列切成哪一种、列宽与每列的行高；切出来的格铺满整个方框 */
-function cells(cfg: WarpConfig, rng: Rng): Box[] {
+function cells(cfg: ExitConfig, rng: Rng): Box[] {
   const m = cfg.maze
   const [lo, hi] = rng.next() < m.fewP ? m.few : m.rooms
   const options = stacks(cfg, lo + Math.floor(rng.next() * (hi - lo + 1)))
@@ -173,7 +173,7 @@ function cells(cfg: WarpConfig, rng: Rng): Box[] {
 }
 
 /** 能走的方块里靠第 wall 面墙、沿墙偏 off 格的圆台 */
-function wallSpot(cfg: WarpConfig, f: Box, wall: number, off: number): Spot {
+function wallSpot(cfg: ExitConfig, f: Box, wall: number, off: number): Spot {
   const d = cfg.pad.insetU + cfg.pad.radiusU
   const mx = (f.x0 + f.x1) / 2 + off
   const my = (f.y0 + f.y1) / 2 + off
@@ -260,7 +260,7 @@ function openIn(room: Pick<Chamber, 'floor' | 'racks' | 'pit' | 'jar'>, x: numbe
  * 连线（见 wire）；每间舱室的入口与门各占一面墙，门开在最朝它要去的那间的那面墙上，两个空角放出怪板，剩下的一角立标本罐；最大的那间做开局的空舱，其余按大小挑样子。
  * 能走的地面每间各算一遍距离场，取最大合成一张
  */
-export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
+export function exitPlan(cfg: ExitConfig, seed: number): ExitPlan {
   const rng = new Rng(seed)
   const boxes = cells(cfg, rng)
   const n = boxes.length
@@ -343,7 +343,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
         racks.push(box)
       }
     }
-    const shape: WarpShape = i !== start && Math.min(w, h) >= cfg.pit.minU && roll < 0.35 ? 'pit' : racks.length > 0 ? 'racks' : 'hall'
+    const shape: ExitShape = i !== start && Math.min(w, h) >= cfg.pit.minU && roll < 0.35 ? 'pit' : racks.length > 0 ? 'racks' : 'hall'
     const pit = shape === 'pit' ? shrink(floor, cfg.pit.marginU) : null
     return {
       index: i,
@@ -389,7 +389,7 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
 }
 
 /** (x, y)（格）落在哪间舱室分到的格里 */
-export function roomIndexAt(plan: WarpPlan, x: number, y: number): number {
+export function roomIndexAt(plan: ExitPlan, x: number, y: number): number {
   const i = Math.min(FRAME_U - 1, Math.max(0, Math.floor(x)))
   const j = Math.min(FRAME_U - 1, Math.max(0, Math.floor(y)))
   return plan.owner[j * FRAME_U + i]!

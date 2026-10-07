@@ -19,11 +19,11 @@ export const SIGNALS = {
   deep: { events: { depart: '潜艇开走', dock: '潜艇停稳' }, cues: { depart: '潜艇开走' }, marks: { door: '潜艇门口' } },
   ruins: { events: { collapse: '墙塌' }, gauges: { walls: '残墙' }, cues: { quake: '余震' }, marks: { tower: '塔楼' } },
   amethyst: { events: { dusk: '日落', dawn: '日出' }, marks: { tunnel: '小晶洞' } },
-  floe: { events: { gust: '阵风' }, cues: { gust: '起一阵风' } },
   volcano: { events: { erupt: '火山喷发' }, cues: { erupt: '火山喷发' }, marks: { vent: '喷气孔' } },
+  floe: { events: { gust: '阵风' }, cues: { gust: '起一阵风' } },
   theater: { events: { act: '换幕' } },
-  warp: { events: { jump: '整队穿门' }, cues: { lock: '锁住所有门' }, marks: { cabin: '舱室' } },
   petri: { gauges: { colony: '菌落覆盖' }, marks: { sector: '分区' } },
+  exit: { events: { jump: '整队穿门' }, cues: { lock: '锁住所有门' }, marks: { cabin: '舱室' } },
   nebula: { gauges: { mass: '黑洞长大' }, cues: { meteor: '来一颗流星' } },
 } as const satisfies { readonly [K in MapKind]?: MapSignals }
 

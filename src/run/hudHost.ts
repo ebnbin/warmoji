@@ -21,11 +21,11 @@ export interface HudSnapshot {
   bossHp: number | null
   bossMaxHp: number
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
-  /** 在紫水晶洞穴里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
+  /** 在紫晶洞里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
   clock: ClockSnapshot | null
   /** 在深海打的一局才有：潜艇停着、快开走还是开走了，这一段还剩多少 */
   submarine: SubmarineSnapshot | null
-  /** 在舞台剧里打的一局才有：离下一次换幕还有多久，正在换还是快要换了，新一幕刚画好时这一章叫什么 */
+  /** 在舞台里打的一局才有：离下一次换幕还有多久，正在换还是快要换了，新一幕刚画好时这一章叫什么 */
   stage: StageSnapshot | null
 }
 
@@ -45,7 +45,7 @@ export interface SubmarineSnapshot {
   readonly inSec: number
 }
 
-/** 舞台剧的倒计时：phase 是演着（stand）、快换幕（warn）还是正在换（turn），ratio 是离下一次换幕还剩的比例，inSec 是还有几秒；title 是刚翻到的这一章，过了那几秒为 null */
+/** 舞台的倒计时：phase 是演着（stand）、快换幕（warn）还是正在换（turn），ratio 是离下一次换幕还剩的比例，inSec 是还有几秒；title 是刚翻到的这一章，过了那几秒为 null */
 export interface StageSnapshot {
   readonly phase: 'stand' | 'warn' | 'turn'
   readonly ratio: number

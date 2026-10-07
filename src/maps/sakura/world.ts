@@ -29,11 +29,11 @@ import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
-/** 樱庭按布景种子打散出自己的种子 */
+/** 樱花按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a4c1e
 
 /**
- * 樱庭此刻的状态：按种子生成的地图与它上面的地标、挡弹体与视线的寺墙林子与樱树，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
+ * 樱花此刻的状态：按种子生成的地图与它上面的地标、挡弹体与视线的寺墙林子与樱树，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定；
  * 哪些身体正在水里站不住、随水漂着，哪些正走在桥上（按实体记，uid 对不上就是换了实体）；见过的掉落物
  */
 export interface SakuraState {
@@ -79,7 +79,7 @@ function solidsOf(cfg: SakuraConfig, plan: SakuraPlan): Solids {
   return makeSolids(at, b.x0, b.y0, b.cols, b.rows, b.cell)
 }
 
-/** 这一局的樱庭：视图要它定地图的大小，规则要它定一切，两边按同一个种子各要一次 */
+/** 这一局的樱花：视图要它定地图的大小，规则要它定一切，两边按同一个种子各要一次 */
 export function sakuraPlanFor(cfg: SakuraConfig, decorSeed: number): SakuraPlan {
   return sakuraPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
@@ -247,7 +247,7 @@ function board(sim: Sim, s: SakuraState): void {
 }
 
 /**
- * 樱庭：能走的是寺墙与三面林缘围着的空地，溪面也能走；寺墙、林缘、空地上樱花的树干、上游的石组与下游的竹栅是硬边界，身体走到跟前就停住、顺着壁面滑；
+ * 樱花：能走的是寺墙与三面林缘围着的空地，溪面也能走；寺墙、林缘、空地上樱花的树干、上游的石组与下游的竹栅是硬边界，身体走到跟前就停住、顺着壁面滑；
  * 寺墙齐头高、林子与树干高过一切，都挡子弹与视线。
  * 水里站不住的身体随水漂、自己划水，站得住的跟在岸上一样，掉落物顺水漂（见 wade）；漂到下游的被水压在竹栅前，贴着竹栅挪到岸边才上得来。
  * 桥上的身体不沾水、出不了栏杆，桥下的照样漂

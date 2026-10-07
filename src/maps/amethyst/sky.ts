@@ -91,7 +91,7 @@ function cycleOf(sky: Sky): Cycle {
   if (c) return c
   const hi = crossing(sky, sky.twilightDeg)
   const lo = crossing(sky, -sky.twilightDeg)
-  if (!hi || !lo) throw new Error('紫水晶洞穴的太阳每天要升过、落过晨昏的高度')
+  if (!hi || !lo) throw new Error('紫晶洞的太阳每天要升过、落过晨昏的高度')
   const hours = [hi.set - hi.rise, lo.set - hi.set, lo.rise + 24 - lo.set, hi.rise - lo.rise]
   const secs = [sky.dayS, sky.duskS, sky.nightS, sky.dawnS]
   c = { from: hi.rise, hours, secs, total: secs.reduce((a, b) => a + b, 0) }

@@ -11,7 +11,7 @@ self.onmessage = (e: MessageEvent<PaintJob>) => {
     setup = { layout: job.layout, seams: job.seams, ppu: job.ppu, width: job.width }
     return
   }
-  if (!setup) throw new Error('画紫水晶洞穴地面的线程还没收到 setup')
+  if (!setup) throw new Error('画紫晶洞地面的线程还没收到 setup')
   if (job.kind === 'relief') {
     const geo = new Uint8ClampedArray(job.size * 4)
     paintRelief(setup.layout, geo)

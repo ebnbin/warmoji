@@ -8,15 +8,15 @@ import { decorSprite } from '../../ecs/decor'
 import { FONT_FAMILY } from '../../ui/theme'
 import { canvasTexture } from '../textures'
 import { FRAME } from '../frame'
-import { WarpPainter } from './painter'
+import { ExitPainter } from './painter'
 import { CYAN_GLOW, EXIT_GREEN, FOE_GLOW, hex, lift, rgb, SEASONS, shade, TEAM_GLOW, VOID_DEEP } from './palette'
 import { encodeTiles, TILES_FRAG, VOID_FRAG } from './shader'
 import { textureSize } from './ground'
-import { warpPlanFor } from './world'
-import type { Flight, WarpState } from './world'
-import type { Chamber, Door, WarpPlan } from './layout'
+import { exitPlanFor } from './world'
+import type { Flight, ExitState } from './world'
+import type { Chamber, Door, ExitPlan } from './layout'
 import type { PaintScene, PixelRect } from './ground'
-import type { WarpConfig } from '../../types/maps'
+import type { ExitConfig } from '../../types/maps'
 import type { EcsAtlas } from '../../ecs/atlas'
 import type { MapView, ViewCtx } from '../../ecs/views'
 import type { Framing } from '../../ecs/lens'
@@ -24,10 +24,10 @@ import type { LocalLight } from '../../ecs/render/sprites'
 import type { Sim } from '../../ecs/sim'
 import type { Point } from '../../util/vec'
 
-const GROUND_KEY = 'warp-ground'
-const TILES_KEY = 'warp-tiles'
-const MASK_KEY = 'warp-mask'
-const TINT_KEY = 'warp-tint'
+const GROUND_KEY = 'exit-ground'
+const TILES_KEY = 'exit-tiles'
+const MASK_KEY = 'exit-mask'
+const TINT_KEY = 'exit-tint'
 const PAINT_THREADS = 4
 const STRIP_PX = 64
 /** 刚踩上那一脚的方框扩到四边要多久，毫秒 */
@@ -114,7 +114,7 @@ function phaseOf(room: Chamber, pattern: number, x: number, y: number): number {
 /**
  * 掩码与着色图：R 是这块瓷砖的律动（加一再乘 50，0 是不会亮的地方），G 是舱室（加一），B 是它在律动里的相位；着色图是那一季的主色
  */
-function maskImages(plan: WarpPlan): { mask: Uint8ClampedArray<ArrayBuffer>; tint: Uint8ClampedArray<ArrayBuffer> } {
+function maskImages(plan: ExitPlan): { mask: Uint8ClampedArray<ArrayBuffer>; tint: Uint8ClampedArray<ArrayBuffer> } {
   const n = FRAME_U * FRAME_U
   const mask = new Uint8ClampedArray(n * 4)
   const tint = new Uint8ClampedArray(n * 4)
@@ -176,12 +176,12 @@ function shifts(a: Point, b: Point): Point[] {
  * 门牌、门上写的去处、「出口」的绿牌与「第几次」是字；门、入口、光桥、监控、标本罐的玻璃、出怪板上凝成形的敌人、被送过虚空的身体散成的光块都每帧现画。
  * 队伍那间与刚走过的几间按各自的亮度亮着，别的舱室暗下去，舱室里的一切都盖在暗里；只有飞过虚空的光块不被盖住
  */
-export class WarpView implements MapView {
+export class ExitView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
-  private plan?: WarpPlan
-  private cfg?: WarpConfig
-  private painter?: WarpPainter
-  private state?: WarpState
+  private plan?: ExitPlan
+  private cfg?: ExitConfig
+  private painter?: ExitPainter
+  private state?: ExitState
   private tiles?: DataTex
   private floorFx?: Phaser.GameObjects.Graphics
   private glowFx?: Phaser.GameObjects.Graphics
@@ -198,8 +198,8 @@ export class WarpView implements MapView {
   private shuttleSeen: number[] = []
   private charging = false
 
-  private planOf(v: ViewCtx): WarpPlan {
-    if (!this.plan) this.plan = warpPlanFor(v.def.warp!, v.run.decorSeed)
+  private planOf(v: ViewCtx): ExitPlan {
+    if (!this.plan) this.plan = exitPlanFor(v.def.exit!, v.run.decorSeed)
     return this.plan
   }
 
@@ -218,7 +218,7 @@ export class WarpView implements MapView {
       v.scene.add
         .shader(
           {
-            name: 'WarpVoid',
+            name: 'ExitVoid',
             fragmentSource: VOID_FRAG,
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               set('uRect', rect)
@@ -253,13 +253,13 @@ export class WarpView implements MapView {
 
   async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
     const plan = this.planOf(v)
-    const cfg = v.def.warp!
+    const cfg = v.def.exit!
     this.cfg = cfg
     const scene = v.scene
     const sc: PaintScene = { cfg, plan }
     const size = textureSize()
     const tex = canvasTexture(scene, GROUND_KEY, size.w, size.h)
-    const painter = new WarpPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
+    const painter = new ExitPainter(sc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const rects: PixelRect[] = []
     for (let y = 0; y < size.h; y += STRIP_PX) rects.push({ x0: 0, y0: y, x1: size.w, y1: Math.min(size.h, y + STRIP_PX) })
@@ -280,7 +280,7 @@ export class WarpView implements MapView {
     this.visuals.push(this.floorFx, this.glowFx, this.airFx, this.shadeFx, this.flyFx)
     this.ghosts = plan.rooms.map((r) => this.ghost(v, r))
     this.labels(v, plan, cfg)
-    const st = sim.worldState.warp
+    const st = sim.worldState.exit
     this.power = plan.rooms.map((r) => (st ? this.lit(st, cfg, r.index) : r.index === plan.start ? 1 : 0))
     this.jumpsSeen = st?.jumps ?? 0
     this.shuttleSeen = st ? st.doors.map((p) => p.shuttledAt) : []
@@ -288,7 +288,7 @@ export class WarpView implements MapView {
   }
 
   /** 会亮的地砖：数据图（谁踩过）、掩码与着色图，着色器盖在地面贴图上 */
-  private floor(v: ViewCtx, plan: WarpPlan): void {
+  private floor(v: ViewCtx, plan: ExitPlan): void {
     const scene = v.scene
     this.tiles = dataTexture(scene, TILES_KEY)
     const { mask, tint } = maskImages(plan)
@@ -306,7 +306,7 @@ export class WarpView implements MapView {
       scene.add
         .shader(
           {
-            name: 'WarpTiles',
+            name: 'ExitTiles',
             fragmentSource: TILES_FRAG,
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               set('uData', 0)
@@ -353,7 +353,7 @@ export class WarpView implements MapView {
    * 字：每间舱室地上一个大大的门牌号（开局那间下面多一行「起点」）；
    * 每扇门朝屋里那一侧写着它通往哪间（那一季的颜色），标着出口的那扇再挂一块绿底的「出口」牌
    */
-  private labels(v: ViewCtx, plan: WarpPlan, cfg: WarpConfig): void {
+  private labels(v: ViewCtx, plan: ExitPlan, cfg: ExitConfig): void {
     const R = cfg.pad.radiusU
     this.texts = plan.rooms.map((room) => {
       const color = SEASONS[room.season]!.color
@@ -387,7 +387,7 @@ export class WarpView implements MapView {
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
-    const st = sim.worldState.warp
+    const st = sim.worldState.exit
     const cfg = this.cfg
     if (!st || !cfg || !this.tiles || !this.floorFx || !this.glowFx || !this.airFx || !this.shadeFx || !this.flyFx) return
     this.state = st
@@ -418,7 +418,7 @@ export class WarpView implements MapView {
   }
 
   /** 第 i 间舱室该亮到几成：亮着的按它在亮着的几间里排第几，别的全黑 */
-  private lit(st: WarpState, cfg: WarpConfig, i: number): number {
+  private lit(st: ExitState, cfg: ExitConfig, i: number): number {
     const k = st.trail.indexOf(i)
     return k < 0 ? 0 : cfg.light.levels[k]!
   }
@@ -427,7 +427,7 @@ export class WarpView implements MapView {
    * 每间舱室朝它该有的亮度亮起来或暗下去，没全亮的盖上一层暗，盖住整块分到的格：全黑时舱室里的一切都看不见；
    * 比亮着的几间里最暗的那一档还暗时，透出一格格瓷砖，越暗越清楚
    */
-  private shade(st: WarpState, cfg: WarpConfig, delta: number): void {
+  private shade(st: ExitState, cfg: ExitConfig, delta: number): void {
     const g = this.shadeFx!
     g.clear()
     const dim = cfg.light.levels[cfg.light.levels.length - 1]!
@@ -445,7 +445,7 @@ export class WarpView implements MapView {
   }
 
   /** 刚到的那一间，地上的门牌放大亮一下 */
-  private arrival(st: WarpState, now: number): void {
+  private arrival(st: ExitState, now: number): void {
     this.texts.forEach((tx, i) => {
       const k = i === st.teamRoom ? clamp01(1 - (now - st.arrivedAt) / ARRIVE_MS) : 0
       const pop = k > 0 && now >= st.arrivedAt ? ease(k) : 0
@@ -454,7 +454,7 @@ export class WarpView implements MapView {
   }
 
   /** 着色器里那圈扩满整间舱室的充能光：半径随充能从门边扩到舱室最远的角 */
-  private chargeRing(st: WarpState, cfg: WarpConfig): void {
+  private chargeRing(st: ExitState, cfg: ExitConfig): void {
     let best: Door | null = null
     let k = 0
     for (const d of st.plan.doors) {
@@ -477,7 +477,7 @@ export class WarpView implements MapView {
   }
 
   /** 开始充能、整队出发、送来一批敌人：在镜头里才响 */
-  private sounds(v: ViewCtx, st: WarpState): void {
+  private sounds(v: ViewCtx, st: ExitState): void {
     const charging = this.u.charge[3] > 0
     const k = st.plan.doors.reduce((m, d) => (d.room === st.teamRoom ? Math.max(m, st.doors[d.index]!.charge) : m), 0)
     if (charging && !this.charging && k < 200) playSfx('charge')
@@ -499,7 +499,7 @@ export class WarpView implements MapView {
    * 光桥：队伍所在那间的每扇门，到它通往的那间入口（画面上平铺的最近那一份）之间一道淡淡的虚线，一节节往那边流；
    * 队长在哪扇门上充能，那道桥就越来越亮；整队出发、一趟车送人过去的那一阵整条桥亮起来，队伍是信号蓝、敌人是信号红
    */
-  private bridges(st: WarpState, cfg: WarpConfig, now: number, t: number): void {
+  private bridges(st: ExitState, cfg: ExitConfig, now: number, t: number): void {
     const g = this.glowFx!
     const R = cfg.pad.radiusU * UNIT
     const live = cfg.pad.transitMs + 250
@@ -564,7 +564,7 @@ export class WarpView implements MapView {
    * 一扇门：外圈是它通往那一季的颜色（出口是应急绿），台面上三道人字纹朝它要飞去的方向滑出去；
    * 队长站上来充能，台面一层层亮成信号蓝、往里收的圈越收越快，队伍里每个人头上一道光柱；有敌人站着时发车前亮起往里收的红圈；出发时亮一下
    */
-  private door(sim: Sim, st: WarpState, cfg: WarpConfig, d: Door, now: number, t: number): void {
+  private door(sim: Sim, st: ExitState, cfg: ExitConfig, d: Door, now: number, t: number): void {
     const to = st.plan.rooms[d.to]!
     const color = d.exit ? EXIT_GREEN : SEASONS[to.season]!.color
     const p = st.doors[d.index]!
@@ -647,7 +647,7 @@ export class WarpView implements MapView {
   }
 
   /** 入口：只进不出，青色的外圈，台面上三圈往台心收的圈；有身体送到的那一刻亮一下 */
-  private entry(st: WarpState, cfg: WarpConfig, room: Chamber, now: number, t: number): void {
+  private entry(st: ExitState, cfg: ExitConfig, room: Chamber, now: number, t: number): void {
     const R = cfg.pad.radiusU * UNIT
     const x = room.entry.x * UNIT
     const y = room.entry.y * UNIT
@@ -671,14 +671,14 @@ export class WarpView implements MapView {
   }
 
   /** 此刻有没有敌人站在这扇门上 */
-  private crowd(sim: Sim, cfg: WarpConfig, d: Door): boolean {
+  private crowd(sim: Sim, cfg: ExitConfig, d: Door): boolean {
     const r = cfg.pad.radiusU * UNIT
     for (const e of query(sim.world, ENEMY_SET)) if (Alive.v[e] && Math.hypot(Transform.x[e]! - d.x * UNIT, Transform.y[e]! - d.y * UNIT) <= r) return true
     return false
   }
 
   /** 机柜：墩子上立着一排半透明的机柜，朝屏幕下方的那一面上一排排指示灯随机明灭，顶面一圈亮边 */
-  private racks(st: WarpState, cfg: WarpConfig, t: number): void {
+  private racks(st: ExitState, cfg: ExitConfig, t: number): void {
     const g = this.airFx!
     const h = cfg.racks.heightM * LIFT_PER_M
     for (const room of st.plan.rooms) {
@@ -709,7 +709,7 @@ export class WarpView implements MapView {
   }
 
   /** 标本罐：罐座上一节玻璃筒，泡着那一季颜色的液体，一串气泡慢慢往上冒，筒顶一圈金属盖 */
-  private jars(st: WarpState, t: number): void {
+  private jars(st: ExitState, t: number): void {
     const g = this.airFx!
     for (const room of st.plan.rooms) {
       const color = SEASONS[room.season]!.color
@@ -739,7 +739,7 @@ export class WarpView implements MapView {
    * 监控：每间舱室台沿的两个角上各装一台。队伍所在那间的监控转过来盯着队长，红灯常亮，地上一片淡淡的视野扫着队长；
    * 别的舱室里的慢慢左右摆，红灯一闪一闪
    */
-  private cameras(sim: Sim, st: WarpState, t: number): void {
+  private cameras(sim: Sim, st: ExitState, t: number): void {
     const g = this.airFx!
     const f = this.glowFx!
     const lx = Transform.x[sim.leader]!
@@ -782,7 +782,7 @@ export class WarpView implements MapView {
    * 出怪板上凝成形的敌人：预兆打下去的那一刻起，四面八方的红色光块往落点收拢、越聚越密，脚下的出怪板跟着亮起来；
    * 到点就是一只敌人
    */
-  private forming(sim: Sim, st: WarpState, cfg: WarpConfig, now: number): void {
+  private forming(sim: Sim, st: ExitState, cfg: ExitConfig, now: number): void {
     const g = this.airFx!
     const f = this.glowFx!
     for (const e of query(sim.world, [Telegraph, Due, Transform])) {
@@ -823,7 +823,7 @@ export class WarpView implements MapView {
    * 一个被送过虚空的身体：出发时散成一格格光块往上飘开，顺着身体走的那条最近的路飞向它要去的那间入口，越过方框的边就从另一边接着飞，在入口聚拢；
    * 队伍是信号蓝，画在暗下去的舱室上面；敌人是信号红，飞进全黑的舱室就看不见了；都夹着几块白
    */
-  private voxels(h: Flight, cfg: WarpConfig, now: number): void {
+  private voxels(h: Flight, cfg: ExitConfig, now: number): void {
     const ms = cfg.pad.transitMs
     const d = now - h.at
     if (d < 0 || d > ms + GATHER_MS) return
@@ -873,7 +873,7 @@ export class WarpView implements MapView {
   }
 
   /** 子弹打在力场上：那里泛起一圈六角形的涟漪 */
-  private ripples(st: WarpState, now: number): void {
+  private ripples(st: ExitState, now: number): void {
     const g = this.glowFx!
     for (const r of st.impacts) {
       const d = now - r.at

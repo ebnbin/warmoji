@@ -3,8 +3,8 @@ import { GROUND_PPU } from '../../data/texel'
 import { valueNoise } from '../../util/noise'
 import { FRAME_U } from '../../util/units'
 import { SEASONS } from './palette'
-import type { Box, Chamber, WarpPlan } from './layout'
-import type { WarpConfig } from '../../types/maps'
+import type { Box, Chamber, ExitPlan } from './layout'
+import type { ExitConfig } from '../../types/maps'
 
 /** 平台朝屏幕下方露出的那一截侧面多高，格：比平台下沿到格边的缝窄，舱与舱之间还留得出一线虚空 */
 export const FACE_U = 0.4
@@ -37,8 +37,8 @@ const LY = SUN.y / SL
 
 /** 画地面用到的那部分地图：只有数据，能整个发给画画的线程 */
 export interface PaintScene {
-  readonly cfg: WarpConfig
-  readonly plan: WarpPlan
+  readonly cfg: ExitConfig
+  readonly plan: ExitPlan
 }
 
 /** 贴图上以像素计的一块：[x0, x1) × [y0, y1) */
@@ -248,13 +248,13 @@ function emblem(out: Rgb, color: Rgb, room: Chamber, x: number, y: number): void
 }
 
 /** 这一点落在哪块平台的顶面上 */
-function slabAt(plan: WarpPlan, x: number, y: number): Chamber | null {
+function slabAt(plan: ExitPlan, x: number, y: number): Chamber | null {
   for (const r of plan.rooms) if (x >= r.slab.x0 && x < r.slab.x1 && y >= r.slab.y0 && y < r.slab.y1) return r
   return null
 }
 
 /** 这一点落在哪块平台朝下的侧面上，从侧面上沿往下走到几成 */
-function faceAt(plan: WarpPlan, x: number, y: number): { room: Chamber; t: number } | null {
+function faceAt(plan: ExitPlan, x: number, y: number): { room: Chamber; t: number } | null {
   for (const r of plan.rooms) if (x >= r.slab.x0 && x < r.slab.x1 && y >= r.slab.y1 && y < r.slab.y1 + FACE_U) return { room: r, t: (y - r.slab.y1) / FACE_U }
   return null
 }
