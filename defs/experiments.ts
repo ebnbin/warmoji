@@ -1152,27 +1152,27 @@ export const EXPERIMENTS = {
   },
   stationTour: {
     emoji: '1f504',
-    name: '环站巡礼',
-    desc: '跃迁站四间房连成单向的一圈：限时 120 秒，整队跃迁 8 次、绕站两圈；离开的房间里的追兵，会一批批从你到站的那座传送台涌出来',
-    note: '传送当目标：到站的台子要冷却，得走到下一座台子去，追兵却总是跟着你的路线来',
+    name: '走遍迷宫',
+    desc: '跃迁站是一座单向的迷宫：每扇门只通往前面的一间，从哪扇门来，那一间就没有门通回去。到访每一间舱室，在入口站满 2.5 秒；顺着挂绿牌的「出口」一定走得完，抄近路可能漏掉几间、得再绕一圈。只有走过的三间亮着，追兵会顺着门跟过来',
+    note: '到访当目标、地图本身是谜题：路只能往前，挑哪扇门决定要绕多远；黑着的舱室里看不见门，只能记住走过的路',
     team: { slots: [{ tags: ['mobile'] }, { tags: ['damage', 'ranged'] }, { tags: ['defense'] }], level: 2 },
-    stars: [{ kind: 'time', ms: 90_000 }, { kind: 'downs', count: 0 }],
+    stars: [{ kind: 'time', ms: 70_000 }, { kind: 'downs', count: 0 }],
     fight: {
-      name: '环站巡礼',
+      name: '走遍迷宫',
       map: 'warp',
       clockSec: 90,
       phases: [
         {
-          intro: { title: '环站巡礼', sub: '整队跃迁 8 次' },
+          intro: { title: '走遍迷宫', sub: '在每一间舱室的入口站满 2.5 秒' },
           mix: [
             { kind: 'zombie', weight: 3 },
             { kind: 'ghost', weight: 2 },
             { kind: 'alien', weight: 2 },
             { kind: 'crab', weight: 1 },
           ],
-          spawns: [{ kind: 'stream', intervalMs: 700 }],
+          spawns: [{ kind: 'stream', intervalMs: 800 }],
           ends: [
-            { kind: 'event', event: 'jump', count: 8 },
+            { kind: 'visit', mark: 'cabin', radius: 1.6, ms: 2500 },
             { kind: 'time', ms: 120_000, lose: true },
           ],
         },
@@ -1182,8 +1182,8 @@ export const EXPERIMENTS = {
   lockdown: {
     emoji: '1f512',
     name: '封站',
-    desc: '传送台全被锁住，哪也去不了：另外三间房的怪越聚越多，每隔几秒就坐班车从你脚下的传送台涌进来；撑过 75 秒',
-    note: '把出口变成入口：怪不从四周来，而是定时从一处整批涌出，守住台口就是守住房间',
+    desc: '前 25 秒门还开着，挑一间好守的舱室；之后门全锁死，哪也去不了：刚走过的两间还亮着，里面出的怪会顺着门，从你这间的入口涌进来。撑到第 90 秒',
+    note: '把出口变成入口：锁门之前在哪儿停下，就定了接下来怪从哪儿来、来多少',
     team: { slots: [{ tags: ['area'] }, { tags: ['defense'] }, { tags: ['support'] }], level: 2 },
     stars: [{ kind: 'downs', count: 0 }, { kind: 'kills', count: 80 }],
     fight: {
@@ -1192,92 +1192,50 @@ export const EXPERIMENTS = {
       clockSec: 90,
       phases: [
         {
-          intro: { title: '封站', sub: '传送台都锁住了' },
+          intro: { title: '封站', sub: '25 秒后门全锁死' },
           mix: [
             { kind: 'ghost', weight: 2 },
             { kind: 'crab', weight: 2 },
             { kind: 'alien', weight: 2 },
             { kind: 'zombie', weight: 2 },
           ],
-          spawns: [{ kind: 'stream', intervalMs: 450 }],
-          cues: [{ cue: 'lock', atMs: 0 }],
-          ends: [{ kind: 'time', ms: 75_000 }],
+          spawns: [
+            { kind: 'stream', intervalMs: 500 },
+            { kind: 'batch', atMs: 25_000, squad: { count: 8, eliteChance: 0.2 }, banner: { title: '封站', sub: '门全锁死了' } },
+          ],
+          cues: [{ cue: 'lock', atMs: 25_000 }],
+          ends: [{ kind: 'time', ms: 90_000 }],
         },
       ],
     },
   },
   stationPurge: {
     emoji: '1f9f9',
-    name: '全站清剿',
-    desc: '四间房各藏着一队敌人：清空整座跃迁站；你不在的房间里，敌人会往传送台聚，坐班车追过来',
-    note: '清场跨房间：敌人分在四处又会自己流动，什么时候去下一间、什么时候守着台口等它们送上门',
+    name: '逐间清剿',
+    desc: '每穿过一道门，亮着的舱室里就冒出一队敌人，大多在新到的这一间，连开局这一间一共六队；清空全部就赢。只有走过的三间亮着：留在身后没清完的，灯一灭就定在黑暗里，得绕一圈回来收拾',
+    note: '清场跨舱室：走得太快会把敌人甩在黑屋里，单向的门让回头路都变成绕远路',
     team: { slots: [{ tags: ['mobile'] }, { tags: ['area'] }, { tags: ['damage'] }], level: 2 },
-    stars: [{ kind: 'time', ms: 100_000 }, { kind: 'downs', count: 0 }],
+    stars: [{ kind: 'time', ms: 120_000 }, { kind: 'downs', count: 0 }],
     fight: {
-      name: '全站清剿',
+      name: '逐间清剿',
       map: 'warp',
       clockSec: 100,
       phases: [
         {
-          intro: { title: '全站清剿', sub: '清空四间房' },
+          intro: { title: '逐间清剿', sub: '每穿过一道门冒出一队，清掉全部六队' },
+          mix: [
+            { kind: 'ghost', weight: 2 },
+            { kind: 'crab', weight: 1 },
+            { kind: 'alien', weight: 2 },
+            { kind: 'zombie', weight: 2 },
+          ],
           spawns: [
-            {
-              kind: 'batch',
-              atMs: 1000,
-              squad: {
-                count: 8,
-                mix: [
-                  { kind: 'ghost', weight: 2 },
-                  { kind: 'chameleon', weight: 1 },
-                  { kind: 'siren', weight: 1 },
-                ],
-                at: { kind: 'gate', gate: 'ghosts' },
-              },
-              banner: { title: '全站清剿', sub: '四间房各有一队' },
-            },
-            {
-              kind: 'batch',
-              atMs: 1000,
-              squad: {
-                count: 7,
-                mix: [
-                  { kind: 'crab', weight: 2 },
-                  { kind: 'gargoyle', weight: 1 },
-                  { kind: 'turtle', weight: 1 },
-                ],
-                at: { kind: 'gate', gate: 'tanks' },
-              },
-            },
-            {
-              kind: 'batch',
-              atMs: 1000,
-              squad: {
-                count: 12,
-                mix: [
-                  { kind: 'alien', weight: 2 },
-                  { kind: 'locust', weight: 2 },
-                  { kind: 'blob', weight: 1 },
-                ],
-                at: { kind: 'gate', gate: 'swarm' },
-              },
-            },
-            {
-              kind: 'batch',
-              atMs: 1000,
-              squad: {
-                count: 8,
-                mix: [
-                  { kind: 'zombie', weight: 2 },
-                  { kind: 'invader', weight: 1 },
-                  { kind: 'ufo', weight: 1 },
-                ],
-                at: { kind: 'gate', gate: 'mixed' },
-              },
-            },
+            { kind: 'batch', atMs: 1500, squad: { count: 8 }, banner: { title: '逐间清剿', sub: '这间藏着一队' } },
+            { kind: 'batch', atMs: 800, on: 'jump', times: 5, squad: { count: 8, eliteChance: 0.15 }, banner: { title: '新的舱室', sub: '这里也藏着一队' } },
           ],
           ends: [
             { kind: 'cleared' },
-            { kind: 'time', ms: 150_000, lose: true },
+            { kind: 'time', ms: 180_000, lose: true },
           ],
         },
       ],
@@ -1286,8 +1244,8 @@ export const EXPERIMENTS = {
   elitePatrol: {
     emoji: '1f46e',
     name: '精英巡逻',
-    desc: '场上最多六只敌人，但只只都是精英，你不在的房间里的会坐班车追过来；队伍伤害提高两成半，两分钟内击杀 20 只',
-    note: '数量少、质量高：全员精英加场上上限，换掉了割草的节奏；四间房和传送台让你挑在哪儿接战',
+    desc: '场上最多六只敌人，但只只都是精英，刚走过的两间舱室里出的也会顺着门追过来；队伍伤害提高两成半，两分钟内击杀 20 只',
+    note: '数量少、质量高：全员精英加场上上限，换掉了割草的节奏；穿门能甩开它们，也会把它们引进新的舱室，在哪儿接战由你挑',
     team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['support'] }], level: 3 },
     stars: [{ kind: 'time', ms: 90_000 }, { kind: 'downs', count: 0 }],
     fight: {
@@ -1304,7 +1262,7 @@ export const EXPERIMENTS = {
             { kind: 'gargoyle', weight: 1 },
             { kind: 'turtle', weight: 1 },
           ],
-          spawns: [{ kind: 'stream', intervalMs: 1800, eliteChance: 1, cap: 6 }],
+          spawns: [{ kind: 'stream', intervalMs: 1500, eliteChance: 1, cap: 6 }],
           ends: [
             { kind: 'kills', count: 20 },
             { kind: 'time', ms: 120_000, lose: true },
