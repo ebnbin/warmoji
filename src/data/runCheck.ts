@@ -249,7 +249,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
       (s) =>
         s.kind === 'knobs' ||
         (s.kind === 'stream' && s.untilMs === undefined && s.total === undefined) ||
-        (s.kind === 'batch' && ((s.every !== undefined && s.times === undefined) || s.on !== undefined)),
+        (s.kind === 'batch' && (s.every !== undefined || s.on !== undefined) && s.times === undefined),
     )
     const boss = p.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs') || squads.some((sq) => isBoss(sq.enemy))
     if (p.mix) checkMix(p.mix, [...path, 'mix'])
@@ -272,7 +272,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
           need(s.every === undefined, sp, '按地图事件放出的一队不再写间隔')
         }
         need(s.every === undefined || s.every > 0, sp, '一再放出的间隔须为正')
-        need(s.times === undefined || (Number.isInteger(s.times) && s.times >= 1 && (s.times === 1 || s.every !== undefined)), sp, '放出的次数须是正整数，多于一次要写间隔')
+        need(s.times === undefined || (Number.isInteger(s.times) && s.times >= 1 && (s.times === 1 || s.every !== undefined || s.on !== undefined)), sp, '放出的次数须是正整数，多于一次要写间隔或按地图事件放')
         checkSquad(s.squad, at, [...sp, 'squad'])
       } else if (s.kind === 'waves') {
         need(s.atMs >= 0 && s.gapMs >= 0 && s.squads.length > 0, sp, '成组敌人须至少一组，时刻与间隔不为负')

@@ -357,7 +357,7 @@ export function squadSize(squad: LegacySquad): number {
   return squad.count + (squad.escort?.count ?? 0)
 }
 
-/** 还没放出的敌人：排着的单只、没登场的一队连同它还要再放的几次、没来的组；只数悬赏目标时护卫不算，一直放下去的一队只算下一次 */
+/** 还没放出的敌人：排着的单只、没登场的一队连同它还要再放的几次、没来的组、按地图事件还要放的几队；只数悬赏目标时护卫不算，一直放下去的一队只算下一次，没写次数的按事件放出的一队放不完 */
 function pendingCount(sim: Sim, bountyOnly: boolean): number {
   let n = 0
   const size = (sq: LegacySquad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
@@ -368,6 +368,10 @@ function pendingCount(sim: Sim, bountyOnly: boolean): number {
     if (c?.rule.kind === 'boss' && !bountyOnly) n++
   }
   for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) n += size(sq)
+  for (const t of sim.fight.triggers) {
+    const k = size(t.rule.squad)
+    if (k > 0) n += k * ((t.rule.times ?? Infinity) - t.fired)
+  }
   return n
 }
 

@@ -150,7 +150,7 @@ export type HoldPoint = { readonly dx: number; readonly dy: number } | { readonl
 
 /**
  * 一个阶段的结束规则，时刻与进度都从这一阶段开始时算，全灭永远是输。
- * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种，写了 by 只数死于这种危害的），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数，
+ * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时、按地图事件放出的与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种，写了 by 只数死于这种危害的），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数，
  * event 地图上这件事发生到 count 次，gauge 地图的读数升过 above 或降过 below，visit 队长到访这一组地标里 count 处（不写是全部），每处在 radius 格内站满 ms。
  * 失败：time 带 lose 时到点就输，downs 队员累计倒下到数就输，event 与 gauge 带 lose 时满足了就输，leak 朝这一组地标行进的敌人走到 radius 格内（走到就离场）累计 count 只就输。
  */

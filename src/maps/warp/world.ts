@@ -142,7 +142,7 @@ export function warpPlanFor(cfg: WarpConfig, decorSeed: number): WarpPlan {
   return warpPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
-/** 出怪的地标：每间舱室的出怪板归到那间配方的名下；看守单独一组，跟着队伍换舱室 */
+/** 地标：每间舱室的出怪板归到那间配方的名下；看守单独一组，跟着队伍换舱室；cabin 是每间舱室的入口，关卡拿它当到访的去处 */
 function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
   const out: Record<string, Landmark[]> = {}
   for (const name of cfg.recipes) out[name] = []
@@ -152,6 +152,7 @@ function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
   }
   const c = plan.rooms[plan.start]!.center
   out.warden = [{ x: c.x * UNIT, y: c.y * UNIT, r: WARDEN_U * UNIT, nx: 0, ny: 0 }]
+  out.cabin = plan.rooms.map((room) => ({ x: room.entry.x * UNIT, y: room.entry.y * UNIT, r: 0, nx: 0, ny: 0 }))
   return out
 }
 
