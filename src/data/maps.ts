@@ -85,7 +85,7 @@ export function rollDecor(
   return out
 }
 
-export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', meteor: '天体', blackhole: '黑洞', lava: '熔岩', collapse: '塌方', drown: '呛水' }
+export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', meteor: '流星', blackhole: '黑洞', lava: '熔岩', collapse: '塌方', drown: '呛水' }
 
 /** 敌人死于这种危害的说法 */
-export const HAZARD_KILLS: Record<Hazard, string> = { coldWater: '寒水冻死', meteor: '天体砸死', blackhole: '黑洞吞掉', lava: '熔岩烧死', collapse: '落石砸死', drown: '呛死' }
+export const HAZARD_KILLS: Record<Hazard, string> = { coldWater: '寒水冻死', meteor: '流星砸死', blackhole: '黑洞吞掉', lava: '熔岩烧死', collapse: '落石砸死', drown: '呛死' }
