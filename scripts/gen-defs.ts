@@ -51,6 +51,7 @@ import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../s
 import { COLS, splits, stacks, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
+import { BOX_MAPS } from '../src/data/boxMaps.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { SIGNALS } from '../src/data/signals.ts'
 import type { MapSignals } from '../src/data/signals.ts'
@@ -877,10 +878,14 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   report(`runs.${id}`, CHECKS.run(r))
 }
 
-for (const [id, e] of Object.entries<ExperimentDef>(EXPERIMENTS)) need(PACK.has(e.emoji), `experiments.${id} 的 emoji 不在表情包里：${e.emoji}`)
+for (const [id, e] of Object.entries<ExperimentDef>(EXPERIMENTS)) {
+  need(PACK.has(e.emoji), `experiments.${id} 的 emoji 不在表情包里：${e.emoji}`)
+  need(BOX_MAPS.includes(e.fight.map), `experiments.${id} 用了旧地图：${e.fight.map}`)
+}
 
 need(PACK.has(EDITOR_DRAFT.emoji), `editor 的 emoji 不在表情包里：${EDITOR_DRAFT.emoji}`)
 report('editor', CHECKS.run(EDITOR_DRAFT))
+for (const s of EDITOR_DRAFT.steps) if (s.kind === 'fight') need(BOX_MAPS.includes(s.fight.map), `editor 用了旧地图：${s.fight.map}`)
 
 const mutatorEmojis = new Map<string, string>()
 for (const [id, m] of Object.entries<MutatorDef>(MUTATORS)) {

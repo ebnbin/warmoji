@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { browserStorage, StorageKey } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
+import { BOX_MAPS } from '../data/boxMaps'
 import { CHARACTERS } from '../data/characters'
 import { chaptersOf, fightCount, fightsOf, RUN_IDS, RUNS } from '../data/runs'
 import type { Chapter } from '../data/runs'
@@ -33,9 +34,8 @@ const JOURNEYS: readonly RunId[] = RUN_IDS.filter((id) => !isExperiment(id) && R
 const TAB_RUNS: readonly RunId[] = RUN_IDS.filter((id) => !LABS.includes(id) && !isExperiment(id))
 const LAB_TAB = { key: 'labs', emoji: '1f9ea', name: '实验关' } as const
 const EXPERIMENT_TAB = { key: 'experiments', emoji: '2697', name: '实验' } as const
-/** 沙盒排在最前，按这个顺序列新画风的地图，开局同试炼场；其余要选地图的页签只列剩下的旧地图 */
+/** 沙盒排在最前，列新画风的地图，开局同试炼场；其余要选地图的页签只列剩下的旧地图 */
 const BOX_TAB = { key: 'box', emoji: '1f3d6', name: '沙盒', run: 'sandbox' } as const
-const BOX_MAPS: readonly MapId[] = ['meadow', 'sakura', 'desert', 'deep', 'ruins', 'amethyst', 'floe', 'volcano', 'theater', 'warp', 'petri', 'nebula']
 const OLD_MAPS: readonly MapId[] = MAP_IDS.filter((id) => !BOX_MAPS.includes(id))
 type Mode = RunId | typeof LAB_TAB.key | typeof EXPERIMENT_TAB.key | typeof BOX_TAB.key
 const isJourney = (mode: Mode): mode is RunId => JOURNEYS.some((id) => id === mode)
