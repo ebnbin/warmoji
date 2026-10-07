@@ -6,7 +6,7 @@ import { endText, stepText } from '../scene/runLines'
 import type { EnemyKind } from '../types/enemies'
 import { isStage } from './draft'
 import type { Draft, End, Phase, Spawn, Stage, Step, WaveSquad } from './draft'
-import { END_KINDS, ICON, SPAWN_KINDS } from './kinds'
+import { endIcon, ICON, SPAWN_KINDS } from './kinds'
 
 /** 导航里的一项指着草稿的哪一块；列表里的一项带着它所在的列表与下标 */
 export type Target =
@@ -64,7 +64,7 @@ function stageNodes(f: Stage, at: Path): Node[] {
         ...spawn.squads.map((squad, k): Node => ({ at: [...sat, 'squads', k], parent: sat, depth: 4, icon: ICON.squad, title: `第 ${k + 1} 组 · ${squad.count} 只`, meta: who(squad), target: { kind: 'squad', list: spawn.squads, index: k, squad, stage: f } })),
       ]
     })
-    const ends = phase.ends.map((end, i): Node => ({ at: [...pat, 'ends', i], parent: pat, depth: 3, icon: END_KINDS[end.kind].icon, title: endText(end), target: { kind: 'end', list: phase.ends, index: i, end } }))
+    const ends = phase.ends.map((end, i): Node => ({ at: [...pat, 'ends', i], parent: pat, depth: 3, icon: endIcon(end), title: endText(end), target: { kind: 'end', list: phase.ends, index: i, end } }))
     return [head, ...spawns, ...ends]
   })
 }

@@ -1,11 +1,16 @@
 import { query, removeEntity } from 'bitecs'
 import { ENEMIES } from '../../data/enemies'
+import { HAZARD_KILLS } from '../../data/maps'
 import { phasesOf, timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { Polarity } from '../../types/battlefield'
 import type { EnemyDef, EnemyKind, EnemyMixEntry } from '../../types/enemies'
-import type { BossRule, CarrierRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyWavesRule, Loot, MixEntry, SpawnAt, StreamRule } from '../../types/runs'
+import type { Hazard } from '../../types/maps'
+import type { BossRule, CarrierRule, CueRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyWavesRule, Loot, MixEntry, SpawnAt, StreamRule } from '../../types/runs'
+import { signalName } from '../../data/signals'
+import type { MapEvent } from '../../data/signals'
+import { isLose } from '../../data/ends'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
@@ -90,6 +95,29 @@ export interface HoldState {
   inside: boolean
 }
 
+/** 一条结束规则自己的进度，按这一阶段结束规则的次序：到访的已经到过哪几处、正站在哪一处（-1 是不在圈里）、站了多久；漏怪的漏过几只 */
+export interface GoalState {
+  readonly done: Set<number>
+  at: number
+  ms: number
+  leaked: number
+}
+
+/** 按地图事件放出的一队：等的是哪件事、这件事已经数到第几次、放过几队 */
+export interface TriggerState {
+  readonly rule: LegacyBatchRule
+  readonly on: MapEvent
+  seen: number
+  fired: number
+}
+
+/** 对地图的一条指令：下一次在这一阶段的第几毫秒、做过几次 */
+export interface CueState {
+  readonly rule: CueRule
+  next: number
+  done: number
+}
+
 /** 一场战斗进行中的状态：刷怪、目标与进度都是当前阶段的 */
 export interface FightState {
   readonly def: FightDef
@@ -108,7 +136,11 @@ export interface FightState {
   /** 这一阶段的配比；不写就按地图 */
   mix: EnemyMixEntry[] | null
   hold: HoldState | null
-  /** 这一阶段开始时的击杀、各种敌人的击杀、金币与倒下次数，进度从这里算 */
+  /** 这一阶段每条结束规则自己的进度 */
+  goals: GoalState[]
+  triggers: TriggerState[]
+  cues: CueState[]
+  /** 这一阶段开始时的击杀、各种敌人的击杀、金币、倒下次数与地图事件，进度从这里算 */
   base: PhaseBase
   /** 放出过几个悬赏目标 */
   bounties: number
@@ -120,26 +152,38 @@ export interface FightState {
   switchedAt: number
   /** 每名队员被扶了多久，按名单位置 */
   readonly rescueMs: number[]
+  /** 这一场地图上各种事件发生过几次 */
+  readonly events: Partial<Record<MapEvent, number>>
+  /** 上一次轮换队长的时刻 */
+  relayAt: number
 }
 
 /** 阶段开始时的计数 */
 interface PhaseBase {
   readonly kills: number
   readonly enemyKills: Partial<Record<EnemyKind, number>>
+  readonly hazardKills: Partial<Record<Hazard, number>>
   readonly coins: number
   readonly downs: number
+  readonly events: Partial<Record<MapEvent, number>>
 }
 
 function downsOf(run: RunState): number {
   return run.stats.deaths.reduce((s, n) => s + n, 0)
 }
 
-function baseOf(run: RunState): PhaseBase {
-  return { kills: run.kills, enemyKills: { ...run.stats.enemyKills }, coins: run.coins, downs: downsOf(run) }
+function baseOf(run: RunState, events: Partial<Record<MapEvent, number>>): PhaseBase {
+  return { kills: run.kills, enemyKills: { ...run.stats.enemyKills }, hazardKills: { ...run.stats.hazardKills }, coins: run.coins, downs: downsOf(run), events: { ...events } }
 }
 
-/** 阶段自己的状态：刷怪、配比与据点换成这一阶段的，进度从 at 这一刻、run 此刻的计数算起 */
-function phaseState(def: FightDef, phase: number, run: RunState, at: number): Pick<FightState, 'phase' | 'phaseAt' | 'streams' | 'waves' | 'knobs' | 'mix' | 'hold' | 'base' | 'bounties' | 'wonAt'> {
+/** 阶段自己的状态：刷怪、配比、据点、各条结束规则的进度与对地图的指令换成这一阶段的，进度从 at 这一刻、run 此刻的计数与这一场此刻的地图事件算起 */
+function phaseState(
+  def: FightDef,
+  phase: number,
+  run: RunState,
+  at: number,
+  events: Partial<Record<MapEvent, number>>,
+): Pick<FightState, 'phase' | 'phaseAt' | 'streams' | 'waves' | 'knobs' | 'mix' | 'hold' | 'goals' | 'triggers' | 'cues' | 'base' | 'bounties' | 'wonAt'> {
   const p = phasesOf(def)[phase]!
   const hold = p.ends.find((e) => e.kind === 'hold')
   return {
@@ -150,7 +194,10 @@ function phaseState(def: FightDef, phase: number, run: RunState, at: number): Pi
     knobs: p.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
     mix: p.mix ? mixOf(p.mix) : null,
     hold: hold?.kind === 'hold' ? { rule: hold, point: 0, heldMs: 0, inside: false } : null,
-    base: baseOf(run),
+    goals: p.ends.map(() => ({ done: new Set<number>(), at: -1, ms: 0, leaked: 0 })),
+    triggers: p.spawns.flatMap((rule) => (rule.kind === 'batch' && rule.on !== undefined ? [{ rule, on: rule.on, seen: events[rule.on] ?? 0, fired: 0 }] : [])),
+    cues: (p.cues ?? []).map((rule) => ({ rule, next: rule.atMs, done: 0 })),
+    base: baseOf(run, events),
     bounties: 0,
     wonAt: -1,
   }
@@ -161,10 +208,12 @@ export function newFight(def: FightDef, run: RunState): FightState {
     def,
     rules: activeRules(runDef(run).rules, def.rules, mutatorRules(run)),
     enemyMods: enemyModsOf(run, def),
-    ...phaseState(def, 0, run, 0),
+    ...phaseState(def, 0, run, 0, {}),
     leaderFell: false,
     switchedAt: -Infinity,
     rescueMs: run.roster.map(() => 0),
+    events: {},
+    relayAt: 0,
   }
 }
 
@@ -178,12 +227,12 @@ export function phaseMs(sim: Sim): number {
   return sim.elapsedMs - sim.fight.phaseAt
 }
 
-/** 这一阶段开始：定时登场的排好，带光圈的敌人抽好效果排好，打出这一阶段的横幅 */
+/** 这一阶段开始：定时登场的排好（按地图事件放出的等事件来），带光圈的敌人抽好效果排好，打出这一阶段的横幅 */
 export function startPhase(sim: Sim): void {
   const at = sim.fight.phaseAt
   const p = phaseOf(sim.fight)
   for (const rule of p.spawns) {
-    if (rule.kind === 'batch' || rule.kind === 'boss') scheduleCall(sim, at + rule.atMs, rule)
+    if ((rule.kind === 'batch' && rule.on === undefined) || rule.kind === 'boss') scheduleCall(sim, at + rule.atMs, rule)
     else if (rule.kind === 'carriers') scheduleCarriers(sim, at, rule)
   }
   if (p.intro) sim.out.banners.push(p.intro)
@@ -211,13 +260,13 @@ export function nextPhase(sim: Sim): void {
     carrierPickup[e] = undefined
     removeEntity(sim.world, e)
   }
-  Object.assign(sim.fight, phaseState(sim.fight.def, sim.fight.phase + 1, sim.run, sim.elapsedMs))
+  Object.assign(sim.fight, phaseState(sim.fight.def, sim.fight.phase + 1, sim.run, sim.elapsedMs, sim.fight.events))
   startPhase(sim)
 }
 
 /** 这一阶段的收获从此刻起算：开波的道具规则可能已经进账 */
 export function markFightBase(sim: Sim): void {
-  sim.fight.base = baseOf(sim.run)
+  sim.fight.base = baseOf(sim.run, sim.fight.events)
 }
 
 /** 这一场给一方身体的常驻修正：我方规则写的，加上试炼场的攻速旋钮给队伍；敌人的写在这一场上，都算上词缀 */
@@ -241,10 +290,59 @@ export function timeLeftMs(sim: Sim): number {
   return limit === undefined ? Infinity : limit - phaseMs(sim)
 }
 
-/** 据点这一处在地图上的位置 */
-export function holdSpot(sim: Sim, p: HoldPoint): Point {
+/** 据点这一处在地图上的位置：中心偏移的收进敌人能站、能走到队伍的地方，地标的就在地标上；那一组地标此刻没有这一处是 null */
+export function holdSpot(sim: Sim, p: HoldPoint): Point | null {
+  if ('mark' in p) return markSpot(sim, p.mark, p.nth ?? 0)
   const c = sim.hooks.center(sim)
   return sim.hooks.settle(sim, { x: c.x + p.dx * UNIT, y: c.y + p.dy * UNIT })
+}
+
+/** 这张图那一组地标里的第 nth 处此刻在哪；没有就是 null */
+export function markSpot(sim: Sim, mark: string, nth: number): Point | null {
+  const m = sim.hooks.landmarks(sim)[mark]?.[nth]
+  return m ? { x: m.x, y: m.y } : null
+}
+
+/** 这一阶段里地图上这件事发生了几次 */
+export function eventsSince(sim: Sim, e: MapEvent): number {
+  const f = sim.fight
+  return (f.events[e] ?? 0) - (f.base.events[e] ?? 0)
+}
+
+/** 地图的这个读数升过或降过了线 */
+function gaugeMet(sim: Sim, e: Extract<EndRule, { kind: 'gauge' }>): boolean {
+  const v = sim.hooks.gauge?.(sim, e.gauge) ?? 0
+  return e.above !== undefined ? v >= e.above : e.below !== undefined && v <= e.below
+}
+
+/** 到访要到几处：写了就是那么多，不写是那一组地标此刻的全部 */
+export function visitNeed(sim: Sim, e: Extract<EndRule, { kind: 'visit' }>): number {
+  return e.count ?? sim.hooks.landmarks(sim)[e.mark]?.length ?? 0
+}
+
+/** 一处要到访的地标此刻的样子：在哪、圈多大、到过没有、队长是不是正站在里面 */
+export interface VisitRing extends Point {
+  readonly r: number
+  readonly done: boolean
+  readonly here: boolean
+}
+
+/** 这一阶段要到访的地标，每处一个圈；没有到访的目标就是空的 */
+export function visitRings(sim: Sim): VisitRing[] {
+  const f = sim.fight
+  const out: VisitRing[] = []
+  phaseOf(f).ends.forEach((e, i) => {
+    if (e.kind !== 'visit') return
+    const g = f.goals[i]!
+    if (g.done.size >= visitNeed(sim, e)) return
+    ;(sim.hooks.landmarks(sim)[e.mark] ?? []).forEach((m, k) => out.push({ x: m.x, y: m.y, r: e.radius * UNIT, done: g.done.has(k), here: g.at === k }))
+  })
+  return out
+}
+
+/** 这一阶段不许敌人走到的地标，每处一个圈 */
+export function leakRings(sim: Sim): (Point & { readonly r: number })[] {
+  return phaseOf(sim.fight).ends.flatMap((e) => (e.kind === 'leak' ? (sim.hooks.landmarks(sim)[e.mark] ?? []).map((m) => ({ x: m.x, y: m.y, r: e.radius * UNIT })) : []))
 }
 
 /** 场上的敌方身体与预兆 */
@@ -259,7 +357,7 @@ export function squadSize(squad: LegacySquad): number {
   return squad.count + (squad.escort?.count ?? 0)
 }
 
-/** 还没放出的敌人：排着的单只、没登场的一队连同它还要再放的几次、没来的组；只数悬赏目标时护卫不算，一直放下去的一队只算下一次 */
+/** 还没放出的敌人：排着的单只、没登场的一队连同它还要再放的几次、没来的组、按地图事件还要放的几队；只数悬赏目标时护卫不算，一直放下去的一队只算下一次，没写次数的按事件放出的一队放不完 */
 function pendingCount(sim: Sim, bountyOnly: boolean): number {
   let n = 0
   const size = (sq: LegacySquad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
@@ -270,6 +368,10 @@ function pendingCount(sim: Sim, bountyOnly: boolean): number {
     if (c?.rule.kind === 'boss' && !bountyOnly) n++
   }
   for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) n += size(sq)
+  for (const t of sim.fight.triggers) {
+    const k = size(t.rule.squad)
+    if (k > 0) n += k * ((t.rule.times ?? Infinity) - t.fired)
+  }
   return n
 }
 
@@ -316,11 +418,12 @@ function bossBelow(sim: Sim, below: number): boolean {
   return livingBosses(sim).some((eid) => Hp.v[eid]! < Hp.max[eid]! * below)
 }
 
-/** 这一阶段里击杀了几只：写了种类就只数这一种 */
-function killsOf(sim: Sim, enemy: EnemyKind | undefined): number {
+/** 这一阶段里击杀了几只：写了种类就只数这一种，写了危害就只数死于它的 */
+function killsOf(sim: Sim, e: Extract<EndRule, { kind: 'kills' }>): number {
   const f = sim.fight
-  if (enemy === undefined) return sim.run.kills - f.base.kills
-  return (sim.run.stats.enemyKills[enemy] ?? 0) - (f.base.enemyKills[enemy] ?? 0)
+  if (e.by !== undefined) return (sim.run.stats.hazardKills[e.by] ?? 0) - (f.base.hazardKills[e.by] ?? 0)
+  if (e.enemy !== undefined) return (sim.run.stats.enemyKills[e.enemy] ?? 0) - (f.base.enemyKills[e.enemy] ?? 0)
+  return sim.run.kills - f.base.kills
 }
 
 /** 还活着或还没放出的悬赏目标 */
@@ -328,8 +431,8 @@ function bountiesLeft(sim: Sim): number {
   return query(sim.world, [Bounty]).length + pendingCount(sim, true)
 }
 
-/** 一条达成条件眼下满足了：头目在更早的阶段就已打倒也算 */
-function won(sim: Sim, e: EndRule): boolean {
+/** 第 i 条达成条件眼下满足了：头目在更早的阶段就已打倒也算 */
+function won(sim: Sim, e: EndRule, i: number): boolean {
   const f = sim.fight
   switch (e.kind) {
     case 'boss':
@@ -339,23 +442,47 @@ function won(sim: Sim, e: EndRule): boolean {
     case 'cleared':
       return !streaming(sim) && foesLeft(sim) === 0
     case 'kills':
-      return killsOf(sim, e.enemy) >= e.count
+      return killsOf(sim, e) >= e.count
     case 'bounty':
       return f.bounties > 0 && bountiesLeft(sim) === 0
     case 'hold':
       return f.hold !== null && f.hold.point >= e.points.length
     case 'coins':
       return sim.run.coins - f.base.coins >= e.count
+    case 'event':
+      return eventsSince(sim, e.event) >= e.count
+    case 'gauge':
+      return gaugeMet(sim, e)
+    case 'visit':
+      return f.goals[i]!.done.size >= visitNeed(sim, e)
     case 'time':
     case 'downs':
+    case 'leak':
       return false
   }
 }
 
-/** 这一阶段的目标达成了：时限之外的达成条件，要全部达成的全都满足，否则满足一条就算 */
+/** 这一阶段的目标达成了：时限与失败条件之外的达成条件，要全部达成的全都满足，否则满足一条就算 */
 function goalsMet(sim: Sim, p: LegacyPhaseDef): boolean {
-  const wins = p.ends.filter((e) => e.kind !== 'time' && e.kind !== 'downs')
-  return p.need === 'all' ? wins.length > 0 && wins.every((e) => won(sim, e)) : wins.some((e) => won(sim, e))
+  const wins = p.ends.flatMap((e, i) => (e.kind === 'time' || isLose(e) ? [] : [{ e, i }]))
+  return p.need === 'all' ? wins.length > 0 && wins.every((w) => won(sim, w.e, w.i)) : wins.some((w) => won(sim, w.e, w.i))
+}
+
+/** 这一阶段的一条失败条件眼下满足了就是输的缘由，否则是 null；时限另算 */
+function lostBy(sim: Sim, e: EndRule, i: number): string | null {
+  const f = sim.fight
+  switch (e.kind) {
+    case 'downs':
+      return downsOf(sim.run) - f.base.downs >= e.count ? `队员倒下了 ${e.count} 次` : null
+    case 'event':
+      return e.lose && eventsSince(sim, e.event) >= e.count ? `${signalName('events', e.event)}了${e.count > 1 ? ` ${e.count} 次` : ''}` : null
+    case 'gauge':
+      return e.lose && gaugeMet(sim, e) ? `${signalName('gauges', e.gauge)}到了 ${Math.round(100 * (e.above ?? e.below ?? 0))}%` : null
+    case 'leak':
+      return f.goals[i]!.leaked >= e.count ? `放过去了 ${e.count} 只敌人` : null
+    default:
+      return null
+  }
 }
 
 export type Verdict = { readonly win: true } | { readonly win: false; readonly reason: string }
@@ -367,8 +494,9 @@ export function fightVerdict(sim: Sim, timeUp: boolean): Verdict | null {
   const f = sim.fight
   if (f.rules.critical && f.leaderFell) return { win: false, reason: '队长倒下了' }
   const p = phaseOf(f)
-  for (const e of p.ends) {
-    if (e.kind === 'downs' && downsOf(sim.run) - f.base.downs >= e.count) return { win: false, reason: `队员倒下了 ${e.count} 次` }
+  for (const [i, e] of p.ends.entries()) {
+    const reason = lostBy(sim, e, i)
+    if (reason !== null) return { win: false, reason }
   }
   const met = goalsMet(sim, p)
   if (met) {
@@ -389,7 +517,7 @@ export function fightVerdict(sim: Sim, timeUp: boolean): Verdict | null {
 export function fightGoals(sim: Sim): { readonly text: string; readonly warn: boolean }[] {
   const f = sim.fight
   const out: { text: string; warn: boolean }[] = []
-  for (const e of phaseOf(f).ends) {
+  for (const [i, e] of phaseOf(f).ends.entries()) {
     switch (e.kind) {
       case 'cleared': {
         const left = foesLeft(sim)
@@ -397,7 +525,7 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
         break
       }
       case 'kills':
-        out.push({ text: `击杀${e.enemy ? ENEMIES[e.enemy].name : ''} ${Math.min(e.count, killsOf(sim, e.enemy))}/${e.count}`, warn: false })
+        out.push({ text: `${e.by ? HAZARD_KILLS[e.by] : `击杀${e.enemy ? ENEMIES[e.enemy].name : ''}`} ${Math.min(e.count, killsOf(sim, e))}/${e.count}`, warn: false })
         break
       case 'bossHp':
         out.push({ text: `把头目打到 ${Math.round(e.below * 100)}% 血`, warn: false })
@@ -425,23 +553,68 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
       case 'time':
         if (e.lose) out.push({ text: '时间到就输', warn: true })
         break
+      case 'event': {
+        const name = signalName('events', e.event)
+        const n = Math.min(e.count, eventsSince(sim, e.event))
+        if (e.lose) out.push({ text: e.count === 1 ? `${name}就输` : `${name} ${n}/${e.count} 次就输`, warn: true })
+        else out.push({ text: e.count === 1 ? `等到${name}` : `${name} ${n}/${e.count}`, warn: false })
+        break
+      }
+      case 'gauge': {
+        const pct = (v: number): string => `${Math.round(v * 100)}%`
+        const now = `${signalName('gauges', e.gauge)} ${pct(sim.hooks.gauge?.(sim, e.gauge) ?? 0)}`
+        const line = e.above !== undefined ? (e.lose ? `到 ${pct(e.above)} 就输` : `要到 ${pct(e.above)}`) : e.lose ? `低于 ${pct(e.below ?? 0)} 就输` : `要降到 ${pct(e.below ?? 0)}`
+        out.push({ text: `${now} · ${line}`, warn: e.lose === true })
+        break
+      }
+      case 'visit': {
+        const g = f.goals[i]!
+        const need = visitNeed(sim, e)
+        if (g.done.size >= need) break
+        const stay = g.at >= 0 ? ` · ${(g.ms / 1000).toFixed(1)}/${(e.ms / 1000).toFixed(1)} 秒` : ''
+        out.push({ text: `${signalName('marks', e.mark)} ${g.done.size}/${need}${stay}`, warn: false })
+        break
+      }
+      case 'leak':
+        out.push({ text: `放过去 ${f.goals[i]!.leaked}/${e.count} 只就输`, warn: true })
+        break
       case 'boss':
         break
     }
   }
+  if (f.rules.relay > 0) out.push({ text: `${Math.max(1, Math.ceil((f.rules.relay - (sim.elapsedMs - f.relayAt)) / 1000))} 秒后换下一名队长`, warn: false })
   if (f.rules.critical) out.push({ text: '队长倒下就输', warn: true })
   const lives = sim.run.lives
   if (Number.isFinite(lives)) out.push({ text: lives > 0 ? `还能起来 ${lives} 次` : '倒下就再也起不来', warn: lives === 0 })
   return out
 }
 
-/** 目标不在视野里时指过去的点：据点这一处，或离队长最近的悬赏目标；要清场又没有悬赏时是最近的敌人 */
+/** 目标不在视野里时指过去的点：据点这一处，或离队长最近的悬赏目标、最近一处还没到访的地标；要清场又没有这些时是最近的敌人 */
 export function goalSpot(sim: Sim): Point | null {
   const h = sim.fight.hold
   if (h && h.point < h.rule.points.length) return holdSpot(sim, h.rule.points[h.point]!)
   const bounty = nearestTo(sim, query(sim.world, [Bounty, Transform]))
-  if (bounty || !phaseOf(sim.fight).ends.some((e) => e.kind === 'cleared')) return bounty
+  if (bounty) return bounty
+  const visit = nearestPoint(sim, visitRings(sim).filter((r) => !r.done))
+  if (visit || !phaseOf(sim.fight).ends.some((e) => e.kind === 'cleared')) return visit
   return nearestTo(sim, query(sim.world, ENEMY_SET).filter((eid) => Faction.v[eid] === FACTION.enemy))
+}
+
+/** 这些点里离队长最近的一点，环面上取离队长最近的那一份 */
+function nearestPoint(sim: Sim, points: readonly Point[]): Point | null {
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
+  let best: Point | null = null
+  let bestD = Infinity
+  for (const p of points) {
+    const d = sim.hooks.worldDelta(sim, lx, ly, p.x, p.y)
+    const d2 = d.x * d.x + d.y * d.y
+    if (d2 < bestD) {
+      bestD = d2
+      best = { x: lx + d.x, y: ly + d.y }
+    }
+  }
+  return best
 }
 
 /** 离队长最近的一个 */

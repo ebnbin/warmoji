@@ -1,16 +1,19 @@
 import type runsJson from '../assets/runs.json'
 import type mutatorsJson from '../assets/mutators.json'
+import type experimentsJson from '../assets/experiments.json'
 import type { Polarity } from './battlefield'
 import type { CharacterId, CharacterTag } from './characters'
 import type { DriveDef, EnemyKind } from './enemies'
 import type { ItemRarity } from './items'
-import type { MapId } from './maps'
+import type { Hazard, MapId } from './maps'
+import type { MapCue, MapEvent, MapGauge } from '../data/signals'
 import type { StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
 import type { XpCurve } from './xp'
 
 export type RunId = keyof typeof runsJson
 export type MutatorId = keyof typeof mutatorsJson
+export type ExperimentId = keyof typeof experimentsJson
 
 /** 横幅：标题与一句提示 */
 export interface Banner {
@@ -89,7 +92,10 @@ export interface StreamRule extends GroupTraits {
   readonly at?: SpawnAt
 }
 
-/** 这一阶段开始 atMs 后打出横幅，放出一队；写了 every 就每隔 every 再放一队，一共 times 队，不写 times 就一直放到这一阶段结束，横幅只在第一队打 */
+/**
+ * 这一阶段开始 atMs 后打出横幅，放出一队；写了 every 就每隔 every 再放一队，一共 times 队，不写 times 就一直放到这一阶段结束，横幅只在第一队打。
+ * 写了 on 就不按阶段开始算：这一阶段里每当地图上发生一次这件事，过 atMs 放出一队、打一次横幅，写了 times 就最多放这么多队
+ */
 export interface BatchRule {
   readonly kind: 'batch'
   readonly atMs: number
@@ -97,6 +103,7 @@ export interface BatchRule {
   readonly banner?: Banner
   readonly every?: number
   readonly times?: number
+  readonly on?: MapEvent
 }
 
 /** 一组一组来：第一组在这一阶段开始 atMs 后，之后每次场上清空再隔 gapMs 来下一组 */
@@ -138,33 +145,36 @@ export interface KnobRule {
 }
 export type LegacySpawnRule = StreamRule | LegacyBatchRule | LegacyWavesRule | BossRule | CarrierRule | KnobRule
 
-/** 据点的一处：地图中心起偏 dx、dy 格 */
-export interface HoldPoint {
-  readonly dx: number
-  readonly dy: number
-}
+/** 据点的一处：地图中心起偏 dx、dy 格，或这张图那一组地标里的第 nth 处（从 0 算，不写是第一处），地标会动的圈跟着动 */
+export type HoldPoint = { readonly dx: number; readonly dy: number } | { readonly mark: string; readonly nth?: number }
 
 /**
  * 一个阶段的结束规则，时刻与进度都从这一阶段开始时算，全灭永远是输。
- * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数。
- * 失败：time 带 lose 时到点就输，downs 队员累计倒下到数就输。
+ * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时、按地图事件放出的与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种，写了 by 只数死于这种危害的），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数，
+ * event 地图上这件事发生到 count 次，gauge 地图的读数升过 above 或降过 below，visit 队长到访这一组地标里 count 处（不写是全部），每处在 radius 格内站满 ms。
+ * 失败：time 带 lose 时到点就输，downs 队员累计倒下到数就输，event 与 gauge 带 lose 时满足了就输，leak 朝这一组地标行进的敌人走到 radius 格内（走到就离场）累计 count 只就输。
  */
 export type EndRule =
   | { readonly kind: 'time'; readonly ms: number; readonly lose?: boolean }
   | { readonly kind: 'boss' }
   | { readonly kind: 'bossHp'; readonly below: number }
   | { readonly kind: 'cleared' }
-  | { readonly kind: 'kills'; readonly count: number; readonly enemy?: EnemyKind }
+  | { readonly kind: 'kills'; readonly count: number; readonly enemy?: EnemyKind; readonly by?: Hazard }
   | { readonly kind: 'bounty' }
   | { readonly kind: 'hold'; readonly ms: number; readonly radius: number; readonly points: readonly HoldPoint[] }
   | { readonly kind: 'coins'; readonly count: number }
   | { readonly kind: 'downs'; readonly count: number }
+  | { readonly kind: 'event'; readonly event: MapEvent; readonly count: number; readonly lose?: boolean }
+  | { readonly kind: 'gauge'; readonly gauge: MapGauge; readonly above?: number; readonly below?: number; readonly lose?: boolean }
+  | { readonly kind: 'visit'; readonly mark: string; readonly count?: number; readonly radius: number; readonly ms: number }
+  | { readonly kind: 'leak'; readonly mark: string; readonly radius: number; readonly count: number }
 
 /**
  * 我方在一场里的规则，写在一局上对每一场生效，写在一场上只管这一场、盖过一局写的：
  * revive 为假时倒下的队员不会自己起来；rescue 让活着的队长在倒下的队员身边 radius 格内连续站满 ms 毫秒把他扶起来；
  * leader 里 lock 不许手动换队长，critical 队长倒下就输，switchCdMs 是手动换队长的冷却；
  * surprise 为真时敌人现身不打预兆；skills 为假时不能放主动技能；vision 是队长看得见的半径（格），外面一片漆黑；
+ * harmless 为真时我方伤不了敌人：出手照样命中，击退、控制与附带的效果照常，只是不掉血，敌人只能死于地图上的危害；relay 是每隔多少毫秒自动把队长交给名单上的下一名活着的队员；
  * mods 是给队伍的常驻修正，一局与一场写的叠加。
  */
 export interface FightRules {
@@ -174,6 +184,8 @@ export interface FightRules {
   readonly surprise?: boolean
   readonly skills?: boolean
   readonly vision?: number
+  readonly harmless?: boolean
+  readonly relay?: number
   readonly mods?: StatMods
 }
 
@@ -195,7 +207,7 @@ export interface RunRules extends FightRules {
   readonly maxLevel?: number
 }
 
-/** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会 */
+/** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会，hazard 全队受到 by 这种危害的伤害不超过 damage，coins 捡到的金币至少 count */
 export type StarRule =
   | { readonly kind: 'downs'; readonly count: number }
   | { readonly kind: 'time'; readonly ms: number }
@@ -203,6 +215,8 @@ export type StarRule =
   | { readonly kind: 'skills'; readonly count: number }
   | { readonly kind: 'kills'; readonly count: number }
   | { readonly kind: 'lives'; readonly count: number }
+  | { readonly kind: 'hazard'; readonly by: Hazard; readonly damage: number }
+  | { readonly kind: 'coins'; readonly count: number }
 
 /** 词缀对我方规则的改动，只能往难里改 */
 export interface MutatorRules {
@@ -229,11 +243,20 @@ export interface FightReward {
   readonly heal?: boolean
 }
 
-/** 一个阶段：intro 是开始时的横幅，mix 是没指定敌人的那批按的配比，spawns 刷什么怪，ends 怎么结束；need 为 all 时达成条件要全部达成，不写达成一条就算 */
+/** 对地图下的一条指令：这一阶段开始 atMs 后让地图做一次 cue，写了 every 就每隔 every 再做一次，一共 times 次，不写 times 就一直做到这一阶段结束 */
+export interface CueRule {
+  readonly cue: MapCue
+  readonly atMs: number
+  readonly every?: number
+  readonly times?: number
+}
+
+/** 一个阶段：intro 是开始时的横幅，mix 是没指定敌人的那批按的配比，spawns 刷什么怪，cues 对地图下的指令，ends 怎么结束；need 为 all 时达成条件要全部达成，不写达成一条就算 */
 export interface PhaseDef {
   readonly intro?: Banner
   readonly mix?: readonly MixEntry[]
   readonly spawns: readonly SpawnRule[]
+  readonly cues?: readonly CueRule[]
   readonly ends: readonly EndRule[]
   readonly need?: 'all'
 }
@@ -338,4 +361,18 @@ export interface RunDef {
   readonly record?: boolean
   readonly stars?: readonly [StarRule, StarRule]
   readonly steps: readonly (StepDef | RepeatDef)[]
+}
+
+/**
+ * 实验：一种新玩法的最小单位，就是一场按阶段写的战斗，地图、阶段、刷怪、目标与这一场的我方规则都写在 fight 里，放进哪一局的步骤里都照样能打。
+ * 单独试玩时按 team 组队打这一场，stars 是赢下后再各得一星的两条条件；name、desc 与 note 同一局
+ */
+export interface ExperimentDef {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly note: string
+  readonly team: TeamDef
+  readonly stars: readonly [StarRule, StarRule]
+  readonly fight: StageDef
 }

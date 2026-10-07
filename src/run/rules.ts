@@ -5,7 +5,7 @@ import type { StatMods } from '../types/stats'
 import { runDef } from './state'
 import type { RunState } from './state'
 
-/** 一场生效的我方规则：一场写的盖过一局写的，词缀再往难里改，修正层层叠加；vision 为 Infinity 是看得见全场 */
+/** 一场生效的我方规则：一场写的盖过一局写的，词缀再往难里改，修正层层叠加；vision 为 Infinity 是看得见全场，relay 为 0 是不轮换 */
 export interface ActiveRules {
   readonly revive: boolean
   readonly rescue: FightRules['rescue']
@@ -15,6 +15,8 @@ export interface ActiveRules {
   readonly surprise: boolean
   readonly skills: boolean
   readonly vision: number
+  readonly harmless: boolean
+  readonly relay: number
   readonly mods: readonly StatMods[]
 }
 
@@ -44,6 +46,8 @@ export function activeRules(run: RunRules | undefined, fight: FightRules | undef
     surprise: fight?.surprise ?? run?.surprise ?? false,
     skills: fight?.skills ?? run?.skills ?? true,
     vision: fight?.vision ?? run?.vision ?? Infinity,
+    harmless: fight?.harmless ?? run?.harmless ?? false,
+    relay: fight?.relay ?? run?.relay ?? 0,
     mods: present([run?.mods, fight?.mods]),
   }
   return mutators.reduce(harden, base)

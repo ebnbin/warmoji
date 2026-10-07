@@ -4,7 +4,8 @@ import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
-import { Alive, Phys, Pickup, Radius, Span, Transform, Uid } from '../../ecs/components'
+import { Alive, FACTION, Faction, Phys, Pickup, Radius, Span, Transform, Uid } from '../../ecs/components'
+import { mapEvent } from '../../ecs/fight/events'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { leaderPoint } from '../../ecs/utils/team'
 import { awayFromWall, keepOut, roomAt } from '../basin'
@@ -44,6 +45,8 @@ export interface SakuraState {
   readonly swimming: Map<number, number>
   readonly aboard: Map<number, number>
   readonly seen: Map<number, number>
+  /** 被溪水冲走过的敌人：每只只记一次 */
+  readonly swept: Map<number, number>
 }
 
 function cfgOf(sim: Sim): SakuraConfig {
@@ -117,7 +120,7 @@ export function sakuraOf(sim: Sim): SakuraState {
   if (!s) {
     const cfg = cfgOf(sim)
     const plan = sakuraPlanFor(cfg, sim.run.decorSeed)
-    const state: SakuraState = { plan, marks: sakuraMarks(cfg, plan), solids: solidsOf(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map(), aboard: new Map(), seen: new Map() }
+    const state: SakuraState = { plan, marks: sakuraMarks(cfg, plan), solids: solidsOf(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map(), aboard: new Map(), seen: new Map(), swept: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -217,7 +220,7 @@ function dryNear(sim: Sim, s: SakuraState, p: Point, room: number): Point {
 
 /**
  * 谁在桥上：在桥面架在水上的那段的范围里，原先就在桥上的、从干地上走进来的都算；从水里漂进来、蹚进来的在桥下。
- * 刚掉出来的掉落物落在桥面那段的范围里就是落在桥上；离开那段就下了桥
+ * 刚掉出来的掉落物落在桥面那段的范围里就是落在桥上；离开那段就下了桥。头一回随水漂走的敌人记一次被溪水冲走
  */
 function board(sim: Sim, s: SakuraState): void {
   const b = s.plan.bridge
@@ -235,7 +238,12 @@ function board(sim: Sim, s: SakuraState): void {
     if (s.aboard.get(eid) === uid) continue
     if (pickup ? fresh : !wetAt(sim, s, x, y)) s.aboard.set(eid, uid)
   }
-  for (const map of [s.aboard, s.seen, s.swimming]) for (const [eid, uid] of map) if (Uid.v[eid] !== uid || (!Alive.v[eid] && !hasComponent(sim.world, eid, Pickup))) map.delete(eid)
+  for (const [eid, uid] of s.swimming) {
+    if (Faction.v[eid] !== FACTION.enemy || s.swept.get(eid) === uid) continue
+    s.swept.set(eid, uid)
+    mapEvent(sim, 'swept')
+  }
+  for (const map of [s.aboard, s.seen, s.swimming, s.swept]) for (const [eid, uid] of map) if (Uid.v[eid] !== uid || (!Alive.v[eid] && !hasComponent(sim.world, eid, Pickup))) map.delete(eid)
 }
 
 /**

@@ -12,7 +12,8 @@ const WALL_OFF_U = 0.5
 
 /**
  * 残垣的地标，像素，按开局的砌体一次定下：door 是通到院外、开局没被木板封住的门洞，朝院落里；
- * 外墙、内墙与塔楼的墙每隔一段一站，标准身高跨不过的站两侧各一处：wall 在墙面外，haunt 在墙心，都朝那一侧。墙塌了地标照旧，翻过的是碎石堆
+ * 外墙、内墙与塔楼的墙每隔一段一站，标准身高跨不过的站两侧各一处：wall 在墙面外，haunt 在墙心，都朝那一侧。墙塌了地标照旧，翻过的是碎石堆；
+ * tower 是塔楼里头的正中
  */
 export function ruinsMarks(plan: RuinsPlan, walk: number): Record<string, Landmark[]> {
   const f = plan.frame
@@ -51,5 +52,6 @@ export function ruinsMarks(plan: RuinsPlan, walk: number): Record<string, Landma
       }
     }
   })
-  return { door, wall, haunt }
+  const tower = plan.spaces.flatMap((sp) => (sp.kind === 'tower' ? [at((sp.u0 + sp.u1) / 2, (sp.v0 + sp.v1) / 2, 0, 0)] : []))
+  return { door, wall, haunt, tower }
 }

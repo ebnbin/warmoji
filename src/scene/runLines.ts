@@ -1,5 +1,8 @@
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
+import { HAZARD_KILLS, HAZARD_NAMES } from '../data/maps'
+import { isLose } from '../data/ends'
+import { signalName } from '../data/signals'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
@@ -26,11 +29,6 @@ export function fightUnit(def: RunDef): string {
   return def.record ? '波' : '场'
 }
 
-/** 失败条件：到点就输的时限，倒下的次数 */
-function isLose(e: EndRule): boolean {
-  return (e.kind === 'time' && e.lose === true) || e.kind === 'downs'
-}
-
 /** 一条结束规则的说法：达成条件说怎么算赢，失败条件说怎么算输 */
 export function endText(e: EndRule): string {
   switch (e.kind) {
@@ -43,15 +41,34 @@ export function endText(e: EndRule): string {
     case 'cleared':
       return '清空所有敌人'
     case 'kills':
-      return `击杀 ${e.count} 只${e.enemy ? ENEMIES[e.enemy].name : ''}`
+      return e.by ? `让 ${e.count} 只敌人被${HAZARD_KILLS[e.by]}` : `击杀 ${e.count} 只${e.enemy ? ENEMIES[e.enemy].name : ''}`
     case 'bounty':
       return '击倒全部悬赏目标'
-    case 'hold':
-      return e.points.length > 1 ? `队长在 ${e.points.length} 处据点里依次各站满 ${sec(e.ms / e.points.length)}` : `队长在据点里累计站满 ${sec(e.ms)}`
+    case 'hold': {
+      const marks = new Set(e.points.map((p) => ('mark' in p ? p.mark : null)))
+      const [only] = marks
+      const where = marks.size === 1 && typeof only === 'string' ? signalName('marks', only) : '据点'
+      return e.points.length > 1 ? `队长在 ${e.points.length} 处${where}里依次各站满 ${sec(e.ms / e.points.length)}` : `队长在${where}累计站满 ${sec(e.ms)}`
+    }
     case 'coins':
       return `捡到 ${e.count} 金币`
     case 'downs':
       return e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`
+    case 'event': {
+      const name = signalName('events', e.event)
+      if (e.lose) return e.count === 1 ? `${name}就输` : `${name} ×${e.count} 就输`
+      return e.count === 1 ? `等到${name}` : `${name} ×${e.count}`
+    }
+    case 'gauge': {
+      const name = signalName('gauges', e.gauge)
+      const pct = (v: number): string => `${Math.round(v * 100)}%`
+      if (e.above !== undefined) return e.lose ? `${name}到 ${pct(e.above)} 就输` : `${name}升到 ${pct(e.above)}`
+      return e.lose ? `${name}低于 ${pct(e.below ?? 0)} 就输` : `${name}降到 ${pct(e.below ?? 0)}`
+    }
+    case 'visit':
+      return `到访${e.count === undefined ? '每一处' : ` ${e.count} 处`}${signalName('marks', e.mark)}，每处站 ${sec(e.ms)}`
+    case 'leak':
+      return `朝${signalName('marks', e.mark)}行进的敌人放过去 ${e.count} 只就输`
   }
 }
 
@@ -68,13 +85,24 @@ function phaseGoalText(p: { readonly ends: readonly Gated<EndRule>[]; readonly n
   return [wins.length === 0 ? '不会结束' : wins.join(p.need === 'all' ? '，并且' : '，或'), ...lose].join(' · ')
 }
 
+/** 一场自己的规则：我方规则、敌人都盯着队长、过关奖励 */
+export function fightRuleLines(f: FightDef): string[] {
+  const out = ruleLines(f.rules)
+  if (f.enemyMods) out.push(`敌人${modTexts(f.enemyMods).join('、')}`)
+  if (f.chaseLeader) out.push('敌人都盯着队长')
+  const reward = rewardText(f.reward)
+  if (reward) out.push(reward)
+  return out
+}
+
 /** 一场怎么赢、怎么输：分阶段的按先后连起来，外加这一场的特别规则与过关奖励 */
 export function fightGoalText(f: FightDef): string {
-  const parts = [phasesOf(f).map(phaseGoalText).join(' → '), ...ruleLines(f.rules)]
-  if (f.chaseLeader) parts.push('敌人都盯着队长')
-  const reward = rewardText(f.reward)
-  if (reward) parts.push(reward)
-  return parts.join(' · ')
+  return [phasesOf(f).map(phaseGoalText).join(' → '), ...fightRuleLines(f)].join(' · ')
+}
+
+/** 一场的各个阶段一行一个：开场横幅的标题，怎么达成、怎么输 */
+export function phaseLines(f: FightDef): string[] {
+  return phasesOf(f).map((p) => `${p.intro ? `${p.intro.title}：` : ''}${phaseGoalText(p)}`)
 }
 
 /** 我方规则的说法 */
@@ -89,6 +117,8 @@ function ruleLines(r: FightRules | undefined): string[] {
   if (r.surprise) out.push('敌人现身没有预兆')
   if (r.skills === false) out.push('不能放主动技能')
   if (r.vision !== undefined) out.push(`只看得见队长身边 ${r.vision} 格`)
+  if (r.harmless) out.push('我方伤不了敌人，击退与控制照常，敌人只能死于地图上的危害')
+  if (r.relay !== undefined) out.push(`每 ${sec(r.relay)}自动换下一名队员当队长`)
   if (r.mods) out.push(`全队${modTexts(r.mods).join('、')}`)
   return out
 }
@@ -139,6 +169,10 @@ export function starText(s: StarRule): string {
       return `击杀至少 ${s.count} 只`
     case 'lives':
       return `至少还剩 ${s.count} 次起来的机会`
+    case 'hazard':
+      return s.damage === 0 ? `没被${HAZARD_NAMES[s.by]}伤到` : `受到的${HAZARD_NAMES[s.by]}伤害不超过 ${s.damage}`
+    case 'coins':
+      return `捡到至少 ${s.count} 金币`
   }
 }
 

@@ -20,6 +20,7 @@ export const ICON = {
   behind: '1f519',
   point: '1f4cd',
   gate: '1f6aa',
+  unedited: '2753',
 } as const
 
 interface Kind<T> {
@@ -36,8 +37,22 @@ export const SPAWN_KINDS: { readonly [K in Spawn['kind']]: Kind<Extract<Spawn, {
   waves: { icon: '1f501', name: '成组敌人', make: () => ({ kind: 'waves', atMs: 0, gapMs: 3_000, squads: [{ count: 6 }, { count: 10 }] }) },
 }
 
+/** 编辑器还写不了的结束规则：读地图信号的这几种 */
+const UNEDITED = ['event', 'gauge', 'visit', 'leak'] as const
+type EditorEnd = Exclude<End, { readonly kind: (typeof UNEDITED)[number] }>
+
+/** 这条结束规则编辑器写得了 */
+export function editable(e: End): e is EditorEnd {
+  return !UNEDITED.some((k) => k === e.kind)
+}
+
+/** 结束规则在导航里的图标：编辑器写不了的用问号 */
+export function endIcon(e: End): string {
+  return editable(e) ? END_KINDS[e.kind].icon : ICON.unedited
+}
+
 /** 结束规则的几种写法 */
-export const END_KINDS: { readonly [K in End['kind']]: Kind<Extract<End, { kind: K }>> } = {
+export const END_KINDS: { readonly [K in EditorEnd['kind']]: Kind<Extract<End, { kind: K }>> } = {
   time: { icon: '23f1', name: '时限', make: () => ({ kind: 'time', ms: 60_000 }) },
   kills: { icon: '1f480', name: '击杀数', make: () => ({ kind: 'kills', count: 50 }) },
   cleared: { icon: '1f9f9', name: '清场', make: () => ({ kind: 'cleared' }) },

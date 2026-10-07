@@ -10,6 +10,7 @@ import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { MapDef } from '../types/maps'
 import type { BatchRule, Between, GroupTraits, RunRules, SpawnAt, Squad, StreamRule } from '../types/runs'
 import { keysOf } from '../util/record'
+import { endText } from '../scene/runLines'
 import { defaultTeam, isStage } from './draft'
 import type { Draft, End, Mutable, Phase, Stage, Step, Waves } from './draft'
 import { END_KINDS, ICON, SPAWN_KINDS } from './kinds'
@@ -522,6 +523,11 @@ function endOwnRows(e: End): Row[] {
       return [num('金币', e.count, { min: 1, max: 500, step: 1, format: unit('枚') }, (v) => (e.count = v), { hint: '捡到这么多金币就达成' })]
     case 'downs':
       return [num('倒下次数', e.count, { min: 1, max: 20, step: 1, format: unit('次') }, (v) => (e.count = v), { hint: '队员累计倒下这么多次就输' })]
+    case 'event':
+    case 'gauge':
+    case 'visit':
+    case 'leak':
+      return [info(endText(e), undefined, { hint: '编辑器还写不了这种读地图信号的结束规则' })]
   }
 }
 

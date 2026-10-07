@@ -1195,6 +1195,7 @@ export interface MapDef {
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
+export type MapKind = MapDef['kind']
 
 export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'collapse' | 'drown'
 

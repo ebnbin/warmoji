@@ -5,5 +5,6 @@ import type { Sim } from '../sim'
 export function grantCoins(sim: Sim): void {
   for (const eid of query(sim.world, [Collected, GrantCoins])) {
     sim.run.coins += GrantCoins.n[eid]!
+    sim.run.stats.coinsTaken += GrantCoins.n[eid]!
   }
 }

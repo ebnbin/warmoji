@@ -9,6 +9,7 @@ import { DIFFICULTY } from '../defs/difficulty.ts'
 import { ECONOMY } from '../defs/economy.ts'
 import { EDITOR_DRAFT } from '../defs/editor.ts'
 import { ENEMIES } from '../defs/enemies.ts'
+import { EXPERIMENTS } from '../defs/experiments.ts'
 import { FEEL } from '../defs/feel.ts'
 import { ITEMS } from '../defs/items.ts'
 import { LEVEL_STATS } from '../defs/levels.ts'
@@ -51,6 +52,8 @@ import { COLS, splits, stacks, warpPlan } from '../src/maps/warp/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
+import { SIGNALS } from '../src/data/signals.ts'
+import type { MapSignals } from '../src/data/signals.ts'
 import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
@@ -59,7 +62,7 @@ import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef, NebulaOldConfig } from '../src/types/maps'
-import type { MutatorDef, RunDef } from '../src/types/runs'
+import type { ExperimentDef, MutatorDef, RunDef } from '../src/types/runs'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -836,6 +839,21 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 
 const PACK = new Set(readFileSync('scripts/emoji/ordering.txt', 'utf8').split(/\s+/))
 
+/** 地图信号：同一个名字在哪种地图上说法都一样，关卡的说明按名字找说法 */
+{
+  const said = new Map<string, string>()
+  for (const s of Object.values<MapSignals>(SIGNALS)) {
+    for (const field of ['events', 'gauges', 'cues', 'marks'] as const) {
+      for (const [name, label] of Object.entries(s[field] ?? {})) {
+        const key = `${field}.${name}`
+        const was = said.get(key)
+        need(was === undefined || was === label, `signals 的 ${key} 在不同地图上说法不一样：${was} / ${label}`)
+        said.set(key, label)
+      }
+    }
+  }
+}
+
 const CHECKS = runChecks({
   enemies: ENEMIES,
   maps: MAPS,
@@ -858,6 +876,8 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   need(PACK.has(r.emoji), `runs.${id} 的 emoji 不在表情包里：${r.emoji}`)
   report(`runs.${id}`, CHECKS.run(r))
 }
+
+for (const [id, e] of Object.entries<ExperimentDef>(EXPERIMENTS)) need(PACK.has(e.emoji), `experiments.${id} 的 emoji 不在表情包里：${e.emoji}`)
 
 need(PACK.has(EDITOR_DRAFT.emoji), `editor 的 emoji 不在表情包里：${EDITOR_DRAFT.emoji}`)
 report('editor', CHECKS.run(EDITOR_DRAFT))
@@ -1066,6 +1086,7 @@ write('difficulty', DIFFICULTY)
 write('economy', ECONOMY)
 write('editor', EDITOR_DRAFT)
 write('enemies', ENEMIES)
+write('experiments', EXPERIMENTS)
 write('feel', FEEL)
 write('items', ITEMS)
 write('levels', LEVEL_STATS)

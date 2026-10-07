@@ -70,6 +70,10 @@ export interface RunState {
     enemyKills: Partial<Record<EnemyKind, number>>
     enemyDamage: Partial<Record<EnemyKind, number>>
     hazardDamage: Partial<Record<Hazard, number>>
+    /** 死于地图上各种危害的敌人 */
+    hazardKills: Partial<Record<Hazard, number>>
+    /** 从地上捡到的金币 */
+    coinsTaken: number
     eliteKills: number
     /** 手动换队长的次数 */
     switches: number
@@ -150,6 +154,8 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mapId?: M
       enemyKills: {},
       enemyDamage: {},
       hazardDamage: {},
+      hazardKills: {},
+      coinsTaken: 0,
       eliteKills: 0,
       switches: 0,
       casts: 0,

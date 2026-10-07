@@ -48,6 +48,7 @@ import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
 import type { TheaterState } from '../../maps/theater/world'
 import type { WarpState } from '../../maps/warp/world'
+import type { MapCue, MapGauge } from '../../data/signals'
 
 export const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -189,6 +190,10 @@ export interface WorldHooks {
   died?(sim: Sim, eid: number): void
   /** 地面此刻盖住了 (x, y) 处躺着的掉落物：捡不到、吸不走，露出来以后照常；不写就从不盖住 */
   covers?(sim: Sim, x: number, y: number): boolean
+  /** 关卡读的地图读数，从 0 到 1：这张图在 data/signals 里写了哪几种就给哪几种 */
+  gauge?(sim: Sim, g: MapGauge): number
+  /** 关卡给地图的指令：让这张图此刻做一次它本来就会做的事，这张图在 data/signals 里写了哪几种就接哪几种 */
+  cue?(sim: Sim, c: MapCue): void
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }

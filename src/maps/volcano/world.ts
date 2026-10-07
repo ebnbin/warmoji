@@ -17,6 +17,7 @@ import type { Point } from '../../util/vec'
 import { grounded } from '../../ecs/utils/pass'
 import { solidOf, solidsTrace, wallsOf } from '../../ecs/worlds/solids'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
 
 function volcanoCfg(sim: Sim): VolcanoConfig {
@@ -58,6 +59,7 @@ function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
     s.phase = 'erupt'
     s.since = now
     s.count++
+    mapEvent(sim, 'erupt')
   } else if (s.phase === 'erupt' && now >= s.since + e.effuseMs) {
     s.phase = 'dormant'
     s.since = now
@@ -127,6 +129,11 @@ export const volcano: WorldHooks = {
   canSpawn(sim, x, y, radius) {
     const f = volcanoOf(sim).field
     return roomFor(f.basin, x, y, radius) && !moltenAt(f, x, y)
+  },
+  /** 关卡要它喷发：平静时立刻起预兆，正在喷发的这一次出完立刻再起预兆，已经在预兆的照旧 */
+  cue(sim, c) {
+    const s = volcanoOf(sim)
+    if (c === 'erupt' && s.phase !== 'warn') s.nextAt = sim.elapsedMs
   },
   /** 火山口只在喷发时抛出东西 */
   landmarks(sim) {

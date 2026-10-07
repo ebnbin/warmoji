@@ -27,6 +27,7 @@ import { clearM, phases, topOf } from '../../ecs/utils/pass'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import type { Solids } from '../../ecs/worlds/solids'
 import { bounded, groundOf, wanderIn } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 
 /** 挡子弹与视线的实心按这么细的格子记，像素：矮晶丛也记得下 */
@@ -68,6 +69,8 @@ export interface AmethystState {
   /** 离下一次重算光、重算绕路还有多久，毫秒 */
   lightIn: number
   trailIn: number
+  /** 上一帧太阳在不在地平线下，还没看过是 null：变了就是日落或日出 */
+  night: boolean | null
 }
 
 function cfgOf(sim: Sim): AmethystConfig {
@@ -145,6 +148,7 @@ export function amethystOf(sim: Sim): AmethystState {
       impacts: [],
       lightIn: LIGHT_MS,
       trailIn: 0,
+      night: null,
     }
     sim.worldState.amethyst = s
   }
@@ -363,5 +367,8 @@ export const amethyst: WorldHooks = {
       s.trailIn = TRAIL_MS
       trailFrom(s.trail, leaderX(sim), leaderY(sim))
     }
+    const night = amethystClock(sim)?.night ?? false
+    if (s.night !== null && s.night !== night) mapEvent(sim, night ? 'dusk' : 'dawn')
+    s.night = night
   },
 }

@@ -12,6 +12,7 @@ import { grounded } from '../../ecs/utils/pass'
 import { leaderPoint } from '../../ecs/utils/team'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
 import { bounded, wanderIn, ZERO } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import { torusDelta, wrapPoint } from '../../ecs/worlds/torus'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
@@ -128,6 +129,8 @@ export interface WarpState {
   readonly arrivals: Arrival[]
   /** 队伍一共穿过几道门：画面按它认出新的一次 */
   jumps: number
+  /** 关卡锁住了所有门：队长站上去也不攒能 */
+  locked: boolean
 }
 
 function cfgOf(sim: Sim): WarpConfig {
@@ -139,7 +142,7 @@ export function warpPlanFor(cfg: WarpConfig, decorSeed: number): WarpPlan {
   return warpPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
-/** 出怪的地标：每间舱室的出怪板归到那间配方的名下；看守单独一组，跟着队伍换舱室 */
+/** 地标：每间舱室的出怪板归到那间配方的名下；看守单独一组，跟着队伍换舱室；cabin 是每间舱室的入口，关卡拿它当到访的去处 */
 function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
   const out: Record<string, Landmark[]> = {}
   for (const name of cfg.recipes) out[name] = []
@@ -149,6 +152,7 @@ function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
   }
   const c = plan.rooms[plan.start]!.center
   out.warden = [{ x: c.x * UNIT, y: c.y * UNIT, r: WARDEN_U * UNIT, nx: 0, ny: 0 }]
+  out.cabin = plan.rooms.map((room) => ({ x: room.entry.x * UNIT, y: room.entry.y * UNIT, r: 0, nx: 0, ny: 0 }))
   return out
 }
 
@@ -190,6 +194,7 @@ export function warpOf(sim: Sim): WarpState {
       impacts: [],
       arrivals: [],
       jumps: 0,
+      locked: false,
     }
     route(s)
     sim.worldState.warp = s
@@ -314,6 +319,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, door: Door, team: boole
     s.arrivedAt = now + ms
     s.doors[door.index]!.jumpedAt = now
     s.jumps++
+    mapEvent(sim, 'jump')
   }
   let foes = 0
   for (const e of query(sim.world, ENEMY_SET)) {
@@ -352,7 +358,7 @@ function enter(s: WarpState, cfg: WarpConfig, room: number): void {
   s.trail = [room, ...s.trail.filter((r) => r !== room)].slice(0, cfg.light.levels.length)
 }
 
-/** 门：队长站在队伍那间的一扇门上攒能、走开就漏，满了整队出发；每扇门到点发一趟车，暗着的舱室里的门不发 */
+/** 门：队长站在队伍那间的一扇门上攒能、走开就漏，满了整队出发，门被锁住时不攒；每扇门到点发一趟车，暗着的舱室里的门不发 */
 function stepDoors(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
   const now = sim.elapsedMs
   const lead = sim.leader
@@ -366,7 +372,7 @@ function stepDoors(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void
   if (s.teamRoom !== s.routeRoom) route(s)
   for (const d of s.plan.doors) {
     const p = s.doors[d.index]!
-    const standing = ready && d.room === s.teamRoom && onDoor(cfg, d, lx, ly)
+    const standing = ready && !s.locked && d.room === s.teamRoom && onDoor(cfg, d, lx, ly)
     p.charge = standing ? p.charge + delta : Math.max(0, p.charge - (delta * cfg.pad.chargeMs) / cfg.pad.drainMs)
     if (p.charge >= cfg.pad.chargeMs) {
       p.charge = 0
@@ -561,6 +567,10 @@ export const warp: WorldHooks = {
   },
   landmarks(sim) {
     return warpOf(sim).marks
+  },
+  /** 关卡锁住所有门：队长站上去也不攒能，队伍走不了；门照常发车，台上的敌人照样送走 */
+  cue(sim, c) {
+    if (c === 'lock') warpOf(sim).locked = true
   },
   lean() {
     return ZERO

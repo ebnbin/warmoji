@@ -55,6 +55,9 @@ export const enemyCarries = slots<FieldPickupDef>()
 /** 关卡给这只敌人的战利品倍率 */
 export const enemyLoot = slots<Loot>()
 
+/** 行进的身体朝哪一组地标走 */
+export const marchMark = slots<string>()
+
 export const pickupDef = slots<FieldPickupDef>()
 
 export const pickupSfx = slots<import('../types/sfx').SfxId>()

@@ -12,7 +12,7 @@ import { floorAt } from './utils/pass'
 import { abilityDef, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
-import { goalSpot, holdSpot, nearestTo } from './fight/state'
+import { goalSpot, holdSpot, leakRings, nearestTo, visitRings } from './fight/state'
 import { cooled } from './systems/shared/avail'
 import { revivable } from './systems/shared/combat'
 import { charSize } from './systems/shared/scale'
@@ -56,10 +56,11 @@ const MARK_LINE = 0.9
 const MARK_WIDTH = 4
 const INSIDE_COLOR = 0x66bb6a
 const OUTSIDE_COLOR = 0xffdc5d
+const LEAK_COLOR = 0xef5350
 const GOAL_COLOR = 0xffdc5d
 const BEACON_COLOR = 0x4dd0e1
 
-/** 地上的一圈：据点或救援的范围 */
+/** 地上的一圈：据点、地标、要守住的地方或救援的范围 */
 interface Mark {
   readonly x: number
   readonly y: number
@@ -71,7 +72,7 @@ interface Mark {
 export class Presentation {
   /** 按 z 排好的精灵：身体头上的汗、队长的倒带残影 */
   readonly sprites: PaintSprite[] = []
-  /** 压在实体的圈下面：据点与救援的圈 */
+  /** 压在实体的圈下面：据点、要到访的地标、不许敌人走到的地方与救援的圈 */
   readonly marks: Scratch = newScratch()
   /** 盖在实体的圈上面：倒带残影下面那段路 */
   readonly trail: Scratch = newScratch()
@@ -96,10 +97,10 @@ export class Presentation {
     if (!r) this.rescue = []
     else if (!sim.over) this.rescue = rescueMarks(sim, r.radius * UNIT)
     const h = sim.fight.hold
-    if (h && h.point < h.rule.points.length) {
-      const p = holdSpot(sim, h.rule.points[h.point]!)
-      mark(this.marks, { x: p.x, y: p.y, r: h.rule.radius * UNIT, color: h.inside ? INSIDE_COLOR : OUTSIDE_COLOR })
-    }
+    const p = h && h.point < h.rule.points.length ? holdSpot(sim, h.rule.points[h.point]!) : null
+    if (h && p) mark(this.marks, { x: p.x, y: p.y, r: h.rule.radius * UNIT, color: h.inside ? INSIDE_COLOR : OUTSIDE_COLOR })
+    for (const v of visitRings(sim)) if (!v.done) mark(this.marks, { x: v.x, y: v.y, r: v.r, color: v.here ? INSIDE_COLOR : OUTSIDE_COLOR })
+    for (const l of leakRings(sim)) mark(this.marks, { x: l.x, y: l.y, r: l.r, color: LEAK_COLOR })
     for (const m of this.rescue) mark(this.marks, m)
   }
 }

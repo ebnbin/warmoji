@@ -35,6 +35,7 @@ import {
   GrowUp,
   Hp,
   Idle,
+  March,
   Mount,
   MARK,
   Nest,
@@ -52,7 +53,7 @@ import {
   Transform,
   VisOff,
 } from '../components'
-import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook } from '../store'
+import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook, marchMark } from '../store'
 import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
@@ -124,13 +125,17 @@ const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
     Orbit.seek[eid] = seekOf(eid)
     Orbit.fresh[eid] = 0
   },
+  march: (sim, eid, d) => {
+    addComponent(sim.world, eid, March)
+    marchMark[eid] = d.mark
+  },
 }
 
 export function attachDrive<K extends keyof DriveOf>(sim: Sim, eid: number, d: DriveOf[K] & { readonly kind: K }): void {
   DRIVES[d.kind](sim, eid, d)
 }
 
-const DRIVE_COMPS = [Chase, Wander, Flee, CoinThief, Standoff, Orbit]
+const DRIVE_COMPS = [Chase, Wander, Flee, CoinThief, Standoff, Orbit, March]
 
 /** 换走法：先拆掉旧的 */
 export function detachDrive(sim: Sim, eid: number): void {

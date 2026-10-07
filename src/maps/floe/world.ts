@@ -18,6 +18,7 @@ import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../../ecs/utils/team'
 import { approach } from '../../ecs/systems/shared/body'
 import { bounded, GROUND, groundOf } from '../../ecs/worlds/hooks'
+import { mapEvent } from '../../ecs/fight/events'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
 
 function floeCfg(sim: Sim): FloeConfig {
@@ -90,6 +91,7 @@ function tickGust(sim: Sim, s: FloeState, cfg: FloeConfig): void {
   if (now < s.nextGust) return
   s.gust = { at: now, veer: (sim.rng.next() * 2 - 1) * w.veerDeg * (Math.PI / 180) }
   s.nextGust = now + Math.max(gustSpan(w), w.intervalMs + (sim.rng.next() * 2 - 1) * w.jitterMs)
+  mapEvent(sim, 'gust')
 }
 
 /** 泡在冰水里的按体温往下掉血：冻僵的时长与体型成正比（散热按表面积、热容按体积），满血的标准身体 freezeSec 秒冻死 */
@@ -281,6 +283,10 @@ export const floe: WorldHooks = {
     const push = windPush(cfg, w.speed, w.angle, 0, 0, bulk(cfg, radius, ENEMY_BODY.mass))
     const hold = frictionAt(s.field, cfg, x, y).s * (GRAVITY / cfg.meterPerU) * UNIT
     return Math.hypot(push.x, push.y) <= hold || roomFor(s.ground, x, y, radius + BLOWN_U * UNIT)
+  },
+  /** 关卡要它起风：立刻起一阵新的，正刮着的也从头再起 */
+  cue(sim, c) {
+    if (c === 'gust') floeOf(sim).nextGust = sim.elapsedMs
   },
   landmarks(sim) {
     return floeOf(sim).marks
