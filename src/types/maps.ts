@@ -1028,43 +1028,60 @@ export interface TheaterConfig {
   /** 寻路最快多久重算一次，毫秒 */
   readonly reflowMs: number
 }
-/** 跃迁站的四间房各是什么样：空旷的大厅、立着几排柱子、绕着中央凹槽的回廊、狭长的一条 */
-export type WarpShape = 'hall' | 'pillars' | 'cloister' | 'narrow'
+/** 舱室里面摆成什么样：空的、立着几排机柜、正中一口凹槽 */
+export type WarpShape = 'hall' | 'racks' | 'pit'
 export interface WarpConfig {
   /**
-   * 方框切成 2×2 四间房，每间是方框的四分之一，画面上整块往四周平铺。平台摆在那一格正中，四边离格边都是 gapU 格（平铺后房与房之间都隔两倍的虚空），
-   * 四边一圈 lipU 格宽的台沿；狭长的那间只有 narrowU 格宽，其余铺成机柜台。能走的地方都落在整格上
+   * 迷宫：舱室分到的格铺满整个方框。方框先竖着切成三列，列宽在 colU 以内；每列再横着切成 rows 里的某一种：n 间、每间高在 u 以内。
+   * 一般一共切出 rooms 间，有 fewP 的机会只切 few 间、每间更大。
+   * 每间舱室的平台四边离格边 gapU 格（平铺后舱与舱之间、贴着方框边的舱与方框另一头的舱之间都隔两倍的虚空），四边一圈 lipU 格宽的台沿，能走的方块落在整格上。
+   * 每间舱室一扇标着「出口」的门，顺着出口一路走会走遍所有舱室再回到原处；另有一扇别的门，有 extraP 的机会两扇；没有两间舱室的门互相通着
    */
-  readonly room: { readonly lipU: number; readonly gapU: number; readonly narrowU: number }
+  readonly maze: {
+    readonly colU: readonly [number, number]
+    readonly rows: readonly { readonly n: number; readonly u: readonly [number, number] }[]
+    readonly rooms: readonly [number, number]
+    readonly fewP: number
+    readonly few: readonly [number, number]
+    readonly gapU: number
+    readonly lipU: number
+    readonly extraP: number
+  }
   /** 窄过两倍 neckU 的缝不能走 */
   readonly neckU: number
-  /** 立柱：从能走的方块的外角起 firstU 格、每隔 stepU 格一根，横竖各 count 根，边长 sizeU 格、高 heightM 米；挨着传送台 padClearU 格以内的不立 */
-  readonly pillars: { readonly firstU: number; readonly stepU: number; readonly count: number; readonly sizeU: number; readonly heightM: number; readonly padClearU: number }
-  /** 回廊正中凹槽的边长，格 */
-  readonly pitU: number
+  /** 机柜：能走的方块两边都不短于 minU 格才立，边长 sizeU 格、高 heightM 米、每隔 stepU 格一台；离门、入口 clearU 格以内的不立 */
+  readonly racks: { readonly minU: number; readonly sizeU: number; readonly heightM: number; readonly stepU: number; readonly clearU: number }
+  /** 凹槽：能走的方块两边都不短于 minU 格才挖，四边留 marginU 格的回廊 */
+  readonly pit: { readonly minU: number; readonly marginU: number }
   /**
-   * 传送台：圆台半径 radiusU 格，离台沿 edgeU 格、离房间朝缝的内角 cornerU 格，立在朝向下一间的那条边上。
-   * 队长站上去充能 chargeMs，走开就按 drainMs 漏光；充满了整支队伍连同召唤物一起穿行 transitMs 到下一间的传送台，到的那座台子冷却 cooldownMs。
-   * 台子每隔 shuttleMs（各台错开）发一趟车，台上的敌人一起送走，发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
+   * 门与入口都是圆台：半径 radiusU 格，离墙 insetU 格；门离墙角至少 cornerU 格。队长站上一扇门充能 chargeMs，走开就按 drainMs 漏光；
+   * 充满了整支队伍连同召唤物一起穿行 transitMs，落在那扇门通往的舱室的入口上。每扇门每隔 shuttleMs（各门错开）发一趟车，台上的敌人一起送走，
+   * 发车前 warnMs 亮起来；送到的敌人以 spillU 格/秒往台外涌
    */
   readonly pad: {
     readonly radiusU: number
-    readonly edgeU: number
+    readonly insetU: number
     readonly cornerU: number
     readonly chargeMs: number
     readonly drainMs: number
     readonly transitMs: number
-    readonly cooldownMs: number
     readonly shuttleMs: number
     readonly warnMs: number
     readonly spillU: number
   }
   /** 出怪板：一块长 plateU 格、宽一格，敌人在板心 markU 格以内凝成形；离队长 clearU 格以内的不出 */
   readonly emitters: { readonly plateU: number; readonly markU: number; readonly clearU: number }
-  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：每间房按种子分到一种 */
+  /** 四种敌人配方，各是出怪口里一种摆在地标上的口子：四季各分到一种，那一季的舱室都出它 */
   readonly recipes: readonly [string, string, string, string]
-  /** 核心柱：半径（格），头目从这里被抛进队长所在的那间 */
-  readonly core: { readonly radiusU: number }
+  /** 标本罐：每间舱室一角立一只，边长 sizeU 格，挡人不挡子弹 */
+  readonly jar: { readonly sizeU: number }
+  /** 敌人认路：除了眼前那道门，每多过一道门在路程上折合多少格 */
+  readonly hopU: number
+  /**
+   * 灯：队伍所在那间与刚走过的几间亮着，亮度依次是 levels（第一项是队伍那间），只有这几间出怪（按亮度分），里面的敌人照常动、顺着门追向队伍；
+   * 别的舱室全黑，只隐约看得见地上的瓷砖，敌人定在原地。从全暗到全亮要 wakeMs，从全亮到全暗要 dimMs
+   */
+  readonly light: { readonly levels: readonly number[]; readonly wakeMs: number; readonly dimMs: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
 }
