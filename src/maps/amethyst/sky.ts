@@ -211,10 +211,10 @@ export function blankSky(): SkyNow {
   return { hour: 0, days: 0, sun: down, moon: down, age: 0, phase: 0, sunLux: 0, skyLux: 0, moonLux: 0, moonSkyLux: 0 }
 }
 
-/** 开局后 sec 秒时天上的样子；月龄从这一局开局时的 age0 起，每过一天长一天 */
-export function skyAt(sky: Sky, sec: number, age0: number, out: SkyNow): SkyNow {
+/** 开局后 sec 秒时天上的样子；开局那天零点起过 fullMoonHour 个钟点时月龄正好半个朔望月，每过一天长一天 */
+export function skyAt(sky: Sky, sec: number, out: SkyNow): SkyNow {
   const { hour, days } = clockAt(sky, sec)
-  const age = (age0 + days) % LUNAR_DAYS
+  const age = (((LUNAR_DAYS / 2 + days - sky.fullMoonHour / 24) % LUNAR_DAYS) + LUNAR_DAYS) % LUNAR_DAYS
   out.hour = hour
   out.days = days
   out.sun = sunBearing(sky, hour)

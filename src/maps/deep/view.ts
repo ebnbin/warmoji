@@ -27,7 +27,7 @@ import type { Sim } from '../../ecs/sim'
 import type { ViewCtx } from '../../ecs/views'
 import type { Point } from '../../util/vec'
 
-const BG = 0x020916
+const BG = 0x061a30
 const ALBEDO_KEY = 'deep-albedo'
 const GEO_KEY = 'deep-geo'
 const NORM_KEY = 'deep-norm'
@@ -53,8 +53,8 @@ const HEAD_LAMP = 1.6
 const DOOR_LAMP_U = 1
 const DOOR_LAMP_M = 2.2
 const HEAD_LAMP_M = 1.3
-/** 头顶照下来的那一丝蓝，三色 */
-const SKY = [0.02, 0.066, 0.25] as const
+/** 头顶透下来的那层幽蓝的微光，三色 */
+const SKY = [0.07, 0.2, 0.5] as const
 const EXPOSURE = 1.5
 /** 冷光：每格几个格子，衰减的时间常数（秒），身体游多快（格/秒）才搅亮水，搅亮多少；弹体一路拖出多亮的尾巴 */
 const GLOW_PPU = 4
@@ -113,7 +113,7 @@ function refreshLinear(tex: Phaser.Textures.CanvasTexture): void {
 }
 
 /**
- * 深海：谷底是开局在后台线程画好的固有色与高度，光照由着色器逐点算——头顶只剩一丝深蓝，潜艇门上的灯、艇首的探照灯与队员的头灯照出一圈圈暖白，
+ * 深海：谷底是开局在后台线程画好的固有色与高度，光照由着色器逐点算——头顶透下一层幽蓝的微光，整片谷底看得清个大概；潜艇门上的灯、艇首的探照灯与队员的头灯照出一圈圈暖白，
  * 光在水里走得越远越只剩青蓝，灯四周罩着一团泛青的光晕；被搅动的浮游生物发出蓝绿的冷光，游过的身体与飞过的子弹身后拖着一道道光痕。
  * 潜艇停在谷底上时贴着地画、压在所有身体后面，门开着时门洞透光、踏板放在谷底上；浮起来按透视越画越大、越往画面外偏，暗下去变淡，
  * 过了身体的头顶就画到身体前面。门口那一片喘得上气的半圆画一道虚线，开走时连同艇身的轮廓画在新落点。气泡像身体一样立着画，离地越高画得越往上；
@@ -248,7 +248,7 @@ export class DeepView extends BoundedView {
     this.visuals.push(this.shadow, this.zone, this.sub, this.door, this.doorGlow)
     this.phase = s.sub.phase
     this.seedSnow(v)
-    v.lens.screen.vignette(0.72, 0.3, 0x010510)
+    v.lens.screen.vignette(0.75, 0.2, 0x03101f)
   }
 
   /** 镜头拍到的世界范围的正中，像素：透视从这里往外推 */
@@ -537,14 +537,14 @@ export class DeepView extends BoundedView {
     this.bubbles = kept
   }
 
-  /** 气泡与海雪被灯照到多少：离潜艇门上的灯近的偏暖白，远的只剩一点深蓝 */
+  /** 气泡与海雪被灯照到多少：离潜艇门上的灯近的偏暖白，远的是幽幽的蓝 */
   private lightTint(x: number, y: number): number {
     const l = this.lit
     const d = Math.hypot(x - l.x, y - l.y) / UNIT
     const k = clamp01(l.power * Math.exp(-(d * d) / 40))
-    const r = Math.round(60 + 195 * k)
-    const g = Math.round(110 + 140 * k)
-    const b = Math.round(170 + 85 * k)
+    const r = Math.round(90 + 165 * k)
+    const g = Math.round(140 + 115 * k)
+    const b = Math.round(190 + 65 * k)
     return (r << 16) | (g << 8) | b
   }
 
@@ -599,7 +599,7 @@ export class DeepView extends BoundedView {
     }
   }
 
-  /** 立着的身体迎着潜艇门上的灯那一面亮，离得越近明暗越分明，再补一层暖白；离灯远的四面一样，只吃头顶那一丝蓝 */
+  /** 立着的身体迎着潜艇门上的灯那一面亮，离得越近明暗越分明，再补一层暖白；离灯远的四面一样亮 */
   lightAt(x: number, y: number, out: LocalLight): void {
     const l = this.lit
     if (!this.ready) return

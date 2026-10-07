@@ -52,15 +52,13 @@ export interface Torch {
   at: number
 }
 
-/** 一局的紫水晶洞穴：地形与这一局的月龄由布景种子定下，画面从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
+/** 一局的紫水晶洞穴：地形由布景种子定下，画面从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
 export interface AmethystState {
   readonly layout: AmethystLayout
   readonly solids: Solids
   readonly light: Lighting
   readonly trail: Trail
   readonly sky: SkyNow
-  /** 这一局开局时的月龄，天 */
-  readonly age0: number
   /** 出怪口用的地标（见 marksOf）与白天的那一份：白天亮堂的几组是空的 */
   readonly marks: Readonly<Record<string, readonly Landmark[]>>
   readonly dayMarks: Readonly<Record<string, readonly Landmark[]>>
@@ -135,8 +133,7 @@ export function amethystOf(sim: Sim): AmethystState {
       SOLID_CELL,
     )
     const light = makeLighting(layout, cfg)
-    const age0 = rng.next() * LUNAR_DAYS
-    const sky = skyAt(cfg.sky, clockSec(sim), age0, blankSky())
+    const sky = skyAt(cfg.sky, clockSec(sim), blankSky())
     stepLighting(light, layout, cfg, sky)
     const marks = marksOf(layout)
     s = {
@@ -145,7 +142,6 @@ export function amethystOf(sim: Sim): AmethystState {
       light,
       trail: makeTrail(layout.basin),
       sky,
-      age0,
       marks,
       dayMarks: { ...marks, geode: [], rift: [], breach: [] },
       torches: new Map(),
@@ -352,7 +348,7 @@ export const amethyst: WorldHooks = {
     s.lightIn -= delta
     if (s.lightIn <= 0) {
       s.lightIn += LIGHT_MS
-      skyAt(cfg.sky, clockSec(sim), s.age0, s.sky)
+      skyAt(cfg.sky, clockSec(sim), s.sky)
       stepLighting(s.light, L, cfg, s.sky)
     }
     sim.characters.forEach((m, slot) => {

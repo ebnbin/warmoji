@@ -422,7 +422,7 @@ export class AmethystView extends BoundedView {
     const target = Math.max(cfg.view.brightLux, s.light.hallLux)
     this.adapt = 10 ** (Math.log10(this.adapt) + (Math.log10(target) - Math.log10(this.adapt)) * (1 - Math.exp(-dt / ADAPT_TAU)))
     const adapt = this.adapt
-    const sky = skyAt(cfg.sky, clockSec(sim), s.age0, this.sky)
+    const sky = skyAt(cfg.sky, clockSec(sim), this.sky)
     const sunDeg = sky.sun.elev / RAD
     const u = this.u
     u.time = now / 1000

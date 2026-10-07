@@ -361,7 +361,7 @@ export const MAPS = {
   deep: {
     emoji: '1fae7',
     name: '深海',
-    desc: '大陆坡上一道海底峡谷的谷底，两三百米深，阳光照不下来，抬头只剩一丝极暗的蓝。两侧是陡峭的岩壁，上游一头是塌下来的岩堆，下游一头是往下没进黑暗的陡坎，都过不去；谷底铺着软泥，散着大石头，躺着一副鲸骨，还有冒泡的冷泉。队伍从一艘停在谷底的潜艇里出来：潜艇只有一侧开着门，门口罩着一团空气，门上的灯照亮门前一片。离开门口只能憋着气：气不会自己回来，歇着也一点点往下掉，赶路掉得更快；绕回门口换口气，很快就补满。艇身挡人也挡子弹，敌人只能从开门的那一侧压过来。气见底了就呛水掉血。潜艇隔一阵自己开走：先猛地排出一大团气泡、关上门，浮起来从头顶开过去，换个地方停下，开走的那一阵哪里都换不了气；落点的地上先画出艇身和门口那一片。海里的东西用不着换气',
+    desc: '大陆坡上一道海底峡谷的谷底，两三百米深，阳光只透下来一层幽蓝的微光，谷底看得清个大概。两侧是陡峭的岩壁，上游一头是塌下来的岩堆，下游一头是往下没进黑暗的陡坎，都过不去；谷底铺着软泥，散着大石头，躺着一副鲸骨，还有冒泡的冷泉。队伍从一艘停在谷底的潜艇里出来：潜艇只有一侧开着门，门口罩着一团空气，门上的灯照亮门前一片。离开门口只能憋着气：气不会自己回来，歇着也一点点往下掉，赶路掉得更快；绕回门口换口气，很快就补满。艇身挡人也挡子弹，敌人只能从开门的那一侧压过来。气见底了就呛水掉血。潜艇隔一阵自己开走：先猛地排出一大团气泡、关上门，浮起来从头顶开过去，换个地方停下，开走的那一阵哪里都换不了气；落点的地上先画出艇身和门口那一片。海里的东西用不着换气',
     kind: 'deep',
     stamina: { exertion: 0.35, regen: 1 },
     palette: {
@@ -370,7 +370,7 @@ export const MAPS = {
       map: hslToInt(214, 0.5, 0.22),
       shadow: 0x000000,
     },
-    // 没有太阳：光来自头顶那一丝蓝、潜艇门上与艇首的灯和队员的头灯，迎着灯的一面泛白、背面沉进深蓝；没有接影子的光
+    // 没有太阳：光来自头顶透下来的那层幽蓝、潜艇门上与艇首的灯和队员的头灯，迎着灯的一面泛白、背面沉进深蓝；没有接影子的光
     light: { sun: 0xdbeaff, shade: 0x35507e },
     decor: {
       emojis: ['1fae7'],
@@ -434,16 +434,16 @@ export const MAPS = {
   ruins: {
     emoji: '1f3da',
     name: '残垣',
-    desc: '山顶台地上一座塌了大半的石砌院落，四围的枫林正红，落叶铺了一地：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少，高度按层算——膝盖以下的残基跨得过，齐腰的矮墙挡人、子弹从上面飞过，齐头的墙挡人也挡子弹和视线，看不见的敌人不会被自动瞄准，只剩一道淡影；跨得过的残基贴着地面，挡路的墙露出一截立面，越高露得越多。矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
+    desc: '山顶台地上一座塌了大半的石砌院落，四围的枫林一片橙黄，落叶铺了一地：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少，高度按层算——膝盖以下的残基跨得过，齐腰的矮墙挡人、子弹从上面飞过，齐头的墙挡人也挡子弹和视线，看不见的敌人不会被自动瞄准，只剩一道淡影；跨得过的残基贴着地面，挡路的墙露出一截立面，越高露得越多。矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
     kind: 'ruins',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
-      bgFrom: 'hsl(16 46% 32%)',
-      bgTo: 'hsl(8 40% 11%)',
-      map: hslToInt(20, 0.42, 0.44),
+      bgFrom: 'hsl(30 52% 34%)',
+      bgTo: 'hsl(24 44% 11%)',
+      map: hslToInt(30, 0.5, 0.46),
       shadow: 0x000000,
     },
-    light: { sun: 0xfff1e4, shade: 0xcdb6ad, shadow: { color: 0x2a140c, alpha: 0.4, length: 0.85 } },
+    light: { sun: 0xfff3e0, shade: 0xd0bca4, shadow: { color: 0x2a1a0a, alpha: 0.4, length: 0.85 } },
     decor: {
       emojis: ['1f342', '1f341', '1f344'],
       sizeU: [0.28, 0.42],
@@ -495,7 +495,7 @@ export const MAPS = {
   amethyst: {
     emoji: '1f48e',
     name: '紫水晶洞穴',
-    desc: '玄武岩里一座巨大的紫水晶晶洞：几个晶洞连成洞厅，洞壁上密密麻麻长满紫色的晶体，洞底立着一丛丛晶簇，几根巨晶从洞壁斜伸进来。阳光从塌开的洞顶和几道顶缝照进来，随太阳东升西落，照到哪里哪里的晶体就闪起来：白天看得到大半个洞；黄昏光变红、洞里一点点暗下来；入夜后只看得清火把照亮的那一圈，晶体映着火光。怪物只从暗处出来：白天从拐进岩体深处的暗道里，夜里也会从地上半埋的晶洞里爬出来、从顶缝落下来。晶簇和巨晶挡人也挡子弹，塌下来的碎晶坡走着慢',
+    desc: '玄武岩里一座巨大的紫水晶晶洞：几个晶洞连成洞厅，洞壁上密密麻麻长满紫色的晶体，其中几片是金黄的黄水晶，洞底立着一丛丛晶簇，几根巨晶从洞壁斜伸进来。阳光从塌开的洞顶和几道顶缝照进来，随太阳东升西落，照到哪里哪里的晶体就闪起来：白天看得到大半个洞；黄昏光变红、洞里一点点暗下来；入夜后只看得清火把照亮的那一圈，晶体映着火光。开局那天正是中秋：头一夜一轮满月，升高以后月光从塌顶照进来。怪物只从暗处出来：白天从拐进岩体深处的暗道里，夜里也会从地上半埋的晶洞里爬出来、从顶缝落下来。晶簇和巨晶挡人也挡子弹，塌下来的碎晶坡走着慢',
     kind: 'amethyst',
     size: { w: 36, h: 36 },
     stamina: { exertion: 0.5, regen: 1 },
@@ -535,7 +535,8 @@ export const MAPS = {
       openings: { breachU: [3, 3.6], breachOffsetU: [4.4, 6], sideBreaches: [0, 1], sideBreachU: [1.8, 2.4], rifts: [2, 3], riftLenU: [5, 7.5], riftWidthU: [0.7, 1.1], jitter: 0.18, gapU: 2.5, debrisM: 1.1, debrisSpread: 1.12 },
       crystals: { clusters: [9, 12], clusterU: [0.65, 1.15], clusterM: [1.9, 2.9], beams: [2, 3], beamU: [1, 1.2], beamLenU: [3.5, 5.5], geodes: [4, 6], geodeU: [0.5, 0.75], geodeM: 0.42, druse: [26, 36], druseU: [0.14, 0.3], druseM: [0.22, 0.5], clearU: 4.8 },
       debris: { viscosity: 1.3, exertion: 1.15 },
-      sky: { latitudeDeg: 22, declinationDeg: 8, startHour: 9.5, twilightDeg: 7, dayS: 62, duskS: 26, nightS: 48, dawnS: 16, extinction: 0.21 },
+      // 开局那天是中秋：太阳在秋分点上，头一夜的子夜月亮正圆
+      sky: { latitudeDeg: 22, declinationDeg: 0, startHour: 9.5, fullMoonHour: 24, twilightDeg: 7, dayS: 62, duskS: 26, nightS: 48, dawnS: 16, extinction: 0.21 },
       light: { albedo: 0.46, bounceU: 4.5, tunnelFadeU: 1.9 },
       torch: { candela: 110, heightM: 1.4, igniteLux: 15, douseLux: 40, staggerMs: 1400 },
       view: { dayU: 18, nightU: 7, darkLux: 0.5, brightLux: 30, clearLux: 2 },
@@ -747,7 +748,7 @@ export const MAPS = {
   warp: {
     emoji: '1f300',
     name: '跃迁',
-    desc: '悬在虚空里的一座跃迁站：四块平台围着中央一根发光的核心柱，平台之间隔着望得见底的虚空，只能靠传送往来。每块平台一座传送台，立在朝向下一块的那条边上，四块连成单向的一圈。队长踏上传送台，台子充能、光圈扩满整间房，然后整支队伍连同召唤物一起被送到下一块平台的传送台上，不管队员在房间哪个角落；到的那座台子要冷却一阵。四间房同时在刷怪：队伍不在的房间，敌人往那间的传送台聚，传送台隔一阵发一趟车，台上站着谁就送谁，追兵就这样一批批从你身后的传送台涌进来。地砖被谁踩过就亮起谁的颜色、慢慢暗下去：哪间堆着多少敌人、往哪儿走，都写在地板上。四间房形状、颜色和出的敌人各不相同，选去哪间就是选和什么打',
+    desc: '一座悬在虚空里的实验迷宫：方框里挤满了舱室，一般八到十一间，偶尔只有六七间、间间更大，舱与舱之间只隔一道望得见底的虚空的缝，只能靠门来往。每间舱室的地上漆着门牌号，墙边一个入口、两三扇门，每扇门开在朝它通往的那一间的墙上，门上写着那一间的门牌，箭头指着要飞去的方向；队长踏上一扇门，门充满能，整支队伍连同召唤物散成光块，顺着最近的路飞过虚空——往外飞，也只会从另一头飞回来——落到那一间的入口上。路是单向的：从哪扇门来，那一间都没有门通回去。每间都有一扇挂着绿色「出口」牌的门，顺着出口一直走，会走遍所有舱室，再回到原来那间。只有队伍那间和刚走过的两间亮着：所在的那间全亮，上一间暗一半，再上一间只剩一点光，别的舱室全黑，只隐约看得见地上一格格的瓷砖，门、东西和敌人都看不见。敌人只在这三间出，这三间里的敌人顺着门一间间追过来；黑着的舱室里敌人定在原地，等你绕回来、灯亮起来才接着动。亮着的舱室里，每扇门隔一阵发一趟车，台上站着的敌人一起送走。舱室按四季分成四片，颜色、出的敌人不同，每间的标本罐里泡着那一季的一件东西；角上的监控一直盯着你',
     kind: 'warp',
     stamina: { exertion: 0.4, regen: 1.1 },
     palette: {
@@ -756,39 +757,55 @@ export const MAPS = {
       map: hslToInt(192, 0.36, 0.86),
       shadow: 0x000000,
     },
-    // 光从左上方的顶灯照下来，地砖与核心柱又从下面、从中间把身体照亮，背光面泛着冷蓝；影子淡
+    // 光从左上方的顶灯照下来，地砖与门又从下面把身体照亮，背光面泛着冷蓝；影子淡
     light: { sun: 0xf6fbff, shade: 0x7e93b8, shadow: { color: 0x07142a, alpha: 0.28, length: 0.55 } },
+    // 标本罐里泡着的东西：草甸的小花、樱庭的樱花、沙漠的驼骨、深海的气泡、残垣的枫叶、紫水晶、浮冰的冰块、火山
     decor: {
-      emojis: ['1f300'],
+      emojis: ['1f33c', '1f338', '1f9b4', '1fae7', '1f341', '1f48e', '1f9ca', '1f30b'],
       sizeU: [0.3, 0.5],
       alpha: [0, 0],
       density: [0, 0],
     },
     mix: WARP_MIX,
-    // 每间房的出怪板按那间的配方只放出那几种：一间幽灵、一间肉盾、一间成群的小东西、一间什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那间。头目从核心柱里被抛出来
+    // 每间舱室的出怪板按那一季的配方只放出那几种：一季幽灵、一季肉盾、一季成群的小东西、一季什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那几间。头目从队伍那间的天花板上落下来
     gates: {
       snapU: 60,
       fallback: 'rise',
       look: 'glow',
-      boss: 'core',
+      boss: 'warden',
       kinds: {
-        ghosts: { name: '幽灵间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
-        tanks: { name: '重甲间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
-        swarm: { name: '虫群间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
-        mixed: { name: '混编间', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
-        core: { name: '核心柱', at: { kind: 'mark' }, enter: 'lob', look: 'glow', weight: 1, reachU: 40, only: ['mecha'] },
+        ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
+        tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
+        swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
+        mixed: { name: '混编舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
+        warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha'] },
       },
     },
-    finalWaveSub: '失控核心从核心柱里冲了出来——它落在哪间，就把哪间变成战场！',
+    finalWaveSub: '看守从天花板上落了下来——这一间就是出口？',
     warp: {
-      room: { lipU: 1, gapU: 2, narrowU: 8 },
+      maze: {
+        colU: [14, 18],
+        rows: [
+          { n: 2, u: [18, 30] },
+          { n: 3, u: [12, 20] },
+          { n: 4, u: [12, 12] },
+        ],
+        rooms: [8, 11],
+        fewP: 0.15,
+        few: [6, 7],
+        gapU: 0.5,
+        lipU: 0.5,
+        extraP: 0.5,
+      },
       neckU: 0.4,
-      pillars: { firstU: 3, stepU: 4, count: 3, sizeU: 1, heightM: 3.4, padClearU: 2 },
-      pitU: 8,
-      pad: { radiusU: 1.4, edgeU: 0.2, cornerU: 3.5, chargeMs: 1400, drainMs: 700, transitMs: 650, cooldownMs: 9000, shuttleMs: 6000, warnMs: 900, spillU: 3.5 },
+      racks: { minU: 11, sizeU: 1, heightM: 2.2, stepU: 4, clearU: 1.2 },
+      pit: { minU: 12, marginU: 4 },
+      pad: { radiusU: 1.4, insetU: 0.2, cornerU: 4.5, chargeMs: 1300, drainMs: 700, transitMs: 650, shuttleMs: 4000, warnMs: 900, spillU: 3.5 },
       emitters: { plateU: 2, markU: 0.6, clearU: 3 },
       recipes: ['ghosts', 'tanks', 'swarm', 'mixed'],
-      core: { radiusU: 1.5 },
+      jar: { sizeU: 1.4 },
+      hopU: 8,
+      light: { levels: [1, 0.5, 0.25], wakeMs: 500, dimMs: 1600 },
       tiles: { teamFadeMs: 4500, foeFadeMs: 2600 },
     },
     boss: 'mecha',

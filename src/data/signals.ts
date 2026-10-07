@@ -22,7 +22,7 @@ export const SIGNALS = {
   floe: { events: { gust: '阵风' }, cues: { gust: '起一阵风' } },
   volcano: { events: { erupt: '火山喷发' }, cues: { erupt: '火山喷发' }, marks: { vent: '喷气孔' } },
   theater: { events: { act: '换幕' } },
-  warp: { events: { jump: '整队跃迁' }, cues: { lock: '锁住传送台' } },
+  warp: { events: { jump: '整队穿门' }, cues: { lock: '锁住所有门' } },
   petri: { gauges: { colony: '菌落覆盖' }, marks: { sector: '分区' } },
   nebula: { gauges: { mass: '黑洞长大' }, cues: { meteor: '来一颗流星' } },
 } as const satisfies { readonly [K in MapKind]?: MapSignals }

@@ -532,7 +532,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       sand: burstEmitter(this, [0xe8c27a, 0xd9a85b, 0xf3dca5, 0xc8954a], 120, 700, { gravityY: 160 }),
       silt: burstEmitter(this, [0x7d8fa3, 0x93a5b5, 0x5f7287, 0xa9b6c2], 60, 1500, { gravityY: 18, scale: { start: 0.7, end: 1.9 }, alpha: { start: 0.45, end: 0 } }),
       bubbles: burstEmitter(this, [0xe0f7ff, 0xb3e5fc, 0xffffff], 70, 1100, { gravityY: -150, scale: { start: 0.35, end: 0.75 }, alpha: { start: 0.85, end: 0 } }),
-      maple: burstEmitter(this, [0xe8401c, 0xf26a1b, 0xd02a1e, 0xff8f3a], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
+      maple: burstEmitter(this, [0xf2881e, 0xf6a830, 0xe8661c, 0xffbe48], 105, 1250, { gravityY: 60, rotate: { min: 0, max: 360 } }),
       shards: burstEmitter(this, [0xb48cff, 0x8e5bd9, 0xe2d2ff, 0x6a3fc0], 210, 620, { gravityY: 260, rotate: { min: 0, max: 360 } }),
       paper: burstEmitter(this, [0xfbf3df, 0xf1e4c4, 0xffffff, 0xe6d3ad], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }

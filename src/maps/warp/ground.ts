@@ -2,16 +2,14 @@ import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { valueNoise } from '../../util/noise'
 import { FRAME_U } from '../../util/units'
-import { SIGNS } from './palette'
-import type { Box, WarpPlan, WarpRoom } from './layout'
+import { SEASONS } from './palette'
+import type { Box, Chamber, WarpPlan } from './layout'
 import type { WarpConfig } from '../../types/maps'
 
-/** 平台朝屏幕下方露出的那一截侧面多高，格 */
-export const FACE_U = 0.62
+/** 平台朝屏幕下方露出的那一截侧面多高，格：比平台下沿到格边的缝窄，舱与舱之间还留得出一线虚空 */
+export const FACE_U = 0.4
 /** 平台落在远处底下的影子往哪边偏、偏多远（格），影子边多软（格） */
 const SHADOW = { x: 0.9, y: 1.3, soft: 0.7, alpha: 0.6 } as const
-/** 机柜台朝地面那一侧露出的立面多高，格 */
-const WALL_FACE_U = 0.34
 /** 凹槽往下看得见的那一截内壁多高，格 */
 const PIT_FACE_U = 1.5
 /** 地砖：底色（冷白偏青）、缝的颜色、缝宽（格） */
@@ -22,7 +20,7 @@ const SEAM_U = 0.045
 const GRAPHITE = [10, 24, 38] as const
 const STEEL = [56, 106, 130] as const
 const DEEP = [0, 10, 22] as const
-/** 全站的主题色：台沿与平台侧面的灯带 */
+/** 整座实验室的主题色：平台侧面的灯带 */
 const CYAN = [0, 255, 255] as const
 
 type Rgb = [number, number, number]
@@ -70,13 +68,18 @@ export function textureSize(): { w: number; h: number } {
   return { w: Math.round(FRAME_U * GROUND_PPU), h: Math.round(FRAME_U * GROUND_PPU) }
 }
 
-/** 画之前一次算好的：每间房的主色（0 到 255） */
+/** 画之前一次算好的：每间舱室那一季的主色（0 到 255） */
 export interface Prepared {
   readonly colors: readonly Rgb[]
 }
 
 export function prepare(sc: PaintScene): Prepared {
-  return { colors: sc.plan.rooms.map((r) => [(SIGNS[r.sign]!.color >> 16) & 0xff, (SIGNS[r.sign]!.color >> 8) & 0xff, SIGNS[r.sign]!.color & 0xff] as Rgb) }
+  return {
+    colors: sc.plan.rooms.map((r) => {
+      const c = SEASONS[r.season]!.color
+      return [(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff] as Rgb
+    }),
+  }
 }
 
 /** 方形的有符号距离：里面为负，格 */
@@ -114,13 +117,7 @@ function face(out: Rgb, color: readonly number[], x: number, t: number, aa: numb
   for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.35 * seam * (1 - strip))
 }
 
-/** 机柜台朝地面的立面：从台顶往下暗下去 */
-function wallFace(out: Rgb, color: Rgb, t: number): void {
-  set(out, GRAPHITE, 1.35 - 0.7 * t)
-  addGlow(out, color, 0.12 * (1 - t))
-}
-
-/** 台沿：亮一点的金属护栏，贴着虚空的那一边一道房间颜色的亮线，隔一段一根矮柱 */
+/** 台沿：亮一点的金属护栏，贴着虚空的那一边一道那一季颜色的亮线，隔一段一根矮柱 */
 function lip(out: Rgb, color: readonly number[], along: number, edge: number, aa: number): void {
   set(out, STEEL, 0.72 + 0.25 * smooth(0.2, 0.9, edge))
   const post = 1 - smooth(0.08, 0.08 + aa, Math.abs(((along + 0.75) % 1.5) - 0.75))
@@ -129,26 +126,6 @@ function lip(out: Rgb, color: readonly number[], along: number, edge: number, aa
   addGlow(out, color, 1.2 * rail)
   const inner = Math.exp(-(((edge - 0.1) / 0.05) ** 2))
   for (let i = 0; i < 3; i++) out[i] = out[i]! * (1 - 0.35 * inner)
-}
-
-/** 机柜台：一排排机柜顶，顶上一列列指示灯；朝地面那边露出立面 */
-function deck(out: Rgb, color: Rgb, b: Box, x: number, y: number, aa: number): void {
-  const u = x - b.x0
-  const v = y - b.y0
-  const cell = ((u % 2.25) + 2.25) % 2.25
-  const row = ((v % 1.5) + 1.5) % 1.5
-  const gap = Math.min(cell, 2.25 - cell) < 0.08 || Math.min(row, 1.5 - row) < 0.08
-  set(out, GRAPHITE, gap ? 0.55 : 1.05 + 0.1 * valueNoise(Math.floor(u / 2.25) * 3.3, Math.floor(v / 1.5) * 5.1, 41))
-  if (!gap) {
-    const top = smooth(0.06, 0.06 + aa, Math.min(cell, row))
-    mixIn(out, [70, 84, 104], 0.4 * (1 - top))
-    const lx = ((cell - 0.3) % 0.28 + 0.28) % 0.28
-    const ly = Math.abs(row - 1.12)
-    if (cell > 0.3 && cell < 1.95 && ly < 0.06 && Math.abs(lx - 0.14) < 0.05) {
-      const on = valueNoise(Math.floor(u / 0.28) * 1.7, Math.floor(v / 1.5) * 2.9, 9)
-      addGlow(out, on > 0.62 ? color : [70, 255, 170], on > 0.3 ? 0.9 : 0.15)
-    }
-  }
 }
 
 /** 凹槽：沿口一道亮线，远处那一面内壁从沿口往下暗进深处，槽底是房间颜色的细网格和一道往上透的光 */
@@ -174,7 +151,7 @@ function pit(out: Rgb, color: Rgb, b: Box, x: number, y: number, aa: number): vo
   mixIn(out, [200, 255, 255], 0.35 * (1 - smooth(0, aa * 2, d)))
 }
 
-/** 立柱的底座：方的金属墩子，四边斜面迎光亮、背光暗，顶上一圈房间颜色的灯 */
+/** 机柜的底座：方的金属墩子，四边斜面迎光亮、背光暗，顶上一圈那一季颜色的灯 */
 function plinth(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
   const d = -sdBox(b, x, y)
   set(out, STEEL, 0.55)
@@ -201,6 +178,22 @@ function plate(out: Rgb, color: Rgb, b: Box, x: number, y: number): void {
   if (bar && d > 0.12) set(out, STEEL, 0.45)
   addGlow(out, color, 0.9 * Math.exp(-(((d - 0.05) / 0.04) ** 2)))
   addGlow(out, [255, 70, 90], 0.12 * smooth(0.1, 0.4, d))
+}
+
+/** 标本罐的罐座：钢的方墩，正中一圈玻璃底，罐里的液体透着那一季的颜色 */
+function jarBase(out: Rgb, color: Rgb, b: Box, x: number, y: number, aa: number): void {
+  const d = -sdBox(b, x, y)
+  set(out, STEEL, 0.5)
+  mixIn(out, [200, 240, 255], 0.5 * Math.exp(-(((d - 0.05) / 0.04) ** 2)))
+  const cx = (b.x0 + b.x1) / 2
+  const cy = (b.y0 + b.y1) / 2
+  const r = Math.hypot(x - cx, y - cy)
+  const R = (b.x1 - b.x0) * 0.38
+  if (r < R) {
+    set(out, color, 0.28)
+    addGlow(out, [180, 255, 255], 0.35 * Math.exp(-(((r - R * 0.92) / 0.05) ** 2)))
+    mixIn(out, [230, 250, 255], 0.25 * (1 - smooth(R - aa * 2, R, r)) * smooth(0, R, r))
+  }
 }
 
 /** 传送台的台座：钢的外圈与斜面，暗色的台面上两道刻槽、一圈刻度，正中一块镜面 */
@@ -237,8 +230,8 @@ function tile(out: Rgb, x: number, y: number, ao: number, aa: number): void {
   mixIn(out, SEAM, seam)
 }
 
-/** 大厅地上嵌的一枚圆徽：两道同心圆，四个缺口对着四面 */
-function emblem(out: Rgb, color: Rgb, room: WarpRoom, x: number, y: number): void {
+/** 空舱地上嵌的一枚圆徽：两道同心圆，四个缺口对着四面 */
+function emblem(out: Rgb, color: Rgb, room: Chamber, x: number, y: number): void {
   const dx = x - room.center.x
   const dy = y - room.center.y
   const r = Math.hypot(dx, dy)
@@ -255,37 +248,38 @@ function emblem(out: Rgb, color: Rgb, room: WarpRoom, x: number, y: number): voi
 }
 
 /** 这一点落在哪块平台的顶面上 */
-function slabAt(plan: WarpPlan, x: number, y: number): WarpRoom | null {
+function slabAt(plan: WarpPlan, x: number, y: number): Chamber | null {
   for (const r of plan.rooms) if (x >= r.slab.x0 && x < r.slab.x1 && y >= r.slab.y0 && y < r.slab.y1) return r
   return null
 }
 
 /** 这一点落在哪块平台朝下的侧面上，从侧面上沿往下走到几成 */
-function faceAt(plan: WarpPlan, x: number, y: number): { room: WarpRoom; t: number } | null {
+function faceAt(plan: WarpPlan, x: number, y: number): { room: Chamber; t: number } | null {
   for (const r of plan.rooms) if (x >= r.slab.x0 && x < r.slab.x1 && y >= r.slab.y1 && y < r.slab.y1 + FACE_U) return { room: r, t: (y - r.slab.y1) / FACE_U }
   return null
 }
 
 /** 平台顶面上的一点：按落在哪一块画 */
-function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: number, aa: number, out: Rgb): void {
+function slabTop(sc: PaintScene, prep: Prepared, room: Chamber, x: number, y: number, aa: number, out: Rgb): void {
   const color = prep.colors[room.index]!
   const f = room.floor
-  const pad = room.pad
   const pr = sc.cfg.pad.radiusU
-  const pd = Math.hypot(x - pad.x, y - pad.y)
-  if (pd < pr) {
-    padBase(out, pd, pr, Math.atan2(y - pad.y, x - pad.x), aa)
-    return
+  let pd = Infinity
+  for (const p of [room.entry, ...room.doors]) {
+    const d = Math.hypot(x - p.x, y - p.y)
+    if (d < pr) return padBase(out, d, pr, Math.atan2(y - p.y, x - p.x), aa)
+    pd = Math.min(pd, d)
   }
   const inFloor = x >= f.x0 && x < f.x1 && y >= f.y0 && y < f.y1
   if (inFloor) {
     if (room.pit && sdBox(room.pit, x, y) < 0) return pit(out, color, room.pit, x, y, aa)
-    for (const b of room.pillars) if (sdBox(grow(b, 0.12), x, y) < 0) return plinth(out, color, grow(b, 0.12), x, y)
+    if (sdBox(room.jar, x, y) < 0) return jarBase(out, color, room.jar, x, y, aa)
+    for (const b of room.racks) if (sdBox(grow(b, 0.12), x, y) < 0) return plinth(out, color, grow(b, 0.12), x, y)
     for (const p of room.plates) if (sdBox(p.box, x, y) < 0) return plate(out, color, p.box, x, y)
     let ao = 0
     ao = Math.max(ao, Math.exp(-Math.max(0, -sdBox(f, x, y)) / 0.35) * 0.55)
     if (room.pit) ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(room.pit, x, y)) / 0.3) * 0.25)
-    for (const b of room.pillars) {
+    for (const b of [...room.racks, room.jar]) {
       const sx = x - 0.25
       const sy = y - 0.35
       ao = Math.max(ao, Math.exp(-Math.max(0, sdBox(grow(b, 0.12), sx, sy)) / 0.25) * 0.55)
@@ -295,22 +289,14 @@ function slabTop(sc: PaintScene, prep: Prepared, room: WarpRoom, x: number, y: n
     if (room.shape === 'hall') emblem(out, color, room, x, y)
     return
   }
-  if (room.deck && sdBox(room.deck, x, y) < 0) {
-    const toFloor = -sdBox(room.deck, x, y)
-    const facing = room.deck.y1 <= f.y0 + 0.01 && room.deck.y1 - y < WALL_FACE_U
-    if (facing) return wallFace(out, color, 1 - (room.deck.y1 - y) / WALL_FACE_U)
-    deck(out, color, room.deck, x, y, aa)
-    addGlow(out, color, 0.9 * Math.exp(-(((toFloor - 0.1) / 0.05) ** 2)))
-    return
-  }
   const toFloor = sdBox(f, x, y)
   const along = x < f.x0 || x >= f.x1 ? y : x
-  return lip(out, CYAN, along, clamp01(toFloor / sc.cfg.room.lipU), aa)
+  return lip(out, color, along, clamp01(toFloor / sc.cfg.maze.lipU), aa)
 }
 
 /**
- * 跃迁站的地面：虚空透明，留给底下的着色器；四块平台的顶面是一格一块的冷白地砖，四边一圈护栏台沿，
- * 镶着那间房颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。立柱的墩子、回廊的凹槽、狭长那间的机柜、出怪板与传送台的台座也画在这里
+ * 迷宫的地面：虚空透明，留给底下的着色器；每间舱室的平台顶面是一格一块的冷白地砖，四边一圈护栏台沿，
+ * 镶着那一季颜色的灯带；平台朝屏幕下方露出一截侧面，在远处的底上落下一片软影。机柜的墩子、凹槽、标本罐的罐座、出怪板与门、入口的台座也画在这里
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const plan = sc.plan
@@ -341,7 +327,7 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
           for (const r of plan.rooms) {
             const s = { x0: r.slab.x0, y0: r.slab.y0, x1: r.slab.x1, y1: r.slab.y1 + FACE_U }
             // 画面四周平铺：贴着方框边的影子要接上那一头平台落下来的
-            for (const ox of [-FRAME_U, 0, FRAME_U]) for (const oy of [-FRAME_U, 0, FRAME_U]) shadow = Math.max(shadow, 1 - smooth(-SHADOW.soft, SHADOW.soft, sdBox(s, x - SHADOW.x - ox, y - SHADOW.y - oy)))
+            for (const ox of x < 4 ? [0, -FRAME_U] : [0]) for (const oy of y < 4 ? [0, -FRAME_U] : [0]) shadow = Math.max(shadow, 1 - smooth(-SHADOW.soft, SHADOW.soft, sdBox(s, x - SHADOW.x - ox, y - SHADOW.y - oy)))
             const under = y - (r.slab.y1 + FACE_U)
             if (x >= r.slab.x0 - 0.3 && x < r.slab.x1 + 0.3 && under >= 0 && under < 1.2) {
               const k = Math.exp(-under / 0.35) * (1 - smooth(r.slab.x1 - 0.2, r.slab.x1 + 0.3, x)) * smooth(r.slab.x0 - 0.3, r.slab.x0 + 0.2, x)

@@ -146,8 +146,8 @@ export const MARK = {
   grow: 40,
 } as const
 
-/** 标记的来源：同种同源的标记刷新而不叠加 */
-export const TAG = { effect: 0, morph: 1, perk: 3 } as const
+/** 标记的来源：同种同源的标记刷新而不叠加；world 是地图按自己的规则加的 */
+export const TAG = { effect: 0, morph: 1, perk: 3, world: 4 } as const
 
 /** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定）；ref 是所引用身体的 Uid */
 export const Mark = {

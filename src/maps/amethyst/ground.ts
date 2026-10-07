@@ -17,6 +17,11 @@ export const ROCK_BG = [13, 8, 19] as const
 export const SHINE = 56
 /** 从洞厅进暗道这么深，洞底与洞壁才全换成暗道里的样子，格 */
 const TUNNEL_BLEND_U = 2
+/** 黄水晶成片地长：每局占洞厅与洞壁的几成，片的大小（格），片里有几成晶体是它，片的边上过渡多宽（按噪声算） */
+const GOLD_AREA = 0.22
+const GOLD_WAVE_U = 8
+const GOLD_SHARE = 0.85
+const GOLD_EDGE = 0.05
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function ease(e0: number, e1: number, x: number): number {
@@ -107,10 +112,55 @@ function amethyst(p: Px, t: number, deep: number): void {
   paint(p, 226 - 108 * k * d, 212 - 158 * k * d, 244 - 40 * k * d)
 }
 
+/** 黄水晶从根到尖的颜色：紫水晶受过热就成了它，根部几乎无色，往尖上越来越黄，最尖处是金黄 */
+function citrine(p: Px, t: number, deep: number): void {
+  const k = clamp01(t) ** 0.8
+  const d = 0.75 + 0.5 * deep
+  paint(p, 250 - 6 * k * d, 240 - 34 * k * d, 220 - 140 * k * d)
+}
+
+function gem(p: Px, t: number, deep: number, gold: boolean): void {
+  if (gold) citrine(p, t, deep)
+  else amethyst(p, t, deep)
+}
+
+function goldNoise(L: AmethystLayout, gx: number, gy: number): number {
+  return fbm(gx / GOLD_WAVE_U, gy / GOLD_WAVE_U, L.seed + 211, 2)
+}
+
+const GOLD_LEVELS = new WeakMap<AmethystLayout, number>()
+
+/** 黄水晶那几片的门槛：取在洞厅与洞壁里噪声的分位上，片落在哪随种子变，面积每局差不多 */
+function goldLevel(L: AmethystLayout): number {
+  let level = GOLD_LEVELS.get(L)
+  if (level !== undefined) return level
+  const f = L.field
+  const wall = L.wallU * UNIT
+  const vals: number[] = []
+  for (let y = f.y; y < f.y + f.h; y += UNIT / 2) {
+    for (let x = f.x; x < f.x + f.w; x += UNIT / 2) if (roomAt(L.shell, x, y) > -wall) vals.push(goldNoise(L, x / UNIT, y / UNIT))
+  }
+  vals.sort((a, b) => a - b)
+  level = vals[Math.floor(vals.length * (1 - GOLD_AREA))] ?? 1
+  GOLD_LEVELS.set(L, level)
+  return level
+}
+
+/** 这里的晶体有几成是黄水晶：片外一根也没有 */
+function goldShare(L: AmethystLayout, gx: number, gy: number): number {
+  const level = goldLevel(L)
+  return GOLD_SHARE * ease(level, level + GOLD_EDGE, goldNoise(L, gx, gy))
+}
+
+/** 按位置给一样东西掷一次：同一样东西各处取到的一样 */
+function rollAt(x: number, y: number, seed: number): number {
+  return hash1(Math.round(x) * 4099 + Math.round(y), seed)
+}
+
 // ————————————————————————————— 洞壁 —————————————————————————————
 
 /** 洞壁上那一圈：贴着洞底的是一排排朝洞里长的晶体（外面一排小的、里面一排大的），再往外是一层层浅紫与灰紫的玛瑙，最外是玄武岩 */
-function lining(p: Px, g: Geode, gi: number, u: number, wx: number, wy: number, gx: number, gy: number, seed: number): void {
+function lining(p: Px, g: Geode, gi: number, u: number, wx: number, wy: number, gx: number, gy: number, gold: number, seed: number): void {
   const dx = wx - g.x
   const dy = wy - g.y
   const d = Math.hypot(dx, dy) || 1
@@ -124,15 +174,15 @@ function lining(p: Px, g: Geode, gi: number, u: number, wx: number, wy: number, 
   // 晶体之间的缝：深紫，越往外越暗
   paint(p, 40 - 14 * u, 18 - 6 * u, 58 - 18 * u)
   p.gloss = 0.08
-  crystalRow(p, along, u, 0.17, 0.4, 0.12, 0.84, ix, iy, seed + 300 + gi * 7)
-  crystalRow(p, along + 0.11, u, 0.3, 0.0, 0.16, 0.66, ix, iy, seed + 400 + gi * 7)
+  crystalRow(p, along, u, 0.17, 0.4, 0.12, 0.84, ix, iy, gold, seed + 300 + gi * 7)
+  crystalRow(p, along + 0.11, u, 0.3, 0.0, 0.16, 0.66, ix, iy, gold, seed + 400 + gi * 7)
 }
 
 /**
  * 洞壁上的一排晶体：每根宽 width 格、从 u = tip..tip+spread 处的尖往外长到 base 处的根；俯看是一根根尖朝洞里的棱柱，
- * 左右两个侧面与尖上的锥面朝向不同，光扫过去时一面一面地闪
+ * 左右两个侧面与尖上的锥面朝向不同，光扫过去时一面一面地闪；gold 是这里的晶体有几成是黄水晶
  */
-function crystalRow(p: Px, along: number, u: number, width: number, tip: number, spread: number, base: number, ix: number, iy: number, seed: number): void {
+function crystalRow(p: Px, along: number, u: number, width: number, tip: number, spread: number, base: number, ix: number, iy: number, gold: number, seed: number): void {
   const k = Math.floor(along / width)
   const a = along / width - k - 0.5
   const h = hash1(k, seed)
@@ -143,7 +193,7 @@ function crystalRow(p: Px, along: number, u: number, width: number, tip: number,
   const w = u < top + tipLen ? (half * (u - top)) / tipLen : half
   if (Math.abs(a) > w) return
   const t = (u - top) / (base - top)
-  amethyst(p, 1 - t, hash1(k, seed + 3))
+  gem(p, 1 - t, hash1(k, seed + 3), hash1(k, seed + 4) < gold)
   // 侧面中间一道亮线：晶体里面的反光
   if (Math.abs(a) < w * 0.18) dim(p, 1.12)
   if (Math.abs(a) > w * 0.85) dim(p, 0.78)
@@ -311,10 +361,10 @@ function floor(p: Px, gx: number, gy: number, wallU: number, tunnel: number, see
 }
 
 /**
- * 塌下来的东西：洞顶的岩粉铺了一层，上面散着从洞顶掉下的碎晶；塌顶下还压着一块块碎石，多是玄武岩、夹着几块玛瑙与紫晶，每块中间一道棱、两边斜下去，块与块之间是暗缝。
- * w 是盖上去的分量；盖住了这一点（画成了碎晶或石块）返回 true
+ * 塌下来的东西：洞顶的岩粉铺了一层，上面散着从洞顶掉下的碎晶；塌顶下还压着一块块碎石，多是玄武岩、夹着几块玛瑙与紫晶（gold 是晶块有几成是黄水晶），
+ * 每块中间一道棱、两边斜下去，块与块之间是暗缝。w 是盖上去的分量；盖住了这一点（画成了碎晶或石块）返回 true
  */
-function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, seed: number): boolean {
+function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, gold: number, seed: number): boolean {
   blend(p, 120, 90, 156, (blocks ? 0.55 : 0.3) * w)
   const s = cellNearest(gx * 4.5, gy * 4.5, seed + 107)
   if (s.h > (blocks ? 0.45 : 0.6) && w > 0.35) {
@@ -344,7 +394,7 @@ function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, seed:
   const k = Math.min(1, w * 1.4)
   if (kind < 0.62) blend(p, 66 + 40 * kind, 50 + 24 * kind, 92 + 40 * kind, k)
   else if (kind < 0.86) blend(p, 184, 170, 212, k)
-  else amethyst(p, 0.6, frac(q.h * 3.9))
+  else gem(p, 0.6, frac(q.h * 3.9), frac(q.h * 11.3) < gold)
   const ridge = q.h * 29.7
   const side = q.dx * Math.cos(ridge) + q.dy * Math.sin(ridge) > 0 ? 0.75 : -0.75
   face(p, Math.cos(ridge) * side + q.dx * 0.6, Math.sin(ridge) * side + q.dy * 0.6, 1)
@@ -354,8 +404,8 @@ function rubble(p: Px, gx: number, gy: number, w: number, blocks: boolean, seed:
   return true
 }
 
-/** 地上半埋的一颗晶洞：外面一圈粗糙的壳，里面一圈圈玛瑙，再往里是一圈朝中心长的紫晶，正中黑洞洞的 */
-function nodule(p: Px, n: Nodule, wx: number, wy: number, gx: number, gy: number, seed: number): boolean {
+/** 地上半埋的一颗晶洞：外面一圈粗糙的壳，里面一圈圈玛瑙，再往里是一圈朝中心长的紫晶（黄水晶那几片里是黄晶），正中黑洞洞的 */
+function nodule(p: Px, n: Nodule, wx: number, wy: number, gx: number, gy: number, L: AmethystLayout, seed: number): boolean {
   const dx = wx - n.x
   const dy = wy - n.y
   const d = Math.hypot(dx, dy) / n.r
@@ -396,7 +446,7 @@ function nodule(p: Px, n: Nodule, wx: number, wy: number, gx: number, gy: number
     dim(p, 0.8 + 0.4 * t)
     return true
   }
-  amethyst(p, 1 - t, hash1(k, seed + 139))
+  gem(p, 1 - t, hash1(k, seed + 139), rollAt(n.x, n.y, seed + 141) < goldShare(L, n.x / UNIT, n.y / UNIT))
   const tx = -iy
   const ty = ix
   const side = a < 0 ? -1 : 1
@@ -410,9 +460,10 @@ function nodule(p: Px, n: Nodule, wx: number, wy: number, gx: number, gy: number
 
 /**
  * 一根晶体俯看的样子：直立的是个正六边形，看到的是尖上的六个锥面；斜着长的是一根尖朝外的棱柱，朝上的那个侧面在中间、左右两个侧面在两边，
- * 尖上是收拢的锥面。颜色从根到尖由白转紫，侧面中间一道亮线是晶体里的反光，边上一道暗线收住轮廓
+ * 尖上是收拢的锥面。颜色从根到尖由白转紫（黄水晶转金黄），侧面中间一道亮线是晶体里的反光，边上一道暗线收住轮廓
  */
-function prism(p: Px, q: Prism, wx: number, wy: number): boolean {
+function prism(p: Px, q: Prism, wx: number, wy: number, L: AmethystLayout): boolean {
+  const gold = (): boolean => rollAt(q.x, q.y, L.seed + 5) < goldShare(L, q.x / UNIT, q.y / UNIT)
   if (q.reach < q.r * UPRIGHT) {
     const dx = wx - q.x
     const dy = wy - q.y
@@ -421,7 +472,7 @@ function prism(p: Px, q: Prism, wx: number, wy: number): boolean {
     const ang = Math.atan2(dy, dx) - q.dir
     const sector = Math.floor((((ang / (Math.PI / 3)) % 6) + 6) % 6)
     const mid = q.dir + (sector + 0.5) * (Math.PI / 3)
-    amethyst(p, 0.45 + 0.55 * (1 - d), q.tone)
+    gem(p, 0.45 + 0.55 * (1 - d), q.tone, gold())
     face(p, Math.cos(mid) * 0.62, Math.sin(mid) * 0.62, 0.79)
     keyed(p)
     if (d > 0.84) dim(p, 0.6)
@@ -456,7 +507,7 @@ function prism(p: Px, q: Prism, wx: number, wy: number): boolean {
     nz = az * 0.62 + nz * 0.79
   }
   face(p, nx, ny, Math.max(0.08, nz))
-  amethyst(p, clamp01((s + q.r) / (end + q.r)), q.tone)
+  gem(p, clamp01((s + q.r) / (end + q.r)), q.tone, gold())
   keyed(p)
   if (Math.abs(qn) < 0.12) dim(p, 1.12)
   if (Math.abs(qn) > 0.8) dim(p, 0.6)
@@ -465,9 +516,9 @@ function prism(p: Px, q: Prism, wx: number, wy: number): boolean {
 }
 
 /** 一丛晶体里盖住这一点的最高的一根 */
-function cluster(p: Px, k: Cluster, wx: number, wy: number): boolean {
+function cluster(p: Px, k: Cluster, wx: number, wy: number, L: AmethystLayout): boolean {
   let hit = false
-  for (const q of k.prisms) if (prism(p, q, wx, wy)) hit = true
+  for (const q of k.prisms) if (prism(p, q, wx, wy, L)) hit = true
   return hit
 }
 
@@ -691,11 +742,12 @@ function rock(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy: 
   }
   // 从洞厅的晶壁进暗道，按进去多深换成玄武岩的壁
   const into = pocket ? 0 : intoTunnel(L, wx, wy, seed)
+  const gold = goldShare(L, gx, gy)
   if (!geode || into >= 1) tunnelWall(p, gx, gy, u, seed)
-  else if (into <= 0) lining(p, geode, gi, u, wx, wy, gx, gy, seed)
+  else if (into <= 0) lining(p, geode, gi, u, wx, wy, gx, gy, gold, seed)
   else {
     copy(WALL, p)
-    lining(p, geode, gi, u, wx, wy, gx, gy, seed)
+    lining(p, geode, gi, u, wx, wy, gx, gy, gold, seed)
     tunnelWall(WALL, gx, gy, u, seed)
     mix(p, WALL, into)
   }
@@ -742,22 +794,22 @@ function ground(p: Px, L: AmethystLayout, wx: number, wy: number, gx: number, gy
       ao = Math.max(ao, 0.4 * ease(0.4 * UNIT, 0, Math.hypot(along, across)))
     }
   }
-  if (debris > 0.02 && rubble(p, gx, gy, debris, blocks, seed)) return
+  if (debris > 0.02 && rubble(p, gx, gy, debris, blocks, goldShare(L, gx, gy), seed)) return
   dim(p, 1 - ao)
   for (let k = from; k < to; k++) {
     const code = L.bins.items[k]!
     const kind = code >> 16
     const idx = code & 0xffff
-    if (kind === BIN.nodule && nodule(p, L.nodules[idx]!, wx, wy, gx, gy, seed)) return
+    if (kind === BIN.nodule && nodule(p, L.nodules[idx]!, wx, wy, gx, gy, L, seed)) return
   }
   // 晶体按从矮到高盖：矮晶丛、晶簇、巨晶
   for (let k = from; k < to; k++) {
     const code = L.bins.items[k]!
-    if (code >> 16 === BIN.druse) cluster(p, L.druse[code & 0xffff]!, wx, wy)
+    if (code >> 16 === BIN.druse) cluster(p, L.druse[code & 0xffff]!, wx, wy, L)
   }
   for (let k = from; k < to; k++) {
     const code = L.bins.items[k]!
-    if (code >> 16 === BIN.cluster) cluster(p, L.clusters[code & 0xffff]!, wx, wy)
+    if (code >> 16 === BIN.cluster) cluster(p, L.clusters[code & 0xffff]!, wx, wy, L)
   }
   for (let k = from; k < to; k++) {
     const code = L.bins.items[k]!

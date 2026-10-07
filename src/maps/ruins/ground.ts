@@ -495,7 +495,7 @@ function siteRoom(b: Basin, x: number, y: number): number {
   return Math.min(r, -Math.max(-x, -y, x - (b.cols * b.cell) / UNIT, y - (b.rows * b.cell) / UNIT))
 }
 
-/** 几种砌墙的石头：冷灰的花岗岩与青石，偏蓝的，偏暖的，一地红叶衬着才显得出 */
+/** 几种砌墙的石头：冷灰的花岗岩与青石，偏蓝的，偏暖的，一地落叶衬着才显得出 */
 const STONES = [
   [182, 184, 186],
   [168, 172, 176],
@@ -999,7 +999,7 @@ function litterThick(stat: Static, x: number, y: number, bare: number, foot: num
   return Math.max(litterDens(stat, x, y) * bare, 0.8 * drift * smooth(FOOT_REACH_U, 0.15, foot))
 }
 
-/** 地上的落叶：铺得厚的地方先透出一层半烂的红褐，再一片片撒上落叶，叠在一起时后撒的压着先撒的；颜色多半是挨着的那棵树的叶色 */
+/** 地上的落叶：铺得厚的地方先透出一层半烂的橙褐，再一片片撒上落叶，叠在一起时后撒的压着先撒的；颜色多半是挨着的那棵树的叶色 */
 function litterOn(o: Px, stat: Static, x: number, y: number, dens: number, seed: number): void {
   if (dens <= 0.02) return
   const mottle = valueNoise(x * 4.5, y * 4.5, seed + 18) * 0.6 + valueNoise(x * 11, y * 11, seed + 20) * 0.4
@@ -1015,7 +1015,7 @@ function litterOn(o: Px, stat: Static, x: number, y: number, dens: number, seed:
 
 /**
  * 地面：台地上院落外是入了秋的草地，通到院门的小路踩出了泥；院落里回廊与房间铺着石板、碎拼石或赤陶砖，回廊院里是草；台地边外是陡坡，
- * 乱石与转红的灌木，越往下越暗。枫叶落了一地：墙根、墙角与台地边积得厚，铺地的中间与路上稀。塌下的碎石盖在上面，倒下的石柱横在地上；
+ * 乱石与转橙的灌木，越往下越暗。枫叶落了一地：墙根、墙角与台地边积得厚，铺地的中间与路上稀。塌下的碎石盖在上面，倒下的石柱横在地上；
  * 挡人的墙露出墙顶的石块和朝屏幕下方的立面，跨得过的残基贴着地面，封门处钉着木板。
  * 按法线与太阳打光，往太阳那边被墙挡住的地方在影子里，墙脚一道接地线、被周围的墙挡掉天光，枫树背着太阳投下斑驳透光的树影。只画 rect 那一块
  */
@@ -1109,7 +1109,7 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
         // 这种地面上落叶留得住几成
         let bare = 1
         if (room < 0.25) {
-          // 台地边外的陡坡：乱石与转红的灌木，坡面朝外倾，越往下越暗
+          // 台地边外的陡坡：乱石与转橙的灌木，坡面朝外倾，越往下越暗
           const down = -room
           const st0 = cellNearest(x * 1.8, y * 1.8, seed + 101)
           const sd = Math.sqrt(st0.dx * st0.dx + st0.dy * st0.dy) / (0.3 + 0.25 * st0.h)
@@ -1124,7 +1124,7 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
           }
           grass(PX2, x, y, seed + 105, 0.2, 0)
           mix(o, PX2.r * 0.75, PX2.g * 0.8, PX2.b * 0.7, smooth(0.6, 0, down) * 0.8)
-          mix(o, 104 + 30 * valueNoise(x * 3, y * 3, seed + 119), 56 + 14 * valueNoise(x * 3, y * 3, seed + 121), 36, scrub * 0.85)
+          mix(o, 136 + 30 * valueNoise(x * 3, y * 3, seed + 119), 90 + 16 * valueNoise(x * 3, y * 3, seed + 121), 40, scrub * 0.85)
           const h = 0.15
           const gx = (siteRoom(sc.basin, x + h, y) - siteRoom(sc.basin, x - h, y)) / (2 * h)
           const gy = (siteRoom(sc.basin, x, y + h) - siteRoom(sc.basin, x, y - h)) / (2 * h)
@@ -1132,7 +1132,7 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
           o.nx = -gx * slope
           o.ny = -gy * slope
           o.nz = 1
-          far = 1 - 0.55 * smooth(0.2, 6, down)
+          far = 1 - 0.45 * smooth(0.2, 6, down)
           bare = 0.9
         } else if (!sp) {
           const path = pathAt(sc, u, v)
@@ -1170,10 +1170,10 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
             o.b *= k
           }
         }
-        // 墙脚的爬山虎：红透了的一小片，伸到地上
+        // 墙脚的爬山虎：橙红的一小片，伸到地上
         if (cell >= 0) {
           const ivy = smooth(0.62, 0.74, fbm(x / 1.4, y / 1.4, seed + 113, 3)) * smooth(0.08, 0.2, ao)
-          if (ivy > 0) mix(o, 142 + 40 * valueNoise(x * 9, y * 9, seed + 115), 46 + 20 * valueNoise(x * 9, y * 9, seed + 117), 34, ivy * 0.9)
+          if (ivy > 0) mix(o, 196 + 40 * valueNoise(x * 9, y * 9, seed + 115), 96 + 24 * valueNoise(x * 9, y * 9, seed + 117), 36, ivy * 0.9)
         }
       }
       // 光：朝太阳的面亮；往太阳那边被挡住的在影子里；墙脚被挡掉天光；斑驳的树影；坡下暗；整张往秋天的暖里调
@@ -1182,13 +1182,13 @@ export function paintGround(sc: PaintScene, stat: Static, prep: Prepared, st: Pa
       const sh = cell < 0 ? 0 : o.top ? smooth(-0.02, 0.1, sample(g, prep.shadow, u, v) - o.z) : sample(g, prep.ground, u, v) * smooth(0.6, 0.05, o.z) + smooth(-0.02, 0.1, sample(g, prep.shadow, u, v) - o.z) * smooth(0.05, 0.6, o.z)
       const shade = Math.max(sh * WALL_SHADE, dappleAt(stat.crowns, x, y))
       const sun = 0.82 * lambert * (1 - Math.min(1, shade / WALL_SHADE))
-      const sky = 0.48 * (1 - 0.55 * ao)
+      const sky = 0.54 * (1 - 0.55 * ao)
       const k = (sky + Math.max(0, sun)) * far
       const lit = Math.max(0, sun) / Math.max(0.001, sky + Math.max(0, sun))
       const o0 = (py - rect.y0) * w * 4 + (px - rect.x0) * 4
-      out[o0] = o.r * k * (0.92 + 0.16 * lit) * GRADE.r
-      out[o0 + 1] = o.g * k * (0.97 + 0.05 * lit) * GRADE.g
-      out[o0 + 2] = o.b * k * (1.08 - 0.18 * lit) * GRADE.b
+      out[o0] = o.r * k * (0.95 + 0.13 * lit) * GRADE.r
+      out[o0 + 1] = o.g * k * (0.98 + 0.04 * lit) * GRADE.g
+      out[o0 + 2] = o.b * k * (1.03 - 0.13 * lit) * GRADE.b
       out[o0 + 3] = 255
     }
   }
