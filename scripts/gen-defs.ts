@@ -878,6 +878,11 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   report(`runs.${id}`, CHECKS.run(r))
 }
 
+/** 冒险按新地图的顺序列章：每张新地图至多一章 */
+const chapterMaps = Object.values<RunDef>(RUNS).flatMap((r) => (r.chapter === undefined ? [] : [r.chapter]))
+need(chapterMaps.every((m) => BOX_MAPS.includes(m)), `冒险的章只能打在新地图上：${chapterMaps.join('、')}`)
+need(new Set(chapterMaps).size === chapterMaps.length, `冒险里一张图只能有一章：${chapterMaps.join('、')}`)
+
 for (const [id, e] of Object.entries<ExperimentDef>(EXPERIMENTS)) {
   need(PACK.has(e.emoji), `experiments.${id} 的 emoji 不在表情包里：${e.emoji}`)
   need(BOX_MAPS.includes(e.fight.map), `experiments.${id} 用了旧地图：${e.fight.map}`)
