@@ -70,14 +70,12 @@ import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
 import { toPx } from '../../data/px'
 import { bossFor, MAPS } from '../../data/maps'
-import type { MapDef } from '../../types/maps'
-import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 import { rollCarry } from '../utils/battleFx'
 import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
-import { clockSec, clockWave } from '../fight/clock'
+import { clockWave } from '../fight/clock'
 import type { ByKind } from '../../util/record'
 
 type DriveOf = ByKind<DriveDef>
@@ -279,19 +277,10 @@ export function spawnBrood(
   }
 }
 
-export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; hour: number } | undefined {
-  const cfg = MAPS[sim.mapId].dayNight
-  if (!cfg) return undefined
-  return { cfg, hour: hourAt(clockSec(sim), cfg) }
-}
-
-/** 这一阶段的配比，不写就按地图与波数，昼夜图按时辰 */
+/** 这一阶段的配比，不写就按地图与波数 */
 function currentMix(sim: Sim): readonly EnemyMixEntry[] {
   if (sim.fight.mix) return sim.fight.mix
-  const m = MAPS[sim.mapId]
-  const dn = dayNightOf(sim)
-  const rows = dn ? ((isDayAt(dn.hour) ? m.dayMix : m.nightMix) ?? m.mix) : m.mix
-  return enemyMixAt(rows, sim.run.wave)
+  return enemyMixAt(MAPS[sim.mapId].mix, sim.run.wave)
 }
 
 /** 敌方身体数，刷怪上限只看它 */
@@ -346,14 +335,13 @@ function foeSpot(sim: Sim, foe: FoeSpec, boss: boolean): Point {
   }
 }
 
-/** 预兆打在哪；有出怪口的地图上这是落点，entry 是它从哪个出怪口、怎么进场 */
+/** 预兆打在落点上，entry 是它从哪个出怪口、怎么进场 */
 export interface Spot extends Point {
-  readonly entry?: Entry
+  readonly entry: Entry
 }
 
-/** 一只敌人在哪预兆、从哪进场：先按站位定点；有出怪口的地图上交给出怪口去定，没有的地图就是站位那一点 */
+/** 一只敌人在哪预兆、从哪进场：先按站位定点，再交给出怪口去定 */
 export function placeFoe(sim: Sim, foe: FoeSpec, kind: EnemyKind, boss: boolean): Spot {
-  if (!MAPS[sim.mapId].gates) return foeSpot(sim, foe, boss)
   const entry = gateEntry(sim, foe.at, kind, boss, () => foeSpot(sim, foe, boss))
   return { x: entry.x, y: entry.y, entry }
 }

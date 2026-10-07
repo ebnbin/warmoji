@@ -34,16 +34,15 @@ export function spawnStep(sim: Sim): void {
   landEntries(sim)
   for (const e of [...query(sim.world, [Telegraph, Due])]) {
     if (now < Due.at[e]!) continue
-    const entry = telegraphEntry[e]
-    if (entry && entry.moves < MAX_MOVES && !sim.hooks.canSpawn(sim, entry.x, entry.y, telegraphDef[e]!.radius)) {
+    const entry = telegraphEntry[e]!
+    if (entry.moves < MAX_MOVES && !sim.hooks.canSpawn(sim, entry.x, entry.y, telegraphDef[e]!.radius)) {
       retarget(sim, e, entry)
       continue
     }
     const boss = Telegraph.boss[e] === 1
     const traits = telegraphTraits[e] ?? {}
-    const eid = spawnEnemy(sim, atlas, telegraphDef[e]!, entry?.sx ?? Transform.x[e]!, entry?.sy ?? Transform.y[e]!,
-      Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss, traits)
-    if (entry) enterBody(sim, eid, entry)
+    const eid = spawnEnemy(sim, atlas, telegraphDef[e]!, entry.sx, entry.sy, Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss, traits)
+    enterBody(sim, eid, entry)
     if (Telegraph.loud[e]) playSfx('boom')
     if (traits.carries) {
       enemyCarries[eid] = traits.carries

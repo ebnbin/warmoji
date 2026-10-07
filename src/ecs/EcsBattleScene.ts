@@ -39,7 +39,6 @@ import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
 import { place } from './render/tri'
 import { Presentation } from './presentation'
-import { remapSim } from './systems/shared/remap'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill } from './views'
 import { viewFor } from './viewRegistry'
@@ -311,7 +310,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     if (!sim) return '不在战斗中'
     const st = gateStats(sim)
-    if (!st) return '这张图没有出怪口：敌人在能站的地方原地冒出来'
     return [
       ...st.rows.map((r) => `${r.name.padEnd(4, '　')} ${String(r.n).padStart(3)} 处 · 共 ${String(r.total).padStart(5)} · 十秒 ${String(r.recent).padStart(4)}`),
       `够不着出怪口、原地出来 ${st.misses} · 落点站不住换地方 ${st.moves}`,
@@ -377,7 +375,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const g = (this.gateGfx ??= this.add.graphics().setDepth(1002))
     g.clear()
     g.setVisible(true)
-    const kinds = Object.keys(MAPS[sim.mapId].gates?.kinds ?? {})
+    const kinds = Object.keys(MAPS[sim.mapId].gates.kinds)
     for (const gate of gatesNow(sim)) {
       if (gate.shape === 'area') continue
       const color = GATE_COLORS[kinds.indexOf(gate.kind) % GATE_COLORS.length]!
@@ -406,7 +404,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 
   /**
-   * 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，沙盒地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下。
+   * 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，按方框取景的地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下。
    * 线宽按屏幕上的粗细定：标准缩放时照原样，拉远看整张图时不跟着变细
    */
   private drawDevGrid(): void {
@@ -509,7 +507,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     // 布景躺在地上，和躺着的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt)
-    if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
+    if (light.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
@@ -806,24 +804,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
 
   private onViewportChanged(): void {
-    const sim = this.sim
-    const fromW = this.mapW
-    const fromH = this.mapH
-    const { w, h, origin } = this.map.layout(this.ctx)
-    this.ctx.w = this.mapW = w
-    this.ctx.h = this.mapH = h
     this.map.resize(this.ctx)
     this.framing = this.map.framing(this.ctx)
     this.lens.frame(this.framing)
-    if (w === fromW && h === fromH) return
-    if (sim) {
-      sim.mapW = w
-      sim.mapH = h
-      remapSim(sim, fromW, fromH, w, h)
-      this.anchor = { x: leaderX(sim), y: leaderY(sim) }
-    } else {
-      this.anchor = { x: origin.x, y: origin.y }
-    }
   }
 
 

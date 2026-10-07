@@ -68,9 +68,8 @@ export function layoutTeam(sim: Sim): void {
   const leader = sim.leader
   const cx = leaderX(sim)
   const cy = leaderY(sim)
-  const medium = sim.hooks.mediumVelocity(sim, cx, cy)
-  const hx = Phys.vx[leader]! - medium.x
-  const hy = Phys.vy[leader]! - medium.y
+  const hx = Phys.vx[leader]!
+  const hy = Phys.vy[leader]!
   const speed = Math.hypot(hx, hy)
   if (speed > HEADING_MIN * UNIT) turnHeading(sim, hx / speed, hy / speed, dt)
   const followers = followersOf(sim)

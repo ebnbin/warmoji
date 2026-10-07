@@ -9,7 +9,7 @@ export interface Rect {
   readonly h: number
 }
 
-/** 沙盒地图的方框，像素：左上角是世界原点 */
+/** 地图的方框，像素：左上角是世界原点 */
 export const FRAME: Rect = { x: 0, y: 0, w: FRAME_U * UNIT, h: FRAME_U * UNIT }
 
 /** 方框里的安全区，像素：能走的地方与地图的边都在这里面 */

@@ -24,7 +24,7 @@ export class EcsSpriteBatch extends SpriteBatch {
   private readonly cutAt: CutAt | undefined
 
   /** paint 须按 z 从小到大排好 */
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight | undefined, lightAt: LightAt | undefined, cutAt: CutAt | undefined) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight, lightAt: LightAt | undefined, cutAt: CutAt | undefined) {
     super(scene, LayerType.Sprite, depth, atlas, paint, light, lightAt)
     this.world = world
     this.zMin = zMin

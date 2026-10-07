@@ -28,7 +28,6 @@ import type { Landmark } from '../landmark'
 import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
-const NO_GHOSTS: Point[] = []
 /** 樱花按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a4c1e
 
@@ -253,21 +252,11 @@ function board(sim: Sim, s: SakuraState): void {
  * 桥上的身体不沾水、出不了栏杆，桥下的照样漂
  */
 export const sakura: WorldHooks = {
-  torus: false,
   worldDelta(_sim, fromX, fromY, toX, toY) {
     return { x: toX - fromX, y: toY - fromY }
   },
-  ghosts() {
-    return NO_GHOSTS
-  },
   wrap(_sim, x, y) {
     return { x, y }
-  },
-  projectileLifeMs() {
-    return 0
-  },
-  mediumVelocity() {
-    return ZERO
   },
   pull() {
     return ZERO

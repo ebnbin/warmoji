@@ -60,12 +60,11 @@ export function finishCharacterPops(sim: Sim): void {
   }
 }
 
-/** 相对介质的速度先低通滤波，滤波后快过阈值才更新朝向，静止时保留上一次的方向 */
+/** 速度先低通滤波，滤波后快过阈值才更新朝向，静止时保留上一次的方向 */
 function face(sim: Sim, eid: number): void {
-  const medium = sim.hooks.mediumVelocity(sim, Transform.x[eid]!, Transform.y[eid]!)
   const k = Math.min(1, sim.dtMs / SQUAD.facingTauMs)
-  const fvx = Facing.vx[eid]! + (Phys.vx[eid]! - medium.x - Facing.vx[eid]!) * k
-  const fvy = Facing.vy[eid]! + (Phys.vy[eid]! - medium.y - Facing.vy[eid]!) * k
+  const fvx = Facing.vx[eid]! + (Phys.vx[eid]! - Facing.vx[eid]!) * k
+  const fvy = Facing.vy[eid]! + (Phys.vy[eid]! - Facing.vy[eid]!) * k
   Facing.vx[eid] = fvx
   Facing.vy[eid] = fvy
   const speed = Math.hypot(fvx, fvy)

@@ -289,8 +289,6 @@ export const FxSlash = { r: f32() }
 
 export const FxBoom = { size: f32() }
 
-export const Meteor = { sx: f32(), sy: f32(), ex: f32(), ey: f32(), t: f32() }
-
 export const Modifier = { totalMs: f32() }
 
 export const Due = { at: f32() }

@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
-import { BOX_MAPS } from '../data/boxMaps'
 import { CHARACTERS } from '../data/characters'
 import { fightCount, RUN_IDS, RUNS } from '../data/runs'
 import { heatOf, MUTATOR_IDS, MUTATORS } from '../data/mutators'
@@ -29,7 +28,7 @@ const RANDOM_SLOT = '2753'
 
 /** 冒险的每一章是一局，在冒险页签里按地图的顺序挑；实验单独试玩的那一局都在实验页签里挑 */
 const isExperiment = (id: RunId): id is ExperimentId => EXPERIMENT_IDS.some((e) => e === id)
-const CHAPTERS: readonly RunId[] = BOX_MAPS.flatMap((m) => RUN_IDS.filter((id) => RUNS[id].chapter === m))
+const CHAPTERS: readonly RunId[] = MAP_IDS.flatMap((m) => RUN_IDS.filter((id) => RUNS[id].chapter === m))
 const ADVENTURE_TAB = { key: 'adventure', emoji: '1f3d5', name: '冒险' } as const
 const EXPERIMENT_TAB = { key: 'experiments', emoji: '2697', name: '实验' } as const
 /** 沙盒排在最前：挑一张地图开一局沙盒 */
@@ -48,7 +47,7 @@ const MUTATOR_ROW = { h: 68, gap: 8 } as const
 
 export class MapScene extends Phaser.Scene {
   private preserveOnRestart = false
-  private boxId: MapId = BOX_MAPS[0]!
+  private boxId: MapId = MAP_IDS[0]!
   private picked: Record<PickTab, RunId | undefined> = { [ADVENTURE_TAB.key]: CHAPTERS[0], [EXPERIMENT_TAB.key]: EXPERIMENT_IDS[0] }
   private mode: Mode = BOX_TAB.key
   private frame!: PageFrame
@@ -90,7 +89,7 @@ export class MapScene extends Phaser.Scene {
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
     if (!preserved) {
-      this.boxId = loadMap(browserStorage(), BOX_MAPS)
+      this.boxId = loadMap(browserStorage(), MAP_IDS)
       this.mutators = loadMutators(browserStorage())
     }
     this.bests = loadLabs(browserStorage())
@@ -136,7 +135,7 @@ export class MapScene extends Phaser.Scene {
           const best = this.bests[id]
           const stars = Array.from({ length: best?.stars ?? 0 }, () => GROUP_ICONS.stars)
           const badge = best && best.heat > 0 ? GROUP_ICONS.heat : undefined
-          if (chapter !== undefined) return { key: id, emoji: MAPS[chapter].emoji, title: chapterName(BOX_MAPS.indexOf(chapter), chapter), icons: stars, badge }
+          if (chapter !== undefined) return { key: id, emoji: MAPS[chapter].emoji, title: chapterName(MAP_IDS.indexOf(chapter), chapter), icons: stars, badge }
           return { key: id, emoji: RUNS[id].emoji, title: RUNS[id].name, icons: [...(map ? [MAPS[map].emoji] : []), ...stars], badge }
         }),
       )
@@ -147,7 +146,7 @@ export class MapScene extends Phaser.Scene {
         saveMap(browserStorage(), key)
         this.refresh()
       }
-      grid.setItems(BOX_MAPS.map((id) => ({ key: id, emoji: MAPS[id].emoji })))
+      grid.setItems(MAP_IDS.map((id) => ({ key: id, emoji: MAPS[id].emoji })))
     }
 
     this.confirm = new Button(this, f.centerX, f.footerY, { label: '', keys: ['ENTER', 'SPACE'], onTap: () => this.start() })

@@ -26,7 +26,6 @@ import type { Landmark } from '../landmark'
 import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
-const NO_GHOSTS: Point[] = []
 /** 残垣按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x5a1e
 /** 身体过得去的砌体分这么多档（石块层数），各按一张距离场与一张寻路走 */
@@ -586,21 +585,11 @@ function seenFromLeader(sim: Sim, x: number, y: number): boolean {
  * 失去支撑的部分塌下来砸人、在墙脚堆成碎石、扬起挡视线的尘雾；碎石上走得慢。怪物刷在队长看不见的地方
  */
 export const ruins: WorldHooks = {
-  torus: false,
   worldDelta(_sim, fromX, fromY, toX, toY) {
     return { x: toX - fromX, y: toY - fromY }
   },
-  ghosts() {
-    return NO_GHOSTS
-  },
   wrap(_sim, x, y) {
     return { x, y }
-  },
-  projectileLifeMs() {
-    return 0
-  },
-  mediumVelocity() {
-    return ZERO
   },
   pull() {
     return ZERO

@@ -1,10 +1,9 @@
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { bossFor, MAPS } from '../../data/maps'
 import type { Banner, LegacySquad } from '../../types/runs'
-import { dayNightOf, foeCount, spawnBoss, telegraphOne } from '../entities/enemy'
+import { foeCount, spawnBoss, telegraphOne } from '../entities/enemy'
 import { scheduleOrder } from '../entities/schedule'
 import { telegraphCount } from '../entities/telegraph'
-import { isDayAt } from '../worlds/daynight'
 import type { Sim } from '../sim'
 import { clockWave, runCurve } from './clock'
 import { calm, foeOf, phaseMs, phaseOf, squadSize } from './state'
@@ -41,19 +40,14 @@ export function callBoss(sim: Sim): void {
   spawnBoss(sim)
 }
 
-function spawnIntervalScale(sim: Sim): number {
-  const dn = dayNightOf(sim)
-  return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
-}
-
-/** 这条连续刷怪此刻的间隔：写了就按它，从它开刷起匀速变到 ramp 的间隔；不写就按这一局的难度曲线随进度缩短、人越多刷得越快、昼夜图按时辰；敌人变多的效果都再除一道 */
+/** 这条连续刷怪此刻的间隔：写了就按它，从它开刷起匀速变到 ramp 的间隔；不写就按这一局的难度曲线随进度缩短、人越多刷得越快；敌人变多的效果都再除一道 */
 export function streamInterval(sim: Sim, st: StreamState): number {
   const rule = st.rule
   const mul = rule.intervalMul ?? 1
   if (rule.intervalMs === undefined) {
     const curve = runCurve(sim)
     const teamFactor = curve.teamFactorBase + curve.teamFactorPerMember * sim.characters.length
-    return (clockWave(sim).spawnIntervalMs * mul * spawnIntervalScale(sim)) / (teamFactor * sim.foes.count)
+    return (clockWave(sim).spawnIntervalMs * mul) / (teamFactor * sim.foes.count)
   }
   const ramp = rule.ramp
   const since = Math.max(0, phaseMs(sim) - (rule.fromMs ?? 0))

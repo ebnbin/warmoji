@@ -8,99 +8,10 @@ export interface MapDecor {
   readonly alpha: readonly [number, number]
   readonly density: readonly [number, number]
 }
-interface WallsConfig {
-  readonly blocks: number
-  readonly maxLen: number
-  readonly centerClearU: number
-  readonly spawnMinCellDist: number
-  readonly reflowMs: number
-  /** 身体撞墙时的半径上限，过道一格宽 */
-  readonly bodyRadiusCapU: number
-}
-export interface DayNightConfig {
-  readonly cycleSec: number
-  readonly startHour: number
-  readonly visionMax: number
-  readonly visionMid: number
-  readonly visionMin: number
-  readonly fogRadiusDusk: number
-  readonly fogRadiusMidnight: number
-  readonly fogAlphaMax: number
-  readonly daySpawnScale: number
-  readonly nightSpawnScale: number
-}
 /** 地面对体力的影响：赶路每走一格扣几点体力，歇着时体力回复乘多少 */
 export interface GroundStamina {
   readonly exertion: number
   readonly regen: number
-}
-export interface IceConfig {
-  readonly floeU: number
-  readonly traction: number
-  readonly waterTraction: number
-  readonly waterViscosity: number
-  /** 水里的体力：冰面按地图的体力算 */
-  readonly waterExertion: number
-  readonly waterRegen: number
-  readonly waterTeamDps: number
-  readonly waterEnemyDps: number
-  readonly waterTickMs: number
-}
-export interface SpaceConfig {
-  readonly blackholeRadiusU: number
-  readonly meteor: {
-    readonly intervalMs: number
-    readonly intervalJitterMs: number
-    readonly warnMs: number
-    readonly radiusU: number
-    readonly speedU: number
-    readonly travelU: number
-    readonly offsetU: number
-    readonly damage: number
-  }
-}
-/** 旧星云：圆心在原点的空心厚球壳，空腔里有一个黑洞，引力按普卢默软化的万有引力 g = GM·r/(r²+ε²)^{3/2} 作用于一切 */
-export interface NebulaOldConfig {
-  /** 壳层的引力按牛顿壳层定理：空腔里为零，壳层里只算内侧那部分质量，外缘以外如同全部质量在中心 */
-  readonly shell: {
-    readonly innerU: number
-    readonly outerU: number
-    /** 引力常数乘壳层总质量，格³/秒² */
-    readonly gm: number
-  }
-  /** 构建期校验的余量：任何身体以 speedMul 倍的最快速度走到停下处，再往外瞬移 leapU 格，引力仍把它拉回 */
-  readonly contain: {
-    readonly speedMul: number
-    readonly leapU: number
-  }
-  readonly hole: {
-    /** 引力常数乘黑洞质量，格³/秒² */
-    readonly gm: number
-    readonly softeningU: number
-    /** 视界半径：中心进了这个圈就被吞噬 */
-    readonly horizonU: number
-    /** 黑洞离星域中心的距离范围，方向随机 */
-    readonly fromCenterU: readonly [number, number]
-    /** 刷怪点与据点离黑洞至少多远 */
-    readonly clearU: number
-  }
-  readonly meteor: {
-    readonly firstMs: number
-    readonly intervalMs: number
-    readonly intervalJitterMs: number
-    readonly warnMs: number
-    /** 流星本体半径：中心距小于它就被砸中 */
-    readonly radiusU: number
-    /** 从壳层内壁冲进空腔时的速度 */
-    readonly speedU: number
-    /** 瞄准点在队长两侧最多偏多远 */
-    readonly offsetU: number
-    /** 以 speedU 飞行时的伤害，按动能随速度的平方变化 */
-    readonly damage: number
-    /** 轨迹按这个步长积分，最长飞这么久 */
-    readonly stepMs: number
-    readonly maxFlightMs: number
-  }
 }
 /**
  * 视界：深空里一团空心的星云，活动的平面是它的赤道面，空腔里有一个黑洞。人、怪、掉落物、子弹与流星都受黑洞与星云壳层的万有引力：
@@ -481,22 +392,6 @@ export interface AmethystConfig {
   }
   /** 怪物只刷在照度不到 spawnLux 的地方 */
   readonly spawnLux: number
-}
-export interface OldRiverConfig {
-  readonly viewScale: number
-  readonly width: number
-  readonly flow: number
-  /** 正逆流、正顺流赶路时费力的倍率，斜着走按夹角插值 */
-  readonly upstream: number
-  readonly downstream: number
-  /** 拾取物漂过下游边多远消失 */
-  readonly coinCullPad: number
-  /** 敌人漂过下游边多远就被冲走 */
-  readonly enemyCullPad: number
-  readonly driftCount: number
-  readonly driftSpeedMul: readonly [number, number]
-  readonly waveSlow: number
-  readonly waveFast: number
 }
 /** 按流量 Q（米³/秒）定的河道：水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米），坡降由曼宁糙率反算 */
 export interface ChannelConfig {
@@ -1085,12 +980,6 @@ export interface ExitConfig {
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
 }
-export interface TorusConfig {
-  readonly arenaLong: number
-  readonly arenaShort: number
-  readonly projectileLifeMs: number
-  readonly frame: number
-}
 /** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
 export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
 /** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光，petals 落花，sand 沙尘，maple 枫叶，silt 水底扬起的泥，bubbles 一串气泡，shards 迸开的碎晶，paper 碎纸屑 */
@@ -1159,27 +1048,18 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'floe' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'deep' | 'petri' | 'theater' | 'exit'
+  readonly kind: 'ruins' | 'nebula' | 'volcano' | 'floe' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'deep' | 'petri' | 'theater' | 'exit'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
-  /** 开着新画风时战场上的精灵怎么受光、身体怎么投影；不写的地图照旧平光、没有影子 */
-  readonly light?: UnitLight
+  /** 开着新画风时战场上的精灵怎么受光、身体怎么投影 */
+  readonly light: UnitLight
   readonly decor: MapDecor
-  readonly drift?: readonly string[]
   readonly mix: readonly EnemyMixRow[]
-  /** 敌人从地图上哪些地方、怎么进场；不写就在能站的地方原地冒出来 */
-  readonly gates?: GatesConfig
-  readonly dayMix?: readonly EnemyMixRow[]
-  readonly nightMix?: readonly EnemyMixRow[]
-  readonly walls?: WallsConfig
-  readonly dayNight?: DayNightConfig
-  readonly ice?: IceConfig
-  readonly space?: SpaceConfig
-  readonly nebulaOld?: NebulaOldConfig
+  /** 敌人从地图上哪些地方、怎么进场 */
+  readonly gates: GatesConfig
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
-  readonly oldRiver?: OldRiverConfig
   readonly floe?: FloeConfig
   readonly amethyst?: AmethystConfig
   readonly desert?: DesertConfig
@@ -1190,7 +1070,6 @@ export interface MapDef {
   readonly petri?: PetriConfig
   readonly theater?: TheaterConfig
   readonly exit?: ExitConfig
-  readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
@@ -1206,9 +1085,4 @@ export interface DecorInstance {
   sizeU: number
   alpha: number
   rotation: number
-}
-export interface MapDefaults {
-  readonly width: number
-  readonly height: number
-  readonly cameraMargin: number
 }

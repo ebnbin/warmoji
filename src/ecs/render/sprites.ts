@@ -89,7 +89,7 @@ export class SpriteBatch extends EcsLayer {
     multiTexturing: true,
   } as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions
   protected readonly paint: readonly PaintSprite[]
-  private readonly light: UnitLight | undefined
+  private readonly light: UnitLight
   private readonly lightAt: LightAt | undefined
   /** 这一帧打不打光：新画风随时能在设置里关掉 */
   private lit = false
@@ -97,7 +97,7 @@ export class SpriteBatch extends EcsLayer {
   /** 四个角按 TL、BL、TR、BR 的染色 */
   private readonly tints = new Uint32Array(4)
 
-  constructor(scene: Phaser.Scene, type: LayerType, depth: number, atlas: EcsAtlas, paint: readonly PaintSprite[], light: UnitLight | undefined, lightAt: LightAt | undefined) {
+  constructor(scene: Phaser.Scene, type: LayerType, depth: number, atlas: EcsAtlas, paint: readonly PaintSprite[], light: UnitLight, lightAt: LightAt | undefined) {
     super(scene, type, depth)
     this.atlas = atlas
     this.paint = paint
@@ -122,7 +122,7 @@ export class SpriteBatch extends EcsLayer {
   /** 这台镜头这一帧怎么画：镜头的矩阵，打不打光 */
   protected aim(camera: Camera, drawingContext: Phaser.Renderer.WebGL.DrawingContext): void {
     this.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
-    this.lit = this.light !== undefined && paintedEmojiOn()
+    this.lit = paintedEmojiOn()
   }
 
   protected drawPaint(node: QuadNode, drawingContext: Phaser.Renderer.WebGL.DrawingContext, s: PaintSprite): void {

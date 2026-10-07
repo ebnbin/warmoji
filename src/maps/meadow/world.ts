@@ -20,7 +20,6 @@ import type { Landmark } from '../landmark'
 import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
-const NO_GHOSTS: Point[] = []
 /** 草甸按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x6d3ad0
 
@@ -111,21 +110,11 @@ function openNear(plan: MeadowPlan, p: Point, room: number): Point {
  * 林缘、栅栏与坡脚是硬边界，身体走到跟前就停住、顺着边滑；林子与陡坡挡子弹和视线，栅栏有缝，子弹照样穿过去
  */
 export const meadow: WorldHooks = {
-  torus: false,
   worldDelta(_sim, fromX, fromY, toX, toY) {
     return { x: toX - fromX, y: toY - fromY }
   },
-  ghosts() {
-    return NO_GHOSTS
-  },
   wrap(_sim, x, y) {
     return { x, y }
-  },
-  projectileLifeMs() {
-    return 0
-  },
-  mediumVelocity() {
-    return ZERO
   },
   pull() {
     return ZERO

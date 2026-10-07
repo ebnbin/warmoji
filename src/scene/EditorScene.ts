@@ -1,9 +1,8 @@
 import Phaser from 'phaser'
 import { CHARACTERS, ROSTER_IDS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import { BOX_MAPS } from '../data/boxMaps'
 import { EXPERIMENT_IDS } from '../data/experiments'
-import { MAPS } from '../data/maps'
+import { MAP_IDS, MAPS } from '../data/maps'
 import { pathText } from '../data/runCheck'
 import type { Issue, Path } from '../data/runCheck'
 import { RUNS } from '../data/runs'
@@ -83,12 +82,12 @@ const inset = (r: Rect, d: number): Rect => ({ x: r.x + d, y: r.y + d, w: r.w - 
 
 const headerTitle = (): string => `{${currentDraft().emoji}} 关卡编辑器`
 
-/** 页面上会出现的图标：导航与操作的、能换上的每一局，外加所有敌人、新地图与角色 */
+/** 页面上会出现的图标：导航与操作的、能换上的每一局，外加所有敌人、地图与角色 */
 function editorEmojis(): EmojiRef[] {
   return [
     ...[WARN, OK, PLAY, currentDraft().emoji, defaultEmoji(), ...EXPERIMENT_IDS.map((id) => RUNS[id].emoji), ...Object.values(ICON), ...Object.values(SPAWN_KINDS).map((k) => k.icon), ...Object.values(END_KINDS).map((k) => k.icon)].map((id) => ({ id })),
     ...Object.values(ENEMIES).map((e) => ({ id: e.emoji, outline: 'enemy' as const })),
-    ...BOX_MAPS.map((id) => ({ id: MAPS[id].emoji })),
+    ...MAP_IDS.map((id) => ({ id: MAPS[id].emoji })),
     ...ROSTER_IDS.map((id) => ({ id: CHARACTERS[id].emoji, outline: 'player' as const })),
   ]
 }

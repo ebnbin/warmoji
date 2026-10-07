@@ -27,7 +27,6 @@ import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 import type { Solid } from '../../ecs/worlds/solids'
 
 const ZERO: Point = { x: 0, y: 0 }
-const NO_GHOSTS: Point[] = []
 /** 弹体飞到离队长这么近（格）的对面那一半就消失：再往前就该从背后绕回来了 */
 const FAR_EDGE_U = 0.5
 /** 追人的离标志物这么近（格，在身体半径之外）就开始贴着边绕；游荡与逃跑的看得远一些 */
@@ -247,21 +246,11 @@ function paceAt(s: DesertState, cfg: DesertConfig, x: number, y: number, dx: num
  * 赶路按坡度与沙的松实出力，吃力时走慢；背阴处歇着回得快；沙上留下印子，踩实的地方省力，过一阵被风吹平
  */
 export const desert: WorldHooks = {
-  torus: true,
   worldDelta(sim, fromX, fromY, toX, toY) {
     return { x: wrapU(toX - fromX, sim.mapW), y: wrapU(toY - fromY, sim.mapH) }
   },
-  ghosts() {
-    return NO_GHOSTS
-  },
   wrap(sim, x, y) {
     return nearLeader(sim, x, y)
-  },
-  projectileLifeMs() {
-    return 0
-  },
-  mediumVelocity() {
-    return ZERO
   },
   pull() {
     return ZERO

@@ -95,8 +95,7 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   Proj.breach[eid] = spec.breach ?? 0
   Proj.through[eid] = spec.through ? 1 : 0
   const life = arc > 0 && spec.speed > 0 ? Math.min(spec.lifeMs, (reach / spec.speed) * 1000) : spec.lifeMs
-  const mapLife = sim.hooks.projectileLifeMs(sim)
-  Proj.dieAt[eid] = sim.elapsedMs + (mapLife > 0 ? Math.min(mapLife, life) : life)
+  Proj.dieAt[eid] = sim.elapsedMs + life
   Depth.z[eid] = 8
   projOnHit[eid] = spec.onHit
   projHitUids[eid] = new Set()

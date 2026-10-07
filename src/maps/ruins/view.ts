@@ -456,7 +456,7 @@ export class RuinsView implements MapView {
     const g = this.stoneGfx
     if (!g) return
     g.clear()
-    const reach = v.def.light?.shadow?.length ?? 0
+    const reach = v.def.light.shadow?.length ?? 0
     const kept: Stone[] = []
     for (const st of this.stones) {
       st.t += dt * 1000

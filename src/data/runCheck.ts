@@ -24,7 +24,7 @@ export interface Issue {
 export interface RunCatalog {
   readonly enemies: Readonly<Record<string, EnemyDef>>
   /** 地图：只看它的名字、种类（定下它给关卡哪些信号）与有哪几种出怪口、各只出哪几种敌人 */
-  readonly maps: Readonly<Record<string, { readonly name: string; readonly kind: MapKind; readonly gates?: { readonly kinds: Readonly<Record<string, { readonly name: string; readonly only?: readonly string[] }>> } }>>
+  readonly maps: Readonly<Record<string, { readonly name: string; readonly kind: MapKind; readonly gates: { readonly kinds: Readonly<Record<string, { readonly name: string; readonly only?: readonly string[] }>> } }>>
   readonly pools: Readonly<Record<string, readonly { readonly polarity: Polarity }[]>>
   readonly characters: Readonly<Record<string, { readonly tags: readonly CharacterTag[] }>>
   readonly maxCharLevel: number
@@ -153,7 +153,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
       need(false, path, '指定出怪口的一场须定下地图')
       return
     }
-    const gate = cat.maps[where.map]?.gates?.kinds[at.gate]
+    const gate = cat.maps[where.map]?.gates.kinds[at.gate]
     need(gate !== undefined, path, `${where.map} 没有这种出怪口：${at.gate}`)
     const only = gate?.only
     const off = only && kinds ? kinds.filter((k) => !only.includes(k)) : []

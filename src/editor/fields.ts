@@ -1,8 +1,7 @@
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { BOSSES, CURVE, ENEMIES, ENEMY_DEFS } from '../data/enemies'
-import { BOX_MAPS } from '../data/boxMaps'
-import { MAPS } from '../data/maps'
+import { MAP_IDS, MAPS } from '../data/maps'
 import type { Path } from '../data/runCheck'
 import { TAGS } from '../data/tags'
 import { WAVE } from '../data/waves'
@@ -165,11 +164,11 @@ function atText(at: SpawnAt | undefined, map: MapDef): { readonly label: string;
     case 'point':
       return { label: '定点', icon: ICON.point }
     case 'gate':
-      return { label: `出怪口 · ${map.gates?.kinds[at.gate]?.name ?? `${at.gate}（这张图没有）`}`, icon: ICON.gate }
+      return { label: `出怪口 · ${map.gates.kinds[at.gate]?.name ?? `${at.gate}（这张图没有）`}`, icon: ICON.gate }
   }
 }
 
-/** 一批敌人从哪来：看得见队伍、远处、围一圈、身后，或这张图的一种出怪口；有出怪口的地图上，前几种定下的点会吸附到附近的出怪口 */
+/** 一批敌人从哪来：看得见队伍、远处、围一圈、身后，或这张图的一种出怪口；前几种定下的点会吸附到附近的出怪口 */
 function atRows(g: { at?: Mutable<SpawnAt> }, map: MapDef): Row[] {
   const at = g.at
   const set = (v: Mutable<SpawnAt> | undefined): void => put(g, 'at', v)
@@ -179,11 +178,11 @@ function atRows(g: { at?: Mutable<SpawnAt> }, map: MapDef): Row[] {
     { emoji: ICON.far, label: '远处', chosen: at?.kind === 'far', run: () => set({ kind: 'far' }) },
     { emoji: ICON.ring, label: '围一圈', chosen: at?.kind === 'ring', run: () => set({ kind: 'ring', dist: 6 }) },
     { emoji: ICON.behind, label: '身后', chosen: at?.kind === 'behind', run: () => set({ kind: 'behind', dist: 4 }) },
-    ...Object.entries(map.gates?.kinds ?? {}).map(
+    ...Object.entries(map.gates.kinds).map(
       ([id, k]): Option => ({ emoji: ICON.gate, label: `出怪口 · ${k.name}`, chosen: at?.kind === 'gate' && at.gate === id, run: () => set({ kind: 'gate', gate: id }) }),
     ),
   ]
-  const hint = map.gates ? '定下的点会吸附到附近的出怪口，按出怪口的样子进场' : '这张图没有出怪口，敌人在定下的点原地冒出来'
+  const hint = '定下的点会吸附到附近的出怪口，按出怪口的样子进场'
   const rows: Row[] = [field({ kind: 'pick', label: '站位', value: now.label, title: '选站位', options, icon: now.icon, hint })]
   if (at?.kind === 'ring' || at?.kind === 'behind') rows.push(num('离队长', at.dist, { min: 1, max: 15, step: 0.5, format: unit('格') }, (v) => (at.dist = v), { sub: true }))
   return rows
@@ -212,7 +211,7 @@ function newPhase(from: Phase | undefined): Phase {
 function newFight(d: Draft): Step {
   const stages = d.steps.flatMap((s) => (s.kind === 'fight' && isStage(s.fight) ? [s.fight] : []))
   const last = stages.at(-1)
-  return { kind: 'fight', fight: { name: `第 ${stages.length + 1} 场`, map: last?.map ?? BOX_MAPS[0]!, phases: [newPhase(last?.phases.at(-1))] } }
+  return { kind: 'fight', fight: { name: `第 ${stages.length + 1} 场`, map: last?.map ?? MAP_IDS[0]!, phases: [newPhase(last?.phases.at(-1))] } }
 }
 
 /** 新的招募：比眼下最多的人数再多一人 */
@@ -334,7 +333,7 @@ function stageRows(f: Stage, node: Node): Row[] {
       value: map.name,
       title: '选地图',
       icon: map.emoji,
-      options: BOX_MAPS.map((id): Option => ({ emoji: MAPS[id].emoji, label: MAPS[id].name, chosen: id === f.map, run: () => (f.map = id) })),
+      options: MAP_IDS.map((id): Option => ({ emoji: MAPS[id].emoji, label: MAPS[id].name, chosen: id === f.map, run: () => (f.map = id) })),
     }),
     flag('定难度时钟', f.clockSec !== undefined, (on) => put(f, 'clockSec', on ? 0 : undefined), { hint: '开打时难度时钟从第几秒走起；不定就接着这一局累计打过的时长' }),
     ...(f.clockSec !== undefined ? [num('难度时钟', f.clockSec, { min: 0, max: 1_800, step: 10, format: moment }, (v) => (f.clockSec = v), { sub: true })] : []),

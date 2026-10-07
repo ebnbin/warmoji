@@ -13,7 +13,6 @@ import { slideCam } from './shared/leader'
 import { breakTrace } from './shared/trace'
 import type { Sim } from '../sim'
 
-const STILL = { x: 0, y: 0 }
 const STEP: BodyStep = { x: 0, y: 0, vx: 0, vy: 0 }
 
 /** 身体一下平移了 (dx, dy) 穿过传送门：队长的镜头滑过去，记的路在这里断开 */
@@ -152,12 +151,11 @@ export function moveBodies(sim: Sim): void {
     } else {
       const air = Span.lo[eid]! > 0
       if (air || !sim.hooks.contact(sim, eid, dt, x, y, vx, vy, STEP)) {
-        // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度 + 引力的终端漂移 g·质量/阻力）
+        // 线性阻力的精确解：速度按 exp 衰减趋近终速（驱动 / 黏度 + 引力的终端漂移 g·质量/阻力）
         const s = air ? GROUND : sim.hooks.surface(sim, x, y, eid)
-        const medium = air ? STILL : sim.hooks.mediumVelocity(sim, x, y)
         const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
-        const bx = medium.x + Drive.x[eid]! / s.viscosity
-        const by = medium.y + Drive.y[eid]! / s.viscosity
+        const bx = Drive.x[eid]! / s.viscosity
+        const by = Drive.y[eid]! / s.viscosity
         if (pulled) drift(sim, STEP, x, y, vx, vy, bx, by, g, Phys.mass[eid]! / Phys.drag[eid]!, k, dt)
         else approach(STEP, x, y, vx, vy, bx, by, k, dt)
       }

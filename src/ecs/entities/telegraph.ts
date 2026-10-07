@@ -27,12 +27,12 @@ const MARK_Z = 4
 const MIN_MARK_MS = 300
 
 /** 预兆打多久：突袭时只有头目打；从出怪口进场的扣掉进场动作的时长，落地时正好是原本现身的时刻，进场动作太长的也至少打一会儿 */
-export function telegraphDelay(sim: Sim, boss: boolean, delayMs: number, entry: Entry | undefined): number {
+export function telegraphDelay(sim: Sim, boss: boolean, delayMs: number, entry: Entry): number {
   if (sim.fight.rules.surprise && !boss) return 0
-  return entry ? Math.max(MIN_MARK_MS, delayMs - entranceMs(entry)) : delayMs
+  return Math.max(MIN_MARK_MS, delayMs - entranceMs(entry))
 }
 
-/** 在 (x, y) 打预兆；entry 是从出怪口进场的样子，此时 (x, y) 是它的落点 */
+/** 在落点 (x, y) 打预兆；entry 是它从出怪口进场的样子 */
 export function spawnTelegraph(
   sim: Sim,
   def: EnemyDef,
@@ -41,9 +41,9 @@ export function spawnTelegraph(
   hp: number,
   elite: boolean,
   boss: boolean,
-  traits: SpawnTraits = {},
-  delayMs = SPAWN.telegraphMs,
-  entry?: Entry,
+  traits: SpawnTraits,
+  delayMs: number,
+  entry: Entry,
 ): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Telegraph, Due)
