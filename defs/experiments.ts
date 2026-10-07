@@ -1,6 +1,6 @@
 import type { ExperimentDef } from '../src/types/runs'
 
-/** 实验：每个只试一种新玩法，都打在沙盒的新地图上，靠这张图自己的机制成立 */
+/** 实验：每个只试一种新玩法，靠这张图自己的机制成立 */
 export const EXPERIMENTS = {
   bankRaid: {
     emoji: '26f0',

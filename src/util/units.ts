@@ -5,7 +5,7 @@ export const UNIT = VIEW.minLong / 20
 /** 离地一米，画面上抬起多少像素：立着画的东西离地多高都按它抬 */
 export const LIFT_PER_M = UNIT * 0.5
 
-/** 沙盒地图都画在边长 FRAME_U 格的方框里：左上角是世界原点，队伍出生在正中，方框外只剩纯色背景 */
+/** 地图都画在边长 FRAME_U 格的方框里：左上角是世界原点，队伍出生在正中，方框外只剩纯色背景 */
 export const FRAME_U = 48
 
 /** 方框四边各留 SAFE_U 格给 HUD、刘海与导航条：能走的地方与地图的边都在这一圈以内 */

@@ -28,23 +28,16 @@ export const flyerHits = slots<Set<number>>()
 
 export const boltPts = slots<Float32Array>()
 
-export const meteorHit = slots<Set<number>>()
-
-/** 旧星云的流星按引力积分好的轨迹，x、y 交替 */
-export const meteorPath = slots<Float32Array>()
-
 export const modDef = slots<FieldPickupDef>()
 
 export const telegraphDef = slots<EnemyDef>()
 
 export const telegraphTraits = slots<SpawnTraits>()
 
-/** 预兆到点后敌人从哪个出怪口、怎么进场；没有出怪口的地图上为空，就在预兆的地方冒出来 */
+/** 预兆到点后敌人从哪个出怪口、怎么进场 */
 export const telegraphEntry = slots<Entry>()
 
-export const carrierPickup = slots<FieldPickupDef>()
-
-/** 到时登场的一队敌人或头目 */
+/** 到时登场的一队敌人 */
 export const callSpec = slots<CallSpec>()
 
 /** 待放出的一只敌人的要求 */

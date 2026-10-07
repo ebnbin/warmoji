@@ -1,11 +1,10 @@
 import mapsJson from '../assets/maps.json'
-import mapDefaultsJson from '../assets/mapdefaults.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
 
 import { ENEMIES } from './enemies'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
-import type { DecorInstance, Hazard, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
+import type { DecorInstance, Hazard, MapDecor, MapDef, MapId } from '../types/maps'
 
 export const MAPS = fromJson<Record<MapId, MapDef>>(mapsJson)
 
@@ -25,7 +24,7 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
     if (def.spawner) add(def.spawner.into)
     for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into)
   }
-  for (const row of MAPS[id].mix) add(ENEMIES[row.kind])
+  for (const kind of MAPS[id].foes) add(ENEMIES[kind])
   add(bossFor(id))
   return out
 }
@@ -86,9 +85,7 @@ export function rollDecor(
   return out
 }
 
-export const MAP = fromJson<MapDefaults>(mapDefaultsJson)
-
-export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', meteor: '天体', blackhole: '黑洞', lava: '熔岩', collapse: '塌方', drown: '呛水' }
+export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', meteor: '流星', blackhole: '黑洞', lava: '熔岩', collapse: '塌方', drown: '呛水' }
 
 /** 敌人死于这种危害的说法 */
-export const HAZARD_KILLS: Record<Hazard, string> = { coldWater: '寒水冻死', meteor: '天体砸死', blackhole: '黑洞吞掉', lava: '熔岩烧死', collapse: '落石砸死', drown: '呛死' }
+export const HAZARD_KILLS: Record<Hazard, string> = { coldWater: '寒水冻死', meteor: '流星砸死', blackhole: '黑洞吞掉', lava: '熔岩烧死', collapse: '落石砸死', drown: '呛死' }

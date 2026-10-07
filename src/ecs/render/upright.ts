@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Depth, Floor, Quad, RENDERABLE, Sprite, Tint, Transform, VisOff } from '../components'
-import { LIFT_PER_M } from '../../util/units'
+import { Depth, Quad, RENDERABLE, Sprite, Tint, Transform, VisOff } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import { LYING_Z } from './bands'
@@ -60,7 +59,7 @@ export class UprightMask extends EcsLayer {
       if (Depth.z[eid]! < LYING_Z || frame < 0 || alpha <= 0) continue
       const hh = Transform.h[eid]! * 0.5
       const hw = (Sprite.flipX[eid] ? -1 : 1) * Transform.w[eid]! * 0.5
-      m.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - Floor.z[eid]! * LIFT_PER_M, Transform.rot[eid]!, 1, 1)
+      m.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]!, Transform.rot[eid]!, 1, 1)
       // 四个角按 TL、BL、TR、BR
       for (let i = 0; i < 4; i++) {
         const lx = i < 2 ? -hw : hw

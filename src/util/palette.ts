@@ -2,7 +2,6 @@ export interface Palette {
   bgFrom: string
   bgTo: string
   map: number
-  shadow: number
 }
 
 export function hslToInt(h: number, s: number, l: number): number {

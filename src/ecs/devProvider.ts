@@ -3,7 +3,7 @@ import { devFlagItem, markPerf, resetPerf } from '../devtools'
 import type { DevItem, DevProvider } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
-import { beginRun } from '../run/state'
+import { beginSandbox } from '../run/state'
 import {
   applySandboxPreset,
   isSandboxCharacterOn,
@@ -130,7 +130,7 @@ function mulChoice(label: string, get: () => SandboxMul, set: (m: SandboxMul) =>
 
 function sandboxItems(battle: EcsBattleScene): DevItem[] {
   const restart = (): void => {
-    beginRun('sandbox', battle.run.mapId)
+    beginSandbox(battle.run.mapId)
     resetPerf()
     battle.scene.restart()
   }
@@ -224,19 +224,19 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
   ]
 }
 
-/** 战斗 scene 专有能力；试炼场页签只在试炼场模式下出现 */
+/** 战斗 scene 专有能力；沙盒页签只在沙盒里出现 */
 export function battleDevProvider(battle: EcsBattleScene): DevProvider {
   return {
     id: 'battle',
     title: '战斗',
     sections: [
       { id: 'battle', title: '战斗', items: () => battleItems(battle) },
-      ...(battle.knobs ? [{ id: 'sandbox', title: '试炼场', items: (): DevItem[] => sandboxItems(battle) }] : []),
+      ...(battle.knobs ? [{ id: 'sandbox', title: '沙盒', items: (): DevItem[] => sandboxItems(battle) }] : []),
     ],
   }
 }
 
-/** 试炼场刷怪达到上限时把性能采样窗口起点标在那一刻 */
+/** 沙盒刷怪达到上限时把性能采样窗口起点标在那一刻 */
 export function watchSandboxSteady(battle: EcsBattleScene): void {
   let steady = false
   battle.time.addEvent({

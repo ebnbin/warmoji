@@ -10,8 +10,6 @@ export interface FeelTuning {
     readonly recallDist: number
     readonly handoverMs: number
     readonly facingTauMs: number
-    /** 队长穿过传送门以后，镜头从门这头滑到门那头要多久，毫秒 */
-    readonly portalCamMs: number
   }
   readonly hitShake: { readonly durationMs: number; readonly intensity: number }
   readonly pop: { readonly enemyMs: number; readonly bossMs: number }

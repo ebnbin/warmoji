@@ -13,7 +13,6 @@ import { EXPERIMENTS } from '../defs/experiments.ts'
 import { FEEL } from '../defs/feel.ts'
 import { ITEMS } from '../defs/items.ts'
 import { LEVEL_STATS } from '../defs/levels.ts'
-import { MAP_DEFAULTS } from '../defs/mapdefaults.ts'
 import { MAPS } from '../defs/maps.ts'
 import { MUTATORS } from '../defs/mutators.ts'
 import { OBSTACLES } from '../defs/obstacles.ts'
@@ -28,7 +27,6 @@ import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
-import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/maps/nebula/physics.ts'
 import { depth, floeOutline, GRAVITY, simple } from '../src/maps/floe/model.ts'
 import { makeMasonry, ruinsPlan, toWorld } from '../src/maps/ruins/layout.ts'
@@ -51,7 +49,6 @@ import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../s
 import { COLS, splits, stacks, exitPlan } from '../src/maps/exit/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
-import { BOX_MAPS } from '../src/data/boxMaps.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { SIGNALS } from '../src/data/signals.ts'
 import type { MapSignals } from '../src/data/signals.ts'
@@ -62,7 +59,7 @@ import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
 import type { ItemDef } from '../src/types/items'
-import type { MapDef, NebulaOldConfig } from '../src/types/maps'
+import type { MapDef } from '../src/types/maps'
 import type { ExperimentDef, MutatorDef, RunDef } from '../src/types/runs'
 
 const errors: string[] = []
@@ -71,10 +68,11 @@ const need = (ok: boolean, msg: string): void => {
 }
 
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  for (const row of [...m.mix, ...(m.dayMix ?? []), ...(m.nightMix ?? [])]) {
-    const e = ENEMIES[row.kind]
-    need(e !== undefined && e.role !== 'boss', `maps.${id} 的出怪配比须引用非 Boss 的敌人：${row.kind}`)
+  for (const kind of m.foes) {
+    const e = ENEMIES[kind]
+    need(e !== undefined && e.role !== 'boss', `maps.${id}.foes 须引用非 Boss 的敌人：${kind}`)
   }
+  need(new Set(m.foes).size === m.foes.length, `maps.${id}.foes 不能重复`)
   need(ENEMIES[m.boss]?.role === 'boss', `maps.${id}.boss 须引用 Boss：${m.boss}`)
 }
 
@@ -95,40 +93,18 @@ need(STAMINA.warnAt > 0 && STAMINA.warnAt < STAMINA.slowFrom, 'stamina.warnAt �
 need(STAMINA.restDelayMs >= 0 && STAMINA.rampMs > 0, 'stamina 的恢复节奏须为正')
 need(STAMINA.draft > 0 && STAMINA.draft <= 1, 'stamina.draft 须在 (0, 1] 内')
 
-/** 每张图赶路都耗体力、歇着都能回；逆流比平地累，顺流比平地省 */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need(m.stamina.exertion > 0 && m.stamina.regen > 0, `maps.${id}.stamina 的费力与回复倍率须为正`)
-  if (m.oldRiver) need(m.oldRiver.upstream >= 1 && m.oldRiver.downstream >= 0 && m.oldRiver.downstream <= 1, `maps.${id}.oldRiver 的逆流倍率须不小于 1，顺流倍率须在 [0, 1] 内`)
-  if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
-}
+/** 每张图赶路都耗体力、歇着都能回 */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) need(m.stamina.exertion > 0 && m.stamina.regen > 0, `maps.${id}.stamina 的费力与回复倍率须为正`)
 
 /** 单位的光：光色与影子色是 24 位颜色，影子有浓度、往外铺得开 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const l = m.light
-  if (!l) continue
   const rgb = (c: number): boolean => Number.isInteger(c) && c >= 0 && c <= 0xffffff
   need(rgb(l.sun) && rgb(l.shade), `maps.${id}.light 的颜色须是 24 位 RGB`)
   if (!l.shadow) continue
   need(rgb(l.shadow.color), `maps.${id}.light.shadow.color 须是 24 位 RGB`)
   need(l.shadow.alpha > 0 && l.shadow.alpha <= 1, `maps.${id}.light.shadow.alpha 须在 (0, 1] 内`)
   need(l.shadow.length > 0, `maps.${id}.light.shadow.length 须为正`)
-}
-
-/** 旧星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'nebulaOld') === (m.nebulaOld !== undefined), `maps.${id} 是旧星云当且仅当写了 nebulaOld`)
-  const n = m.nebulaOld
-  if (!n) continue
-  const [near, far] = n.hole.fromCenterU
-  need(n.shell.innerU > 0 && n.shell.outerU > n.shell.innerU && n.shell.gm > 0, `maps.${id}.nebulaOld.shell 须内径为正、外径大于内径、引力为正`)
-  need(n.contain.speedMul >= 1 && n.contain.leapU >= 0, `maps.${id}.nebulaOld.contain 的速度余量不小于 1、瞬移余量不为负`)
-  need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebulaOld.hole 的引力与软化长度须为正`)
-  need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebulaOld.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
-  need(near >= 0 && near <= far && far + n.hole.horizonU < n.shell.innerU, `maps.${id}.nebulaOld.hole 的位置范围须落在空腔里`)
-  need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebulaOld.hole.clearU 须大于视界`)
-  need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebulaOld.meteor 的积分步长须为正且不超过最长飞行时间`)
-  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0 && n.meteor.offsetU >= 0, `maps.${id}.nebulaOld.meteor 的速度与半径须为正`)
-  need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebulaOld.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
 }
 
 /** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束；整座山都积满雪 */
@@ -141,7 +117,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const l = v.lava
   const r = v.rim
   const s = v.snow
-  const side = Math.min(m.size?.w ?? MAP_DEFAULTS.width, m.size?.h ?? MAP_DEFAULTS.height)
+  need(m.size !== undefined, `maps.${id} 是火山，须写 size`)
+  if (!m.size) continue
+  const side = Math.min(m.size.w, m.size.h)
   need(r.insetU[0] > 0 && r.insetU[0] <= r.insetU[1] && r.insetU[1] < side / 4, `maps.${id}.volcano.rim.insetU 须让盆地的边落在地图边以内、离中线足够远`)
   need(r.waveU > 0 && r.cornerU >= 0 && r.neckU > 0, `maps.${id}.volcano.rim 的波长、窄缝须为正，磨角不为负`)
   need(r.cliffU > 0 && r.cliffHeight > 0 && r.backSlope >= 0, `maps.${id}.volcano.rim 的崖壁须有宽有高，高地往外不升高`)
@@ -175,7 +153,6 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const g = m.gates
-  if (!g) continue
   const kinds = Object.entries(g.kinds)
   const at = `maps.${id}.gates`
   need(g.snapU > 0 && kinds.length > 0, `${at} 的吸附半径须为正、至少一种出怪口`)
@@ -193,7 +170,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const takes = (e: EnemyKind): boolean => kinds.some(([, d]) => d.only === undefined || d.only.includes(e))
   const boss = g.boss === undefined ? undefined : g.kinds[g.boss]
   need(g.boss === undefined || (boss !== undefined && (boss.only?.includes(m.boss) ?? true)), `${at}.boss 须是这张图的一种出怪口，接得住头目 ${m.boss}`)
-  for (const row of [...m.mix, ...(m.dayMix ?? []), ...(m.nightMix ?? [])]) need(takes(row.kind), `${at} 没有出怪口接配比里的 ${row.kind}`)
+  for (const kind of m.foes) need(takes(kind), `${at} 没有出怪口接出没的 ${kind}`)
 }
 
 /** 进场动作：时长为正，高度与距离不为负，落点的距离范围从正数起 */
@@ -266,8 +243,10 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const pos = (r: readonly [number, number]): boolean => r[0] > 0 && span(r)
   const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 0 && span(r)
   const { chambers: ch, tunnels: tn, openings: op, crystals: cr, debris, sky, light, torch, view } = a
-  const mapW = m.size?.w ?? MAP_DEFAULTS.width
-  const mapH = m.size?.h ?? MAP_DEFAULTS.height
+  need(m.size !== undefined, `${at} 须写 size`)
+  if (!m.size) continue
+  const mapW = m.size.w
+  const mapH = m.size.h
   need(mapW === mapH && mapW <= FRAME_U - SAFE_U * 2, `${at} 的地图须是方的、放得进方框的安全区`)
   need(pos(ch.mainU) && ch.driftU >= 0 && ints(ch.sideCount) && pos(ch.sideU) && pos(ch.overlapU) && ch.jitter >= 0 && ch.jitter < 0.5, `${at}.chambers 的半径与叠进去的深度须为正、个数须为非负整数、起伏在 0 到 0.5 之间`)
   need(ch.wobbleU >= 0 && ch.waveU > 0 && ch.neckU > 0 && ch.rimU > 0 && ch.wallU > 0, `${at}.chambers 的起伏、波长、窄缝、离地图边的岩体与洞壁宽须为正`)
@@ -562,7 +541,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(top(c.lowM) > over(standard) + 1e-9, `${at}.lowM 须高过标准身体跨得过的 ${+over(standard).toFixed(2)} 米：矮布景要挡得住人`)
   need(top(c.lowM) < chest, `${at}.lowM 须低过平射的高度 ${+chest.toFixed(2)} 米：子弹要从矮布景上面飞过去`)
   need(top(c.lowM) <= over(boss.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${m.boss} 跨得过去`)
-  const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]!.radius))
+  const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.foes.map((kind) => ENEMIES[kind]!.radius))
   need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与台边之间须过得去最大的小怪（半径 ${small} 格）`)
   need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与台边之间须过得去头目（半径 ${boss.radius} 格）`)
   need(margin.aisle > 0, `${at}.margin.aisle 须为正：布景不压台中线上的活门`)
@@ -633,9 +612,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(li.levels.length >= 1 && li.levels[0] === 1 && li.levels.every((v, k) => v > 0 && v <= (k === 0 ? 1 : li.levels[k - 1]!)) && li.wakeMs > 0 && li.dimMs > 0, `${at}.light 的亮度须从全亮往下排、都不是全黑，亮起来、暗下去的时间须为正`)
   need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
   const g = m.gates
-  need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
-  need(g?.boss === 'warden' && g.kinds.warden?.at.kind === 'mark', `${at} 的头目须从看守（地标上的出怪口 warden）出来`)
-  for (const [k, d] of Object.entries(g?.kinds ?? {})) need(d.at.kind !== 'mark' || k === 'warden' || c.recipes.includes(k), `${at} 地标上的出怪口 ${k} 既不是配方也不是看守`)
+  need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)
+  need(g.boss === 'warden' && g.kinds.warden?.at.kind === 'mark', `${at} 的头目须从看守（地标上的出怪口 warden）出来`)
+  for (const [k, d] of Object.entries(g.kinds)) need(d.at.kind !== 'mark' || k === 'warden' || c.recipes.includes(k), `${at} 地标上的出怪口 ${k} 既不是配方也不是看守`)
   for (let s = 0; s < 24; s++) {
     const plan = exitPlan(c, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
@@ -747,35 +726,6 @@ for (const e of Object.values(ENEMIES).flatMap(withNested)) {
   need(ok(COMBAT.swarmSpan) && COMBAT.swarmSpan[0] > 0, 'combat.swarmSpan 须悬空')
 }
 
-/** 走进壳层停下的半径：终端漂移 g·fall 追上速度的地方，壳层里引力随半径单调增大；外缘都追不上就停不下 */
-const shellStopU = (shell: NebulaOldConfig['shell'], fall: number, speedU: number): number => {
-  if (shellPull(shell, shell.outerU) * fall < speedU) return Infinity
-  let lo = shell.innerU
-  let hi = shell.outerU
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2
-    if (shellPull(shell, mid) * fall >= speedU) hi = mid
-    else lo = mid
-  }
-  return hi
-}
-/** 旧星云壳层困得住每个角色与敌人：停下处再往外瞬移，仍在壳外引力重新追不上它的逃逸半径以内 */
-for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  const n = m.nebulaOld
-  if (!n) continue
-  const bodies = [
-    ...Object.entries<CharacterAuthoring>(CHARACTERS).map(([k, c]) => ({ path: `characters.${k}`, fall: c.body.mass / c.body.drag, speedU: c.stats.moveSpeed })),
-    ...Object.values(ENEMIES)
-      .flatMap(withNested)
-      .map((e) => ({ path: `enemies.${e.kind}`, fall: COMBAT.enemyBody.mass / COMBAT.enemyBody.drag, speedU: e.speed })),
-  ]
-  for (const b of bodies) {
-    const v = b.speedU * n.contain.speedMul
-    const escapeU = Math.sqrt((n.shell.gm * b.fall) / v)
-    need(shellStopU(n.shell, b.fall, v) + n.contain.leapU <= escapeU, `maps.${id}.nebulaOld.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${n.contain.leapU} 格就逃出引力`)
-  }
-}
-
 /**
  * 视界：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点（球心）够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来，
  * 走得最深也落在方框安全区的内切圆里；
@@ -833,7 +783,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(disk.outerRs * rs < ring, `${at}.disk 铺到 ${+(disk.outerRs * rs).toFixed(2)} 格，盖住了爱因斯坦环（${+ring.toFixed(2)} 格）：GM ${gm}、离中心 ${d} 格`)
     }
   }
-  const slowest = Math.min(...[...m.mix.map((r) => ENEMIES[r.kind]!.speed), ENEMIES[m.boss]!.speed])
+  const slowest = Math.min(...[...m.foes.map((kind) => ENEMIES[kind]!.speed), ENEMIES[m.boss]!.speed])
   const clear = captureU(hole.maxGm, rsMax, enemyFall / slowest) + n.spawnClearU
   need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }
@@ -878,19 +828,16 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   report(`runs.${id}`, CHECKS.run(r))
 }
 
-/** 冒险按新地图的顺序列章：每张新地图至多一章 */
+/** 冒险按地图的顺序列章：每张图至多一章 */
 const chapterMaps = Object.values<RunDef>(RUNS).flatMap((r) => (r.chapter === undefined ? [] : [r.chapter]))
-need(chapterMaps.every((m) => BOX_MAPS.includes(m)), `冒险的章只能打在新地图上：${chapterMaps.join('、')}`)
 need(new Set(chapterMaps).size === chapterMaps.length, `冒险里一张图只能有一章：${chapterMaps.join('、')}`)
 
 for (const [id, e] of Object.entries<ExperimentDef>(EXPERIMENTS)) {
   need(PACK.has(e.emoji), `experiments.${id} 的 emoji 不在表情包里：${e.emoji}`)
-  need(BOX_MAPS.includes(e.fight.map), `experiments.${id} 用了旧地图：${e.fight.map}`)
 }
 
 need(PACK.has(EDITOR_DRAFT.emoji), `editor 的 emoji 不在表情包里：${EDITOR_DRAFT.emoji}`)
 report('editor', CHECKS.run(EDITOR_DRAFT))
-for (const s of EDITOR_DRAFT.steps) if (s.kind === 'fight') need(BOX_MAPS.includes(s.fight.map), `editor 用了旧地图：${s.fight.map}`)
 
 const mutatorEmojis = new Map<string, string>()
 for (const [id, m] of Object.entries<MutatorDef>(MUTATORS)) {
@@ -959,7 +906,6 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'ruins') === (m.ruins !== undefined), `maps.${id} 是残垣当且仅当写了 ruins`)
-  need((m.kind === 'oldRuins') === (m.walls !== undefined), `maps.${id} 是旧残垣当且仅当写了 walls`)
   const r = m.ruins
   if (!r) continue
   const at = `maps.${id}.ruins`
@@ -1100,7 +1046,6 @@ write('experiments', EXPERIMENTS)
 write('feel', FEEL)
 write('items', ITEMS)
 write('levels', LEVEL_STATS)
-write('mapdefaults', MAP_DEFAULTS)
 write('maps', MAPS)
 write('mutators', MUTATORS)
 write('obstacles', OBSTACLES)

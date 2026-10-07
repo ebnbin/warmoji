@@ -1,16 +1,15 @@
 import { CHARACTERS, ROSTER_IDS, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
-import { RUNS } from '../data/runs'
-import { planOf } from '../data/rounds'
+import { fightsOf, RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
-import type { FightDef, MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
-import { MAP_IDS } from '../data/maps'
+import type { MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import type { XpState } from '../types/xp'
 import type { SceneKey } from '../scene/keys'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
+import { sandboxRun } from './sandbox'
 
 /** 无敌时的生命上限 */
 export const INVINCIBLE_HP = 10_000_000
@@ -26,10 +25,7 @@ export interface RunState {
   step: number
   /** 这一场或接下来那一场在哪张地图上打 */
   mapId: MapId
-  /** 这一局的地图：玩家选的或玩法固定的，没写地图的场次在这里打 */
-  homeMap: MapId
   decorSeed: number
-  wave: number
   coins: number
   kills: number
   /** 全队经验：满了升级 */
@@ -72,8 +68,6 @@ export interface RunState {
     hazardDamage: Partial<Record<Hazard, number>>
     /** 死于地图上各种危害的敌人 */
     hazardKills: Partial<Record<Hazard, number>>
-    /** 从地上捡到的金币 */
-    coinsTaken: number
     eliteKills: number
     /** 手动换队长的次数 */
     switches: number
@@ -99,9 +93,14 @@ function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
   return out
 }
 
-/** 开一局内置关卡，带上玩家选的地图与自选的词缀 */
-export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readonly MutatorId[] = []): RunState {
-  return openRun(RUNS[id], { runId: id, mapId, mutators })
+/** 开一局内置关卡，带上自选的词缀 */
+export function beginRun(id: RunId, mutators: readonly MutatorId[] = []): RunState {
+  return openRun(RUNS[id], { runId: id, mutators })
+}
+
+/** 在这张图上开一局沙盒 */
+export function beginSandbox(map: MapId): RunState {
+  return openRun(sandboxRun(map), {})
 }
 
 /** 按一份关卡数据开一局，离开时回到 origin */
@@ -109,9 +108,9 @@ export function beginCustomRun(def: RunDef, origin: SceneKey): RunState {
   return openRun(def, { origin })
 }
 
-/** 按同样的玩法、地图、词缀与来处再开一局 */
+/** 按同样的玩法、词缀与来处再开一局 */
 export function restartRun(run: RunState): RunState {
-  return openRun(run.def, { runId: run.runId, mapId: run.homeMap, mutators: run.mutators, origin: run.origin })
+  return openRun(run.def, { runId: run.runId, mutators: run.mutators, origin: run.origin })
 }
 
 /** 新的布景种子：地图的布局、地面装饰与出怪口都按它生成 */
@@ -119,23 +118,20 @@ function newSeed(): number {
   return (Math.random() * 0xffffffff) >>> 0
 }
 
-/** 开一局：地图固定的不看选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
-function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mapId?: MapId; readonly mutators?: readonly MutatorId[]; readonly origin?: SceneKey }): RunState {
-  const home = def.map ?? opts.mapId ?? MAP_IDS[0]!
+/** 开一局：玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；带上自选的词缀 */
+function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mutators?: readonly MutatorId[]; readonly origin?: SceneKey }): RunState {
   const run: RunState = {
     def,
     runId: opts.runId,
     origin: opts.origin,
     step: 0,
-    mapId: home,
-    homeMap: home,
+    mapId: fightsOf(def)[0]!.map,
     decorSeed: newSeed(),
-    wave: def.start?.wave ?? 1,
     coins: def.coins ?? 0,
     kills: 0,
     xp: { level: 1, xp: 0 },
     claimed: 0,
-    combatMs: (def.start?.sec ?? 0) * 1000,
+    combatMs: 0,
     roster: [],
     memberHp: [],
     memberItems: [],
@@ -160,7 +156,6 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mapId?: M
       enemyDamage: {},
       hazardDamage: {},
       hazardKills: {},
-      coinsTaken: 0,
       eliteKills: 0,
       switches: 0,
       casts: 0,
@@ -186,12 +181,10 @@ export function currentRun(): RunState | undefined {
   return current
 }
 
+/** 进行中的一局：只有开了局才进得了要它的页面 */
 export function getRun(): RunState {
-  if (current) return current
-  const run = beginRun('classic')
-  addMember(run, ROSTER_IDS[0]!)
-  skipFilled(run)
-  return run
+  if (!current) throw new Error('没有进行中的一局')
+  return current
 }
 
 export function endRun(): void {
@@ -202,14 +195,9 @@ export function runDef(run: RunState): RunDef {
   return run.def
 }
 
-/** 这一局实际打了多久：开局进度给的秒数不算 */
-export function foughtMs(run: RunState): number {
-  return run.combatMs - (runDef(run).start?.sec ?? 0) * 1000
-}
-
-/** 这一局要走的步骤：按轮重复的展开成一轮一轮的，一直重复的展开到眼下之后几轮 */
+/** 这一局要走的步骤 */
 export function stepsOf(run: RunState): readonly StepDef[] {
-  return planOf(runDef(run), run.step)
+  return runDef(run).steps
 }
 
 /** 当前这一步；步骤都走完了是 undefined */
@@ -230,26 +218,15 @@ export function nextStep(run: RunState): void {
   skipFilled(run)
 }
 
-/** 这一场在哪张地图上打 */
-export function fightMap(run: RunState, fight: FightDef): MapId {
-  return fight.map ?? run.homeMap
-}
-
 /** 地图跟着当前或接下来那一场走；后面没有战斗了就留在最后一场的地图上 */
 function syncMap(run: RunState): void {
   const next = stepsOf(run).slice(run.step).find((s) => s.kind === 'fight')
-  if (next?.kind === 'fight') run.mapId = fightMap(run, next.fight)
+  if (next?.kind === 'fight') run.mapId = next.fight.map
 }
 
-/** 这一局许招的角色：规则限定了标签就只许招同时带着它们的 */
-export function recruitPool(run: RunState): CharacterId[] {
-  const tags = runDef(run).rules?.recruit?.tags ?? []
-  return ROSTER_IDS.filter((id) => tags.every((t) => CHARACTERS[id].tags.includes(t)))
-}
-
-/** 许招又还没入队的角色 */
+/** 还没入队的角色 */
 export function recruitCandidates(run: RunState): CharacterId[] {
-  return recruitPool(run).filter((id) => !run.roster.includes(id))
+  return ROSTER_IDS.filter((id) => !run.roster.includes(id))
 }
 
 /** 当前这一步还要招几人：不是招募步骤就是 0 */

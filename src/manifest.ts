@@ -144,7 +144,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       '1f6ab',
       '1f4a6',
       '1fad8',
-      ...Object.values<MapDef>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
+      ...Object.values<MapDef>(MAPS).flatMap((m) => m.decor.emojis),
     ]),
   ],
   enemy: [...seen.enemy.body],
@@ -152,7 +152,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   elite: [...seen.enemy.body],
 }
 
-export const PLAIN_EMOJIS: readonly string[] = ['1f4a5', SPAWN.markEmoji, '1fa90']
+export const PLAIN_EMOJIS: readonly string[] = ['1f4a5', SPAWN.markEmoji]
 
 export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(OUTLINED_EMOJIS).flat(),

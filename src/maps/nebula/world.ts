@@ -5,7 +5,6 @@ import { ENEMY_BODY } from '../../data/abilities'
 import { MAPS } from '../../data/maps'
 import { FRAME_MID } from '../frame'
 import type { MapId, NebulaConfig } from '../../types/maps'
-import { clampToDisc } from '../../ecs/worlds/space'
 import { accrete, aroundCircle, endMeteor, feed, flyMeteor, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from './model'
 import type { NebulaMeteor, NebulaState } from './model'
 import { roomFor } from '../landmark'
@@ -22,6 +21,15 @@ import type { Sim } from '../../ecs/sim'
 import { leaderX, leaderY } from '../../ecs/utils/team'
 import { bounded } from '../../ecs/worlds/hooks'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+
+function clampToDisc(px: number, py: number, cx: number, cy: number, r: number): { x: number; y: number } {
+  const dx = px - cx
+  const dy = py - cy
+  const d = Math.hypot(dx, dy)
+  if (d <= r || d < 1e-6) return { x: px, y: py }
+  const k = r / d
+  return { x: cx + dx * k, y: cy + dy * k }
+}
 
 function nebulaCfg(sim: Sim): NebulaConfig {
   return MAPS[sim.mapId].nebula!
@@ -46,7 +54,7 @@ function slowestFoeU(sim: Sim): number {
   let v = SLOWEST.get(sim.mapId)
   if (v === undefined) {
     const def = MAPS[sim.mapId]
-    v = Math.min(...def.mix.map((r) => ENEMIES[r.kind].speed), ENEMIES[def.boss].speed)
+    v = Math.min(...def.foes.map((k) => ENEMIES[k].speed), ENEMIES[def.boss].speed)
     SLOWEST.set(sim.mapId, v)
   }
   return v

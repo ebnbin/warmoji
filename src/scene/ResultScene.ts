@@ -6,15 +6,14 @@ import { keysOf } from '../util/record'
 import { PICKUPS } from '../data/pickups'
 import { fightCount } from '../data/runs'
 import { heatOf } from '../data/mutators'
-import { submitScore } from '../save/highscore'
 import { reachLab, submitLab } from '../save/labs'
 import { ITEMS } from '../data/items'
-import { endRun, foughtMs, getRun, restartRun, runDef, skipFilled } from '../run/state'
+import { endRun, getRun, restartRun, runDef, skipFilled } from '../run/state'
 import { starMet } from '../run/stars'
 import { teamLeveled } from '../run/members'
 import { fightsDone } from '../run/flow'
 import { goStep } from './teamPage'
-import { fightUnit, starText } from './runLines'
+import { starText } from './runLines'
 import type { RunState } from '../run/state'
 import { browserStorage } from '../util/storage'
 import { burstEmitter } from '../ui/fx'
@@ -32,10 +31,9 @@ export class ResultScene extends Phaser.Scene {
   private preserveOnRestart = false
   private run!: RunState
   private win = false
-  /** 输在哪；从别处直接跳来的没有 */
+  /** 输在哪；赢了没有 */
   private reason: string | null = null
   private submitted = false
-  private best = { newBest: false, bestWave: 0, bestKills: 0 }
   /** 赢下带星级的一关：每条条件做到没有、几颗星、热度、破没破纪录 */
   private lab: { met: boolean[]; stars: number; heat: number; newBest: boolean } | null = null
 
@@ -66,17 +64,14 @@ export class ResultScene extends Phaser.Scene {
     if (!this.submitted) {
       this.submitted = true
       const id = this.run.runId
-      if (id !== undefined) {
-        if (def.record) {
-          const r = submitScore(browserStorage(), reached, this.run.kills)
-          this.best = { newBest: r.newBest, bestWave: r.score.bestWave, bestKills: r.score.bestKills }
-        } else if (this.win && def.stars) {
+      if (id !== undefined && def.stars) {
+        if (this.win) {
           const met = def.stars.map((s) => starMet(this.run, s))
           const stars = 1 + met.filter(Boolean).length
           const heat = heatOf(this.run.mutators)
           const r = submitLab(browserStorage(), id, stars, heat, fights)
           this.lab = { met, stars, heat, newBest: r.newStars || r.newHeat }
-        } else if (def.stars) {
+        } else {
           reachLab(browserStorage(), id, reached - 1)
         }
       }
@@ -87,7 +82,7 @@ export class ResultScene extends Phaser.Scene {
     const { content } = f
     const cx = f.centerX
     const titleY = content.y + (f.portrait ? 96 : 64)
-    const verdict = def.record ? (this.win ? '{1f3c6} 通关胜利！' : '{1f480} 全军覆没') : this.win ? '{1f3c6} 挑战成功！' : '{1f480} 挑战失败'
+    const verdict = this.win ? '{1f3c6} 挑战成功！' : '{1f480} 挑战失败'
     const title = new RichLabel(this, cx, titleY, verdict, {
       kind: 'display',
       color: this.win ? 'accent' : 'bad',
@@ -105,11 +100,10 @@ export class ResultScene extends Phaser.Scene {
       this.time.delayedCall(320, () => confetti.explode(26, cx + 180, titleY))
     }
 
-    const fought = foughtMs(this.run)
+    const fought = this.run.combatMs
     const minutes = Math.floor(fought / 60000)
     const seconds = Math.round((fought % 60000) / 1000)
-    const unit = fightUnit(def)
-    const waveText = fights > 1 ? (this.win ? `${fights} ${unit}全部打完` : `止步第 ${reached} ${unit}`) : def.name
+    const waveText = fights > 1 ? (this.win ? `${fights} 场全部打完` : `止步第 ${reached} 场`) : def.name
     new RichLabel(
       this,
       cx,
@@ -117,7 +111,6 @@ export class ResultScene extends Phaser.Scene {
       `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText}${teamLeveled(this.run) ? ` · 全队 Lv ${this.run.xp.level}` : ''} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
       { kind: 'heading', bold: false, color: 'soft', originX: 0.5, maxWidth: content.w - 48 },
     )
-    const lost = !def.record && !this.win && this.reason !== null
     const statusY = titleY + (f.portrait ? 102 : 100)
     const lab = this.lab
     if (lab && def.stars) {
@@ -129,20 +122,8 @@ export class ResultScene extends Phaser.Scene {
         `${'{2b50}'.repeat(lab.stars)} ${lab.stars}/${1 + def.stars.length} 星${missed.length > 0 ? `（没做到：${missed.join('、')}）` : ''}${lab.heat > 0 ? ` · 热度 ${lab.heat}` : ''}${lab.newBest ? ' · 新纪录！' : ''}`,
         { kind: 'heading', bold: false, color: 'accent', originX: 0.5, maxWidth: content.w - 48 },
       )
-    } else {
-      new Label(
-        this,
-        cx,
-        statusY,
-        lost
-          ? `败因：${this.reason}`
-          : !def.record
-            ? `${def.name}不计入最佳纪录`
-            : this.best.newBest
-              ? '新纪录！'
-              : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
-        { kind: 'heading', bold: false, color: lost ? 'bad' : 'accent' },
-      ).setOrigin(0.5)
+    } else if (this.reason !== null) {
+      new Label(this, cx, statusY, `败因：${this.reason}`, { kind: 'heading', bold: false, color: 'bad' }).setOrigin(0.5)
     }
 
     const top = titleY + (f.portrait ? 140 : 126)
@@ -162,14 +143,10 @@ export class ResultScene extends Phaser.Scene {
       skipFilled(run)
       goStep(this, run)
     }
-    const menu = (): void => {
-      endRun()
-      this.scene.start(SceneKey.Menu)
-    }
     const btnW = 300
     const gap = 26
-    const first = def.record ? { label: '再来一局', onTap: again } : { label: '再试一次', onTap: retry }
-    const second = def.record ? { label: '回主菜单', onTap: menu } : { label: origin === SceneKey.Editor ? '返回编辑器' : '返回选图', onTap: again }
+    const first = { label: '再试一次', onTap: retry }
+    const second = { label: origin === SceneKey.Editor ? '返回编辑器' : '返回选图', onTap: again }
     new Button(this, cx - btnW / 2 - gap / 2, f.footerY, { ...first, width: btnW, armMs: 500, keys: ['ENTER', 'SPACE'] })
     new Button(this, cx + btnW / 2 + gap / 2, f.footerY, { ...second, width: btnW, variant: 'secondary', armMs: 500 })
 

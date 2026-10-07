@@ -7,8 +7,6 @@ export const ICON = {
   curve: '1f4c8',
   recruit: '1f91d',
   shop: '1f6d2',
-  legacy: '2694',
-  repeat: '1f504',
   phase: '1f4d1',
   squad: '1f465',
   random: '1f3b2',
@@ -18,7 +16,6 @@ export const ICON = {
   far: '1f52d',
   ring: '2b55',
   behind: '1f519',
-  point: '1f4cd',
   gate: '1f6aa',
   unedited: '2753',
 } as const

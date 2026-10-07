@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
 import { MATERIALS } from '../../data/obstacles'
-import { LIFT_PER_M, UNIT } from '../../util/units'
-import { Alive, Floor, Pickup, Proj, Projectile, Radius, Shard, Span, Transform, VisOff } from '../components'
+import { UNIT } from '../../util/units'
+import { Alive, Pickup, Proj, Projectile, Radius, Shard, Span, Transform, VisOff } from '../components'
 import { boltZ, hiOf, layerAt, layersOf, loOf, overOf } from '../utils/pass'
 import { roomAt } from '../../maps/basin'
 import type { Lens, Rect } from '../lens'
@@ -119,7 +119,7 @@ export class HeightOverlay {
     return made
   }
 
-  /** 身体旁从脚下的地面往上一层一格：占着的层上色、底下空着的只描框，白线以下的高度跨得过；弹体按此刻离基准面在哪一层画圈；站在高处的都按脚下的地面抬起 */
+  /** 身体旁从脚下往上一层一格：占着的层上色、底下空着的只描框，白线以下的高度跨得过；弹体按此刻离地在哪一层画圈 */
   private drawMarks(sim: Sim): void {
     const g = this.marks
     const world = sim.world
@@ -132,7 +132,7 @@ export class HeightOverlay {
       const lo = loOf(world, eid)
       const hi = hiOf(world, eid)
       const x = Transform.x[eid]! + Radius.v[eid]! + 0.06 * UNIT
-      const foot = Transform.y[eid]! + Radius.v[eid]! * 0.5 - Floor.z[eid]! * LIFT_PER_M
+      const foot = Transform.y[eid]! + Radius.v[eid]! * 0.5
       for (let k = 0; k <= hi; k++) {
         const top = foot - (k + 1) * pitch + GAP_U * UNIT
         if (k >= lo) {
@@ -150,7 +150,7 @@ export class HeightOverlay {
     }
     for (const eid of query(world, [Projectile, Proj, Transform, VisOff])) {
       g.lineStyle(0.035 * UNIT, colorOf(layerAt(boltZ(eid))), 1)
-      g.strokeCircle(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]! - Floor.z[eid]! * LIFT_PER_M, Math.max(0.1 * UNIT, Proj.radius[eid]! + 0.04 * UNIT))
+      g.strokeCircle(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]!, Math.max(0.1 * UNIT, Proj.radius[eid]! + 0.04 * UNIT))
     }
   }
 }

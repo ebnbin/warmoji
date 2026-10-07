@@ -8,11 +8,10 @@ import { WAVE } from '../../../data/waves'
 import type { RunState } from '../../../run/state'
 import type { Sim } from '../../sim'
 
-/** 一场结束：生命与资源带走，成长道具攒进度，收获与过关奖励进账，波数加一；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
+/** 一场结束：生命与资源带走，成长道具攒进度，收获与过关奖励进账；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
 export function settleWave(sim: Sim): void {
   const run = sim.run
   run.combatMs += sim.elapsedMs
-  run.wave += 1
   const between = runDef(run).rules?.between ?? 'carry'
   const reward = sim.fight.def.reward
   run.memberHp = sim.characters.map((m) => carriedHp(m, between === 'full' || !!reward?.heal, between === 'rest'))

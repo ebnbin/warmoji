@@ -6,7 +6,7 @@ import { DUTY_TAGS, TAG_IDS, TAGS, tagsOf } from '../data/tags'
 import { playSfx } from '../audio/sfx'
 import { claimRecruit } from '../run/levelUp'
 import { memberLook } from '../run/members'
-import { getRun, recruitCandidates, recruitDueCount, recruitMember, recruitPool, runDef } from '../run/state'
+import { getRun, recruitCandidates, recruitDueCount, recruitMember } from '../run/state'
 import { fought } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId, CharacterTag } from '../types/characters'
@@ -157,10 +157,9 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     return { roster: { x: B.x, y, w: rw, h }, panel: { x: B.x + rw + GAP, y, w: B.w - rw - GAP, h } }
   }
 
-  /** 列出的角色里同时带着这些标签的：列出的是这一局许招的，加上已经入队的 */
+  /** 同时带着这些标签的角色 */
   private matching(tags: readonly CharacterTag[]): CharacterId[] {
-    const pool = recruitPool(this.run)
-    return ROSTER_IDS.filter((id) => (pool.includes(id) || this.run.roster.includes(id)) && tags.every((t) => CHARACTERS[id].tags.includes(t)))
+    return ROSTER_IDS.filter((id) => tags.every((t) => CHARACTERS[id].tags.includes(t)))
   }
 
   private toggle(t: CharacterTag): void {
@@ -283,8 +282,6 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     const roster = this.run.roster
     const flow = new Flow(this, view, { x: 24, y: 16, width: w - 48 })
     flow.put(new Label(this, 24, 16, roster.length === 0 ? '挑一名首发队员' : '给队伍补一名新队员', { kind: 'heading' }), 46)
-    const only = runDef(this.run).rules?.recruit?.tags
-    if (only) flow.text(`这一局只能招募${only.map((t) => TAGS[t].name).join('、')}角色`, { kind: 'label', color: 'accent', indent: false })
     if (roster.length > 0) {
       const count = (t: CharacterTag): number => roster.filter((id) => CHARACTERS[id].tags.includes(t)).length
       const lack = DUTY_TAGS.filter((t) => count(t) === 0)

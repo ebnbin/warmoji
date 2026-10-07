@@ -21,18 +21,3 @@ export function rollCarry(mapId: MapId, polarity: Polarity, rand: () => number):
 export function foldBattleEffects(parts: readonly FieldPickupDef['fx'][]): BattleEffects {
   return { team: parts.flatMap((p) => (p.team ? [p.team] : [])), enemy: parts.flatMap((p) => (p.enemy ? [p.enemy] : [])) }
 }
-
-/** 带光圈的敌人各自带什么效果：先 buff 个增益，再 debuff 个减益，都从地图的效果池里抽 */
-export function rollCarriers(mapId: MapId, buff: number, debuff: number, rand: () => number): FieldPickupDef[] {
-  const pool = POOLS[mapId]
-  const out: FieldPickupDef[] = []
-  for (let i = 0; i < buff; i++) {
-    const d = pickPolarity(pool, 'buff', rand)
-    if (d) out.push(d)
-  }
-  for (let i = 0; i < debuff; i++) {
-    const d = pickPolarity(pool, 'debuff', rand)
-    if (d) out.push(d)
-  }
-  return out
-}

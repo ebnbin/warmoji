@@ -201,7 +201,6 @@ function runtime(sim: Sim, cfg: GatesConfig): GateRuntime {
 /** 此刻所有的出怪口：不变的几处，加上地图此刻给的地标；地标上抛入的口子是以它为心、抛得到的那一圈 */
 export function gatesNow(sim: Sim): Gate[] {
   const cfg = MAPS[sim.mapId].gates
-  if (!cfg) return []
   const out = [...runtime(sim, cfg).fixed]
   for (const [kind, def] of Object.entries(cfg.kinds)) {
     if (def.at.kind !== 'mark') continue
@@ -444,11 +443,11 @@ function standNear(sim: Sim, p: Point, radius: number): Point {
 }
 
 /**
- * 一只敌人从哪进场，只在有出怪口的地图上用。关卡指定了出怪口（头目没写站位时用地图的头目出怪口）就从那种口子出来；
+ * 一只敌人从哪进场：关卡指定了出怪口（头目没写站位时用地图的头目出怪口）就从那种口子出来；
  * 否则先按 base 照常定一个出生点，再吸附到附近的出怪口；哪一处都不行就在那一点（站不住就挪到附近站得住的地方）按地图的 fallback 出来
  */
 export function gateEntry(sim: Sim, at: SpawnAt | undefined, enemy: EnemyKind, boss: boolean, base: () => Point): Entry {
-  const cfg = MAPS[sim.mapId].gates!
+  const cfg = MAPS[sim.mapId].gates
   const rt = runtime(sim, cfg)
   const radius = ENEMIES[enemy].radius * UNIT
   const named = at?.kind === 'gate' ? at.gate : boss && at === undefined ? cfg.boss : undefined
@@ -467,19 +466,19 @@ export function gateEntry(sim: Sim, at: SpawnAt | undefined, enemy: EnemyKind, b
 /** 落点到时站不住了（比如熔岩漫了过来）：按原来的站位重找一处 */
 export function moveEntry(sim: Sim, e: Entry, enemy: EnemyKind, boss: boolean, base: () => Point): Entry {
   const next = gateEntry(sim, e.at, enemy, boss, base)
-  runtime(sim, MAPS[sim.mapId].gates!).moves++
+  runtime(sim, MAPS[sim.mapId].gates).moves++
   return { ...next, moves: e.moves + 1 }
 }
 
 /** 这只敌人进场时冒出的样子：从出怪口出来的按那种口子，原地出来的按地图 */
 export function entryLook(sim: Sim, e: Entry): EntranceLook {
-  const cfg = MAPS[sim.mapId].gates!
+  const cfg = MAPS[sim.mapId].gates
   return (e.kind === null ? cfg.look : cfg.kinds[e.kind]!.look) ?? 'puff'
 }
 
 /** 记下一只还在进场路上的敌人 */
 export function expectLanding(sim: Sim, t: Touchdown): void {
-  runtime(sim, MAPS[sim.mapId].gates!).landing.push(t)
+  runtime(sim, MAPS[sim.mapId].gates).landing.push(t)
 }
 
 /** 到点落地的：交出去冒样子，没到的留着 */
@@ -520,9 +519,8 @@ export function gateLoad(sim: Sim, g: Gate): number {
 }
 
 /** 开发者工具看的统计：每种出怪口眼下几处、一共出了几只、最近十秒出了几只，吸附不到在原地出来的与落点到时换地方的次数 */
-export function gateStats(sim: Sim): { readonly rows: readonly { readonly name: string; readonly n: number; readonly total: number; readonly recent: number }[]; readonly misses: number; readonly moves: number } | null {
+export function gateStats(sim: Sim): { readonly rows: readonly { readonly name: string; readonly n: number; readonly total: number; readonly recent: number }[]; readonly misses: number; readonly moves: number } {
   const cfg = MAPS[sim.mapId].gates
-  if (!cfg) return null
   const gates = gatesNow(sim)
   const rt = runtime(sim, cfg)
   const rows = Object.entries(cfg.kinds).map(([kind, def]) => {

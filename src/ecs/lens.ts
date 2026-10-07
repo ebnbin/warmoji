@@ -1,8 +1,6 @@
 import Phaser from 'phaser'
-import { MAP } from '../data/maps'
 import { safeInsets, viewport } from '../util/apply'
 import { mainCameraOnly } from '../util/camera'
-import { UNIT } from '../util/units'
 import { FRAME } from '../maps/frame'
 import { fitAspectRect } from './worlds/torus'
 import type { Rect } from '../maps/frame'
@@ -11,14 +9,12 @@ import type { Point } from '../util/vec'
 export type { Rect } from '../maps/frame'
 
 /**
- * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；
- * clamp 跟随时镜头停在地图外 cameraMargin 格再加设备安全区；open 不设边；wrap 四边回绕、一圈就是地图矩形；
- * fit 的图平时就整张放进一屏、不跟随；tile 的图跟随时也把地图矩形四周平铺出一圈副本（只画，不是世界），只用在 wrap 的图上
+ * 一张图怎么被拍：map 是地图矩形；edge 是它的边：frame 镜头连同震动都不出地图矩形，画面比它大时放大到正好装下；wrap 四边回绕、一圈就是地图矩形；
+ * tile 的图跟随时也把地图矩形四周平铺出一圈副本（只画，不是世界），只用在 wrap 的图上
  */
 export interface Framing {
   readonly map: Rect
-  readonly edge: 'frame' | 'clamp' | 'open' | 'wrap'
-  readonly fit?: boolean
+  readonly edge: 'frame' | 'wrap'
   readonly tile?: boolean
 }
 
@@ -142,7 +138,7 @@ export class Lens {
     const W = this.scene.scale.width
     const H = this.scene.scale.height
     const f = this.framing
-    const follow = this.mode === 'follow' && !f.fit
+    const follow = this.mode === 'follow'
     const area: Port = this.mode === 'follow' ? { x: 0, y: 0, w: W, h: H } : safeArea(W, H)
     const followZoom = viewport.renderScale * this.followZoom
     let port: Port = { x: 0, y: 0, w: W, h: H }
@@ -155,15 +151,10 @@ export class Lens {
       zoom = f.edge === 'frame' ? Math.max(followZoom, W / f.map.w, H / f.map.h) : followZoom
       cx = anchor.x
       cy = anchor.y
-      if (f.edge === 'clamp') {
-        const b = this.bounds()
-        cx = clampSpan(cx, b.x, b.w, W / zoom)
-        cy = clampSpan(cy, b.y, b.h, H / zoom)
-      }
       wrap = f.edge === 'wrap' && f.tile === true
       clip = wrap
     } else if (f.edge === 'wrap') {
-      const r = f.fit ? f.map : cellOf(f.map, anchor)
+      const r = cellOf(f.map, anchor)
       port = fitIn(area, r.w, r.h)
       zoom = Math.min(port.w / r.w, port.h / r.h)
       cx = r.x + r.w / 2
@@ -175,7 +166,7 @@ export class Lens {
       cx = r.x + r.w / 2 - (area.x + area.w / 2 - W / 2) / zoom
       cy = r.y + r.h / 2 - (area.y + area.h / 2 - H / 2) / zoom
     }
-    const q = this.tremor(dtMs, port, f.fit ? zoom : followZoom, zoom)
+    const q = this.tremor(dtMs, port, followZoom, zoom)
     cx += q.x
     cy += q.y
     if (follow && f.edge === 'frame') {
@@ -212,14 +203,6 @@ export class Lens {
     if (this.mirrors.length === 0) return v
     const m = this.framing.map
     return { x: v.x - m.w, y: v.y - m.h, w: v.w + m.w * 2, h: v.h + m.h * 2 }
-  }
-
-  /** 旧图跟随时镜头停在哪：地图外 cameraMargin 格，再加上这一边的设备安全区 */
-  private bounds(): Rect {
-    const m = this.framing.map
-    const g = MAP.cameraMargin * UNIT
-    const s = safeInsets
-    return { x: m.x - g - s.left, y: m.y - g - s.top, w: m.w + g * 2 + s.left + s.right, h: m.h + g * 2 + s.top + s.bottom }
   }
 
   /** 这一帧震屏把镜头挪多少，世界像素：屏幕上的幅度按 Phaser 的震法在缩放 base 下算，再换到此刻的缩放 */

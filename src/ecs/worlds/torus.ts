@@ -16,21 +16,6 @@ export function torusDelta(from: Point, to: Point, w: number, h: number): Point 
   return { x: dx, y: dy }
 }
 
-export function torusDist2(a: Point, b: Point, w: number, h: number): number {
-  const d = torusDelta(a, b, w, h)
-  return d.x * d.x + d.y * d.y
-}
-
-export function ghostImages(p: Point, w: number, h: number): Point[] {
-  const dx = p.x < w / 2 ? w : -w
-  const dy = p.y < h / 2 ? h : -h
-  return [
-    { x: p.x + dx, y: p.y },
-    { x: p.x, y: p.y + dy },
-    { x: p.x + dx, y: p.y + dy },
-  ]
-}
-
 export function fitAspectRect(
   containerW: number,
   containerH: number,

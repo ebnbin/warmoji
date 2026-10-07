@@ -1,8 +1,7 @@
 import Phaser from 'phaser'
 import { entityExists, query } from 'bitecs'
 import { cubicEaseIn, cubicEaseOut, sineEaseInOut } from '../utils/ease'
-import { Barrier, Depth, Floor, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Motion, MOTION, Radius, Tether, Transform, TRANSIT, Uid } from '../components'
-import { LIFT_PER_M } from '../../util/units'
+import { Barrier, Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Motion, MOTION, Radius, Tether, Transform, TRANSIT, Uid } from '../components'
 import { boltPts } from '../store'
 import type { EcsWorld } from '../world'
 import { fan, quad, ringStrip, segment } from './tri'
@@ -29,11 +28,6 @@ const FREE = -1
 
 
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
-
-/** 站在高处的按脚下的地面抬起，像素 */
-function lift(eid: number): number {
-  return Floor.z[eid]! * LIFT_PER_M
-}
 
 export class CueLayer {
   private readonly flash: Phaser.GameObjects.Rectangle
@@ -83,7 +77,7 @@ export class CueLayer {
       const r = FxCircle.r[k]! * s
       const fade = 1 - e
       const x = Transform.x[k]!
-      const y = Transform.y[k]! - lift(k)
+      const y = Transform.y[k]!
       fan(o, m, x, y, r, packTint(FxCircle.fill[k]!, FxCircle.fillAlpha[k]! * fade))
       const stroke = FxCircle.stroke[k]!
       if (stroke >= 0) {
@@ -95,18 +89,17 @@ export class CueLayer {
       for (const k of query(this.world, [Barrier])) {
         const color = Barrier.color[k]!
         const w = Barrier.thick[k]! * 2
-        const up = lift(k)
         if (Barrier.shape[k] === 1) {
-          ringStrip(o, m, Barrier.cx[k]!, Barrier.cy[k]! - up, Barrier.r[k]!, w, packTint(color, 0.7))
+          ringStrip(o, m, Barrier.cx[k]!, Barrier.cy[k]!, Barrier.r[k]!, w, packTint(color, 0.7))
           continue
         }
-        segment(o, m, Barrier.ax[k]!, Barrier.ay[k]! - up, Barrier.bx[k]!, Barrier.by[k]! - up, w, packTint(color, 0.8))
-        segment(o, m, Barrier.ax[k]!, Barrier.ay[k]! - up, Barrier.bx[k]!, Barrier.by[k]! - up, w * 0.35, packTint(0xffffff, 0.7))
+        segment(o, m, Barrier.ax[k]!, Barrier.ay[k]!, Barrier.bx[k]!, Barrier.by[k]!, w, packTint(color, 0.8))
+        segment(o, m, Barrier.ax[k]!, Barrier.ay[k]!, Barrier.bx[k]!, Barrier.by[k]!, w * 0.35, packTint(0xffffff, 0.7))
       }
       for (const k of query(this.world, [Link, Transform])) {
         const to = Link.to[k]!
         if (!entityExists(this.world, to) || Uid.v[to] !== Link.toUid[k]) continue
-        segment(o, m, Transform.x[k]!, Transform.y[k]! - lift(k), Transform.x[to]!, Transform.y[to]! - lift(to), 3, packTint(Link.color[k]!, 0.55))
+        segment(o, m, Transform.x[k]!, Transform.y[k]!, Transform.x[to]!, Transform.y[to]!, 3, packTint(Link.color[k]!, 0.55))
       }
       for (const k of query(this.world, [Motion, Radius])) {
         if (Motion.kind[k] !== MOTION.transit || Motion.look[k] !== TRANSIT.streak) continue
@@ -116,9 +109,8 @@ export class CueLayer {
         const x = fx + (Motion.tx[k]! - fx) * p
         const y = fy + (Motion.ty[k]! - fy) * p
         const w = Radius.v[k]! * 1.2
-        const up = lift(k)
-        segment(o, m, fx, fy - up, x, y - up, w, packTint(Motion.color[k]!, 0.3))
-        segment(o, m, fx, fy - up, x, y - up, w * 0.3, packTint(0xffffff, 0.5))
+        segment(o, m, fx, fy, x, y, w, packTint(Motion.color[k]!, 0.3))
+        segment(o, m, fx, fy, x, y, w * 0.3, packTint(0xffffff, 0.5))
       }
     }
 
@@ -135,7 +127,7 @@ export class CueLayer {
         const ca = Math.cos(a)
         const sa = Math.sin(a)
         const x = Transform.x[k]!
-        const y = Transform.y[k]! - lift(k)
+        const y = Transform.y[k]!
         const L = FxBeam.len[k]!
         quad(
           o, m,
@@ -162,12 +154,12 @@ export class CueLayer {
         const a = Tether.a[k]!
         const b = Tether.b[k]!
         if (!entityExists(this.world, a) || !entityExists(this.world, b)) continue
-        segment(o, m, Transform.x[a]!, Transform.y[a]! - lift(a), Transform.x[b]!, Transform.y[b]! - lift(b), 4, packTint(Tether.color[k]!, pulse))
+        segment(o, m, Transform.x[a]!, Transform.y[a]!, Transform.x[b]!, Transform.y[b]!, 4, packTint(Tether.color[k]!, pulse))
       }
       for (const k of query(this.world, [Fx, FxSlash, Transform])) {
         const a = Transform.rot[k]!
         ringStrip(
-          o, m, Transform.x[k]!, Transform.y[k]! - lift(k), FxSlash.r[k]!, 5,
+          o, m, Transform.x[k]!, Transform.y[k]!, FxSlash.r[k]!, 5,
           packTint(0xffffff, 0.9 * (1 - age(k))),
           a - 1.1, a + 1.1,
         )

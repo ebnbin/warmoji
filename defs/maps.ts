@@ -1,198 +1,5 @@
 import { hslToInt } from '../src/util/palette.ts'
 import type { MapDef } from '../src/types/maps'
-import type { EnemyMixRow } from '../src/types/enemies'
-
-const FOREST_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
-  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 12, max: 30 },
-  { kind: 'locust', sinceWave: 2, base: 14, perWave: 0.6, min: 0, max: 28 },
-  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
-  { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'mushroom', sinceWave: 4, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
-  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-]
-
-const MEADOW_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
-  { kind: 'locust', sinceWave: 1, base: 15, perWave: 0.8, min: 12, max: 30 },
-  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
-  { kind: 'boar', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'snake', sinceWave: 3, base: 8, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-]
-
-const DESERT_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
-  { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
-  { kind: 'boar', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
-  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'creeper', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'turtle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
-]
-
-const RIVER_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
-  { kind: 'ghost', sinceWave: 1, base: 14, perWave: 0.8, min: 10, max: 28 },
-  { kind: 'blob', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 22 },
-  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
-  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'puffer', sinceWave: 4, base: 6, perWave: 0.4, min: 0, max: 13 },
-  { kind: 'turtle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'siren', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'crab', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-]
-
-const FACTORY_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
-  { kind: 'invader', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
-  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
-  { kind: 'creeper', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
-  { kind: 'puffer', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
-  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
-  { kind: 'raccoon', sinceWave: 3, base: 5, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
-]
-
-const RUINS_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
-  { kind: 'ghost', sinceWave: 1, base: 18, perWave: 1, min: 14, max: 34 },
-  { kind: 'mushroom', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
-  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'creeper', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 13 },
-  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
-  { kind: 'skeleton', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
-  { kind: 'knight', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
-]
-
-const DAY_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 70, perWave: -2, min: 34, max: 70 },
-  { kind: 'boar', sinceWave: 1, base: 18, perWave: 0.8, min: 12, max: 34 },
-  { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
-  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
-  { kind: 'invader', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'knight', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-]
-
-const NIGHT_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 40, perWave: -1, min: 20, max: 40 },
-  { kind: 'ghost', sinceWave: 1, base: 16, perWave: 1, min: 12, max: 30 },
-  { kind: 'gargoyle', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
-  { kind: 'rat', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 11 },
-  { kind: 'chameleon', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-]
-
-const SPACE_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
-  { kind: 'invader', sinceWave: 1, base: 16, perWave: 0.7, min: 12, max: 30 },
-  { kind: 'alien', sinceWave: 2, base: 14, perWave: 0.6, min: 0, max: 26 },
-  { kind: 'comet', sinceWave: 3, base: 9, perWave: 0.4, min: 0, max: 17 },
-  { kind: 'ufo', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
-  { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
-  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'siren', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
-]
-
-const ICE_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
-  { kind: 'boar', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
-  { kind: 'ghost', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 24 },
-  { kind: 'blob', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 22 },
-  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'turtle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'creeper', sinceWave: 5, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'crab', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
-]
-
-const VOLCANO_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
-  { kind: 'turtle', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
-  { kind: 'creeper', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
-  { kind: 'skeleton', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'comet', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'boar', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-]
-
-const NEBULA_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 72, perWave: -2, min: 34, max: 72 },
-  { kind: 'alien', sinceWave: 1, base: 16, perWave: 0.7, min: 12, max: 30 },
-  { kind: 'comet', sinceWave: 2, base: 11, perWave: 0.5, min: 0, max: 21 },
-  { kind: 'ufo', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
-  { kind: 'siren', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'chameleon', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-]
-
-const AMETHYST_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
-  { kind: 'skeleton', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
-  { kind: 'crab', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'rat', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 15 },
-  { kind: 'chameleon', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
-  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
-  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-]
-
-const PETRI_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
-  { kind: 'blob', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
-  { kind: 'slime', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
-  { kind: 'rat', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
-  { kind: 'mushroom', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
-  { kind: 'crab', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-]
-
-const DEEP_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
-  { kind: 'puffer', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
-  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
-  { kind: 'blob', sinceWave: 2, base: 11, perWave: 0.5, min: 0, max: 20 },
-  { kind: 'skeleton', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
-  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
-  { kind: 'crab', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'siren', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'ghost', sinceWave: 5, base: 6, perWave: 0.3, min: 0, max: 12 },
-]
-
-const THEATER_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
-  { kind: 'rat', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
-  { kind: 'mushroom', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'ghost', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
-  { kind: 'knight', sinceWave: 3, base: 7, perWave: 0.4, min: 0, max: 14 },
-  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
-  { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
-]
-
-const WARP_MIX: readonly EnemyMixRow[] = [
-  { kind: 'zombie', sinceWave: 1, base: 60, perWave: -2, min: 30, max: 60 },
-  { kind: 'ghost', sinceWave: 1, base: 18, perWave: 0.8, min: 14, max: 30 },
-  { kind: 'alien', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 30 },
-  { kind: 'crab', sinceWave: 1, base: 12, perWave: 0.5, min: 8, max: 22 },
-  { kind: 'locust', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
-  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'gargoyle', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'blob', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'ufo', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'turtle', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
-  { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
-]
 
 export const MAPS = {
   meadow: { // Meadow
@@ -205,7 +12,6 @@ export const MAPS = {
       bgFrom: 'hsl(112 23% 42%)',
       bgTo: 'hsl(158 28% 17%)',
       map: hslToInt(107, 0.33, 0.56),
-      shadow: 0x000000,
     },
     light: { sun: 0xfffaf0, shade: 0xc5cdbb, shadow: { color: 0x0f1a08, alpha: 0.4, length: 0.85 } },
     decor: {
@@ -214,7 +20,7 @@ export const MAPS = {
       alpha: [0.8, 0.92],
       density: [0.012, 0.018],
     },
-    mix: MEADOW_MIX,
+    foes: ['zombie', 'locust', 'slime', 'boar', 'snake', 'mushroom', 'rat'],
     gates: {
       snapU: 4,
       fallback: 'rise',
@@ -230,7 +36,6 @@ export const MAPS = {
         grass: { name: '草丛', at: { kind: 'ground' }, enter: 'rise', look: 'leaves', weight: 1 },
       },
     },
-    finalWaveSub: '蛛后从林子里爬出来了——草地开阔，绕着它打！',
     meadow: {
       meterPerU: 0.5,
       sizeU: 36,
@@ -256,7 +61,6 @@ export const MAPS = {
       bgFrom: 'hsl(350 38% 42%)',
       bgTo: 'hsl(22 34% 15%)',
       map: hslToInt(88, 0.32, 0.42),
-      shadow: 0x000000,
     },
     light: { sun: 0xfffaf6, shade: 0xd1c2c4, shadow: { color: 0x2a1216, alpha: 0.38, length: 0.55 } },
     decor: {
@@ -265,7 +69,7 @@ export const MAPS = {
       alpha: [0.85, 0.95],
       density: [0.004, 0.008],
     },
-    mix: RIVER_MIX,
+    foes: ['zombie', 'ghost', 'blob', 'slime', 'snake', 'puffer', 'turtle', 'siren', 'crab'],
     gates: {
       snapU: 3,
       fallback: 'rise',
@@ -280,7 +84,6 @@ export const MAPS = {
         lawn: { name: '落花', at: { kind: 'ground' }, enter: 'rise', look: 'petals', weight: 1 },
       },
     },
-    finalWaveSub: '巨鳄顺着溪游了下来——别跟它在深水里纠缠！',
     sakura: {
       meterPerU: 0.5,
       cellU: 0.25,
@@ -309,7 +112,6 @@ export const MAPS = {
       bgFrom: 'hsl(35 43% 54%)',
       bgTo: 'hsl(22 32% 20%)',
       map: hslToInt(42, 0.84, 0.69),
-      shadow: 0x000000,
     },
     light: { sun: 0xfff8ea, shade: 0xdac1a3, shadow: { color: 0x3a200c, alpha: 0.42, length: 1.05 } },
     decor: {
@@ -318,7 +120,7 @@ export const MAPS = {
       alpha: [0.75, 0.9],
       density: [0.002, 0.0035],
     },
-    mix: DESERT_MIX,
+    foes: ['zombie', 'locust', 'boar', 'snake', 'rat', 'creeper', 'turtle', 'skeleton', 'raccoon'],
     gates: {
       snapU: 3,
       fallback: 'rise',
@@ -330,7 +132,6 @@ export const MAPS = {
         burrow: { name: '沙下', at: { kind: 'ground' }, enter: 'rise', look: 'sand', weight: 1 },
       },
     },
-    finalWaveSub: '蝎王在沙下穿行——别在沙丘上耗光体力！',
     desert: {
       meterPerU: 0.5,
       viewMaxU: 26,
@@ -368,7 +169,6 @@ export const MAPS = {
       bgFrom: 'hsl(212 64% 22%)',
       bgTo: 'hsl(224 72% 6%)',
       map: hslToInt(214, 0.5, 0.22),
-      shadow: 0x000000,
     },
     // 没有太阳：光来自头顶透下来的那层幽蓝、潜艇门上与艇首的灯和队员的头灯，迎着灯的一面泛白、背面沉进深蓝；没有接影子的光
     light: { sun: 0xdbeaff, shade: 0x35507e },
@@ -378,7 +178,7 @@ export const MAPS = {
       alpha: [0, 0],
       density: [0, 0],
     },
-    mix: DEEP_MIX,
+    foes: ['zombie', 'puffer', 'slime', 'blob', 'skeleton', 'snake', 'crab', 'siren', 'ghost'],
     // 石缝里游出来、从岩堆上爬下来、从陡坎下面浮上来、从鲸骨底下钻出来、冷泉里冒出来、从头顶的黑暗里沉下来、从软泥里钻出来；巨鳄从陡坎下面上来
     gates: {
       snapU: 3,
@@ -395,7 +195,6 @@ export const MAPS = {
         ooze: { name: '软泥', at: { kind: 'ground' }, enter: 'rise', look: 'silt', weight: 1 },
       },
     },
-    finalWaveSub: '巨鳄从陡坎下面游上来了——别被它堵在离潜艇门口远的地方！',
     deep: {
       meterPerU: 0.5,
       sizeU: 36,
@@ -441,7 +240,6 @@ export const MAPS = {
       bgFrom: 'hsl(30 52% 34%)',
       bgTo: 'hsl(24 44% 11%)',
       map: hslToInt(30, 0.5, 0.46),
-      shadow: 0x000000,
     },
     light: { sun: 0xfff3e0, shade: 0xd0bca4, shadow: { color: 0x2a1a0a, alpha: 0.4, length: 0.85 } },
     decor: {
@@ -450,7 +248,7 @@ export const MAPS = {
       alpha: [0.8, 0.92],
       density: [0.006, 0.01],
     },
-    mix: RUINS_MIX,
+    foes: ['zombie', 'ghost', 'mushroom', 'snake', 'creeper', 'gargoyle', 'elf', 'skeleton', 'knight'],
     gates: {
       snapU: 3,
       fallback: 'rise',
@@ -462,7 +260,6 @@ export const MAPS = {
         haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['ghost'] },
       },
     },
-    finalWaveSub: '暴龙撞穿墙冲过来——别和它一起被塌下的墙堵在屋里！',
     ruins: {
       meterPerU: 0.5,
       cellU: 0.25,
@@ -503,7 +300,6 @@ export const MAPS = {
       bgFrom: 'hsl(276 42% 24%)',
       bgTo: 'hsl(272 48% 7%)',
       map: hslToInt(276, 0.46, 0.44),
-      shadow: 0x000000,
     },
     // 洞里的明暗由光照层按开口与火把画，精灵只按光从哪边来分出迎光面与背光面；光不从太阳来，不投影
     light: { sun: 0xffffff, shade: 0x8a82a0 },
@@ -513,7 +309,7 @@ export const MAPS = {
       alpha: [0.6, 0.85],
       density: [0.02, 0.035],
     },
-    mix: AMETHYST_MIX,
+    foes: ['zombie', 'skeleton', 'crab', 'rat', 'chameleon', 'creeper', 'gargoyle'],
     gates: {
       snapU: 3,
       fallback: 'rise',
@@ -528,7 +324,6 @@ export const MAPS = {
         dark: { name: '暗处', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
       },
     },
-    finalWaveSub: '夜伯爵从塌顶落进晶洞——守住火光！',
     amethyst: {
       chambers: { mainU: [9.8, 10.6], driftU: 1.2, sideCount: [3, 4], sideU: [4.8, 6.2], overlapU: [2.6, 3.6], jitter: 0.1, wobbleU: 0.5, waveU: 3, neckU: 0.8, rimU: 1.6, ceilingM: 9, wallU: 2.4 },
       tunnels: { count: [3, 4], widthU: 2.4, outU: 3.2, turnU: [3, 4.2], pocketU: 1.5, rockU: 1.1 },
@@ -555,7 +350,6 @@ export const MAPS = {
       bgFrom: 'hsl(210 6% 19%)',
       bgTo: 'hsl(210 20% 6%)',
       map: hslToInt(209, 0.05, 0.3),
-      shadow: 0x000000,
     },
     light: { sun: 0xf6ebe4, shade: 0xa29793, shadow: { color: 0x080404, alpha: 0.45, length: 0.85 } },
     decor: {
@@ -564,7 +358,7 @@ export const MAPS = {
       alpha: [0.2, 0.34],
       density: [0.03, 0.05],
     },
-    mix: VOLCANO_MIX,
+    foes: ['zombie', 'turtle', 'creeper', 'skeleton', 'comet', 'boar', 'gargoyle'],
     // 崖脚的洞里走出来、崖顶跳下来、喷气孔里钻出来、喷发时火山口抛出来、骷髅从灰里爬起来；暴龙从山坡上下来
     gates: {
       snapU: 3,
@@ -579,7 +373,6 @@ export const MAPS = {
         foot: { name: '山坡', at: { kind: 'mark' }, enter: 'walk', weight: 1, only: ['rhino'] },
       },
     },
-    finalWaveSub: '暴龙踏着熔岩而来——别在火山脚下恋战！',
     volcano: {
       cellU: 0.5,
       rim: { insetU: [0.5, 2.5], waveU: 7, cornerU: 5, neckU: 1, cliffU: 1.1, cliffHeight: 2.6, backSlope: 0.12 },
@@ -627,7 +420,6 @@ export const MAPS = {
       bgFrom: 'hsl(202 38% 24%)',
       bgTo: 'hsl(214 48% 7%)',
       map: hslToInt(200, 0.22, 0.86),
-      shadow: 0x000000,
     },
     light: { sun: 0xffffff, shade: 0xc4d2e0, shadow: { color: 0x1a3a66, alpha: 0.38, length: 1.5 } },
     decor: {
@@ -636,7 +428,7 @@ export const MAPS = {
       alpha: [0.14, 0.28],
       density: [0.05, 0.09],
     },
-    mix: ICE_MIX,
+    foes: ['zombie', 'boar', 'ghost', 'blob', 'snake', 'turtle', 'creeper', 'crab', 'knight'],
     gates: {
       snapU: 4,
       fallback: 'rise',
@@ -708,7 +500,6 @@ export const MAPS = {
       bgFrom: 'hsl(356 40% 26%)',
       bgTo: 'hsl(350 40% 8%)',
       map: hslToInt(38, 0.45, 0.84),
-      shadow: 0x000000,
     },
     // 台上的灯从左上方照下来，地布反光，背光面不暗；影子落在台上，暖褐色
     light: { sun: 0xfffaf0, shade: 0xd2c4b2, shadow: { color: 0x3b2614, alpha: 0.32, length: 0.7 } },
@@ -718,7 +509,7 @@ export const MAPS = {
       alpha: [0, 0],
       density: [0, 0],
     },
-    mix: THEATER_MIX,
+    foes: ['zombie', 'rat', 'mushroom', 'ghost', 'knight', 'skeleton', 'gargoyle', 'elf', 'raccoon'],
     // 从台上的活门里升上来、从台边爬上来、从布景后面走出来、从地布底下钻出来；夜伯爵从活门里升上来
     gates: {
       snapU: 3,
@@ -732,7 +523,6 @@ export const MAPS = {
         print: { name: '地布下', at: { kind: 'ground' }, enter: 'rise', look: 'paper', weight: 1 },
       },
     },
-    finalWaveSub: '夜伯爵从台上的活门里升了上来——换幕的时候，别和它困在同一片布景后面！',
     theater: {
       size: { wU: 36, hU: 27 },
       plazaU: 4.5,
@@ -755,7 +545,6 @@ export const MAPS = {
       bgFrom: 'hsl(204 16% 80%)',
       bgTo: 'hsl(212 14% 38%)',
       map: hslToInt(43, 0.55, 0.87),
-      shadow: 0x000000,
     },
     // 光从头顶的灯照下来，脚下的灯箱又从下面透上来，背光面不暗、影子淡
     light: { sun: 0xfffaf4, shade: 0xc9c4b8, shadow: { color: 0x2e2412, alpha: 0.3, length: 0.6 } },
@@ -765,7 +554,7 @@ export const MAPS = {
       alpha: [0, 0],
       density: [0, 0],
     },
-    mix: PETRI_MIX,
+    foes: ['zombie', 'blob', 'slime', 'rat', 'mushroom', 'crab', 'ghost'],
     gates: {
       snapU: 3,
       fallback: 'drop',
@@ -776,7 +565,6 @@ export const MAPS = {
         drip: { name: '滴落', at: { kind: 'ground' }, enter: 'drop', look: 'splash', weight: 1 },
       },
     },
-    finalWaveSub: '蛛后翻过皿壁爬了进来——它在菌落上照样走，趁它走进菌落时打倒它，倒下时能溶出一大片！',
     petri: {
       mmPerU: 2.7,
       dish: { radiusU: 16, wallU: 0.45 },
@@ -799,7 +587,6 @@ export const MAPS = {
       bgFrom: 'hsl(222 52% 14%)',
       bgTo: 'hsl(232 60% 4%)',
       map: hslToInt(192, 0.36, 0.86),
-      shadow: 0x000000,
     },
     // 光从左上方的顶灯照下来，地砖与门又从下面把身体照亮，背光面泛着冷蓝；影子淡
     light: { sun: 0xf6fbff, shade: 0x7e93b8, shadow: { color: 0x07142a, alpha: 0.28, length: 0.55 } },
@@ -810,7 +597,7 @@ export const MAPS = {
       alpha: [0, 0],
       density: [0, 0],
     },
-    mix: WARP_MIX,
+    foes: ['zombie', 'ghost', 'alien', 'crab', 'locust', 'invader', 'gargoyle', 'chameleon', 'blob', 'ufo', 'turtle', 'siren', 'hive'],
     // 每间舱室的出怪板按那一季的配方只放出那几种：一季幽灵、一季肉盾、一季成群的小东西、一季什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那几间。头目从队伍那间的天花板上落下来
     gates: {
       snapU: 60,
@@ -820,12 +607,11 @@ export const MAPS = {
       kinds: {
         ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
         tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
-        swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
+        swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob', 'hive'] },
         mixed: { name: '混编舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
         warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha'] },
       },
     },
-    finalWaveSub: '看守从天花板上落了下来——这一间就是出口？',
     exit: {
       maze: {
         colU: [14, 18],
@@ -864,7 +650,6 @@ export const MAPS = {
       bgFrom: 'hsl(240 8% 8%)',
       bgTo: 'hsl(240 10% 3%)',
       map: hslToInt(240, 0.08, 0.07),
-      shadow: 0x000000,
     },
     // 没有太阳：主光是黑洞的吸积盘，迎着它的一面是盘光的蓝白，背面偏冷偏暗；没有接影子的地面
     light: { sun: 0xf4f6ff, shade: 0x8f97b8 },
@@ -874,7 +659,7 @@ export const MAPS = {
       alpha: [0, 0],
       density: [0, 0],
     },
-    mix: NEBULA_MIX,
+    foes: ['zombie', 'alien', 'comet', 'ufo', 'siren', 'chameleon', 'ghost'],
     gates: {
       snapU: 3,
       fallback: 'rise',
@@ -888,7 +673,6 @@ export const MAPS = {
         dust: { name: '星尘', at: { kind: 'ground' }, enter: 'rise', look: 'glow', weight: 1 },
       },
     },
-    finalWaveSub: '奇点从视界边上走来——别被它和黑洞夹在中间！',
     nebula: {
       shell: { innerU: 16, outerU: 24, gm: 3_000_000, rise: 1.5, tau: 90 },
       contain: { speedMul: 1.5, depthU: 2, leapU: 8 },
@@ -912,279 +696,6 @@ export const MAPS = {
       },
       spawnClearU: 1.5,
       cameraU: 48,
-    },
-    boss: 'blackhole',
-  },
-  forest: {
-    emoji: '1f332',
-    name: '黑森林',
-    desc: '苍郁密林，落叶与蕨草铺满林间空地',
-    kind: 'bounded',
-    stamina: { exertion: 0.4, regen: 1.2 },
-    palette: {
-      bgFrom: 'hsl(150 30% 30%)',
-      bgTo: 'hsl(170 32% 17%)',
-      map: hslToInt(110, 0.3, 0.7),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['1f332', '1f333', '1f33f', '1f342', '1f343', '1faa8'],
-      sizeU: [0.35, 0.95],
-      alpha: [0.14, 0.26],
-      density: [0.1, 0.14],
-    },
-    mix: FOREST_MIX,
-    boss: 'treant',
-  },
-  oldDesert: {
-    emoji: '1f3dc',
-    name: '旧荒漠',
-    desc: '烈日炙烤的荒漠，赶路格外耗体力，歇着也回得慢；沙丘与枯骨之间潜伏着不知疲倦的毒物',
-    kind: 'bounded',
-    size: { w: 30, h: 30 },
-    stamina: { exertion: 1.5, regen: 0.7 },
-    palette: {
-      bgFrom: 'hsl(30 42% 36%)',
-      bgTo: 'hsl(15 38% 20%)',
-      map: hslToInt(45, 0.48, 0.76),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['1f335', '1faa8', '1f9b4', '1f480', '1f940'],
-      sizeU: [0.35, 0.9],
-      alpha: [0.14, 0.26],
-      density: [0.08, 0.11],
-    },
-    mix: DESERT_MIX,
-    finalWaveSub: '蝎王不知疲倦，你会累——别在流沙里挣扎！',
-    boss: 'scorpion',
-  },
-  oldRiver: {
-    emoji: '1f30a',
-    name: '奔流（旧）',
-    desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
-    kind: 'oldRiver',
-    stamina: { exertion: 0.5, regen: 1 },
-    palette: {
-      bgFrom: 'hsl(28 32% 30%)',
-      bgTo: 'hsl(205 38% 15%)',
-      map: hslToInt(197, 0.52, 0.66),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['1f33e', '1f33f', '1faa8', '1f333', '1f344'],
-      sizeU: [0.4, 0.8],
-      alpha: [0.3, 0.45],
-      density: [0.1, 0.14],
-    },
-    drift: ['1f343', '1f338', '1fae7', '1f342'],
-    mix: RIVER_MIX,
-    finalWaveSub: '大河没有退路，正面迎战！',
-    oldRiver: {
-      viewScale: 1.2,
-      width: 12,
-      flow: 1,
-      upstream: 2.4,
-      downstream: 0.3,
-      coinCullPad: 2,
-      enemyCullPad: 6,
-      driftCount: 18,
-      driftSpeedMul: [0.75, 1.3],
-      waveSlow: 0.6,
-      waveFast: 1.2,
-    },
-    boss: 'croc',
-  },
-  void: {
-    emoji: '1f3ed',
-    name: '工厂',
-    desc: '轰鸣的自动化车间，四壁皆是传送闸口——出这头即现那头',
-    kind: 'void',
-    stamina: { exertion: 0.35, regen: 1 },
-    palette: {
-      bgFrom: 'hsl(210 16% 20%)',
-      bgTo: 'hsl(214 22% 8%)',
-      map: hslToInt(210, 0.08, 0.34),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['2699', '1f527', '1f529', '1f6e2', '1f4e6', '1f6e0'],
-      sizeU: [0.3, 0.7],
-      alpha: [0.14, 0.26],
-      density: [0.05, 0.09],
-    },
-    mix: FACTORY_MIX,
-    finalWaveSub: '环形厂区无处可退，正面迎战！',
-    torus: {
-      arenaLong: 24,
-      arenaShort: 13.5,
-      projectileLifeMs: 1500,
-      frame: 0.3,
-    },
-    boss: 'mecha',
-  },
-  oldRuins: {
-    emoji: '1f3da',
-    name: '残垣（旧）',
-    desc: '断壁残垣的废墟回廊——墙挡人、挡弹、也挡视线，墙后的敌人只剩淡影；靠掩体、卡口与探头作战',
-    kind: 'oldRuins',
-    stamina: { exertion: 0.6, regen: 1 },
-    palette: {
-      bgFrom: 'hsl(35 16% 28%)',
-      bgTo: 'hsl(28 18% 12%)',
-      map: hslToInt(38, 0.12, 0.62),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['1faa8', '1f9f1', '1f940', '1f33f'],
-      sizeU: [0.3, 0.7],
-      alpha: [0.12, 0.22],
-      density: [0.05, 0.08],
-    },
-    mix: RUINS_MIX,
-    walls: { blocks: 15, maxLen: 4, centerClearU: 3.5, spawnMinCellDist: 5, reflowMs: 120, bodyRadiusCapU: 0.45 },
-    boss: 'rhino',
-  },
-  daynight: {
-    emoji: '1f304',
-    name: '晨昏原野',
-    desc: '随昼夜轮转的旷野：正午视野纵览全场，午夜相机收窄、四合起以身为心的迷雾；昼夜各出一批怪',
-    kind: 'daynight',
-    size: { w: 30, h: 30 },
-    stamina: { exertion: 0.4, regen: 1 },
-    palette: {
-      bgFrom: 'hsl(245 30% 28%)',
-      bgTo: 'hsl(258 34% 11%)',
-      map: hslToInt(150, 0.2, 0.6),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['1f33e', '1f33f', '1f33b', '1f33c', '1faa8'],
-      sizeU: [0.35, 0.9],
-      alpha: [0.14, 0.26],
-      density: [0.09, 0.13],
-    },
-    mix: [...DAY_MIX, ...NIGHT_MIX],
-    dayMix: DAY_MIX,
-    nightMix: NIGHT_MIX,
-    dayNight: {
-      cycleSec: 48,
-      startHour: 6,
-      visionMax: 30,
-      visionMid: 20,
-      visionMin: 10,
-      fogRadiusDusk: 11,
-      fogRadiusMidnight: 3.5,
-      fogAlphaMax: 0.9,
-      daySpawnScale: 0.68,
-      nightSpawnScale: 1.55,
-    },
-    finalWaveSub: '击败它，或撑过头目波——注意昼夜轮替，夜幕里它更难缠！',
-    boss: 'eclipse',
-  },
-  space: {
-    emoji: '1f30c',
-    name: '深空',
-    desc: '被黑洞禁锢的圆形星域——全程困在一个圈里，越靠边缘引力越强、谁也逃不出去；天体不时拖着直线横扫战场（敌我通吃），终波奇点正面决战',
-    kind: 'space',
-    stamina: { exertion: 0.3, regen: 0.8 },
-    palette: {
-      bgFrom: 'hsl(245 45% 14%)',
-      bgTo: 'hsl(255 55% 4%)',
-      map: hslToInt(246, 0.45, 0.09),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['2b50', '2728', '1f31f', '1f4ab'],
-      sizeU: [0.3, 0.7],
-      alpha: [0.16, 0.32],
-      density: [0.06, 0.1],
-    },
-    mix: SPACE_MIX,
-    finalWaveSub: '奇点降临——禁锢星域内已无处可逃，正面迎战！',
-    space: {
-      blackholeRadiusU: 12.5,
-      meteor: {
-        intervalMs: 15000,
-        intervalJitterMs: 5000,
-        warnMs: 1500,
-        radiusU: 2.6,
-        speedU: 14,
-        travelU: 30,
-        offsetU: 7,
-        damage: 30,
-      },
-    },
-    boss: 'blackhole',
-  },
-  ice: {
-    emoji: '2744',
-    name: '旧浮冰',
-    desc: '脚下是打滑的浮冰——不跟手、刹不住、会过冲；四周刺骨寒水，滑出冰面就掉血、越游越慢（敌我通吃）。低摩擦让击退格外突出，把敌人推下水淹死是这里的活路',
-    kind: 'ice',
-    stamina: { exertion: 0.3, regen: 0.9 },
-    palette: {
-      bgFrom: 'hsl(205 45% 20%)',
-      bgTo: 'hsl(215 55% 6%)',
-      map: hslToInt(198, 0.32, 0.82),
-      shadow: 0x0a1f33,
-    },
-    decor: {
-      emojis: ['2744', '1f9ca'],
-      sizeU: [0.3, 0.7],
-      alpha: [0.14, 0.28],
-      density: [0.05, 0.09],
-    },
-    mix: ICE_MIX,
-    ice: {
-      floeU: 25,
-      traction: 0.12,
-      waterTraction: 0.35,
-      waterViscosity: 2.5,
-      waterExertion: 2.5,
-      waterRegen: 0.3,
-      waterTeamDps: 16,
-      waterEnemyDps: 32,
-      waterTickMs: 250,
-    },
-    boss: 'swan',
-  },
-  nebulaOld: {
-    emoji: '1f573',
-    name: '旧星云',
-    desc: '一团空心的星云，空腔里某处藏着一个黑洞：人、怪、子弹、流星、掉落物都受它的万有引力，越近越强，中心掉进视界就被吞噬；空腔外是厚重的星云壳层，越往外走被它拉回得越狠，谁也出不去；壳层里落下的碎块化作流星横穿空腔',
-    kind: 'nebulaOld',
-    stamina: { exertion: 0.3, regen: 0.8 },
-    palette: {
-      bgFrom: 'hsl(290 45% 17%)',
-      bgTo: 'hsl(255 55% 5%)',
-      map: hslToInt(270, 0.45, 0.08),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['2b50', '2728', '1f31f', '1f4ab'],
-      sizeU: [0.3, 0.7],
-      alpha: [0.16, 0.32],
-      density: [0.05, 0.08],
-    },
-    mix: SPACE_MIX,
-    finalWaveSub: '奇点降临——别被它逼进黑洞的视界！',
-    nebulaOld: {
-      shell: { innerU: 18, outerU: 30, gm: 120_000 },
-      contain: { speedMul: 1.5, leapU: 8 },
-      hole: { gm: 110, softeningU: 0.6, horizonU: 1.2, fromCenterU: [8, 12], clearU: 5 },
-      meteor: {
-        firstMs: 7000,
-        intervalMs: 15000,
-        intervalJitterMs: 5000,
-        warnMs: 1800,
-        radiusU: 1.3,
-        speedU: 12,
-        offsetU: 6,
-        damage: 30,
-        stepMs: 16,
-        maxFlightMs: 5000,
-      },
     },
     boss: 'blackhole',
   },

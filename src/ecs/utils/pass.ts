@@ -1,13 +1,13 @@
 import { hasComponent, query } from 'bitecs'
 import { MATERIALS, OBSTACLES } from '../../data/obstacles'
-import { Barrier, Motion, MOTION, Phasing, Proj, Span, Transform } from '../components'
+import { Barrier, Motion, MOTION, Phasing, Proj, Span } from '../components'
 import { barrierHit, hostileTo } from '../entities/barrier'
 import type { ObstacleId, Span as Layers } from '../../types/obstacles'
 import type { Source } from './source'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
 
-/** 一次探测：沿线段飞的弹体、看过去的视线或够过去的出手。两端离基准面多高（米），中间比两端的连线再高出 arc 米（抛物线），一路还能贯穿几次 */
+/** 一次探测：沿线段飞的弹体、看过去的视线或够过去的出手。两端离地多高（米），中间比两端的连线再高出 arc 米（抛物线），一路还能贯穿几次 */
 export interface Probe {
   readonly via: 'shot' | 'sight'
   readonly h0: number
@@ -50,17 +50,12 @@ const CHEST = B.layers - 1
 /** 爆炸与落地的冲击从离地多高打出去，米 */
 export const BLAST_M = OBSTACLES.blastM
 
-/** 竖直方向的一段：离基准面从 bottom 到 top 米，含底不含顶 */
+/** 竖直方向的一段：离地从 bottom 到 top 米，含底不含顶 */
 export type Band = readonly [bottom: number, top: number]
 
-/** (x, y) 处能站的地面离基准面多高，米：地图没写的都是平地 */
-export function floorAt(sim: Sim, x: number, y: number): number {
-  return sim.hooks.floorZ?.(sim, x, y) ?? 0
-}
-
-/** 站在离基准面 floor 米的地面上、占 span 层的东西占的那一段 */
-export function bandAt(floor: number, span: Layers): Band {
-  return [floor + span[0] * LAYER_M, floor + (span[1] + 1) * LAYER_M]
+/** 占 span 层的东西占的那一段 */
+export function bandAt(span: Layers): Band {
+  return [span[0] * LAYER_M, (span[1] + 1) * LAYER_M]
 }
 
 /** z 落在这一段里 */
@@ -108,9 +103,9 @@ export function spanOf(world: EcsWorld, eid: number): Layers {
   return [loOf(world, eid), hiOf(world, eid)]
 }
 
-/** 身体此刻占的那一段：脚下的地面加上此刻占的层 */
+/** 身体此刻占的那一段 */
 export function bandOf(sim: Sim, eid: number): Band {
-  return bandAt(floorAt(sim, Transform.x[eid]!, Transform.y[eid]!), spanOf(sim.world, eid))
+  return bandAt(spanOf(sim.world, eid))
 }
 
 /** 脚沾着地：占着贴地的一层，没在弧线里腾空，也没在穿行 */
@@ -164,18 +159,10 @@ export function passCost(p: Probe, material: ObstacleId): number {
   return m.pierce ?? Infinity
 }
 
-/**
- * 地图上沿线段 a→b 的探测：地图报出第一处探测在它里面、又要贯穿才过得去的实心，贯穿得过的扣掉次数从它背后接着查。
- * 没写 trace 的地图按 wallHit：碰上就挡，当作岩体
- */
+/** 地图上沿线段 a→b 的探测：地图报出第一处探测在它里面、又要贯穿才过得去的实心，贯穿得过的扣掉次数从它背后接着查；没写 trace 的地图没有实心 */
 export function terrainPass(sim: Sim, p: Probe, ax: number, ay: number, bx: number, by: number): Passage {
   const h = sim.hooks
-  if (!h.trace) {
-    const hit = h.wallHit?.(sim, ax, ay, bx, by) ?? null
-    if (!hit) return { block: null, spent: 0 }
-    const len = Math.hypot(bx - ax, by - ay)
-    return { block: { x: hit.x, y: hit.y, t: len > 0 ? Math.hypot(hit.x - ax, hit.y - ay) / len : 0, material: 'rock', barrier: -1 }, spent: 0 }
-  }
+  if (!h.trace) return { block: null, spent: 0 }
   let from = 0
   let left = p.pierce
   for (let k = 0; k < 16 && from < 1; k++) {
@@ -191,17 +178,17 @@ export function terrainPass(sim: Sim, p: Probe, ax: number, ay: number, bx: numb
   return { block: null, spent: p.pierce - left }
 }
 
-/** 看得见：从 (ax, ay) 脚下的地面往上 eyeA 米看到 (bx, by) 脚下的地面往上 eyeB 米，中间没有挡视线的东西；技能墙看得穿 */
+/** 看得见：从 (ax, ay) 离地 eyeA 米看到 (bx, by) 离地 eyeB 米，中间没有挡视线的东西；技能墙看得穿 */
 export function canSee(sim: Sim, ax: number, ay: number, eyeA: number, bx: number, by: number, eyeB: number): boolean {
-  return terrainPass(sim, { via: 'sight', h0: floorAt(sim, ax, ay) + eyeA, h1: floorAt(sim, bx, by) + eyeB, arc: 0, pierce: 0 }, ax, ay, bx, by).block === null
+  return terrainPass(sim, { via: 'sight', h0: eyeA, h1: eyeB, arc: 0, pierce: 0 }, ax, ay, bx, by).block === null
 }
 
 /** 标准身体平射飞的高度，米：近战、爆炸与场按它看够不够得着，画面上抛射按高出它多少抬起 */
 export const CHEST_M = layerZ(CHEST)
 
-/** 齐胸高从出手处往目标够，第一处挡住的地方：两头各从自己脚下的地面量起；近战、爆炸与场都按它，贯穿不了 */
+/** 齐胸高从出手处往目标够，第一处挡住的地方；近战、爆炸与场都按它，贯穿不了 */
 export function reachBlock(sim: Sim, ax: number, ay: number, bx: number, by: number): Block | null {
-  return terrainPass(sim, { via: 'shot', h0: floorAt(sim, ax, ay) + CHEST_M, h1: floorAt(sim, bx, by) + CHEST_M, arc: 0, pierce: 0 }, ax, ay, bx, by).block
+  return terrainPass(sim, { via: 'shot', h0: CHEST_M, h1: CHEST_M, arc: 0, pierce: 0 }, ax, ay, bx, by).block
 }
 
 export function reaches(sim: Sim, ax: number, ay: number, bx: number, by: number): boolean {
@@ -226,27 +213,21 @@ export function shotPass(sim: Sim, faction: number, p: Probe, ax: number, ay: nu
   return { block: best, spent: best && best.barrier >= 0 ? 0 : r.spent }
 }
 
-/** 弹体从离基准面 z0 米出手、飞到 z1 米（抛射是落点的地面）的整段探测，抛射中间拱起 arc 米 */
+/** 弹体从离地 z0 米出手、飞到 z1 米（抛射是落点的地面）的整段探测，抛射中间拱起 arc 米 */
 export function flightProbe(z0: number, z1: number, arc: number, pierce: number): Probe {
   return { via: 'shot', h0: z0, h1: z1, arc, pierce }
 }
 
-/** 弹体飞出 flown 像素时的基准：出手处的地面顺着连到瞄准处（抛射是落点）的地面，离基准面多高，米 */
-export function boltFloor(eid: number, flown: number): number {
-  return Proj.g[eid]! + Proj.dg[eid]! * flown
-}
-
-/** 弹体飞出 flown 像素时离基准面多高，米：平射离它的基准一直是出手时那么高；抛射从出手的高度落到落点的地面，中间拱起 arc 米 */
+/** 弹体飞出 flown 像素时离地多高，米：平射一直是出手时那么高；抛射从出手的高度落到地面，中间拱起 arc 米 */
 export function boltZAt(eid: number, flown: number): number {
-  const rel = Proj.z[eid]! - Proj.g[eid]!
+  const z = Proj.z[eid]!
   const arc = Proj.arc[eid]!
-  if (arc <= 0) return boltFloor(eid, flown) + rel
-  const reach = Proj.reach[eid]!
-  const s = Math.min(1, flown / reach)
-  return boltFloor(eid, Math.min(flown, reach)) + rel * (1 - s) + 4 * arc * s * (1 - s)
+  if (arc <= 0) return z
+  const s = Math.min(1, flown / Proj.reach[eid]!)
+  return z * (1 - s) + 4 * arc * s * (1 - s)
 }
 
-/** 弹体此刻离基准面多高，米 */
+/** 弹体此刻离地多高，米 */
 export function boltZ(eid: number): number {
   return boltZAt(eid, Proj.flown[eid]!)
 }
@@ -270,7 +251,7 @@ export function phases(world: EcsWorld, eid: number, material: ObstacleId): bool
   return MATERIALS[material].phase && hasComponent(world, eid, Phasing)
 }
 
-/** 破坏力打在 (x, y) 离基准面 z 米处、半径 r 像素的范围里：地图按材质的强度折算能打掉多少，返回实际用掉的破坏力 */
+/** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里：地图按材质的强度折算能打掉多少，返回实际用掉的破坏力 */
 export function breachAt(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number {
   if (amount <= 0) return 0
   return sim.hooks.breach?.(sim, x, y, z, r, amount) ?? 0

@@ -580,8 +580,8 @@ export class AmethystView extends BoundedView {
       const view = sim.view
       // 从上面落下来的还不在地上
       const lurking = [...query(sim.world, [Telegraph, Transform])]
-        .filter((t) => telegraphEntry[t]?.enter !== 'drop')
-        .map((t) => ({ eid: t, x: telegraphEntry[t]?.sx ?? Transform.x[t]!, y: telegraphEntry[t]?.sy ?? Transform.y[t]!, h: telegraphDef[t]!.size * (Telegraph.boss[t] ? 0.2 : 0.3) }))
+        .filter((t) => telegraphEntry[t]!.enter !== 'drop')
+        .map((t) => ({ eid: t, x: telegraphEntry[t]!.sx, y: telegraphEntry[t]!.sy, h: telegraphDef[t]!.size * (Telegraph.boss[t] ? 0.2 : 0.3) }))
       const bodies = [...query(sim.world, ENEMY_SET)].filter((eid) => Alive.v[eid]).map((eid) => ({ eid, x: Transform.x[eid]!, y: Transform.y[eid]!, h: Transform.h[eid]! }))
       for (const { eid, x, y, h } of [...bodies, ...lurking]) {
         if (x < view.x || x > view.right || y < view.y || y > view.bottom) continue

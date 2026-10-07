@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { LIFT_PER_M, UNIT } from '../util/units'
+import { UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
@@ -29,7 +29,7 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Floor, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
@@ -39,7 +39,6 @@ import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
 import { place } from './render/tri'
 import { Presentation } from './presentation'
-import { remapSim } from './systems/shared/remap'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill } from './views'
 import { viewFor } from './viewRegistry'
@@ -70,7 +69,7 @@ import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { openWave, settleWave } from './systems/shared/wave'
 import { waveAt, WAVE } from '../data/waves'
 import { SURGE } from '../data/enemies'
-import { curveOf, phasesOf, timeLimitMs } from '../data/runs'
+import { curveOf, timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, streamInterval } from './fight/spawns'
@@ -97,7 +96,7 @@ import { hit } from './systems/shared/damage'
 import { bodySource, WORLD_SOURCE } from './utils/source'
 import { nearestTarget } from './utils/targets'
 import { LAYER_M } from './utils/pass'
-import { camSlideOffset, canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
+import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 import { wallLoops } from '../maps/basin'
@@ -300,7 +299,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (!sim) return '不在战斗中'
     const f = sim.fight
     return [
-      `阶段 ${f.phase + 1}/${phasesOf(f.def).length} · 已 ${(phaseMs(sim) / 1000).toFixed(1)} 秒 · 难度时钟 ${Math.round(clockSec(sim))} 秒`,
+      `阶段 ${f.phase + 1}/${f.def.phases.length} · 已 ${(phaseMs(sim) / 1000).toFixed(1)} 秒 · 难度时钟 ${Math.round(clockSec(sim))} 秒`,
       ...f.streams.map((st, i) => `连续刷怪 ${i + 1} · 间隔 ${Math.round(streamInterval(sim, st))} ms · 已放 ${st.spawned}${st.rule.total === undefined ? '' : `/${st.rule.total}`}`),
       ...fightGoals(sim).map((g) => `目标 · ${g.text}`),
     ].join('\n')
@@ -311,7 +310,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     if (!sim) return '不在战斗中'
     const st = gateStats(sim)
-    if (!st) return '这张图没有出怪口：敌人在能站的地方原地冒出来'
     return [
       ...st.rows.map((r) => `${r.name.padEnd(4, '　')} ${String(r.n).padStart(3)} 处 · 共 ${String(r.total).padStart(5)} · 十秒 ${String(r.recent).padStart(4)}`),
       `够不着出怪口、原地出来 ${st.misses} · 落点站不住换地方 ${st.moves}`,
@@ -377,7 +375,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const g = (this.gateGfx ??= this.add.graphics().setDepth(1002))
     g.clear()
     g.setVisible(true)
-    const kinds = Object.keys(MAPS[sim.mapId].gates?.kinds ?? {})
+    const kinds = Object.keys(MAPS[sim.mapId].gates.kinds)
     for (const gate of gatesNow(sim)) {
       if (gate.shape === 'area') continue
       const color = GATE_COLORS[kinds.indexOf(gate.kind) % GATE_COLORS.length]!
@@ -406,7 +404,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 
   /**
-   * 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，沙盒地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下。
+   * 坐标网格按主镜头此刻拍到的范围每帧重画：每格一条线，过原点的两条另上色，按方框取景的地图再框出安全区；盖在战斗画面之上、碰撞边界与出怪口之下。
    * 线宽按屏幕上的粗细定：标准缩放时照原样，拉远看整张图时不跟着变细
    */
   private drawDevGrid(): void {
@@ -505,11 +503,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.paint = paint
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
-    const cutAt = this.map.cutAt?.bind(this.map)
     // 布景躺在地上，和躺着的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, cutAt)
-    if (light?.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
+    if (light.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
@@ -583,8 +580,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
     const boss = sim ? query(this.world, [Enemy, Boss]).find((eid) => Boss.v[eid] === 1) : undefined
-    const left = sim ? timeLeftMs(sim) : (timeLimitMs(phasesOf(this.fightDef)[0]!) ?? Infinity)
-    const phases = phasesOf(this.fightDef).length
+    const left = sim ? timeLeftMs(sim) : (timeLimitMs(this.fightDef.phases[0]!) ?? Infinity)
+    const phases = this.fightDef.phases.length
     const name = this.fightDef.name
     const xpNext = xpToNext(this.run)
     return {
@@ -594,7 +591,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       levelUps: pendingLevelUps(this.run),
       kills: this.run.kills,
       coins: this.run.coins,
-      label: name === undefined ? null : phases > 1 ? `${name} ${(sim?.fight.phase ?? 0) + 1}/${phases}` : name,
+      label: phases > 1 ? `${name} ${(sim?.fight.phase ?? 0) + 1}/${phases}` : name,
       seconds: Math.floor(elapsed / 1000),
       remainMs: Number.isFinite(left) ? Math.max(0, left) : null,
       goals: sim ? fightGoals(sim) : [],
@@ -760,7 +757,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.aimGfx ??= this.add.graphics().setDepth(40)
     const g = this.aimGfx
     const x = Transform.x[sim.leader]!
-    const y = Transform.y[sim.leader]! - Floor.z[sim.leader]! * LIFT_PER_M
+    const y = Transform.y[sim.leader]!
     const ex = x + dir.x * sk.rangeU * UNIT
     const ey = y + dir.y * sk.rangeU * UNIT
     g.clear()
@@ -772,14 +769,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.fillCircle(ex, ey, 10)
   }
 
-  /** 队伍由试炼场的旋钮给出 */
+  /** 队伍由沙盒的旋钮给出 */
   get knobs(): boolean {
     return runDef(this.run).team === 'knobs'
   }
 
   /** 这一阶段没有结束规则，一直打下去 */
   get endless(): boolean {
-    return (this.sim ? phaseOf(this.sim.fight) : phasesOf(this.fightDef)[0]!).ends.length === 0
+    return (this.sim ? phaseOf(this.sim.fight) : this.fightDef.phases[0]!).ends.length === 0
   }
 
   /** 无敌切换后立刻生效：换掉队员的生命上限，开无敌时补满 */
@@ -806,24 +803,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
 
   private onViewportChanged(): void {
-    const sim = this.sim
-    const fromW = this.mapW
-    const fromH = this.mapH
-    const { w, h, origin } = this.map.layout(this.ctx)
-    this.ctx.w = this.mapW = w
-    this.ctx.h = this.mapH = h
     this.map.resize(this.ctx)
     this.framing = this.map.framing(this.ctx)
     this.lens.frame(this.framing)
-    if (w === fromW && h === fromH) return
-    if (sim) {
-      sim.mapW = w
-      sim.mapH = h
-      remapSim(sim, fromW, fromH, w, h)
-      this.anchor = { x: leaderX(sim), y: leaderY(sim) }
-    } else {
-      this.anchor = { x: origin.x, y: origin.y }
-    }
   }
 
 
@@ -848,7 +830,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     run.leaderId = run.roster[sim.characters.indexOf(sim.leader)]!
     playSfx('wave')
     this.hud.emit(HudEvent.WaveComplete, {
-      title: `${this.fightDef.name ?? '本场'}完成！`,
+      title: `${this.fightDef.name}完成！`,
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
       reward: rewardText(this.fightDef.reward),
@@ -986,9 +968,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return
     }
     const camOff = handoverCamOffset(sim)
-    const slide = camSlideOffset(sim)
-    this.anchor.x = leaderX(sim) + camOff.x + slide.x
-    this.anchor.y = leaderY(sim) + camOff.y + slide.y - Floor.z[sim.leader]! * LIFT_PER_M
+    this.anchor.x = leaderX(sim) + camOff.x
+    this.anchor.y = leaderY(sim) + camOff.y
     this.aimLens(delta)
     this.map.step(this.ctx, sim, delta)
     this.fog?.show(leaderX(sim), leaderY(sim), sim.fight.rules.vision * UNIT, VISION_FOG_ALPHA)

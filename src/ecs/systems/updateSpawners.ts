@@ -24,7 +24,7 @@ export function updateSpawners(sim: Sim): void {
   for (const eid of eids) {
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
-    if (hasMark(sim, eid, MARK.stun) || hasMark(sim, eid, MARK.morph)) continue
+    if (hasMark(sim, eid, MARK.stun) || hasMark(sim, eid, MARK.morph) || hasMark(sim, eid, MARK.stasis)) continue
     if (now < Nest.nextSpawnAt[eid]!) continue
     Nest.nextSpawnAt[eid] = now + spawner.intervalMs
     if (active >= SPAWN.maxAlive) continue

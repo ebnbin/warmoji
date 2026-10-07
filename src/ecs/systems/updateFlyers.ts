@@ -11,7 +11,7 @@ import { targetsWithin } from '../utils/targets'
 import { impactAt, reachBlock } from '../utils/pass'
 import type { Sim } from '../sim'
 
-/** 飞返体：去程沿直线缓动到射程尽头（撞上障碍就提早折回），回程沿最近的直路追着持有者；去程越过传送门的门线就从另一扇门那边接着飞，回程穿过去离持有者更近才穿；去程回程各打每个身体一次，只打得到占着持有者那几层的 */
+/** 飞返体：去程沿直线缓动到射程尽头（撞上障碍就提早折回），回程沿最近的直路追着持有者；去程回程各打每个身体一次，只打得到占着持有者那几层的 */
 export function updateFlyers(sim: Sim): void {
   const dt = sim.wdtMs
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
@@ -25,24 +25,10 @@ export function updateFlyers(sim: Sim): void {
     if (Flyer.phase[f] === 0) {
       Flyer.t[f] = Math.min(1, Flyer.t[f]! + dt / FlyerShape.outMs[e]!)
       const ease = Math.sin((Flyer.t[f]! * Math.PI) / 2)
-      let x0 = Transform.x[f]!
-      let y0 = Transform.y[f]!
-      let x1 = Flyer.launchX[f]! + (Flyer.destX[f]! - Flyer.launchX[f]!) * ease
-      let y1 = Flyer.launchY[f]! + (Flyer.destY[f]! - Flyer.launchY[f]!) * ease
-      // 越过传送门的门线：整段去程平移到另一扇门那边，撞障碍从门那边算起
-      const hop = sim.hooks.portal?.(sim, f, x0, y0, x1, y1)
-      if (hop) {
-        Flyer.launchX[f] = Flyer.launchX[f]! + hop.dx
-        Flyer.launchY[f] = Flyer.launchY[f]! + hop.dy
-        Flyer.destX[f] = Flyer.destX[f]! + hop.dx
-        Flyer.destY[f] = Flyer.destY[f]! + hop.dy
-        x0 += (x1 - x0) * hop.t + hop.dx
-        y0 += (y1 - y0) * hop.t + hop.dy
-        x1 += hop.dx
-        y1 += hop.dy
-      }
-      Transform.x[f] = x1
-      Transform.y[f] = y1
+      const x0 = Transform.x[f]!
+      const y0 = Transform.y[f]!
+      Transform.x[f] = Flyer.launchX[f]! + (Flyer.destX[f]! - Flyer.launchX[f]!) * ease
+      Transform.y[f] = Flyer.launchY[f]! + (Flyer.destY[f]! - Flyer.launchY[f]!) * ease
       // 去程撞上障碍就从那里往回飞
       const wall = src.blocked ? reachBlock(sim, x0, y0, Transform.x[f]!, Transform.y[f]!) : null
       if (wall) {
@@ -65,15 +51,10 @@ export function updateFlyers(sim: Sim): void {
         catchFlyer(sim, e, f)
         continue
       }
-      // 沿最近的直路飞回去，穿门近就穿门；只在穿过去离持有者更近时穿，不会在两扇门之间绕个没完
-      const d = sim.hooks.towards?.(sim, x0, y0, ox, oy) ?? near
-      const dist = Math.hypot(d.x, d.y)
-      const p = sim.hooks.wrap(sim, x0 + (d.x / dist) * step, y0 + (d.y / dist) * step)
-      let hop = sim.hooks.portal?.(sim, -1, x0, y0, p.x, p.y) ?? null
-      if (hop && Math.hypot(ox - p.x - hop.dx, oy - p.y - hop.dy) >= Math.hypot(ox - p.x, oy - p.y)) hop = null
-      if (hop) sim.hooks.portal!(sim, f, x0, y0, p.x, p.y)
-      Transform.x[f] = p.x + (hop?.dx ?? 0)
-      Transform.y[f] = p.y + (hop?.dy ?? 0)
+      const dist = Math.hypot(near.x, near.y)
+      const p = sim.hooks.wrap(sim, x0 + (near.x / dist) * step, y0 + (near.y / dist) * step)
+      Transform.x[f] = p.x
+      Transform.y[f] = p.y
     }
     const magnet = FlyerShape.coinMagnet[e]!
     if (magnet > 0) sim.frameAttractors.push({ x: Transform.x[f]!, y: Transform.y[f]!, r2: magnet * magnet })

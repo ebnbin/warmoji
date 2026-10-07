@@ -1,13 +1,11 @@
 import type { Polarity } from '../types/battlefield'
 import type { CharacterTag } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
-import type { ItemRarity } from '../types/items'
-import type { FightDef, FightRules, GroupTraits, LegacyPhaseDef, LegacySquad, LevelPick, MixEntry, RepeatDef, Rounds, RunDef, SpawnAt, StarRule, StepDef, TeamDef } from '../types/runs'
+import type { FightDef, FightRules, GroupTraits, MixEntry, PhaseDef, RunDef, SpawnAt, Squad, StarRule, StepDef, TeamDef } from '../types/runs'
 import type { DifficultyCurve } from '../types/waves'
 import type { MapKind } from '../types/maps'
 import type { MapSignals } from './signals.ts'
 // 构建脚本也跑这些检查，本地模块写全扩展名
-import { cycleOf, roundPicks, roundsOf } from './rounds.ts'
 import { isLose } from './ends.ts'
 import { hasSignal } from './signals.ts'
 
@@ -24,7 +22,7 @@ export interface Issue {
 export interface RunCatalog {
   readonly enemies: Readonly<Record<string, EnemyDef>>
   /** 地图：只看它的名字、种类（定下它给关卡哪些信号）与有哪几种出怪口、各只出哪几种敌人 */
-  readonly maps: Readonly<Record<string, { readonly name: string; readonly kind: MapKind; readonly gates?: { readonly kinds: Readonly<Record<string, { readonly name: string; readonly only?: readonly string[] }>> } }>>
+  readonly maps: Readonly<Record<string, { readonly name: string; readonly kind: MapKind; readonly gates: { readonly kinds: Readonly<Record<string, { readonly name: string; readonly only?: readonly string[] }>> } }>>
   readonly pools: Readonly<Record<string, readonly { readonly polarity: Polarity }[]>>
   readonly characters: Readonly<Record<string, { readonly tags: readonly CharacterTag[] }>>
   readonly maxCharLevel: number
@@ -58,37 +56,20 @@ const PLACES: Readonly<Record<string, (n: number | undefined) => string>> = {
   stars: (n) => `第 ${n} 条星级`,
 }
 
-/** 位置的说法：第几步、第几阶段、第几条规则……重复里的步骤说成每轮第几步；空位置是这一局本身 */
+/** 位置的说法：第几步、第几阶段、第几条规则……；空位置是这一局本身 */
 export function pathText(at: Path): string {
   const out: string[] = []
-  let steps = 0
   for (let i = 0; i < at.length; i++) {
     const key = at[i]
     if (typeof key !== 'string') continue
     const next = at[i + 1]
-    const n = typeof next === 'number' ? next + 1 : undefined
-    if (key === 'steps') out.push(steps++ === 0 ? `第 ${n} 步` : `每轮第 ${n} 步`)
-    else {
-      const place = PLACES[key]
-      if (place) out.push(place(n))
-    }
+    const place = PLACES[key]
+    if (place) out.push(place(typeof next === 'number' ? next + 1 : undefined))
   }
   return out.length > 0 ? out.join(' · ') : '这一局'
 }
 
 const inUnit = (x: number | undefined): boolean => x === undefined || (x >= 0 && x <= 1)
-
-const RARITY_RANK: Record<ItemRarity, number> = { common: 0, rare: 1, epic: 2, legendary: 3 }
-
-/** 轮次条件的每一项都是正整数，起点不晚于终点 */
-const roundsOk = (g: Rounds): boolean => [g.from, g.to, g.every].every((n) => n === undefined || (Number.isInteger(n) && n >= 1)) && (g.from ?? 1) <= (g.to ?? Infinity)
-
-/** 一段重复要查的轮数：有限的查全部轮次，一直重复的查到每一种轮次组合都出现过；轮数或轮次写错了就不展开 */
-const roundsToCheck = (s: RepeatDef): number => {
-  if (!roundsOf(s).every(roundsOk)) return 0
-  if (s.times === undefined) return cycleOf(s)
-  return Number.isInteger(s.times) && s.times >= 1 ? s.times : 0
-}
 
 /** 按一份资料查关卡的几样检查，各自返回查出的问题 */
 export interface RunChecks {
@@ -128,65 +109,55 @@ export function runChecks(cat: RunCatalog): RunChecks {
     mix.forEach((m, i) => need(cat.enemies[m.kind] !== undefined && !isBoss(m.kind) && m.weight > 0, [...path, i], `配比须引用非头目的敌人、权重为正：${m.kind}`))
   }
 
-  /** 查一批敌人时的上下文：在哪张图上打（一场、一局都没写是 undefined），这一场是不是按阶段写的，这一阶段的配比 */
-  type Where = { readonly map: string | undefined; readonly staged: boolean; readonly mix: readonly MixEntry[] | undefined }
+  /** 查一批敌人时的上下文：在哪张图上打，这一阶段的配比 */
+  type Where = { readonly map: string; readonly mix: readonly MixEntry[] | undefined }
 
-  /** 读地图信号的写法：这一场得定下地图，那张图有这个信号 */
+  /** 读地图信号的写法：那张图有这个信号 */
   const checkSignal = (where: Where, field: keyof MapSignals, name: string, path: Path): void => {
-    if (where.map === undefined) {
-      need(false, path, '读地图信号的一场须定下地图')
-      return
-    }
     const map = cat.maps[where.map]
     need(map !== undefined && hasSignal(map.kind, field, name), path, `${where.map} 没有这个地图信号：${field}.${name}`)
   }
 
   /**
-   * 站位的距离与散开范围；指定出怪口的，这一场得定下地图、那张图有这种出怪口，
+   * 站位的距离；指定出怪口的，那张图有这种出怪口，
    * 这一批会放出的敌人 kinds（说不准的是 null）那种出怪口都接得住：接不住的会悄悄改从别处出来
    */
   const checkAt = (at: SpawnAt | undefined, kinds: readonly string[] | null, where: Where, path: Path): void => {
     if (at?.kind === 'ring' || at?.kind === 'behind') need(at.dist > 0, path, '站位距离须为正')
-    if (at?.kind === 'point') need((at.spread ?? 0) >= 0, path, '散开范围不为负')
     if (at?.kind !== 'gate') return
-    if (where.map === undefined) {
-      need(false, path, '指定出怪口的一场须定下地图')
-      return
-    }
-    const gate = cat.maps[where.map]?.gates?.kinds[at.gate]
+    const gate = cat.maps[where.map]?.gates.kinds[at.gate]
     need(gate !== undefined, path, `${where.map} 没有这种出怪口：${at.gate}`)
     const only = gate?.only
     const off = only && kinds ? kinds.filter((k) => !only.includes(k)) : []
     need(off.length === 0, path, `${where.map} 的出怪口 ${at.gate} 接不住 ${off.join('、')}`)
   }
 
-  /** 一批敌人会放出哪几种：指定的那一种，或这一批、这一阶段的配比里的；都没写（按地图抽）是 null */
+  /** 一批敌人会放出哪几种：指定的那一种，或这一批、这一阶段的配比里的；都没写是 null */
   const groupKinds = (t: GroupTraits, where: Where): string[] | null => {
     if (t.enemy) return [t.enemy]
     const mix = t.mix ?? where.mix
     return mix ? mix.map((m) => m.kind) : null
   }
 
-  /** 一批敌人的特征：指定的敌人存在，指定了就不再写配比；按阶段写的一场里没指定敌人的得有配比可抽；换走法须指定敌人；几率与倍率在范围内；要带的效果这张图的效果池里有 */
+  /** 一批敌人的特征：指定的敌人存在，指定了就不再写配比；没指定敌人的得有配比可抽；换走法须指定敌人；几率与倍率在范围内；要带的效果这张图的效果池里有 */
   const checkTraits = (t: GroupTraits, where: Where, path: Path): void => {
     need(t.enemy === undefined || cat.enemies[t.enemy] !== undefined, path, `引用了不存在的敌人：${t.enemy}`)
     need(t.enemy === undefined || t.mix === undefined, path, '指定了敌人就不用再写配比')
     if (t.mix) checkMix(t.mix, [...path, 'mix'])
-    need(!where.staged || t.enemy !== undefined || (t.mix ?? where.mix) !== undefined, path, '没指定敌人，这一批和这一阶段都没写配比')
+    need(t.enemy !== undefined || (t.mix ?? where.mix) !== undefined, path, '没指定敌人，这一批和这一阶段都没写配比')
     need(t.drive === undefined || t.enemy !== undefined, path, '换走法须指定敌人')
     if (t.drive?.kind === 'march') checkSignal(where, 'marks', t.drive.mark, path)
     need(inUnit(t.eliteChance), path, '精英几率须在 [0, 1] 内')
     need((t.stats?.mul?.maxHp ?? 1) > 0, path, '血量倍率须为正')
     need((t.loot?.xp ?? 0) >= 0 && (t.loot?.coins ?? 0) >= 0, path, '战利品倍率不为负')
-    const pool = where.map === undefined ? undefined : cat.pools[where.map]
+    const pool = cat.pools[where.map]
     need(t.carry === undefined || pool === undefined || pool.some((d) => d.polarity === t.carry), path, `要带的效果在 ${where.map} 的效果池里没有`)
   }
 
-  /** 一队敌人：数量、精英、间隔与血量倍率在范围内，特征合规，护卫引用非头目的敌人 */
-  const checkSquad = (sq: LegacySquad, where: Where, path: Path): void => {
+  /** 一队敌人：数量、精英与间隔在范围内，特征合规，护卫引用非头目的敌人 */
+  const checkSquad = (sq: Squad, where: Where, path: Path): void => {
     need(sq.count >= 1 && (sq.spreadMs ?? 0) >= 0, path, '一队敌人须至少一只，间隔不为负')
     need((sq.elites ?? 0) >= 0 && (sq.elites ?? 0) <= sq.count, path, '精英数须在 0 到这一队的只数之间')
-    need((sq.hpMul ?? 1) > 0, path, '血量倍率须为正')
     checkTraits(sq, where, path)
     const e = sq.escort
     need(e === undefined || (cat.enemies[e.enemy] !== undefined && !isBoss(e.enemy) && e.count >= 1 && (e.stats?.mul?.maxHp ?? 1) > 0), [...path, 'escort'], '护卫须引用非头目的敌人、至少一只，血量倍率为正')
@@ -194,8 +165,8 @@ export function runChecks(cat: RunCatalog): RunChecks {
     checkAt(sq.at, kinds && sq.escort ? [...kinds, sq.escort.enemy] : kinds, where, path)
   }
 
-  /** 这一阶段可能出现的敌人种类，连同巢穴生出的与死后分裂出的；有按地图抽的就说不准，是 null */
-  const phaseKinds = (p: LegacyPhaseDef): Set<string> | null => {
+  /** 这一阶段可能出现的敌人种类，连同巢穴生出的与死后分裂出的；有没写配比的就说不准，是 null */
+  const phaseKinds = (p: PhaseDef): Set<string> | null => {
     const out = new Set<string>()
     let open = false
     const kind = (k: EnemyKind): void => {
@@ -210,12 +181,12 @@ export function runChecks(cat: RunCatalog): RunChecks {
     const group = (g: GroupTraits): void => (g.enemy ? kind(g.enemy) : pool(g.mix))
     for (const s of p.spawns) {
       if (s.kind === 'stream') group(s)
-      else if (s.kind === 'batch' || s.kind === 'waves') {
+      else {
         for (const sq of s.kind === 'batch' ? [s.squad] : s.squads) {
           group(sq)
           if (sq.escort) kind(sq.escort.enemy)
         }
-      } else open = true
+      }
     }
     return open ? null : out
   }
@@ -229,12 +200,11 @@ export function runChecks(cat: RunCatalog): RunChecks {
     need((r?.vision ?? Infinity) > squadReach, path, `视野须大于 ${squadReach} 格，看得见跟在身后的队员`)
   }
 
-  /** 星级条件：次数不为负，用时为正，击杀至少一只；剩下几次起来的机会须在命数以内 */
-  const checkStar = (s: StarRule, lives: number | undefined, path: Path): void => {
+  /** 星级条件：次数不为负，用时为正，击杀至少一只 */
+  const checkStar = (s: StarRule, path: Path): void => {
     if (s.kind === 'time') need(s.ms > 0, path, '用时须为正')
     else if (s.kind === 'hazard') need(s.damage >= 0, path, '伤害不为负')
-    else if (s.kind === 'kills' || s.kind === 'coins') need(s.count >= 1, path, '数目至少为 1')
-    else if (s.kind === 'lives') need(lives !== undefined && s.count >= 1 && s.count <= lives, path, '要剩下起来的机会，须有命数且不超过它')
+    else if (s.kind === 'kills') need(s.count >= 1, path, '数目至少为 1')
     else need(s.count >= 0, path, '次数不为负')
   }
 
@@ -242,16 +212,15 @@ export function runChecks(cat: RunCatalog): RunChecks {
    * 一个阶段：数值在范围内，结束规则都有着落——要打倒的头目得在这一阶段或这一场更早的阶段登场，悬赏目标与要数的那种敌人得在这一阶段出现，要清场就不能一直刷，一组一组来的后面几组要等场上清空，要全部达成的不能有到点就算达成的时限；只有最后一个阶段可以不结束。
    * 返回这一阶段有没有头目登场。
    */
-  const checkPhase = (p: LegacyPhaseDef, last: boolean, bossBefore: boolean, where: Where, path: Path): boolean => {
+  const checkPhase = (p: PhaseDef, last: boolean, bossBefore: boolean, where: Where, path: Path): boolean => {
     const at: Where = { ...where, mix: p.mix }
     const squads = p.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
     const endless = p.spawns.some(
       (s) =>
-        s.kind === 'knobs' ||
         (s.kind === 'stream' && s.untilMs === undefined && s.total === undefined) ||
         (s.kind === 'batch' && (s.every !== undefined || s.on !== undefined) && s.times === undefined),
     )
-    const boss = p.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs') || squads.some((sq) => isBoss(sq.enemy))
+    const boss = squads.some((sq) => isBoss(sq.enemy))
     if (p.mix) checkMix(p.mix, [...path, 'mix'])
     p.spawns.forEach((s, i) => {
       const sp = [...path, 'spawns', i]
@@ -278,10 +247,6 @@ export function runChecks(cat: RunCatalog): RunChecks {
         need(s.atMs >= 0 && s.gapMs >= 0 && s.squads.length > 0, sp, '成组敌人须至少一组，时刻与间隔不为负')
         need(s.squads.length === 1 || !endless, sp, '一直在刷怪时场上不会清空，成组的敌人只能有一组')
         s.squads.forEach((sq, k) => checkSquad(sq, at, [...sp, 'squads', k]))
-      } else if (s.kind === 'boss') {
-        need(s.atMs >= 0, sp, '头目登场时刻不为负')
-      } else if (s.kind === 'carriers') {
-        need(s.buff >= 0 && s.debuff >= 0 && s.atMs >= 0 && s.spanMs >= 0, sp, '带光圈敌人数与时刻不为负')
       }
     })
     p.cues?.forEach((c, i) => {
@@ -339,17 +304,16 @@ export function runChecks(cat: RunCatalog): RunChecks {
     return boss
   }
 
-  /** 一场战斗：各阶段按先后查，外加这一场的规则、地图、奖励与难度时钟 */
-  const checkFight = (f: FightDef, runMap: string | undefined, path: Path): void => {
-    const phases: readonly LegacyPhaseDef[] = f.phases === undefined ? [f] : f.phases
-    const where: Where = { map: f.map ?? runMap, staged: f.phases !== undefined, mix: undefined }
-    need(phases.length > 0, path, '至少要有一个阶段')
+  /** 一场战斗：地图存在，各阶段按先后查，外加这一场的规则、奖励与难度时钟 */
+  const checkFight = (f: FightDef, path: Path): void => {
+    need(cat.maps[f.map] !== undefined, path, `引用了不存在的地图：${f.map}`)
+    const where: Where = { map: f.map, mix: undefined }
+    need(f.phases.length > 0, path, '至少要有一个阶段')
     let boss = false
-    phases.forEach((p, i) => {
-      boss = checkPhase(p, i === phases.length - 1, boss, where, f.phases === undefined ? path : [...path, 'phases', i]) || boss
+    f.phases.forEach((p, i) => {
+      boss = checkPhase(p, i === f.phases.length - 1, boss, where, [...path, 'phases', i]) || boss
     })
     checkRules(f.rules, [...path, 'rules'])
-    need(f.map === undefined || cat.maps[f.map] !== undefined, path, `引用了不存在的地图：${f.map}`)
     need((f.reward?.coins ?? 0) >= 0 && Number.isInteger(f.reward?.coins ?? 0), path, '奖励金币须是非负整数')
     need(f.clockSec === undefined || (Number.isFinite(f.clockSec) && f.clockSec >= 0), path, '难度时钟不为负')
   }
@@ -380,51 +344,27 @@ export function runChecks(cat: RunCatalog): RunChecks {
     need(c.coinDropChanceMin >= 0 && c.coinDropChanceMin <= 1 && c.coinDropChanceHalfLifeSec > 0, path, '掉金币几率的下限须在 [0, 1] 内，衰减时长为正')
   }
 
-  /** 按轮重复：轮数是正整数，一直重复的只能是最后一步；轮次条件是正整数、起点不晚于终点、落在轮数以内；每一轮都得有一场战斗 */
-  const checkRepeat = (s: RepeatDef, last: boolean, path: Path): void => {
-    need(s.times === undefined || (Number.isInteger(s.times) && s.times >= 1), path, '轮数须是正整数')
-    need(s.times !== undefined || last, path, '一直重复，只能是最后一步')
-    for (const g of roundsOf(s)) {
-      need(roundsOk(g), path, '轮次须是正整数，起点不晚于终点')
-      need(s.times === undefined || Math.max(g.from ?? 1, g.to ?? 1) <= s.times, path, `轮次超出了 ${s.times} 轮`)
-    }
-    for (let k = 1; k <= roundsToCheck(s); k++) need(roundPicks(s, k).some((p) => p.step.kind === 'fight'), path, `第 ${k} 轮没有战斗`)
-  }
-
   /** 一步：招募人数在满编以内，商店的物价档位是正整数，一场战斗按一场查 */
-  const checkStep = (s: StepDef, runMap: string | undefined, path: Path): void => {
+  const checkStep = (s: StepDef, path: Path): void => {
     if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= teamSize, path, '招募人数须在 1 到满编之间')
-    if (s.kind === 'shop') need(s.tier === undefined || (Number.isInteger(s.tier) && s.tier >= 1), path, '商店的物价档位须是正整数')
-    if (s.kind === 'fight') checkFight(s.fight, runMap, [...path, 'fight'])
+    if (s.kind === 'shop') need(Number.isInteger(s.tier) && s.tier >= 1, path, '商店的物价档位须是正整数')
+    if (s.kind === 'fight') checkFight(s.fight, [...path, 'fight'])
   }
-
-  /** 一局要走的每一步和它写在哪：重复的按轮展开，round 是第几轮 */
-  const planned = (r: RunDef): { readonly step: StepDef; readonly at: Path; readonly round?: number }[] =>
-    r.steps.flatMap((s, i) => {
-      if (s.kind !== 'repeat') return [{ step: s, at: ['steps', i] }]
-      return Array.from({ length: roundsToCheck(s) }, (_, k) => roundPicks(s, k + 1).map((p) => ({ step: p.step, at: ['steps', i, 'steps', p.index], round: k + 1 }))).flat()
-    })
 
   const checkRun = (r: RunDef): void => {
-    const plan = planned(r)
-    const steps = plan.map((p) => p.step)
+    const steps = r.steps
     const fights = steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
     const first = steps.findIndex((s) => s.kind === 'fight')
     need(first >= 0, [], '至少要有一场战斗')
     need(r.team !== undefined || steps.slice(0, first).some((s) => s.kind === 'recruit'), ['team'], '没有预设队伍，第一场战斗之前须有招募')
-    need(r.map === undefined || cat.maps[r.map] !== undefined, [], `引用了不存在的地图：${r.map}`)
-    need(r.map === undefined || fights.every((f) => f.map === undefined), [], '固定了地图，各场就不能再换地图')
     need(r.chapter === undefined || (cat.maps[r.chapter] !== undefined && fights.every((f) => f.map === r.chapter)), [], `冒险的一章各场都要打在 ${r.chapter} 上`)
     const clocked = fights.map((f) => f.clockSec !== undefined)
     need(clocked.every((c) => c === clocked[0]), [], '难度时钟要么每场都定，要么都不定')
-    need(r.start === undefined || (r.start.wave >= 1 && r.start.sec >= 0), [], '开局进度须从第 1 波、第 0 秒起')
     if (r.curve) checkCurve(r.curve, ['curve'])
     if (r.team && r.team !== 'knobs') checkTeam(r.team, ['team'])
     checkRules(r.rules, ['rules'])
     const lives = r.rules?.lives
     need(lives === undefined || (Number.isInteger(lives) && lives >= 1), ['rules'], '命数须是正整数')
-    const rarity = r.rules?.shop?.rarity
-    need(rarity === undefined || RARITY_RANK[rarity.min ?? 'common'] <= RARITY_RANK[rarity.max ?? 'legendary'], ['rules'], '商店的稀有度下限不能高于上限')
     const maxLevel = r.rules?.maxLevel
     const floor = r.team && r.team !== 'knobs' ? (r.team.level ?? 1) : 1
     need(maxLevel === undefined || (Number.isInteger(maxLevel) && maxLevel >= floor && maxLevel < cat.maxCharLevel), ['rules'], `等级上限须是整数，不低于队伍的等级下限、低于 ${cat.maxCharLevel}`)
@@ -432,50 +372,13 @@ export function runChecks(cat: RunCatalog): RunChecks {
     if (t) {
       need(t.base > 0 && t.growth >= 1, ['teamLevel'], '底数须为正，增长不小于 1：越往后升级越难')
       need(Number.isInteger(t.maxLevel) && t.maxLevel >= 2, ['teamLevel'], '满级须是不小于 2 的整数')
-      const picks: readonly LevelPick[] = t.picks ?? ['recruit', 'upgrade']
-      need(picks.length > 0 && new Set(picks).size === picks.length, ['teamLevel'], '可选项不能为空，也不能重复')
-      // 每一次全队升级都得有得选：许招人时补满队伍的人数，加上许升级时每人还能升的级数，够用完升到满级的次数
+      // 每一次全队升级都得有得选：补满队伍的人数，加上每人还能升的级数，够用完升到满级的次数
       const free = Math.max(r.team && r.team !== 'knobs' ? r.team.slots.length : 0, ...steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
-      const recruit = picks.includes('recruit')
-      const room = (recruit ? teamSize - free : 0) + (picks.includes('upgrade') ? (recruit ? teamSize : free) * ((maxLevel ?? cat.maxCharLevel) - floor) : 0)
+      const room = teamSize - free + teamSize * ((maxLevel ?? cat.maxCharLevel) - floor)
       need(room >= t.maxLevel - 1, ['teamLevel'], `靠全队升级，能选的只用得掉 ${room} 次，不够升到 ${t.maxLevel} 级的 ${t.maxLevel - 1} 次`)
     }
-    if (fights.some((f) => f.phases !== undefined)) {
-      need(fights.every((f) => f.phases !== undefined), [], '各场要么都按阶段写，要么都不按')
-      need(r.map === undefined && r.start === undefined && r.record === undefined, [], '按阶段写的一局不固定地图、不给开局进度、不记最高分：地图与难度时钟写在每一场上')
-      need(plan.every((p) => p.round !== undefined || p.step.kind !== 'shop' || p.step.tier !== undefined), [], '按阶段写的一局，重复之外的每家商店都要写物价档位')
-    }
-    need(r.stars === undefined || r.steps.every((s) => s.kind !== 'repeat' || s.times !== undefined), [], '一直重复的一局赢不了，不能有星级')
-    r.stars?.forEach((s, i) => checkStar(s, lives, ['stars', i]))
-    const only = r.rules?.recruit?.tags
-    if (only) {
-      // 预设里随机的位置与招募都从这些角色里挑，按最坏情况也得够
-      const upTo = Math.max(0, ...steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
-      const fixed = new Set<string>(r.team && r.team !== 'knobs' ? r.team.slots.filter((s) => typeof s === 'string') : [])
-      const pool = Object.entries(cat.characters).filter(([cid, c]) => !fixed.has(cid) && only.every((tag) => c.tags.includes(tag)))
-      need(only.length > 0 && upTo > 0, ['rules'], '限定了招募就得有招募步骤与标签')
-      need(pool.length >= upTo - fixed.size, ['rules'], '限定的招募标签可挑的角色不够')
-    }
-    r.steps.forEach((s, i) => {
-      if (s.kind === 'repeat') checkRepeat(s, i === r.steps.length - 1, ['steps', i])
-    })
-    // 重复里同一步每轮查出的同一个问题只报第一轮，位置落在写它的那一步上
-    const seen = new Set<string>()
-    for (const p of plan) {
-      const found = collect(() => checkStep(p.step, r.map, p.at))
-      if (p.round === undefined) {
-        sink.push(...found)
-        continue
-      }
-      for (const f of found) {
-        const sub = f.at.slice(p.at.length)
-        const phase = sub[0] === 'fight' && sub[1] === 'phases' && typeof sub[2] === 'number' ? ` 第 ${sub[2] + 1} 阶段` : ''
-        const key = `${p.at.join('.')}|${phase}|${f.why}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        sink.push({ at: p.at, why: `第 ${p.round} 轮${phase}：${f.why}` })
-      }
-    }
+    r.stars?.forEach((s, i) => checkStar(s, ['stars', i]))
+    steps.forEach((s, i) => checkStep(s, ['steps', i]))
   }
 
   return {

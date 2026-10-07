@@ -14,8 +14,6 @@ export const OBSTACLES = {
     earth: { name: '土', phase: true, opaque: true, pierce: null, strength: null },
     // 有缝的栅栏：草甸的木栅栏、樱花的竹栅，挡身体，弹体与视线从缝里过去
     fence: { name: '栅栏', phase: true, opaque: false, pierce: 0, strength: null },
-    // 旧残垣的断墙：一格一格的，破坏力碰上就碎
-    wall: { name: '断墙', phase: true, opaque: true, pierce: null, strength: 1 },
     // 残垣的石墙与石柱
     masonry: { name: '砌石', phase: true, opaque: true, pierce: null, strength: 1 },
     // 残垣里封门窗的木板

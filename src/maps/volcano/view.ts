@@ -725,7 +725,7 @@ export class VolcanoView extends BoundedView {
     if (!g || !sg) return
     const f = s.field
     const dt = delta / 1000
-    const reach = v.def.light?.shadow?.length ?? 0
+    const reach = v.def.light.shadow?.length ?? 0
     if (s.phase === 'erupt') {
       this.acc.bomb += dt * 20 * this.u.vigor
       while (this.acc.bomb >= 1) {

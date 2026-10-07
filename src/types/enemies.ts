@@ -146,14 +146,6 @@ export interface EnemyDef extends NpcDef {
   readonly coins: number
   readonly role?: 'enemy' | 'boss'
 }
-export interface EnemyMixRow {
-  readonly kind: EnemyKind
-  readonly sinceWave: number
-  readonly base: number
-  readonly perWave: number
-  readonly min: number
-  readonly max: number
-}
 export interface Difficulty {
   /** 没写难度曲线的一局按这一条 */
   readonly curve: DifficultyCurve

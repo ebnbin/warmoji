@@ -63,7 +63,7 @@ import { flying, sourceOf, sweep } from '../../utils/source'
 import { HIT } from '../../utils/hitTags'
 import type { Source } from '../../utils/source'
 import { eachAlly, eachTarget, nearestTarget, targetsNear, targetsWithin } from '../../utils/targets'
-import { aimLayer, BLAST_M, breachAt, covered, flightProbe, floorAt, hiOf, impactAt, layerZ, loOf, muzzleOf, reachBlock, reaches, shotPass } from '../../utils/pass'
+import { aimLayer, BLAST_M, breachAt, covered, flightProbe, hiOf, impactAt, layerZ, loOf, muzzleOf, reachBlock, reaches, shotPass } from '../../utils/pass'
 import type { Found } from '../../utils/targets'
 import { circleHitIndices, sectorHitIndices, thrustHitIndices } from '../../utils/hit'
 import { strongestTarget } from '../../utils/assassinate'
@@ -150,8 +150,7 @@ function hittable(sim: Sim, e: number, src: Source, ox: number, oy: number, f: F
     if (def !== undefined && abilityPiercesWalls(def)) return true
     const h = shotZ(sim, e, f)
     const arc = Bolt.arc[e]!
-    const ground = floorAt(sim, f.x, f.y)
-    return shotPass(sim, src.faction, flightProbe(floorAt(sim, ox, oy) + h, arc > 0 ? ground : ground + h, arc, Bolt.pierce[e]!), ox, oy, f.x, f.y).block === null
+    return shotPass(sim, src.faction, flightProbe(h, arc > 0 ? 0 : h, arc, Bolt.pierce[e]!), ox, oy, f.x, f.y).block === null
   }
   if (hasComponent(w, e, Segment) || hasComponent(w, e, Sector) || hasComponent(w, e, Chain)) return reaches(sim, ox, oy, f.x, f.y)
   return true
@@ -242,7 +241,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
     if (wall) {
       impactAt(sim, wall)
-      breachAt(sim, wall.x, wall.y, floorAt(sim, ox, oy) + layerZ(muzzleLayer(sim, e)), radius, breachOf(e))
+      breachAt(sim, wall.x, wall.y, layerZ(muzzleLayer(sim, e)), radius, breachOf(e))
     }
     if (Segment.beam[e]) spawnFxBeam(sim, ox, oy, angle, reach, radius, color)
     Swing.startMs[e] = sim.fxMs
@@ -256,7 +255,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
     applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
-    breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, floorAt(sim, ox, oy) + layerZ(muzzleLayer(sim, e)), radius * 0.5, breachOf(e))
+    breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, layerZ(muzzleLayer(sim, e)), radius * 0.5, breachOf(e))
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = Sector.ms[e]!
     return true
@@ -287,7 +286,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
     const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy }, HIT.area)
     applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
-    breachAt(sim, cx, cy, floorAt(sim, cx, cy) + BLAST_M, r, breachOf(e))
+    breachAt(sim, cx, cy, BLAST_M, r, breachOf(e))
     if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
     return true
   }
