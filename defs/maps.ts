@@ -137,6 +137,7 @@ const WARP_MIX: readonly EnemyMixRow[] = [
   { kind: 'ufo', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
   { kind: 'turtle', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
   { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
 ]
 
 export const MAPS = {
@@ -754,7 +755,7 @@ export const MAPS = {
       kinds: {
         ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
         tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
-        swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob'] },
+        swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob', 'hive'] },
         mixed: { name: '混编舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
         warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha'] },
       },
