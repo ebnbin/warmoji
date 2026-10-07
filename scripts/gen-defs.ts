@@ -68,10 +68,11 @@ const need = (ok: boolean, msg: string): void => {
 }
 
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  for (const row of m.mix) {
-    const e = ENEMIES[row.kind]
-    need(e !== undefined && e.role !== 'boss', `maps.${id} 的出怪配比须引用非 Boss 的敌人：${row.kind}`)
+  for (const kind of m.foes) {
+    const e = ENEMIES[kind]
+    need(e !== undefined && e.role !== 'boss', `maps.${id}.foes 须引用非 Boss 的敌人：${kind}`)
   }
+  need(new Set(m.foes).size === m.foes.length, `maps.${id}.foes 不能重复`)
   need(ENEMIES[m.boss]?.role === 'boss', `maps.${id}.boss 须引用 Boss：${m.boss}`)
 }
 
@@ -169,7 +170,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const takes = (e: EnemyKind): boolean => kinds.some(([, d]) => d.only === undefined || d.only.includes(e))
   const boss = g.boss === undefined ? undefined : g.kinds[g.boss]
   need(g.boss === undefined || (boss !== undefined && (boss.only?.includes(m.boss) ?? true)), `${at}.boss 须是这张图的一种出怪口，接得住头目 ${m.boss}`)
-  for (const row of m.mix) need(takes(row.kind), `${at} 没有出怪口接配比里的 ${row.kind}`)
+  for (const kind of m.foes) need(takes(kind), `${at} 没有出怪口接出没的 ${kind}`)
 }
 
 /** 进场动作：时长为正，高度与距离不为负，落点的距离范围从正数起 */
@@ -540,7 +541,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(top(c.lowM) > over(standard) + 1e-9, `${at}.lowM 须高过标准身体跨得过的 ${+over(standard).toFixed(2)} 米：矮布景要挡得住人`)
   need(top(c.lowM) < chest, `${at}.lowM 须低过平射的高度 ${+chest.toFixed(2)} 米：子弹要从矮布景上面飞过去`)
   need(top(c.lowM) <= over(boss.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${m.boss} 跨得过去`)
-  const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.mix.map((row) => ENEMIES[row.kind]!.radius))
+  const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.foes.map((kind) => ENEMIES[kind]!.radius))
   need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与台边之间须过得去最大的小怪（半径 ${small} 格）`)
   need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与台边之间须过得去头目（半径 ${boss.radius} 格）`)
   need(margin.aisle > 0, `${at}.margin.aisle 须为正：布景不压台中线上的活门`)
@@ -782,7 +783,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(disk.outerRs * rs < ring, `${at}.disk 铺到 ${+(disk.outerRs * rs).toFixed(2)} 格，盖住了爱因斯坦环（${+ring.toFixed(2)} 格）：GM ${gm}、离中心 ${d} 格`)
     }
   }
-  const slowest = Math.min(...[...m.mix.map((r) => ENEMIES[r.kind]!.speed), ENEMIES[m.boss]!.speed])
+  const slowest = Math.min(...[...m.foes.map((kind) => ENEMIES[kind]!.speed), ENEMIES[m.boss]!.speed])
   const clear = captureU(hole.maxGm, rsMax, enemyFall / slowest) + n.spawnClearU
   need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }

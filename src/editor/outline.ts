@@ -4,8 +4,7 @@ import type { Path } from '../data/runCheck'
 import type { OutlineKind } from '../emoji/svg'
 import { endText, stepText } from '../scene/runLines'
 import type { EnemyKind } from '../types/enemies'
-import { isStage } from './draft'
-import type { Draft, End, Phase, Spawn, Stage, Step, WaveSquad } from './draft'
+import type { Draft, End, Fight, Phase, Spawn, Step, WaveSquad } from './draft'
 import { endIcon, ICON, SPAWN_KINDS } from './kinds'
 
 /** 导航里的一项指着草稿的哪一块；列表里的一项带着它所在的列表与下标 */
@@ -15,9 +14,9 @@ export type Target =
   | { readonly kind: 'rules' }
   | { readonly kind: 'curve' }
   | { readonly kind: 'step'; readonly list: Step[]; readonly index: number; readonly step: Step }
-  | { readonly kind: 'phase'; readonly list: Phase[]; readonly index: number; readonly phase: Phase; readonly stage: Stage }
-  | { readonly kind: 'spawn'; readonly list: Spawn[]; readonly index: number; readonly spawn: Spawn; readonly stage: Stage }
-  | { readonly kind: 'squad'; readonly list: WaveSquad[]; readonly index: number; readonly squad: WaveSquad; readonly stage: Stage }
+  | { readonly kind: 'phase'; readonly list: Phase[]; readonly index: number; readonly phase: Phase; readonly fight: Fight }
+  | { readonly kind: 'spawn'; readonly list: Spawn[]; readonly index: number; readonly spawn: Spawn; readonly fight: Fight }
+  | { readonly kind: 'squad'; readonly list: WaveSquad[]; readonly index: number; readonly squad: WaveSquad; readonly fight: Fight }
   | { readonly kind: 'end'; readonly list: End[]; readonly index: number; readonly end: End }
 
 /** 导航里的一项 */
@@ -51,17 +50,17 @@ function spawnText(s: Spawn): { readonly title: string; readonly meta: string } 
 }
 
 /** 一场与它的阶段、刷怪、成组的每一组、结束规则 */
-function stageNodes(f: Stage, at: Path): Node[] {
+function fightNodes(f: Fight, at: Path): Node[] {
   return f.phases.flatMap((phase, p) => {
     const pat = [...at, 'fight', 'phases', p]
-    const head: Node = { at: pat, parent: at, depth: 2, icon: ICON.phase, title: `第 ${p + 1} 阶段`, meta: phase.ends.map(endText).join('，'), target: { kind: 'phase', list: f.phases, index: p, phase, stage: f } }
+    const head: Node = { at: pat, parent: at, depth: 2, icon: ICON.phase, title: `第 ${p + 1} 阶段`, meta: phase.ends.map(endText).join('，'), target: { kind: 'phase', list: f.phases, index: p, phase, fight: f } }
     const spawns = phase.spawns.flatMap((spawn, i): Node[] => {
       const sat = [...pat, 'spawns', i]
-      const self: Node = { at: sat, parent: pat, depth: 3, icon: SPAWN_KINDS[spawn.kind].icon, ...spawnText(spawn), target: { kind: 'spawn', list: phase.spawns, index: i, spawn, stage: f } }
+      const self: Node = { at: sat, parent: pat, depth: 3, icon: SPAWN_KINDS[spawn.kind].icon, ...spawnText(spawn), target: { kind: 'spawn', list: phase.spawns, index: i, spawn, fight: f } }
       if (spawn.kind !== 'waves') return [self]
       return [
         self,
-        ...spawn.squads.map((squad, k): Node => ({ at: [...sat, 'squads', k], parent: sat, depth: 4, icon: ICON.squad, title: `第 ${k + 1} 组 · ${squad.count} 只`, meta: who(squad), target: { kind: 'squad', list: spawn.squads, index: k, squad, stage: f } })),
+        ...spawn.squads.map((squad, k): Node => ({ at: [...sat, 'squads', k], parent: sat, depth: 4, icon: ICON.squad, title: `第 ${k + 1} 组 · ${squad.count} 只`, meta: who(squad), target: { kind: 'squad', list: spawn.squads, index: k, squad, fight: f } })),
       ]
     })
     const ends = phase.ends.map((end, i): Node => ({ at: [...pat, 'ends', i], parent: pat, depth: 3, icon: endIcon(end), title: endText(end), target: { kind: 'end', list: phase.ends, index: i, end } }))
@@ -86,17 +85,10 @@ export function outline(d: Draft): Node[] {
         out.push({ ...base, icon: ICON.recruit, title: stepText(step) })
         break
       case 'shop':
-        out.push({ ...base, icon: ICON.shop, title: '商店', meta: `物价第 ${step.tier ?? 1} 档` })
+        out.push({ ...base, icon: ICON.shop, title: '商店', meta: `物价第 ${step.tier} 档` })
         break
       case 'fight':
-        if (!isStage(step.fight)) {
-          out.push({ ...base, icon: ICON.legacy, title: step.fight.name ?? '战斗', meta: '旧写法' })
-          break
-        }
-        out.push({ ...base, icon: MAPS[step.fight.map].emoji, title: step.fight.name, meta: MAPS[step.fight.map].name }, ...stageNodes(step.fight, at))
-        break
-      case 'repeat':
-        out.push({ ...base, icon: ICON.repeat, title: `重复 ${step.times ?? '不限'} 轮`, meta: '编辑器还不支持' })
+        out.push({ ...base, icon: MAPS[step.fight.map].emoji, title: step.fight.name, meta: MAPS[step.fight.map].name }, ...fightNodes(step.fight, at))
     }
   })
   return out

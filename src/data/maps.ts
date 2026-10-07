@@ -24,7 +24,7 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
     if (def.spawner) add(def.spawner.into)
     for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into)
   }
-  for (const row of MAPS[id].mix) add(ENEMIES[row.kind])
+  for (const kind of MAPS[id].foes) add(ENEMIES[kind])
   add(bossFor(id))
   return out
 }

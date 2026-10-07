@@ -149,7 +149,6 @@ export const meadow: WorldHooks = {
   solidAt(sim, x, y) {
     return solidOf(meadowOf(sim).solids, x, y)
   },
-  smashWall() {},
   wanderDir(sim, eid, dx, dy) {
     const b = meadowOf(sim).plan.basin
     const x = Transform.x[eid]!

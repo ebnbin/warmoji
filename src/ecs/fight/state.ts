@@ -1,13 +1,13 @@
 import { query, removeEntity } from 'bitecs'
 import { ENEMIES } from '../../data/enemies'
 import { HAZARD_KILLS } from '../../data/maps'
-import { phasesOf, timeLimitMs } from '../../data/runs'
+import { timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { Polarity } from '../../types/battlefield'
 import type { EnemyDef, EnemyKind, EnemyMixEntry } from '../../types/enemies'
 import type { Hazard } from '../../types/maps'
-import type { BossRule, CarrierRule, CueRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyWavesRule, Loot, MixEntry, SpawnAt, StreamRule } from '../../types/runs'
+import type { BatchRule, CueRule, EndRule, FightDef, GroupTraits, HoldPoint, Loot, MixEntry, PhaseDef, SpawnAt, Squad, StreamRule, WavesRule } from '../../types/runs'
 import { signalName } from '../../data/signals'
 import type { MapEvent } from '../../data/signals'
 import { isLose } from '../../data/ends'
@@ -16,11 +16,10 @@ import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
 import { runDef } from '../../run/state'
 import type { RunState } from '../../run/state'
-import { Boss, Bounty, Call, Carrier, Due, Enemy, ENEMY_SET, FACTION, Faction, Hp, Order, Telegraph, Transform } from '../components'
-import { scheduleCall, scheduleCarrier } from '../entities/schedule'
-import { callSpec, carrierPickup, foeSpec } from '../store'
+import { Boss, Bounty, Call, Due, Enemy, ENEMY_SET, FACTION, Faction, Hp, Order, Telegraph, Transform } from '../components'
+import { scheduleCall } from '../entities/schedule'
+import { callSpec, foeSpec } from '../store'
 import { sandboxTeamMods } from '../sandbox/knobs'
-import { rollCarriers } from '../utils/battleFx'
 import { leaderX, leaderY } from '../utils/team'
 import type { Sim } from '../sim'
 
@@ -47,9 +46,9 @@ export interface FoeSpec {
   readonly carry?: Polarity
 }
 
-/** 到时登场的一队敌人或头目；round 是一再放出的一队这是第几次，从 0 算 */
+/** 到时登场的一队敌人；round 是一再放出的一队这是第几次，从 0 算 */
 export interface CallSpec {
-  readonly rule: LegacyBatchRule | BossRule
+  readonly rule: BatchRule
   readonly round: number
 }
 
@@ -82,7 +81,7 @@ export interface StreamState {
 
 /** 一组一组来的进度：下一组的序号，场上清空的时刻（-1 是还没清空） */
 export interface WavesState {
-  readonly rule: LegacyWavesRule
+  readonly rule: WavesRule
   next: number
   calmAt: number
 }
@@ -105,7 +104,7 @@ export interface GoalState {
 
 /** 按地图事件放出的一队：等的是哪件事、这件事已经数到第几次、放过几队 */
 export interface TriggerState {
-  readonly rule: LegacyBatchRule
+  readonly rule: BatchRule
   readonly on: MapEvent
   seen: number
   fired: number
@@ -184,7 +183,7 @@ function phaseState(
   at: number,
   events: Partial<Record<MapEvent, number>>,
 ): Pick<FightState, 'phase' | 'phaseAt' | 'streams' | 'waves' | 'knobs' | 'mix' | 'hold' | 'goals' | 'triggers' | 'cues' | 'base' | 'bounties' | 'wonAt'> {
-  const p = phasesOf(def)[phase]!
+  const p = def.phases[phase]!
   const hold = p.ends.find((e) => e.kind === 'hold')
   return {
     phase,
@@ -218,8 +217,8 @@ export function newFight(def: FightDef, run: RunState): FightState {
 }
 
 /** 当前阶段 */
-export function phaseOf(f: FightState): LegacyPhaseDef {
-  return phasesOf(f.def)[f.phase]!
+export function phaseOf(f: FightState): PhaseDef {
+  return f.def.phases[f.phase]!
 }
 
 /** 当前阶段开始了多久 */
@@ -227,37 +226,23 @@ export function phaseMs(sim: Sim): number {
   return sim.elapsedMs - sim.fight.phaseAt
 }
 
-/** 这一阶段开始：定时登场的排好（按地图事件放出的等事件来），带光圈的敌人抽好效果排好，打出这一阶段的横幅 */
+/** 这一阶段开始：定时登场的排好（按地图事件放出的等事件来），打出这一阶段的横幅 */
 export function startPhase(sim: Sim): void {
   const at = sim.fight.phaseAt
   const p = phaseOf(sim.fight)
-  for (const rule of p.spawns) {
-    if ((rule.kind === 'batch' && rule.on === undefined) || rule.kind === 'boss') scheduleCall(sim, at + rule.atMs, rule)
-    else if (rule.kind === 'carriers') scheduleCarriers(sim, at, rule)
-  }
+  for (const rule of p.spawns) if (rule.kind === 'batch' && rule.on === undefined) scheduleCall(sim, at + rule.atMs, rule)
   if (p.intro) sim.out.banners.push(p.intro)
-}
-
-function scheduleCarriers(sim: Sim, at: number, rule: CarrierRule): void {
-  const carriers = rollCarriers(sim.mapId, rule.buff, rule.debuff, () => sim.rng.next())
-  carriers.forEach((pickup, i) => {
-    scheduleCarrier(sim, at + rule.atMs + (rule.spanMs * i) / carriers.length, pickup)
-  })
 }
 
 /** 已经是这一场的最后一个阶段 */
 export function lastPhase(f: FightState): boolean {
-  return f.phase === phasesOf(f.def).length - 1
+  return f.phase === f.def.phases.length - 1
 }
 
-/** 这一阶段达成，不停顿地接上下一阶段：还没登场的一队、头目与带光圈的敌人不再来，场上的留着 */
+/** 这一阶段达成，不停顿地接上下一阶段：还没登场的一队不再来，场上的留着 */
 export function nextPhase(sim: Sim): void {
   for (const e of [...query(sim.world, [Due, Call])]) {
     callSpec[e] = undefined
-    removeEntity(sim.world, e)
-  }
-  for (const e of [...query(sim.world, [Due, Carrier])]) {
-    carrierPickup[e] = undefined
     removeEntity(sim.world, e)
   }
   Object.assign(sim.fight, phaseState(sim.fight.def, sim.fight.phase + 1, sim.run, sim.elapsedMs, sim.fight.events))
@@ -353,19 +338,18 @@ function onField(sim: Sim): number {
 }
 
 /** 一队连同护卫一共几只 */
-export function squadSize(squad: LegacySquad): number {
+export function squadSize(squad: Squad): number {
   return squad.count + (squad.escort?.count ?? 0)
 }
 
 /** 还没放出的敌人：排着的单只、没登场的一队连同它还要再放的几次、没来的组、按地图事件还要放的几队；只数悬赏目标时护卫不算，一直放下去的一队只算下一次，没写次数的按事件放出的一队放不完 */
 function pendingCount(sim: Sim, bountyOnly: boolean): number {
   let n = 0
-  const size = (sq: LegacySquad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
+  const size = (sq: Squad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
   for (const e of query(sim.world, [Due, Order])) if (!bountyOnly || foeSpec[e]?.bounty) n++
   for (const e of query(sim.world, [Due, Call])) {
-    const c = callSpec[e]
-    if (c?.rule.kind === 'batch') n += size(c.rule.squad) * (c.rule.every === undefined || c.rule.times === undefined ? 1 : c.rule.times - c.round)
-    if (c?.rule.kind === 'boss' && !bountyOnly) n++
+    const c = callSpec[e]!
+    n += size(c.rule.squad) * (c.rule.every === undefined || c.rule.times === undefined ? 1 : c.rule.times - c.round)
   }
   for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) n += size(sq)
   for (const t of sim.fight.triggers) {
@@ -402,8 +386,8 @@ function bossesLeft(sim: Sim): number {
   for (const t of query(sim.world, [Telegraph])) if (Telegraph.boss[t]) n++
   for (const e of query(sim.world, [Due, Order])) if (foeSpec[e]?.enemy?.role === 'boss') n++
   for (const e of query(sim.world, [Due, Call])) {
-    const r = callSpec[e]?.rule
-    if (r?.kind === 'boss' || (r?.squad.enemy !== undefined && ENEMIES[r.squad.enemy].role === 'boss')) n++
+    const enemy = callSpec[e]!.rule.squad.enemy
+    if (enemy !== undefined && ENEMIES[enemy].role === 'boss') n++
   }
   return n
 }
@@ -463,7 +447,7 @@ function won(sim: Sim, e: EndRule, i: number): boolean {
 }
 
 /** 这一阶段的目标达成了：时限与失败条件之外的达成条件，要全部达成的全都满足，否则满足一条就算 */
-function goalsMet(sim: Sim, p: LegacyPhaseDef): boolean {
+function goalsMet(sim: Sim, p: PhaseDef): boolean {
   const wins = p.ends.flatMap((e, i) => (e.kind === 'time' || isLose(e) ? [] : [{ e, i }]))
   return p.need === 'all' ? wins.length > 0 && wins.every((w) => won(sim, w.e, w.i)) : wins.some((w) => won(sim, w.e, w.i))
 }

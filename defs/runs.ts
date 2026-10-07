@@ -1,4 +1,4 @@
-import type { ExperimentDef, FightReward, PhaseDef, RunDef, StageDef } from '../src/types/runs'
+import type { ExperimentDef, FightDef, FightReward, PhaseDef, RunDef } from '../src/types/runs'
 import { mapValues } from '../src/util/record.ts'
 import { EXPERIMENTS } from './experiments.ts'
 
@@ -11,7 +11,7 @@ function stage(
   name: string,
   clockSec: number,
   extra: { readonly before?: readonly PhaseDef[]; readonly after?: readonly PhaseDef[]; readonly reward?: FightReward } = {},
-): StageDef {
+): FightDef {
   return { ...e.fight, name, clockSec, phases: [...(extra.before ?? []), ...e.fight.phases, ...(extra.after ?? [])], ...(extra.reward ? { reward: extra.reward } : {}) }
 }
 
@@ -45,7 +45,7 @@ const MEADOW_RELAY_END: PhaseDef = {
 }
 
 /** 草甸的头目战：先清掉蛛后产下的卵，她从林缘爬出来，打到一半暴走，坡顶也冲下野猪 */
-const MEADOW_BOSS: StageDef = {
+const MEADOW_BOSS: FightDef = {
   name: '1-4 蛛后',
   map: 'meadow',
   clockSec: 300,

@@ -5,7 +5,7 @@ import { bandOf, canSee, eyeM } from './pass'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
-/** 帧首快照里的一个身体；uid 用来识别快照后已死亡或被复用的编号；bottom、top 是此刻占的那一段离基准面多高（米）；hidden 看不见，untargetable 碰不到，realm 是所在的界 */
+/** 帧首快照里的一个身体；uid 用来识别快照后已死亡或被复用的编号；bottom、top 是此刻占的那一段离地多高（米）；hidden 看不见，untargetable 碰不到，realm 是所在的界 */
 export interface Target {
   readonly eid: number
   readonly uid: number

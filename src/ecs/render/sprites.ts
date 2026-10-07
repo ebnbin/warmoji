@@ -26,28 +26,6 @@ export interface LocalLight {
 /** 地图按位置给单位的光：可以把主光换个方向，也可以加一层补光 */
 export type LightAt = (x: number, y: number, out: LocalLight) => void
 
-/**
- * 一张精灵切下来的一份：整张平移 (dx, dy) 像素再画，只留沿 axis（0 是横、1 是竖）在 at 这条线 keep 那一侧的部分；
- * at 按身体在地上的位置算，像素，离地抬起的精灵连同这条线一起抬
- */
-export interface SpriteCut {
-  dx: number
-  dy: number
-  axis: 0 | 1
-  at: number
-  keep: 1 | -1
-}
-
-/** 地图按身体在地上的位置 (x, y) 与精灵的半宽半高把它切成几份画：份数写进 out 并返回，0 是照常整张画 */
-export type CutAt = (x: number, y: number, hw: number, hh: number, out: SpriteCut[]) => number
-
-/** 画的时候只留一侧：at 是相对精灵中心的坐标，像素 */
-export interface LocalCut {
-  axis: 0 | 1
-  at: number
-  keep: 1 | -1
-}
-
 /** 状态色乘上一个角受的光：t 从迎光的 0 到背光的 1，在 sun 与 shade 之间插 */
 function litTint(color: number, sun: number, shade: number, t: number, alpha: number): number {
   const r = (((sun >> 16) & 0xff) * (1 - t) + ((shade >> 16) & 0xff) * t) * ((color >> 16) & 0xff)
@@ -130,32 +108,15 @@ export class SpriteBatch extends EcsLayer {
     this.draw(node, drawingContext, s.x, s.y, s.rot ?? 0, s.w, s.h, 0, s.frame, 0, s.color, s.alpha, 0)
   }
 
-  /** 画一张图：(x, y) 为中心转 rot，宽高 w×h，flipX 水平翻转，quad 非零时只取四分之一格；cut 给了就只画线的一侧 */
+  /** 画一张图：(x, y) 为中心转 rot，宽高 w×h，flipX 水平翻转，quad 非零时只取四分之一格 */
   protected draw(
     node: QuadNode,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
     x: number, y: number, rot: number, w: number, h: number, flipX: number, frame: number, quad: number,
-    color: number, alpha: number, effect: number, cut?: LocalCut,
+    color: number, alpha: number, effect: number,
   ): void {
     let hw = (flipX ? -1 : 1) * w * 0.5
     const hh = h * 0.5
-    // 留下的那一份：沿精灵自己的横、竖，从一边（s、t 为 0）到另一边（为 1）
-    let s0 = 0
-    let s1 = 1
-    let t0 = 0
-    let t1 = 1
-    if (cut) {
-      if (cut.axis === 0) {
-        const f = (cut.at + hw) / (2 * hw)
-        if (cut.keep > 0 === hw > 0) s0 = Math.max(s0, f)
-        else s1 = Math.min(s1, f)
-      } else {
-        const f = (cut.at + hh) / (2 * hh)
-        if (cut.keep > 0) t0 = Math.max(t0, f)
-        else t1 = Math.min(t1, f)
-      }
-      if (s0 >= s1 || t0 >= t1) return
-    }
 
     const spriteMatrix = this.spriteMatrix
     const calc = this.calc
@@ -193,20 +154,13 @@ export class SpriteBatch extends EcsLayer {
         const u = u0
         u0 = u1
         u1 = u
-        const s = s0
-        s0 = 1 - s1
-        s1 = 1 - s
       }
     }
 
-    const xa = -hw + 2 * hw * s0
-    const xb = -hw + 2 * hw * s1
-    const ya = -hh + 2 * hh * t0
-    const yb = -hh + 2 * hh * t1
-    const ua = u0 + (u1 - u0) * s0
-    const ub = u0 + (u1 - u0) * s1
-    const va = v0 + (v1 - v0) * t0
-    const vb = v0 + (v1 - v0) * t1
+    const xa = -hw
+    const xb = hw
+    const ya = -hh
+    const yb = hh
     const x0 = calc.getX(xa, ya)
     const y0 = calc.getY(xa, ya)
     const x1 = calc.getX(xa, yb)
@@ -218,7 +172,7 @@ export class SpriteBatch extends EcsLayer {
     const tex = this.atlas.pageGlTexture(this.atlas.page(frame))
     if (!light) {
       const tint = packTint(color, alpha)
-      node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, ua, va, ub - ua, vb - va, effect, tint, tint, tint, tint, this.renderOptions)
+      node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, effect, tint, tint, tint, tint, this.renderOptions)
       return
     }
     // 每个角偏离中心的那段投到背光方向上：迎光的一半保持 sun，过了中心才往背光的一角渐渐乘到 shade
@@ -229,7 +183,7 @@ export class SpriteBatch extends EcsLayer {
       const cy = i % 2 === 0 ? ya : yb
       tints[i] = litTint(color, sun, shade, Math.max(0, cx * ax + cy * ay), alpha)
     }
-    node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, ua, va, ub - ua, vb - va, effect, tints[0]!, tints[1]!, tints[2]!, tints[3]!, this.renderOptions)
+    node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, effect, tints[0]!, tints[1]!, tints[2]!, tints[3]!, this.renderOptions)
     if (l.fill * alpha * 255 < 1) return
     // 补光：同一张剪影填成光的颜色叠上去，越朝着光的角越浓
     for (let i = 0; i < 4; i++) {
@@ -237,6 +191,6 @@ export class SpriteBatch extends EcsLayer {
       const cy = i % 2 === 0 ? ya : yb
       tints[i] = packTint(l.color, alpha * l.fill * (FILL_AMBIENT + (1 - FILL_AMBIENT) * Math.max(0, cx * fx + cy * fy)))
     }
-    node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, ua, va, ub - ua, vb - va, TINT_FILL, tints[0]!, tints[1]!, tints[2]!, tints[3]!, this.renderOptions)
+    node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, TINT_FILL, tints[0]!, tints[1]!, tints[2]!, tints[3]!, this.renderOptions)
   }
 }

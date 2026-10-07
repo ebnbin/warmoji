@@ -54,7 +54,7 @@ function slowestFoeU(sim: Sim): number {
   let v = SLOWEST.get(sim.mapId)
   if (v === undefined) {
     const def = MAPS[sim.mapId]
-    v = Math.min(...def.mix.map((r) => ENEMIES[r.kind].speed), ENEMIES[def.boss].speed)
+    v = Math.min(...def.foes.map((k) => ENEMIES[k].speed), ENEMIES[def.boss].speed)
     SLOWEST.set(sim.mapId, v)
   }
   return v

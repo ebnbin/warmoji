@@ -300,7 +300,6 @@ export const sakura: WorldHooks = {
   solidAt(sim, x, y) {
     return solidOf(sakuraOf(sim).solids, x, y)
   },
-  smashWall() {},
   wanderDir(sim, eid, dx, dy) {
     const b = sakuraOf(sim).plan.basin
     const x = Transform.x[eid]!

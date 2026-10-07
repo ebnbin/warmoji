@@ -1,6 +1,6 @@
 import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { spawnBody } from './body'
-import { AI, ELITE, SPAWN } from '../../data/enemies'
+import { AI, ELITE, ENEMIES, SPAWN } from '../../data/enemies'
 import { ACQUIRE, ENEMY_BODY, MORPH } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
@@ -58,7 +58,7 @@ import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
-import { spawnTelegraph, telegraphCount } from './telegraph'
+import { spawnTelegraph } from './telegraph'
 import { gateEntry } from '../worlds/gates'
 import type { Entry } from '../worlds/gates'
 import type { SpawnTraits } from './telegraph'
@@ -70,8 +70,7 @@ import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
 import { toPx } from '../../data/px'
 import { bossFor, MAPS } from '../../data/maps'
-import type { FieldPickupDef } from '../../types/battlefield'
-import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
+import { pickEnemy } from '../utils/spawnMix'
 import { rollCarry } from '../utils/battleFx'
 import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
@@ -277,10 +276,9 @@ export function spawnBrood(
   }
 }
 
-/** 这一阶段的配比，不写就按地图与波数 */
+/** 这一阶段的配比，不写就在这张图出没的小怪里平均抽 */
 function currentMix(sim: Sim): readonly EnemyMixEntry[] {
-  if (sim.fight.mix) return sim.fight.mix
-  return enemyMixAt(MAPS[sim.mapId].mix, sim.run.wave)
+  return sim.fight.mix ?? MAPS[sim.mapId].foes.map((kind) => ({ def: ENEMIES[kind], weight: 1 }))
 }
 
 /** 敌方身体数，刷怪上限只看它 */
@@ -325,12 +323,6 @@ function foeSpot(sim: Sim, foe: FoeSpec, boss: boolean): Point {
     case 'behind': {
       const a = Math.atan2(-sim.heading.y, -sim.heading.x) + (count > 1 ? (index / (count - 1) - 0.5) * BEHIND_ARC : 0)
       return sim.hooks.settle(sim, { x: leaderX(sim) + Math.cos(a) * at.dist * UNIT, y: leaderY(sim) + Math.sin(a) * at.dist * UNIT })
-    }
-    case 'point': {
-      const c = sim.hooks.center(sim)
-      const r = (at.spread ?? 0) * UNIT * Math.sqrt(sim.rng.next())
-      const a = sim.rng.next() * Math.PI * 2
-      return sim.hooks.settle(sim, { x: c.x + at.dx * UNIT + Math.cos(a) * r, y: c.y + at.dy * UNIT + Math.sin(a) * r })
     }
   }
 }
@@ -388,16 +380,6 @@ export function spawnBoss(sim: Sim): void {
   const pos = placeFoe(sim, { hpMul: 1 }, raw.kind, true)
   const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, {}, SPAWN.telegraphMs * 1.6, pos.entry)
   Telegraph.loud[t] = 1
-}
-
-export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
-  if (sim.over) return
-  if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
-  const raw = pickEnemy(currentMix(sim), () => sim.rng.next())
-  const def = toPx(raw)
-  const hp = Math.round(def.hp * clockWave(sim).hpMultiplier)
-  const pos = placeFoe(sim, { hpMul: 1 }, raw.kind, false)
-  spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, { carries: pickup }, SPAWN.telegraphMs, pos.entry)
 }
 
 /** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */

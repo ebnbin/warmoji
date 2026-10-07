@@ -11,21 +11,16 @@ const STEP_MS = 50
 
 const REWIND_COLOR = 0x80deea
 
-/**
- * 身体走过的路：环形地记着每一格的时刻、位置与生命，i 是下一格，n 是已记的格数；时刻按身体自己的时钟 clock，next 是下次记的时刻；倒带途中 back 记着到了以后时钟退回哪、留几格、生命取多少，途中不记也不走钟。
- * cut 标着这一格与上一格之间穿过了传送门、路在那里断开，hop 是记完上一格以后穿过了传送门
- */
+/** 身体走过的路：环形地记着每一格的时刻、位置与生命，i 是下一格，n 是已记的格数；时刻按身体自己的时钟 clock，next 是下次记的时刻；倒带途中 back 记着到了以后时钟退回哪、留几格、生命取多少，途中不记也不走钟 */
 export interface TraceRec {
   readonly t: Float64Array
   readonly x: Float32Array
   readonly y: Float32Array
   readonly hp: Float32Array
-  readonly cut: Uint8Array
   i: number
   n: number
   clock: number
   next: number
-  hop: boolean
   back: { readonly clock: number; readonly keep: number; readonly hp: number } | null
 }
 
@@ -43,13 +38,7 @@ export function keepTrace(sim: Sim, eid: number, ms: number): void {
   const size = Math.ceil((ms * 2) / STEP_MS) + 2
   if ((traces[eid]?.t.length ?? 0) >= size) return
   if (!hasComponent(sim.world, eid, Trace)) addComponent(sim.world, eid, Trace)
-  traces[eid] = { t: new Float64Array(size), x: new Float32Array(size), y: new Float32Array(size), hp: new Float32Array(size), cut: new Uint8Array(size), i: 0, n: 0, clock: 0, next: 0, hop: false, back: null }
-}
-
-/** 身体一下穿过了传送门：记的路在这里断开 */
-export function breakTrace(eid: number): void {
-  const r = traces[eid]
-  if (r) r.hop = true
+  traces[eid] = { t: new Float64Array(size), x: new Float32Array(size), y: new Float32Array(size), hp: new Float32Array(size), i: 0, n: 0, clock: 0, next: 0, back: null }
 }
 
 /** 第 k 新的一格在环里的下标，0 是最新的 */
@@ -86,14 +75,12 @@ export function recordTraces(sim: Sim): void {
     r.x[s] = Transform.x[eid]!
     r.y[s] = Transform.y[eid]!
     r.hp[s] = hasComponent(sim.world, eid, Hp) ? Hp.v[eid]! : 0
-    r.cut[s] = r.hop ? 1 : 0
-    r.hop = false
     r.i = (s + 1) % r.t.length
     r.n = Math.min(r.t.length, r.n + 1)
   }
 }
 
-/** ms 前的那一刻：两格之间按时刻插值，中间穿过了传送门就取早的那一格；记得不够久取最早的一格，一格都没有返回 null */
+/** ms 前的那一刻：两格之间按时刻插值；记得不够久取最早的一格，一格都没有返回 null */
 function pointAt(sim: Sim, r: TraceRec, ms: number): TracePoint | null {
   if (r.n === 0) return null
   const when = r.clock - ms
@@ -102,7 +89,7 @@ function pointAt(sim: Sim, r: TraceRec, ms: number): TracePoint | null {
   const a = slot(r, k)
   const ta = r.t[a]!
   const b = slot(r, Math.max(0, k - 1))
-  if (k === 0 || ta >= when || r.cut[b]) return { x: r.x[a]!, y: r.y[a]!, hp: r.hp[a]!, at: ta, keep: r.n - k }
+  if (k === 0 || ta >= when) return { x: r.x[a]!, y: r.y[a]!, hp: r.hp[a]!, at: ta, keep: r.n - k }
   const f = (when - ta) / (r.t[b]! - ta)
   const d = sim.hooks.worldDelta(sim, r.x[a]!, r.y[a]!, r.x[b]!, r.y[b]!)
   const p = sim.hooks.wrap(sim, r.x[a]! + d.x * f, r.y[a]! + d.y * f)
@@ -115,7 +102,7 @@ export function traceAt(sim: Sim, eid: number, ms: number): { readonly x: number
   return r ? pointAt(sim, r, ms) : null
 }
 
-/** 最近 ms 的路：从 ms 前那一刻起依次展开到身体此刻的位置，倒带途中停在出发那一刻；点不回绕，x,y 依次排，穿过传送门的地方插一对 NaN 断开；没记路或一格都没记返回 null */
+/** 最近 ms 的路：从 ms 前那一刻起依次展开到身体此刻的位置，倒带途中停在出发那一刻；点不回绕，x,y 依次排；没记路或一格都没记返回 null */
 export function tracePath(sim: Sim, eid: number, ms: number): Float32Array | null {
   const r = traces[eid]
   const p = r ? pointAt(sim, r, ms) : null
@@ -123,20 +110,14 @@ export function tracePath(sim: Sim, eid: number, ms: number): Float32Array | nul
   const out = [p.x, p.y]
   let x = p.x
   let y = p.y
-  const step = (tx: number, ty: number, cut: boolean): void => {
-    if (cut) {
-      out.push(NaN, NaN)
-      x = tx
-      y = ty
-    } else {
-      const d = sim.hooks.worldDelta(sim, x, y, tx, ty)
-      x += d.x
-      y += d.y
-    }
+  const step = (tx: number, ty: number): void => {
+    const d = sim.hooks.worldDelta(sim, x, y, tx, ty)
+    x += d.x
+    y += d.y
     out.push(x, y)
   }
-  for (let k = r.n - p.keep - 1; k >= 0; k--) step(r.x[slot(r, k)]!, r.y[slot(r, k)]!, r.cut[slot(r, k)] === 1)
-  if (!r.back) step(Transform.x[eid]!, Transform.y[eid]!, r.hop)
+  for (let k = r.n - p.keep - 1; k >= 0; k--) step(r.x[slot(r, k)]!, r.y[slot(r, k)]!)
+  if (!r.back) step(Transform.x[eid]!, Transform.y[eid]!)
   return Float32Array.from(out)
 }
 

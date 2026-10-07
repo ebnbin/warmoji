@@ -8,7 +8,7 @@ import { fightCount } from '../data/runs'
 import { heatOf } from '../data/mutators'
 import { reachLab, submitLab } from '../save/labs'
 import { ITEMS } from '../data/items'
-import { endRun, foughtMs, getRun, restartRun, runDef, skipFilled } from '../run/state'
+import { endRun, getRun, restartRun, runDef, skipFilled } from '../run/state'
 import { starMet } from '../run/stars'
 import { teamLeveled } from '../run/members'
 import { fightsDone } from '../run/flow'
@@ -100,7 +100,7 @@ export class ResultScene extends Phaser.Scene {
       this.time.delayedCall(320, () => confetti.explode(26, cx + 180, titleY))
     }
 
-    const fought = foughtMs(this.run)
+    const fought = this.run.combatMs
     const minutes = Math.floor(fought / 60000)
     const seconds = Math.round((fought % 60000) / 1000)
     const waveText = fights > 1 ? (this.win ? `${fights} 场全部打完` : `止步第 ${reached} 场`) : def.name

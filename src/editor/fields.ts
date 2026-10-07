@@ -11,8 +11,8 @@ import type { MapDef } from '../types/maps'
 import type { BatchRule, Between, GroupTraits, RunRules, SpawnAt, Squad, StreamRule } from '../types/runs'
 import { keysOf } from '../util/record'
 import { endText } from '../scene/runLines'
-import { defaultTeam, isStage } from './draft'
-import type { Draft, End, Mutable, Phase, Stage, Step, Waves } from './draft'
+import { defaultTeam } from './draft'
+import type { Draft, End, Fight, Mutable, Phase, Step, Waves } from './draft'
 import { END_KINDS, ICON, SPAWN_KINDS } from './kinds'
 import type { Node, Target } from './outline'
 
@@ -161,8 +161,6 @@ function atText(at: SpawnAt | undefined, map: MapDef): { readonly label: string;
       return { label: '围一圈', icon: ICON.ring }
     case 'behind':
       return { label: '身后', icon: ICON.behind }
-    case 'point':
-      return { label: '定点', icon: ICON.point }
     case 'gate':
       return { label: `出怪口 · ${map.gates.kinds[at.gate]?.name ?? `${at.gate}（这张图没有）`}`, icon: ICON.gate }
   }
@@ -209,9 +207,9 @@ function newPhase(from: Phase | undefined): Phase {
 
 /** 新的一场：接着上一场的地图与配比 */
 function newFight(d: Draft): Step {
-  const stages = d.steps.flatMap((s) => (s.kind === 'fight' && isStage(s.fight) ? [s.fight] : []))
-  const last = stages.at(-1)
-  return { kind: 'fight', fight: { name: `第 ${stages.length + 1} 场`, map: last?.map ?? MAP_IDS[0]!, phases: [newPhase(last?.phases.at(-1))] } }
+  const fights = d.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
+  const last = fights.at(-1)
+  return { kind: 'fight', fight: { name: `第 ${fights.length + 1} 场`, map: last?.map ?? MAP_IDS[0]!, phases: [newPhase(last?.phases.at(-1))] } }
 }
 
 /** 新的招募：比眼下最多的人数再多一人 */
@@ -323,9 +321,9 @@ function curveRows(d: Draft): Row[] {
   ]
 }
 
-function stageRows(f: Stage, node: Node): Row[] {
+function fightRows(f: Fight, node: Node): Row[] {
   const map = MAPS[f.map]
-  const reward = (): NonNullable<Stage['reward']> => (f.reward ??= {})
+  const reward = (): NonNullable<Fight['reward']> => (f.reward ??= {})
   return [
     field({
       kind: 'pick',
@@ -352,11 +350,9 @@ function stepRows(t: Extract<Target, { kind: 'step' }>, node: Node): Row[] {
       case 'recruit':
         return [num('招募到', s.upTo, { min: 1, max: TEAM.maxSize, step: 1, format: unit('人') }, (v) => (s.upTo = v), { hint: '队伍不到这么多人就进招募页补上' })]
       case 'shop':
-        return [num('物价档位', s.tier ?? 1, { min: 1, max: 30, step: 1, format: (v) => `第 ${v} 档` }, (v) => (s.tier = v), { hint: '物价与稀有度按第几波算' })]
+        return [num('物价档位', s.tier, { min: 1, max: 30, step: 1, format: (v) => `第 ${v} 档` }, (v) => (s.tier = v), { hint: '物价与稀有度按第几波算' })]
       case 'fight':
-        return isStage(s.fight) ? stageRows(s.fight, node) : [info('旧写法的一场', '编辑器还不支持')]
-      case 'repeat':
-        return [info('按轮重复', '编辑器还不支持')]
+        return fightRows(s.fight, node)
     }
   })()
   return [...own, heading('这一步'), listActions(t.list, t.index, node, '这一步')]
@@ -488,7 +484,7 @@ function wavesRows(s: Waves, node: Node): Row[] {
 
 function spawnRows(t: Extract<Target, { kind: 'spawn' }>, node: Node): Row[] {
   const s = t.spawn
-  const map = MAPS[t.stage.map]
+  const map = MAPS[t.fight.map]
   const own = s.kind === 'stream' ? streamRows(s, map) : s.kind === 'batch' ? batchRows(s, map) : wavesRows(s, node)
   return [...own, heading('这一条'), listActions(t.list, t.index, node, '这一条')]
 }
@@ -550,7 +546,7 @@ export function inspect(d: Draft, node: Node): Row[] {
     case 'spawn':
       return spawnRows(t, node)
     case 'squad':
-      return [...squadRows(t.squad, MAPS[t.stage.map]), heading('这一组'), listActions(t.list, t.index, node, '这一组')]
+      return [...squadRows(t.squad, MAPS[t.fight.map]), heading('这一组'), listActions(t.list, t.index, node, '这一组')]
     case 'end':
       return [...endOwnRows(t.end), heading('这一条'), listActions(t.list, t.index, node, '这一条')]
   }

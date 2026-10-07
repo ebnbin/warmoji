@@ -2,10 +2,10 @@ import { query, removeEntity } from 'bitecs'
 import { Call, Due } from '../components'
 import { callSpec } from '../store'
 import { scheduleCall } from '../entities/schedule'
-import { callBoss, callSquad } from '../fight/spawns'
+import { callSquad } from '../fight/spawns'
 import type { Sim } from '../sim'
 
-/** 到点的一队敌人或头目登场；一再放出的一队排好下一次 */
+/** 到点的一队敌人登场；一再放出的一队排好下一次 */
 export function fireCalls(sim: Sim): void {
   for (const eid of [...query(sim.world, [Due, Call])]) {
     const at = Due.at[eid]!
@@ -13,10 +13,6 @@ export function fireCalls(sim: Sim): void {
     const { rule, round } = callSpec[eid]!
     callSpec[eid] = undefined
     removeEntity(sim.world, eid)
-    if (rule.kind === 'boss') {
-      callBoss(sim)
-      continue
-    }
     callSquad(sim, rule.squad, round === 0 ? rule.banner : undefined)
     if (rule.every !== undefined && round + 1 < (rule.times ?? Infinity)) scheduleCall(sim, at + rule.every, rule, round + 1)
   }

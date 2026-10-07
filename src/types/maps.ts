@@ -1,6 +1,6 @@
 import type mapsJson from '../assets/maps.json'
 import type { Palette } from '../util/palette'
-import type { EnemyKind, EnemyMixRow } from './enemies'
+import type { EnemyKind } from './enemies'
 
 export interface MapDecor {
   readonly emojis: readonly string[]
@@ -1055,7 +1055,8 @@ export interface MapDef {
   /** 开着新画风时战场上的精灵怎么受光、身体怎么投影 */
   readonly light: UnitLight
   readonly decor: MapDecor
-  readonly mix: readonly EnemyMixRow[]
+  /** 这张图出没的小怪：沙盒、图鉴与出怪口按它，关卡里的配比另写 */
+  readonly foes: readonly EnemyKind[]
   /** 敌人从地图上哪些地方、怎么进场 */
   readonly gates: GatesConfig
   readonly nebula?: NebulaConfig
@@ -1070,7 +1071,6 @@ export interface MapDef {
   readonly petri?: PetriConfig
   readonly theater?: TheaterConfig
   readonly exit?: ExitConfig
-  readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson

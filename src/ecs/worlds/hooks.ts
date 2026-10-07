@@ -79,13 +79,6 @@ export function newWorldState(): WorldState {
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 
-/** 穿过一扇传送门：在这一段路上走到 t（0 到 1）时越过门线，剩下的路连同终点平移 (dx, dy) 像素到另一扇门那边，速度不变 */
-export interface PortalHop {
-  readonly t: number
-  readonly dx: number
-  readonly dy: number
-}
-
 export interface WorldHooks {
   worldDelta(sim: Sim, fromX: number, fromY: number, toX: number, toY: number): Point
   wrap(sim: Sim, x: number, y: number): Point
@@ -101,27 +94,19 @@ export interface WorldHooks {
   contact(sim: Sim, eid: number, dt: number, x: number, y: number, vx: number, vy: number, out: BodyStep): boolean
   /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
-  /** 跟随中的身体从 from 被拉到 next 时的位置修正；不写就照拉，隔着障碍也贴到宿主身上 */
-  follow?(sim: Sim, eid: number, from: Point, next: Point): Point
   /** 岩壁这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
   /** 能站的地面：出怪口沿它的外边界摆，翻进从它外面起跳；默认是 basin，冰面外是海、空腔外是软壳层这类没有硬墙的地图另给 */
   ground(sim: Sim): Basin | null
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
-  /** 线段 a→b 上第一处探测在它里面、又要贯穿才过得去的实心（贯穿几次按 utils/pass 的 passCost）；不写就按 wallHit */
+  /** 线段 a→b 上第一处探测在它里面、又要贯穿才过得去的实心（贯穿几次按 utils/pass 的 passCost）；不写就没有实心 */
   trace?(sim: Sim, probe: Probe, ax: number, ay: number, bx: number, by: number): Crossing | null
-  /** 线段第一次碰上墙的地方：碰上的一律当作岩体挡下；写了 trace 的不看它 */
-  wallHit?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   /** (x, y) 处立着的实心，挡身体的与挡弹体的都算，取规则用的那份；只给开发面板画高度，不写就当没有 */
   solidAt?(sim: Sim, x: number, y: number): Solid | null
-  /** (x, y) 处能站的地面离基准面多高，米：站在上面的身体、地上的东西都从它量起；不写就是平地 */
-  floorZ?(sim: Sim, x: number, y: number): number
   /** 破坏力打在 (x, y) 离地 z 米处、半径 r 像素的范围里，按材质的强度折算能打掉多少，返回实际用掉的；不写就什么也打不坏 */
   breach?(sim: Sim, x: number, y: number, z: number, r: number, amount: number): number
   /** 弹体或出手撞上了障碍：给画面崩点碎屑 */
   impact?(sim: Sim, x: number, y: number, material: ObstacleId): void
-  /** 引擎不调用：破坏一律走 breach */
-  smashWall?(sim: Sim, x: number, y: number): void
   wanderDir(sim: Sim, eid: number, dx: number, dy: number): Point
   fleeDir(sim: Sim, eid: number, awayX: number, awayY: number): Point
   /** 飞行物出了这里就消失 */
@@ -137,12 +122,8 @@ export interface WorldHooks {
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
   /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（浮冰是风速）；不偏为零 */
   lean(sim: Sim): Point
-  /** 队员在队长 from 身后的坑位 at 落在不该站的地方（会伤人、贴着或隔着传送门）时挪开；不写就不挪 */
+  /** 队员在队长 from 身后的坑位 at 落在不该站的地方时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
-  /** 沿直线从 a 走到 b（像素）先穿过的那扇传送门；eid 不为 −1 时是这个实体此刻真的穿了过去。没有传送门的地图不写 */
-  portal?(sim: Sim, eid: number, ax: number, ay: number, bx: number, by: number): PortalHop | null
-  /** 从 a 飞向 b（像素）最近的直路：直着飞，或先穿过一扇传送门再飞；返回这一路起头朝哪、多长的位移。没有传送门的地图不写，按 worldDelta */
-  towards?(sim: Sim, ax: number, ay: number, bx: number, by: number): Point
   /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */
   toLeader?(sim: Sim, x: number, y: number): number
   /** 这个身体此刻每秒换多少口气，按体力点数：正的是喘得上气，走着也按它补；负的是憋着气，按它往下掉，歇着也回不来；不写就照常 */

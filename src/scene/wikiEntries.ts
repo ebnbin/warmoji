@@ -111,11 +111,11 @@ export function enemyStatLines(e: EnemyDef): string[] {
 function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   const m = MAPS[id]
   const boss = bossFor(id)
-  const names = [...new Set(m.mix.map((r) => ENEMIES[r.kind]?.name).filter(Boolean))]
+  const names = m.foes.map((k) => ENEMIES[k].name)
   return [
     `世界规则 ${MAP_KIND_LABEL[m.kind]}`,
     mapStaminaLine(m),
-    `终波头目 ${boss.name}`,
+    `头目 ${boss.name}`,
     `出没敌人 ${names.join('、')}`,
   ]
 }

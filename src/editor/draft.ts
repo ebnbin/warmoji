@@ -8,7 +8,7 @@ import { fromJson } from '../data/json'
 import { MAPS } from '../data/maps'
 import { runChecks } from '../data/runCheck'
 import type { Issue } from '../data/runCheck'
-import type { EndRule, FightDef, PhaseDef, RunDef, SpawnRule, StageDef, WavesRule } from '../types/runs'
+import type { EndRule, FightDef, PhaseDef, RunDef, SpawnRule, WavesRule } from '../types/runs'
 
 /** 每一层都去掉只读：编辑器就地改草稿 */
 export type Mutable<T> = T extends object ? { -readonly [K in keyof T]: Mutable<T[K]> } : T
@@ -17,17 +17,11 @@ export type Mutable<T> = T extends object ? { -readonly [K in keyof T]: Mutable<
 export type Draft = Mutable<RunDef>
 export type Step = Draft['steps'][number]
 export type Fight = Mutable<FightDef>
-export type Stage = Mutable<StageDef>
 export type Phase = Mutable<PhaseDef>
 export type Spawn = Mutable<SpawnRule>
 export type Waves = Mutable<WavesRule>
 export type WaveSquad = Waves['squads'][number]
 export type End = Mutable<EndRule>
-
-/** 按阶段写的一场：编辑器只写这一种 */
-export function isStage(f: Fight): f is Stage {
-  return f.phases !== undefined
-}
 
 const CHECKS = runChecks({
   enemies: ENEMIES,

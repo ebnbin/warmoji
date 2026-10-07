@@ -11,7 +11,7 @@ import { characterVisual } from '../characterVisual'
 import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
 import { tickStamina } from '../tickStamina'
-import { stepCamSlide, stepHandover } from '../shared/leader'
+import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { settleMotions } from '../settleMotions'
 import { popInEnemies } from '../popInEnemies'
@@ -49,7 +49,6 @@ export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   tickSkillCooldowns,
   stepHandover,
-  stepCamSlide,
   { run: reviveCharacters, after: [stepHandover] },
   tickMarks,
   { run: tickResources, after: [tickMarks] },

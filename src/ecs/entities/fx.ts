@@ -1,8 +1,6 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
-import { LIFT_PER_M } from '../../util/units'
-import { floorAt } from '../utils/pass'
 import { boltPts } from '../store'
 import { MISS, pushDamageNumber } from '../damageNumbers'
 import { attachDrawable } from './drawable'
@@ -77,13 +75,12 @@ export function spawnFxBeam(
   return eid
 }
 
-/** 一道电弧连过这几点：每一点按脚下的地面抬起，画的时候不再抬 */
+/** 一道电弧连过这几点 */
 export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[], color: number): number {
-  const shown = points.map((p) => ({ x: p.x, y: p.y - floorAt(sim, p.x, p.y) * LIFT_PER_M }))
-  const pts: number[] = [shown[0]!.x, shown[0]!.y]
-  for (let p = 1; p < shown.length; p++) {
-    const a = shown[p - 1]!
-    const b = shown[p]!
+  const pts: number[] = [points[0]!.x, points[0]!.y]
+  for (let p = 1; p < points.length; p++) {
+    const a = points[p - 1]!
+    const b = points[p]!
     const segs = 4
     for (let s = 1; s <= segs; s++) {
       const t = s / segs
@@ -119,16 +116,16 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
   return eid
 }
 
-/** 伤害数字从 (x, y) 上方飘起，站在高处的按脚下的地面抬起 */
+/** 伤害数字从 (x, y) 上方飘起 */
 export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): void {
   if (!sim.damageNumbers) return
-  pushDamageNumber(sim.damageNumbers, x, y - 14 - floorAt(sim, x, y) * LIFT_PER_M, amount, crit, sim.fxMs)
+  pushDamageNumber(sim.damageNumbers, x, y - 14, amount, crit, sim.fxMs)
 }
 
 /** 躲开的一下：飘一个"闪避" */
 export function spawnMissText(sim: Sim, x: number, y: number): void {
   if (!sim.damageNumbers) return
-  pushDamageNumber(sim.damageNumbers, x, y - 14 - floorAt(sim, x, y) * LIFT_PER_M, MISS, false, sim.fxMs)
+  pushDamageNumber(sim.damageNumbers, x, y - 14, MISS, false, sim.fxMs)
 }
 
 export function spawnFxSlash(sim: Sim, x: number, y: number, angle: number, radius: number): number {

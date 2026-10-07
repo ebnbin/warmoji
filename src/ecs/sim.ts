@@ -42,7 +42,6 @@ export interface Sim {
   leader: number
   heading: { x: number; y: number }
   handover: Handover | null
-  camSlide: CamSlide | null
   aim: { x: number; y: number }
   characters: number[]
   /** 每个角色的主动技能（连段的第一段），按槽位 */
@@ -90,14 +89,6 @@ interface Handover {
   toScale: number
   camX: number
   camY: number
-}
-
-/** 镜头的余量：队长穿门一下到了别处，镜头锚点从原处滑过去；x、y 是开始滑时锚点相对队长的偏移 */
-interface CamSlide {
-  msLeft: number
-  ms: number
-  x: number
-  y: number
 }
 
 export interface PendingDeath {
@@ -201,7 +192,6 @@ export function makeSim(
     leader,
     heading: { x: 0, y: -1 },
     handover: null,
-    camSlide: null,
     aim: { x: 0, y: -1 },
   }
   // 这一局回不来的队员倒着上场

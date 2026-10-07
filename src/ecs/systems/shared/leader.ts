@@ -6,7 +6,6 @@ import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { handoverMs } from './squad'
 import { switchBlock } from '../../fight/state'
-import { SQUAD } from '../../../data/feel'
 
 const ZERO: Point = { x: 0, y: 0 }
 
@@ -27,35 +26,6 @@ export function handoverCamOffset(sim: Sim): Point {
   if (!h) return ZERO
   const k = 1 - handoverEase(sim)
   return { x: h.camX * k, y: h.camY * k }
-}
-
-/** 镜头滑过去的进度缓动 0→1：先快后慢，出门那边很快就进了画面 */
-function slideEase(p: number): number {
-  const c = p < 0 ? 0 : p > 1 ? 1 : p
-  return 1 - (1 - c) ** 3
-}
-
-/** 相机锚点相对队长还差多少：从队长穿门前的地方滑向队长 */
-export function camSlideOffset(sim: Sim): Point {
-  const c = sim.camSlide
-  if (!c) return ZERO
-  const k = 1 - slideEase(1 - c.msLeft / c.ms)
-  return { x: c.x * k, y: c.y * k }
-}
-
-/** 队长一下平移了 (dx, dy)：镜头不跟着跳，从此刻所在的地方重新滑过去；来回穿门时就近滑回来 */
-export function slideCam(sim: Sim, dx: number, dy: number): void {
-  const o = camSlideOffset(sim)
-  const ms = SQUAD.portalCamMs
-  sim.camSlide = { msLeft: ms, ms, x: o.x - dx, y: o.y - dy }
-}
-
-/** 镜头的余量按真实时间收拢 */
-export function stepCamSlide(sim: Sim): void {
-  const c = sim.camSlide
-  if (!c) return
-  c.msLeft -= sim.dtMs
-  if (c.msLeft <= 0) sim.camSlide = null
 }
 
 /** 阵亡者不走动画系统，尺寸随倍率直接改 */

@@ -21,7 +21,7 @@ function seenByTeam(sim: Sim, eid: number): boolean {
 
 /** 每个敌人有没有被队伍看见：地图里有挡视线的障碍才判断，没有的一律看得见；判断的结果渐变成 Seen.v，画面按它淡出 */
 export function trackSight(sim: Sim): void {
-  const blocks = sim.hooks.trace !== undefined || sim.hooks.wallHit !== undefined
+  const blocks = sim.hooks.trace !== undefined
   const now = sim.elapsedMs
   const k = 1 - Math.exp(-Math.min(sim.dtMs, 50) / 1000 / FADE_S)
   for (const eid of query(sim.world, ENEMY_SET)) {

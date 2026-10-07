@@ -3,26 +3,12 @@ import { ENEMIES } from '../data/enemies'
 import { HAZARD_KILLS, HAZARD_NAMES } from '../data/maps'
 import { isLose } from '../data/ends'
 import { signalName } from '../data/signals'
-import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
-import { phasesOf } from '../data/runs'
 import { WAVE } from '../data/waves'
-import type { EndRule, FightDef, FightReward, FightRules, Gated, LevelPick, MutatorDef, RepeatDef, Rounds, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
+import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, PhaseDef, RunDef, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
-
-/** 重复里哪几轮有它的说法 */
-function roundsText(r: Rounds): string {
-  const from = r.from ?? 1
-  const span = r.to === undefined ? `第 ${from} 轮起` : from === r.to ? `第 ${from} 轮` : `第 ${from} 到 ${r.to} 轮`
-  return (r.every ?? 1) > 1 ? `${span}每 ${r.every} 轮一次` : span
-}
-
-/** 只在某几轮才有的，说法后面注明轮次 */
-function gatedText(text: string, r: Rounds | undefined): string {
-  return r ? `${text}（${roundsText(r)}）` : text
-}
 
 /** 一条结束规则的说法：达成条件说怎么算赢，失败条件说怎么算输 */
 export function endText(e: EndRule): string {
@@ -73,10 +59,10 @@ export function rewardText(r: FightReward | undefined): string | null {
   return parts.length > 0 ? `过关奖励 ${parts.join('、')}` : null
 }
 
-/** 一个阶段怎么达成、怎么输；重复里只在某几轮才有的注明轮次 */
-function phaseGoalText(p: { readonly ends: readonly Gated<EndRule>[]; readonly need?: 'all' }): string {
-  const wins = p.ends.flatMap((e) => (isLose(e) ? [] : [gatedText(endText(e), e.rounds)]))
-  const lose = p.ends.flatMap((e) => (isLose(e) ? [gatedText(endText(e), e.rounds)] : []))
+/** 一个阶段怎么达成、怎么输 */
+function phaseGoalText(p: PhaseDef): string {
+  const wins = p.ends.flatMap((e) => (isLose(e) ? [] : [endText(e)]))
+  const lose = p.ends.flatMap((e) => (isLose(e) ? [endText(e)] : []))
   return [wins.length === 0 ? '不会结束' : wins.join(p.need === 'all' ? '，并且' : '，或'), ...lose].join(' · ')
 }
 
@@ -92,12 +78,12 @@ export function fightRuleLines(f: FightDef): string[] {
 
 /** 一场怎么赢、怎么输：分阶段的按先后连起来，外加这一场的特别规则与过关奖励 */
 export function fightGoalText(f: FightDef): string {
-  return [phasesOf(f).map(phaseGoalText).join(' → '), ...fightRuleLines(f)].join(' · ')
+  return [f.phases.map(phaseGoalText).join(' → '), ...fightRuleLines(f)].join(' · ')
 }
 
 /** 一场的各个阶段一行一个：开场横幅的标题，怎么达成、怎么输 */
 export function phaseLines(f: FightDef): string[] {
-  return phasesOf(f).map((p) => `${p.intro ? `${p.intro.title}：` : ''}${phaseGoalText(p)}`)
+  return f.phases.map((p) => `${p.intro ? `${p.intro.title}：` : ''}${phaseGoalText(p)}`)
 }
 
 /** 我方规则的说法 */
@@ -118,22 +104,7 @@ function ruleLines(r: FightRules | undefined): string[] {
   return out
 }
 
-/** 商店规则的说法 */
-function shopLines(s: ShopRules): string[] {
-  const out: string[] = []
-  if (s.rarity) {
-    const lo = RARITIES[s.rarity.min ?? 'common'].label
-    const hi = RARITIES[s.rarity.max ?? 'legendary'].label
-    out.push(lo === hi ? `商店只卖${lo}道具` : `商店只卖${lo}到${hi}的道具`)
-  }
-  if (s.reroll === false) out.push('商店不能刷新')
-  return out
-}
-
-/** 全队升级时能选什么 */
-const PICK_TEXT: Record<LevelPick, string> = { recruit: '招一名新队员', upgrade: '给一名队员升一级' }
-
-/** 一局的我方规则：每一场都照这些，外加命数、场间恢复、招募限定、商店、等级上限与全队升级 */
+/** 一局的我方规则：每一场都照这些，外加命数、场间恢复、等级上限与全队升级 */
 export function runRuleLines(def: RunDef): string[] {
   const r = def.rules ?? {}
   const out = ruleLines(r)
@@ -141,11 +112,9 @@ export function runRuleLines(def: RunDef): string[] {
   if (r.between === 'rest') out.push(`场与场之间，每人回复 ${Math.round(WAVE.restRatio * 100)}% 损失的生命，倒下的也起来`)
   if (r.between === 'full') out.push('每一场满血开局')
   if (r.between === 'permadeath') out.push('一场打完时还倒着的队员，这一局都回不来')
-  if (r.recruit) out.push(`只能招募${r.recruit.tags.map((t) => TAGS[t].name).join('、')}角色`)
-  if (r.shop) out.push(...shopLines(r.shop))
   if (r.maxLevel !== undefined) out.push(r.maxLevel === 1 ? '队员不能升级' : `队员最高只能升到 ${r.maxLevel} 级`)
   const t = def.teamLevel
-  if (t) out.push(`击杀攒全队经验，最高 ${t.maxLevel} 级；每升一级掉一个升级道具，队长走过去捡起来，${(t.picks ?? ['recruit', 'upgrade']).map((k) => PICK_TEXT[k]).join('或')}；进商店前没捡的替你捡起；买道具不再涨角色经验`)
+  if (t) out.push(`击杀攒全队经验，最高 ${t.maxLevel} 级；每升一级掉一个升级道具，队长走过去捡起来，招一名新队员或给一名队员升一级；进商店前没捡的替你捡起；买道具不再涨角色经验`)
   return out
 }
 
@@ -162,12 +131,8 @@ export function starText(s: StarRule): string {
       return s.count === 0 ? '不放主动技能' : `主动技能最多放 ${s.count} 次`
     case 'kills':
       return `击杀至少 ${s.count} 只`
-    case 'lives':
-      return `至少还剩 ${s.count} 次起来的机会`
     case 'hazard':
       return s.damage === 0 ? `没被${HAZARD_NAMES[s.by]}伤到` : `受到的${HAZARD_NAMES[s.by]}伤害不超过 ${s.damage}`
-    case 'coins':
-      return `捡到至少 ${s.count} 金币`
   }
 }
 
@@ -184,19 +149,13 @@ export function stepText(s: StepDef): string {
     case 'shop':
       return '商店'
     case 'fight':
-      return `${s.fight.name ?? '战斗'}：${fightGoalText(s.fight)}`
+      return `${s.fight.name}：${fightGoalText(s.fight)}`
   }
-}
-
-/** 一步的说法：重复的一段头一行说重复几轮，后面一行一步是每一轮要走的，只在某几轮才有的注明轮次 */
-function stepLines(s: StepDef | RepeatDef): string[] {
-  if (s.kind !== 'repeat') return [stepText(s)]
-  return [s.times === undefined ? '一直重复下面几步：' : `重复 ${s.times} 轮下面几步：`, ...s.steps.map((b) => `· ${gatedText(stepText(b), b.rounds)}`)]
 }
 
 /** 一局按顺序的每一步 */
 export function runStepLines(def: RunDef): string[] {
-  return def.steps.flatMap((s, i) => stepLines(s).map((line, k) => (k === 0 ? `${i + 1}. ${line}` : line)))
+  return def.steps.map((s, i) => `${i + 1}. ${stepText(s)}`)
 }
 
 /** 预设队伍：指定的写名字，随机的写要带的标签 */

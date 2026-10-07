@@ -6,7 +6,7 @@ import { CHARACTERS } from '../data/characters'
 import { fightCount, RUN_IDS, RUNS } from '../data/runs'
 import { heatOf, MUTATOR_IDS, MUTATORS } from '../data/mutators'
 import { EXPERIMENT_IDS, EXPERIMENTS } from '../data/experiments'
-import type { ExperimentId, MutatorId, RunId, StageDef } from '../types/runs'
+import type { ExperimentId, FightDef, MutatorId, RunId } from '../types/runs'
 import { beginRun, beginSandbox, skipFilled } from '../run/state'
 import { SANDBOX } from '../run/sandbox'
 import { mutatorFits } from '../run/rules'
@@ -253,7 +253,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   /** 实验那一场：这一场的规则，各个阶段怎么达成 */
-  private flowExperiment(flow: Flow, fight: StageDef): void {
+  private flowExperiment(flow: Flow, fight: FightDef): void {
     const rules = fightRuleLines(fight)
     if (rules.length > 0) {
       flow.heading('规则', GROUP_ICONS.rules)

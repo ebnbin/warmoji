@@ -4,10 +4,10 @@ import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ENEMIES } from '../data/enemies'
 import { FIELD, POOLS } from '../data/battlefield'
 import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
-import { bossFor, HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
+import { HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
 import { STAT_CATEGORIES, STAT_KEYS, STATS, statValue } from '../data/stats'
-import { fightCount, phasesOf } from '../data/runs'
+import { fightCount } from '../data/runs'
 import { heatOf, MUTATORS } from '../data/mutators'
 import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
@@ -15,14 +15,13 @@ import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { levelCap, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
 import { pendingLevelUps } from '../run/levelUp'
 import { xpMaxed, xpToNext } from '../run/xp'
-import { endRun, fightMap, foughtMs, getRun, leaderSlot, runDef, stepsOf, waveStartHp } from '../run/state'
+import { endRun, getRun, leaderSlot, runDef, stepsOf, waveStartHp } from '../run/state'
 import { fightAfterRecruit, fightsDone, lastFight, nextFight, plannedFights } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { FightDef, GroupTraits, LegacySquad, MixEntry } from '../types/runs'
-import type { MapId } from '../types/maps'
+import type { FightDef, GroupTraits, Squad } from '../types/runs'
 import { fightGoalText, mutatorText, runRuleLines } from './runLines'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
 import { formatBig, formatTime } from '../util/format'
@@ -104,7 +103,7 @@ interface Foe {
   readonly since: number
 }
 
-/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体；配比按这一批的，再按这一阶段的，都不写就按地图，地图的配比从开局的波数起算 */
+/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体；配比按这一批的，再按这一阶段的；沙盒是这张图出没的全部 */
 function runFoes(run: RunState): Foe[] {
   const since = new Map<EnemyKind, number>()
   const order: EnemyDef[] = []
@@ -123,27 +122,21 @@ function runFoes(run: RunState): Foe[] {
     for (const e of mapEnemyRoster(run.mapId)) add(e, 1)
     return order.map((def) => ({ def, since: 1 }))
   }
-  const firstWave = runDef(run).start?.wave ?? 1
   plannedFights(run).forEach((f, i) => {
     const n = i + 1
-    const map = fightMap(run, f)
-    for (const p of phasesOf(f)) {
-      const mix = (own?: readonly MixEntry[]): void => {
-        const rows = own ?? p.mix
-        if (rows) for (const m of rows) add(ENEMIES[m.kind], n)
-        else for (const row of MAPS[map].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
+    for (const p of f.phases) {
+      const group = (g: GroupTraits): void => {
+        if (g.enemy) add(ENEMIES[g.enemy], n)
+        else for (const m of g.mix ?? p.mix ?? []) add(ENEMIES[m.kind], n)
       }
-      const group = (g: GroupTraits): void => (g.enemy ? add(ENEMIES[g.enemy], n) : mix(g.mix))
-      const squad = (sq: LegacySquad): void => {
+      const squad = (sq: Squad): void => {
         group(sq)
         if (sq.escort) add(ENEMIES[sq.escort.enemy], n)
       }
       for (const s of p.spawns) {
-        if (s.kind === 'boss') add(bossFor(map), n)
-        else if (s.kind === 'batch') squad(s.squad)
+        if (s.kind === 'batch') squad(s.squad)
         else if (s.kind === 'waves') s.squads.forEach(squad)
-        else if (s.kind === 'stream') group(s)
-        else mix()
+        else group(s)
       }
     }
   })
@@ -151,19 +144,15 @@ function runFoes(run: RunState): Foe[] {
 }
 
 /** 这一场登场的头目，各阶段的都算 */
-function fightBosses(f: FightDef, mapId: MapId): EnemyDef[] {
-  const spawns = phasesOf(f).flatMap((p) => p.spawns)
-  const squads = spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
-  return [
-    ...spawns.flatMap((s) => (s.kind === 'boss' ? [bossFor(mapId)] : [])),
-    ...squads.flatMap((sq) => (sq.enemy && ENEMIES[sq.enemy].role === 'boss' ? [ENEMIES[sq.enemy]] : [])),
-  ]
+function fightBosses(f: FightDef): EnemyDef[] {
+  const squads = f.phases.flatMap((p) => p.spawns).flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
+  return squads.flatMap((sq) => (sq.enemy && ENEMIES[sq.enemy].role === 'boss' ? [ENEMIES[sq.enemy]] : []))
 }
 
 /** 多场的一局里这一场的特别之处：有头目，或有一队必出精英 */
-function fightTag(f: FightDef, mapId: MapId): string {
-  if (fightBosses(f, mapId).length > 0) return '（首领场）'
-  return phasesOf(f).some((p) => p.spawns.some((s) => s.kind === 'batch' && (s.squad.elites ?? 0) > 0)) ? '（精英场）' : ''
+function fightTag(f: FightDef): string {
+  if (fightBosses(f).length > 0) return '（首领场）'
+  return f.phases.some((p) => p.spawns.some((s) => s.kind === 'batch' && (s.squad.elites ?? 0) > 0)) ? '（精英场）' : ''
 }
 
 /** 暂停页：一局之中的信息都在这里，盖在战斗、商店或招募页上，下层停住 */
@@ -471,27 +460,23 @@ export class PauseScene extends Phaser.Scene {
     if (total > 1) {
       const done = fightsDone(run)
       const prev = lastFight(run)
-      const tag = (f: FightDef): string => fightTag(f, fightMap(run, f))
+      const tag = (f: FightDef): string => fightTag(f)
       flow.text(
         snap && cur
-          ? `${cur.name ?? ''}进行中${tag(cur)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
-          : `${prev ? `${prev.name ?? ''}已完成 · ` : ''}下一场是${cur?.name ?? ''}${cur ? tag(cur) : ''}`,
+          ? `${cur.name}进行中${tag(cur)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
+          : `${prev ? `${prev.name}已完成 · ` : ''}下一场是${cur?.name ?? ''}${cur ? tag(cur) : ''}`,
         { color: 'ink', bold: true },
       )
-      if (Number.isFinite(total)) {
-        const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${total} 场`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
-        const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: done / total })
-        flow.put(bar).put(barText, 34)
-        const numbered = plannedFights(run).map((f, i) => ({ f, n: i + 1 }))
-        const elites = numbered.filter(({ f, n }) => n > done && tag(f) === `（精英场）`).map(({ n }) => n)
-        const bosses = numbered.flatMap(({ f, n }) => {
-          const names = fightBosses(f, fightMap(run, f)).map((b) => b.name)
-          return names.length > 0 ? [`第 ${n} 场是首领场：${names.join('、')}`] : []
-        })
-        flow.text([elites.length > 0 ? `精英场还有第 ${elites.join('、')} 场` : '', ...bosses].filter(Boolean).join(' · '))
-      } else {
-        flow.text(`已打完 ${done} 场，一直打到全灭为止`, { color: 'soft' })
-      }
+      const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${total} 场`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
+      const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: done / total })
+      flow.put(bar).put(barText, 34)
+      const numbered = plannedFights(run).map((f, i) => ({ f, n: i + 1 }))
+      const elites = numbered.filter(({ f, n }) => n > done && tag(f) === `（精英场）`).map(({ n }) => n)
+      const bosses = numbered.flatMap(({ f, n }) => {
+        const names = fightBosses(f).map((b) => b.name)
+        return names.length > 0 ? [`第 ${n} 场是首领场：${names.join('、')}`] : []
+      })
+      flow.text([elites.length > 0 ? `精英场还有第 ${elites.join('、')} 场` : '', ...bosses].filter(Boolean).join(' · '))
     } else {
       flow.text(`${def.name} · 已打 ${formatTime(snap?.seconds ?? 0)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`)
     }
@@ -509,7 +494,7 @@ export class PauseScene extends Phaser.Scene {
     }
 
     flow.heading('收获', '1fa99')
-    const combatMs = foughtMs(run) + (snap ? snap.seconds * 1000 : 0)
+    const combatMs = run.combatMs + (snap ? snap.seconds * 1000 : 0)
     flow.text(`金币 ${run.coins} · 击杀 ${run.kills}${run.stats.eliteKills > 0 ? `（精英 ${run.stats.eliteKills}）` : ''} · 战斗用时 ${formatTime(combatMs / 1000)}`)
     const hazards = keysOf(run.stats.hazardDamage).map((h) => `${HAZARD_NAMES[h]} ${formatBig(run.stats.hazardDamage[h] ?? 0)}`)
     if (hazards.length > 0) flow.text(`地形伤害：${hazards.join(' · ')}`, { color: 'warn' })
@@ -522,7 +507,7 @@ export class PauseScene extends Phaser.Scene {
         : picked
           ? `队伍 ${size} / ${TEAM.maxSize} 人 · 全队升级时可以招募新队员`
           : joinAt
-            ? `队伍 ${size} / ${TEAM.maxSize} 人 · ${joinAt.name ?? '下一场'}开打前招募新队员`
+            ? `队伍 ${size} / ${TEAM.maxSize} 人 · ${joinAt.name}开打前招募新队员`
             : `队伍 ${size} 人`,
     )
     if (picked) {

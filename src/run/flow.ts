@@ -1,6 +1,6 @@
 import { SceneKey } from '../scene/keys'
 import type { FightDef } from '../types/runs'
-import { fightMap, runDef, stepOf, stepsOf } from './state'
+import { runDef, stepOf, stepsOf } from './state'
 import type { RunState } from './state'
 
 /** 一步对应的页面 */
@@ -32,13 +32,13 @@ export function enterFight(run: RunState): FightDef {
     const s = steps[i]!
     if (s.kind !== 'fight') continue
     run.step = i
-    run.mapId = fightMap(run, s.fight)
+    run.mapId = s.fight.map
     return s.fight
   }
   throw new Error(`${runDef(run).name}已经没有战斗了`)
 }
 
-/** 这一局要打的各场，按先后；一直重复的只展开到眼下之后几轮 */
+/** 这一局要打的各场，按先后 */
 export function plannedFights(run: RunState): FightDef[] {
   return stepsOf(run).flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
 }
