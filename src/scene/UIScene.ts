@@ -431,7 +431,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     })
   }
 
-  /** 在紫水晶洞穴里打的一局：太阳月亮走到哪、离天黑或天亮还有多久，随时看得见 */
+  /** 在紫晶洞里打的一局：太阳月亮走到哪、离天黑或天亮还有多久，随时看得见 */
   private updateClock(c: HudSnapshot['clock']): void {
     if (!c) return
     this.sundial ??= new Sundial(this, viewport.logicalWidth - safeInsets.right - DIAL.right, safeInsets.top + DIAL.top, DIAL.radius)
@@ -445,7 +445,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.submarineDial.setSubmarine(b.phase, b.ratio, b.inSec, this.time.now)
   }
 
-  /** 在舞台剧里打的一局：离下一次换幕还有多久、正在换还是快要换了，随时看得见 */
+  /** 在舞台里打的一局：离下一次换幕还有多久、正在换还是快要换了，随时看得见 */
   private updateStage(b: HudSnapshot['stage']): void {
     if (!b) return
     this.stageDial ??= new StageDial(this, viewport.logicalWidth - safeInsets.right - DIAL.right, safeInsets.top + DIAL.top, DIAL.radius)

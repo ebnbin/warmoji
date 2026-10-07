@@ -41,11 +41,11 @@ export const SFX = {
   gurgle: { wave: 'noise', freq: 900, freqEnd: 260, duration: 0.7, volume: 0.32, attack: 0.01, decayPow: 1.2, steps: [1, 0.45, 1.2, 0.5, 1.1, 0.4, 1, 0.5], throttleMs: 900, jitter: 0.2 },
   sonar: { wave: 'sine', freq: 1180, freqEnd: 1150, duration: 1.8, volume: 0.18, attack: 0.003, decayPow: 2.6, throttleMs: 1500 },
   warp: { wave: 'sine', freq: 520, freqEnd: 1650, duration: 0.16, volume: 0.16, attack: 0.005, decayPow: 1.3, throttleMs: 90, jitter: 0.1 },
-  // 紫水晶洞穴：子弹敲在晶体上、晶体入夜遇冷的轻响
+  // 紫晶洞：子弹敲在晶体上、晶体入夜遇冷的轻响
   tink: { wave: 'sine', freq: 2900, freqEnd: 2760, duration: 0.42, volume: 0.07, attack: 0.002, decayPow: 2.4, steps: [1, 1.498], throttleMs: 90, jitter: 0.12 },
   hoist: { wave: 'noise', freq: 500, freqEnd: 1500, duration: 0.35, volume: 0.12, attack: 0.08, decayPow: 1.1, throttleMs: 90, jitter: 0.25 },
   land: { wave: 'noise', freq: 420, freqEnd: 110, duration: 0.18, volume: 0.28, attack: 0.003, decayPow: 1.7, throttleMs: 70, jitter: 0.25 },
-  // 跃迁：传送台充能越升越高的嗡鸣，整队被送走的那一下
+  // 出口：传送台充能越升越高的嗡鸣，整队被送走的那一下
   charge: { wave: 'sine', freq: 180, freqEnd: 760, duration: 1.4, volume: 0.13, attack: 1.1, decayPow: 0.5, throttleMs: 1200 },
   jump: { wave: 'sawtooth', freq: 140, freqEnd: 1500, duration: 0.42, volume: 0.17, attack: 0.008, decayPow: 1.3, throttleMs: 300 },
 } as const satisfies Record<string, SfxDef>

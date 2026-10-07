@@ -172,7 +172,7 @@ export interface Cut {
 }
 
 /**
- * 樱庭的边，本地坐标，格。寺墙在 a 小的一边，墙身中线几乎是直的：整条斜 skew（斜率）、过了 kinkAt 再拐 kink（斜率），从 b = from 砌到 b = to，两头伸进林子；
+ * 樱花的边，本地坐标，格。寺墙在 a 小的一边，墙身中线几乎是直的：整条斜 skew（斜率）、过了 kinkAt 再拐 kink（斜率），从 b = from 砌到 b = to，两头伸进林子；
  * 另外三面（b 小的 low、a 大的 far、b 大的 high）是樱林，林缘按噪声弯，再叠上几处林舌与草湾；溪穿过林缘的两处，林缘按石组与竹栅那条线走
  */
 export interface Edges {
@@ -337,7 +337,7 @@ export interface Terrain extends Heights {
 }
 
 /**
- * 按种子生成的樱庭，格与米：地图 w × h 格；本地坐标系与边（寺墙、樱林）、墙身的两段与院门；石组到石槛之间的主溪、石组以上与石槛以下伸出地图的两段；
+ * 按种子生成的樱花，格与米：地图 w × h 格；本地坐标系与边（寺墙、樱林）、墙身的两段与院门；石组到石槛之间的主溪、石组以上与石槛以下伸出地图的两段；
  * 上游的石组、下游的石槛与竹栅、木桥；从院门到桥头的路；樱花；地形、能走的地面（像素）、开局时队伍站的地方；画画用的种子
  */
 export interface SakuraPlan {
@@ -1174,7 +1174,7 @@ function terrainOf(cfg: SakuraConfig, k: Sketch, seed: number, x0: number, y0: n
 let last: { cfg: SakuraConfig; seed: number; plan: SakuraPlan } | null = null
 
 /**
- * 按种子生成樱庭：先定形状，粗量能走的面积，不在范围里就换一组随机数；形状定了再算地形与细的距离场。
+ * 按种子生成樱花：先定形状，粗量能走的面积，不在范围里就换一组随机数；形状定了再算地形与细的距离场。
  * 同一张图的视图与规则各要一次，记住最近一张
  */
 export function sakuraPlan(cfg: SakuraConfig, seed: number): SakuraPlan {
@@ -1193,5 +1193,5 @@ export function sakuraPlan(cfg: SakuraConfig, seed: number): SakuraPlan {
     last = { cfg, seed, plan }
     return plan
   }
-  throw new Error(`樱庭生成不出来：种子 ${seed}`)
+  throw new Error(`樱花生成不出来：种子 ${seed}`)
 }

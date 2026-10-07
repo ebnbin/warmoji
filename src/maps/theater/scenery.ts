@@ -354,7 +354,7 @@ function blades(ctx: Ctx, rng: Rng, n: number, w: number, h: number, ang: number
 
 /**
  * 春的第一个景：草甸。草色按噪声在青绿、浓绿、枯黄之间变，一片片野花各有一种花占大头；
- * 背着樱庭的那条台边是一道陡坡上去的上一层草甸：坡顶干黄发亮，坡面朝灯的亮、背灯的暗，坡脚一道洼下去的暗影
+ * 背着樱花的那条台边是一道陡坡上去的上一层草甸：坡顶干黄发亮，坡面朝灯的亮、背灯的暗，坡脚一道洼下去的暗影
  */
 const meadow: Painter = (ctx, w, h, rng, env) => {
   const seed = rng.int(0, 1 << 20)
@@ -365,7 +365,7 @@ const meadow: Painter = (ctx, w, h, rng, env) => {
     const c = mix(mix(base, [128, 186, 110, 1], smooth(0.45, 0.7, lush)), [214, 212, 150, 1], smooth(0.55, 0.75, dry) * 0.7)
     return c
   })
-  // 上一层草甸：挑一条离樱庭最远的台边
+  // 上一层草甸：挑一条离樱花最远的台边
   const sides = [
     { nx: -1, ny: 0, dist: (x: number) => x, len: h, at: (s: number, d: number): Pt => [d, s] },
     { nx: 1, ny: 0, dist: (x: number) => w - x, len: h, at: (s: number, d: number): Pt => [w - d, s] },
@@ -470,7 +470,7 @@ function sakuraPetal(ctx: Ctx, rng: Rng, x: number, y: number, s: number): void 
 }
 
 /**
- * 春的第二个景：樱庭。青灰的草上落满了花瓣：树冠底下厚厚一层铺成粉色的毯子，风把别处的花瓣吹成一溜溜的堆；
+ * 春的第二个景：樱花。青灰的草上落满了花瓣：树冠底下厚厚一层铺成粉色的毯子，风把别处的花瓣吹成一溜溜的堆；
  * 寺墙脚下一片耙过的白砂，一串踏脚石
  */
 const garden: Painter = (ctx, w, h, rng, env) => {
@@ -524,7 +524,7 @@ const garden: Painter = (ctx, w, h, rng, env) => {
 }
 
 /**
- * 春的接缝：一条小溪从草甸那边的台边流进来，过界的地方架一座红木桥，穿过樱庭从另一边的台边流出去；
+ * 春的接缝：一条小溪从草甸那边的台边流进来，过界的地方架一座红木桥，穿过樱花从另一边的台边流出去；
  * 上游从几块长青苔的大石头缝里涌进来，下游漫过一道低石槛，水面上漂着花瓣，石槛前堆了一层
  */
 const brook: Painter = (ctx, w, h, rng, env) => {
@@ -909,7 +909,7 @@ function glint(ctx: Ctx, x: number, y: number, s: number, color = '#ffffff'): vo
 }
 
 /**
- * 秋的第一个景：紫水晶洞的洞底（圈里）。紫色的晶砂，一块块深色的斑，一片片细小的晶皮；地上半埋着几个小晶洞，一圈玛瑙纹里朝心长着晶；
+ * 秋的第一个景：紫晶洞的洞底（圈里）。紫色的晶砂，一块块深色的斑，一片片细小的晶皮；地上半埋着几个小晶洞，一圈玛瑙纹里朝心长着晶；
  * 塌开的洞顶漏下一两束光，照到的地方亮白，碎晶散了一地闪着
  */
 const geode: Painter = (ctx, w, h, rng, env) => {

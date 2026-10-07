@@ -16,13 +16,13 @@ import { mapEvent } from '../../ecs/fight/events'
 import { torusDelta, wrapPoint } from '../../ecs/worlds/torus'
 import { alongWall, keepOut, roomAt } from '../basin'
 import { roomFor } from '../landmark'
-import { inBox, roomIndexAt, warpPlan } from './layout'
+import { inBox, roomIndexAt, exitPlan } from './layout'
 import { clearWalk, flowDir, flowTo, navDist, navGrid } from './nav'
 import type { NavField, NavGrid } from './nav'
-import type { Door, WarpPlan } from './layout'
+import type { Door, ExitPlan } from './layout'
 import type { Solid, Solids } from '../../ecs/worlds/solids'
 import type { Landmark } from '../landmark'
-import type { WarpConfig } from '../../types/maps'
+import type { ExitConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
@@ -104,8 +104,8 @@ export interface Tiles {
  * 每间舱室离队伍要过几道门（走不到为 −1）与该走哪扇门（steps 为 0 或走不到为 −1），按 routeRoom 那间算的；
  * 每扇门；寻路的底子、各扇门所在那间到门的步数场与到队长的步数场；地砖；画面要的送人与力场受击的记录
  */
-export interface WarpState {
-  readonly plan: WarpPlan
+export interface ExitState {
+  readonly plan: ExitPlan
   readonly solids: Solids
   readonly marks: Record<string, Landmark[]>
   teamRoom: number
@@ -133,17 +133,17 @@ export interface WarpState {
   locked: boolean
 }
 
-function cfgOf(sim: Sim): WarpConfig {
-  return MAPS[sim.mapId].warp!
+function cfgOf(sim: Sim): ExitConfig {
+  return MAPS[sim.mapId].exit!
 }
 
 /** 这一局的迷宫：视图要它画，规则要它定边界与门，两边按同一个种子各要一次 */
-export function warpPlanFor(cfg: WarpConfig, decorSeed: number): WarpPlan {
-  return warpPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
+export function exitPlanFor(cfg: ExitConfig, decorSeed: number): ExitPlan {
+  return exitPlan(cfg, (decorSeed ^ PLAN_SEED) >>> 0)
 }
 
 /** 地标：每间舱室的出怪板归到那间配方的名下；看守单独一组，跟着队伍换舱室；cabin 是每间舱室的入口，关卡拿它当到访的去处 */
-function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
+function marksOf(cfg: ExitConfig, plan: ExitPlan): Record<string, Landmark[]> {
   const out: Record<string, Landmark[]> = {}
   for (const name of cfg.recipes) out[name] = []
   for (const room of plan.rooms) {
@@ -156,11 +156,11 @@ function marksOf(cfg: WarpConfig, plan: WarpPlan): Record<string, Landmark[]> {
   return out
 }
 
-export function warpOf(sim: Sim): WarpState {
-  let s = sim.worldState.warp
+export function exitOf(sim: Sim): ExitState {
+  let s = sim.worldState.exit
   if (!s) {
     const cfg = cfgOf(sim)
-    const plan = warpPlanFor(cfg, sim.run.decorSeed)
+    const plan = exitPlanFor(cfg, sim.run.decorSeed)
     const b = plan.basin
     const grids = plan.basins.map(navGrid)
     const never = (): Float32Array => new Float32Array(FRAME_U * FRAME_U).fill(-1e9)
@@ -197,13 +197,13 @@ export function warpOf(sim: Sim): WarpState {
       locked: false,
     }
     route(s)
-    sim.worldState.warp = s
+    sim.worldState.exit = s
   }
   return s
 }
 
 /** 倒着从队伍那间往外数：每间舱室要过几道门才到队伍那里，第一道该走哪扇 */
-function route(s: WarpState): void {
+function route(s: ExitState): void {
   const { steps, via, plan } = s
   steps.fill(-1)
   via.fill(-1)
@@ -226,17 +226,17 @@ function route(s: WarpState): void {
 }
 
 /** (x, y) 像素落在哪间舱室 */
-function roomOf(s: WarpState, x: number, y: number): number {
+function roomOf(s: ExitState, x: number, y: number): number {
   return roomIndexAt(s.plan, x / UNIT, y / UNIT)
 }
 
 /** 身体中心落在这扇门的台面里 */
-function onDoor(cfg: WarpConfig, d: Door, x: number, y: number): boolean {
+function onDoor(cfg: ExitConfig, d: Door, x: number, y: number): boolean {
   return Math.hypot(x / UNIT - d.x, y / UNIT - d.y) <= cfg.pad.radiusU
 }
 
 /** 第 k 个送到的身体落在入口上哪（相对台心，格）：先排满台心与两圈，再往外随手撒 */
-function slot(sim: Sim, cfg: WarpConfig, k: number): Point {
+function slot(sim: Sim, cfg: ExitConfig, k: number): Point {
   let i = k
   for (const [r, n] of RINGS) {
     if (i < n) {
@@ -273,7 +273,7 @@ function teamCargo(sim: Sim): { bodies: number[]; things: number[] } {
   return { bodies, things }
 }
 
-function logFlight(s: WarpState, f: Flight): void {
+function logFlight(s: ExitState, f: Flight): void {
   s.flights.push(f)
   if (s.flights.length > FLIGHT_CAP) s.flights.splice(0, s.flights.length - FLIGHT_CAP)
 }
@@ -282,7 +282,7 @@ function logFlight(s: WarpState, f: Flight): void {
  * 这扇门发车：台上的敌人都送到它通往的那间的入口上；team 为真时是队长充满了能，整支队伍连同召唤物不论在舱室哪里一起走。
  * 身体没有实体地穿过虚空，落地时散在入口上；敌人落地后往台外涌
  */
-function depart(sim: Sim, s: WarpState, cfg: WarpConfig, door: Door, team: boolean): number {
+function depart(sim: Sim, s: ExitState, cfg: ExitConfig, door: Door, team: boolean): number {
   const to = s.plan.rooms[door.to]!
   const now = sim.elapsedMs
   const ms = cfg.pad.transitMs
@@ -332,7 +332,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, door: Door, team: boole
 }
 
 /** 送到的敌人到点往台外涌：从台心往外推，锚定的不推 */
-function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
+function spill(sim: Sim, s: ExitState, cfg: ExitConfig): void {
   const now = sim.elapsedMs
   for (let k = s.arrivals.length - 1; k >= 0; k--) {
     const a = s.arrivals[k]!
@@ -353,13 +353,13 @@ function spill(sim: Sim, s: WarpState, cfg: WarpConfig): void {
 }
 
 /** 队伍进了第 room 间：它排到亮着的舱室最前面，亮着的多出来的那间（最早走过的）熄掉 */
-function enter(s: WarpState, cfg: WarpConfig, room: number): void {
+function enter(s: ExitState, cfg: ExitConfig, room: number): void {
   if (s.trail[0] === room) return
   s.trail = [room, ...s.trail.filter((r) => r !== room)].slice(0, cfg.light.levels.length)
 }
 
 /** 门：队长站在队伍那间的一扇门上攒能、走开就漏，满了整队出发，门被锁住时不攒；每扇门到点发一趟车，暗着的舱室里的门不发 */
-function stepDoors(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void {
+function stepDoors(sim: Sim, s: ExitState, cfg: ExitConfig, delta: number): void {
   const now = sim.elapsedMs
   const lead = sim.leader
   const lx = Transform.x[lead]!
@@ -389,7 +389,7 @@ function stepDoors(sim: Sim, s: WarpState, cfg: WarpConfig, delta: number): void
 }
 
 /** 暗着的舱室里的敌人定在原地：静止一拍一拍地续着，那间亮回来就松开 */
-function stepDark(sim: Sim, s: WarpState): void {
+function stepDark(sim: Sim, s: ExitState): void {
   const until = sim.elapsedMs + HOLD_MARK_MS
   for (const e of query(sim.world, ENEMY_SET)) {
     if (!Alive.v[e] || inTransit(e) || live(s, roomOf(s, Transform.x[e]!, Transform.y[e]!))) continue
@@ -400,7 +400,7 @@ function stepDark(sim: Sim, s: WarpState): void {
 }
 
 /** 活着、脚沾地的身体踩亮脚下的瓷砖 */
-function stepTiles(sim: Sim, s: WarpState): void {
+function stepTiles(sim: Sim, s: ExitState): void {
   const now = sim.elapsedMs
   const t = s.tiles
   const mark = (eid: number, at: Float32Array, from: Float32Array): void => {
@@ -421,7 +421,7 @@ function stepTiles(sim: Sim, s: WarpState): void {
 }
 
 /** 到队长的步数场：队长换了一格或换了一间就重铺，最多隔 NAV_MS 铺一次 */
-function stepNav(sim: Sim, s: WarpState): void {
+function stepNav(sim: Sim, s: ExitState): void {
   const lead = leaderPoint(sim)
   const room = s.teamRoom
   const cell = Math.floor(lead.y / UNIT / 0.5) * 1000 + Math.floor(lead.x / UNIT / 0.5)
@@ -433,7 +433,7 @@ function stepNav(sim: Sim, s: WarpState): void {
 }
 
 /** 第 room 间里朝 (tx, ty) 走：近了、中间没挡着就直奔，否则顺着步数场 */
-function steer(s: WarpState, room: number, field: NavField | null, x: number, y: number, tx: number, ty: number, r: number): Point {
+function steer(s: ExitState, room: number, field: NavField | null, x: number, y: number, tx: number, ty: number, r: number): Point {
   const b = s.plan.basins[room]!
   const d = norm(tx - x, ty - y)
   if (Math.hypot(tx - x, ty - y) < DIRECT_U * UNIT && clearWalk(b, x, y, tx, ty, r)) return alongWall(b, x, y, d.x, d.y, r + 0.3 * UNIT)
@@ -443,7 +443,7 @@ function steer(s: WarpState, room: number, field: NavField | null, x: number, y:
 }
 
 /** 第 room 间的身体往通向队伍的那扇门去：到了台上就在台面里打转；没有门可走为 null */
-function towardDoor(s: WarpState, cfg: WarpConfig, room: number, eid: number, dx: number, dy: number): Point | null {
+function towardDoor(s: ExitState, cfg: ExitConfig, room: number, eid: number, dx: number, dy: number): Point | null {
   const k = s.via[room]!
   if (k < 0) return null
   const d = s.plan.doors[k]!
@@ -456,7 +456,7 @@ function towardDoor(s: WarpState, cfg: WarpConfig, room: number, eid: number, dx
 }
 
 /** 第 i 间里随手挑一处离壁至少 clear 像素的地方 */
-function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
+function randomIn(sim: Sim, s: ExitState, i: number, clear: number): Point {
   const r = s.plan.rooms[i]!
   const b = s.plan.basins[i]!
   let p: Point = { x: r.entry.x * UNIT, y: r.entry.y * UNIT }
@@ -468,7 +468,7 @@ function randomIn(sim: Sim, s: WarpState, i: number, clear: number): Point {
 }
 
 /** 这间舱室此刻亮着：队伍那间与刚走过的几间，只有它们出怪、里面的敌人会动 */
-function live(s: WarpState, room: number): boolean {
+function live(s: ExitState, room: number): boolean {
   return s.trail.includes(room)
 }
 
@@ -477,7 +477,7 @@ function live(s: WarpState, room: number): boolean {
  * 舱室之间只靠门来往：队长站上一扇门充满能，整支队伍连同召唤物从最近的那条路穿过虚空，落到它通往的那间的入口上；每扇门定期发车，台上的敌人一起送走。
  * 只有队伍那间与刚走过的几间亮着：敌人只在这几间出，这几间里的敌人顺着门一间间追过来；别的舱室暗着，敌人定在原地
  */
-export const warp: WorldHooks = {
+export const exit: WorldHooks = {
   ...bounded,
   /** 两点之间按方框平铺开以后最近的那一份算 */
   worldDelta(sim, fromX, fromY, toX, toY) {
@@ -488,19 +488,19 @@ export const warp: WorldHooks = {
     return wrapPoint({ x, y }, sim.mapW, sim.mapH)
   },
   constrainBody(sim, eid, from, next) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const room = s.crossing ? roomOf(s, next.x, next.y) : roomOf(s, from.x, from.y)
     return keepOut(s.plan.basins[room]!, next.x, next.y, Radius.v[eid]!)
   },
   basin(sim) {
-    return warpOf(sim).plan.basin
+    return exitOf(sim).plan.basin
   },
   ground(sim) {
-    return warpOf(sim).plan.basin
+    return exitOf(sim).plan.basin
   },
   /** 目标在别的舱室就先去通向队伍的那扇门；同一间里追向队伍按到队长的步数场绕开机柜与凹槽 */
   chaseDir(sim, eid, tx, ty) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const room = roomOf(s, x, y)
@@ -508,14 +508,14 @@ export const warp: WorldHooks = {
     return steer(s, room, room === s.navRoom ? s.toLeader : null, x, y, tx, ty, Radius.v[eid]!)
   },
   trace(sim, probe, ax, ay, bx, by) {
-    return solidsTrace(warpOf(sim).solids, probe, ax, ay, bx, by)
+    return solidsTrace(exitOf(sim).solids, probe, ax, ay, bx, by)
   },
   solidAt(sim, x, y) {
-    return solidOf(warpOf(sim).solids, x, y)
+    return solidOf(exitOf(sim).solids, x, y)
   },
   /** 亮着的别的舱室里，没事做的敌人往通向队伍的那扇门去 */
   wanderDir(sim, eid, dx, dy) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const room = roomOf(s, Transform.x[eid]!, Transform.y[eid]!)
     if (Faction.v[eid] === FACTION.enemy && room !== s.teamRoom && live(s, room)) {
       const d = towardDoor(s, cfgOf(sim), room, eid, dx, dy)
@@ -524,7 +524,7 @@ export const warp: WorldHooks = {
     return wanderIn(s.plan.basins[room]!, eid, dx, dy)
   },
   fleeDir(sim, eid, awayX, awayY) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = fleeSteer(x, y, awayX, awayY, sim.mapW, sim.mapH, 1.5 * UNIT)
@@ -537,7 +537,7 @@ export const warp: WorldHooks = {
   },
   /** 平常的敌人落在亮着的几间里，按各间的亮度分；出怪口再按种类挑那几间里配方接它的出怪板。头目落在队伍那间、离队长远的地方 */
   spawnPoint(sim, boss) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     if (!boss) {
       const levels = cfgOf(sim).light.levels
       let left = sim.rng.next() * s.trail.reduce((sum, _, k) => sum + levels[k]!, 0)
@@ -551,33 +551,33 @@ export const warp: WorldHooks = {
     return p
   },
   center(sim) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const c = s.plan.rooms[s.teamRoom]!.center
     return { x: c.x * UNIT, y: c.y * UNIT }
   },
   settle(sim, p) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     return keepOut(s.plan.basins[roomOf(s, p.x, p.y)]!, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
   /** 站得下、落在出怪的舱室里，也不贴着队长冒出来 */
   canSpawn(sim, x, y, radius) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const lead = leaderPoint(sim)
     return live(s, roomOf(s, x, y)) && roomFor(s.plan.basin, x, y, radius) && Math.hypot(x - lead.x, y - lead.y) >= cfgOf(sim).emitters.clearU * UNIT
   },
   landmarks(sim) {
-    return warpOf(sim).marks
+    return exitOf(sim).marks
   },
   /** 关卡锁住所有门：队长站上去也不攒能，队伍走不了；门照常发车，台上的敌人照样送走 */
   cue(sim, c) {
-    if (c === 'lock') warpOf(sim).locked = true
+    if (c === 'lock') exitOf(sim).locked = true
   },
   lean() {
     return ZERO
   },
   /** 走到队长的路：门一下就到，所以别的舱室里只算走到通向队伍的那扇门，之后每多过一道门折合 hopU 格 */
   toLeader(sim, x, y) {
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     const room = roomOf(s, x, y)
     if (room === s.teamRoom) {
       const lead = leaderPoint(sim)
@@ -590,16 +590,16 @@ export const warp: WorldHooks = {
   /** 打在力场上的弹体：力场在那里泛一圈涟漪 */
   impact(sim, x, y, material) {
     if (material !== 'field') return
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     s.impacts.push({ x, y, at: sim.elapsedMs })
     if (s.impacts.length > IMPACT_CAP) s.impacts.shift()
   },
   onStart(sim) {
-    warpOf(sim)
+    exitOf(sim)
   },
   tick(sim, delta) {
     const cfg = cfgOf(sim)
-    const s = warpOf(sim)
+    const s = exitOf(sim)
     stepDoors(sim, s, cfg, delta)
     stepDark(sim, s)
     spill(sim, s, cfg)

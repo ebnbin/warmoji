@@ -1030,7 +1030,7 @@ const STAGE_TITLE_MS = 4500
 /** 离换幕不到这么久，换幕盘闪着催人，毫秒 */
 const STAGE_WARN_MS = 3000
 
-/** 在舞台剧里打的一局：换幕的倒计时 */
+/** 在舞台里打的一局：换幕的倒计时 */
 function stageSnapshot(sim: Sim): StageSnapshot | null {
   const s = sim.worldState.theater
   if (!s) return null

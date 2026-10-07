@@ -630,7 +630,7 @@ function buildFloe(): BgmScore {
   )
 }
 
-/** 星云：利底亚调式的深空，正弦低音像引力一样慢慢拖着走，三角波长音铺底，钟声似的琶音带着长回声，底鼓像隔着很远的心跳 */
+/** 视界：利底亚调式的深空，正弦低音像引力一样慢慢拖着走，三角波长音铺底，钟声似的琶音带着长回声，底鼓像隔着很远的心跳 */
 function buildNebula(): BgmScore {
   const chords = [0, 0, 1, 1, 5, 5, 4, 3, 0, 0, 1, 1, 2, 4, 5, 0]
   return track(
@@ -675,7 +675,7 @@ function buildNebula(): BgmScore {
   )
 }
 
-/** 紫水晶洞穴：多利亚调式的三拍子，正弦波的琶音像晶体一串串地响，回声拖得长；三角波的长音慢慢唱，低音踏着根音与五音，高处偶尔一声清脆的晶鸣 */
+/** 紫晶洞：多利亚调式的三拍子，正弦波的琶音像晶体一串串地响，回声拖得长；三角波的长音慢慢唱，低音踏着根音与五音，高处偶尔一声清脆的晶鸣 */
 function buildAmethyst(): BgmScore {
   const chords = [0, 3, 0, 6, 5, 3, 4, 0, 0, 3, 0, 6, 2, 3, 4, 4]
   return track(
@@ -819,7 +819,7 @@ function buildDunes(): BgmScore {
   )
 }
 
-/** 樱庭：慢一点的阳音阶，筝拨着五声的分解和弦，尺八似的笛子吹着长音，隔两小节一声铃，鼓点轻得几乎听不见 */
+/** 樱花：慢一点的阳音阶，筝拨着五声的分解和弦，尺八似的笛子吹着长音，隔两小节一声铃，鼓点轻得几乎听不见 */
 function buildSakura(): BgmScore {
   const roots = [0, 3, 2, 1, 0, 3, 4, 2, 3, 2, 1, 0, 3, 4, 2, 0]
   const pluck = [0, 2, 3, 5, 3, 2, 5, 7]
@@ -959,7 +959,7 @@ function buildPetri(): BgmScore {
   )
 }
 
-/** 舞台剧：八音盒似的六八拍摇篮曲，大调；竖琴分解和弦一路拨着，钢片琴领奏、带着回声，低音管只踩每小节头，长笛在乐句里垫一口气，一小节换一个和弦 */
+/** 舞台：八音盒似的六八拍摇篮曲，大调；竖琴分解和弦一路拨着，钢片琴领奏、带着回声，低音管只踩每小节头，长笛在乐句里垫一口气，一小节换一个和弦 */
 function buildTheater(): BgmScore {
   const chords = [0, 0, 5, 3, 0, 4, 1, 4, 5, 5, 3, 0, 1, 4, 0, 0]
   return track(
@@ -1004,8 +1004,8 @@ function buildTheater(): BgmScore {
   )
 }
 
-/** 跃迁：多利亚调式的电子乐，八分音符的八度低音一路往前推；方波琶音一级级往上爬、到小节末尾冲上去，像充能；铺底带一点失谐，三角波的主旋律隔着回声在虚空里回荡 */
-function buildWarp(): BgmScore {
+/** 出口：多利亚调式的电子乐，八分音符的八度低音一路往前推；方波琶音一级级往上爬、到小节末尾冲上去，像充能；铺底带一点失谐，三角波的主旋律隔着回声在虚空里回荡 */
+function buildExit(): BgmScore {
   const chords = [0, 0, 3, 3, 4, 4, 2, 6, 0, 0, 3, 3, 5, 4, 6, 6]
   return track(
     {
@@ -1075,7 +1075,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   deep: buildDeep,
   petri: buildPetri,
   theater: buildTheater,
-  warp: buildWarp,
+  exit: buildExit,
 }
 
 const cache = new Map<BgmId, BgmScore>()

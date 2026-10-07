@@ -291,7 +291,7 @@ type Where = 'a' | 'b' | 'far' | 'mid' | 'any'
 type Item = { readonly n: readonly [number, number]; readonly specs: readonly Spec[]; readonly at: Where }
 
 /**
- * 四章：春是草甸流进樱庭，夏是沙漠走到深海，秋是台角的紫水晶洞通到外面落满红叶的残垣，冬是海岸一边的雪火山流下熔岩、淌进另一边漂着浮冰的冻海；
+ * 四章：春是草甸流进樱花，夏是沙漠走到深海，秋是台角的紫晶洞通到外面落满红叶的残垣，冬是海岸一边的雪火山流下熔岩、淌进另一边漂着浮冰的冻海；
  * 冬天的冰山、冰脊、雪堆离岸远一点，各自坐在一块浮冰上
  */
 const LAYOUTS: Record<ChapterKey, readonly Item[]> = {
@@ -574,7 +574,7 @@ export function actOf(cfg: TheaterConfig, stage: Stage, index: number): Act {
   const blend = blendOf(stage, chapter, new Rng(base ^ 0x3b1e9d))
   let pieces: Piece[] | null = null
   for (let t = 0; t < PAGE_TRIES && !pieces; t++) pieces = arrange(cfg, stage, chapter, blend, (base + Math.imul(t, 0x632be5ab)) >>> 0, index === 0)
-  if (!pieces) throw new Error(`舞台剧第 ${index} 幕摆不下 ${cfg.pieces[0]} 件布景`)
+  if (!pieces) throw new Error(`舞台第 ${index} 幕摆不下 ${cfg.pieces[0]} 件布景`)
   // 远的先摆在后面：画的时候按底边从屏幕里往外排
   const ordered = [...pieces].sort((p, q) => p.y - q.y)
   return { index, chapter, seed: base, blend, pieces: ordered }

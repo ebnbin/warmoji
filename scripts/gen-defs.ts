@@ -48,7 +48,7 @@ import { deepPlan } from '../src/maps/deep/layout.ts'
 import { fits, homePose, hullOf, innerOf, rimOf } from '../src/maps/deep/sub.ts'
 import { diffusionU, frontWidthU, petriPlan } from '../src/maps/petri/model.ts'
 import { CARD_U, clockAt, makeStage, actOf, slabGap, slabOf, slabSd } from '../src/maps/theater/model.ts'
-import { COLS, splits, stacks, warpPlan } from '../src/maps/warp/layout.ts'
+import { COLS, splits, stacks, exitPlan } from '../src/maps/exit/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { BOX_MAPS } from '../src/data/boxMaps.ts'
@@ -252,13 +252,13 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 紫水晶洞穴：参数说得通；主晶洞与它上方的塌顶落得进地图，出生点在主晶洞里；挡路的晶体挡得住平射与视线，矮晶丛与地上的晶洞矮得标准身体跨得过去；
+ * 紫晶洞：参数说得通；主晶洞与它上方的塌顶落得进地图，出生点在主晶洞里；挡路的晶体挡得住平射与视线，矮晶丛与地上的晶洞矮得标准身体跨得过去；
  * 太阳每天升过、落过晨昏的高度；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍。抽一批种子真的生成一遍、按正午与午夜算一遍光：
  * 暗道挖得够、出生点四周空得开；正午洞厅亮得看得清整个洞、塌顶下亮得熄得了火把，暗道尽头暗得出得了怪；没有月亮的午夜洞厅暗得出得了怪
  */
 const DEG = Math.PI / 180
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'amethyst') === (m.amethyst !== undefined), `maps.${id} 是紫水晶洞穴当且仅当写了 amethyst`)
+  need((m.kind === 'amethyst') === (m.amethyst !== undefined), `maps.${id} 是紫晶洞当且仅当写了 amethyst`)
   const a = m.amethyst
   if (!a) continue
   const at = `maps.${id}.amethyst`
@@ -448,11 +448,11 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 樱庭：参数说得通；槛下的溪比槛顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
+ * 樱花：参数说得通；槛下的溪比槛顶低过汇的深度；抽一批种子真的生成一遍：每张都生成得出来，
  * 开局站位离边够远，桥两头落在能走的地方，石槛顶没有塌下去的缺口
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'sakura') === (m.sakura !== undefined), `maps.${id} 是樱庭当且仅当写了 sakura`)
+  need((m.kind === 'sakura') === (m.sakura !== undefined), `maps.${id} 是樱花当且仅当写了 sakura`)
   const s = m.sakura
   if (!s) continue
   const at = `maps.${id}.sakura`
@@ -536,12 +536,12 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 舞台剧：台面连四周的台板放得进安全区，台中空得出出生点；换幕的各段时长为正；
+ * 舞台：台面连四周的台板放得进安全区，台中空得出出生点；换幕的各段时长为正；
  * 矮布景挡得住标准身体、子弹从上面飞过、头目跨得过，高布景挡得住视线与平射；路宽过得去最大的小怪与头目，台边与布景之间也过得去；
  * 抽一批种子把四章都摆一遍：件数在范围里，都落在半边台上、不压台中线，别组之间留够路，开局那一幕不压着出生的空地，换页的钟按段走
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'theater') === (m.theater !== undefined), `maps.${id} 是舞台剧当且仅当写了 theater`)
+  need((m.kind === 'theater') === (m.theater !== undefined), `maps.${id} 是舞台当且仅当写了 theater`)
   const c = m.theater
   if (!c) continue
   const at = `maps.${id}.theater`
@@ -598,17 +598,17 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 跃迁：舱室的格切得出来、要的每种间数都搭得出来、能走的方块落在整格上，最小的舱室也放得下入口与三扇门、开局那间放得下开局的空地；
+ * 出口：舱室的格切得出来、要的每种间数都搭得出来、能走的方块落在整格上，最小的舱室也放得下入口与三扇门、开局那间放得下开局的空地；
  * 每间至少五间，门才都往前跳得开；门与入口站得下队长和跟在身后的队员、不压着墙角的出怪板，充能、发车的时长说得通；
  * 亮着的几间从全亮往下排、都比暗着的亮；四种配方各是一种摆在地标上的出怪口，地标上的出怪口只有配方与看守；
  * 抽一批种子真的生成一遍：间数在要的范围里，分到的格正好铺满方框；开局站位四周空着；每间舱室的入口、门与出怪板都落在那间能走的地方上、台子互不相压，各有会亮的瓷砖；
  * 每间两三扇门、不通回自己、不重复、没有两间互相通着；顺着出口走恰好走遍所有舱室绕回原处；四季都分到了舱室
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'warp') === (m.warp !== undefined), `maps.${id} 是跃迁当且仅当写了 warp`)
-  const c = m.warp
+  need((m.kind === 'exit') === (m.exit !== undefined), `maps.${id} 是出口当且仅当写了 exit`)
+  const c = m.exit
   if (!c) continue
-  const at = `maps.${id}.warp`
+  const at = `maps.${id}.exit`
   const { maze: z, pad, racks: rk, emitters: em, light: li } = c
   const edge = z.gapU + z.lipU
   need(z.gapU > 0 && z.lipU > 0 && Number.isInteger(edge) && c.neckU > 0, `${at}.maze 的缝宽、台沿须为正、加起来是整格，窄缝须为正`)
@@ -637,7 +637,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(g?.boss === 'warden' && g.kinds.warden?.at.kind === 'mark', `${at} 的头目须从看守（地标上的出怪口 warden）出来`)
   for (const [k, d] of Object.entries(g?.kinds ?? {})) need(d.at.kind !== 'mark' || k === 'warden' || c.recipes.includes(k), `${at} 地标上的出怪口 ${k} 既不是配方也不是看守`)
   for (let s = 0; s < 24; s++) {
-    const plan = warpPlan(c, s * 7919 + 13)
+    const plan = exitPlan(c, s * 7919 + 13)
     const where = `${at} 第 ${s} 个样本`
     const n = plan.rooms.length
     need((n >= z.rooms[0] && n <= z.rooms[1]) || (n >= z.few[0] && n <= z.few[1]), `${where} 切出了 ${n} 间`)
@@ -777,12 +777,12 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
 }
 
 /**
- * 星云：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点（球心）够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来，
+ * 视界：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点（球心）够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来，
  * 走得最深也落在方框安全区的内切圆里；
  * 爱因斯坦环落在一般角色走不出来的半径上；最慢的敌人也有刷怪的地方
  */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是星云当且仅当写了 nebula`)
+  need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是视界当且仅当写了 nebula`)
   const n = m.nebula
   if (!n) continue
   const { shell, contain, hole, swallow, accretion, disk, meteor } = n

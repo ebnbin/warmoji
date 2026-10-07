@@ -47,7 +47,7 @@ import type { RuinsState } from '../../maps/ruins/world'
 import type { DeepState } from '../../maps/deep/world'
 import type { PetriState } from '../../maps/petri/world'
 import type { TheaterState } from '../../maps/theater/world'
-import type { WarpState } from '../../maps/warp/world'
+import type { ExitState } from '../../maps/exit/world'
 import type { MapCue, MapGauge } from '../../data/signals'
 
 export const ZERO: Point = { x: 0, y: 0 }
@@ -102,12 +102,12 @@ export interface WorldState {
   deep: DeepState | null
   petri: PetriState | null
   theater: TheaterState | null
-  warp: WarpState | null
+  exit: ExitState | null
   gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ruins: null, nebula: null, floe: null, amethyst: null, desert: null, meadow: null, sakura: null, deep: null, petri: null, theater: null, warp: null, gates: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ruins: null, nebula: null, floe: null, amethyst: null, desert: null, meadow: null, sakura: null, deep: null, petri: null, theater: null, exit: null, gates: null }
 }
 
 const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}

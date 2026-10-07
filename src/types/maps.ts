@@ -103,7 +103,7 @@ export interface NebulaOldConfig {
   }
 }
 /**
- * 星云：深空里一团空心的星云，活动的平面是它的赤道面，空腔里有一个黑洞。人、怪、掉落物、子弹与流星都受黑洞与星云壳层的万有引力：
+ * 视界：深空里一团空心的星云，活动的平面是它的赤道面，空腔里有一个黑洞。人、怪、掉落物、子弹与流星都受黑洞与星云壳层的万有引力：
  * 身体在星云气体里按终速被拖着漂，子弹、冲刺与流星按弹道飞；中心进了视界就被吞掉，吞下的质量让黑洞长大。这里没有太阳，光来自吸积盘与流星
  */
 export interface NebulaConfig {
@@ -369,7 +369,7 @@ export interface FloeConfig {
   readonly coldTickMs: number
 }
 /**
- * 紫水晶洞穴：玄武岩里几个晶洞连成的洞厅，洞壁长满紫水晶。阳光、天光、月光从塌开的洞顶与顶缝照进来，随真实的太阳与月亮移动；入夜后队员点起火把。
+ * 紫晶洞：玄武岩里几个晶洞连成的洞厅，洞壁长满紫水晶。阳光、天光、月光从塌开的洞顶与顶缝照进来，随真实的太阳与月亮移动；入夜后队员点起火把。
  * 光照按勒克斯算，一格 1 米；镜头短边看到多少格由洞里的亮度决定；怪物只从暗处出来；洞壁、晶簇与巨晶挡人也挡子弹
  */
 export interface AmethystConfig {
@@ -537,7 +537,7 @@ export interface WadeConfig {
   readonly wetM: number
 }
 /**
- * 樱庭：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘上的樱花一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
+ * 樱花：寺院外溪边的一片樱林空地。一面是寺院的瓦顶土墙，另外三面是樱林，林缘上的樱花一棵挨一棵；一条斜着的溪从一面林缘流进来、从另一面林缘流出去，
  * 上游横着一排石组，下游漫过一道低石槛，槛上立着竹栅：水过得去，身体与掉落物过不去，漂到下游的就堵在竹栅前。溪的水流是浅水方程在溪床上的稳态解，溪上架着一座木桥；
  * 寺墙、林缘的走向，溪的走向与位置都由种子定。物理量按米、千克、秒算，一格 meterPerU 米
  */
@@ -995,7 +995,7 @@ export interface PetriConfig {
   }
 }
 /**
- * 舞台剧：一座剧场的舞台，台面就是战场：台口一排脚灯，台下是乐池与观众席，两边红丝绒大幕，顶上帷幔，台后挂着画好的天幕。
+ * 舞台：一座剧场的舞台，台面就是战场：台口一排脚灯，台下是乐池与观众席，两边红丝绒大幕，顶上帷幔，台后挂着画好的天幕。
  * 台上铺着画好的地布，画的都能走；台上立着布景片，挡人，高的也挡子弹和视线。隔一阵换一幕：台上暗下来，每个角色头上一束发白的追光，角色被吊绳吊起，旧布景依次吊上去，
  * 地布与天幕连同地上的敌人、金币从右往左推成新的一幅，推进大幕的退场，新布景依次吊下来，角色原地放下。一幕是故事的一章，按故事的次序轮下去
  */
@@ -1029,8 +1029,8 @@ export interface TheaterConfig {
   readonly reflowMs: number
 }
 /** 舱室里面摆成什么样：空的、立着几排机柜、正中一口凹槽 */
-export type WarpShape = 'hall' | 'racks' | 'pit'
-export interface WarpConfig {
+export type ExitShape = 'hall' | 'racks' | 'pit'
+export interface ExitConfig {
   /**
    * 迷宫：舱室分到的格铺满整个方框。方框先竖着切成三列，列宽在 colU 以内；每列再横着切成 rows 里的某一种：n 间、每间高在 u 以内。
    * 一般一共切出 rooms 间，有 fewP 的机会只切 few 间、每间更大。
@@ -1159,7 +1159,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'floe' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'deep' | 'petri' | 'theater' | 'warp'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'oldRuins' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'floe' | 'amethyst' | 'desert' | 'meadow' | 'sakura' | 'deep' | 'petri' | 'theater' | 'exit'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -1189,7 +1189,7 @@ export interface MapDef {
   readonly deep?: DeepConfig
   readonly petri?: PetriConfig
   readonly theater?: TheaterConfig
-  readonly warp?: WarpConfig
+  readonly exit?: ExitConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
