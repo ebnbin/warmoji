@@ -414,6 +414,7 @@ export function runChecks(cat: RunCatalog): RunChecks {
     need(r.team !== undefined || steps.slice(0, first).some((s) => s.kind === 'recruit'), ['team'], '没有预设队伍，第一场战斗之前须有招募')
     need(r.map === undefined || cat.maps[r.map] !== undefined, [], `引用了不存在的地图：${r.map}`)
     need(r.map === undefined || fights.every((f) => f.map === undefined), [], '固定了地图，各场就不能再换地图')
+    need(r.chapter === undefined || (cat.maps[r.chapter] !== undefined && fights.every((f) => f.map === r.chapter)), [], `冒险的一章各场都要打在 ${r.chapter} 上`)
     const clocked = fights.map((f) => f.clockSec !== undefined)
     need(clocked.every((c) => c === clocked[0]), [], '难度时钟要么每场都定，要么都不定')
     need(r.start === undefined || (r.start.wave >= 1 && r.start.sec >= 0), [], '开局进度须从第 1 波、第 0 秒起')

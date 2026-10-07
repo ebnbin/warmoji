@@ -344,7 +344,8 @@ export interface TeamDef {
 
 /**
  * 一局的玩法：按顺序走完这些步骤就赢，全灭就输；步骤里可以有按轮重复的一段，一直重复的一局走不完，打到全灭为止。
- * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；teamLevel 让队员靠全队升级成长；curve 是这一局的难度曲线，不写按默认的；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件。
+ * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；teamLevel 让队员靠全队升级成长；curve 是这一局的难度曲线，不写按默认的；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件；
+ * chapter 写了，这一局就是冒险里这张图的那一章：各场都打在这张图上，每逛完一次商店，下一场就在同一主题上按新种子重新生成地图。
  */
 export interface RunDef {
   readonly emoji: string
@@ -352,6 +353,7 @@ export interface RunDef {
   readonly desc: string
   readonly note?: string
   readonly map?: MapId
+  readonly chapter?: MapId
   readonly team?: 'knobs' | TeamDef
   readonly rules?: RunRules
   readonly teamLevel?: TeamLevelDef

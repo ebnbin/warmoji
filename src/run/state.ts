@@ -114,6 +114,11 @@ export function restartRun(run: RunState): RunState {
   return openRun(run.def, { runId: run.runId, mapId: run.homeMap, mutators: run.mutators, origin: run.origin })
 }
 
+/** 新的布景种子：地图的布局、地面装饰与出怪口都按它生成 */
+function newSeed(): number {
+  return (Math.random() * 0xffffffff) >>> 0
+}
+
 /** 开一局：地图固定的不看选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
 function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mapId?: MapId; readonly mutators?: readonly MutatorId[]; readonly origin?: SceneKey }): RunState {
   const home = def.map ?? opts.mapId ?? MAP_IDS[0]!
@@ -124,7 +129,7 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mapId?: M
     step: 0,
     mapId: home,
     homeMap: home,
-    decorSeed: (Math.random() * 0xffffffff) >>> 0,
+    decorSeed: newSeed(),
     wave: def.start?.wave ?? 1,
     coins: def.coins ?? 0,
     kills: 0,
@@ -218,8 +223,9 @@ export function skipFilled(run: RunState): void {
   syncMap(run)
 }
 
-/** 当前这一步做完了，走到下一个要做的步骤 */
+/** 当前这一步做完了，走到下一个要做的步骤；冒险的一章逛完商店，下一场换一张新生成的地图 */
 export function nextStep(run: RunState): void {
+  if (runDef(run).chapter !== undefined && stepOf(run)?.kind === 'shop') run.decorSeed = newSeed()
   run.step++
   skipFilled(run)
 }
