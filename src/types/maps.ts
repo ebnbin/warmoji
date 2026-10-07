@@ -1079,9 +1079,9 @@ export interface WarpConfig {
   readonly hopU: number
   /**
    * 灯：队伍所在那间与刚走过的几间亮着，亮度依次是 levels（第一项是队伍那间），只有这几间出怪（按亮度分），里面的敌人照常动、顺着门追向队伍；
-   * 别的舱室暗到 darkest，敌人定在原地。从全暗到全亮要 wakeMs，从全亮到全暗要 dimMs
+   * 别的舱室全黑，只隐约看得见地上的瓷砖，敌人定在原地。从全暗到全亮要 wakeMs，从全亮到全暗要 dimMs
    */
-  readonly light: { readonly levels: readonly number[]; readonly darkest: number; readonly wakeMs: number; readonly dimMs: number }
+  readonly light: { readonly levels: readonly number[]; readonly wakeMs: number; readonly dimMs: number }
   /** 地砖被队伍、敌人踩亮以后按各自的时间常数暗下去，毫秒 */
   readonly tiles: { readonly teamFadeMs: number; readonly foeFadeMs: number }
 }

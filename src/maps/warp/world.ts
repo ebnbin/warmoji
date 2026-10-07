@@ -98,7 +98,7 @@ export interface Tiles {
 }
 
 /**
- * 迷宫此刻：按种子定下的迷宫，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间、每间到过几次、上一次哪一刻从哪扇门到的；
+ * 迷宫此刻：按种子定下的迷宫，挡弹体与视线的力场，出怪的地标；队伍此刻在哪间、上一次到的那一刻；
  * 亮着的舱室：队伍那间在前，接着是刚走过的几间，最多 cfg.light.levels 那么多间；
  * 每间舱室离队伍要过几道门（走不到为 −1）与该走哪扇门（steps 为 0 或走不到为 −1），按 routeRoom 那间算的；
  * 每扇门；寻路的底子、各扇门所在那间到门的步数场与到队长的步数场；地砖；画面要的送人与力场受击的记录
@@ -108,9 +108,7 @@ export interface WarpState {
   readonly solids: Solids
   readonly marks: Record<string, Landmark[]>
   teamRoom: number
-  readonly visits: number[]
   arrivedAt: number
-  arrivedVia: number
   trail: number[]
   readonly steps: Int16Array
   readonly via: Int16Array
@@ -168,9 +166,7 @@ export function warpOf(sim: Sim): WarpState {
       solids: makeSolids((x, y) => (plan.rooms.some((r) => inBox(r.floor, x / UNIT, y / UNIT)) ? null : FIELD), b.x0, b.y0, b.cols, b.rows, b.cell),
       marks: marksOf(cfg, plan),
       teamRoom: plan.start,
-      visits: plan.rooms.map((_, i) => (i === plan.start ? 1 : 0)),
       arrivedAt: 0,
-      arrivedVia: -1,
       trail: [plan.start],
       steps: new Int16Array(n),
       via: new Int16Array(n),
@@ -315,9 +311,7 @@ function depart(sim: Sim, s: WarpState, cfg: WarpConfig, door: Door, team: boole
     }
     s.teamRoom = to.index
     enter(s, cfg, to.index)
-    s.visits[to.index]!++
     s.arrivedAt = now + ms
-    s.arrivedVia = door.index
     s.doors[door.index]!.jumpedAt = now
     s.jumps++
   }

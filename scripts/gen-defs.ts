@@ -626,7 +626,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(Number.isInteger(em.plateU) && em.plateU >= 1 && em.markU > 0 && em.clearU >= 0, `${at}.emitters 的板长须是正整数，凝成形的半径为正`)
   need(c.jar.sizeU > 0 && c.jar.sizeU + 0.3 < Math.min(pad.cornerU, tight / 2) - pad.radiusU, `${at}.jar 的标本罐须为正、不压着门`)
   need(c.hopU > 0, `${at} 过一道门折合的路程须为正`)
-  need(li.levels.length >= 1 && li.levels[0] === 1 && li.darkest >= 0 && li.levels.every((v, k) => v > li.darkest && v <= (k === 0 ? 1 : li.levels[k - 1]!)) && li.wakeMs > 0 && li.dimMs > 0, `${at}.light 的亮度须从全亮往下排、都比暗着的亮，亮起来、暗下去的时间须为正`)
+  need(li.levels.length >= 1 && li.levels[0] === 1 && li.levels.every((v, k) => v > 0 && v <= (k === 0 ? 1 : li.levels[k - 1]!)) && li.wakeMs > 0 && li.dimMs > 0, `${at}.light 的亮度须从全亮往下排、都不是全黑，亮起来、暗下去的时间须为正`)
   need(c.tiles.teamFadeMs > 0 && c.tiles.foeFadeMs > 0, `${at}.tiles 的暗下去的时间须为正`)
   const g = m.gates
   need(new Set(c.recipes).size === 4 && c.recipes.every((k) => g?.kinds[k]?.at.kind === 'mark'), `${at}.recipes 须是四种不同的、摆在地标上的出怪口`)

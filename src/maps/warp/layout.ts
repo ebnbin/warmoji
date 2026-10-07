@@ -35,7 +35,10 @@ export interface Plate {
   readonly y: number
 }
 
-/** 一扇门，格：全图第 index 扇，在第 room 间舱室、靠第 wall 面墙（0 上 1 右 2 下 3 左），台心与朝屋里的方向；通往第 to 间舱室的入口；exit 为真是标着「出口」的那扇 */
+/**
+ * 一扇门，格：全图第 index 扇，在第 room 间舱室、靠第 wall 面墙（0 上 1 右 2 下 3 左），台心与朝屋里的方向；通往第 to 间舱室的入口；exit 为真是标着「出口」的那扇；
+ * (fx, fy) 是从台心穿过虚空飞往那个入口的方向（单位向量，按方框四边首尾相接时最近的那条路）
+ */
 export interface Door {
   readonly index: number
   readonly room: number
@@ -46,6 +49,8 @@ export interface Door {
   readonly ny: number
   readonly to: number
   readonly exit: boolean
+  readonly fx: number
+  readonly fy: number
 }
 
 /** 墙边一处圆台：台心、靠哪面墙、朝屋里的方向 */
@@ -178,6 +183,36 @@ function wallSpot(cfg: WarpConfig, f: Box, wall: number, off: number): Spot {
   return { wall, x: f.x0 + d, y: my, nx: 1, ny: 0 }
 }
 
+/** 第 wall 面墙朝外的方向 */
+const OUTWARD: readonly Point[] = [
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 },
+]
+
+/** 方框四边首尾相接时从 a 到 b 最近的那条路的方向（单位向量） */
+function heading(a: Point, b: Point): Point {
+  const dx = b.x - a.x - FRAME_U * Math.round((b.x - a.x) / FRAME_U)
+  const dy = b.y - a.y - FRAME_U * Math.round((b.y - a.y) / FRAME_U)
+  const len = Math.hypot(dx, dy) || 1
+  return { x: dx / len, y: dy / len }
+}
+
+/** 一间舱室的门各靠哪面墙：每扇门挑最朝它要去的方向的那面，被占了就挑次好的；入口在剩下的墙里随手挑。dirs 是每扇门要去的方向 */
+function sidesFor(rng: Rng, dirs: readonly Point[]): { entry: number; doors: number[] } {
+  const pairs = dirs.flatMap((d, k) => OUTWARD.map((o, w) => ({ k, w, score: o.x * d.x + o.y * d.y }))).sort((a, b) => b.score - a.score)
+  const doors = dirs.map(() => -1)
+  const used = new Set<number>()
+  for (const p of pairs) {
+    if (doors[p.k]! >= 0 || used.has(p.w)) continue
+    doors[p.k] = p.w
+    used.add(p.w)
+  }
+  const free = [0, 1, 2, 3].filter((w) => !used.has(w))
+  return { entry: free[Math.floor(rng.next() * free.length)]!, doors }
+}
+
 /** 第 wall 面墙有多长 */
 function wallLen(f: Box, wall: number): number {
   return wall % 2 === 0 ? f.x1 - f.x0 : f.y1 - f.y0
@@ -222,7 +257,7 @@ function openIn(room: Pick<Chamber, 'floor' | 'racks' | 'pit' | 'jar'>, x: numbe
 
 /**
  * 按种子摆一座迷宫：切格；按象限分四季，每季一种配方、两件东西轮着装进标本罐；门牌号打乱；
- * 连线（见 wire）；每间舱室的入口与门各占一面墙，两个空角放出怪板，剩下的一角立标本罐；最大的那间做开局的空舱，其余按大小挑样子。
+ * 连线（见 wire）；每间舱室的入口与门各占一面墙，门开在最朝它要去的那间的那面墙上，两个空角放出怪板，剩下的一角立标本罐；最大的那间做开局的空舱，其余按大小挑样子。
  * 能走的地面每间各算一遍距离场，取最大合成一张
  */
 export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
@@ -244,21 +279,25 @@ export function warpPlan(cfg: WarpConfig, seed: number): WarpPlan {
     if (span(f) > span(floors[start]!)) start = i
   })
   const turns = [0, 0, 0, 0]
+  const centers = floors.map((f) => ({ x: (f.x0 + f.x1) / 2, y: (f.y0 + f.y1) / 2 }))
+  // 门开在最朝它要去的那间的墙上，在墙上也往那边偏；入口先都摆好，门才算得出飞往入口的方向
+  const sides = out.map((to, i) => sidesFor(rng, to.map((t) => heading(centers[i]!, centers[t]!))))
+  const room = (f: Box, wall: number): number => Math.max(0, wallLen(f, wall) / 2 - cfg.pad.cornerU)
+  const entries = sides.map((sd, i) => wallSpot(cfg, floors[i]!, sd.entry, (rng.next() * 2 - 1) * room(floors[i]!, sd.entry)))
   const doors: Door[] = []
   const rooms: Chamber[] = boxes.map((cell, i) => {
     const floor = floors[i]!
-    const center = { x: (floor.x0 + floor.x1) / 2, y: (floor.y0 + floor.y1) / 2 }
+    const center = centers[i]!
     const season = seasonOf[(center.x < MID ? 0 : 1) + (center.y < MID ? 0 : 2)]!
     const token = TOKENS[season]![(turns[season]!++ + (seed & 1)) % 2]!
-    const walls = shuffled(rng, [0, 1, 2, 3])
-    const spot = (wall: number): Spot => {
-      const room = Math.max(0, wallLen(floor, wall) / 2 - cfg.pad.cornerU)
-      return wallSpot(cfg, floor, wall, (rng.next() * 2 - 1) * room)
-    }
-    const entry = spot(walls[0]!)
+    const entry = entries[i]!
     const mine = out[i]!.map((to, k): Door => {
-      const s = spot(walls[k + 1]!)
-      return { index: doors.length + k, room: i, wall: s.wall, x: s.x, y: s.y, nx: s.nx, ny: s.ny, to, exit: k === 0 }
+      const wall = sides[i]!.doors[k]!
+      const d = heading(center, centers[to]!)
+      const along = wall % 2 === 0 ? d.x : d.y
+      const s = wallSpot(cfg, floor, wall, Math.max(-1, Math.min(1, along * 1.6)) * room(floor, wall))
+      const f = heading(s, entries[to]!)
+      return { index: doors.length + k, room: i, wall: s.wall, x: s.x, y: s.y, nx: s.nx, ny: s.ny, to, exit: k === 0, fx: f.x, fy: f.y }
     })
     doors.push(...mine)
     const pads: Point[] = [entry, ...mine]
