@@ -46,9 +46,8 @@ function effectTraits(list: readonly Effect[] | undefined, out: Set<Trait>): boo
       case 'heal':
         out.add('heal')
         break
-      case 'spawn':
-      case 'clone':
-        out.add('summon')
+      case 'summon':
+        if (fx.of !== 'victim') out.add('summon')
         break
       default:
         break

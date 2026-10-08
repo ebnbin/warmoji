@@ -1,13 +1,14 @@
 import { INITIAL_CAPACITY } from './world'
 import type { BodyRules, EnemyDef, NpcDef, ResourceDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
-import type { AbilityDef, Cond, Effect } from '../types/abilityDefs'
+import type { AbilityDef, Cond, Effect, Split } from '../types/abilityDefs'
 import type { Source } from './utils/source'
 import type { StatBase, StatLayer, StatMods } from '../types/stats'
 import type { Loot } from '../types/runs'
 import type { CallSpec, FoeSpec } from './fight/state'
 import type { SpawnTraits } from './entities/telegraph'
 import type { Entry } from './worlds/gates'
+import type { BoltSpec } from './entities/projectile'
 
 const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
 
@@ -72,6 +73,12 @@ export const emplaceAbility = slots<AbilityDef>()
 
 /** 弹体出膛时记下的来源：归因与倍率跟着弹体走 */
 export const projSrc = slots<Source>()
+
+/** 能力射出的弹体怎么分裂，不裂的没有 */
+export const boltSplit = slots<Split>()
+
+/** 会分裂的弹体：裂开时照着自己的规格再射几发 */
+export const projSplit = slots<{ readonly spec: BoltSpec; readonly split: Split }>()
 
 export const poisonSrc = slots<Source>()
 

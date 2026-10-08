@@ -1,5 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { Linger, Proj, PROJ_SET, Transform, Vel } from '../components'
+import { projSplit } from '../store'
+import { splitBolt } from '../entities/projectile'
 import { cullProjectile } from './shared/projectile'
 import type { Sim } from '../sim'
 
@@ -14,7 +16,7 @@ function settle(sim: Sim, eid: number): boolean {
   return true
 }
 
-/** 弹体到寿命（撞上障碍的当场到寿命）、飞出世界就消失（会落地的先躺一阵），敌我同一条；镜头看不看得到与射程无关 */
+/** 弹体到寿命（撞上障碍的当场到寿命）、飞出世界就消失（会落地的先躺一阵，会分裂的到寿命时先裂开），敌我同一条；镜头看不看得到与射程无关 */
 export function cullProjectiles(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of [...query(sim.world, PROJ_SET)]) {
@@ -22,6 +24,7 @@ export function cullProjectiles(sim: Sim): void {
     const y = Transform.y[eid]!
     if (now >= Proj.dieAt[eid]! || sim.hooks.outside(sim, x, y)) {
       if (now >= Proj.dieAt[eid]! && settle(sim, eid)) continue
+      if (projSplit[eid] && !sim.hooks.outside(sim, x, y)) splitBolt(sim, eid)
       cullProjectile(sim, eid)
     }
   }

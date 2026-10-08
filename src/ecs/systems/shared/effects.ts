@@ -26,6 +26,8 @@ import { spawnCoins } from '../../entities/pickup'
 import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
+import { fireAbility } from './fire'
+import { grantedAbility } from '../../entities/ability'
 import { healAllies } from './heal'
 import { eachAlly, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
@@ -250,22 +252,26 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   spawnProjectile: (sim, src, fx, at) => {
     const t = nearestTarget(sim, src, at.x, at.y, Infinity)
     if (!t) return
+    const p = fx.projectile
     spawnBolt(sim, at.x, at.y, Math.atan2(t.y - at.y, t.x - at.x), {
       faction: src.faction,
-      frame: sim.frames.index(fx.projectile.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
-      size: fx.projectile.size,
-      radius: fx.projectile.radius,
-      speed: fx.projectile.speed,
-      rotOffsetDeg: fx.projectile.rotationOffsetDeg,
+      frame: sim.frames.index(p.look.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
+      size: p.look.size,
+      radius: p.radius,
+      speed: p.speed,
+      rotOffsetDeg: p.look.rotationOffsetDeg ?? 0,
       lifeMs: fx.lifeMs,
       pierce: 0,
       damage: fx.damage,
       knockback: 0,
       src: flying(src),
       onHit: fx.onHit,
-      homingDeg: fx.projectile.homingDeg,
-      linger: fx.projectile.linger,
+      homingDeg: p.flight?.kind === 'homing' ? p.flight.degPerSec : undefined,
+      linger: p.linger,
       h: layerZ(aimLayer(STANDARD[0], STANDARD[1], loOf(sim.world, t.eid), hiOf(sim.world, t.eid))),
+      arc: p.flight?.kind === 'arc' ? p.flight.peakM : undefined,
+      reach: Math.hypot(t.x - at.x, t.y - at.y),
+      split: p.split,
     })
   },
 
@@ -639,13 +645,25 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true)
   },
 
-  clone: (sim, src, fx) => {
+  summon: (sim, src, fx, at) => {
+    const of = fx.of
+    if (of === 'victim') {
+      if (at.victim !== undefined) raiseDead(sim, at.victim, src.faction, casterOf(sim, src), fx.lifeMs ?? Infinity, fx.hpRatio ?? 1, fx.onDeath)
+      return
+    }
     const by = casterOf(sim, src)
-    if (by >= 0) spawnClones(sim, by, fx.count, fx.lifeMs, fx.hpRatio, fx.dmgRatio, fx.onDeath)
+    if ('clone' in of) {
+      if (by >= 0) spawnClones(sim, by, fx.count, fx.lifeMs ?? Infinity, fx.hpRatio ?? 1, of.clone.dmgRatio, fx.onDeath)
+      return
+    }
+    const x = by >= 0 ? Transform.x[by]! : at.x
+    const y = by >= 0 ? Transform.y[by]! : at.y
+    spawnAround(sim, by, src.faction, fx.onDeath ? { ...of.unit, onDeath: fx.onDeath } : of.unit, fx.count, of.spread, x, y, fx.lifeMs, fx.hpRatio)
   },
 
-  raise: (sim, src, fx, at) => {
-    if (at.victim !== undefined) raiseDead(sim, at.victim, src.faction, casterOf(sim, src), fx.lifeMs, fx.hpRatio)
+  cast: (sim, src, fx) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) fireAbility(sim, grantedAbility(sim, by, fx.ability))
   },
 
   devour: (sim, src, fx, at) => {
@@ -666,13 +684,6 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       if (!displace(sim, t, { kind: 'follow', host: by, ox: (d.x / len) * r, oy: (d.y / len) * r, ms: fx.ms }, { self: false, free: true })) continue
       addMark(t, MARK.untargetable, TAG.effect, until)
     }
-  },
-
-  spawn: (sim, src, fx, at) => {
-    const by = casterOf(sim, src)
-    const x = by >= 0 ? Transform.x[by]! : at.x
-    const y = by >= 0 ? Transform.y[by]! : at.y
-    spawnAround(sim, by, src.faction, fx.def, fx.count, fx.spread, x, y)
   },
 
   teleport: (sim, src, fx, at) => {

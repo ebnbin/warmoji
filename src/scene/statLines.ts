@@ -211,16 +211,18 @@ export function effectLine(e: Effect, self = false): string {
       return `沿直线闪回 ${sec(e.ms)} 前的位置，途中无敌，生命取那时与现在的较高者`
     case 'steal':
       return `夺取目标的${e.skill ? '主动技能' : '一项能力'}，自己用 ${sec(e.ms)}（每 ${sec(e.cooldownMs)} 一次）${e.skill ? '；原主的冷却重新走，夺取者死了原主立刻转好' : ''}`
-    case 'clone':
-      return `造出 ${e.count} 个分身 ${sec(e.lifeMs)}：${pct(e.hpRatio)} 生命、${pct(e.dmgRatio)} 伤害${e.onDeath ? lead('，分身死时', joinFx(e.onDeath)) : ''}`
-    case 'raise':
-      return `死者为你而战 ${sec(e.lifeMs)}（${pct(e.hpRatio)} 生命）`
+    case 'summon': {
+      const life = e.lifeMs === undefined ? '' : ` ${sec(e.lifeMs)}`
+      if (e.of === 'victim') return `死者为你而战${life}（${pct(e.hpRatio ?? 1)} 生命）${e.onDeath ? lead('，它死时', joinFx(e.onDeath)) : ''}`
+      if ('clone' in e.of) return `造出 ${e.count} 个分身${life}：${pct(e.hpRatio ?? 1)} 生命、${pct(e.of.clone.dmgRatio)} 伤害${e.onDeath ? lead('，分身死时', joinFx(e.onDeath)) : ''}`
+      return `召出 ${e.count} 个${e.of.unit.name}${life}${e.hpRatio === undefined ? '' : `（${pct(e.hpRatio)} 生命）`}${e.onDeath ? lead('，它们死时', joinFx(e.onDeath)) : ''}`
+    }
+    case 'cast':
+      return `放出一次${abilityLabel(e.ability)}`
     case 'devour':
       return `吞下目标最多 ${sec(e.ms)}，每秒消化 ${e.dps}；挨够 ${e.escape} 伤害就吐出来`
     case 'attach':
       return `贴到施法者身上 ${sec(e.ms)}，期间不可选中，照常出手`
-    case 'spawn':
-      return `召出 ${e.count} 个${e.def.name}`
     case 'teleport':
       return `瞬移到离敌人最近的一个自己召出的${ENEMIES[e.of]?.name ?? e.of}旁${e.then ? lead('，落地时', joinFx(e.then)) : ''}`
     case 'shadow':
@@ -310,8 +312,11 @@ function selectorLine(s: Exclude<Selector, { readonly side: 'self' }>): string {
 
 function shapeLine(w: AbilityDef, s: Shape): string {
   switch (s.kind) {
-    case 'bolt':
-      return `弹速 ${grid(s.projectile.speed)}/秒 · 弹体 ${grid(s.projectile.radius * 2)}${s.projectile.arc ? ` · 抛射（拱起 ${s.projectile.arc} 米，越过比它矮的墙，落下来才打得到人）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${s.projectile.homingDeg ? ` · 追踪（每秒转 ${s.projectile.homingDeg}°）` : ''}${s.projectile.linger ? ` · 飞完落地 ${sec(s.projectile.linger)} 等召回` : ''}`
+    case 'bolt': {
+      const p = s.projectile
+      const f = p.flight
+      return `弹速 ${grid(p.speed)}/秒 · 弹体 ${grid(p.radius * 2)}${f?.kind === 'arc' ? ` · 抛射（拱起 ${f.peakM} 米，越过比它矮的墙，落下来才打得到人）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${f?.kind === 'homing' ? ` · 追踪（每秒转 ${f.degPerSec}°）` : ''}${p.split ? ` · 打中或飞完裂成 ${p.split.count} 发（每发 ${pct(p.split.ratio)} 伤害）` : ''}${p.linger ? ` · 飞完落地 ${sec(p.linger)} 等召回` : ''}`
+    }
     case 'segment':
       return s.beam
         ? `射程 ${grid(s.reach)} · 束宽 ${grid(s.radius * 2)} · 贯穿直线全部敌人`

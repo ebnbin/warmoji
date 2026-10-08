@@ -7,16 +7,10 @@ const pistol = {
   fireSfx: 'shoot',
   damage: 16,
   knockback: 3,
-  held: {
-    emoji: '1f52b',
-    size: 0.75,
-    restOffset: 0.45,
-    rotationOffsetDeg: 180,
-    mountGap: 0.32,
-  },
+  held: { look: { emoji: '1f52b', size: 0.75, rotationOffsetDeg: 180 }, restOffset: 0.45, mountGap: 0.32 },
   shape: {
     kind: 'bolt',
-    projectile: { emoji: '1f4a7', size: 0.45, radius: 0.15, speed: 13, rotationOffsetDeg: 90 },
+    projectile: { look: { emoji: '1f4a7', size: 0.45, rotationOffsetDeg: 90 }, radius: 0.15, speed: 13 },
     lifeMs: 2000,
   },
 } satisfies AbilityDef
@@ -31,7 +25,7 @@ const woodTurretShot = {
   knockback: 2.5,
   shape: {
     kind: 'bolt',
-    projectile: { emoji: '1fab5', size: 0.42, radius: 0.15, speed: 11, rotationOffsetDeg: 0 },
+    projectile: { look: { emoji: '1fab5', size: 0.42, rotationOffsetDeg: 0 }, radius: 0.15, speed: 11 },
     lifeMs: 2000,
   },
 } satisfies AbilityDef
@@ -46,7 +40,7 @@ const BASE = {
     knockback: 3.5,
     shape: {
       kind: 'bolt',
-      projectile: { emoji: '1f345', size: 0.55, radius: 0.18, speed: 12, rotationOffsetDeg: 0, arc: 1.4 },
+      projectile: { look: { emoji: '1f345', size: 0.55, rotationOffsetDeg: 0 }, radius: 0.18, speed: 12, flight: { kind: 'arc', peakM: 1.4 } },
       lifeMs: 2000,
     },
   } satisfies AbilityDef,
@@ -66,12 +60,7 @@ const BASE = {
     fireSfx: 'whoosh',
     damage: 30,
     knockback: 7,
-    held: {
-      emoji: '1fa93',
-      size: 0.85,
-      restOffset: 0.6,
-      rotationOffsetDeg: 135,
-    },
+    held: { look: { emoji: '1fa93', size: 0.85, rotationOffsetDeg: 135 }, restOffset: 0.6 },
     shape: { kind: 'sector', radius: 2.2, arcDeg: 150, ms: 260 },
   } satisfies AbilityDef,
   pistolLeft: {
@@ -103,12 +92,7 @@ const BASE = {
     knockback: 2.5,
     color: 0xff5252,
     piercesWalls: true,
-    held: {
-      emoji: '1f526',
-      size: 0.75,
-      restOffset: 0.45,
-      rotationOffsetDeg: 135,
-    },
+    held: { look: { emoji: '1f526', size: 0.75, rotationOffsetDeg: 135 }, restOffset: 0.45 },
     shape: { kind: 'segment', reach: 8, radius: 0.22, ms: 0, beam: true },
   } satisfies AbilityDef,
   frostAura: {
@@ -133,12 +117,7 @@ const BASE = {
     fireSfx: 'whoosh',
     damage: 18,
     knockback: 4.5,
-    held: {
-      emoji: '1fa83',
-      size: 0.75,
-      restOffset: 0.5,
-      rotationOffsetDeg: 0,
-    },
+    held: { look: { emoji: '1fa83', size: 0.75, rotationOffsetDeg: 0 }, restOffset: 0.5 },
     shape: { kind: 'flyer', range: 4, outMs: 500, returnSpeed: 10, radius: 0.5, spinDegPerSec: 800 },
   } satisfies AbilityDef,
   sparkleBolt: {
@@ -150,7 +129,7 @@ const BASE = {
     knockback: 2,
     shape: {
       kind: 'bolt',
-      projectile: { emoji: '2728', size: 0.5, radius: 0.17, speed: 11, rotationOffsetDeg: 0 },
+      projectile: { look: { emoji: '2728', size: 0.5, rotationOffsetDeg: 0 }, radius: 0.17, speed: 11 },
       lifeMs: 2000,
     },
     onHit: [{ kind: 'morph', durationMs: 2500, morphEmoji: '1f411' }],
@@ -163,12 +142,7 @@ const BASE = {
     range: 6,
     damage: 85,
     knockback: 6,
-    held: {
-      emoji: '1f5e1',
-      size: 0.7,
-      restOffset: 0.42,
-      rotationOffsetDeg: 135,
-    },
+    held: { look: { emoji: '1f5e1', size: 0.7, rotationOffsetDeg: 135 }, restOffset: 0.42 },
     shape: { kind: 'blink', behindDist: 0.6, strikeMs: 400 },
   } satisfies AbilityDef,
   woodTurret: {
@@ -181,7 +155,7 @@ const BASE = {
       count: 1,
       maxAlive: 2,
       lifeMs: 0,
-      turret: { emoji: '1f3f9', size: 0.95 },
+      look: { emoji: '1f3f9', size: 0.95 },
       ability: woodTurretShot,
     },
   } satisfies AbilityDef,
@@ -194,7 +168,7 @@ const BASE = {
     shape: {
       kind: 'summon',
       count: 3,
-      minion: { emoji: '1f41d', size: 0.5, speed: 8, orbit: { radius: 0.625, spinRadPerSec: 3 } },
+      minion: { look: { emoji: '1f41d', size: 0.5 }, speed: 8, orbit: { radius: 0.625, spinRadPerSec: 3 } },
       lifeMs: 4000,
     },
     onHit: [{ kind: 'poison', damage: 8, tickMs: 1000, durationMs: 5000 }],
@@ -216,7 +190,7 @@ const BASE = {
     knockback: 2,
     shape: {
       kind: 'bolt',
-      projectile: { emoji: '1f489', size: 0.48, radius: 0.15, speed: 12, rotationOffsetDeg: 135 },
+      projectile: { look: { emoji: '1f489', size: 0.48, rotationOffsetDeg: 135 }, radius: 0.15, speed: 12 },
       lifeMs: 2000,
     },
   } satisfies AbilityDef,
@@ -276,7 +250,7 @@ const BASE = {
       spread: 1.2,
       maxAlive: 3,
       lifeMs: 8000,
-      turret: { emoji: '1f3f9', size: 0.95 },
+      look: { emoji: '1f3f9', size: 0.95 },
       ability: {
         trigger: 'auto',
         cooldownMs: 650,
@@ -287,7 +261,7 @@ const BASE = {
         knockback: 2,
         shape: {
           kind: 'bolt',
-          projectile: { emoji: '1f3f9', size: 0.5, radius: 0.16, speed: 14, rotationOffsetDeg: 45 },
+          projectile: { look: { emoji: '1f3f9', size: 0.5, rotationOffsetDeg: 45 }, radius: 0.16, speed: 14 },
           lifeMs: 1500,
         },
       },
@@ -380,7 +354,7 @@ const boomerang2 = { ...BASE.boomerang, repeat: { count: 2, spreadDeg: 360 } } s
 const boomerang3 = {
   ...boomerang2,
   shape: { ...BASE.boomerang.shape, radius: BASE.boomerang.shape.radius * 1.4, coinMagnetRadius: 1.6 },
-  held: { ...BASE.boomerang.held, size: BASE.boomerang.held.size * 1.4 },
+  held: { ...BASE.boomerang.held, look: { ...BASE.boomerang.held.look, size: BASE.boomerang.held.look.size * 1.4 } },
 } satisfies AbilityDef
 
 const laserBeam2 = { ...BASE.laserBeam, repeat: { count: 2, spreadDeg: 360 } } satisfies AbilityDef
@@ -453,7 +427,7 @@ const voltArc3 = {
 
 const RING = (color: number) => ({ color, fillAlpha: 0.3, lineWidth: 4, lineAlpha: 0.9, durMs: 260 })
 
-const shot = (emoji: string, speed: number, rotationOffsetDeg = 0) => ({ emoji, size: 0.48, radius: 0.16, speed, rotationOffsetDeg })
+const shot = (emoji: string, speed: number, rotationOffsetDeg = 0) => ({ look: { emoji, size: 0.48, rotationOffsetDeg }, radius: 0.16, speed })
 
 // 🐸 青蛙：舌头把远处的敌人拽到身边
 const frogTongue = {
@@ -502,7 +476,7 @@ const foxClones = {
   fireSfx: 'whoosh',
   shape: { kind: 'world' },
   reactions: [{ on: 'fire', to: 'self', effects: [
-    { kind: 'clone', count: 2, lifeMs: 6000, hpRatio: 0.4, dmgRatio: 0.5, onDeath: [{ kind: 'to', who: { side: 'foes', radius: 2.5 }, then: [{ kind: 'charm', durationMs: 1500 }] }] },
+    { kind: 'summon', of: { clone: { dmgRatio: 0.5 } }, count: 2, lifeMs: 6000, hpRatio: 0.4, onDeath: [{ kind: 'to', who: { side: 'foes', radius: 2.5 }, then: [{ kind: 'charm', durationMs: 1500 }] }] },
     { kind: 'hide', durationMs: 1500 },
   ] }],
 } satisfies AbilityDef
@@ -735,7 +709,7 @@ const vampBlade = {
   shape: { kind: 'bolt', projectile: shot('1f31f', 12), lifeMs: 1600 },
   onHit: [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'heal', amount: 5 }] }],
 } satisfies AbilityDef
-const vampMark = { kind: 'if', when: { kind: 'hpBelow', who: 'target', ratio: 0.35 }, then: [{ kind: 'deathMark', ms: 2000, then: [{ kind: 'raise', lifeMs: 8000, hpRatio: 0.4 }] }] } as const
+const vampMark = { kind: 'if', when: { kind: 'hpBelow', who: 'target', ratio: 0.35 }, then: [{ kind: 'deathMark', ms: 2000, then: [{ kind: 'summon', of: 'victim', count: 1, lifeMs: 8000, hpRatio: 0.4 }] }] } as const
 const vampBlade2 = { ...vampBlade, onHit: [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'heal', amount: 5 }] }, vampMark] } satisfies AbilityDef
 const vampBlade3 = {
   ...vampBlade,
@@ -749,7 +723,7 @@ const vampRaise = {
   damage: 25,
   hpCost: 20,
   shape: { kind: 'disc', radius: 4.5, at: 'self' },
-  onHit: [{ kind: 'deathMark', ms: 5000, then: [{ kind: 'raise', lifeMs: 12000, hpRatio: 0.6 }] }],
+  onHit: [{ kind: 'deathMark', ms: 5000, then: [{ kind: 'summon', of: 'victim', count: 1, lifeMs: 12000, hpRatio: 0.6 }] }],
 } satisfies AbilityDef
 
 // 🧞 灯神：火从神灯里出来，灯在哪火就从哪来
@@ -761,11 +735,11 @@ const genieFlame = {
   range: 7,
   damage: 16,
   knockback: 2,
-  anchor: { emoji: '1fa94', size: 0.7, mode: 'orbit', distance: 1.8 },
+  anchor: { look: { emoji: '1fa94', size: 0.7 }, mode: 'orbit', distance: 1.8 },
   shape: { kind: 'bolt', projectile: shot('1f525', 10), lifeMs: 1800 },
 } satisfies AbilityDef
-const genieFlame2 = { ...genieFlame, anchor: { emoji: '1fa94', size: 0.7, mode: 'trail', distance: 0 } } satisfies AbilityDef
-const genieFlame3 = { ...genieFlame, anchor: { emoji: '1fa94', size: 0.7, mode: 'ally', distance: 1 } } satisfies AbilityDef
+const genieFlame2 = { ...genieFlame, anchor: { look: { emoji: '1fa94', size: 0.7 }, mode: 'trail', distance: 0 } } satisfies AbilityDef
+const genieFlame3 = { ...genieFlame, anchor: { look: { emoji: '1fa94', size: 0.7 }, mode: 'ally', distance: 1 } } satisfies AbilityDef
 const genieWish = {
   trigger: 'manual',
   aim: 'self',
@@ -847,7 +821,7 @@ const chipRoll = {
 } satisfies AbilityDef
 
 // 💂 卫兵：把敌人按在墙上
-const guardShield = { emoji: '1f6e1', size: 0.7, restOffset: 0.45, rotationOffsetDeg: 0 } as const
+const guardShield = { look: { emoji: '1f6e1', size: 0.7, rotationOffsetDeg: 0 }, restOffset: 0.45 } as const
 const guardStun = [{ kind: 'stun', durationMs: 1400 }, { kind: 'damage', amount: 0, ratio: 0.8 }] as const
 const guardBash = {
   trigger: 'auto',
@@ -884,7 +858,7 @@ const feather = {
   fireSfx: 'shoot',
   damage: 9,
   knockback: 0.5,
-  shape: { kind: 'bolt', projectile: { emoji: '1fab6', size: 0.5, radius: 0.16, speed: 14, rotationOffsetDeg: 45, linger: 5000 }, lifeMs: 420, pierce: 1 },
+  shape: { kind: 'bolt', projectile: { look: { emoji: '1fab6', size: 0.5, rotationOffsetDeg: 45 }, radius: 0.16, speed: 14, linger: 5000 }, lifeMs: 420, pierce: 1 },
 } satisfies AbilityDef
 const featherRecall = { trigger: 'auto', cooldownMs: 280, aim: 'self', fireSfx: 'whoosh', shape: { kind: 'world' }, onHit: [{ kind: 'recall', speed: 20 }] } satisfies AbilityDef
 const featherPin = { kind: 'stack', max: 3, durationMs: 1500, then: [{ kind: 'root', durationMs: 1500 }] } as const

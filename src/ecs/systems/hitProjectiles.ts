@@ -7,6 +7,7 @@ import { eachTargetBody } from '../utils/targets'
 import { strike } from './shared/damage'
 import { HIT } from '../utils/hitTags'
 import { cullProjectile } from './shared/projectile'
+import { splitBolt } from '../entities/projectile'
 import { projHitUids, projOnHit, projSrc } from '../store'
 import { bandOf, boltZAt, inBand } from '../utils/pass'
 import type { Sim } from '../sim'
@@ -56,7 +57,10 @@ export function hitProjectiles(sim: Sim): void {
     const damage = Proj.damage[eid]!
     const s = struckOf(f.eid)
     if (strike(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy }, tags: HIT.ranged })) applyOnHit(sim, src, projOnHit[eid], f.x, f.y, damage, [s])
-    if (Proj.pierce[eid]! <= 0) cullProjectile(sim, eid)
+    if (Proj.pierce[eid]! <= 0) {
+      splitBolt(sim, eid)
+      cullProjectile(sim, eid)
+    }
     else Proj.pierce[eid] = Proj.pierce[eid]! - 1
   }
 }

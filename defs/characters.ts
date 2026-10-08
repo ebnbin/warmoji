@@ -715,7 +715,7 @@ export const CHARACTERS = {
             fireSfx: 'shoot',
             damage: 14,
             knockback: 1,
-            shape: { kind: 'bolt', projectile: { emoji: '1fabd', size: 0.45, radius: 0.16, speed: 7, rotationOffsetDeg: 0, homingDeg: 240 }, lifeMs: 2500 },
+            shape: { kind: 'bolt', projectile: { look: { emoji: '1fabd', size: 0.45, rotationOffsetDeg: 0 }, radius: 0.16, speed: 7, flight: { kind: 'homing', degPerSec: 240 } }, lifeMs: 2500 },
             repeat: { count: 3, spreadDeg: 60 },
             onHit: [{ kind: 'slow', factor: 0.7, durationMs: 1000 }],
           },

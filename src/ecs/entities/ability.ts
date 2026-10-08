@@ -6,6 +6,7 @@ import {
   AIM,
   Ammo,
   Charges,
+  Granted,
   Hold,
   Spend,
   Stage,
@@ -62,7 +63,7 @@ import {
   ZoneFollow,
   ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
+import { abilityArtEmoji, abilityBoost, boltSplit, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls, PET_TRAIL_MS, reactionEffects, rewindMs } from '../../data/abilities'
 import { UNIT } from '../../util/units'
@@ -83,16 +84,18 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
   bolt: {
     comps: [Bolt, Shots],
     attach: (sim, e, s, faction) => {
-      Bolt.frame[e] = sim.frames.index(s.projectile.emoji, faction === FACTION.enemy ? 'enemyProjectile' : 'player')
-      Bolt.size[e] = s.projectile.size
-      Bolt.radius[e] = s.projectile.radius
-      Bolt.speed[e] = s.projectile.speed
-      Bolt.rotOffset[e] = s.projectile.rotationOffsetDeg
+      const p = s.projectile
+      Bolt.frame[e] = sim.frames.index(p.look.emoji, faction === FACTION.enemy ? 'enemyProjectile' : 'player')
+      Bolt.size[e] = p.look.size
+      Bolt.radius[e] = p.radius
+      Bolt.speed[e] = p.speed
+      Bolt.rotOffset[e] = p.look.rotationOffsetDeg ?? 0
       Bolt.lifeMs[e] = s.lifeMs
       Bolt.pierce[e] = s.pierce ?? 0
-      Bolt.homingDeg[e] = s.projectile.homingDeg ?? 0
-      Bolt.linger[e] = s.projectile.linger ?? 0
-      Bolt.arc[e] = s.projectile.arc ?? 0
+      Bolt.homingDeg[e] = p.flight?.kind === 'homing' ? p.flight.degPerSec : 0
+      Bolt.linger[e] = p.linger ?? 0
+      Bolt.arc[e] = p.flight?.kind === 'arc' ? p.flight.peakM : 0
+      boltSplit[e] = p.split
     },
   },
   segment: {
@@ -144,11 +147,11 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
     comps: [DropShape],
     attach: (_sim, e, s) => {
       DropShape.targets[e] = s.targets
-      DropShape.size[e] = s.size
+      DropShape.size[e] = s.look.size
       DropShape.fromAbove[e] = s.fromAbove
       DropShape.dropMs[e] = s.dropMs
       DropShape.staggerMs[e] = s.staggerMs
-      abilityArtEmoji[e] = s.emoji
+      abilityArtEmoji[e] = s.look.emoji
     },
   },
   blink: {
@@ -207,12 +210,12 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
     comps: [SummonShape],
     attach: (_sim, e, s) => {
       SummonShape.count[e] = s.count
-      SummonShape.size[e] = s.minion.size
+      SummonShape.size[e] = s.minion.look.size
       SummonShape.speed[e] = s.minion.speed
       SummonShape.lifeMs[e] = s.lifeMs
       SummonShape.orbitRadius[e] = s.minion.orbit.radius
       SummonShape.orbitSpin[e] = s.minion.orbit.spinRadPerSec
-      abilityArtEmoji[e] = s.minion.emoji
+      abilityArtEmoji[e] = s.minion.look.emoji
     },
   },
   emplace: {
@@ -222,8 +225,8 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       EmplaceShape.spread[e] = s.spread ?? 0
       EmplaceShape.maxAlive[e] = s.maxAlive
       EmplaceShape.lifeMs[e] = s.lifeMs
-      EmplaceShape.size[e] = s.turret.size
-      abilityArtEmoji[e] = s.turret.emoji
+      EmplaceShape.size[e] = s.look.size
+      abilityArtEmoji[e] = s.look.emoji
       emplaceAbility[e] = s.ability
     },
   },
@@ -336,7 +339,7 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
 /** 施法锚点物件：画在宿主身边，能力从它身上出手，由 tickPets 摆放 */
 function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['anchor']>, faction: number): number {
   const p = newEntity(sim.world)
-  attachDrawable(sim.world, p, sim.frames, { id: a.emoji, outline: holderOutline(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.size, z: 13 })
+  attachDrawable(sim.world, p, sim.frames, { id: a.look.emoji, outline: holderOutline(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.look.size, z: 13 })
   addComponents(sim.world, p, Pet, Mounted)
   Pet.of[p] = e
   Mounted.host[p] = host
@@ -388,6 +391,14 @@ function chainStage(sim: Sim, e: number, windowMs: number, next: number): void {
 /** 主动技能：所有者与锚点都是宿主，由附身者按键触发；冷却基数与剩余冷却由角色给 */
 export function equipSkill(sim: Sim, host: number, def: AbilityDef, cdMs: number, leftMs: number): number {
   return equipAbility(sim, host, def, FACTION.team, leftMs, { manual: true, baseMs: cdMs })
+}
+
+/** 效果放出来的能力：头一回给施法者装上，之后都用这一条；手动的，只由效果出手 */
+export function grantedAbility(sim: Sim, host: number, def: AbilityDef): number {
+  for (const e of query(sim.world, [Ability, Granted, Owner])) if (Owner.eid[e] === host && abilityDef[e] === def) return e
+  const e = equipAbility(sim, host, def, Faction.v[host]!, 0, { manual: true })
+  addComponent(sim.world, e, Granted)
+  return e
 }
 
 /** 撤掉一个身体的能力（默认全部），连同它们造出来的场、召唤物、装置、飞返体、坠物与施法锚点 */

@@ -196,16 +196,16 @@ export function usedEmojiSet(): Set<string> {
       for (const card of carrier.cards) if (card) used.add(card.icon)
     }
     for (const w of baseLoadout(c)) {
-      if (w.held) used.add(w.held.emoji)
-      if (w.shape.kind === 'bolt') used.add(w.shape.projectile.emoji)
+      if (w.held) used.add(w.held.look.emoji)
+      if (w.shape.kind === 'bolt') used.add(w.shape.projectile.look.emoji)
     }
   }
   for (const c of Object.values(CHARACTERS)) for (const f of c.forms ?? []) if (f.emoji) used.add(f.emoji)
   for (const e of [...ENEMY_DEFS, ...BOSSES]) {
     for (const f of e.forms ?? []) if (f.emoji) used.add(f.emoji)
     for (const w of e.abilities ?? []) {
-      if (w.shape.kind === 'bolt') used.add(w.shape.projectile.emoji)
-      if (w.shape.kind === 'drop') used.add(w.shape.emoji)
+      if (w.shape.kind === 'bolt') used.add(w.shape.projectile.look.emoji)
+      if (w.shape.kind === 'drop') used.add(w.shape.look.emoji)
     }
   }
   used.add(PICKUPS.coin.emoji)

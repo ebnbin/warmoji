@@ -1,5 +1,5 @@
 import { addComponent, hasComponent, query } from 'bitecs'
-import { Ability, Alive, Borrowed, Cd, Faction, Manual, Owner, Stage, Uid } from '../../components'
+import { Ability, Alive, Borrowed, Cd, Faction, Granted, Manual, Owner, Stage, Uid } from '../../components'
 import { abilityDef } from '../../store'
 import { equipAbility, unequipAbilities } from '../../entities/ability'
 import { isSameEntity } from '../../utils/identity'
@@ -17,7 +17,7 @@ export function stealAbility(sim: Sim, by: number, t: number, ms: number, cooldo
   if (by === t || !Alive.v[by]) return
   const pool: number[] = []
   for (const e of query(sim.world, [Ability, Owner])) {
-    if (Owner.eid[e] !== t || !abilityDef[e] || hasComponent(sim.world, e, Borrowed)) continue
+    if (Owner.eid[e] !== t || !abilityDef[e] || hasComponent(sim.world, e, Borrowed) || hasComponent(sim.world, e, Granted)) continue
     if (hasComponent(sim.world, e, Stage) && Stage.root[e] !== 0) continue
     if (skill !== hasComponent(sim.world, e, Manual)) continue
     pool.push(e)

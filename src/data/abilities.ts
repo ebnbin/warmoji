@@ -51,7 +51,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
       return [fx.then]
     case 'form':
       return [fx.onEnd]
-    case 'clone':
+    case 'summon':
       return [fx.onDeath]
     case 'shove':
       return [fx.onWall]
@@ -115,8 +115,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'refresh':
     case 'gain':
     case 'portal':
-    case 'spawn':
-    case 'raise':
+    case 'cast':
     case 'shadow':
     case 'shadowSwap':
     case 'recall':
@@ -154,9 +153,17 @@ export function reactionEffects(list: readonly Reaction[] | undefined, on: React
   })
 }
 
-/** 能力里套着的能力：下一段、轮换的招式、装置出手用的 */
+/** 能力里套着的能力：下一段、轮换的招式、装置出手用的，以及效果里放出的 */
 export function childAbilities(a: AbilityDef): readonly AbilityDef[] {
-  return [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : [])]
+  const out: AbilityDef[] = [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : [])]
+  const walk = (list: EffectList): void => {
+    for (const fx of list ?? []) {
+      if (fx.kind === 'cast') out.push(fx.ability)
+      for (const c of childEffects(fx)) walk(c)
+    }
+  }
+  for (const list of abilityEffects(a)) walk(list)
+  return out
 }
 
 /** 尾随的施法锚点落在宿主多久前走过的地方 */

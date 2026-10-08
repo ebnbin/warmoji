@@ -3,24 +3,32 @@ import type { GroundEffectDef, ZoneRules } from './groundEffects'
 import type { EnemyDef, EnemyKind } from './enemies'
 import type { StatusId } from './statuses'
 
-interface ProjectileSpec {
+/** 外观：用哪张图、显示多大（格）；rotationOffsetDeg 是图里尖头的朝向与出手方向差几度 */
+export interface Look {
   readonly emoji: string
   readonly size: number
+  readonly rotationOffsetDeg?: number
+}
+/** 弹体的飞法：不写是直飞；homing 每秒最多转 degPerSec 度转向最近的敌人；arc 从出手处抛向瞄准的地方，最高处比两头的连线高出 peakM 米，越过比它矮的障碍，落下来才打得到身体 */
+export type Flight = { readonly kind: 'homing'; readonly degPerSec: number } | { readonly kind: 'arc'; readonly peakM: number }
+/** 分裂：打中身体或飞完时裂成 count 发，在 spreadDeg 内散开，伤害 × ratio；裂出来的不再裂 */
+export interface Split {
+  readonly count: number
+  readonly spreadDeg: number
+  readonly ratio: number
+}
+interface ProjectileBase {
+  readonly look: Look
   readonly radius: number
   readonly speed: number
-  readonly rotationOffsetDeg: number
-  /** 追踪：每秒最多转这么多度，转向最近的敌人 */
-  readonly homingDeg?: number
-  /** 飞完不消失，落在地上 ms，等着被召回 */
-  readonly linger?: number
-  /** 抛射：从出手处抛向瞄准的地方，最高处比两头的连线高出这么多米；越过比它矮的障碍，落下来才打得到身体。不写是平射 */
-  readonly arc?: number
+  readonly flight?: Flight
 }
+/** linger：飞完不消失，落在地上 ms，等着被召回；落地的与分裂的二选一 */
+type ProjectileSpec = ProjectileBase & ({ readonly linger?: number; readonly split?: never } | { readonly linger?: never; readonly split?: Split })
+/** 拿在手里的武器：restOffset 是离持有者中心多远，mountSide 与 mountGap 是偏在哪一侧、偏多远，弹体也从这里出手 */
 export interface HeldVisual {
-  readonly emoji: string
-  readonly size: number
+  readonly look: Look
   readonly restOffset: number
-  readonly rotationOffsetDeg: number
   readonly mountSide?: -1 | 1
   readonly mountGap?: number
 }
@@ -420,20 +428,19 @@ interface StealEffect {
   readonly cooldownMs: number
   readonly skill?: boolean
 }
-/** 分身：在施法者身边造 count 个复制体，生命为施法者上限的 hpRatio，带着它的普通出手（伤害 × dmgRatio），存在 lifeMs，死时施加 onDeath */
-interface CloneEffect {
-  readonly kind: 'clone'
+/** 召唤：召出 count 个身体，阵营随施法者、记在施法者名下；unit 是一种身体，在施法者身边 spread 内散开；clone 是施法者的分身，带着它的普通出手（伤害 × dmgRatio）；victim 是死亡印记结算时的死者，以施法者的阵营站起来（头目不会）；给了 lifeMs 到时消失，hpRatio 是生命比例（分身按施法者的上限、死者按原来的上限），onDeath 是它死时施加的 */
+interface SummonEffect {
+  readonly kind: 'summon'
+  readonly of: { readonly unit: EnemyDef; readonly spread: number } | { readonly clone: { readonly dmgRatio: number } } | 'victim'
   readonly count: number
-  readonly lifeMs: number
-  readonly hpRatio: number
-  readonly dmgRatio: number
+  readonly lifeMs?: number
+  readonly hpRatio?: number
   readonly onDeath?: readonly Effect[]
 }
-/** 亡者倒戈：死者（死亡印记结算时）以施法者的阵营站起来 lifeMs，生命为原来的 hpRatio */
-interface RaiseEffect {
-  readonly kind: 'raise'
-  readonly lifeMs: number
-  readonly hpRatio: number
+/** 放出另一个能力：从施法者身上照这个能力的瞄准与形状出手一次，吃施法者的属性；不耗冷却，也不算放了主动技能 */
+interface CastEffect {
+  readonly kind: 'cast'
+  readonly ability: Extract<AbilityDef, { readonly trigger: 'manual' }>
 }
 /** 吞噬：把目标吞进施法者肚子里最多 ms，每秒消化 dps；施法者挨够 escape 伤害或死了就吐出来；spit 是吐出时抛出的距离 */
 interface DevourEffect {
@@ -447,13 +454,6 @@ interface DevourEffect {
 interface AttachEffect {
   readonly kind: 'attach'
   readonly ms: number
-}
-/** 召出 count 个 def 的身体，阵营随施法者，记在施法者名下 */
-interface SpawnEffect {
-  readonly kind: 'spawn'
-  readonly def: EnemyDef
-  readonly count: number
-  readonly spread: number
 }
 /** 隐身穿行到自己召出的 of 身边（最靠近目标的那个），现身时施加 then */
 interface TeleportEffect {
@@ -600,11 +600,10 @@ export type Effect =
   | GrowEffect
   | RewindEffect
   | StealEffect
-  | CloneEffect
-  | RaiseEffect
+  | SummonEffect
+  | CastEffect
   | DevourEffect
   | AttachEffect
-  | SpawnEffect
   | TeleportEffect
   | ShadowEffect
   | ShadowSwapEffect
@@ -647,8 +646,7 @@ export type Shape =
   | {
       readonly kind: 'drop'
       readonly targets: number
-      readonly emoji: string
-      readonly size: number
+      readonly look: Look
       readonly fromAbove: number
       readonly dropMs: number
       readonly staggerMs: number
@@ -671,8 +669,7 @@ export type Shape =
       readonly kind: 'summon'
       readonly count: number
       readonly minion: {
-        readonly emoji: string
-        readonly size: number
+        readonly look: Look
         readonly speed: number
         readonly orbit: { readonly radius: number; readonly spinRadPerSec: number }
       }
@@ -684,7 +681,7 @@ export type Shape =
       readonly spread?: number
       readonly maxAlive: number
       readonly lifeMs: number
-      readonly turret: { readonly emoji: string; readonly size: number }
+      readonly look: Look
       readonly ability: AbilityDef
     }
   | { readonly kind: 'world' }
@@ -753,7 +750,7 @@ interface AbilityBase {
   /** 影子也照着出手 */
   readonly mirror?: boolean
   /** 施法锚点：这条能力从一个跟着宿主的物件上出手；orbit 绕宿主转、trail 落在宿主一秒半前的位置、ally 贴着血量最低的队友 */
-  readonly anchor?: { readonly emoji: string; readonly size: number; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
+  readonly anchor?: { readonly look: Look; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
 }
 /** 反应把效果施于谁：self 是带着这条反应的身体，other 是这件事里的另一方（打中的目标、出手打它的身体），spot 是这件事发生的地方（倒下处） */
 export type ReactTo = 'self' | 'other' | 'spot'

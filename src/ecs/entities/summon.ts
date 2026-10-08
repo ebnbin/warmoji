@@ -40,13 +40,15 @@ function waveHp(sim: Sim): number {
   return clockWave(sim).hpMultiplier
 }
 
-/** 召出 count 个 def：敌方的按波次放大生命 */
-export function spawnAround(sim: Sim, by: number, faction: number, def: EnemyDef, count: number, spread: number, x: number, y: number): void {
-  const hp = Math.round(def.hp * (faction === FACTION.enemy ? waveHp(sim) : 1))
+/** 召出 count 个 def：敌方的按波次放大生命，给了 hpRatio 再乘上；给了 lifeMs 到时消失 */
+export function spawnAround(sim: Sim, by: number, faction: number, def: EnemyDef, count: number, spread: number, x: number, y: number, lifeMs?: number, hpRatio?: number): void {
+  const base = def.hp * (faction === FACTION.enemy ? waveHp(sim) : 1)
+  const hp = Math.round(hpRatio === undefined ? base : base * hpRatio)
   for (let i = 0; i < count; i++) {
     const a = sim.rng.next() * Math.PI * 2
     const r = count > 1 || spread > 0 ? spread * (0.5 + sim.rng.next() * 0.5) : 0
-    summonBody(sim, def, x + Math.cos(a) * r, y + Math.sin(a) * r, hp, faction, by)
+    const eid = summonBody(sim, def, x + Math.cos(a) * r, y + Math.sin(a) * r, hp, faction, by)
+    if (lifeMs !== undefined) Despawn.at[eid] = sim.elapsedMs + lifeMs
   }
 }
 
@@ -109,10 +111,10 @@ export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number,
 }
 
 /** 亡者倒戈：死者以施法者的阵营站起来，到时消失；Boss 不会被拉起来 */
-export function raiseDead(sim: Sim, victim: number, faction: number, by: number, lifeMs: number, hpRatio: number): void {
+export function raiseDead(sim: Sim, victim: number, faction: number, by: number, lifeMs: number, hpRatio: number, onDeath: readonly Effect[] | undefined): void {
   const def = enemyDef[victim]
   if (!def || Boss.v[victim] || Faction.v[victim] === faction) return
-  const raised: NpcDef = { ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath: undefined }
+  const raised: NpcDef = { ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath }
   const eid = spawnNpc(sim, sim.frames, raised, Transform.x[victim]!, Transform.y[victim]!, Math.max(1, Math.round(Hp.max[victim]! * hpRatio)), { faction })
   markSummoned(sim, eid, by)
   Despawn.at[eid] = sim.elapsedMs + lifeMs

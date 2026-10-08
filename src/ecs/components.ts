@@ -452,6 +452,9 @@ export const Trace = {}
 /** 借来的能力：到时撤掉；from 是被夺走的那条能力与它的编号，夺取者死了就还回去 */
 export const Borrowed = { until: f32(), from: i32(), fromUid: u32() }
 
+/** 效果放出的能力：只在效果里出手，不算主动技能，也夺不走 */
+export const Granted = {}
+
 /** 肚子里装着的身体：victim 与编号、这期间挨了多少、挨够多少吐出、最多装到何时、每秒消化、吐出距离、下次消化的时刻 */
 export const Gut = { victim: i32(), uid: u32(), hurt: f32(), limit: f32(), until: f32(), dps: f32(), spit: f32(), nextAt: f32() }
 
