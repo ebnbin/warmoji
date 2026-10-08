@@ -20,20 +20,20 @@ export default {
     alpha: [0, 0],
     density: [0, 0],
   },
-  foes: ['zombie', 'puffer', 'slime', 'blob', 'skeleton', 'snake', 'crab', 'siren', 'ghost'],
-  // 石缝里游出来、从岩堆上爬下来、从陡坎下面浮上来、从鲸骨底下钻出来、冷泉里冒出来、从头顶的黑暗里沉下来、从软泥里钻出来；巨鳄从陡坎下面上来
+  foes: ['fishSchool', 'pearlClam', 'porcupineFish', 'conch', 'shark', 'seepBubble', 'abyssEye', 'doorCoral'],
+  // 石缝里游出来、从岩堆上爬下来、从陡坎下面浮上来、从鲸骨底下钻出来、冷泉里冒出来、从头顶的黑暗里沉下来、从软泥里钻出来；蛇颈龙与深渊巨鲸从陡坎下面上来
   gates: {
     snapU: 3,
     fallback: 'rise',
     look: 'silt',
     boss: 'abyss',
     kinds: {
-      crack: { name: '石缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'ends', minU: 3 } }, enter: 'walk', look: 'silt', weight: 3, perSec: 1.5, only: ['zombie', 'skeleton', 'snake', 'crab', 'slime'] },
+      crack: { name: '石缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'ends', minU: 3 } }, enter: 'walk', look: 'silt', weight: 3, perSec: 1.5, only: ['zombie', 'skeleton', 'snake', 'crab', 'slime', 'fishSchool', 'conch', 'doorCoral'] },
       rubble: { name: '岩堆', at: { kind: 'mark' }, enter: 'climb', weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'crab'] },
-      abyss: { name: '陡坎下', at: { kind: 'mark' }, enter: 'climb', look: 'silt', weight: 3, perSec: 1.5, only: ['zombie', 'puffer', 'blob', 'siren', 'snake', 'croc'] },
-      bones: { name: '鲸骨', at: { kind: 'mark' }, enter: 'walk', look: 'silt', weight: 2, perSec: 1, only: ['slime', 'crab', 'blob', 'snake'] },
-      seep: { name: '冷泉', at: { kind: 'mark' }, enter: 'rise', look: 'bubbles', weight: 1.5, perSec: 1, only: ['blob', 'slime', 'puffer'] },
-      above: { name: '头顶', at: { kind: 'ground' }, enter: 'drop', look: 'silt', weight: 1, only: ['ghost', 'puffer', 'zombie'] },
+      abyss: { name: '陡坎下', at: { kind: 'mark' }, enter: 'climb', look: 'silt', weight: 3, perSec: 1.5, only: ['zombie', 'puffer', 'blob', 'siren', 'snake', 'croc', 'shark', 'plesiosaur', 'abyssWhale'] },
+      bones: { name: '鲸骨', at: { kind: 'mark' }, enter: 'walk', look: 'silt', weight: 2, perSec: 1, only: ['slime', 'crab', 'blob', 'snake', 'fishSchool', 'pearlClam', 'conch'] },
+      seep: { name: '冷泉', at: { kind: 'mark' }, enter: 'rise', look: 'bubbles', weight: 1.5, perSec: 1, only: ['blob', 'slime', 'puffer', 'porcupineFish', 'seepBubble'] },
+      above: { name: '头顶', at: { kind: 'ground' }, enter: 'drop', look: 'silt', weight: 1, only: ['ghost', 'puffer', 'zombie', 'porcupineFish', 'abyssEye'] },
       ooze: { name: '软泥', at: { kind: 'ground' }, enter: 'rise', look: 'silt', weight: 1 },
     },
   },
@@ -70,5 +70,5 @@ export default {
       roomU: 0.5,
     },
   },
-  bosses: ['croc'],
+  bosses: ['plesiosaur', 'abyssWhale'],
 } as const satisfies MapDef

@@ -1,0 +1,36 @@
+import type { EnemyDef } from '../../../../src/types/enemies'
+import { shot } from '../../../kit.ts'
+
+const PEARL_CLAM = {
+  kind: 'pearlClam',
+  emoji: '1f9aa',
+  name: '珍珠贝',
+  element: 'water',
+  desc: '趴在谷底一动不动，每隔两秒多吐一颗珍珠打人；挨打时有四成几率合上壳，两秒内受到的伤害只剩三成',
+  size: 1.2,
+  radius: 0.46,
+  span: [0, 1],
+  hp: 90,
+  stats: { armor: 6 },
+  speed: 0,
+  damage: 0,
+  xp: 4,
+  coins: 4,
+  traits: ['anchored'],
+  drive: { kind: 'stay' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 2200,
+      firstDelayMs: 800,
+      aim: 'nearest',
+      range: 7,
+      damage: 11,
+      fireSfx: 'plip',
+      shape: { kind: 'bolt', projectile: shot('26aa', 7, 0.4), lifeMs: 1100 },
+    },
+  ],
+  reactions: [{ on: 'hurt', to: 'self', chance: 0.4, effects: [{ kind: 'guard', mul: 0.3, durationMs: 2000 }] }],
+} satisfies EnemyDef
+
+export default PEARL_CLAM
