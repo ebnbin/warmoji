@@ -19,19 +19,19 @@ export default {
     alpha: [0.14, 0.28],
     density: [0.05, 0.09],
   },
-  foes: ['zombie', 'boar', 'ghost', 'blob', 'snake', 'turtle', 'creeper', 'crab', 'knight'],
+  foes: ['badSnowman', 'frostSwan', 'snowCloud', 'mistSpirit', 'curlingStone', 'iceBlock', 'gustSpirit', 'crackGrin'],
   gates: {
     snapU: 4,
     fallback: 'rise',
     look: 'snow',
-    boss: 'sky',
+    boss: 'edge',
     lean: { mul: 3, full: 13 },
     kinds: {
-      edge: { name: '冰缘', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'splash', snapU: 8, weight: 3, perSec: 1.5, only: ['zombie', 'turtle', 'crab', 'snake', 'blob'] },
-      seam: { name: '新冰缝', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['turtle', 'crab', 'snake'] },
-      drift: { name: '雪堆', at: { kind: 'mark' }, enter: 'rise', look: 'snow', weight: 2, perSec: 1.5, only: ['zombie', 'boar', 'blob', 'creeper', 'knight'] },
-      squall: { name: '风雪', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1.5, only: ['ghost'] },
-      sky: { name: '天上', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1, only: ['swan'] },
+      edge: { name: '冰缘', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'splash', snapU: 8, weight: 3, perSec: 1.5, only: ['zombie', 'turtle', 'crab', 'snake', 'blob', 'curlingStone', 'iceBlock', 'orca', 'yeti'] },
+      seam: { name: '新冰缝', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['turtle', 'crab', 'snake', 'iceBlock', 'crackGrin'] },
+      drift: { name: '雪堆', at: { kind: 'mark' }, enter: 'rise', look: 'snow', weight: 2, perSec: 1.5, only: ['zombie', 'boar', 'blob', 'creeper', 'knight', 'badSnowman', 'frostSwan', 'mistSpirit', 'curlingStone'] },
+      squall: { name: '风雪', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1.5, only: ['ghost', 'snowCloud', 'mistSpirit', 'gustSpirit'] },
+      sky: { name: '天上', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1, only: ['swan', 'frostSwan', 'snowCloud'] },
     },
   },
   floe: {
@@ -79,5 +79,5 @@ export default {
     waterRegen: 0.2,
     coldTickMs: 250,
   },
-  bosses: ['swan'],
+  bosses: ['orca', 'yeti'],
 } as const satisfies MapDef
