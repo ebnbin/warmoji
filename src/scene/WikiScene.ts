@@ -10,12 +10,11 @@ import type { PageFrame } from '../ui'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { SceneKey } from './keys'
-import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
 const ALL_TAB = -1
 const ICON = 100
 
-export class WikiScene extends Phaser.Scene implements DevTabsHost {
+export class WikiScene extends Phaser.Scene {
   private preserveOnRestart = false
   private category = 0
   private focusedIndex = 0
@@ -227,31 +226,5 @@ export class WikiScene extends Phaser.Scene implements DevTabsHost {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
-  }
-
-  devTabs(): DevSceneTabs {
-    return {
-      title: '图鉴',
-      tabs: [
-        {
-          id: 'wiki',
-          title: '图鉴',
-          items: () => [
-            {
-              kind: 'action',
-              label: '随机条目',
-              desc: '在当前分类里随机选一条',
-              run: (): void => {
-                const g = this.groups[this.category]
-                if (!g || g.entries.length === 0) return
-                this.focusedIndex = Math.floor(Math.random() * g.entries.length)
-                this.levelSel = 0
-                this.refreshEntries()
-              },
-            },
-          ],
-        },
-      ],
-    }
   }
 }

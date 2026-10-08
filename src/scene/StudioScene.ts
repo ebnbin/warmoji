@@ -37,7 +37,6 @@ import {
 import type { PageFrame, Rect } from '../ui'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
-import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
 const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
@@ -67,7 +66,7 @@ interface AnatUi {
 
 const DEFAULT_SUBJECT = '1f939'
 
-export class StudioScene extends Phaser.Scene implements DevTabsHost {
+export class StudioScene extends Phaser.Scene {
   private preserveOnRestart = false
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
@@ -610,29 +609,5 @@ export class StudioScene extends Phaser.Scene implements DevTabsHost {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
-  }
-
-  devTabs(): DevSceneTabs {
-    return {
-      title: 'Studio',
-      tabs: [
-        {
-          id: 'studio',
-          title: 'Studio',
-          items: () => [
-            {
-              kind: 'action',
-              label: '随机换一个 emoji',
-              desc: '在当前页签的全集里随机选一个，省去在几千个里翻找',
-              run: (): void => {
-                const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.allKeys
-                const cp = keys[Math.floor(Math.random() * keys.length)]
-                if (cp) this.onGridTap(cp)
-              },
-            },
-          ],
-        },
-      ],
-    }
   }
 }
