@@ -34,21 +34,12 @@ function innateCarrier(i: InnateSource): Carrier {
 }
 
 function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
+  const { skill, weapons, innate, instincts, ...unit } = src
   return {
-    emoji: src.emoji,
-    name: src.name,
-    desc: src.desc,
-    role: src.role,
-    tags: src.tags,
-    body: src.body,
-    stats: src.stats,
-    skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },
-    carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
-    resource: src.resource,
-    traits: src.traits,
-    reactions: src.reactions,
-    forms: src.forms,
-    instincts: src.instincts ?? ROLES[src.role].instincts,
+    ...unit,
+    skill: { ...skill, ability: ABILITIES[skill.ability], aim: skill.aim === true },
+    carriers: [...weapons.map(weaponCarrier), ...innate.map(innateCarrier)],
+    instincts: instincts ?? ROLES[src.role].instincts,
   }
 }
 
