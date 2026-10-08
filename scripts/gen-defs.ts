@@ -2,13 +2,16 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFi
 import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
-import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, WEAPONS } from '../defs/characters.ts'
+import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, NEW_CHARACTER_FILES, WEAPONS } from '../defs/characters.ts'
 import type { CharacterFile } from '../defs/characters.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
 import { ECONOMY } from '../defs/economy.ts'
 import { EDITOR_DRAFT } from '../defs/editor.ts'
-import { ENEMIES } from '../defs/enemies.ts'
+import { ELEMENTS } from '../defs/elements.ts'
+import { ENEMIES, NEW_ENEMIES } from '../defs/enemies.ts'
+import { LEGACY_CHARACTER_FILES } from '../defs/legacy/characters.ts'
+import { LEGACY_ENEMIES } from '../defs/legacy/enemies.ts'
 import { EXPERIMENTS } from '../defs/experiments.ts'
 import { FEEL } from '../defs/feel.ts'
 import { ITEMS } from '../defs/items.ts'
@@ -79,7 +82,23 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(e !== undefined && e.role !== 'boss', `maps.${id}.foes 须引用非 Boss 的敌人：${kind}`)
   }
   need(new Set(m.foes).size === m.foes.length, `maps.${id}.foes 不能重复`)
-  need(ENEMIES[m.boss]?.role === 'boss', `maps.${id}.boss 须引用 Boss：${m.boss}`)
+  need(m.bosses.length > 0 && new Set(m.bosses).size === m.bosses.length, `maps.${id}.bosses 至少一个、不能重复`)
+  for (const kind of m.bosses) need(ENEMIES[kind]?.role === 'boss', `maps.${id}.bosses 须引用头目：${kind}`)
+}
+
+/** 新敌人都绑在至少一张图上：写进某张图的小怪或头目，或由绑了的敌人召出、分裂出、生出、长成 */
+{
+  const seen = new Set<object>()
+  const under = (v: unknown, out: Set<string>): void => {
+    if (v === null || typeof v !== 'object' || seen.has(v)) return
+    seen.add(v)
+    const o = v as Record<string, unknown>
+    if (typeof o.kind === 'string' && o.kind in ENEMIES && 'xp' in o && 'drive' in o) out.add(o.kind)
+    for (const x of Object.values(o)) under(x, out)
+  }
+  const bound = new Set<string>()
+  for (const m of Object.values<MapDef>(MAPS)) for (const k of [...m.foes, ...m.bosses]) under(ENEMIES[k], bound)
+  for (const k of Object.keys(NEW_ENEMIES)) need(bound.has(k), `新敌人 ${k} 没绑到任何一张图上：写进某张图的 foes 或 bosses，或由绑了的敌人召出`)
 }
 
 /** 地面费力、场内费力和身体的赶路耗体力，出现在哪都不能为负；属性修正的加值可以为负，由属性表的下限兜住 */
@@ -175,7 +194,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   }
   const takes = (e: EnemyKind): boolean => kinds.some(([, d]) => d.only === undefined || d.only.includes(e))
   const boss = g.boss === undefined ? undefined : g.kinds[g.boss]
-  need(g.boss === undefined || (boss !== undefined && (boss.only?.includes(m.boss) ?? true)), `${at}.boss 须是这张图的一种出怪口，接得住头目 ${m.boss}`)
+  for (const b of m.bosses) need(g.boss === undefined || (boss !== undefined && (boss.only?.includes(b) ?? true)), `${at}.boss 须是这张图的一种出怪口，接得住头目 ${b}`)
   for (const kind of m.foes) need(takes(kind), `${at} 没有出怪口接出没的 ${kind}`)
 }
 
@@ -542,14 +561,14 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const over = (span: Span): number => (span[0] + Math.floor((span[1] - span[0] + 1) * B.step)) * layer
   const top = (h: number): number => Math.ceil(h / layer - 1e-9) * layer
   const chest = (B.layers - 0.5) * layer
-  const boss = ENEMIES[m.boss]
   const standard: Span = [0, B.layers - 1]
   need(top(c.lowM) > over(standard) + 1e-9, `${at}.lowM 须高过标准身体跨得过的 ${+over(standard).toFixed(2)} 米：矮布景要挡得住人`)
   need(top(c.lowM) < chest, `${at}.lowM 须低过平射的高度 ${+chest.toFixed(2)} 米：子弹要从矮布景上面飞过去`)
-  need(top(c.lowM) <= over(boss.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${m.boss} 跨得过去`)
+  for (const b of m.bosses) need(top(c.lowM) <= over(ENEMIES[b]!.span ?? standard) + 1e-9, `${at}.lowM 须让头目 ${b} 跨得过去`)
   const small = Math.max(TEAM_BASELINE.member.radius * TEAM_BASELINE.team.leaderSizeMul, ...m.foes.map((kind) => ENEMIES[kind]!.radius))
   need(gapU.low >= small * 2 + 0.2 && margin.low >= small * 2 + 0.2, `${at} 矮布景之间、矮布景与台边之间须过得去最大的小怪（半径 ${small} 格）`)
-  need(gapU.tall >= boss.radius * 2 + 0.2 && margin.tall >= boss.radius * 2 + 0.2, `${at} 高布景之间、高布景与台边之间须过得去头目（半径 ${boss.radius} 格）`)
+  const big = Math.max(...m.bosses.map((b) => ENEMIES[b]!.radius))
+  need(gapU.tall >= big * 2 + 0.2 && margin.tall >= big * 2 + 0.2, `${at} 高布景之间、高布景与台边之间须过得去最大的头目（半径 ${big} 格）`)
   need(margin.aisle > 0, `${at}.margin.aisle 须为正：布景不压台中线上的活门`)
   for (let s = 0; s < 6; s++) {
     const stage = makeStage(c, s * 7919 + 13)
@@ -808,7 +827,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
       need(disk.outerRs * rs < ring, `${at}.disk 铺到 ${+(disk.outerRs * rs).toFixed(2)} 格，盖住了爱因斯坦环（${+ring.toFixed(2)} 格）：GM ${gm}、离中心 ${d} 格`)
     }
   }
-  const slowest = Math.min(...[...m.foes.map((kind) => ENEMIES[kind]!.speed), ENEMIES[m.boss]!.speed])
+  const slowest = Math.min(...[...m.foes, ...m.bosses].map((kind) => ENEMIES[kind]!.speed))
   const clear = captureU(hole.maxGm, rsMax, enemyFall / slowest) + n.spawnClearU
   need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }
@@ -1026,6 +1045,14 @@ need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restR
 need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
 need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
 
+/** 新旧名单：选角、沙盒、地图与图鉴按它分开新旧 */
+const ROSTER = {
+  characters: Object.keys(NEW_CHARACTER_FILES),
+  legacyCharacters: Object.keys(LEGACY_CHARACTER_FILES),
+  enemies: Object.keys(NEW_ENEMIES),
+  legacyEnemies: Object.keys(LEGACY_ENEMIES),
+}
+
 /** 写进 JSON 的全部定义表 */
 const TABLES = {
   abilities: ABILITIES,
@@ -1037,6 +1064,7 @@ const TABLES = {
   difficulty: DIFFICULTY,
   economy: ECONOMY,
   editor: EDITOR_DRAFT,
+  elements: ELEMENTS,
   enemies: ENEMIES,
   experiments: EXPERIMENTS,
   feel: FEEL,
@@ -1048,6 +1076,7 @@ const TABLES = {
   pickups: PICKUPS,
   progression: PROGRESSION,
   roles: ROLES,
+  roster: ROSTER,
   runs: RUNS,
   sfx: SFX,
   stamina: STAMINA,
@@ -1070,6 +1099,30 @@ const TABLES = {
   const icons = list.flatMap(([, d]) => (d.icon ? [d.icon.rank] : []))
   need(new Set(icons).size === icons.length, `状态的图标轻重有重复：${icons.join(',')}`)
   for (const [id, d] of list) need(d.merge !== 'bySource' || d.forces !== undefined, `statuses.${id} 按施加者分格的只能是牵着走的状态`)
+}
+
+/** 元素：克制的元素都存在、不克自己，每种克别人的与被克的一样多；附着的状态各不相同；反应是两种不同元素，同一对只有一种反应 */
+{
+  const list = ELEMENTS.list as Readonly<Record<string, { readonly beats: readonly string[]; readonly aura: string }>>
+  const ids = Object.keys(list)
+  for (const [id, e] of Object.entries(list)) {
+    need(e.beats.every((b) => b !== id && ids.includes(b)), `elements.list.${id}.beats 须是别的元素`)
+    const beaten = ids.filter((o) => list[o]!.beats.includes(id)).length
+    need(beaten === e.beats.length, `elements.list.${id} 克 ${e.beats.length} 种、被 ${beaten} 种克，须一样多`)
+    need(e.aura in STATUSES, `elements.list.${id}.aura 须是状态表里的状态：${e.aura}`)
+  }
+  need(new Set(Object.values(list).map((e) => e.aura)).size === ids.length, 'elements.list 各元素附着的状态须各不相同')
+  const pairs = new Set<string>()
+  for (const [id, r] of Object.entries(ELEMENTS.reactions)) {
+    const [a, b] = r.of
+    need(a !== b && ids.includes(a) && ids.includes(b), `elements.reactions.${id} 须是两种不同的元素`)
+    const key = [a, b].sort().join('+')
+    need(!pairs.has(key), `elements.reactions.${id}：${key} 已经有别的反应`)
+    pairs.add(key)
+    need(!('mul' in r) || r.mul > 0, `elements.reactions.${id}.mul 须为正`)
+  }
+  const { strong, weak, same } = ELEMENTS.mul
+  need(strong > 1 && weak > 0 && weak < 1 && same > 0 && same <= 1 && ELEMENTS.auraMs > 0, 'elements.mul 须克制大于 1、被克与同元素在 (0, 1] 内，附着时长为正')
 }
 
 /** 本能：生命比例在 (0, 1] 内、距离为正；队员离队长的绳长为正，躲危险的余量不为负 */
@@ -1160,30 +1213,43 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
 }
 
 /**
- * 内容一个单位一个文件：敌人与角色在 common 或某张图的目录里，地图与关卡在各自的目录里；文件名就是 id，每个文件都登记、只登记一次；
- * 关卡在哪张图的目录里写的就是那张图；角色文件里的能力与武器 id 全局不重，角色用到的能力与武器都在它自己的文件里、文件里的也都用得上
+ * 内容一个单位一个文件：旧的敌人与角色在 legacy，新的在各自那张图的目录里，地图与关卡在各自的目录里；文件名就是 id，每个文件都在所在目录的登记表里登记、只登记一次；
+ * 新旧的 id 不重；关卡在哪张图的目录里写的就是那张图；角色文件里的能力与武器 id 全局不重，角色用到的能力与武器都在它自己的文件里、文件里的也都用得上
  */
 {
   const defs = new URL('../defs/', import.meta.url)
   const tsIn = (dir: URL): string[] => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.ts')) : [])
   const where = (dir: URL, f: string): string => `defs/${new URL(f, dir).pathname.slice(defs.pathname.length)}`
   const mapDirs = readdirSync(new URL('maps/', defs), { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? [d.name] : []))
-  const unitDirs = (kind: string): URL[] => [new URL(`common/${kind}/`, defs), ...mapDirs.map((m) => new URL(`maps/${m}/${kind}/`, defs))]
 
-  /** 一类单位的文件与登记表对得上：文件名就是登记的名字，登记的每一个都来自一个文件 */
-  const registered = async (kind: string, table: Readonly<Record<string, unknown>>, pick: (mod: Record<string, unknown>) => unknown): Promise<void> => {
+  /** 一个目录里的单位文件与它的登记表对得上：文件名就是登记的名字，登记的每一个都来自这个目录里的一个文件 */
+  const registered = async (dir: URL, at: string, table: Readonly<Record<string, unknown>>, pick: (mod: Record<string, unknown>) => unknown): Promise<void> => {
     let n = 0
-    for (const dir of unitDirs(kind)) {
-      for (const f of tsIn(dir)) {
-        n++
-        const mod = (await import(new URL(f, dir).href)) as Record<string, unknown>
-        need(table[f.slice(0, -3)] === pick(mod), `${where(dir, f)} 没在 defs/${kind}.ts 里登记，或登记的名字不是文件名`)
-      }
+    for (const f of tsIn(dir)) {
+      n++
+      const mod = (await import(new URL(f, dir).href)) as Record<string, unknown>
+      need(table[f.slice(0, -3)] === pick(mod), `${where(dir, f)} 没在 ${at} 里登记，或登记的名字不是文件名`)
     }
-    need(n === Object.keys(table).length, `defs/${kind}.ts 登记了 ${Object.keys(table).length} 个，目录里有 ${n} 个文件：每个一个文件、只登记一次`)
+    need(n === Object.keys(table).length, `${at} 登记了 ${Object.keys(table).length} 个，${where(dir, '')} 里有 ${n} 个文件：每个一个文件、只登记一次`)
   }
-  await registered('enemies', ENEMIES, (mod) => mod.default)
-  await registered('characters', CHARACTER_FILES, (mod) => mod)
+  await registered(new URL('legacy/enemies/', defs), 'defs/legacy/enemies.ts', LEGACY_ENEMIES, (mod) => mod.default)
+  await registered(new URL('legacy/characters/', defs), 'defs/legacy/characters.ts', LEGACY_CHARACTER_FILES, (mod) => mod)
+  let newEnemies = 0
+  let newCharacters = 0
+  for (const m of mapDirs) {
+    const units = new URL(`maps/${m}/units.ts`, defs)
+    need(existsSync(units), `defs/maps/${m}/ 缺 units.ts`)
+    if (!existsSync(units)) continue
+    const own = (await import(units.href)) as { ENEMIES: Record<string, EnemyDef>; CHARACTERS: Record<string, CharacterFile> }
+    await registered(new URL(`maps/${m}/enemies/`, defs), `defs/maps/${m}/units.ts`, own.ENEMIES, (mod) => mod.default)
+    await registered(new URL(`maps/${m}/characters/`, defs), `defs/maps/${m}/units.ts`, own.CHARACTERS, (mod) => mod)
+    for (const [k, e] of Object.entries(own.ENEMIES)) need((NEW_ENEMIES as Record<string, unknown>)[k] === e, `defs/maps/${m}/units.ts 的敌人 ${k} 没在 defs/enemies.ts 里接上，或和别的敌人重名`)
+    for (const [k, c] of Object.entries(own.CHARACTERS)) need((NEW_CHARACTER_FILES as Record<string, unknown>)[k] === c, `defs/maps/${m}/units.ts 的角色 ${k} 没在 defs/characters.ts 里接上，或和别的角色重名`)
+    newEnemies += Object.keys(own.ENEMIES).length
+    newCharacters += Object.keys(own.CHARACTERS).length
+  }
+  need(newEnemies === Object.keys(NEW_ENEMIES).length && newEnemies + Object.keys(LEGACY_ENEMIES).length === Object.keys(ENEMIES).length, '新敌人之间或新旧敌人之间有重名的种类')
+  need(newCharacters === Object.keys(NEW_CHARACTER_FILES).length && newCharacters + Object.keys(LEGACY_CHARACTER_FILES).length === Object.keys(CHARACTER_FILES).length, '新角色之间或新旧角色之间有重名的 id')
   for (const [k, e] of Object.entries<EnemyDef>(ENEMIES)) need(e.kind === k, `enemies.${k} 的 kind 须是 ${k}`)
 
   let fights = 0

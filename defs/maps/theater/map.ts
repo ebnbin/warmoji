@@ -44,5 +44,5 @@ export default {
     turn: { firstMs: 20000, intervalMs: 20000, jitterMs: 0, lightMs: 700, staggerMs: 900, flyMs: 900, slideMs: 1600 },
     reflowMs: 300,
   },
-  boss: 'eclipse',
+  bosses: ['eclipse'],
 } as const satisfies MapDef

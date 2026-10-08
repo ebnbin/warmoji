@@ -1,6 +1,6 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
-import { Alive, Casting, Clock, Ctl, Depth, Drive, Faction, Grow, Hp, Idle, Leech, Lethal, Mark, Motion, MotionHit, Phys, Radius, Span, Sprite, Stamina, Tint, Transform, VisOff } from '../components'
+import { Alive, Casting, Clock, Ctl, Depth, Drive, Elem, Faction, Grow, Hp, Idle, Leech, Lethal, Mark, Motion, MotionHit, Phys, Radius, Span, Sprite, Stamina, Tint, Transform, VisOff } from '../components'
 import { attachStats } from '../utils/stats'
 import type { Span as Layers } from '../../types/obstacles'
 import type { StatBase } from '../../types/stats'
@@ -19,6 +19,8 @@ interface BodySpec {
   readonly grip: number
   /** 走自己的钟就不受时停 */
   readonly ownClock: boolean
+  /** 元素编号，0 是无元素 */
+  readonly element: number
 }
 
 /** 一个身体：有位置、阵营、体积、属性表、力学和标记，能施法、能被画；角色和敌人都从这里出生，再各自加上身份；出生满血满体力 */
@@ -31,6 +33,7 @@ export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   Phys.grip[eid] = spec.grip
   Clock.v[eid] = spec.ownClock ? 1 : 0
   Faction.v[eid] = spec.faction
+  Elem.v[eid] = spec.element
   Radius.v[eid] = spec.radius
   Span.lo[eid] = spec.span[0]
   Span.hi[eid] = spec.span[1]

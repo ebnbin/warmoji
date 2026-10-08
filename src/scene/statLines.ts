@@ -11,6 +11,7 @@ import { gearMods, resolveAbilityDef } from '../data/items'
 import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ROLES } from '../data/roles'
 import { STATUSES } from '../data/statuses'
+import { ELEMENTS } from '../data/elements'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { GrowthProgress, ItemId } from '../types/items'
@@ -93,7 +94,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'slow':
       return e.factor === 0 ? `冻结 ${sec(e.durationMs)}` : `减速 ${pct(1 - e.factor)} ${sec(e.durationMs)}`
     case 'poison':
-      return `中毒 ${e.damage}/${sec(e.tickMs)}×${sec(e.durationMs)}`
+      return `中毒 ${[e.damage ? `${e.damage}` : '', e.ratio ? `${pct(e.ratio)} 基础伤害` : ''].filter(Boolean).join(' + ')}/${sec(e.tickMs)}×${sec(e.durationMs)}`
     case 'ground':
       return `留下 ${grid(e.def.radius)} 的${e.def.trap ? '陷阱' : '场地'} ${sec(e.def.durationMs)}${e.def.damage && e.def.tickMs ? `，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤` : ''}${e.def.effects && !e.def.trap ? `，每 ${sec(e.def.tickMs)} ${joinFx(e.def.effects)}` : ''}${zoneRuleLine(e.def, e.def.effects, e.def.damage)}`
     case 'morph':
@@ -255,6 +256,8 @@ export function effectLine(e: Effect, self = false): string {
       return `拴在身后拖行 ${sec(e.ms)}，期间不能行动`
     case 'realm':
       return `把目标与自己拉进只有彼此的异界 ${sec(e.ms)}，界外谁也插不了手`
+    case 'imbue':
+      return `附${ELEMENTS[e.element].name}魔 ${sec(e.ms)}（出手都带${ELEMENTS[e.element].name}元素）`
   }
 }
 
@@ -307,6 +310,8 @@ export function condLine(c: Cond): string {
       return `离自己 ${grid(c.radius)} 以内`
     case 'afterSkill':
       return `${who}放主动技能后 ${sec(c.ms)} 内`
+    case 'element':
+      return `${who}是${ELEMENTS[c.element].name}元素`
   }
 }
 

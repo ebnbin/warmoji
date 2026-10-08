@@ -72,6 +72,7 @@ function lookAlike(sim: Sim, by: number): NpcDef {
   return {
     emoji: bodyLook[by] ?? c?.emoji ?? '1f47b',
     name: c?.name ?? '',
+    element: c?.element,
     size: charSize(by),
     radius: Radius.v[by]!,
     hp: Hp.max[by]!,

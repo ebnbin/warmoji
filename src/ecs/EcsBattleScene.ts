@@ -294,7 +294,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
         if (cmd.what === 'one') telegraphOne(sim, { hpMul: 1 })
         else if (cmd.what === 'elite') telegraphOne(sim, { hpMul: 1, elite: true })
         else if (cmd.what === 'surge') callSquad(sim, SURGE)
-        else spawnBoss(sim)
+        else spawnBoss(sim, cmd.n)
         return
       case 'killAll':
         if (sim.over) return

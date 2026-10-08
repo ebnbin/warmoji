@@ -42,6 +42,7 @@ import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
 import { spawnFxCircle, spawnFxRing } from '../../entities/fx'
 import { withDeath } from '../../../data/reactions'
+import { elementIndex } from '../../../data/elements'
 
 interface HitCtx {
   readonly x: number
@@ -198,8 +199,9 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   poison: (sim, src, fx, at) => {
     const now = sim.elapsedMs
+    const tick = fx.damage + (fx.ratio ?? 0) * at.baseDamage
     eachCapable(sim, at, Mark, (t) => {
-      const s = addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
+      const s = addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, tick, fx.tickMs, now + fx.tickMs)
       if (s >= 0) (markSrcs[t] ??= [])[s - t * MARK_SLOTS] = src
     })
   },
@@ -208,6 +210,11 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     eachCapable(sim, at, Enemy, (t) => {
       if (!isSteadfast(sim, t)) applyMorph(sim, sim.frames, t, fx)
     })
+  },
+
+  imbue: (sim, _src, fx, at) => {
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.imbue, TAG.effect, until, elementIndex(fx.element)))
   },
 
   attackSlow: (sim, _src, fx, at) => {

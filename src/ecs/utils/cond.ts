@@ -1,4 +1,5 @@
-import { Boss, FACTION, Faction, Gear, Hp, MARK, Phys, Radius, Transform, Uid } from '../components'
+import { Boss, Elem, FACTION, Faction, Gear, Hp, MARK, Phys, Radius, Transform, Uid } from '../components'
+import { elementIndex } from '../../data/elements'
 import { isAirborne, markSlot, statusDef } from './marks'
 import { UNIT } from '../../util/units'
 import type { Cond } from '../../types/abilityDefs'
@@ -53,6 +54,8 @@ function atom(sim: Sim, src: Source, self: number, t: number, c: Atom): boolean 
     }
     case 'afterSkill':
       return sim.elapsedMs - Gear.skillAt[t]! < c.ms
+    case 'element':
+      return Elem.v[t] === elementIndex(c.element)
   }
 }
 

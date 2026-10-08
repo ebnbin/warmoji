@@ -1,7 +1,8 @@
 import charactersJson from '../assets/characters.json'
+import rosterJson from '../assets/roster.json'
 import teamJson from '../assets/team.json'
 import { fromJson } from './json'
-import { keysOf, mapValues } from '../util/record'
+import { mapValues } from '../util/record'
 import { ABILITIES } from './abilities'
 
 import type { AbilityDef } from '../types/abilityDefs'
@@ -53,7 +54,11 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
 
 const CHARACTER_TABLE = fromJson<Record<CharacterId, CharacterAuthoring>>(charactersJson)
 export const CHARACTERS: Record<CharacterId, CharacterDef> = mapValues(CHARACTER_TABLE, hydrateCharacter)
-export const ROSTER_IDS: readonly CharacterId[] = keysOf(CHARACTERS)
+const ROSTER = fromJson<{ readonly characters: readonly CharacterId[]; readonly legacyCharacters: readonly CharacterId[] }>(rosterJson)
+/** 新角色：选角、招募与沙盒只列它们，按地图的先后 */
+export const ROSTER_IDS: readonly CharacterId[] = ROSTER.characters
+/** 旧角色：只给旧关卡的预设队伍与图鉴的旧角色页用 */
+export const LEGACY_ROSTER_IDS: readonly CharacterId[] = ROSTER.legacyCharacters
 
 /** 角色在这一级时各载体用的能力 */
 export function loadoutFor(def: CharacterDef, level: number): readonly AbilityDef[] {

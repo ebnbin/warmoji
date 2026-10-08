@@ -49,5 +49,5 @@ export default {
     view: { dayU: 18, nightU: 7, darkLux: 0.5, brightLux: 30, clearLux: 2 },
     spawnLux: 1,
   },
-  boss: 'eclipse',
+  bosses: ['eclipse'],
 } as const satisfies MapDef

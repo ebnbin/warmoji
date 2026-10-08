@@ -50,5 +50,5 @@ export default {
     trees: { inside: [3, 6], crownU: [1.3, 2.2], heightM: [4, 6], overhangU: 0.5, templeGapU: 4.5 },
     body: { kg: 60, radiusU: 0.45, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, mu: 0.5, swim: 0.4, wetM: 0.02 },
   },
-  boss: 'croc',
+  bosses: ['croc'],
 } as const satisfies MapDef

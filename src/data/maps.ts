@@ -11,8 +11,9 @@ export const MAPS = fromJson<Record<MapId, MapDef>>(mapsJson)
 
 export const MAP_IDS: readonly MapId[] = keysOf(MAPS)
 
-export function bossFor(id: MapId): EnemyDef {
-  return ENEMIES[MAPS[id].boss]
+/** 这张图的头目，按登场的先后 */
+export function bossesOf(id: MapId): EnemyDef[] {
+  return MAPS[id].bosses.map((k) => ENEMIES[k])
 }
 
 export function mapEnemyRoster(id: MapId): EnemyDef[] {
@@ -26,7 +27,7 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
     for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split' && fx.into) add(fx.into)
   }
   for (const kind of MAPS[id].foes) add(ENEMIES[kind])
-  add(bossFor(id))
+  for (const b of bossesOf(id)) add(b)
   return out
 }
 

@@ -6,6 +6,7 @@ import { UNIT } from '../../util/units'
 import { CHARACTERS, MEMBER, TEAM, memberBase } from '../../data/characters'
 
 import { ROLES } from '../../data/roles'
+import { elementIndex } from '../../data/elements'
 
 import { INVINCIBLE_HP, waveStartHp } from '../../run/state'
 import { armIdle } from '../systems/shared/anim'
@@ -57,6 +58,7 @@ export function spawnCharacter(
     mass: def.body.mass,
     grip: TEAM.followerGrip,
     ownClock: true,
+    element: elementIndex(def.element),
   })
   addComponents(world, eid, Slot, Breath, Pop, CharScale, Seat, Facing, Revive, CharFlash, Anim)
   Slot.v[eid] = slot

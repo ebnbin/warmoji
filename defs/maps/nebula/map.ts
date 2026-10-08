@@ -58,5 +58,5 @@ export default {
     spawnClearU: 1.5,
     cameraU: 48,
   },
-  boss: 'blackhole',
+  bosses: ['blackhole'],
 } as const satisfies MapDef

@@ -14,7 +14,8 @@ const CHECK_EVERY = 60
 
 /** 开发面板对这一场下的指令 */
 export type DevCommand =
-  | { readonly kind: 'spawn'; readonly what: 'one' | 'elite' | 'surge' | 'boss' }
+  /** n 是放这张图的第几个头目 */
+  | { readonly kind: 'spawn'; readonly what: 'one' | 'elite' | 'surge' | 'boss'; readonly n?: number }
   | { readonly kind: 'killAll' }
   | { readonly kind: 'grant'; readonly what: 'coins' | 'level' }
   | { readonly kind: 'endWave' }

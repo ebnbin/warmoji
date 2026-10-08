@@ -124,6 +124,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'interest':
     case 'vanish':
     case 'status':
+    case 'imbue':
       return []
     default:
       return unlisted(fx)

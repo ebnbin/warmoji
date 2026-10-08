@@ -48,5 +48,5 @@ export default {
     flowers: { cover: 0.24, patchU: 4 },
     sheep: [3, 6],
   },
-  boss: 'treant',
+  bosses: ['treant'],
 } as const satisfies MapDef

@@ -135,6 +135,9 @@ export const Stats = Object.fromEntries(STAT_KEYS.map((k) => [k, f32()])) as Rec
 export const Elite = { v: u8() }
 export const Boss = { v: u8() }
 
+/** 身体此刻的元素编号：0 是无元素，其余按元素表的次序 */
+export const Elem = { v: u8() }
+
 export const Radius = { v: f32() }
 
 /** 身段：竖直方向从第 lo 层占到第 hi 层，第 0 层贴着地；所有身体都有 */

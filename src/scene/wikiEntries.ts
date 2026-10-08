@@ -8,7 +8,7 @@ import type { BodyRules, EnemyDef, Tenacity } from '../types/enemies'
 import type { StatusAction, StatusDef, StatusForce, StatusMerge } from '../types/statuses'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
-import { MAP_IDS, MAPS, bossFor } from '../data/maps'
+import { MAP_IDS, MAPS, bossesOf } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
@@ -151,12 +151,11 @@ export function enemyStatLines(e: EnemyDef): string[] {
 
 function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   const m = MAPS[id]
-  const boss = bossFor(id)
   const names = m.foes.map((k) => ENEMIES[k].name)
   return [
     `世界规则 ${MAP_KIND_LABEL[m.kind]}`,
     mapStaminaLine(m),
-    `头目 ${boss.name}`,
+    `头目 ${bossesOf(id).map((b) => b.name).join('、')}`,
     `出没敌人 ${names.join('、')}`,
   ]
 }

@@ -73,7 +73,8 @@ import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
 import { toPx } from '../../data/px'
-import { bossFor, MAPS } from '../../data/maps'
+import { bossesOf, MAPS } from '../../data/maps'
+import { elementIndex } from '../../data/elements'
 import { pickEnemy } from '../utils/spawnMix'
 import { rollCarry } from '../utils/battleFx'
 import { fightMods } from '../fight/state'
@@ -214,6 +215,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     mass: ENEMY_BODY.mass,
     grip: ENEMY_BODY.grip,
     ownClock: false,
+    element: elementIndex(def.element),
   })
   addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim, Act)
   Act.gcdUntil[eid] = 0
@@ -399,9 +401,11 @@ export function markBounty(sim: Sim, eid: number): void {
   Ring.breathe[eid] = 1
 }
 
-export function spawnBoss(sim: Sim): void {
+/** 放出这张图的第 n 个头目，没有那么多就放最后一个 */
+export function spawnBoss(sim: Sim, n = 0): void {
   if (sim.over) return
-  const raw = bossFor(sim.mapId)
+  const all = bossesOf(sim.mapId)
+  const raw = all[Math.min(n, all.length - 1)]!
   const def = toPx(raw)
   const pos = placeFoe(sim, { hpMul: 1 }, raw.kind, true)
   const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, {}, SPAWN.telegraphMs * 1.6, pos.entry)

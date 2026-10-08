@@ -56,5 +56,5 @@ export default {
       gaits: { zombie: 'foot', skeleton: 'foot', boar: 'hoof', snake: 'slither', rat: 'paw', raccoon: 'paw', turtle: 'paw', creeper: 'paw', locust: 'hop', scorpion: 'legs' },
     },
   },
-  boss: 'scorpion',
+  bosses: ['scorpion'],
 } as const satisfies MapDef

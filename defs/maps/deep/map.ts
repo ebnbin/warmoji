@@ -70,5 +70,5 @@ export default {
       roomU: 0.5,
     },
   },
-  boss: 'croc',
+  bosses: ['croc'],
 } as const satisfies MapDef
