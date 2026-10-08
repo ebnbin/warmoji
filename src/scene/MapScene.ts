@@ -7,7 +7,7 @@ import { fightCount, RUN_IDS, RUNS } from '../data/runs'
 import { heatOf, MUTATOR_IDS, MUTATORS } from '../data/mutators'
 import { EXPERIMENT_IDS, EXPERIMENTS } from '../data/experiments'
 import type { ExperimentId, FightDef, MutatorId, RunId } from '../types/runs'
-import { beginRun, beginSandbox, skipFilled } from '../run/state'
+import { beginRun, enterSandbox, skipFilled } from '../run/state'
 import { SANDBOX } from '../run/sandbox'
 import { mutatorFits } from '../run/rules'
 import { goStep } from './teamPage'
@@ -164,7 +164,7 @@ export class MapScene extends Phaser.Scene {
   private start(): void {
     const mode = this.mode
     if (!isPick(mode)) {
-      goStep(this, beginSandbox(this.boxId))
+      goStep(this, enterSandbox(this.boxId))
       return
     }
     const id = this.picked[mode]

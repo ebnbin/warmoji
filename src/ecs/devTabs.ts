@@ -275,7 +275,7 @@ function sandboxTab(battle: EcsBattleScene): DevTab {
         set: (id): void => {
           const p = SANDBOX_PRESETS.find((x) => x.id === id)
           if (!p) return
-          applySandboxPreset(p.id)
+          applySandboxPreset(p.id, battle.run.mapId)
           restart()
         },
       },

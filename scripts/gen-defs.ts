@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFi
 import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
-import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, NEW_CHARACTER_FILES, WEAPONS } from '../defs/characters.ts'
+import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, MAP_CHARACTERS, NEW_CHARACTER_FILES, WEAPONS } from '../defs/characters.ts'
 import type { CharacterFile } from '../defs/characters.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
@@ -1113,13 +1113,15 @@ need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restR
 need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
 need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
 
-/** 新旧名单：选角、沙盒、地图与图鉴按它分开新旧 */
+/** 新旧名单与各张图对应的角色：选角、沙盒、地图与图鉴按它分开新旧，沙盒按图抽队伍 */
 const ROSTER = {
   characters: Object.keys(NEW_CHARACTER_FILES),
   legacyCharacters: Object.keys(LEGACY_CHARACTER_FILES),
   enemies: Object.keys(NEW_ENEMIES),
   legacyEnemies: Object.keys(LEGACY_ENEMIES),
+  maps: MAP_CHARACTERS,
 }
+need(Object.keys(MAP_CHARACTERS).sort().join() === Object.keys(MAPS).sort().join(), 'defs/characters.ts 的 MAP_CHARACTERS 须每张图各一份')
 
 /** 写进 JSON 的全部定义表 */
 const TABLES = {

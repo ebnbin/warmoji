@@ -42,6 +42,9 @@ export const NEW_CHARACTER_FILES = {
   ...nebula,
 } satisfies Record<string, CharacterFile>
 
+/** 各张图对应的新角色，按登记的先后：沙盒进哪张图就从哪张图的里面抽队伍 */
+export const MAP_CHARACTERS = mapValues({ meadow, sakura, desert, deep, ruins, amethyst, volcano, floe, theater, petri, exit, nebula }, (own) => Object.keys(own))
+
 /** 角色登记表：旧角色在前、新角色在后；每名角色一个文件，文件名就是 id */
 export const CHARACTER_FILES = { ...LEGACY_CHARACTER_FILES, ...NEW_CHARACTER_FILES } satisfies Record<string, CharacterFile>
 
