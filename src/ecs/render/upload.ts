@@ -17,8 +17,13 @@ function bindForUpload(scene: Phaser.Scene, tex: Phaser.Textures.Texture): { gl:
 
 /** 画好的图交给 Phaser，只在这时传一次；CanvasTexture 建时先传一张空图，还要把整张画布读回一遍 */
 export function canvasToTexture(scene: Phaser.Scene, key: string, canvas: HTMLCanvasElement): Phaser.Textures.Texture {
-  if (scene.textures.exists(key)) scene.textures.remove(key)
-  return scene.textures.create(key, canvas, canvas.width, canvas.height)!
+  const textures = scene.textures
+  if (textures.exists(key)) textures.remove(key)
+  const tex = textures.create(key, canvas, canvas.width, canvas.height)!
+  tex.add('__BASE', 0, 0, 0, canvas.width, canvas.height)
+  textures.emit(Phaser.Textures.Events.ADD, key, tex)
+  textures.emit(Phaser.Textures.Events.ADD_KEY + key, tex)
+  return tex
 }
 
 /** 每帧要换的数据图：像素就是 data，显卡丢了上下文时 Phaser 拿它重建；不经画布，免得写进去再读出来 */
