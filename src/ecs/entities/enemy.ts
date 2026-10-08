@@ -171,7 +171,7 @@ export function spawnEnemy(
   traits: SpawnTraits = {},
 ): number {
   const affixes = elite ? rollAffixes(sim) : []
-  const body = affixes.length > 0 ? withAffixes(def, affixes.map((id) => AFFIXES[id])) : def
+  const body = affixes.length > 0 ? withAffixes(def, affixes.map((id) => toPx(AFFIXES[id]))) : def
   const eid = spawnNpc(sim, atlas, body, x, y, hp, { elite, boss, group: traits.stats, huntLeader: traits.huntLeader, affixes })
   enemyOf[eid] = def
   enemyLoot[eid] = traits.loot

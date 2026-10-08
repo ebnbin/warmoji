@@ -1,9 +1,10 @@
 import { KNOCKBACK_TAU_MS } from '../data/abilities'
 import { reactionEffects } from '../data/reactions'
 import { STAT_KEYS, STATS, modTexts, statText } from '../data/stats'
-import { CHARACTERS, INSTINCT, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
+import { CHARACTERS, INSTINCT, loadoutFor, MEMBER, memberStats, upgradeCardsFor } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import type { ResourceDef } from '../types/enemies'
+import type { ResourceDef, UnitTrait } from '../types/enemies'
+import type { Span } from '../types/obstacles'
 import type { CharacterId } from '../types/characters'
 import type { InstinctDef, InstinctRule } from '../types/roles'
 import { gearMods, resolveAbilityDef } from '../data/items'
@@ -447,6 +448,13 @@ function instinctWhat(d: InstinctDef): string {
   }
 }
 
+const UNIT_TRAIT_LABEL: Record<UnitTrait, string> = { swims: '会游泳', breathes: '要换气', phases: '穿墙', fireproof: '耐火', coldproof: '耐寒', anchored: '定身', wary: '识险' }
+
+/** 单位的特质说成一串：会飞的看身段；一个都没有是空串 */
+export function traitLine(traits: readonly UnitTrait[] | undefined, span: Span | undefined): string {
+  return [...(span && span[0] > 0 ? ['会飞'] : []), ...(traits ?? []).map((t) => UNIT_TRAIT_LABEL[t])].join('、')
+}
+
 /** 一条本能的说法：条件里的目标是离自己最近的敌人 */
 export function instinctLine(r: InstinctRule): string {
   if (!r.if) return instinctWhat(r.do)
@@ -476,8 +484,18 @@ export function characterStatGroups(
     const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
     if (rest.length > 0) baseLines.push(rest.join(' · '))
     if (def.resource) baseLines.push(resourceLine(def.resource))
-    baseLines.push(`跟队时：${def.instincts.map(instinctLine).join('；')}；都不成就回坑位，离队长不超过 ${grid(INSTINCT.leash)}，躲开危险的地方`)
+    baseLines.push(`特质：${traitLine([...MEMBER.traits, ...(def.traits ?? [])], undefined) || '无'}`)
     groups.push({ icon: '2764', title: `基础 · ${ROLES[def.role].name}`, lines: baseLines })
+    groups.push({
+      icon: '1f9ed',
+      title: `跟队本能 · ${ROLES[def.role].name}`,
+      lines: [
+        '当队员时自己挑站的地方，当队长时听你的；按下面的先后取第一条成立的：',
+        ...def.instincts.map((r, i) => `${i + 1}. ${instinctLine(r)}`),
+        `都不成立就回到队长身后的坑位；离队长最远 ${grid(INSTINCT.leash)}，再远就先回坑位`,
+        '全员都躲：敌人跳砸的落点、敌人正在蓄力的招打得到的地方、敌方的场，以及熔岩、黑洞边缘、冰水这类站上去就伤人的地方',
+      ],
+    })
   }
   groups.push({
     icon: def.skill.icon,

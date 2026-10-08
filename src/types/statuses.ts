@@ -22,6 +22,8 @@ export type StatusMerge = 'high' | 'low' | 'rate' | 'bySource'
 /** 一种状态：身体上一条带时限的标记，规则都写在这里，按名字施加与判断 */
 export interface StatusDef {
   readonly name: string
+  /** 一句话说清它让身体怎样，图鉴的状态页用 */
+  readonly desc: string
   /** 带时限时头顶显示的图标：emoji 码位，同时有几个时 rank 小的在前；不写就不显示 */
   readonly icon?: { readonly emoji: string; readonly rank: number }
   /** 不写的同种只刷新时长（取长的），参数用新的 */
