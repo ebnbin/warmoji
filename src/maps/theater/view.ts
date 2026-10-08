@@ -488,6 +488,7 @@ export class TheaterView implements MapView {
     })
     ctx.globalCompositeOperation = 'source-over'
     this.darkTex!.refresh()
+    this.darkTex!.setFilter(Phaser.Textures.FilterMode.LINEAR)
   }
 
   /** 被吊起来的角色头顶两根吊绳，一直通到台框上面 */

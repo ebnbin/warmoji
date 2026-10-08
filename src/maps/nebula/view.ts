@@ -87,6 +87,12 @@ function diskLight(lum: number, dU: number): number {
   return (lum * 9) / (dU * dU + 4)
 }
 
+/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
+function upload(tex: Phaser.Textures.CanvasTexture): void {
+  tex.refresh()
+  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
+}
+
 /**
  * 视界：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按透视、黑洞的引力透镜、吸积盘的光与光回波画出来；
  * 内壁上此起彼伏地演着天象：恒星诞生、发光、死去，把周围的气体与尘埃照成各种颜色。
@@ -186,8 +192,8 @@ export class NebulaView extends BoundedView {
       to.getContext().putImageData(new ImageData(p.pixels, layerPx(sheet, p.band.layer), p.band.r1 - p.band.r0), 0, p.band.r0)
     })
     if (this.painter !== painter) return
-    tex.refresh()
-    rem.refresh()
+    upload(tex)
+    upload(rem)
     const cosmos = new Cosmos((v.run.decorSeed ^ 0x636f) >>> 0, sheet.wallU)
     this.cosmos = cosmos
     this.center = { x: L.cx, y: L.cy }
