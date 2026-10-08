@@ -14,15 +14,6 @@ const seedShot = {
   shape: { kind: 'bolt', projectile: shot('1fad8', 10, 0.36), lifeMs: 1400 },
 } satisfies AbilityDef
 
-const sunPulse = {
-  trigger: 'auto',
-  cooldownMs: 900,
-  aim: 'self',
-  fireSfx: 'chirp',
-  shape: { kind: 'disc', radius: 3, at: 'self', of: 'hurt' },
-  onHit: [{ kind: 'heal', amount: 6 }],
-} satisfies AbilityDef
-
 const sunflower = (ability: AbilityDef, maxAlive: number, cooldownMs: number) =>
   ({
     trigger: 'auto',
@@ -34,7 +25,8 @@ const sunflower = (ability: AbilityDef, maxAlive: number, cooldownMs: number) =>
 
 const farmerPlant = sunflower(seedShot, 2, 4500)
 const farmerPlant2 = sunflower(seedShot, 3, 3500)
-const farmerPlant3 = sunflower({ ...seedShot, cycle: [seedShot, seedShot, sunPulse] }, 3, 3500)
+const harvest = { kind: 'to', who: { side: 'allies', radius: 3, filter: { kind: 'hpBelow', who: 'target', ratio: 1 } }, then: [{ kind: 'heal', amount: 2 }] } as const
+const farmerPlant3 = sunflower({ ...seedShot, reactions: [{ on: 'fire', to: 'self', effects: [harvest] }] }, 3, 3500)
 
 const cornShot = {
   trigger: 'auto',
@@ -75,7 +67,7 @@ export default {
       base: 'farmerPlant',
       upgrades: [
         { ability: 'farmerPlant2', card: { icon: '1f331', name: '多种', desc: '最多同时三株，种得更勤' } },
-        { ability: 'farmerPlant3', card: { icon: '1f33e', name: '丰收', desc: '向日葵每吐两发就给身边受伤的队友回 6 点血' } },
+        { ability: 'farmerPlant3', card: { icon: '1f33e', name: '丰收', desc: '向日葵每吐一发豆子，就给身边 3 格内受伤的队友回 2 点血' } },
       ],
     },
   ],
