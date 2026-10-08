@@ -42,6 +42,8 @@ export interface Screen {
   visible(): Rect
   /** 世界里 (x, y) 往外 pad 像素以内有没有落进主镜头 */
   sees(x: number, y: number, pad?: number): boolean
+  /** 画布上 (px, py) 此刻对着主镜头里世界的哪一点 */
+  toWorld(px: number, py: number): Point
 }
 
 /** 环面固定取景、或平铺的图跟随时，八台镜像镜头各比主镜头偏几圈 */
@@ -115,6 +117,7 @@ export class Lens {
         const v = this.view()
         return x >= v.x - pad && x <= v.x + v.w + pad && y >= v.y - pad && y <= v.y + v.h + pad
       },
+      toWorld: (px, py) => ({ x: this.cx + (px - this.port.x - this.port.w / 2) / this.zoom, y: this.cy + (py - this.port.y - this.port.h / 2) / this.zoom }),
     }
   }
 

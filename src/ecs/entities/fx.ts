@@ -4,8 +4,19 @@ import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from 
 import { boltPts } from '../store'
 import { MISS, pushDamageNumber } from '../damageNumbers'
 import { attachDrawable } from './drawable'
-import type { CircleCue } from '../render/cues'
 import type { Sim } from '../sim'
+
+export interface CircleCue {
+  readonly fill: number
+  readonly fillAlpha: number
+  readonly stroke?: number
+  readonly lineWidth?: number
+  readonly lineAlpha?: number
+  readonly fromScale: number
+  readonly toScale: number
+  readonly durationMs: number
+  readonly depth: number
+}
 
 const BEAM_MS = 200
 const BOLT_MS = 200
@@ -87,7 +98,7 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
       const nx = -(b.y - a.y)
       const ny = b.x - a.x
       const len = Math.hypot(nx, ny) || 1
-      const jitter = s === segs ? 0 : (Math.random() - 0.5) * 18
+      const jitter = s === segs ? 0 : (sim.fxRng.next() - 0.5) * 18
       pts.push(a.x + (b.x - a.x) * t + (nx / len) * jitter, a.y + (b.y - a.y) * t + (ny / len) * jitter)
     }
   }
@@ -110,7 +121,7 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
     x,
     y,
     size: size * 0.4,
-    rot: (Math.random() - 0.5) * 0.8,
+    rot: (sim.fxRng.next() - 0.5) * 0.8,
     z: BOOM_Z,
   })
   return eid

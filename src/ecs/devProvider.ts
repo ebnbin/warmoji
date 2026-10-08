@@ -1,6 +1,6 @@
 import type { EcsBattleScene } from './EcsBattleScene'
-import { devFlagItem, markPerf, resetPerf } from '../devtools'
-import type { DevItem, DevProvider } from '../devtools'
+import { defineDevChoice, defineDevFlag, devFlagItem, markPerf, pickOnce, resetPerf, TIME_SCALES } from '../devtools'
+import type { DevButtonsItem, DevItem, DevProvider } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
 import { beginSandbox } from '../run/state'
@@ -27,7 +27,27 @@ import {
   toggleSandboxEnemy,
 } from './sandbox/knobs'
 import type { SandboxLevel, SandboxMul } from './sandbox/knobs'
-import { pipelineProfile, resetPipelineProfile } from './systems/pipeline/step'
+import { pipelineProfile, profilePipelineWhen, resetPipelineProfile } from './systems/pipeline/step'
+import { hostNumChoices } from './systems/shared/devNumbers'
+import { decodeTape, encodeTape } from './tape'
+import type { Tape } from './tape'
+
+// 模拟层不依赖开发面板：它的剖析开关与可调数值在这里挂上，持久化与显示归开发面板
+profilePipelineWhen(
+  defineDevFlag({ id: 'ecs.profile', group: '战斗', label: '流水线剖析', desc: '逐 system 计时，结果在战斗页签' }),
+  () => performance.now(),
+)
+hostNumChoices((k) => {
+  const get = defineDevChoice({
+    id: k.id,
+    group: k.group,
+    label: k.label,
+    desc: k.desc,
+    options: k.values.map((v) => ({ id: String(v), label: k.fmt(v) })),
+    default: String(k.fallback),
+  })
+  return () => Number(get())
+})
 
 const MULS: readonly SandboxMul[] = [1, 3, 10]
 const LEVELS: readonly { readonly lv: SandboxLevel; readonly label: string }[] = [
@@ -46,6 +66,42 @@ function profileText(): string {
     `已采样 ${p.frames} 帧 · 各 system 平均合计 ${total.toFixed(2)} ms/帧`,
     ...rows.map((r) => `${r.avgMs.toFixed(3).padStart(7)} ms  ${r.name}`),
   ].join('\n')
+}
+
+/** 录像存成文件：名字带上地图与步数 */
+function saveTape(battle: EcsBattleScene, tape: Tape): void {
+  const url = URL.createObjectURL(new Blob([encodeTape(tape)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `warmoji-${battle.run.mapId}-${tape.ticks}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 选一个录像文件，读出来就照着重打 */
+function loadTape(battle: EcsBattleScene): void {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'application/json,.json'
+  input.onchange = (): void => {
+    const file = input.files?.[0]
+    if (!file) return
+    file
+      .text()
+      .then((text) => battle.replay(decodeTape(text)))
+      .catch((e: unknown) => console.error('读不了这份录像', e))
+  }
+  input.click()
+}
+
+function tapeButtons(battle: EcsBattleScene): DevButtonsItem['buttons'] {
+  const now = battle.currentTape()
+  const before = battle.previousTape()
+  return [
+    ...(now ? [{ label: '从头回放这一场', run: (): void => battle.replay(now) }, { label: '存下录像', run: (): void => saveTape(battle, now) }] : []),
+    ...(before ? [{ label: '回放上一场', run: (): void => battle.replay(before) }] : []),
+    { label: '读入录像回放', run: (): void => loadTape(battle) },
+  ]
 }
 
 function battleItems(battle: EcsBattleScene): DevItem[] {
@@ -74,24 +130,26 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
       kind: 'buttons',
       label: '生成',
       buttons: [
-        { label: '1 只', run: () => battle.devSpawn('one') },
-        { label: '1 只精英', run: () => battle.devSpawn('elite') },
-        { label: '精英潮', run: () => battle.devSpawn('surge') },
-        { label: 'Boss', run: () => battle.devSpawn('boss') },
-        { label: '全灭', run: () => battle.devKillAll() },
+        { label: '1 只', run: () => battle.dev({ kind: 'spawn', what: 'one' }) },
+        { label: '1 只精英', run: () => battle.dev({ kind: 'spawn', what: 'elite' }) },
+        { label: '精英潮', run: () => battle.dev({ kind: 'spawn', what: 'surge' }) },
+        { label: 'Boss', run: () => battle.dev({ kind: 'spawn', what: 'boss' }) },
+        { label: '全灭', run: () => battle.dev({ kind: 'killAll' }) },
       ],
     },
     {
       kind: 'buttons',
       label: '作弊',
       buttons: [
-        { label: '金币 +1000', run: () => battle.devGrant('coins') },
-        { label: '升一级', run: () => battle.devGrant('level') },
-        { label: '技能冷却清零', run: () => battle.devResetSkill() },
-        ...(battle.endless ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
-        { label: '下一阶段', run: () => battle.devNextPhase() },
+        { label: '金币 +1000', run: () => battle.dev({ kind: 'grant', what: 'coins' }) },
+        { label: '升一级', run: () => battle.dev({ kind: 'grant', what: 'level' }) },
+        { label: '技能冷却清零', run: () => battle.dev({ kind: 'resetSkill' }) },
+        ...(battle.endless ? [] : [{ label: '结束本波', run: (): void => battle.dev({ kind: 'endWave' }) }]),
+        { label: '下一阶段', run: () => battle.dev({ kind: 'nextPhase' }) },
       ],
     },
+    { kind: 'text', label: '录像 · 每步之前的输入都录下，回放照着重打，每秒比对一次战局', mono: true, read: () => battle.tapeText() },
+    { kind: 'buttons', buttons: tapeButtons(battle) },
     {
       kind: 'text',
       label: '队伍物理 · 极速是属性表的移速 · 响应 = 质量 ÷ 阻力 · 其余旋钮在"开关"页签',
@@ -184,7 +242,7 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
     mulChoice('难度 · 敌人血量', sandboxDifficulty, setSandboxDifficulty),
     mulChoice('攻速 · 我方冷却 ÷ 它', sandboxFireRate, (m) => {
       setSandboxFireRate(m)
-      battle.applyKnobs()
+      battle.dev({ kind: 'knobs' })
     }),
     {
       kind: 'toggle',
@@ -192,8 +250,7 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
       get: sandboxInvincible,
       set: (on): void => {
         setSandboxInvincible(on)
-        battle.run.invincible = on
-        battle.applyInvincible()
+        battle.dev({ kind: 'invincible', on })
       },
     },
     {
@@ -224,6 +281,28 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
   ]
 }
 
+/** 只停模拟：画面、镜头、开发面板与输入照常，停住时可一步一步往前走，点选身体看它此刻的样子 */
+function inspectItems(battle: EcsBattleScene): DevItem[] {
+  return [
+    {
+      kind: 'choice',
+      label: '模拟快慢',
+      options: TIME_SCALES.map((s) => ({ id: String(s), label: s === 0 ? '停' : `×${s}` })),
+      get: () => String(battle.simRate()),
+      set: (id) => battle.setSimRate(Number(id)),
+    },
+    {
+      kind: 'buttons',
+      buttons: [
+        { label: '走一步', run: () => battle.stepTicks(1) },
+        { label: '走一秒', run: () => battle.stepTicks(60) },
+        { label: '点选单位', run: () => pickOnce((px, py) => battle.inspectAt(px, py)) },
+      ],
+    },
+    { kind: 'text', label: '检视 · 停住时也照常刷新', mono: true, read: () => battle.inspectText() },
+  ]
+}
+
 /** 战斗 scene 专有能力；沙盒页签只在沙盒里出现 */
 export function battleDevProvider(battle: EcsBattleScene): DevProvider {
   return {
@@ -231,6 +310,7 @@ export function battleDevProvider(battle: EcsBattleScene): DevProvider {
     title: '战斗',
     sections: [
       { id: 'battle', title: '战斗', items: () => battleItems(battle) },
+      { id: 'inspect', title: '检视', items: () => inspectItems(battle) },
       ...(battle.knobs ? [{ id: 'sandbox', title: '沙盒', items: (): DevItem[] => sandboxItems(battle) }] : []),
     ],
   }

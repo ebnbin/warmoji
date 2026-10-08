@@ -21,7 +21,7 @@ import { attachResource } from './resource'
 import { memberGear, memberGearMods } from './loadout'
 
 import type { EcsWorld } from '../world'
-import type { EcsAtlas } from '../atlas'
+import type { FrameIndex } from '../frames'
 
 interface CharacterPlacement {
   slot: number
@@ -33,7 +33,7 @@ interface CharacterPlacement {
 
 export function spawnCharacter(
   world: EcsWorld,
-  atlas: EcsAtlas,
+  atlas: FrameIndex,
   run: RunState,
   place: CharacterPlacement,
   mods: readonly StatMods[],

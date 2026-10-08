@@ -1,4 +1,3 @@
-import { playSfx } from '../../audio/sfx'
 import { SPAWN } from '../../data/enemies'
 import { attachCarrierRing } from '../entities/pickup'
 import { markBounty, sightedSpawnPoint, spawnEnemy } from '../entities/enemy'
@@ -43,7 +42,7 @@ export function spawnStep(sim: Sim): void {
     const traits = telegraphTraits[e] ?? {}
     const eid = spawnEnemy(sim, atlas, telegraphDef[e]!, entry.sx, entry.sy, Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss, traits)
     enterBody(sim, eid, entry)
-    if (Telegraph.loud[e]) playSfx('boom')
+    if (Telegraph.loud[e]) sim.out.sfx.push('boom')
     if (traits.carries) {
       enemyCarries[eid] = traits.carries
       attachCarrierRing(sim, eid, traits.carries)

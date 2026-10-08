@@ -31,7 +31,6 @@ import type { FieldPickupDef, Polarity } from '../../types/battlefield'
 import type { SfxId } from '../../types/sfx'
 import type { Sim } from '../sim'
 import { UNIT } from '../../util/units'
-import { playSfx } from '../../audio/sfx'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { FIELD } from '../../data/battlefield'
 import { leaderX, leaderY } from '../utils/team'
@@ -214,7 +213,7 @@ export function dropLevelUp(sim: Sim, x: number, y: number): void {
     y = ly + u.y * away
   }
   sim.out.bursts.push({ x, y, count: 10, kind: 'coin' })
-  playSfx('upgrade')
+  sim.out.sfx.push('upgrade')
   spawnPickup(sim, x, y, levelUpSpec())
 }
 
@@ -268,6 +267,6 @@ export function animatePickup(sim: Sim, eid: number): void {
 export function spawnCoins(sim: Sim, x: number, y: number, count: number): void {
   if (sim.over) return
   sim.out.bursts.push({ x, y, count: 6, kind: 'coin' })
-  playSfx('coin')
+  sim.out.sfx.push('coin')
   dropCoins(sim, x, y, count)
 }

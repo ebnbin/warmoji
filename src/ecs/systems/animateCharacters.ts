@@ -1,5 +1,4 @@
 import { UNIT } from '../../util/units'
-import { playSfx } from '../../audio/sfx'
 import { charSize } from './shared/scale'
 import { endMotion } from './shared/displace'
 import { REJOIN, SQUAD } from '../../data/feel'
@@ -28,7 +27,7 @@ function land(sim: Sim, eid: number): void {
   Revive.drop[eid] = 0
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
-  playSfx('revive')
+  sim.out.sfx.push('revive')
   startPop(sim, eid, REJOIN.bounceMs)
   spawnFxCircle(sim, x, y, REJOIN.ringRadius * UNIT, {
     fill: 0xfff59d,

@@ -1,7 +1,6 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { REJOIN } from '../../../data/feel'
 import { UNIT } from '../../../util/units'
-import { playSfx } from '../../../audio/sfx'
 import { gainXp } from '../../../run/xp'
 import { teamLeveled } from '../../../run/members'
 import { coinDropChance } from '../../../data/waves'
@@ -130,7 +129,7 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
     if (src.slot >= 0 && src.slot < st.kills.length) st.kills[src.slot] = (st.kills[src.slot] ?? 0) + 1
     if (src.hazard) st.hazardKills[src.hazard] = (st.hazardKills[src.hazard] ?? 0) + 1
   }
-  playSfx('kill')
+  sim.out.sfx.push('kill')
   const def = enemyDef[eid]
   const who = hostile ? enemyOf[eid] : undefined
   const elite = Elite.v[eid] === 1
@@ -176,7 +175,7 @@ export function gainTeamXp(sim: Sim, amount: number, x?: number, y?: number): vo
   const gained = gainXp(sim.run, amount)
   if (gained === 0) return
   if (!teamLeveled(sim.run)) {
-    playSfx('levelup')
+    sim.out.sfx.push('levelup')
     return
   }
   const cx = x ?? Transform.x[sim.leader]! + UNIT

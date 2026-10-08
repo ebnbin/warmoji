@@ -29,7 +29,6 @@ import { worldFor } from './worlds/registry'
 import { newOutbox } from './outbox'
 import { newDamageNumbers } from './damageNumbers'
 import { FACTION, Stats } from './components'
-import type { EcsAtlas } from './atlas'
 import type { FightDef } from '../types/runs'
 import { fightMods, newFight } from './fight/state'
 import { layDown } from './systems/shared/combat'
@@ -69,7 +68,11 @@ export interface Sim {
   /** 按阵营的可被打身体快照，每帧开头与身体走完后各刷新一次 */
   targets: Target[][]
   frames: FrameIndex
+  /** 走过的步数 */
+  tick: number
   rng: Rng
+  /** 只给画面效果用的随机：不占玩法那一路，开关画面效果也不改变战局 */
+  fxRng: Rng
   /** 这一场的规则与进行中的状态 */
   fight: FightState
   pendingDeaths: PendingDeath[]
@@ -143,7 +146,7 @@ export function stepSim(sim: Sim): void {
 
 export function makeSim(
   world: EcsWorld,
-  atlas: EcsAtlas,
+  frames: FrameIndex,
   run: RunState,
   origin: { x: number; y: number },
   mapW: number,
@@ -152,7 +155,8 @@ export function makeSim(
   fight: FightDef,
 ): Sim {
   const state = newFight(fight, run)
-  const team = formTeam(world, atlas, run, origin.x, origin.y, fightMods(state, FACTION.team))
+  const seed = (run.decorSeed ^ 0x9e37 ^ Math.imul(run.step, 0x9e3779b1)) >>> 0
+  const team = formTeam(world, frames, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
   const sim: Sim = {
     world,
@@ -182,11 +186,13 @@ export function makeSim(
     },
     frameAttractors: [],
     targets: [[], []],
-    frames: atlas,
+    frames,
     pendingDeaths: [],
     out: newOutbox(),
     damageNumbers: damageNumbers ? newDamageNumbers() : null,
-    rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.step, 0x9e3779b1)) >>> 0),
+    tick: 0,
+    rng: new Rng(seed),
+    fxRng: new Rng((seed ^ 0x5bd1e995) >>> 0),
     fight: state,
     run,
     leader,

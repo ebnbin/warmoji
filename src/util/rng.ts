@@ -13,6 +13,11 @@ export class Rng {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 
+  /** 当前状态：比对两次模拟有没有走到同一处 */
+  snapshot(): number {
+    return this.state
+  }
+
   int(min: number, max: number): number {
     return min + Math.floor(this.next() * (max - min + 1))
   }

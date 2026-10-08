@@ -177,6 +177,11 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mutators?
   return run
 }
 
+/** 把这一局当作进行中的一局：照录像重打时换上录下的那一局 */
+export function adoptRun(run: RunState): void {
+  current = run
+}
+
 export function currentRun(): RunState | undefined {
   return current
 }

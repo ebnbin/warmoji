@@ -53,8 +53,12 @@ import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { SIGNALS } from '../src/data/signals.ts'
 import type { MapSignals } from '../src/data/signals.ts'
 import { render } from '../src/emoji/painted/design.ts'
+import { animIssues } from '../src/emoji/animCheck.ts'
+import { packSvg, parseEmojiPack } from '../src/emoji/pack.ts'
+import { splitSvg } from '../src/emoji/svgSplit.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
+import type { AbilityDef } from '../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
@@ -1023,6 +1027,79 @@ need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restR
 need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
 need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
 
+/** 写进 JSON 的全部定义表 */
+const TABLES = {
+  abilities: ABILITIES,
+  ai: AI,
+  animations: ANIMATIONS,
+  battlefield: BATTLEFIELD,
+  characters: CHARACTERS,
+  combat: COMBAT,
+  difficulty: DIFFICULTY,
+  economy: ECONOMY,
+  editor: EDITOR_DRAFT,
+  enemies: ENEMIES,
+  experiments: EXPERIMENTS,
+  feel: FEEL,
+  items: ITEMS,
+  levels: LEVEL_STATS,
+  maps: MAPS,
+  mutators: MUTATORS,
+  obstacles: OBSTACLES,
+  pickups: PICKUPS,
+  progression: PROGRESSION,
+  roles: ROLES,
+  runs: RUNS,
+  sfx: SFX,
+  stamina: STAMINA,
+  stats: STATS,
+  team: TEAM_BASELINE,
+  timestop: TIMESTOP,
+  weapons: WEAPONS,
+}
+
+/** 键名里带 emoji 或 icon 的字段都是表情包里的码位，缺图的单位到运行时只会隐形 */
+{
+  const scan = (v: unknown, path: string, isEmoji: boolean): void => {
+    if (typeof v === 'string') {
+      if (isEmoji) need(PACK.has(v), `${path} 不在表情包里：${v}`)
+    } else if (Array.isArray(v)) {
+      v.forEach((x, i) => scan(x, `${path}[${i}]`, isEmoji))
+    } else if (v !== null && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v)) scan(x, `${path}.${k}`, /emoji|icon/i.test(k))
+    }
+  }
+  for (const [name, data] of Object.entries(TABLES)) scan(data, name, false)
+}
+
+/** 动画配方：部件的下标对得上这张 emoji 的顶层元素，首尾姿态闭环 */
+{
+  const pack = parseEmojiPack(readFileSync('scripts/emoji/ordering.txt', 'utf8'), readFileSync('scripts/emoji/twemoji.txt', 'utf8'))
+  const elementCount = (emoji: string): number | undefined => {
+    const svg = packSvg(pack, emoji)
+    return svg === null ? undefined : splitSvg(svg).els.length
+  }
+  for (const issue of animIssues(ANIMATIONS, elementCount)) need(false, issue)
+}
+
+/** 角色的能力：引用存在；主动技能手动出手、要拖着瞄准的才用摇杆瞄准；武器与天生能力自动出手 */
+for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
+  const skill = (ABILITIES as Record<string, AbilityDef | undefined>)[c.skill.ability]
+  need(skill !== undefined, `characters.${id}.skill 引用了不存在的能力：${c.skill.ability}`)
+  if (skill) {
+    need(skill.trigger === 'manual', `characters.${id}.skill 的能力须手动出手：${c.skill.ability}`)
+    need((c.skill.aim === true) === (skill.aim === 'stick'), `characters.${id}.skill 写了 aim，能力就须用摇杆瞄准，反之亦然：${c.skill.ability}`)
+  }
+  const carriers = [...c.weapons.map((w) => ({ at: `weapons.${w}`, base: WEAPONS[w].base, upgrades: WEAPONS[w].upgrades })), ...c.innate.map((i) => ({ at: `innate.${i.name}`, base: i.base, upgrades: i.upgrades }))]
+  for (const cr of carriers) {
+    for (const ref of [cr.base, ...cr.upgrades.map((t) => t.ability)]) {
+      const a = (ABILITIES as Record<string, AbilityDef | undefined>)[ref]
+      need(a !== undefined, `characters.${id} 的 ${cr.at} 引用了不存在的能力：${ref}`)
+      need(a === undefined || a.trigger === 'auto', `characters.${id} 的 ${cr.at} 的能力须自动出手：${ref}`)
+    }
+  }
+}
+
 if (errors.length > 0) {
   console.error(errors.join('\n'))
   process.exit(1)
@@ -1030,35 +1107,7 @@ if (errors.length > 0) {
 
 const OUT = 'src/assets'
 mkdirSync(`${OUT}/emoji`, { recursive: true })
-const write = (name: string, data: unknown): void =>
-  writeFileSync(`${OUT}/${name}.json`, JSON.stringify(data, null, 1) + '\n')
-write('abilities', ABILITIES)
-write('ai', AI)
-write('animations', ANIMATIONS)
-write('battlefield', BATTLEFIELD)
-write('characters', CHARACTERS)
-write('combat', COMBAT)
-write('difficulty', DIFFICULTY)
-write('economy', ECONOMY)
-write('editor', EDITOR_DRAFT)
-write('enemies', ENEMIES)
-write('experiments', EXPERIMENTS)
-write('feel', FEEL)
-write('items', ITEMS)
-write('levels', LEVEL_STATS)
-write('maps', MAPS)
-write('mutators', MUTATORS)
-write('obstacles', OBSTACLES)
-write('pickups', PICKUPS)
-write('progression', PROGRESSION)
-write('roles', ROLES)
-write('runs', RUNS)
-write('sfx', SFX)
-write('stamina', STAMINA)
-write('stats', STATS)
-write('team', TEAM_BASELINE)
-write('timestop', TIMESTOP)
-write('weapons', WEAPONS)
+for (const [name, data] of Object.entries(TABLES)) writeFileSync(`${OUT}/${name}.json`, JSON.stringify(data, null, 1) + '\n')
 
 // ordering.txt 与 twemoji.txt 逐行对应，只拷贝不改写
 for (const name of ['ordering.txt', 'twemoji.txt']) copyFileSync(`scripts/emoji/${name}`, `${OUT}/emoji/${name}`)

@@ -19,6 +19,7 @@ const MAX_DRAW = 400
 let game: Phaser.Game | undefined
 let devKey = ''
 let pickMode = false
+let takeover: ((px: number, py: number) => void) | null = null
 let picked: Picked[] = []
 let selected = 0
 let showHitAreas = false
@@ -91,9 +92,25 @@ function details(scene: Phaser.Scene, o: Phaser.GameObjects.GameObject, b: Phase
 
 function setPickMode(on: boolean): void {
   pickMode = on
+  if (!on) takeover = null
+}
+
+/** 业务接管下一次拾取：进入拾取模式，点到面板外时把画布坐标交给 handler，不拾取 Phaser 对象 */
+export function pickOnce(handler: (px: number, py: number) => void): void {
+  takeover = handler
+  pickMode = true
+  refreshDevPanel()
 }
 
 export function pickAt(px: number, py: number): void {
+  const handler = takeover
+  if (handler) {
+    takeover = null
+    pickMode = false
+    handler(px, py)
+    refreshDevPanel()
+    return
+  }
   const found: { p: Picked; depth: number; index: number }[] = []
   let index = 0
   for (const scene of businessScenes()) {

@@ -73,6 +73,13 @@ export const SANDBOX_PRESETS: readonly SandboxPreset[] = [
 ]
 
 let presetId: SandboxPresetId | undefined
+let version = 0
+
+/** 手动改了旋钮：不再算某个预设 */
+function touched(): void {
+  presetId = undefined
+  version++
+}
 
 export function sandboxPresetId(): SandboxPresetId | undefined {
   return presetId
@@ -101,13 +108,13 @@ export function isSandboxEnemyOn(kind: EnemyKind): boolean {
 function setSandboxEnemies(kinds: readonly EnemyKind[]): void {
   enemies.clear()
   for (const k of kinds) enemies.add(k)
-  presetId = undefined
+  touched()
 }
 
 export function toggleSandboxEnemy(kind: EnemyKind): void {
   if (enemies.has(kind)) enemies.delete(kind)
   else enemies.add(kind)
-  presetId = undefined
+  touched()
 }
 
 export function isSandboxCharacterOn(id: CharacterId): boolean {
@@ -122,12 +129,12 @@ export function toggleSandboxCharacter(id: CharacterId): void {
     if (roster.length >= TEAM.maxSize) return
     roster = [...roster, id]
   }
-  presetId = undefined
+  touched()
 }
 
 function setSandboxRoster(ids: readonly CharacterId[]): void {
   roster = ids.length > 0 ? [...ids] : [...ROSTER_IDS.slice(0, 1)]
-  presetId = undefined
+  touched()
 }
 
 export function sandboxLevel(): SandboxLevel {
@@ -136,7 +143,7 @@ export function sandboxLevel(): SandboxLevel {
 
 export function setSandboxLevel(lv: SandboxLevel): void {
   level = lv
-  presetId = undefined
+  touched()
 }
 
 export function sandboxScale(): SandboxScale {
@@ -145,7 +152,7 @@ export function sandboxScale(): SandboxScale {
 
 export function setSandboxScale(s: SandboxScale): void {
   scale = s
-  presetId = undefined
+  touched()
 }
 
 export function sandboxDifficulty(): SandboxMul {
@@ -154,7 +161,7 @@ export function sandboxDifficulty(): SandboxMul {
 
 export function setSandboxDifficulty(m: SandboxMul): void {
   difficulty = m
-  presetId = undefined
+  touched()
 }
 
 export function sandboxFireRate(): SandboxMul {
@@ -163,7 +170,7 @@ export function sandboxFireRate(): SandboxMul {
 
 export function setSandboxFireRate(m: SandboxMul): void {
   fireRate = m
-  presetId = undefined
+  touched()
 }
 
 export function sandboxInvincible(): boolean {
@@ -172,7 +179,7 @@ export function sandboxInvincible(): boolean {
 
 export function setSandboxInvincible(on: boolean): void {
   invincible = on
-  presetId = undefined
+  touched()
 }
 
 export function sandboxStarters(): CharacterId[] {
@@ -188,6 +195,40 @@ export function sandboxTeam(): { readonly ids: readonly CharacterId[]; readonly 
 /** 攻速旋钮给队伍的常驻修正：冷却与技能冷却都除以它 */
 export function sandboxTeamMods(): StatMods[] {
   return fireRate === 1 ? [] : [{ mul: { cooldown: 1 / fireRate, skillCooldown: 1 / fireRate } }]
+}
+
+/** 旋钮的全部取值：录像开场时记下，回放时照样摆回去 */
+export interface SandboxState {
+  readonly enemies: readonly EnemyKind[]
+  readonly roster: readonly CharacterId[]
+  readonly level: SandboxLevel
+  readonly scale: SandboxScale
+  readonly difficulty: SandboxMul
+  readonly fireRate: SandboxMul
+  readonly invincible: boolean
+  readonly preset: SandboxPresetId | null
+}
+
+export function sandboxState(): SandboxState {
+  return { enemies: [...enemies], roster: [...roster], level, scale, difficulty, fireRate, invincible, preset: presetId ?? null }
+}
+
+export function restoreSandbox(s: SandboxState): void {
+  enemies.clear()
+  for (const k of s.enemies) enemies.add(k)
+  roster = [...s.roster]
+  level = s.level
+  scale = s.scale
+  difficulty = s.difficulty
+  fireRate = s.fireRate
+  invincible = s.invincible
+  presetId = s.preset ?? undefined
+  version++
+}
+
+/** 旋钮每改一次就变一次 */
+export function sandboxVersion(): number {
+  return version
 }
 
 applySandboxPreset(SANDBOX_PRESETS[0]!.id)

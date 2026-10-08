@@ -1,7 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
-import { playSfx } from '../../../audio/sfx'
 import { Alive, Boss, CharFlash, Elite, FACTION, Faction, Flash, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Tint, Transform, Uid } from '../../components'
 import { hasMark, inTransit, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
@@ -277,12 +276,12 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   lowHp(sim, target)
   gearLowHp(sim, target)
   if (team) {
-    playSfx('hurt')
+    sim.out.sfx.push('hurt')
     CharFlash.until[target] = sim.fxMs + 120
     Tint.color[target] = src.tint ?? 0xff7777
     Tint.effect[target] = 0
   } else {
-    playSfx('hit')
+    sim.out.sfx.push('hit')
     Flash.until[target] = now + 70
     Tint.effect[target] = 1
     Tint.color[target] = 0xffffff

@@ -1,4 +1,3 @@
-import { playSfx } from '../../audio/sfx'
 import { UNIT } from '../../util/units'
 import { Alive } from '../components'
 import { phaseOf, visitNeed } from '../fight/state'
@@ -31,7 +30,7 @@ export function tickVisits(sim: Sim): void {
     if (g.ms < e.ms) return
     const m = marks[here]!
     sim.out.bursts.push({ x: m.x, y: m.y, count: 16, kind: 'coin' })
-    playSfx('upgrade')
+    sim.out.sfx.push('upgrade')
     g.done.add(here)
     g.at = -1
     g.ms = 0
