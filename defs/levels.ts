@@ -38,4 +38,4 @@ export const LEVEL_STATS = {
   caterpillar: [{ add: { maxHp: 30 }, mul: { damage: 1.2 } }, { add: { maxHp: 60 }, mul: { damage: 1.45 } }],
   dragon: [{ add: { maxHp: 35 }, mul: { damage: 1.2 } }, { add: { maxHp: 70 }, mul: { damage: 1.45 } }],
   clown: [{ add: { maxHp: 15 }, mul: { damage: 1.25 } }, { add: { maxHp: 35 }, mul: { damage: 1.5 } }],
-} as const satisfies Record<CharacterId, readonly [StatMods, StatMods]>
+} as const satisfies Record<CharacterId, readonly StatMods[]>

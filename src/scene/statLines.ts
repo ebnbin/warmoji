@@ -5,7 +5,7 @@ import { ENEMIES } from '../data/enemies'
 import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
 import { gearMods, resolveAbilityDef } from '../data/items'
-import { tiersForLevel } from '../data/charLevel'
+import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ROLES } from '../data/roles'
 import { STATUSES } from '../data/statuses'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
@@ -434,8 +434,7 @@ export function characterStatGroups(
 ): StatGroup[] {
   const def = CHARACTERS[id]
   const stats = memberStats(def, gearMods(items, levelStatsFor(id, level), opts.growth))
-  const tiers = tiersForLevel(level)
-  const loadout = loadoutFor(def, tiers)
+  const loadout = loadoutFor(def, level)
   const groups: StatGroup[] = []
   if (opts.base !== false) {
     const baseLines = [
@@ -476,7 +475,7 @@ export function characterStatGroups(
       ],
     })
   }
-  const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
+  const tier = Math.min(level, MAX_CHAR_LEVEL) - 1
   for (const [i, carrier] of def.carriers.entries()) {
     const w = resolveAbilityDef(loadout[i]!, stats)
     const how = deliveryOf(w)

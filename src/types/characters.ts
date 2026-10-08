@@ -66,11 +66,12 @@ export interface CharacterAuthoring {
   readonly forms?: readonly FormDef[]
 }
 type CharacterRules = Pick<BodyRules, 'onHurt' | 'onKill' | 'onTouched' | 'onTouch' | 'onLethal' | 'onLowHp' | 'onIdle'>
+/** 载体：tiers 是 1 级起每一级用的能力，到顶后一直用最后一档；cards 是 2 级起每一级亮出的升级卡 */
 export interface Carrier {
   readonly name: string
   readonly icon: string
   readonly tiers: readonly AbilityDef[]
-  readonly cards: readonly (UpgradeCard | null)[]
+  readonly cards: readonly UpgradeCard[]
 }
 export interface CharacterDef {
   readonly emoji: string
@@ -85,10 +86,6 @@ export interface CharacterDef {
   readonly resource?: ResourceDef
   readonly rules?: CharacterRules
   readonly forms?: readonly FormDef[]
-}
-export interface UpgradeTiers {
-  u1: boolean
-  u2: boolean
 }
 export type CharacterId = keyof typeof charactersJson
 export interface TeamBaseline {

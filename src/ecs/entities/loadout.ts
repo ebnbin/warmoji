@@ -1,6 +1,5 @@
 import { CHARACTERS, loadoutFor } from '../../data/characters'
 import { gearMods, ITEMS, resolveAbilityDef } from '../../data/items'
-import { tiersForLevel } from '../../data/charLevel'
 import { levelStatsFor } from '../../data/levels'
 import { toPx } from '../../data/px'
 import { memberLevel } from '../../run/members'
@@ -29,7 +28,7 @@ export function armCarriers(sim: Sim, slot: number, defs?: readonly AbilityDef[]
   const m = sim.characters[slot]!
   const { owned, level } = memberGear(sim.run, slot)
   const fx = { range: Stats.range[m]!, projSpeed: Stats.projSpeed[m]! }
-  const own = defs ?? loadoutFor(CHARACTERS[sim.run.roster[slot]!], tiersForLevel(level))
+  const own = defs ?? loadoutFor(CHARACTERS[sim.run.roster[slot]!], level)
   const list = [...own, ...owned.flatMap((id) => ITEMS[id].ability ?? [])]
   list.forEach((w, i) => {
     equipAbility(sim, m, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230)

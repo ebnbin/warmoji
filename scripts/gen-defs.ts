@@ -704,11 +704,13 @@ for (const [id, e] of Object.entries<EnemyDef>(ENEMIES)) checkStamina(e.stats, `
 
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   need(new Set(c.tags).size === c.tags.length, `characters.${id}.tags 不能重复`)
-  for (const k of [0, 1]) {
+  for (let k = 0; k < MAX_CHAR_LEVEL - 1; k++) {
     const tiers = [...c.weapons.map((w) => WEAPONS[w].upgrades[k]), ...c.innate.map((i) => i.upgrades[k])]
     const names = new Set(tiers.flatMap((t) => (t ? [t.card.name] : [])))
     need(names.size === 1, `characters.${id} 第 ${k + 1} 档升级卡须存在且各载体一致`)
   }
+  for (const u of [...c.weapons.map((w) => WEAPONS[w].upgrades), ...c.innate.map((i) => i.upgrades)]) need(u.length < MAX_CHAR_LEVEL, `characters.${id} 的载体升级档不能多过等级上限：${u.length} 档`)
+  need(LEVEL_STATS[id as keyof typeof LEVEL_STATS].length === MAX_CHAR_LEVEL - 1, `levels.${id} 须给 2 到 ${MAX_CHAR_LEVEL} 级每一级写属性`)
 }
 
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {
