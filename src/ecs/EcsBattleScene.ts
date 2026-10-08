@@ -67,7 +67,8 @@ import { Lifetime, Modifier, Radius, Uid } from './components'
 import { isSameEntity } from './utils/identity'
 import { bodyAt, describeBody } from './inspector'
 
-import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
+import { initialLayout, stepFrozen } from './sim'
+import { presentFrame, presentFrozen } from './present/frame'
 import { openWave, settleWave } from './systems/shared/wave'
 import { waveAt, WAVE } from '../data/waves'
 import { SURGE } from '../data/enemies'
@@ -653,6 +654,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
+    presentFrame(this.sim, 0)
     this.sim.hooks.onStart(this.sim)
     hint.setText('绘制地图…')
     await this.map.onSimReady(this.ctx, this.sim)
@@ -1034,9 +1036,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return
     }
     if (this.ending) {
-      sim.dtMs = delta
-      sim.wdtMs = delta * worldTimeScale(sim)
-      stepFrozenVisuals(sim)
+      stepFrozen(sim, delta)
+      presentFrozen(sim)
       drainSfx(sim.out)
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
@@ -1050,7 +1051,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.view.right = seen.x + seen.w
     sim.view.bottom = seen.y + seen.h
     const steps = this.stepsFor(delta)
+    const from = sim.tick
     for (let i = 0; i < steps; i++) if (!this.tick(sim)) break
+    presentFrame(sim, (sim.tick - from) * TICK_MS)
     if (sim.leader !== this.shownLeader) {
       this.shownLeader = sim.leader
       const def = CHARACTERS[this.run.roster[sim.characters.indexOf(sim.leader)]!]

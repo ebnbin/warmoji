@@ -17,7 +17,6 @@ import { tickRescue } from '../tickRescue'
 import { tickVisits } from '../tickVisits'
 import { fireCues } from '../fireCues'
 import { fireTriggers } from '../fireTriggers'
-import { updateAnims } from '../updateAnims'
 import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
 import { updateZones } from '../updateZones'
@@ -33,7 +32,6 @@ const FRAME_PIPELINE = pipeline([
   { run: stepSim, after: [castRequests] },
   armEnemies,
   { run: stepAbilities, after: [stepSim, armEnemies] },
-  updateAnims,
   runDeathEffects,
   updateZones,
   updatePickups,

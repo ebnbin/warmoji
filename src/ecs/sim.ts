@@ -1,15 +1,9 @@
 import { SIM_PIPELINE } from './systems/pipeline/sim'
 import { runPipeline } from './systems/pipeline/step'
-import { animateCharacters, finishCharacterPops } from './systems/animateCharacters'
-import { characterVisual } from './systems/characterVisual'
-import { finishEnemyPops } from './systems/popInEnemies'
-import { hideTelegraphs } from './systems/blinkTelegraphs'
+import { settleLandings } from './systems/landCharacters'
 import { finishZoneFades } from './systems/updateZones'
 import { updateEmplacements } from './systems/updateEmplacements'
-import { showMounted } from './systems/showMounted'
-import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
-import { animateBooms } from './systems/animateBooms'
 import { expireFx } from './systems/expireFx'
 import { layoutTeam } from './systems/layoutTeam'
 import type { EcsWorld } from './world'
@@ -109,7 +103,6 @@ export interface PendingDeath {
 export function initialLayout(sim: Sim): void {
   sim.dtMs = 0
   layoutTeam(sim)
-  animateCharacters(sim)
 }
 
 function timeScaleFor(input01: number): number {
@@ -121,17 +114,13 @@ export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
 }
 
-export function stepFrozenVisuals(sim: Sim): void {
-  sim.fxMs += sim.dtMs
+/** 打完以后战局停住：画面时钟照真实时间走，到时的特效、碎片、装置、场照样收走，还在空中的队员直接落地 */
+export function stepFrozen(sim: Sim, dtMs: number): void {
+  sim.dtMs = dtMs
+  sim.fxMs += dtMs
   updateShards(sim)
-  animateBooms(sim)
   expireFx(sim)
-  stepPickupVisuals(sim)
-  characterVisual(sim)
-  finishCharacterPops(sim)
-  finishEnemyPops(sim)
-  showMounted(sim)
-  hideTelegraphs(sim)
+  settleLandings(sim)
   finishZoneFades(sim)
   updateEmplacements(sim)
 }

@@ -4,7 +4,6 @@ import { tickCooldowns } from '../tickCooldowns'
 import { tickRepeats } from '../tickRepeats'
 import { tickWindups } from '../tickWindups'
 import { placeHeld } from '../placeHeld'
-import { showMounted } from '../showMounted'
 import { castAbilities } from '../castAbilities'
 import { tickBlinks } from '../tickBlinks'
 import { updateDrops } from '../updateDrops'
@@ -28,7 +27,6 @@ const ABILITY_PIPELINE = pipeline([
   { run: castAbilities, after: [tickWindups, tickRepeats, updateDrops, updateFlyers, tickBlinks] },
   { run: updateEmplacements, after: [castAbilities] },
   { run: placeHeld, after: [castAbilities] },
-  { run: showMounted, after: [placeHeld] },
 ])
 
 export function stepAbilities(sim: Sim): void {

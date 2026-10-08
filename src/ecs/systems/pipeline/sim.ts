@@ -1,20 +1,15 @@
-import { animateEnemies } from '../animateEnemies'
-import { blinkTelegraphs } from '../blinkTelegraphs'
-import { animateBooms } from '../animateBooms'
 import { expireFx } from '../expireFx'
-import { animateCharacters } from '../animateCharacters'
+import { faceCharacters } from '../faceCharacters'
+import { landCharacters } from '../landCharacters'
 import { despawnExpired } from '../despawnExpired'
-import { fadeEnemyFlash } from '../fadeEnemyFlash'
 import { layoutTeam } from '../layoutTeam'
 import { touchBodies } from '../touchBodies'
-import { characterVisual } from '../characterVisual'
 import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
 import { tickStamina } from '../tickStamina'
 import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { settleMotions } from '../settleMotions'
-import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
 import { reviveCharacters } from '../reviveCharacters'
 import { steerBodies } from '../steerBodies'
@@ -34,8 +29,6 @@ import { tickShadows } from '../../entities/shadow'
 import { recordTraces } from '../shared/trace'
 import { tickBarriers } from '../../entities/barrier'
 import { tickTethers } from '../../entities/tether'
-import { tintEnemies } from '../tintEnemies'
-import { trackSight } from '../trackSight'
 import { cullProjectiles } from '../cullProjectiles'
 import { hitProjectiles } from '../hitProjectiles'
 import { refreshTargets } from '../refreshTargets'
@@ -64,30 +57,23 @@ export const SIM_PIPELINE = pipeline([
   { run: updateControl, after: [tickStats, tickMarks] },
   { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
-  popInEnemies,
   despawnExpired,
-  fadeEnemyFlash,
-  { run: tintEnemies, after: [fadeEnemyFlash] },
   updateBees,
   { run: steerBodies, after: [updateControl, updateBees] },
   { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: tickStamina, after: [moveBodies] },
   { run: refreshTargets, after: [moveBodies] },
-  { run: trackSight, after: [moveBodies] },
   { run: recordTraces, after: [moveBodies] },
   { run: tickPets, after: [moveBodies] },
   { run: tickTethers, after: [refreshTargets] },
   { run: settleMotions, after: [refreshTargets] },
-  { run: animateCharacters, after: [moveBodies] },
-  { run: animateEnemies, after: [moveBodies] },
+  { run: landCharacters, after: [moveBodies] },
+  { run: faceCharacters, after: [moveBodies] },
   { run: moveProjectiles, after: [moveBodies] },
   { run: hitProjectiles, after: [moveProjectiles, refreshTargets] },
   { run: touchBodies, after: [refreshTargets, settleMotions] },
   { run: cullProjectiles, after: [hitProjectiles] },
-  { run: characterVisual, after: [hitProjectiles, touchBodies] },
-  blinkTelegraphs,
   updateShards,
-  animateBooms,
-  { run: expireFx, after: [animateBooms] },
+  expireFx,
   { run: worldTick, after: [moveBodies, touchBodies] },
 ])
