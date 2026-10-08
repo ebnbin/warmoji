@@ -1,5 +1,4 @@
 import { hasComponent } from 'bitecs'
-import { playSfx } from '../../../audio/sfx'
 import { DEG2RAD } from '../../../util/units'
 import { TRANSIT_MS } from '../../../data/abilities'
 import {
@@ -591,7 +590,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
     if (!fired) return false
   }
   const sfx = abilityFireSfx[e]
-  if (sfx) playSfx(sfx)
+  if (sfx) sim.out.sfx.push(sfx)
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
   // 潜行出手即现形，闲着的计时重来
@@ -637,6 +636,6 @@ export function fireRepeat(sim: Sim, e: number): boolean {
   Aim.rad[e] = angle
   if (!fireMirrored(sim, e, src, angle, target, RepeatState.damage[e]! * Repeat.ratio[e]!, { onHit: abilityOnHit[e], reach: 1 })) return false
   const sfx = abilityFireSfx[e]
-  if (sfx) playSfx(sfx)
+  if (sfx) sim.out.sfx.push(sfx)
   return true
 }

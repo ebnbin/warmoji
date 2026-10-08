@@ -1,4 +1,3 @@
-import { playSfx } from '../../audio/sfx'
 import { UNIT } from '../../util/units'
 import { Alive } from '../components'
 import { holdSpot } from '../fight/state'
@@ -20,7 +19,7 @@ export function tickHold(sim: Sim): void {
   if (h.inside) h.heldMs += sim.wdtMs
   if (h.heldMs < h.rule.ms / h.rule.points.length) return
   sim.out.bursts.push({ x: spot.x, y: spot.y, count: 16, kind: 'coin' })
-  playSfx('upgrade')
+  sim.out.sfx.push('upgrade')
   h.point++
   h.heldMs = 0
   h.inside = false

@@ -1,5 +1,5 @@
 import type { EcsBattleScene } from './EcsBattleScene'
-import { devFlagItem, markPerf, resetPerf } from '../devtools'
+import { defineDevChoice, defineDevFlag, devFlagItem, markPerf, resetPerf } from '../devtools'
 import type { DevItem, DevProvider } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
@@ -27,7 +27,22 @@ import {
   toggleSandboxEnemy,
 } from './sandbox/knobs'
 import type { SandboxLevel, SandboxMul } from './sandbox/knobs'
-import { pipelineProfile, resetPipelineProfile } from './systems/pipeline/step'
+import { pipelineProfile, profilePipelineWhen, resetPipelineProfile } from './systems/pipeline/step'
+import { hostNumChoices } from './systems/shared/devNumbers'
+
+// 模拟层不依赖开发面板：它的剖析开关与可调数值在这里挂上，持久化与显示归开发面板
+profilePipelineWhen(defineDevFlag({ id: 'ecs.profile', group: '战斗', label: '流水线剖析', desc: '逐 system 计时，结果在战斗页签' }))
+hostNumChoices((k) => {
+  const get = defineDevChoice({
+    id: k.id,
+    group: k.group,
+    label: k.label,
+    desc: k.desc,
+    options: k.values.map((v) => ({ id: String(v), label: k.fmt(v) })),
+    default: String(k.fallback),
+  })
+  return () => Number(get())
+})
 
 const MULS: readonly SandboxMul[] = [1, 3, 10]
 const LEVELS: readonly { readonly lv: SandboxLevel; readonly label: string }[] = [

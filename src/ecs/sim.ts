@@ -29,7 +29,6 @@ import { worldFor } from './worlds/registry'
 import { newOutbox } from './outbox'
 import { newDamageNumbers } from './damageNumbers'
 import { FACTION, Stats } from './components'
-import type { EcsAtlas } from './atlas'
 import type { FightDef } from '../types/runs'
 import { fightMods, newFight } from './fight/state'
 import { layDown } from './systems/shared/combat'
@@ -143,7 +142,7 @@ export function stepSim(sim: Sim): void {
 
 export function makeSim(
   world: EcsWorld,
-  atlas: EcsAtlas,
+  frames: FrameIndex,
   run: RunState,
   origin: { x: number; y: number },
   mapW: number,
@@ -152,7 +151,7 @@ export function makeSim(
   fight: FightDef,
 ): Sim {
   const state = newFight(fight, run)
-  const team = formTeam(world, atlas, run, origin.x, origin.y, fightMods(state, FACTION.team))
+  const team = formTeam(world, frames, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
   const sim: Sim = {
     world,
@@ -182,7 +181,7 @@ export function makeSim(
     },
     frameAttractors: [],
     targets: [[], []],
-    frames: atlas,
+    frames,
     pendingDeaths: [],
     out: newOutbox(),
     damageNumbers: damageNumbers ? newDamageNumbers() : null,

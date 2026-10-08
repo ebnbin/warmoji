@@ -85,7 +85,7 @@ import { amethystClock } from '../maps/amethyst/world'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
-import type { Burst } from './outbox'
+import type { Burst, Outbox } from './outbox'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
@@ -559,6 +559,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   private drainOutbox(): void {
     const out = this.sim!.out
+    drainSfx(out)
     drain(out.banners, (bs) => {
       for (const b of bs) this.hud.emit(HudEvent.WaveWarning, b)
     })
@@ -884,9 +885,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   /** 按本局的名单与等级补上新招的队员，给升了级的队员换上新能力 */
   private syncTeam(): void {
     const sim = this.sim
-    if (!sim || !this.atlas) return
+    if (!sim) return
     for (let slot = sim.characters.length; slot < this.run.roster.length; slot++) {
-      joinTeam(sim, this.atlas, slot)
+      joinTeam(sim, slot)
       this.armedLevels[slot] = memberLevel(this.run, slot)
     }
     this.run.roster.forEach((_, slot) => {
@@ -916,6 +917,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.wdtMs = delta * worldTimeScale(sim)
     if (this.ending) {
       stepFrozenVisuals(sim)
+      drainSfx(sim.out)
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)
@@ -995,6 +997,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     playSfx('over')
     this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false, reason }))
   }
+}
+
+function drainSfx(out: Outbox): void {
+  drain(out.sfx, (ids) => {
+    for (const id of ids) playSfx(id)
+  })
 }
 
 /** 在深海打的一局：潜艇的倒计时 */

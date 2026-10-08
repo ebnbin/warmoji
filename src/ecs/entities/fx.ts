@@ -4,8 +4,19 @@ import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from 
 import { boltPts } from '../store'
 import { MISS, pushDamageNumber } from '../damageNumbers'
 import { attachDrawable } from './drawable'
-import type { CircleCue } from '../render/cues'
 import type { Sim } from '../sim'
+
+export interface CircleCue {
+  readonly fill: number
+  readonly fillAlpha: number
+  readonly stroke?: number
+  readonly lineWidth?: number
+  readonly lineAlpha?: number
+  readonly fromScale: number
+  readonly toScale: number
+  readonly durationMs: number
+  readonly depth: number
+}
 
 const BEAM_MS = 200
 const BOLT_MS = 200

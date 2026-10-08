@@ -8,7 +8,7 @@
     "dev": "vite",
     "gen": "node scripts/gen-defs.ts",
     "prebuild": "npm run gen",
-    "build": "node scripts/check-devtools.ts && node scripts/check-ui.ts && node scripts/check-lens.ts && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && vite build",
+    "build": "node scripts/check-devtools.ts && node scripts/check-ui.ts && node scripts/check-lens.ts && node scripts/check-sim.ts && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

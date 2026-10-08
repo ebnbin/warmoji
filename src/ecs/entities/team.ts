@@ -5,7 +5,7 @@ import { TEAM } from '../../data/characters'
 import { leaderSlot } from '../../run/state'
 import type { RunState } from '../../run/state'
 import type { StatMods } from '../../types/stats'
-import type { EcsAtlas } from '../atlas'
+import type { FrameIndex } from '../frames'
 import { Alive, CharFlash, FACTION, Hp, Tint, Transform } from '../components'
 import { fightMods } from '../fight/state'
 import { startPop } from '../utils/pop'
@@ -25,7 +25,7 @@ export interface TeamLayout {
 }
 
 /** 队长站在出生点，其余按入队顺序排在身后的扇形上；mods 是这一场给队伍的常驻修正 */
-export function formTeam(world: EcsWorld, atlas: EcsAtlas, run: RunState, x: number, y: number, mods: readonly StatMods[]): TeamLayout {
+export function formTeam(world: EcsWorld, atlas: FrameIndex, run: RunState, x: number, y: number, mods: readonly StatMods[]): TeamLayout {
   const count = run.roster.length
   const lead = leaderSlot(run)
   const fan = fanSlots(Math.max(0, count - 1), SQUAD.fanDistance, SQUAD.fanSpreadDeg, 0, -1)
@@ -71,12 +71,12 @@ function glow(sim: Sim, eid: number): void {
 }
 
 /** 半路入队：站到队长身后弹出来，带着这一场给队伍的修正，装好能力与主动技能 */
-export function joinTeam(sim: Sim, atlas: EcsAtlas, slot: number): void {
+export function joinTeam(sim: Sim, slot: number): void {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   const back = SQUAD.fanDistance * UNIT
   const p = sim.hooks.constrainBody(sim, sim.leader, { x: lx, y: ly }, { x: lx - sim.heading.x * back, y: ly - sim.heading.y * back })
-  const eid = spawnCharacter(sim.world, atlas, sim.run, { slot, x: p.x, y: p.y, depthOffsetY: 0, sizeMul: TEAM.followerSizeMul }, fightMods(sim.fight, FACTION.team))
+  const eid = spawnCharacter(sim.world, sim.frames, sim.run, { slot, x: p.x, y: p.y, depthOffsetY: 0, sizeMul: TEAM.followerSizeMul }, fightMods(sim.fight, FACTION.team))
   sim.characters.push(eid)
   sim.fight.rescueMs.push(0)
   armMember(sim, slot)

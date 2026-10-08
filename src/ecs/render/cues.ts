@@ -11,19 +11,6 @@ import { LayerType, TriBatch } from './layer'
 import { packTint } from './tint'
 
 
-export interface CircleCue {
-  readonly fill: number
-  readonly fillAlpha: number
-  readonly stroke?: number
-  readonly lineWidth?: number
-  readonly lineAlpha?: number
-  readonly fromScale: number
-  readonly toScale: number
-  readonly durationMs: number
-  readonly depth: number
-}
-
-
 const FREE = -1
 
 

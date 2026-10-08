@@ -1,5 +1,4 @@
 import { hasComponent, query } from 'bitecs'
-import { playSfx } from '../../audio/sfx'
 import { Alive, LeapShape, Motion, MOTION, MotionHit, Payload, SprintShape, Transform } from '../components'
 import { sourceOf, sweep } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
@@ -35,7 +34,7 @@ function landHits(sim: Sim, m: number, e: number): void {
   const damage = Motion.dmg[m]!
   applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
   breachAt(sim, x, y, BLAST_M, radius, abilityDef[e]?.breach ?? 0)
-  playSfx('boom')
+  sim.out.sfx.push('boom')
   spawnFxCircle(sim, x, y, radius, {
     fill: color,
     fillAlpha: 0.35,

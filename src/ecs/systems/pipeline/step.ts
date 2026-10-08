@@ -1,7 +1,6 @@
 import type { Sim } from '../../sim'
-import { defineDevFlag } from '../../../devtools'
 
-const profiling = defineDevFlag({ id: 'ecs.profile', group: '战斗', label: '流水线剖析', desc: '逐 system 计时，结果在战斗页签' })
+let profiling: () => boolean = () => false
 const acc = new Map<string, { ms: number; calls: number }>()
 let profiledFrames = 0
 
@@ -18,6 +17,11 @@ export function pipeline(steps: readonly Step[]): readonly System[] {
     }
   })
   return runs
+}
+
+/** 开发面板给出何时逐 system 计时 */
+export function profilePipelineWhen(on: () => boolean): void {
+  profiling = on
 }
 
 export function runPipeline(systems: readonly System[], sim: Sim): void {
