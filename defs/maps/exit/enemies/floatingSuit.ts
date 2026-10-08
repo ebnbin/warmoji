@@ -15,7 +15,7 @@ const FLOATING_SUIT = {
   damage: 10,
   xp: 6,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3.5 },
+  drive: { kind: 'standoff', standoffDist: 3.5 },
   abilities: [
     {
       trigger: 'auto',

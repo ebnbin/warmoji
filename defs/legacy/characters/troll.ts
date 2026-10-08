@@ -60,13 +60,13 @@ export const levels = [{ add: { maxHp: 70 }, mul: { damage: 1.12 } }, { add: { m
 
 export default {
   emoji: '1f9d1_200d_1f692',
-  name: '消防员',
+  name: '消防队长',
   desc: '抡起消防斧，横扫身前扇形范围',
   role: 'tank',
   tags: ['defense', 'melee', 'area'],
   body: { drag: 4.5, mass: 1.8 },
   stats: { moveSpeed: 3.78, maxStamina: 140, staminaRegen: 45, exertion: 1.3 },
-  skill: { name: '吸引火力', icon: '1f4e2', desc: '举起喇叭大喊一声，四格半内的敌人两秒半内只追消防员，期间自己受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
+  skill: { name: '吸引火力', icon: '1f4e2', desc: '举起喇叭大喊一声，四格半内的敌人两秒半内只追消防队长，期间自己受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
   weapons: ['axe'],
   innate: [],
 } as const satisfies CharacterAuthoring

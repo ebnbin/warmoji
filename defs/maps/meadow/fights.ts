@@ -23,7 +23,7 @@ export const FIGHTS = {
           ],
           spawns: [
             { kind: 'stream', intervalMs: 700, ramp: { toMs: 380, overMs: 60_000 }, at: { kind: 'gate', gate: 'bank' } },
-            { kind: 'batch', atMs: 40_000, squad: { count: 6, enemy: 'boar', elites: 1, at: { kind: 'gate', gate: 'bank' } }, banner: { title: '野猪群', sub: '一群野猪从坡顶冲下来' } },
+            { kind: 'batch', atMs: 40_000, squad: { count: 6, enemy: 'boar', elites: 1, at: { kind: 'gate', gate: 'bank' } }, banner: { title: '山猪群', sub: '一群山猪从坡顶冲下来' } },
           ],
           ends: [{ kind: 'time', ms: 75_000 }],
         },

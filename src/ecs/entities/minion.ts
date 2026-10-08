@@ -8,6 +8,7 @@ import { attachDrawable } from './drawable'
 import { holderOutline } from './weapon'
 import {
   Alive,
+  AROUND,
   Anim,
   Built,
   Clock,
@@ -37,7 +38,7 @@ import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
 import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
-import { equipAbility } from '../entities/ability'
+import { abilityGroup, equipAbility } from '../entities/ability'
 import { attachStats } from '../utils/stats'
 import { hoverPx } from '../utils/ground'
 import { liveOnes } from '../utils/turret'
@@ -122,6 +123,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Orbit.aggro[m] = 0
   Orbit.seek[m] = ACQUIRE.range * UNIT
   Orbit.fresh[m] = 1
+  Orbit.around[m] = AROUND.nest
   Contact.damage[m] = Payload.damage[e]!
   Contact.knockback[m] = Payload.knockback[e]!
   Contact.vanish[m] = 1
@@ -129,13 +131,13 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   VisOff.y[m] = -hoverPx(m)
 }
 
-/** 装置退场：先撤它的能力，再缩小淡出 */
+/** 装置退场：先撤它的能力（连同轮换的各式与连段的各段），再缩小淡出 */
 export function retireEmplacement(sim: Sim, t: number): void {
   addComponent(sim.world, t, Retiring)
   Retiring.until[t] = sim.fxMs + EMPLACE.retireMs
   const a = Minion.ability[t]!
   if (a !== 0) {
-    removeEntity(sim.world, a)
+    for (const x of abilityGroup(sim, a)) removeEntity(sim.world, x)
     Minion.ability[t] = 0
   }
 }

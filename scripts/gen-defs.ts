@@ -60,7 +60,7 @@ import { animIssues } from '../src/emoji/animCheck.ts'
 import { packSvg, parseEmojiPack } from '../src/emoji/pack.ts'
 import { splitSvg } from '../src/emoji/svgSplit.ts'
 import type { Issue } from '../src/data/runCheck.ts'
-import type { AbilityDef, Cond, CondWho } from '../src/types/abilityDefs'
+import type { AbilityDef, Cond, CondWho, Effect } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
 import type { AffixDef } from '../src/types/affixes'
 import type { InstinctDef, InstinctRule, RoleDef } from '../src/types/roles'
@@ -743,11 +743,80 @@ for (const [at, u] of units) {
   need((u.reactions ?? []).filter((r) => r.on === 'lowHp').length <= 8, `${at} 的残血线最多八条`)
 }
 
+/** 角色与敌人新旧放在一起，id 各不相同、名字也各不相同 */
+{
+  const dup = (list: readonly string[]): string[] => [...new Set(list.filter((k, i) => list.indexOf(k) !== i))]
+  const ids = dup([...Object.keys(CHARACTERS), ...Object.keys(ENEMIES)])
+  need(ids.length === 0, `角色与敌人的 id 有重复：${ids.join('，')}`)
+  const names = dup([...Object.values<CharacterAuthoring>(CHARACTERS).map((c) => c.name), ...Object.values<EnemyDef>(ENEMIES).map((e) => e.name)])
+  need(names.length === 0, `角色与敌人的名字有重复：${names.join('，')}`)
+}
+
+/**
+ * 没有基础伤害的地方不能写按基础伤害倍数算的伤害，要写固定数值：身体的死亡、击杀、濒死、残血、闲置、锚点消失反应，
+ * 头目进阶段、资源攒满，以及能力出手前和打死谁时的反应；顺着沿用落点与基础伤害的效果往里查
+ */
+{
+  const ZERO = new Set(['death', 'kill', 'lethal', 'lowHp', 'idle', 'anchorLost'])
+  const scan = (list: readonly unknown[] | undefined, at: string): void => {
+    for (const fx of (list ?? []) as Effect[]) {
+      if ((fx.kind === 'blast' || fx.kind === 'damage' || fx.kind === 'poison') && (fx.ratio ?? 0) > 0) need(false, `${at} 没有基础伤害，${fx.kind} 按倍数算的伤害打不出来，改写固定数值`)
+      if (fx.kind === 'if') scan(fx.else, at)
+      if (fx.kind === 'if' || fx.kind === 'chance' || fx.kind === 'to' || fx.kind === 'each' || fx.kind === 'stack' || fx.kind === 'fuse' || fx.kind === 'teleport') scan(fx.then, at)
+      if (fx.kind === 'knockup' || fx.kind === 'throw') scan(fx.onLand, at)
+      if (fx.kind === 'shove') scan(fx.onWall, at)
+    }
+  }
+  const bodies: [string, UnitBase & { readonly phases?: EnemyDef['phases'] }][] = [
+    ...Object.values(ENEMIES).flatMap(withNested).map((e): [string, EnemyDef] => [`enemies.${e.kind}`, e]),
+    ...Object.entries<UnitBase>(CHARACTERS).map(([id, c]): [string, UnitBase] => [`characters.${id}`, c]),
+  ]
+  for (const [at, u] of bodies) {
+    for (const r of u.reactions ?? []) if (ZERO.has(r.on)) scan(r.effects, `${at} 的 ${r.on} 反应`)
+    scan(u.resource?.full?.effects, `${at} 的资源攒满`)
+    for (const p of u.phases ?? []) scan(p.effects, `${at} 进入阶段`)
+  }
+  const seen = new Set<object>()
+  const abilitiesIn = (v: unknown, at: string): void => {
+    if (v === null || typeof v !== 'object' || seen.has(v)) return
+    seen.add(v)
+    const o = v as Record<string, unknown>
+    if ('trigger' in o && 'shape' in o) for (const r of (v as AbilityDef).reactions ?? []) if (r.on === 'cast' || r.on === 'kill') scan(r.effects, `${at} 里能力的 ${r.on} 反应`)
+    for (const x of Object.values(o)) abilitiesIn(x, at)
+  }
+  for (const [id, a] of Object.entries<AbilityDef>(ABILITIES)) abilitiesIn(a, `abilities.${id}`)
+  for (const [id, e] of Object.entries<EnemyDef>(ENEMIES)) abilitiesIn(e, `enemies.${id}`)
+}
+
 /** 头目阶段：生命线在 0 到 1 之间、一段比一段低；阶段换招式的不能再有换招式的形态，免得两边抢着装 */
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {
   const lines = (e.phases ?? []).map((p) => p.below)
   need(lines.every((b, i) => b > 0 && b < 1 && (i === 0 || b < lines[i - 1]!)), `enemies.${e.kind}.phases 的生命线须在 0 到 1 之间、一段比一段低：${lines.join(',')}`)
   need(!(e.phases ?? []).some((p) => p.abilities) || !(e.forms ?? []).some((f) => f.abilities), `enemies.${e.kind} 的阶段与形态不能都换招式`)
+}
+
+/** 绕巢转的敌人只能由别的身体生出来或召出来，不能从出怪口刷：刷出来的没有巢可绕 */
+{
+  const nested = new Set<string>()
+  const seen = new Set<object>()
+  const walk = (v: unknown): void => {
+    if (v === null || typeof v !== 'object' || seen.has(v)) return
+    seen.add(v)
+    const o = v as Record<string, unknown>
+    const of = o.kind === 'summon' ? (o.of as { readonly unit?: EnemyDef } | string) : undefined
+    if (typeof of === 'object' && of.unit) nested.add(of.unit.kind)
+    const sp = o.spawner as { readonly into: EnemyDef } | undefined
+    if (sp && typeof sp === 'object') nested.add(sp.into.kind)
+    for (const x of Object.values(o)) walk(x)
+  }
+  walk(ENEMIES)
+  walk(ABILITIES)
+  const gated = new Set(Object.values<MapDef>(MAPS).flatMap((m) => [...m.foes, ...m.bosses]))
+  for (const e of Object.values<EnemyDef>(ENEMIES)) {
+    const drives = [e.drive, ...(e.drives ?? []).map((r) => r.drive), ...(e.forms ?? []).flatMap((f) => (f.drive ? [f.drive] : [])), ...(e.phases ?? []).flatMap((p) => (p.drive ? [p.drive] : []))]
+    if (!drives.some((d) => d.kind === 'orbit' && d.around === 'nest')) continue
+    need(nested.has(e.kind) && !gated.has(e.kind), `enemies.${e.kind} 绕巢转，只能由别的身体生出来或召出来，不能从出怪口刷`)
+  }
 }
 
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {
@@ -1193,13 +1262,13 @@ const TABLES = {
   for (const issue of animIssues(ANIMATIONS, elementCount)) need(false, issue)
 }
 
-/** 角色的能力：引用存在；主动技能手动出手、要拖着瞄准的才用摇杆瞄准；武器与天生能力自动出手 */
+/** 角色的能力：引用存在；主动技能（轮流出手的每一式）手动出手、要拖着瞄准的才用摇杆瞄准；武器与天生能力自动出手 */
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   const skill = (ABILITIES as Record<string, AbilityDef | undefined>)[c.skill.ability]
   need(skill !== undefined, `characters.${id}.skill 引用了不存在的能力：${c.skill.ability}`)
-  if (skill) {
-    need(skill.trigger === 'manual', `characters.${id}.skill 的能力须手动出手：${c.skill.ability}`)
-    need((c.skill.aim === true) === (skill.aim === 'stick'), `characters.${id}.skill 写了 aim，能力就须用摇杆瞄准，反之亦然：${c.skill.ability}`)
+  for (const step of skill ? [skill, ...(skill.cycle ?? [])] : []) {
+    need(step.trigger === 'manual', `characters.${id}.skill 的能力（连同轮流出手的每一式）须手动出手：${c.skill.ability}`)
+    need((c.skill.aim === true) === (step.aim === 'stick'), `characters.${id}.skill 写了 aim，能力（连同轮流出手的每一式）就须用摇杆瞄准，反之亦然：${c.skill.ability}`)
   }
   const carriers = [...c.weapons.map((w) => ({ at: `weapons.${w}`, base: WEAPONS[w].base, upgrades: WEAPONS[w].upgrades })), ...c.innate.map((i) => ({ at: `innate.${i.name}`, base: i.base, upgrades: i.upgrades }))]
   for (const cr of carriers) {

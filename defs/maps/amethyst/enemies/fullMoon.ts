@@ -1,5 +1,4 @@
 import type { EnemyDef } from '../../../../src/types/enemies'
-import { FRAME_U } from '../../../../src/util/units.ts'
 import { zoneLook } from '../../../kit.ts'
 
 const FULL_MOON = {
@@ -19,7 +18,7 @@ const FULL_MOON = {
   xp: 60,
   coins: 60,
   traits: ['anchored', 'wary'],
-  drive: { kind: 'standoff', detectRange: FRAME_U, standoffDist: 4.5 },
+  drive: { kind: 'standoff', standoffDist: 4.5 },
   abilities: [
     {
       trigger: 'auto',

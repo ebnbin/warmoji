@@ -14,7 +14,7 @@ const UFO = {
   damage: 6,
   xp: 5,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 9, standoffDist: 6 },
+  drive: { kind: 'standoff', standoffDist: 6 },
   abilities: [
     {
       trigger: 'auto',

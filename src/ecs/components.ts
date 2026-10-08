@@ -382,6 +382,7 @@ export const Swing = { startMs: f32(), durMs: f32() }
 
 export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32(), homingDeg: f32(), linger: f32(), arc: f32() }
 
+/** 突刺：reach 是判定从身体伸出去的总长（前扑连触及），lunge 是身体在画面上往前扑多远 */
 export const Segment = { reach: f32(), radius: f32(), ms: f32(), lunge: f32(), beam: u8() }
 
 export const Sector = { radius: f32(), arcDeg: f32(), ms: f32() }
@@ -413,7 +414,8 @@ export const EmplaceShape = { count: f32(), spread: f32(), maxAlive: f32(), life
 
 export const WorldShape = {}
 
-export const Aura = { zone: i32() }
+/** 跟随场：这条能力放出的场与它的 Uid，场没了才能再放 */
+export const Aura = { zone: i32(), uid: u32() }
 
 export const BLINK = { none: 0, going: 1, striking: 2 } as const
 
@@ -434,8 +436,8 @@ export const Stage = { next: i32(), window: f32(), open: f32(), root: i32() }
 /** 弹匣：剩几发、容量、换弹时长、换好的时刻 */
 export const Ammo = { n: f32(), max: f32(), reloadMs: f32(), readyAt: f32() }
 
-/** 轮流出手：同组里只有 active 的那一式能出手，打完把出手权交给 next */
-export const Turn = { active: u8(), next: i32() }
+/** 轮流出手：同组里只有 active 的那一式能出手，打完把出手权交给 next；stuck 为 1 时这一式冷却好了却出不去，到 until 还出不去就让给 next */
+export const Turn = { active: u8(), next: i32(), stuck: u8(), until: f32() }
 
 /** 按住蓄力：按满的时长、满蓄时的距离与伤害倍率，ratio 是这一次蓄了几成 */
 export const Hold = { maxMs: f32(), reachMul: f32(), damageMul: f32(), ratio: f32() }
@@ -594,10 +596,12 @@ export const Flee = { range: f32() }
 
 export const CoinThief = {}
 
-export const Standoff = { detectRange: f32(), standoffDist: f32() }
+export const Standoff = { seek: f32(), standoffDist: f32() }
 
 /** 环绕 Nest 里的身体：spin 为 0 时全速绕行；aggro 为 0 时看见目标就扑，否则目标须在锚点 aggro 内；seek 是自己的索敌距离；fresh 优先扑还没中毒的 */
-export const Orbit = { radius: f32(), spin: f32(), aggro: f32(), seek: f32(), fresh: u8() }
+/** 绕着转：around 是绕谁（AROUND），aggro 是绕巢时目标进到锚点多近就扑上去 */
+export const AROUND = { nest: 0, foe: 1 } as const
+export const Orbit = { radius: f32(), spin: f32(), aggro: f32(), seek: f32(), fresh: u8(), around: u8() }
 
 /** 行进：朝这张图 marchMark 那一组地标里最近的一处走，不理会队伍 */
 export const March = {}

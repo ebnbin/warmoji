@@ -10,7 +10,7 @@ export const STATS = {
   revive: { name: '复活时间', base: 0, min: 1000, unit: 'ms', category: 'survival', better: 'lower' },
   taken: { name: '受到伤害', base: 1, min: 0, unit: 'ratio', category: 'survival', better: 'lower' },
   blocks: { name: '每波护盾', base: 0, min: 0, unit: 'count', category: 'survival', better: 'higher' },
-  thorns: { name: '接触反伤', base: 0, min: 0, unit: 'count', category: 'survival', better: 'higher' },
+  thorns: { name: '近战反伤', base: 0, min: 0, unit: 'count', category: 'survival', better: 'higher' },
   killHeal: { name: '击杀回复', base: 0, min: 0, unit: 'count', category: 'survival', better: 'higher' },
   healing: { name: '治疗效果', base: 1, min: 0, unit: 'ratio', category: 'survival', better: 'higher' },
   damage: { name: '伤害', base: 1, min: 0, unit: 'ratio', category: 'offense', better: 'higher' },

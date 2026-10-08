@@ -1,8 +1,9 @@
 import { hasComponent, query } from 'bitecs'
 import { Linger, Proj, PROJ_SET, Transform, Vel } from '../components'
-import { projSplit } from '../store'
+import { projHitUids, projOnHit, projSplit, projSrc } from '../store'
 import { splitBolt } from '../entities/projectile'
 import { cullProjectile } from './shared/projectile'
+import { applyAbilityEffects } from './shared/effects'
 import type { Sim } from '../sim'
 
 /** 会落地的弹体飞完就停在原地躺着 */
@@ -16,7 +17,14 @@ function settle(sim: Sim, eid: number): boolean {
   return true
 }
 
-/** 弹体到寿命（撞上障碍的当场到寿命）、飞出世界就消失（会落地的先躺一阵，会分裂的到寿命时先裂开），敌我同一条；镜头看不看得到与射程无关 */
+/** 抛射弹落了地却谁也没打中：在落点结算命中效果，爆炸、地面这类范围效果照常，针对目标的落空；落在地上等召回的不算 */
+function land(sim: Sim, eid: number): void {
+  if (sim.over || Proj.arc[eid]! <= 0 || hasComponent(sim.world, eid, Linger) || (projHitUids[eid]?.size ?? 0) > 0) return
+  const src = projSrc[eid]
+  if (src) applyAbilityEffects(sim, src, projOnHit[eid], { x: Transform.x[eid]!, y: Transform.y[eid]!, baseDamage: Proj.damage[eid]!, targets: [] })
+}
+
+/** 弹体到寿命（撞上障碍的当场到寿命）、飞出世界就消失（会落地的先躺一阵，抛射的先在落点结算，会分裂的到寿命时先裂开），敌我同一条；镜头看不看得到与射程无关 */
 export function cullProjectiles(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of [...query(sim.world, PROJ_SET)]) {
@@ -24,6 +32,7 @@ export function cullProjectiles(sim: Sim): void {
     const y = Transform.y[eid]!
     if (now >= Proj.dieAt[eid]! || sim.hooks.outside(sim, x, y)) {
       if (now >= Proj.dieAt[eid]! && settle(sim, eid)) continue
+      if (!sim.hooks.outside(sim, x, y)) land(sim, eid)
       if (projSplit[eid] && !sim.hooks.outside(sim, x, y)) splitBolt(sim, eid)
       cullProjectile(sim, eid)
     }

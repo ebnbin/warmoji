@@ -36,6 +36,8 @@ interface HitOpts {
   readonly tick?: boolean
   /** 出手处补上的伤害标签（见 hitTags）：范围，或替换来源的出手方式 */
   readonly tags?: number
+  /** 近身打它的身体：反伤反给它，不写就是出手的身体 */
+  readonly by?: number
 }
 
 function record(sim: Sim, src: Source, target: number, dmg: number): void {
@@ -272,6 +274,16 @@ function reacted(sim: Sim, src: Source, target: number, uid: number, r: ElementR
   applyAbilityEffects(sim, { ...src, element: 0 }, effects, { x: at.x, y: at.y, baseDamage: dmg, targets: alive ? [target] : [] })
 }
 
+/** 反伤：带刺的身体被近战打中，反给近身打它的身体一下；持续伤害不算 */
+function spikesOf(sim: Sim, src: Source, target: number, tags: number, o: HitOpts): (() => void) | null {
+  if (o.tick || (tags & HIT.melee) === 0 || !hasComponent(sim.world, target, Stats)) return null
+  const n = Stats.thorns[target]!
+  const by = o.by ?? casterOf(sim, src)
+  if (n <= 0 || by < 0 || by === target) return null
+  const own = selfSource(sim, target)
+  return () => void hit(sim, own, by, n)
+}
+
 /** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (!lands(sim, src, target, o, true)) return false
@@ -286,6 +298,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     return false
   }
   const now = sim.elapsedMs
+  const spikes = spikesOf(sim, src, target, tags, o)
   const atk = attackOf(sim, src)
   let raw = damage * tagMul(atk, tags) * (Boss.v[target] || Elite.v[target] ? atk.bossDamage : 1)
   const sleep = strongestSlot(sim, target, MARK.sleep)
@@ -305,6 +318,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (dmg <= 0) {
     blockFx(sim, target, SHIELD_COLOR)
     if (react) reacted(sim, src, target, Uid.v[target]!, react, { x: Transform.x[target]!, y: Transform.y[target]! }, dealt)
+    spikes?.()
     return true
   }
   const team = Faction.v[target] === FACTION.team
@@ -333,6 +347,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     die(sim, target, src, jx, jy)
     gearStruck(sim, src, target, uid, at, damage, tags, crit)
     if (react) reacted(sim, src, target, uid, react, at, dmg)
+    spikes?.()
     return true
   }
   Hp.v[target] = hp
@@ -343,5 +358,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
   gearStruck(sim, src, target, uid, at, damage, tags, crit)
   if (react) reacted(sim, src, target, uid, react, at, dmg)
+  spikes?.()
   return true
 }

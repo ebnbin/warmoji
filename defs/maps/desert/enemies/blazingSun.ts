@@ -1,6 +1,5 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { EnemyDef } from '../../../../src/types/enemies'
-import { FRAME_U } from '../../../../src/util/units.ts'
 import { patch } from '../../../kit.ts'
 
 const sunBeam = {
@@ -91,8 +90,7 @@ const BLAZING_SUN = {
   xp: 60,
   coins: 60,
   traits: ['anchored', 'wary'],
-  // 头目从整片沙地上钻出来，离队伍可能大半圈远；standoff 出了 detectRange 只会闲逛
-  drive: { kind: 'standoff', detectRange: FRAME_U, standoffDist: 4.5 },
+  drive: { kind: 'standoff', standoffDist: 4.5 },
   abilities: [sunBeam, flare, heatWave],
   phases: [
     { below: 0.5, name: '日蚀', element: 'dark', abilities: [darkBeam, eclipse] },

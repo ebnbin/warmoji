@@ -16,7 +16,7 @@ const sealSlap = {
   repeat: { count: 2, delayMs: 250 },
 } satisfies AbilityDef
 
-const sealSlap2 = { ...sealSlap, range: 2.8, shape: { ...sealSlap.shape, reach: 2.7, lungeDist: 2 } } satisfies AbilityDef
+const sealSlap2 = { ...sealSlap, range: 2.8, shape: { ...sealSlap.shape, reach: 0.7, lungeDist: 2 } } satisfies AbilityDef
 
 const sealHeadbutt = {
   trigger: 'auto',
@@ -25,7 +25,7 @@ const sealHeadbutt = {
   range: 2.8,
   damage: 18,
   fireSfx: 'thud',
-  shape: { kind: 'segment', reach: 2.7, radius: 0.5, ms: 200, lungeDist: 2 },
+  shape: { kind: 'segment', reach: 0.7, radius: 0.5, ms: 200, lungeDist: 2 },
   onHit: [{ kind: 'knockup', durationMs: 600, height: 1.2 }],
 } satisfies AbilityDef
 

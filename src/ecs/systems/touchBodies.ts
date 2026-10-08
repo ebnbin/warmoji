@@ -1,5 +1,5 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Built, Contact, Ctl, Faction, Radius, Stats, Transform } from '../components'
+import { Alive, Built, Contact, Ctl, Faction, Radius, Transform } from '../components'
 import { blocks } from '../utils/marks'
 import { bodyRules } from '../store'
 import { hit } from './shared/damage'
@@ -17,7 +17,7 @@ function contactSource(sim: Sim, eid: number): Source {
   return selfSource(sim, eid)
 }
 
-/** 接触：带接触载荷的身体碰到能打的身体就打一下，每帧最多一下；这一帧不能出手的不打；只碰得到高度与它重叠的；打中后被碰者先按属性表反伤、再施加它的被碰规则，最后施加碰者的接触效果；接触不看隐匿与视线 */
+/** 接触：带接触载荷的身体碰到能打的身体就打一下，每帧最多一下；这一帧不能出手的不打；只碰得到高度与它重叠的；打中后（反伤在伤害入口里反给碰它的身体）被碰者施加它的被碰规则，最后施加碰者的接触效果；接触不看隐匿与视线 */
 export function touchBodies(sim: Sim): void {
   if (sim.over) return
   for (const eid of [...query(sim.world, [Contact, Transform, Radius, Alive, Faction])]) {
@@ -32,10 +32,8 @@ export function touchBodies(sim: Sim): void {
     let landed = false
     eachFoeBody(sim, { ...src, band: bandOf(sim, eid) }, x, y, Radius.v[eid]!, (t, tx, ty) => {
       const s = struckOf(t)
-      if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y }, tags: HIT.melee })) return
+      if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y }, tags: HIT.melee, by: eid })) return
       landed = true
-      const thorns = Stats.thorns[t]!
-      if (thorns > 0) hit(sim, selfSource(sim, t), eid, thorns)
       const back = bodyRules[t]?.onTouched
       if (back) applyAbilityEffects(sim, selfSource(sim, t), back, { x: tx, y: ty, baseDamage: dmg, targets: [eid] })
       applyOnHit(sim, src, touch, tx, ty, dmg, [s])

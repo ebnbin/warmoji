@@ -17,6 +17,7 @@ import {
   Anchored,
   Anim,
   Boss,
+  AROUND,
   Bounty,
   Chase,
   CoinThief,
@@ -117,14 +118,15 @@ const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
   coinThief: (sim, eid) => addComponent(sim.world, eid, CoinThief),
   standoff: (sim, eid, d) => {
     addComponent(sim.world, eid, Standoff)
-    Standoff.detectRange[eid] = d.detectRange
+    Standoff.seek[eid] = seekOf(eid)
     Standoff.standoffDist[eid] = d.standoffDist
   },
   orbit: (sim, eid, d) => {
     addComponent(sim.world, eid, Orbit)
     Orbit.radius[eid] = d.radius
     Orbit.spin[eid] = 0
-    Orbit.aggro[eid] = d.aggroRange
+    Orbit.aggro[eid] = d.around === 'nest' ? d.aggroRange : 0
+    Orbit.around[eid] = AROUND[d.around]
     Orbit.seek[eid] = seekOf(eid)
     Orbit.fresh[eid] = 0
   },

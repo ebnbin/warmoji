@@ -2,7 +2,7 @@ import type { EnemyDef } from '../../../src/types/enemies'
 
 const SIREN = {
   kind: 'siren',
-  drive: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
+  drive: { kind: 'standoff', standoffDist: 5 },
   emoji: '1f441',
   name: '迷魂眼',
   desc: '远远地盯着队伍放出迷魂光，被光球打中的队员被魅惑，不由自主地朝它走去',

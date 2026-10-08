@@ -21,7 +21,7 @@ import * as blackCat from './characters/blackCat.ts'
 import * as gorilla from './characters/gorilla.ts'
 import * as detective from './characters/detective.ts'
 import * as eagle from './characters/eagle.ts'
-import * as bear from './characters/bear.ts'
+import * as boxerBear from './characters/boxerBear.ts'
 import * as vampire from './characters/vampire.ts'
 import * as genie from './characters/genie.ts'
 import * as parrot from './characters/parrot.ts'
@@ -60,7 +60,7 @@ export const LEGACY_CHARACTER_FILES = {
   gorilla,
   detective,
   eagle,
-  bear,
+  boxerBear,
   vampire,
   genie,
   parrot,

@@ -102,7 +102,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
   segment: {
     comps: [Segment, Swing],
     attach: (_sim, e, s) => {
-      Segment.reach[e] = s.reach
+      Segment.reach[e] = s.reach + (s.lungeDist ?? 0)
       Segment.radius[e] = s.radius
       Segment.ms[e] = s.ms
       Segment.lunge[e] = s.lungeDist ?? 0
@@ -236,7 +236,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
 
 /** 未指明索敌距离时，近战形状只在够得着时出手，空袭不限远，其余用通用索敌距离 */
 function shapeRange(s: Shape): number {
-  if (s.kind === 'segment') return s.reach + s.radius
+  if (s.kind === 'segment') return s.reach + (s.lungeDist ?? 0) + s.radius
   if (s.kind === 'sector') return s.radius
   if (s.kind === 'drop') return Infinity
   return ACQUIRE.range * UNIT
@@ -367,14 +367,28 @@ export function equipAbility(
   attachAbility(sim, e, def, { owner: opts.owner ?? host, anchor: host, faction, cooldownMs, baseMs: opts.baseMs, manual })
   if (def.recast) chainStage(sim, e, def.recast.windowMs, equipAbility(sim, host, def.recast.ability, faction, 0, { manual, owner: opts.owner }))
   if (def.cycle) {
-    const members = [e, ...def.cycle.map((d) => equipAbility(sim, host, d, faction, cooldownMs, { manual, owner: opts.owner }))]
+    const members = [e, ...def.cycle.map((d) => equipAbility(sim, host, d, faction, cooldownMs, { manual, owner: opts.owner, baseMs: opts.baseMs }))]
     members.forEach((m, i) => {
       addComponent(sim.world, m, Turn)
       Turn.active[m] = i === 0 ? 1 : 0
       Turn.next[m] = members[(i + 1) % members.length]!
+      Turn.stuck[m] = 0
     })
   }
   return e
+}
+
+/** 一条能力连同它轮换的各式与连段的各段 */
+export function abilityGroup(sim: Sim, e: number): number[] {
+  const out = new Set<number>()
+  const visit = (a: number): void => {
+    if (a === 0 || out.has(a)) return
+    out.add(a)
+    if (hasComponent(sim.world, a, Turn)) visit(Turn.next[a]!)
+    if (hasComponent(sim.world, a, Stage)) visit(Stage.next[a]!)
+  }
+  visit(e)
+  return [...out]
 }
 
 /** 把 next 接成 e 的下一段：整条连段的第一段都记在 root 上 */

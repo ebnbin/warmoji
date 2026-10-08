@@ -15,7 +15,7 @@ const guardBash = {
   range: 1.9,
   damage: 24,
   held: guardShield,
-  shape: { kind: 'segment', reach: 1.6, radius: 0.6, ms: 180, lungeDist: 0.4 },
+  shape: { kind: 'segment', reach: 1.2, radius: 0.6, ms: 180, lungeDist: 0.4 },
   onHit: [{ kind: 'shove', distance: 2.4, ms: 260, onWall: guardStun }],
 } satisfies AbilityDef
 

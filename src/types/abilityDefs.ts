@@ -40,10 +40,12 @@ interface BlastRing {
   readonly lineAlpha: number
   readonly durMs: number
 }
+/** 爆炸：落点 radius 内的敌人挨一下 amount 加基础伤害 ratio 倍的伤害，并被击退 */
 interface BlastEffect {
   readonly kind: 'blast'
   readonly radius: number
-  readonly ratio: number
+  readonly amount?: number
+  readonly ratio?: number
   readonly knockback: number
   readonly ring?: BlastRing
   /** 破坏力：炸掉多少立方米的完好砌体（按材质的强度折算） */
@@ -432,6 +434,11 @@ export type Selector =
       readonly sort?: 'nearest' | 'weakest'
       readonly count?: number
     }
+/** 逐个：对每个目标各施加一次 then，落点换成它脚下 */
+interface EachEffect {
+  readonly kind: 'each'
+  readonly then: readonly Effect[]
+}
 /** 换个对象施加：选出的身体吃 then，一个都没选到就不施加 */
 interface ToEffect {
   readonly kind: 'to'
@@ -631,6 +638,7 @@ export type Effect =
   | GainEffect
   | EmpowerEffect
   | ToEffect
+  | EachEffect
   | ChanceEffect
   | FormEffect
   | GrowEffect
@@ -670,6 +678,7 @@ export type Delivery = 'melee' | 'ranged'
 
 export type Shape =
   | { readonly kind: 'bolt'; readonly projectile: ProjectileSpec; readonly lifeMs: number; readonly pierce?: number }
+  /** lungeDist 是身体往前扑多远：判定从身体伸到扑出去的地方，再往前伸 reach */
   | { readonly kind: 'segment'; readonly reach: number; readonly radius: number; readonly ms: number; readonly lungeDist?: number; readonly beam?: boolean }
   | { readonly kind: 'sector'; readonly radius: number; readonly arcDeg: number; readonly ms: number }
   | { readonly kind: 'disc'; readonly radius: number; readonly at: 'self' | 'target'; readonly of?: 'foes' | 'hurt' }
@@ -692,9 +701,11 @@ export type Shape =
       readonly staggerMs: number
     }
   | { readonly kind: 'blink'; readonly behindDist: number; readonly strikeMs: number; readonly execute?: { readonly hpRatio: number; readonly mul: number } }
+  /** radius 不写时，带着伤害、击退或命中效果的按自己的身体半径撞人，什么都不带的只是位移 */
   | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius?: number; readonly seek?: boolean }
   | { readonly kind: 'leap'; readonly distance: number; readonly ms: number; readonly height: number; readonly radius: number }
   | { readonly kind: 'all'; readonly of: 'foes' | 'allies'; readonly downed?: boolean }
+  /** follow 让场跟着施法者走：还在场上时不再放，限时的到期消失后才能再放 */
   | (ZoneRules & {
       readonly kind: 'zone'
       readonly radius: number
@@ -730,7 +741,7 @@ export type ShapeKind = Shape['kind']
 /** 瞄准：出手的方向或落点从哪来 */
 export type Aim = 'nearest' | 'strongest' | 'move' | 'leader' | 'self' | 'stick'
 
-/** 重复出手：一次几发、隔多久、每发打几折、每第 N 次才触发、追加的几发怎么重新瞄准 */
+/** 重复出手：一次几发、隔多久、追加的每发打几折（同时射出的最靠中间那发不打折）、每第 N 次才触发、追加的几发怎么重新瞄准；写了 spreadDeg 的同时射出就在扇面里散开、隔着射就从扇面一侧扫到另一侧 */
 export interface Repeat {
   readonly count: number
   readonly spreadDeg?: number

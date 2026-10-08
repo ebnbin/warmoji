@@ -187,7 +187,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   blast: (sim, src, fx, at) => {
-    applyBlast(sim, src, at.x, at.y, at.baseDamage * fx.ratio, fx.radius, fx.knockback, at.exclude)
+    applyBlast(sim, src, at.x, at.y, (fx.amount ?? 0) + at.baseDamage * (fx.ratio ?? 0), fx.radius, fx.knockback, at.exclude)
     breachAt(sim, at.x, at.y, BLAST_M, fx.radius, fx.breach ?? 0)
     if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
@@ -641,6 +641,10 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     }
     const picked = select(sim, src, at.x, at.y, fx.who)
     if (picked.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: picked })
+  },
+
+  each: (sim, src, fx, at) => {
+    for (const t of at.targets ?? []) applyAbilityEffects(sim, src, fx.then, { ...at, x: Transform.x[t]!, y: Transform.y[t]!, targets: [t] })
   },
 
   chance: (sim, src, fx, at) => {

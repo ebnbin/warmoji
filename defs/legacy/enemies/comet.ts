@@ -3,7 +3,7 @@ import type { EnemyDef } from '../../../src/types/enemies'
 const COMET = {
   kind: 'comet',
   emoji: '2604',
-  name: '流星',
+  name: '彗星',
   desc: '拖着尾焰蓄势，锁定后直线疾冲，横向可躲',
   size: 1.3,
   radius: 0.5,

@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../src/types/characters'
 import type { StatMods } from '../../../src/types/stats'
 
-// 🐼 熊猫：能量打连环掌，太极卸力反制
+// 🐼 太极熊猫：能量打连环掌，太极卸力反制
 const pandaPalm = {
   trigger: 'auto',
   cooldownMs: 380,
@@ -12,7 +12,7 @@ const pandaPalm = {
   damage: 16,
   knockback: 2,
   cost: 10,
-  shape: { kind: 'segment', reach: 1.7, radius: 0.5, ms: 140, lungeDist: 0.4 },
+  shape: { kind: 'segment', reach: 1.3, radius: 0.5, ms: 140, lungeDist: 0.4 },
 } satisfies AbilityDef
 
 const pandaPalm2 = { ...pandaPalm, onHit: [{ kind: 'shove', distance: 1.2, ms: 160 }] } satisfies AbilityDef
@@ -40,7 +40,7 @@ export const levels = [{ add: { maxHp: 50 }, mul: { damage: 1.15 } }, { add: { m
 
 export default {
   emoji: '1f43c',
-  name: '熊猫',
+  name: '太极熊猫',
   desc: '能量打出连环掌；太极卸下一切来招并反制',
   role: 'bruiser',
   tags: ['defense', 'control', 'melee'],

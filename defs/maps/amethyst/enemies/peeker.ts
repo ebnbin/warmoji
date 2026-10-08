@@ -14,7 +14,7 @@ const PEEKER = {
   damage: 8,
   xp: 5,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 4.5 },
+  drive: { kind: 'standoff', standoffDist: 4.5 },
   drives: [{ if: { kind: 'within', who: 'target', radius: 3 }, drive: { kind: 'flee', range: 5 } }],
   abilities: [
     {

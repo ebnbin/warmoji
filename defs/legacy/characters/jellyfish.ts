@@ -48,7 +48,7 @@ export const levels = [{ add: { maxHp: 20 }, mul: { damage: 1.25 } }, { add: { m
 
 export default {
   emoji: '1fabc',
-  name: '水母',
+  name: '电水母',
   desc: '电弧在敌群间弹跳传导，敌人越密越疼',
   role: 'area',
   tags: ['damage', 'control', 'ranged', 'area'],

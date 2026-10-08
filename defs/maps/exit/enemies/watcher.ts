@@ -1,6 +1,5 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { EnemyDef } from '../../../../src/types/enemies'
-import { FRAME_U } from '../../../../src/util/units.ts'
 import { shot } from '../../../kit.ts'
 import SMILEY from './smiley.ts'
 
@@ -59,7 +58,7 @@ const WATCHER = {
   xp: 40,
   coins: 40,
   traits: ['anchored', 'wary'],
-  drive: { kind: 'standoff', detectRange: FRAME_U, standoffDist: 5 },
+  drive: { kind: 'standoff', standoffDist: 5 },
   abilities: [scan, shock, alarm],
   phases: [{ below: 0.4, name: '警报', stats: { mul: { cooldown: 0.75 } }, effects: [{ kind: 'unstoppable', durationMs: 2000 }] }],
 } satisfies EnemyDef

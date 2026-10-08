@@ -45,6 +45,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'deathMark':
     case 'empower':
     case 'to':
+    case 'each':
     case 'chance':
     case 'parry':
     case 'teleport':

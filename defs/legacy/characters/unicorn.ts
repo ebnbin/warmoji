@@ -9,7 +9,7 @@ const hornThrust = {
   fireSfx: 'whoosh',
   damage: 26,
   knockback: 9,
-  shape: { kind: 'segment', reach: 2.2, radius: 0.6, ms: 220, lungeDist: 1.0 },
+  shape: { kind: 'segment', reach: 1.2, radius: 0.6, ms: 220, lungeDist: 1.0 },
 } satisfies AbilityDef
 
 const rainbowRush = {
@@ -47,7 +47,7 @@ export const levels = [{ add: { maxHp: 25 }, mul: { damage: 1.25 } }, { add: { m
 
 export default {
   emoji: '1f984',
-  name: '独角兽',
+  name: '独角驹',
   desc: '独角向前突刺，穿透沿途敌人',
   role: 'bruiser',
   tags: ['damage', 'melee', 'mobile'],

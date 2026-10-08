@@ -14,7 +14,7 @@ const TEMPLE_MONKEY = {
   damage: 6,
   xp: 3,
   coins: 2,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3.5 },
+  drive: { kind: 'standoff', standoffDist: 3.5 },
   abilities: [
     {
       trigger: 'auto',

@@ -14,7 +14,7 @@ const FLIRT = {
   damage: 9,
   xp: 6,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 4 },
+  drive: { kind: 'standoff', standoffDist: 4 },
   abilities: [
     {
       trigger: 'auto',

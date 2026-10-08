@@ -6,7 +6,7 @@ const SAPLING = {
   drive: { kind: 'stay' },
   emoji: '1faba',
   name: '蛛卵',
-  desc: '蛛后产下的卵，六秒内不打破就孵出小蛛、结成会缠人的蛛网',
+  desc: '织网蛛母产下的卵，六秒内不打破就孵出小蛛、结成会缠人的蛛网',
   size: 1,
   radius: 0.4,
   span: [0, 0],

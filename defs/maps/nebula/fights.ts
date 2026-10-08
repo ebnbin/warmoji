@@ -7,7 +7,7 @@ export const FIGHTS = {
     name: '喂黑洞',
     desc: '我方伤不了敌人，击退却格外有劲：黑洞的引力会把靠近的东西拖进视界吞掉，敌人往往比你先被吸走；让 35 只敌人被黑洞吞掉，它每吞一只就更重一分',
     note: '只能借地形杀敌：站到黑洞边上当诱饵，自己又不能越过那圈走不出来的光环',
-    team: { slots: ['frog', 'bear', 'mage'], level: 2 },
+    team: { slots: ['frog', 'boxerBear', 'mage'], level: 2 },
     stars: [{ kind: 'time', ms: 75_000 }, { kind: 'hazard', by: 'blackhole', damage: 0 }],
     fight: {
       name: '喂黑洞',

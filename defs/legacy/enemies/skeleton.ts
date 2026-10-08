@@ -4,7 +4,7 @@ const SKELETON = {
   kind: 'skeleton',
   drive: { kind: 'chase' },
   emoji: '1f480',
-  name: '骷髅兵',
+  name: '复生骷髅',
   desc: '打散了还会爬起来：第一次生命归零时回到六成，之后三秒内加速扑来、生命流尽才真正散架',
   size: 1.25,
   radius: 0.46,

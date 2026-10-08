@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Alive, LeapShape, Motion, MOTION, MotionHit, Payload, SprintShape, Transform } from '../components'
+import { Alive, LeapShape, Motion, MOTION, MotionHit, Payload, Radius, SprintShape, Transform } from '../components'
 import { sourceOf, sweep } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
 import { hit } from './shared/damage'
@@ -9,6 +9,13 @@ import { BLAST_M, breachAt, covered } from '../utils/pass'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
+/** 冲刺撞人的半径：写了按写的；没写的带着伤害、击退或命中效果就按自己的身体，什么都不带的不撞人 */
+function dashRadius(m: number, e: number): number {
+  const r = SprintShape.radius[e]!
+  if (r > 0) return r
+  return Payload.damage[e]! > 0 || Payload.knockback[e]! > 0 || (abilityOnHit[e]?.length ?? 0) > 0 ? Radius.v[m]! : 0
+}
+
 /** 冲刺途中撞到的敌人各吃一下，同一段冲刺不重复；只撞得到与冲刺的身体层重叠的 */
 function dashHits(sim: Sim, m: number, e: number): void {
   const src = sourceOf(sim, e)
@@ -16,7 +23,7 @@ function dashHits(sim: Sim, m: number, e: number): void {
   const y = Transform.y[m]!
   const stamp = Motion.stamp[m]!
   const damage = Motion.dmg[m]!
-  for (const t of covered(sim, src, x, y, targetsWithin(sim, sweep(sim, e, src), x, y, SprintShape.radius[e]!))) {
+  for (const t of covered(sim, src, x, y, targetsWithin(sim, sweep(sim, e, src), x, y, dashRadius(m, e)))) {
     if (MotionHit.stamp[t.eid] === stamp) continue
     MotionHit.stamp[t.eid] = stamp
     const s = struckOf(t.eid)
@@ -57,7 +64,7 @@ export function settleMotions(sim: Sim): void {
     if (kind === MOTION.none && landed === 0) continue
     if (!Alive.v[m]) continue
     const e = Motion.skill[m]!
-    if (e !== 0 && hasComponent(sim.world, e, SprintShape) && SprintShape.radius[e]! > 0 && (kind === MOTION.dash || landed !== 0)) dashHits(sim, m, e)
+    if (e !== 0 && hasComponent(sim.world, e, SprintShape) && dashRadius(m, e) > 0 && (kind === MOTION.dash || landed !== 0)) dashHits(sim, m, e)
     if (landed === 0) continue
     Motion.landed[m] = 0
     if (e !== 0 && hasComponent(sim.world, e, LeapShape)) landHits(sim, m, e)

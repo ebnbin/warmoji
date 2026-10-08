@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../src/types/characters'
 import type { StatMods } from '../../../src/types/stats'
 import { shot } from '../abilityKit.ts'
 
-// 🐿 松鼠：弹匣打空换弹，翻滚攒着次数用
+// 🐿 花栗鼠：弹匣打空换弹，翻滚攒着次数用
 const chipAcorn = {
   trigger: 'auto',
   cooldownMs: 180,
@@ -45,7 +45,7 @@ export const levels = [{ add: { maxHp: 15 }, mul: { damage: 1.2 } }, { add: { ma
 
 export default {
   emoji: '1f43f',
-  name: '松鼠',
+  name: '花栗鼠',
   desc: '六发橡果打空了要换弹；翻滚攒着三次随时用',
   role: 'ranged',
   tags: ['damage', 'ranged', 'mobile'],

@@ -5,6 +5,7 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import {
   Alive,
+  AROUND,
   Chase,
   CoinThief,
   Drive,
@@ -24,6 +25,8 @@ import {
   Transform,
 } from '../components'
 import { freshFoe, nearestFoe, wanderDir } from './shared/steer'
+import type { Found } from '../utils/targets'
+import type { Point } from '../../util/vec'
 import { marchMark } from '../store'
 import { moveSpeed } from '../utils/stats'
 import { leaderPoint } from '../utils/team'
@@ -98,7 +101,7 @@ function flee(sim: Sim): void {
   }
 }
 
-/** 探测到敌人后保持在 standoffDist 附近：远了靠近，近了后退，带内不动 */
+/** 索敌距离内有敌人就保持在 standoffDist 附近：远了靠近，近了后退，带内不动；没有就慢速游荡 */
 function standoff(sim: Sim): void {
   const band = AI.standoffBandU * UNIT
   for (const eid of query(sim.world, [Standoff, Ctl, Transform, Phys, Stats])) {
@@ -106,14 +109,14 @@ function standoff(sim: Sim): void {
     const sp = moveSpeed(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
-    const target = nearestFoe(sim, eid, ex, ey)
-    const dx = target ? target.x - ex : 0
-    const dy = target ? target.y - ey : 0
-    const dist = target ? Math.hypot(dx, dy) : Infinity
-    if (dist > Standoff.detectRange[eid]!) {
+    const target = nearestFoe(sim, eid, ex, ey, Standoff.seek[eid]!)
+    if (!target) {
       stroll(sim, eid, sp * AI.idleSpeedMul.standoff)
       continue
     }
+    const dx = target.x - ex
+    const dy = target.y - ey
+    const dist = Math.hypot(dx, dy)
     const stand = Standoff.standoffDist[eid]!
     if (dist > stand + band) {
       const d = norm(dx, dy)
@@ -128,7 +131,21 @@ function standoff(sim: Sim): void {
   }
 }
 
-/** 绕着锚点转（巡游不算赶路）；该扑的时候扑向目标；锚点没了就只剩追，看不见目标就慢速游荡 */
+/** 绕谁转：绕人的绕看得见的最近敌人；绕巢的绕还活着的锚点，目标进到锚点 aggro 内（aggro 为 0 时一看见）就不绕了；不绕返回 null */
+function orbitCenter(sim: Sim, eid: number, target: Found | null): Point | null {
+  if (Orbit.around[eid] === AROUND.foe) return target
+  const anchor = Nest.of[eid]!
+  if (anchor < 0 || Alive.v[anchor] !== 1) return null
+  if (target) {
+    const aggro = Orbit.aggro[eid]!
+    if (aggro === 0) return null
+    const td = sim.hooks.worldDelta(sim, Transform.x[anchor]!, Transform.y[anchor]!, target.x, target.y)
+    if (td.x * td.x + td.y * td.y <= aggro * aggro) return null
+  }
+  return { x: Transform.x[anchor]!, y: Transform.y[anchor]! }
+}
+
+/** 绕着转（巡游不算赶路）；绕巢的该扑的时候扑向目标，锚点没了就只剩追；看不见目标就慢速游荡 */
 function orbit(sim: Sim): void {
   for (const eid of query(sim.world, [Orbit, Nest, Ctl, Transform, Phys, Stats])) {
     if (!Ctl.move[eid]) continue
@@ -137,18 +154,8 @@ function orbit(sim: Sim): void {
     const ey = Transform.y[eid]!
     const seek = Orbit.seek[eid]!
     const target = Orbit.fresh[eid] ? freshFoe(sim, eid, ex, ey, seek) : nearestFoe(sim, eid, ex, ey, seek)
-    const anchor = Nest.of[eid]!
-    let circling = anchor >= 0 && Alive.v[anchor] === 1
-    if (circling && target) {
-      const aggro = Orbit.aggro[eid]!
-      if (aggro === 0) {
-        circling = false
-      } else {
-        const td = sim.hooks.worldDelta(sim, Transform.x[anchor]!, Transform.y[anchor]!, target.x, target.y)
-        if (td.x * td.x + td.y * td.y <= aggro * aggro) circling = false
-      }
-    }
-    if (!circling) {
+    const center = orbitCenter(sim, eid, target)
+    if (!center) {
       if (!target) {
         stroll(sim, eid, sp * AI.idleSpeedMul.chase)
         continue
@@ -157,7 +164,7 @@ function orbit(sim: Sim): void {
       drive(eid, dir.x, dir.y, sp)
       continue
     }
-    const rel = sim.hooks.worldDelta(sim, Transform.x[anchor]!, Transform.y[anchor]!, ex, ey)
+    const rel = sim.hooks.worldDelta(sim, center.x, center.y, ex, ey)
     const r = Math.hypot(rel.x, rel.y)
     const ux = r > 1e-6 ? rel.x / r : 1
     const uy = r > 1e-6 ? rel.y / r : 0

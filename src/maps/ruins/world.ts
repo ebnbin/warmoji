@@ -489,7 +489,7 @@ function collapsed(sim: Sim, s: RuinsState, falls: readonly Fall[], at: { u: num
   capped(s.collapses, { x: c.x * UNIT, y: c.y * UNIT, volume: stone, top, stones, timber: wood })
 }
 
-/** 余震从多高处打、使多大的劲：照暴龙冲锋撞墙的量 */
+/** 余震从多高处打、使多大的劲：照霸王龙冲锋撞墙的量 */
 const QUAKE = { heightFrac: 0.5, amount: 2.4, nearU: 2, farU: 9, tries: 32 }
 
 /** 余震：在队长身边 nearU 到 farU 格里找一处还立着、标准身高跨不过的墙，从半腰打塌；落石敌我通吃 */

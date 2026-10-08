@@ -47,16 +47,17 @@ import { SAFE } from '../maps/frame'
 import { Lens } from './lens'
 import type { Framing } from './lens'
 import { makeSim } from './sim'
-import { abilityRequires, bodyLook, modDef, statBase } from './store'
+import { abilityDef, abilityRequires, bodyLook, modDef, statBase } from './store'
 import { foldBody, lastingStats, setStatLayer, statsOf } from './utils/stats'
 import { aimAt } from './systems/shared/fire'
 import { sourceOf } from './utils/source'
 import { resetEntities } from './entities/entity'
+import { abilityGroup } from './entities/ability'
 import { armTeam, memberGear } from './entities/loadout'
 import { levelUpsOnField, sweepLevelUps } from './entities/pickup'
 import { joinTeam, relevel } from './entities/team'
 import { requestCast } from './systems/shared/ability'
-import { openStage, ready } from './systems/shared/avail'
+import { openStage, ready, turnOf } from './systems/shared/avail'
 import { skillRemainMs } from './systems/tickSkillCooldowns'
 import { stepFrame, TICK_MS } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
@@ -146,7 +147,7 @@ function reviveSec(sim: Sim, m: number): number | null {
 function aimReach(a: AbilityDef): number {
   const s = a.shape
   if (s.kind === 'sprint' || s.kind === 'leap') return s.distance
-  if (s.kind === 'segment') return s.reach
+  if (s.kind === 'segment') return s.reach + (s.lungeDist ?? 0)
   let r = 0
   for (const fx of a.onHit ?? []) {
     if (fx.kind === 'portal' || fx.kind === 'warp') r = Math.max(r, fx.distance)
@@ -316,7 +317,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
         return
       case 'resetSkill':
         this.run.skillCd.fill(0)
-        for (const e of sim.skills) {
+        for (const e of sim.skills.flatMap((root) => abilityGroup(sim, root))) {
           Cd.left[e] = 0
           if (hasComponent(this.world, e, Charges)) Charges.n[e] = Charges.max[e]!
         }
@@ -811,20 +812,22 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     if (!sim) return null
     const slot = sim.characters.indexOf(sim.leader)
     const def = CHARACTERS[this.run.roster[slot]!]
-    const a = def.skill.ability
     const root = sim.skills[slot]
+    // 轮流出手的看轮到的那一式；装上的定义按像素算，瞄准线换回格
+    const cur = root === undefined ? undefined : turnOf(sim, root)
+    const now = cur === undefined ? undefined : abilityDef[cur]
     const open = root === undefined ? 0 : openStage(sim, root)
     return {
       icon: def.skill.icon,
       name: def.skill.name,
       emoji: bodyLook[sim.leader] ?? def.emoji,
-      remainMs: root === undefined ? 0 : skillRemainMs(sim, root),
+      remainMs: cur === undefined ? 0 : skillRemainMs(sim, cur),
       cdMs: def.skill.cdMs,
       aim: def.skill.aim,
-      rangeU: aimReach(a),
-      charges: root !== undefined && hasComponent(this.world, root, Charges) ? Charges.n[root]! : -1,
+      rangeU: now ? aimReach(now) / UNIT : aimReach(def.skill.ability),
+      charges: cur !== undefined && hasComponent(this.world, cur, Charges) ? Charges.n[cur]! : -1,
       recastMs: open !== 0 ? Math.max(0, Stage.open[open]! - sim.elapsedMs) : 0,
-      holdMs: a.hold?.maxMs ?? 0,
+      holdMs: (now ?? def.skill.ability).hold?.maxMs ?? 0,
     }
   }
 
@@ -832,7 +835,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     return this.issue({ t: this.sim?.tick ?? 0, k: 'cast', dir: dir && { x: dir.x, y: dir.y }, hold: holdRatio })
   }
 
-  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向；连段开着时接下一段；按住蓄力的带上蓄了几成 */
+  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向；连段开着时接下一段，轮流出手的放轮到的那一式；按住蓄力的带上蓄了几成 */
   private cast(sim: Sim, dir: Point | null, holdRatio: number): boolean {
     if (sim.over || this.ending || this.skillBlock()) return false
     const leader = sim.leader
@@ -840,7 +843,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     const slot = sim.characters.indexOf(leader)
     const root = sim.skills[slot]
     if (root === undefined) return false
-    const e = openStage(sim, root) || root
+    const e = openStage(sim, root) || turnOf(sim, root)
     if (!ready(sim, e)) return false
     if (abilityRequires[e] && !aimAt(sim, e, sourceOf(sim, e))) return false
     const def = CHARACTERS[this.run.roster[slot]!]

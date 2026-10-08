@@ -15,7 +15,7 @@ const SATELLITE = {
   damage: 11,
   xp: 6,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 5 },
+  drive: { kind: 'standoff', standoffDist: 5 },
   abilities: [
     {
       trigger: 'auto',

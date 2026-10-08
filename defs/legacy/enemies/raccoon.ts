@@ -4,7 +4,7 @@ const RACCOON = {
   kind: 'raccoon',
   drive: { kind: 'chase' },
   emoji: '1f9b9',
-  name: '怪盗',
+  name: '神偷',
   desc: '一碰到队员就偷走那名队员的主动技能自己用，被偷的技能冷却重新走；打死它，技能立刻还回来',
   size: 1.2,
   radius: 0.45,

@@ -14,7 +14,7 @@ import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
 import { goalSpot, holdSpot, leakRings, nearestTo, visitRings } from './fight/state'
-import { cooled } from './systems/shared/avail'
+import { cooled, turnOf } from './systems/shared/avail'
 import { revivable } from './systems/shared/combat'
 import { charSize } from './systems/shared/scale'
 import { dragging, staminaLeft } from './systems/shared/stamina'
@@ -216,11 +216,12 @@ function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void 
 function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const lead = sim.leader
   const root = sim.skills[sim.characters.indexOf(lead)]
-  const def = root === undefined ? undefined : abilityDef[root]
+  const cur = root === undefined ? undefined : turnOf(sim, root)
+  const def = cur === undefined ? undefined : abilityDef[cur]
   const ms = def && Alive.v[lead] ? rewindMs(def) : 0
   const at = ms > 0 ? traceAt(sim, lead, ms) : null
-  if (!at || root === undefined) return
-  const dim = (cooled(sim, root) ? 1 : COOLING_DIM) * hostShown(lead)
+  if (!at || cur === undefined) return
+  const dim = (cooled(sim, cur) ? 1 : COOLING_DIM) * hostShown(lead)
   sprites.push({
     z: ECHO_Z,
     frame: sim.frames.index(lookOf(sim, lead), 'player'),

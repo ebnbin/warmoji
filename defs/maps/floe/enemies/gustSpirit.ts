@@ -14,7 +14,7 @@ const GUST_SPIRIT = {
   damage: 7,
   xp: 6,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3 },
+  drive: { kind: 'standoff', standoffDist: 3 },
   abilities: [
     {
       trigger: 'auto',

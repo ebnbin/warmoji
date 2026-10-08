@@ -48,12 +48,16 @@ import {
   WindupState,
   Idle,
   Mirror,
+  Lifetime,
+  Radius,
+  Zone,
 } from '../../components'
 import { abilityArtEmoji, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, abilityWhen, ammoLast, blinkStrike, zoneRules } from '../../store'
 import { abilityPiercesWalls } from '../../../data/abilities'
 import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
 import { anchorX, anchorY } from '../../utils/ability'
+import { isSameEntity } from '../../utils/identity'
 import { flying, sourceOf, sweep } from '../../utils/source'
 import { HIT } from '../../utils/hitTags'
 import type { Source } from '../../utils/source'
@@ -193,6 +197,14 @@ function burst(sim: Sim, x: number, y: number, radius: number, color: number, bo
     depth: 7,
   })
   if (boom) spawnFxBoom(sim, x, y, radius * 1.5)
+}
+
+/** 这条能力放出的跟随场还在：没到期、没在淡出 */
+function auraUp(sim: Sim, e: number): boolean {
+  const z = Aura.zone[e]!
+  if (z === 0 || !isSameEntity(sim.world, z, Aura.uid[e]!)) return false
+  const until = Lifetime.until[z]!
+  return Zone.fadeAt[z] === 0 && (until === 0 || sim.elapsedMs < until)
 }
 
 /** 打一遍：返回真正落到身上的身体；不带伤害的形状只碰不打 */
@@ -365,7 +377,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach), seek }, { self: true, skill: e })) return false
       Motion.dmg[m] = damage
       Motion.breach[m] = breachOf(e)
-      if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
+      if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]! || Radius.v[m]!, {
         fill: color,
         fillAlpha: 0.35,
         stroke: color,
@@ -424,7 +436,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
     case 'zone': {
       const follow = ZoneShape.follow[e] === 1
-      if (follow && Aura.zone[e] !== 0) return false
+      if (follow && auraUp(sim, e)) return false
       const spec = {
         x: ox,
         y: oy,
@@ -446,7 +458,10 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       const pulseMs = ZoneShape.pulseMs[e]!
       // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
       const zone = spawnZone(sim, spec)
-      if (follow) Aura.zone[e] = zone
+      if (follow) {
+        Aura.zone[e] = zone
+        Aura.uid[e] = Uid.v[zone]!
+      }
       if (pulseMs > 0) {
         spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0, rules: undefined })
       }
@@ -503,6 +518,13 @@ function fireMirrored(sim: Sim, e: number, src: Source, angle: number, target: F
   }
   Anchor.eid[e] = home
   return true
+}
+
+/** 一次几发里第 i 发的方向：一整圈的从瞄准方向起均分，扇面的从一侧排到另一侧，不散开的都朝瞄准方向 */
+function volleyAngle(base: number, spreadDeg: number, i: number, count: number): number {
+  if (spreadDeg >= 360 - 1e-9) return base + (i * Math.PI * 2) / count
+  if (spreadDeg <= 0 || count <= 1) return base
+  return base + spreadDeg * DEG2RAD * (i / (count - 1) - 0.5)
 }
 
 /** 蓄力：记下方向，让宿主停下并显出预兆，到点由 tickWindups 出手 */
@@ -572,7 +594,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const holdMul = hold > 0 ? 1 + (Hold.damageMul[e]! - 1) * hold : 1
   const damage = Payload.damage[e]! * holdMul * (boost?.damageMul ?? 1)
   if (count <= 1 || delay > 0) {
-    if (!fireMirrored(sim, e, src, shot.angle, shot.target, damage, mods)) return false
+    if (!fireMirrored(sim, e, src, volleyAngle(shot.angle, spread, 0, count), shot.target, damage, mods)) return false
     if (count > 1) {
       RepeatState.left[e] = count - 1
       RepeatState.nextAt[e] = sim.elapsedMs + delay
@@ -580,11 +602,11 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
       RepeatState.damage[e] = damage
     }
   } else {
-    const ring = spread >= 360 - 1e-9
+    // 同时射出的几发：最靠中间的一发（一整圈的是正对瞄准的那发）全额，其余打折
+    const main = spread >= 360 - 1e-9 ? 0 : Math.floor(count / 2)
     let fired = false
     for (let i = 0; i < count; i++) {
-      const angle = ring ? shot.angle + (i * Math.PI * 2) / count : shot.angle + spread * DEG2RAD * (i / (count - 1) - 0.5)
-      if (fireMirrored(sim, e, src, angle, shot.target, damage, mods)) fired = true
+      if (fireMirrored(sim, e, src, volleyAngle(shot.angle, spread, i, count), shot.target, i === main ? damage : damage * Repeat.ratio[e]!, mods)) fired = true
     }
     if (!fired) return false
   }
@@ -605,7 +627,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   return true
 }
 
-/** 延迟重复的下一发：重新瞄准或沿环转动，伤害按比例打折 */
+/** 延迟重复的下一发：重新瞄准，或沿环转动、在扇面里往另一侧扫，伤害按比例打折 */
 export function fireRepeat(sim: Sim, e: number): boolean {
   const src = sourceOf(sim, e)
   const count = Repeat.count[e]!
@@ -630,7 +652,7 @@ export function fireRepeat(sim: Sim, e: number): boolean {
       break
     }
     default:
-      if (Repeat.spreadDeg[e]! >= 360 - 1e-9) angle = RepeatState.angle[e]! + (i * Math.PI * 2) / count
+      angle = volleyAngle(RepeatState.angle[e]!, Repeat.spreadDeg[e]!, i, count)
   }
   Aim.rad[e] = angle
   if (!fireMirrored(sim, e, src, angle, target, RepeatState.damage[e]! * Repeat.ratio[e]!, { onHit: abilityOnHit[e], reach: 1 })) return false

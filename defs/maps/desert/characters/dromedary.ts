@@ -16,8 +16,7 @@ const dromedarySpray = {
   onHit: [{ kind: 'slow', factor: 0.8, durationMs: 1000 }],
 } satisfies AbilityDef
 
-// 扇形的 ground 落在出手者脚下；stack 叠满一层就在被打中的身体脚下结算，借它给每个喷中的敌人各铺一片
-const scald = { kind: 'stack', max: 1, durationMs: 1, then: [{ kind: 'ground', def: patch(1, 2500, 0xffb74d, undefined, 3, 500) }] } as const
+const scald = { kind: 'each', then: [{ kind: 'ground', def: patch(1, 2500, 0xffb74d, undefined, 3, 500) }] } as const
 
 const dromedarySpray2 = { ...dromedarySpray, onHit: [...dromedarySpray.onHit, scald] } satisfies AbilityDef
 

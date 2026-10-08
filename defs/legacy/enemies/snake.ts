@@ -14,7 +14,7 @@ const SNAKE = {
   damage: 5,
   xp: 4,
   coins: 3,
-  drive: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
+  drive: { kind: 'standoff', standoffDist: 5 },
   abilities: [
     {
       trigger: 'auto',

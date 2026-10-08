@@ -25,7 +25,7 @@ const GRASS_SNAKE = {
       damage: 6,
       fireSfx: 'whoosh',
       windup: { ms: 260, lockAt: 'end', telegraph: 'shake' },
-      shape: { kind: 'segment', reach: 1.6, radius: 0.4, ms: 120, lungeDist: 0.8 },
+      shape: { kind: 'segment', reach: 0.8, radius: 0.4, ms: 120, lungeDist: 0.8 },
       onHit: [{ kind: 'poison', damage: 3, tickMs: 600, durationMs: 3600 }],
     },
   ],
