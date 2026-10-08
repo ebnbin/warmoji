@@ -6,7 +6,6 @@ import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
 import { AWAY } from '../../data/light'
-import { paintedEmojiOn } from '../../emoji/style'
 import { bottomAt, footY } from '../utils/ground'
 import { UNDER_Z } from './bands'
 import { EcsLayer, LayerType } from './layer'
@@ -59,10 +58,6 @@ export class EcsShadowBatch extends EcsLayer {
     this.enableFilters()
     this.filtersForceComposite = true
     this.filterCamera!.setAlpha(shadow.alpha)
-  }
-
-  willRender(camera: Phaser.Cameras.Scene2D.Camera): boolean {
-    return paintedEmojiOn() && super.willRender(camera)
   }
 
   focusFiltersOnCamera(camera: Phaser.Cameras.Scene2D.Camera): this {

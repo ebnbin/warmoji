@@ -2,11 +2,7 @@ import Phaser from 'phaser'
 import { visibleEmojiIds } from '../emoji/pack'
 import { browserStorage } from '../util/storage'
 import { loadSettings } from '../save/settings'
-import { OUTLINE, outlineSvg, setSvgSize } from '../emoji/svg'
-import type { OutlineKind } from '../emoji/svg'
-import { PAINTED } from '../emoji/painted/index.ts'
-import { OUTLINED_EMOJIS } from '../manifest'
-import { MAPS } from '../data/maps'
+import { setSvgSize } from '../emoji/svg'
 import {
   ANIM_RECIPES,
   ANIM_DEF,
@@ -16,12 +12,11 @@ import {
   bakeAnimFrame,
   composeSvg,
   flattenTree,
-  paintedAnimSet,
   parseSvgTree,
 } from '../emoji/anim'
 import type { AnimClip, AnimRecipe, AnimTemplate, SvgTree, TreeRow } from '../emoji/anim'
 import type { AnimClipId } from '../types/anim'
-import { emojiSvgText, ensureEmoji, loadEmojiPack, paintedSvgText, svgToImage, twemojiSvgText } from '../emoji/textures'
+import { emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import {
   beginPage,
@@ -50,20 +45,13 @@ const ANAT_ROW = 64
 const ANAT_INDENT = 28
 const anatIndentOf = (depth: number): number => 16 + depth * ANAT_INDENT
 
-type Tab = 'recipes' | 'templates' | 'anatomy' | 'painted'
+type Tab = 'recipes' | 'templates' | 'anatomy'
 
 const TABS: readonly { readonly key: Tab; readonly label: string }[] = [
   { key: 'recipes', label: '{1f3ac} 配方' },
   { key: 'templates', label: '{1f9e9} 模板' },
   { key: 'anatomy', label: '{1f52c} 解剖' },
-  { key: 'painted', label: '{1f3a8} 新画风' },
 ]
-
-const PAINTED_IDS = Object.keys(PAINTED)
-
-/** 新画风对照页：游戏里的大小，按实际战场上的阵营描边 */
-const outlineOf = (id: string): OutlineKind =>
-  OUTLINED_EMOJIS.enemy.includes(id) ? 'enemy' : OUTLINED_EMOJIS.enemyProjectile.includes(id) ? 'enemyProjectile' : 'player'
 
 const CLIP_LABELS: Record<AnimClipId, string> = { idle: '{1f9d8} 待机', attack: '{2694} 攻击' }
 
@@ -87,7 +75,6 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
   private tplEmoji = DEFAULT_SUBJECT
   private tpl: AnimTemplate = ANIM_TEMPLATES[0]!
   private anatEmoji = DEFAULT_SUBJECT
-  private paintSel = PAINTED_IDS[0]!
   private allKeys: string[] = []
 
   private anat?: AnatUi
@@ -129,7 +116,6 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
       this.tplEmoji = DEFAULT_SUBJECT
       this.tpl = ANIM_TEMPLATES[0]!
       this.anatEmoji = DEFAULT_SUBJECT
-      this.paintSel = PAINTED_IDS[0]!
       this.resetAnatState()
       this.paused = false
       this.speedIdx = 0
@@ -185,9 +171,6 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
       if (this.tab === 'recipes') {
         grid.setItems(ANIM_RECIPES.map((r) => r.emoji))
         grid.setSelected(this.recipeSel)
-      } else if (this.tab === 'painted') {
-        grid.setItems(PAINTED_IDS)
-        grid.setSelected(this.paintSel)
       } else {
         grid.setItems(this.allKeys)
         grid.setSelected(this.tab === 'templates' ? this.tplEmoji : this.anatEmoji)
@@ -196,7 +179,6 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
     }
     if (this.tab === 'recipes') this.buildRecipeDetail()
     else if (this.tab === 'templates') this.buildTemplateDetail()
-    else if (this.tab === 'painted') this.buildPaintedDetail()
     else this.buildAnatomyDetail()
   }
 
@@ -213,11 +195,6 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
       this.tplEmoji = cp
       this.grid?.setSelected(cp)
       this.buildTemplateDetail()
-    } else if (this.tab === 'painted') {
-      if (cp === this.paintSel) return
-      this.paintSel = cp
-      this.grid?.setSelected(cp)
-      this.buildPaintedDetail()
     } else {
       if (cp === this.anatEmoji) return
       this.anatEmoji = cp
@@ -336,84 +313,6 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
       .catch((err) => {
         console.error(`模板套用失败: ${String(err)}`)
       })
-  }
-
-  /** 新画风对照：Twemoji 与新画风并排（新画风有动画就播），下面按游戏里的大小、带阵营描边放在两张地图的地面色上 */
-  private buildPaintedDetail(): void {
-    const d = this.resetDetail()
-    const id = this.paintSel
-    const design = PAINTED[id]
-    if (!design) return
-    const big = this.frame.portrait ? 200 : 170
-    const lx = d.x + d.w * 0.28
-    const rx = d.x + d.w * 0.72
-    const mid = d.x + d.w / 2
-    let y = d.y + 14
-    this.keep(new Label(this, mid, y, `${design.name} · ${id}`, { kind: 'lead' }).setOrigin(0.5, 0))
-    y += 46
-    this.keep(new Label(this, lx, y, 'Twemoji', { kind: 'label', color: 'muted' }).setOrigin(0.5, 0))
-    this.keep(new Label(this, rx, y, '新画风', { kind: 'label', color: 'muted' }).setOrigin(0.5, 0))
-    y += 40
-    const cy = y + big / 2
-    for (const x of [lx, rx]) this.keep(new Panel(this, x - big / 2 - 8, cy - big / 2 - 8, big + 16, big + 16, { variant: 'well' }))
-    const twBig = this.keep(new Picture(this, lx, cy, big))
-    const pBig = this.keep(new Picture(this, rx, cy, big))
-    this.preview = pBig
-    this.previewSize = big
-    y += big + 22
-    const set = paintedAnimSet(id)
-    const clip = set?.clips[0]
-    if (clip) y = this.buildControls(mid, y) + 12
-    this.keep(new Label(this, mid, y, '游戏里的大小，带阵营描边：左 Twemoji，右新画风', { kind: 'caption', color: 'muted', align: 'center', wrap: d.w - 48 }).setOrigin(0.5, 0))
-    y += 34
-    const tile = this.frame.portrait ? 132 : 120
-    const small = 48
-    const smalls: [Picture, Picture][] = []
-    const grounds = [
-      { name: MAPS.volcano.name, color: MAPS.volcano.palette.map },
-      { name: MAPS.desert.name, color: MAPS.desert.palette.map },
-    ]
-    grounds.forEach((g, i) => {
-      const gx = i === 0 ? lx : rx
-      const gy = y + tile / 2
-      this.keep(new Swatch(this, gx, gy, tile, g.color))
-      smalls.push([this.keep(new Picture(this, gx - small / 2 - 4, gy, small)), this.keep(new Picture(this, gx + small / 2 + 4, gy, small))])
-      this.keep(new Label(this, gx, gy + tile / 2 + 6, g.name, { kind: 'caption', color: 'faint' }).setOrigin(0.5, 0))
-    })
-    const kind = outlineOf(id)
-    const painted = paintedSvgText(id)!
-    const gen = ++this.jobGen
-    void twemojiSvgText(id)
-      .then(async (tw) => {
-        const [twKey, pKey, twOl, pOl] = await Promise.all([
-          this.ownTexture(`studio-cmp-tw-${id}`, tw),
-          this.ownTexture(`studio-cmp-p-${id}`, painted),
-          this.ownTexture(`studio-cmp-tw-${id}-${kind}`, outlineSvg(tw, OUTLINE.radius, OUTLINE.colors[kind])),
-          this.ownTexture(`studio-cmp-p-${id}-${kind}`, outlineSvg(painted, OUTLINE.radius, OUTLINE.colors[kind])),
-        ])
-        if (gen !== this.jobGen || !this.scene.isActive(SceneKey.Studio)) return
-        twBig.show(twKey, big)
-        pBig.show(pKey, big)
-        for (const [a, b] of smalls) {
-          a.show(twOl, small)
-          b.show(pOl, small)
-        }
-        if (clip) this.startBake(clip, big, `studio-cmp-anim-${id}`, clip.frames, painted)
-      })
-      .catch((err) => {
-        console.error(`新画风对照失败: ${String(err)}`)
-      })
-  }
-
-  /** 把一张 SVG 光栅化成这个场景自己管的纹理 */
-  private async ownTexture(key: string, svg: string): Promise<string> {
-    if (this.textures.exists(key)) return key
-    const img = await svgToImage(setSvgSize(svg, RASTER))
-    if (!this.textures.exists(key)) {
-      this.textures.addImage(key, img)
-      this.ownedKeys.add(key)
-    }
-    return key
   }
 
   private buildAnatomyDetail(): void {
@@ -674,10 +573,9 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
     })
   }
 
-  /** svg 不给就用此刻该用的那一张 */
-  private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number, svg?: string): void {
+  private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number): void {
     const gen = ++this.jobGen
-    void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_DEF.frames, svg)
+    void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_DEF.frames)
       .then((keys) => {
         if (gen !== this.jobGen || !this.preview) return
         this.frameKeys = keys
@@ -691,8 +589,8 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
       })
   }
 
-  private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix: string | undefined, frames: number, source?: string): Promise<string[]> {
-    const svg = source ?? (await emojiSvgText(recipe.emoji))
+  private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix: string | undefined, frames: number): Promise<string[]> {
+    const svg = await emojiSvgText(recipe.emoji)
     const prefix = keyPrefix ?? `studio-anim-${recipe.emoji}`
     const keys: string[] = []
     for (let k = 0; k < frames; k++) {
@@ -728,7 +626,7 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
               label: '随机换一个 emoji',
               desc: '在当前页签的全集里随机选一个，省去在几千个里翻找',
               run: (): void => {
-                const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.tab === 'painted' ? PAINTED_IDS : this.allKeys
+                const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.allKeys
                 const cp = keys[Math.floor(Math.random() * keys.length)]
                 if (cp) this.onGridTap(cp)
               },

@@ -26,15 +26,10 @@ export function parseEmojiPack(orderingText: string, twemojiText: string): Emoji
   return { ids, bodyById }
 }
 
-/** 一张 emoji 的正文包成 36×36 的 SVG */
-export function emojiSvg(body: string): string {
-  return `${EMOJI_HEADER}${body}</svg>`
-}
-
 export function packSvg(pack: EmojiPack, id: string): string | null {
   const body = pack.bodyById.get(id)
   if (body === undefined) return null
-  return emojiSvg(body)
+  return `${EMOJI_HEADER}${body}</svg>`
 }
 
 function allEmojiIds(pack: EmojiPack): readonly string[] {

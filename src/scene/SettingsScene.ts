@@ -3,9 +3,6 @@ import { browserStorage } from '../util/storage'
 import { loadSettings, saveSettings, SETTING_DEFS } from '../save/settings'
 import type { Settings } from '../save/settings'
 import { preloadEmojis } from '../emoji/hold'
-import { setPaintedEmoji } from '../emoji/style'
-import { loadEmojiTextures } from '../emoji/textures'
-import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 import { beginPage, Label, ListItem, PageHeader, pageFrame, ScrollView, Switch, templateEmojis } from '../ui'
 import { setBgmEnabled } from '../audio/bgm'
 import { setSfxEnabled } from '../audio/sfx'
@@ -42,7 +39,6 @@ export class SettingsScene extends Phaser.Scene {
           saveSettings(browserStorage(), this.settings)
           setSfxEnabled(this.settings.sound)
           setBgmEnabled(this.settings.bgm)
-          if (def.key === 'paintedEmoji') this.switchEmoji(on)
         },
       })
       list.add(
@@ -65,12 +61,6 @@ export class SettingsScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
-  }
-
-  /** 换画风：之后要用的纹理按新画风的 key 另起，常驻的那一批先生成好 */
-  private switchEmoji(on: boolean): void {
-    setPaintedEmoji(on)
-    void loadEmojiTextures(this, PRELOAD_EMOJIS, OUTLINED_EMOJIS)
   }
 
   private onViewportChanged(): void {
