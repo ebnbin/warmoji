@@ -27,9 +27,10 @@ export type StatValues = Record<StatKey, number>
 /** 身体的基础值：没写的取属性目录里的默认值 */
 export type StatBase = Partial<StatValues>
 
-/** 对属性的修正：add 加在基础值上，mul 乘在结果上 */
+/** 对属性的修正：add 加在基础值上；pct 是百分比，同一项的各条先相加，再按 1 + 合计乘上去；mul 各条连乘在结果上 */
 export interface StatMods {
   readonly add?: StatBase
+  readonly pct?: StatBase
   readonly mul?: StatBase
 }
 

@@ -28,7 +28,7 @@ import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { fireAbility } from './fire'
 import { grantedAbility } from '../../entities/ability'
-import { healAllies } from './heal'
+import { healAllies, mend } from './heal'
 import { eachAlly, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
 import { aimLayer, BLAST_M, bandAt, breachAt, covered, FLOOR, hiOf, layerZ, loOf, STANDARD } from '../../utils/pass'
@@ -243,10 +243,10 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (fx.scope === 'lowest') {
       let best = hurt[0]!
       for (const t of hurt) if (Hp.v[t]! / Hp.max[t]! < Hp.v[best]! / Hp.max[best]!) best = t
-      Hp.v[best] = Math.min(Hp.max[best]!, Hp.v[best]! + each)
+      mend(best, each)
       return
     }
-    for (const t of hurt) Hp.v[t] = Math.min(Hp.max[t]!, Hp.v[t]! + each)
+    for (const t of hurt) mend(t, each)
   },
 
   spawnProjectile: (sim, src, fx, at) => {
@@ -336,7 +336,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   healRatio: (sim, _src, fx, at) => {
     eachCapable(sim, at, Hp, (t) => {
-      if (Alive.v[t]) Hp.v[t] = Math.min(Hp.max[t]!, Hp.v[t]! + Hp.max[t]! * fx.ratio)
+      if (Alive.v[t]) mend(t, Hp.max[t]! * fx.ratio)
     })
   },
 

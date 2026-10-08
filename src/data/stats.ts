@@ -24,9 +24,10 @@ function clamp(k: StatKey, v: number): number {
   return Math.min(d.max ?? Infinity, Math.max(d.min ?? -Infinity, v))
 }
 
-/** 汇总一张属性表：从基础值起，加值相加、倍率相乘，只取最强一条的倍率（减速）另外相乘，最后按上下限夹住 */
+/** 汇总一张属性表：从基础值起，加值相加，百分比相加后乘上，倍率相乘，只取最强一条的倍率（减速）另外相乘，最后按上下限夹住 */
 export class StatFold {
   private readonly sum = new Float64Array(STAT_KEYS.length)
+  private readonly pct = new Float64Array(STAT_KEYS.length)
   private readonly mul = new Float64Array(STAT_KEYS.length)
   private readonly low = new Float64Array(STAT_KEYS.length)
 
@@ -34,6 +35,7 @@ export class StatFold {
     for (let i = 0; i < STAT_KEYS.length; i++) {
       const k = STAT_KEYS[i]!
       this.sum[i] = base?.[k] ?? STATS[k].base
+      this.pct[i] = 0
       this.mul[i] = 1
       this.low[i] = 1
     }
@@ -41,12 +43,18 @@ export class StatFold {
 
   apply(m: StatMods): void {
     if (m.add) for (const k in m.add) this.plus(k as StatKey, m.add[k as StatKey]!)
+    if (m.pct) for (const k in m.pct) this.percent(k as StatKey, m.pct[k as StatKey]!)
     if (m.mul) for (const k in m.mul) this.times(k as StatKey, m.mul[k as StatKey]!)
   }
 
   plus(k: StatKey, v: number): void {
     const i = INDEX[k]
     this.sum[i] = this.sum[i]! + v
+  }
+
+  percent(k: StatKey, v: number): void {
+    const i = INDEX[k]
+    this.pct[i] = this.pct[i]! + v
   }
 
   times(k: StatKey, v: number): void {
@@ -61,20 +69,22 @@ export class StatFold {
   }
 
   value(i: number): number {
-    return clamp(STAT_KEYS[i]!, this.sum[i]! * this.mul[i]! * this.low[i]!)
+    return clamp(STAT_KEYS[i]!, this.sum[i]! * (1 + this.pct[i]!) * this.mul[i]! * this.low[i]!)
   }
 }
 
-/** 一组修正叠 n 份：加值乘份数，倍率的涨跌乘份数（冷却倍率按攻速的涨跌） */
+/** 一组修正叠 n 份：加值与百分比乘份数，倍率的涨跌乘份数（冷却倍率按攻速的涨跌） */
 export function stackMods(m: StatMods, n: number): StatMods {
   const add: StatBase = {}
+  const pct: StatBase = {}
   const mul: StatBase = {}
   for (const k of keysOf(m.add ?? {})) add[k] = m.add![k]! * n
+  for (const k of keysOf(m.pct ?? {})) pct[k] = m.pct![k]! * n
   for (const k of keysOf(m.mul ?? {})) {
     const v = m.mul![k]!
     mul[k] = STATS[k].unit === 'rate' ? 1 / (1 + (1 / v - 1) * n) : 1 + (v - 1) * n
   }
-  return { add, mul }
+  return { add, pct, mul }
 }
 
 const scratch = new StatFold()
@@ -168,8 +178,10 @@ function goodness(k: StatKey, delta: number): boolean | null {
 export function modLines(m: StatMods): ModLine[] {
   const out: ModLine[] = []
   const add = m.add ?? {}
+  const pct = m.pct ?? {}
   const mul = m.mul ?? {}
   for (const k of keysOf(add)) out.push({ text: `${STATS[k].name} ${addText(STATS[k].unit, add[k]!)}`, good: goodness(k, add[k]!) })
+  for (const k of keysOf(pct)) out.push({ text: `${STATS[k].name} ${mulText(STATS[k].unit, 1 + pct[k]!)}`, good: goodness(k, pct[k]!) })
   for (const k of keysOf(mul)) out.push({ text: `${STATS[k].name} ${mulText(STATS[k].unit, mul[k]!)}`, good: goodness(k, mul[k]! - 1) })
   return out
 }

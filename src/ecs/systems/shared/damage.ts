@@ -191,7 +191,7 @@ function leech(sim: Sim, src: Source, atk: Offense, dmg: number, tags: number): 
   }
   const amount = Math.min(dmg * atk.lifesteal, Hp.max[b]! * LIFESTEAL_CAP_PER_SEC - Leech.hp[b]!)
   if (amount <= 0) return
-  mend(b, amount)
+  if (Alive.v[b]) mend(b, amount)
   Leech.hp[b] = Leech.hp[b]! + amount
 }
 

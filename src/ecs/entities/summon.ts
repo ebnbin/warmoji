@@ -85,7 +85,7 @@ const OFFENSE: readonly StatKey[] = ['damage', 'meleeDamage', 'rangedDamage', 'a
 
 function offenseOnly(mods: StatMods): StatMods {
   const pick = (r: StatBase | undefined): StatBase => Object.fromEntries(OFFENSE.flatMap((k) => (r?.[k] === undefined ? [] : [[k, r[k]]])))
-  return { add: pick(mods.add), mul: pick(mods.mul) }
+  return { add: pick(mods.add), pct: pick(mods.pct), mul: pick(mods.mul) }
 }
 
 /** 分身：长得和施法者一样，带着它的普通出手（伤害打折），到时消失，死时施加 onDeath */
