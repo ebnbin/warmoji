@@ -715,7 +715,15 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
 
 const units: [string, UnitBase][] = [...Object.values(ENEMIES).flatMap(withNested).map((e): [string, UnitBase] => [`enemies.${e.kind}`, e]), ...Object.entries<UnitBase>(CHARACTERS).map(([id, c]): [string, UnitBase] => [`characters.${id}`, c])]
 for (const [at, u] of units) {
-  for (const on of ['lowHp', 'idle', 'death'] as const) need((u.reactions ?? []).filter((r) => r.on === on).length <= 1, `${at} 的 ${on} 反应最多一条`)
+  for (const on of ['idle', 'death'] as const) need((u.reactions ?? []).filter((r) => r.on === on).length <= 1, `${at} 的 ${on} 反应最多一条`)
+  need((u.reactions ?? []).filter((r) => r.on === 'lowHp').length <= 8, `${at} 的残血线最多八条`)
+}
+
+/** 头目阶段：生命线在 0 到 1 之间、一段比一段低；阶段换招式的不能再有换招式的形态，免得两边抢着装 */
+for (const e of Object.values(ENEMIES).flatMap(withNested)) {
+  const lines = (e.phases ?? []).map((p) => p.below)
+  need(lines.every((b, i) => b > 0 && b < 1 && (i === 0 || b < lines[i - 1]!)), `enemies.${e.kind}.phases 的生命线须在 0 到 1 之间、一段比一段低：${lines.join(',')}`)
+  need(!(e.phases ?? []).some((p) => p.abilities) || !(e.forms ?? []).some((f) => f.abilities), `enemies.${e.kind} 的阶段与形态不能都换招式`)
 }
 
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {

@@ -299,6 +299,10 @@ export function condLine(c: Cond): string {
       return `${who}不是队长`
     case 'noFoesNear':
       return `${who}身边 ${grid(c.radius)} 内没有敌人`
+    case 'foesNear':
+      return `${who}身边 ${grid(c.radius)} 内至少 ${c.atLeast} 个敌人`
+    case 'within':
+      return `离自己 ${grid(c.radius)} 以内`
     case 'afterSkill':
       return `${who}放主动技能后 ${sec(c.ms)} 内`
   }
@@ -422,6 +426,8 @@ export function abilityStatLines(w: AbilityDef): string[] {
   lines.push(...availLines(w))
   const fx = selfAndHit(w)
   if (fx.length > 0) lines.push(fx.join(' · '))
+  const pick = [w.when ? `${condLine(w.when)}时才用` : '', w.priority ? `优先级 ${w.priority}` : '', w.combo ? `连招：接着放${w.combo.map(abilityLabel).join('、')}` : ''].filter(Boolean)
+  if (pick.length > 0) lines.push(pick.join(' · '))
   return lines
 }
 

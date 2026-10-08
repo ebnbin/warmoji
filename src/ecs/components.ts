@@ -119,6 +119,9 @@ export const Mark = {
 }
 export const CharFlash = { until: f32() }
 
+/** 非玩家身体的出手节奏与阶段：公共冷却到何时、当前的头目阶段与生效的走法规则，-1 是没有 */
+export const Act = { gcdUntil: f32(), phase: i32Fill(-1), rule: i32Fill(-1) }
+
 /** 控制韧性：被控制累计了多少毫秒、填满要多少、满了霸体多久 */
 export const Tenacity = { ms: f32(), fill: f32(), hold: f32() }
 

@@ -10,7 +10,7 @@ import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
 import { modTexts, statText } from '../data/stats'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
-import { abilityLabel, abilityStatLines, characterStatGroups, effectLine } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, condLine, effectLine } from './statLines'
 import { itemLines, TRAIT_LABEL } from './itemLines'
 import { mapStaminaLine } from './mapLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -89,6 +89,13 @@ export function enemyStatLines(e: EnemyDef): string[] {
   const traits = traitLine(e.traits, e.span)
   if (traits) lines.push(`特质：${traits}`)
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
+  if (e.gcdMs) lines.push(`出完一招 ${e.gcdMs / 1000} 秒内不出下一招`)
+  for (const r of e.drives ?? []) lines.push(`${condLine(r.if)}时改为${DRIVE_LABEL[r.drive.kind]}`)
+  for (const p of e.phases ?? []) {
+    const enter = [p.drive ? `改为${DRIVE_LABEL[p.drive.kind]}` : '', ...(p.stats ? modTexts(p.stats) : []), ...(p.effects ?? []).map((x) => effectLine(x, true))].filter(Boolean)
+    lines.push(`阶段${p.name ? `「${p.name}」` : ''}：生命低于 ${Math.round(p.below * 100)}% 进入${enter.length > 0 ? `，${enter.join('，')}` : ''}`)
+    for (const w of p.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
+  }
   const span = e.span ? spanLine(e.span) : null
   if (span) lines.push(span)
   if (e.traits?.includes('phases')) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
@@ -97,7 +104,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
   const r = rulesOf(e)
   if (r.onLethal) lines.push(`致命一击时不死，改为：${r.onLethal.map((x) => effectLine(x, true)).join('，')}`)
-  if (r.onLowHp) lines.push(`生命第一次低于 ${Math.round(r.onLowHp.ratio * 100)}% 时：${r.onLowHp.effects.map((x) => effectLine(x, true)).join('，')}`)
+  for (const l of r.onLowHp ?? []) lines.push(`生命第一次低于 ${Math.round(l.ratio * 100)}% 时：${l.effects.map((x) => effectLine(x, true)).join('，')}`)
   if (r.onIdle) lines.push(`${r.onIdle.ms / 1000} 秒没出手${r.onIdle.still ? '也没动' : ''}：${r.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue

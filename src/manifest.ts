@@ -77,7 +77,7 @@ function walkAbility(a: AbilityDef, side: Side): void {
 
 function walkRules(r: BodyRules | undefined, side: Side): void {
   if (!r) return
-  for (const list of [r.onHurt, r.onTouched, r.onTouch, r.onKill, r.onAnchorLost, r.onLethal, r.onLowHp?.effects, r.onIdle?.effects, r.resource?.full?.effects]) walkEffects(list, side)
+  for (const list of [r.onHurt, r.onTouched, r.onTouch, r.onKill, r.onAnchorLost, r.onLethal, ...(r.onLowHp ?? []).map((l) => l.effects), r.onIdle?.effects, r.resource?.full?.effects]) walkEffects(list, side)
 }
 
 function walkNpc(def: NpcDef, side: Side): void {
@@ -86,6 +86,10 @@ function walkNpc(def: NpcDef, side: Side): void {
   s.npcs.add(def)
   s.body.add(def.emoji)
   for (const a of def.abilities ?? []) walkAbility(a, side)
+  for (const ph of def.phases ?? []) {
+    for (const a of ph.abilities ?? []) walkAbility(a, side)
+    walkEffects(ph.effects, side)
+  }
   for (const f of def.forms ?? []) {
     if (f.emoji) s.body.add(f.emoji)
     for (const a of f.abilities ?? []) walkAbility(a, side)

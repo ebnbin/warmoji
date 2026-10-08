@@ -63,7 +63,7 @@ import { replayDeath } from './systems/shared/death'
 import { spawnBoss } from './entities/enemy'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
-import { Lifetime, Modifier, Radius, Uid } from './components'
+import { Act, Lifetime, Modifier, Radius, Uid } from './components'
 import { isSameEntity } from './utils/identity'
 import { bodyAt, describeBody } from './inspector'
 
@@ -156,12 +156,19 @@ function aimReach(a: AbilityDef): number {
   return r
 }
 
+/** 头目的名字，进了有名字的阶段带上阶段名 */
+function bossName(eid: number): string {
+  const def = enemyDef[eid]
+  const phase = def?.phases?.[Act.phase[eid]!]
+  return phase?.name ? `${def!.name} · ${phase.name}` : (def?.name ?? '')
+}
+
 /** 场上活着的头目按出场先后排，各自的名字、生命与控制韧性 */
 function bossBars(sim: Sim): BossBar[] {
   return [...query(sim.world, [Enemy, Boss])]
     .filter((eid) => Boss.v[eid] === 1 && Alive.v[eid] === 1)
     .sort((a, b) => Uid.v[a]! - Uid.v[b]!)
-    .map((eid) => ({ uid: Uid.v[eid]!, name: enemyDef[eid]?.name ?? '', hp: Hp.v[eid]!, maxHp: Hp.max[eid]!, tenacity: tenacityRatio(sim.world, eid), steadfast: isSteadfast(sim, eid) }))
+    .map((eid) => ({ uid: Uid.v[eid]!, name: bossName(eid), hp: Hp.v[eid]!, maxHp: Hp.max[eid]!, tenacity: tenacityRatio(sim.world, eid), steadfast: isSteadfast(sim, eid) }))
 }
 
 export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost {

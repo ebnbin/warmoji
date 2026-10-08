@@ -11,6 +11,7 @@ import type { DriveDef, EnemyDef, EnemyKind, EnemyMixEntry, NpcDef } from '../..
 import type { StatMods } from '../../types/stats'
 import type { OutlineKind } from '../../emoji/svg'
 import {
+  Act,
   Anchored,
   Anim,
   Boss,
@@ -36,14 +37,13 @@ import {
   Hp,
   Idle,
   March,
-  Mount,
   MARK,
+  Mount,
   Nest,
   Orbit,
   Pop,
   Radius,
   Ring,
-  Wander,
   Sprite,
   Standoff,
   TAG,
@@ -51,6 +51,7 @@ import {
   Tint,
   Transform,
   VisOff,
+  Wander,
 } from '../components'
 import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook, marchMark } from '../store'
 import { attachResource } from './resource'
@@ -195,7 +196,10 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim, Act)
+  Act.gcdUntil[eid] = 0
+  Act.phase[eid] = -1
+  Act.rule[eid] = -1
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   if (boss || elite) attachTenacity(world, eid, boss ? TENACITY.boss : TENACITY.elite)

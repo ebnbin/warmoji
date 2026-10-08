@@ -49,7 +49,7 @@ import {
   Idle,
   Mirror,
 } from '../../components'
-import { abilityArtEmoji, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, blinkStrike, zoneRules } from '../../store'
+import { abilityArtEmoji, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, abilityWhen, ammoLast, blinkStrike, zoneRules } from '../../store'
 import { abilityPiercesWalls } from '../../../data/abilities'
 import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
@@ -526,12 +526,14 @@ function empowered(sim: Sim, e: number): readonly Effect[] {
   return def?.then ?? []
 }
 
-/** 出手：瞄准、第一发、即时重复或安排延迟重复、音效、施法者自身的效果；有蓄力的先蓄力，到点再带着方向回到这里 */
+/** 出手：瞄准、看什么时候用、第一发、即时重复或安排延迟重复、音效、施法者自身的效果；有蓄力的先蓄力，到点再带着方向回到这里 */
 export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const w = sim.world
   const src = sourceOf(sim, e)
   const shot = preset ?? aimAt(sim, e, sweep(sim, e, src))
   if (!shot) return false
+  const when = preset ? undefined : abilityWhen[e]
+  if (when && !test(sim, src, Owner.eid[e]!, shot.target?.eid ?? -1, when)) return false
   Aim.rad[e] = shot.angle
   if (!preset && hasComponent(w, e, Windup)) {
     startWindup(sim, e, shot)

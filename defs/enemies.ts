@@ -997,7 +997,7 @@ const FACTORY_BOSS = {
       shape: { kind: 'drop', targets: 5, look: { emoji: '1f528', size: 1.1 }, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
-  reactions: [{ on: 'lowHp', ratio: 0.5, to: 'self', effects: [{ kind: 'form', to: 0 }, { kind: 'summon', of: { unit: PYLON, spread: 5 }, count: 2 }] }],
+  phases: [{ below: 0.5, name: '泄漏', effects: [{ kind: 'form', to: 0 }, { kind: 'summon', of: { unit: PYLON, spread: 5 }, count: 2 }] }],
   forms: [
     {
       emoji: '2623',

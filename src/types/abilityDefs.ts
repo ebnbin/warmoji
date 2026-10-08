@@ -320,6 +320,10 @@ export type Cond =
   | { readonly kind: 'follower'; readonly who: CondWho }
   /** radius 内没有活着的敌人 */
   | { readonly kind: 'noFoesNear'; readonly who: CondWho; readonly radius: number }
+  /** radius 内至少有 atLeast 个活着的敌人 */
+  | { readonly kind: 'foesNear'; readonly who: CondWho; readonly radius: number; readonly atLeast: number }
+  /** 目标离自己不超过 radius；没有目标或没有自己就不成立 */
+  | { readonly kind: 'within'; readonly who: 'target'; readonly radius: number }
   /** 放完主动技能还不到 ms */
   | { readonly kind: 'afterSkill'; readonly who: CondWho; readonly ms: number }
 /** 几率：过了 p 的几率才施加 then */
@@ -747,13 +751,18 @@ interface AbilityBase {
   readonly hpCost?: number
   /** 只对满足条件的目标出手 */
   readonly requires?: Cond
+  /** 什么时候用：瞄准以后再看一次，不成立就不出手、下一刻再看；self 是出手的身体，target 是瞄准到的目标，没有目标的看不了 target */
+  readonly when?: Cond
+  /** 非玩家身体同时有几招能出时，先出 priority 大的，一样大的按装上的先后 */
+  readonly priority?: number
+  /** 连招：非玩家身体放完这一招，按顺序接着放这几招，每招等上一招做完；连招里的不看冷却，瞄不到目标就断 */
+  readonly combo?: readonly Extract<AbilityDef, { readonly trigger: 'manual' }>[]
   /** 影子也照着出手 */
   readonly mirror?: boolean
   /** 施法锚点：这条能力从一个跟着宿主的物件上出手；orbit 绕宿主转、trail 落在宿主一秒半前的位置、ally 贴着血量最低的队友 */
   readonly anchor?: { readonly look: Look; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
 }
-/** 反应把效果施于谁：self 是带着这条反应的身体，other 是这件事里的另一方（打中的目标、出手打它的身体），spot 是这件事发生的地方（倒下处） */
-/** 反应：on 这件事发生时，满足 if、过了 chance 的几率，对 to 施加 effects */
+/** 反应：on 这件事发生时，满足 if、过了 chance 的几率，对 to 施加 effects；to 的 self 是带着这条反应的身体，other 是这件事里的另一方（打中的目标、出手打它的身体），spot 是这件事发生的地方（倒下处） */
 export interface ReactionBase {
   readonly if?: Cond
   readonly effects: readonly Effect[]

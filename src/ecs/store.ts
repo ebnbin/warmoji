@@ -80,6 +80,13 @@ export const boltSplit = slots<Split>()
 /** 会分裂的弹体：裂开时照着自己的规格再射几发 */
 export const projSplit = slots<{ readonly spec: BoltSpec; readonly split: Split }>()
 
+/** 能力什么时候用、放完接着放的连招 */
+export const abilityWhen = slots<Cond>()
+export const abilityCombo = slots<readonly AbilityDef[]>()
+
+/** 非玩家身体正放着的连招：招式表与下一招的下标 */
+export const npcCombo = slots<{ readonly list: readonly AbilityDef[]; next: number }>()
+
 /** 每个身体每个标记槽位的来源：引信、存伤、叠层、死亡印记结算时用，中毒跳伤记在它名下 */
 export const markSrcs = slots<(Source | undefined)[]>()
 
