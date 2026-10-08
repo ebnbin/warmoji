@@ -269,7 +269,7 @@ export class ExitView implements MapView {
     painter.close()
     if (this.painter !== painter) return
     this.painter = undefined
-    upload(tex, Phaser.Textures.FilterMode.LINEAR)
+    tex.refresh()
     this.visuals.push(scene.add.image(0, 0, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.floor(v, plan)
     this.floorFx = scene.add.graphics().setDepth(-0.8)

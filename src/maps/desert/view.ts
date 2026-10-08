@@ -20,6 +20,7 @@ import type { TrackTex } from './stamp'
 import type { DesertState } from './world'
 import type { EcsAtlas } from '../../ecs/atlas'
 import type { MapView, ViewCtx } from '../../ecs/views'
+import { canvasTexture } from '../textures'
 import { FRAME, FRAME_MID } from '../frame'
 import type { Framing } from '../../ecs/lens'
 import type { Sim } from '../../ecs/sim'
@@ -55,20 +56,6 @@ interface LandmarkFx {
   readonly img: Phaser.GameObjects.Image | null
   readonly rag: Point | null
   readonly phase: number
-}
-
-function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
-  if (scene.textures.exists(key)) scene.textures.remove(key)
-  const tex = scene.textures.createCanvas(key, w, h)!
-  if (draw) draw(tex.getContext())
-  upload(tex)
-  return tex
-}
-
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
 }
 
 /** 贴图上换一块像素：画布跟着换（显卡丢了上下文时 Phaser 拿整张画布重建），显卡上只重传这一块 */
@@ -198,7 +185,7 @@ export class DesertView implements MapView {
     painter.close()
     if (this.painter !== painter) return
     this.painter = undefined
-    upload(tex)
+    tex.refresh()
     const info = encodeInfo(plan)
     canvasTexture(scene, INFO_KEY, plan.cols, plan.cols, (ctx) => ctx.putImageData(new ImageData(info, plan.cols, plan.cols), 0, 0))
     const data = newTrackTex(plan.sizeU, cfg.tracks.perU, cfg.tracks.lifeS)

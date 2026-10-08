@@ -120,12 +120,6 @@ interface TorchFx {
   readonly moths: Phaser.GameObjects.Image[]
 }
 
-/** 重传画布贴图：重传会按游戏的像素风设置退回最近邻取样，地面与数据图都要线性插值 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
-}
-
 /** 直射弱过眼睛适应亮度的这么多倍就当没有：着色器省下挡光的计算 */
 const faint = (x: number): number => (x < 0.002 ? 0 : x)
 
@@ -248,9 +242,9 @@ export class AmethystView extends BoundedView {
     if (this.painter !== painter) return
     painter.close()
     this.painter = undefined
-    upload(albedo)
-    upload(face)
-    upload(geo)
+    albedo.refresh()
+    face.refresh()
+    geo.refresh()
     const lt = s.light
     const lux = canvasTexture(scene, LUX_KEY, lt.cols, lt.rows)
     const shade = canvasTexture(scene, SHADE_KEY, SHADE_BINS, SHADE_ROWS)
@@ -268,8 +262,6 @@ export class AmethystView extends BoundedView {
     this.visuals.push(scene.add.image(f.x, f.y, ALBEDO_KEY).setOrigin(0, 0).setDisplaySize(f.w, f.h).setDepth(-1))
     if (v.atlas) this.scatter(v, v.atlas, L)
     const maskTex = scene.textures.addDynamicTexture(MASK_KEY, MASK_PX, MASK_PX)
-    // 高分屏开了 pixelArt，缺省的最近点取样会让单位轮廓边上的明暗起一格格的锯齿
-    maskTex?.setFilter(Phaser.Textures.FilterMode.LINEAR)
     if (maskTex && v.atlas) this.mask = new UprightMask(scene, v.world, v.atlas, maskTex)
     const mask = this.mask
     const u = this.u
@@ -415,7 +407,7 @@ export class AmethystView extends BoundedView {
       d.shown = fade
       encodeLux(d.from, d.to, fade, d.luxImg.data)
       d.lux.getContext().putImageData(d.luxImg, 0, 0)
-      upload(d.lux)
+      d.lux.refresh()
     }
     // 眼睛按洞里的平均照度适应（对数上平滑地跟），最暗适应到 view.brightLux
     const target = Math.max(cfg.view.brightLux, s.light.hallLux)
@@ -529,7 +521,9 @@ export class AmethystView extends BoundedView {
     this.u.torchCount = n
     if (n > 0) {
       d.shade.getContext().putImageData(d.shadeImg, 0, 0)
-      upload(d.shade)
+      d.shade.refresh()
+      // 按方位角取：mipmap 会在 ±180° 的接缝上取错层，还会把各支火把的行混在一起，只用线性插值
+      d.shade.setFilter(Phaser.Textures.FilterMode.LINEAR)
     }
   }
 

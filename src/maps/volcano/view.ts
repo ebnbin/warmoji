@@ -196,12 +196,6 @@ function pieceImage(p: GroundPiece, ppc: number): { img: ImageData; x: number; y
   return { img: new ImageData(p.pixels, (p.rect.c1 - p.rect.c0) * ppc, (p.rect.r1 - p.rect.r0) * ppc), x: p.rect.c0 * ppc, y: p.rect.r0 * ppc }
 }
 
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
-}
-
 /** 贴图上换一块像素：画布跟着换（显卡丢了上下文时 Phaser 拿整张画布重建），显卡上只重传这一块 */
 function patchTexture(scene: Phaser.Scene, tex: Phaser.Textures.CanvasTexture, img: ImageData, x: number, y: number): void {
   tex.getContext().putImageData(img, x, y)
@@ -297,7 +291,7 @@ export class VolcanoView extends BoundedView {
       tex.getContext().putImageData(img, x, y)
     })
     if (this.painter !== painter) return
-    upload(tex)
+    tex.refresh()
     painter.trim(1)
     this.visuals.push(scene.add.image(f.x0, f.y0, GROUND_KEY).setOrigin(0, 0).setDisplaySize(f.cols * f.cell, f.rows * f.cell).setDepth(-1))
     const dirty = new Uint8Array(Math.ceil(f.cols / GROUND_TILE) * Math.ceil(f.rows / GROUND_TILE))
@@ -327,10 +321,10 @@ export class VolcanoView extends BoundedView {
     }
     shineSnow(f, cfg, snow.shineImg.data, { c0: 0, r0: 0, c1: f.cols, r1: f.rows })
     shine.getContext().putImageData(snow.shineImg, 0, 0)
-    upload(shine)
+    shine.refresh()
     encodeSnow(snow.state, f.cols, f.rows, snow.img.data)
     snowTex.getContext().putImageData(snow.img, 0, 0)
-    upload(snowTex)
+    snowTex.refresh()
     this.snow = snow
     this.simAt = sim.elapsedMs
     const u = this.u
@@ -530,9 +524,9 @@ export class VolcanoView extends BoundedView {
     if (!d) return
     encodeLava(s.field, v.def.volcano!, now, d.shown, d.lavaImg.data, d.auxImg.data, d.glow, d.soft)
     d.lava.getContext().putImageData(d.lavaImg, 0, 0)
-    upload(d.lava)
+    d.lava.refresh()
     d.aux.getContext().putImageData(d.auxImg, 0, 0)
-    upload(d.aux)
+    d.aux.refresh()
   }
 
   /** 积雪按模拟走过的时间涨落，编码进数据图 */
@@ -543,7 +537,7 @@ export class VolcanoView extends BoundedView {
     stepSnow(sn.state, s.field, cfg, d.shown.on, d.glow, c.melt, c.ash, now, dtMs)
     encodeSnow(sn.state, s.field.cols, s.field.rows, sn.img.data)
     sn.tex.getContext().putImageData(sn.img, 0, 0)
-    upload(sn.tex)
+    sn.tex.refresh()
   }
 
   /** 新凝固的岩石改变了地表：把受影响的块记下，上一批补画完了就把记下的块整批交出去重画，画好一块重传一块；雪面的光照跟着重算这几块 */
@@ -583,7 +577,7 @@ export class VolcanoView extends BoundedView {
     if (!sn) return
     for (const r of rects) shineSnow(f, cfg, sn.shineImg.data, r)
     sn.shine.getContext().putImageData(sn.shineImg, 0, 0)
-    upload(sn.shine)
+    sn.shine.refresh()
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {

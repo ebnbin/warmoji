@@ -222,7 +222,10 @@ export class FloeView extends BoundedView {
     canvasTexture(scene, LEE_KEY, Math.round(rect[2]! / (LEE_CELL_U * UNIT)), Math.round(rect[3]! / (LEE_CELL_U * UNIT)), (ctx) =>
       drawLee(ctx, f, { x: rect[0]!, y: rect[1]!, w: rect[2]!, h: rect[3]! }, cfg.wind.fetchM / cfg.meterPerU),
     )
-    canvasTexture(scene, SEA_NOISE_KEY, NOISE_TILE, NOISE_TILE, (ctx) => drawSeaNoise(ctx, f.seed ^ 0x3a7)).setWrap(Phaser.Textures.WrapMode.REPEAT, Phaser.Textures.WrapMode.REPEAT)
+    const noise = canvasTexture(scene, SEA_NOISE_KEY, NOISE_TILE, NOISE_TILE, (ctx) => drawSeaNoise(ctx, f.seed ^ 0x3a7))
+    noise.setWrap(Phaser.Textures.WrapMode.REPEAT, Phaser.Textures.WrapMode.REPEAT)
+    // 噪声按各种尺度取，碎冰还按各块错开的坐标取：mipmap 会把它抹平、在块的接缝上取错层，只用线性插值
+    noise.setFilter(Phaser.Textures.FilterMode.LINEAR)
     const sea = new WindSea(f.windAngle, f.seed ^ 0x51a, cfg.wind.meanMs, cfg.wind.fetchM, cfg.meterPerU, FLOE_GRAVITY)
     const long = canvasTexture(scene, SEA_LONG_KEY, SEA_N, SEA_N)
     const short = canvasTexture(scene, SEA_SHORT_KEY, SEA_N, SEA_N)

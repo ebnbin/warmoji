@@ -12,6 +12,7 @@ import { Alive, Transform } from '../../ecs/components'
 import { roomAt } from '../basin'
 import { CANOPY_PPU } from '../foliage'
 import { ensureLeaves, FallingLeaves } from '../leaves'
+import { canvasTexture } from '../textures'
 import { textureSize } from './ground'
 import { toLocal, toWorld } from './layout'
 import { cellAt, GRAVITY } from './masonry'
@@ -82,20 +83,6 @@ interface Crow {
   left: number
   flap: number
   scared: number
-}
-
-function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
-  if (scene.textures.exists(key)) scene.textures.remove(key)
-  const tex = scene.textures.createCanvas(key, w, h)!
-  if (draw) draw(tex.getContext())
-  upload(tex)
-  return tex
-}
-
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
 }
 
 /** 贴图上换一块像素：画布跟着换（显卡丢了上下文时 Phaser 拿整张画布重建），显卡上只重传这一块 */
@@ -202,8 +189,8 @@ export class RuinsView implements MapView {
     await painter.paint(tasks, state, put)
     if (this.painter !== painter) return
     painter.trim(1)
-    upload(ground)
-    upload(canopy)
+    ground.refresh()
+    canopy.refresh()
     const x0 = 0
     const y0 = 0
     this.visuals.push(scene.add.image(x0, y0, GROUND_KEY).setOrigin(0, 0).setDisplaySize((gs.w / GROUND_PPU) * UNIT, (gs.h / GROUND_PPU) * UNIT).setDepth(-1))
