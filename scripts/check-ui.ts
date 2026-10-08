@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 
-// 界面一律用 src/ui 组件库搭：库外不许直接建显示对象、接管指针、写颜色和字体样式。
+// 界面一律用 src/ui 组件库搭：库外不许直接建显示对象、接管指针、写颜色和字体样式，也不许用 React。
 // 战斗的 ECS 与地图、可独立成库的开发者工具与 emoji 纹理管线不属于界面。
 const root = resolve('src')
 const exempt = ['ui', 'ecs', 'maps', 'devtools', 'emoji'].map((d) => join(root, d) + sep)
@@ -12,6 +12,7 @@ const RULES: readonly { readonly re: RegExp; readonly what: string }[] = [
   { re: /\b0x[0-9a-fA-F]{6}\b|['"`]#[0-9a-fA-F]{3,8}['"`]/, what: '写死颜色' },
   { re: /\b(fontFamily|fontSize|fontStyle|strokeThickness|backgroundColor|wordWrap|lineSpacing)\s*:/, what: '写死字体样式' },
   { re: /\.set(Tint|TintFill|FillStyle|StrokeStyle|Color|Stroke|Shadow|FontSize|FontStyle|BackgroundColor)\s*\(/, what: '直接改样式' },
+  { re: /['"]react(-dom)?(\/[^'"]*)?['"]/, what: '用 React 搭界面' },
 ]
 
 const files: string[] = []
@@ -20,7 +21,7 @@ const walk = (dir: string): void => {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) {
       if (!exempt.includes(p + sep)) walk(p)
-    } else if (p.endsWith('.ts')) {
+    } else if (/\.tsx?$/.test(p)) {
       files.push(p)
     }
   }
