@@ -1,6 +1,7 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef, ZoneRules } from './groundEffects'
 import type { EnemyDef, EnemyKind } from './enemies'
+import type { StatusId } from './statuses'
 
 interface ProjectileSpec {
   readonly emoji: string
@@ -285,12 +286,17 @@ interface ThrowEffect {
 interface SwapEffect {
   readonly kind: 'swap'
 }
-/** 身上能被条件认出来的标记 */
-export type MarkName = 'stun' | 'root' | 'sleep' | 'fear' | 'charm' | 'slow' | 'poison' | 'silence' | 'disarm' | 'stasis' | 'fuse' | 'stack' | 'store' | 'deathMark'
+/** 按状态表施加一种状态，持续 ms；控制类的霸体不吃；value 是这种状态的参数，如倍率 */
+interface StatusEffect {
+  readonly kind: 'status'
+  readonly status: StatusId
+  readonly ms: number
+  readonly value?: number
+}
 /** 条件：对目标判断 */
 export type Cond =
   | { readonly kind: 'airborne' }
-  | { readonly kind: 'marked'; readonly mark: MarkName }
+  | { readonly kind: 'marked'; readonly mark: StatusId }
   | { readonly kind: 'hpBelow'; readonly ratio: number }
   | { readonly kind: 'boss' }
   | { readonly kind: 'not'; readonly cond: Cond }
@@ -505,6 +511,7 @@ interface RealmEffect {
   readonly ms: number
 }
 export type Effect =
+  | StatusEffect
   | BlastEffect
   | SlowEffect
   | PoisonEffect

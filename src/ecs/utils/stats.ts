@@ -1,7 +1,8 @@
 import { addComponent, hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { STATS, STAT_KEYS, StatFold, foldStats, stackMods } from '../../data/stats'
-import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK, MARK_SLOTS, Mark, Phys, Slot, Stamina, Stats, Summoned, Transform, Uid } from '../components'
+import { STATUSES, STATUS_IDS } from '../../data/statuses'
+import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK_SLOTS, Mark, Phys, Slot, Stamina, Stats, Summoned, Transform, Uid } from '../components'
 import { gearRules, statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
 import { fatigue, squadStamina, staminaLeft } from '../systems/shared/stamina'
@@ -11,15 +12,14 @@ import type { GearCond, GearWhen } from '../../types/items'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
 
-/** 限时的属性修正由效果以标记施加，按种类折进属性表；减速只取最强的一条 */
-const FROM_MARK: Partial<Record<number, { readonly stat: StatKey; readonly strongest?: boolean }>> = {
-  [MARK.dmg]: { stat: 'damage' },
-  [MARK.cd]: { stat: 'cooldown' },
-  [MARK.guard]: { stat: 'taken' },
-  [MARK.speed]: { stat: 'moveSpeed' },
-  [MARK.slow]: { stat: 'moveSpeed', strongest: true },
-  [MARK.grow]: { stat: 'scale' },
-}
+/** 限时的属性修正由效果以标记施加，按状态表折进属性表 */
+const FROM_MARK: readonly ({ readonly stat: StatKey; readonly strongest?: boolean } | undefined)[] = [
+  undefined,
+  ...STATUS_IDS.map((id) => {
+    const st = STATUSES[id].stat
+    return st ? { stat: st.key, strongest: st.strongest } : undefined
+  }),
+]
 
 const fold = new StatFold()
 

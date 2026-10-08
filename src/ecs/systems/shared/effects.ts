@@ -1,9 +1,9 @@
-import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
+import type { Cond, Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { TRANSIT_MS } from '../../../data/abilities'
 import { hasComponent, query } from 'bitecs'
 import { Ability, Alive, Anchored, Boss, Cd, Charges, Elite, Enemy, FACTION, Faction, Grow, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, Stats, TAG, Trace, Transform, Uid } from '../../components'
-import { addCc, addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
+import { addCc, addMark, CC_MARKS, CLEANSED, isAirborne, isSteadfast, markSlot, statusDef } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
 import { gainRes } from './resource'
@@ -89,23 +89,6 @@ export const STORE_DEF = new Interned<EffectOfKind<'store'>>()
 export const DEATH_DEF = new Interned<EffectOfKind<'deathMark'>>()
 export const EMPOWER_DEF = new Interned<EffectOfKind<'empower'>>()
 
-const MARK_OF: Record<MarkName, number> = {
-  stun: MARK.stun,
-  root: MARK.root,
-  sleep: MARK.sleep,
-  fear: MARK.fear,
-  charm: MARK.charm,
-  slow: MARK.slow,
-  poison: MARK.poison,
-  silence: MARK.silence,
-  disarm: MARK.disarm,
-  stasis: MARK.stasis,
-  fuse: MARK.fuse,
-  stack: MARK.stack,
-  store: MARK.store,
-  deathMark: MARK.deathMark,
-}
-
 /** 加一条记着来源的标记：按来源分开记的以来源身体的编号为 ref */
 export function markFrom(t: number, kind: number, until: number, a: number, b: number, src: Source): number {
   const s = addMark(t, kind, TAG.effect, until, a, b, 0, src.bodyUid ?? 0)
@@ -123,9 +106,8 @@ export function test(sim: Sim, src: Source, t: number, cond: Cond): boolean {
     case 'airborne':
       return isAirborne(t)
     case 'marked': {
-      const kind = MARK_OF[cond.mark]
-      const keyed = kind === MARK.fuse || kind === MARK.stack || kind === MARK.store || kind === MARK.deathMark
-      return markSlot(sim, t, kind, keyed ? (src.bodyUid ?? 0) : 0) >= 0
+      const kind = MARK[cond.mark]
+      return markSlot(sim, t, kind, statusDef(kind)?.keyed ? (src.bodyUid ?? 0) : 0) >= 0
     }
     case 'hpBelow':
       return Hp.max[t]! > 0 && Hp.v[t]! / Hp.max[t]! < cond.ratio
@@ -188,6 +170,16 @@ type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K]
 
 /** 效果只看目标有没有对应的组件；金币只对队伍来源生效 */
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
+  status: (sim, _src, fx, at) => {
+    const kind = MARK[fx.status]
+    const def = statusDef(kind)!
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => {
+      const on = def.cc ? addCc(sim, t, kind, until, fx.value ?? 0) : addMark(t, kind, TAG.effect, until, fx.value ?? 0) >= 0
+      if (on && def.interrupts) interrupt(sim, t)
+    })
+  },
+
   blast: (sim, src, fx, at) => {
     applyBlast(sim, src, at.x, at.y, at.baseDamage * fx.ratio, fx.radius, fx.knockback, at.exclude)
     breachAt(sim, at.x, at.y, BLAST_M, fx.radius, fx.breach ?? 0)
@@ -209,7 +201,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   morph: (sim, _src, fx, at) => {
     eachCapable(sim, at, Enemy, (t) => {
-      if (!hasMark(sim, t, MARK.unstoppable)) applyMorph(sim, sim.frames, t, fx)
+      if (!isSteadfast(sim, t)) applyMorph(sim, sim.frames, t, fx)
     })
   },
 
@@ -437,7 +429,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   cleanse: (sim, _src, _fx, at) => {
-    eachCapable(sim, at, Mark, (t) => expireMarks(sim, t, [...CC_MARKS, MARK.slow]))
+    eachCapable(sim, at, Mark, (t) => expireMarks(sim, t, CLEANSED))
   },
 
   spellShield: (sim, _src, fx, at) => {
@@ -488,7 +480,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   knockup: (sim, src, fx, at) => {
     for (const t of at.targets ?? []) {
-      if (hasMark(sim, t, MARK.unstoppable)) continue
+      if (isSteadfast(sim, t)) continue
       if (displace(sim, t, { kind: 'arc', x: Transform.x[t]!, y: Transform.y[t]!, ms: fx.durationMs, height: fx.height }, { self: false, src, onLand: fx.onLand, base: at.baseDamage })) interrupt(sim, t)
     }
   },
@@ -498,7 +490,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const ox = by >= 0 ? Transform.x[by]! : at.x
     const oy = by >= 0 ? Transform.y[by]! : at.y
     for (const t of at.targets ?? []) {
-      if (t === by || hasMark(sim, t, MARK.unstoppable)) continue
+      if (t === by || isSteadfast(sim, t)) continue
       const d = sim.hooks.worldDelta(sim, ox, oy, Transform.x[t]!, Transform.y[t]!)
       const angle = Math.atan2(d.y, d.x)
       displace(sim, t, { kind: 'dash', angle, distance: fx.distance, ms: fx.ms }, { self: false, src, onWall: fx.onWall, base: at.baseDamage })
@@ -508,7 +500,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   throw: (sim, src, fx, at) => {
     const by = casterOf(sim, src)
     for (const t of at.targets ?? []) {
-      if (t === by || hasMark(sim, t, MARK.unstoppable)) continue
+      if (t === by || isSteadfast(sim, t)) continue
       const tx = Transform.x[t]!
       const ty = Transform.y[t]!
       let to: { x: number; y: number } | null = null
@@ -612,7 +604,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   swap: (sim, src, _fx, at) => {
     const by = casterOf(sim, src)
     const t = at.targets?.[0]
-    if (by < 0 || t === undefined || t === by || hasMark(sim, t, MARK.unstoppable)) return
+    if (by < 0 || t === undefined || t === by || isSteadfast(sim, t)) return
     const tx = Transform.x[t]!
     const ty = Transform.y[t]!
     const ms = TRANSIT_MS.swap
@@ -740,7 +732,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   interrupt: (sim, _src, _fx, at) => {
-    for (const t of at.targets ?? []) if (!hasMark(sim, t, MARK.unstoppable)) interrupt(sim, t)
+    for (const t of at.targets ?? []) if (!isSteadfast(sim, t)) interrupt(sim, t)
   },
 
   warp: (sim, src, fx, at) => {

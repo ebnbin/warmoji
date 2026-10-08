@@ -1,6 +1,8 @@
 import type { QueryTerm } from 'bitecs'
 import { INITIAL_CAPACITY } from './world'
 import { STAT_KEYS } from '../data/stats'
+import { STATUS_IDS } from '../data/statuses'
+import type { StatusId } from '../types/statuses'
 import type { StatKey } from '../types/stats'
 
 // 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`
@@ -99,49 +101,8 @@ const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   return col
 }
 
-/** 标记的种类：slow/speed/guard/dmg/cd/grow 是限时的属性修正（见 utils/stats），poison 按节拍扣血、undead 按秒流失，其余是有无；a/b/c/ref 按种类解释，见 utils/marks */
-export const MARK = {
-  none: 0,
-  slow: 1,
-  speed: 2,
-  guard: 3,
-  dmg: 4,
-  cd: 5,
-  poison: 6,
-  stun: 7,
-  hide: 8,
-  taunt: 9,
-  invuln: 10,
-  morph: 11,
-  morphImmune: 12,
-  root: 14,
-  silence: 15,
-  disarm: 16,
-  ground: 17,
-  sleep: 18,
-  fear: 19,
-  charm: 20,
-  berserk: 21,
-  stasis: 22,
-  untargetable: 23,
-  unstoppable: 24,
-  spellShield: 25,
-  frontGuard: 26,
-  reveal: 27,
-  undying: 28,
-  realm: 29,
-  parry: 30,
-  stealth: 31,
-  stack: 32,
-  fuse: 33,
-  store: 34,
-  empower: 35,
-  deathMark: 36,
-  mist: 37,
-  devoured: 38,
-  undead: 39,
-  grow: 40,
-} as const
+/** 标记的种类编号：0 是空槽，其余按状态表的次序 */
+export const MARK = Object.fromEntries([['none', 0], ...STATUS_IDS.map((id, i) => [id, i + 1])]) as Readonly<Record<StatusId | 'none', number>>
 
 /** 标记的来源：同种同源的标记刷新而不叠加；world 是地图按自己的规则加的 */
 export const TAG = { effect: 0, morph: 1, perk: 3, world: 4 } as const

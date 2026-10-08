@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { Casting, Ctl, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Transform } from '../components'
-import { hasMark, inTransit, isAirborne, markedBy, markSlot } from '../utils/marks'
+import { BLOCK, blockedBits, FORCING, hasMark, inTransit, isAirborne, markedBy, markSlot, wanderPace } from '../utils/marks'
 import { norm } from '../../util/vec'
 import { wanderDir } from './shared/steer'
 import { moveSpeed } from '../utils/stats'
@@ -21,7 +21,7 @@ function ledPoint(sim: Sim, eid: number, kind: number): { x: number; y: number }
   return { x: Mark.b[s]!, y: Mark.c[s]! }
 }
 
-/** 每个身体这一帧能做什么，敌我同一条：静止、被吞、穿行、眩晕、睡眠什么都做不了；被抛在空中不能出手；定身不能走，沉默不能施放，致盲不能出手，禁锢不能位移；恐惧与魅惑被牵着走，嘲讽被拉向嘲讽者；变形中会走的只慢速乱逛；脚本位移与蓄力中不自己走 */
+/** 每个身体这一帧能做什么，敌我同一条：身上的状态按状态表封住动作、逼着它走（见 data/statuses）；穿行中什么都做不了，被抛在空中不能出手；脚本位移与蓄力中不自己走 */
 export function updateControl(sim: Sim): void {
   for (const eid of query(sim.world, [Ctl, Mark, Drive])) controlBody(sim, eid)
 }
@@ -33,60 +33,36 @@ export function controlBody(sim: Sim, eid: number): void {
   Drive.y[eid] = 0
   Drive.idle[eid] = 0
   Ctl.forced[eid] = 0
-  let move = 1
-  let act = 1
-  let cast = 1
-  let dash = 1
-  const stun = hasMark(sim, eid, MARK.stun)
-  if (stun || hasMark(sim, eid, MARK.sleep) || hasMark(sim, eid, MARK.stasis) || hasMark(sim, eid, MARK.devoured) || inTransit(eid)) {
-    if (stun) Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3
-    move = 0
-    act = 0
-    cast = 0
-    dash = 0
-  }
-  if (isAirborne(eid)) {
-    act = 0
-    cast = 0
-  }
-  if (hasMark(sim, eid, MARK.root)) {
-    move = 0
-    dash = 0
-  }
-  if (hasMark(sim, eid, MARK.silence)) cast = 0
-  if (hasMark(sim, eid, MARK.disarm)) act = 0
-  if (hasMark(sim, eid, MARK.ground)) dash = 0
-  if (hasMark(sim, eid, MARK.morph)) {
-    act = 0
-    cast = 0
-    dash = 0
-    move = 0
-    if (hasComponent(sim.world, eid, EDir)) {
-      const d = wanderDir(sim, eid)
-      const sp = moveSpeed(eid) * 0.5
-      Drive.x[eid] = d.x * sp
-      Drive.y[eid] = d.y * sp
-      Drive.idle[eid] = 1
-    }
+  if (hasMark(sim, eid, MARK.stun)) Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3
+  let bits = blockedBits(sim, eid)
+  if (inTransit(eid)) bits |= BLOCK.move | BLOCK.act | BLOCK.cast | BLOCK.dash
+  if (isAirborne(eid)) bits |= BLOCK.act | BLOCK.cast
+  let move = bits & BLOCK.move ? 0 : 1
+  const act = bits & BLOCK.act ? 0 : 1
+  const cast = bits & BLOCK.cast ? 0 : 1
+  const dash = bits & BLOCK.dash ? 0 : 1
+  const wander = wanderPace(sim, eid)
+  if (wander > 0 && hasComponent(sim.world, eid, EDir)) {
+    const d = wanderDir(sim, eid)
+    const sp = moveSpeed(eid) * wander
+    Drive.x[eid] = d.x * sp
+    Drive.y[eid] = d.y * sp
+    Drive.idle[eid] = 1
   }
   let forced = 0
   let pace = 1
   let to: { x: number; y: number } | null = null
-  const fear = ledPoint(sim, eid, MARK.fear)
-  const charm = fear ? null : ledPoint(sim, eid, MARK.charm)
-  if (fear || charm) {
-    forced = fear ? FLEE : APPROACH
-    pace = fear ? 1 : 0.75
-    to = fear ?? charm
-    act = 0
-    cast = 0
-    dash = 0
-  } else {
-    const taunter = markedBy(sim, eid, MARK.taunt)
-    if (taunter >= 0) {
-      forced = APPROACH
-      to = { x: Transform.x[taunter]!, y: Transform.y[taunter]! }
+  for (const { kind, force } of FORCING) {
+    if (force.kind === 'taunted') {
+      const by = markedBy(sim, eid, kind)
+      if (by >= 0) to = { x: Transform.x[by]!, y: Transform.y[by]! }
+    } else {
+      to = ledPoint(sim, eid, kind)
     }
+    if (!to) continue
+    forced = force.kind === 'flee' ? FLEE : APPROACH
+    pace = force.pace
+    break
   }
   if (Motion.kind[eid] !== MOTION.none || now < Casting.until[eid]!) move = 0
   if (forced !== 0 && to && move) {

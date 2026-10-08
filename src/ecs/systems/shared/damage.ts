@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
 import { Alive, Boss, Elite, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
-import { hasMark, inTransit, isUntargetable, markSlot } from '../../utils/marks'
+import { hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
 import { nearestSummoned } from '../../entities/summon'
@@ -140,12 +140,12 @@ function guarded(sim: Sim, target: number): boolean {
 /** 这一下能不能落到目标身上：静止、穿行与碰不到、依存无敌、挡格；带伤害的还看无敌；持续伤害不看也不消耗无敌与挡格 */
 function lands(sim: Sim, src: Source, target: number, o: HitOpts, harmful: boolean): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Alive.v[target] === 0) return false
-  if (hasMark(sim, target, MARK.stasis) || inTransit(target) || (!o.tick && isUntargetable(sim, target))) return false
+  if (isUntouchable(sim, target) || inTransit(target) || (!o.tick && isUntargetable(sim, target))) return false
   if (guarded(sim, target)) {
     if (!o.tick) blockFx(sim, target, 0x80d8ff)
     return false
   }
-  return o.tick === true || !((harmful && hasMark(sim, target, MARK.invuln)) || blocked(sim, src, target, o))
+  return o.tick === true || !((harmful && isInvulnerable(sim, target)) || blocked(sim, src, target, o))
 }
 
 /** 不带伤害的一下：挡格与依存无敌照挡，无敌只挡伤害；返回是否碰到 */

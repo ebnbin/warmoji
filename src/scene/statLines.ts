@@ -7,10 +7,11 @@ import type { CharacterId } from '../types/characters'
 import { gearMods, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
 import { ROLES } from '../data/roles'
+import { STATUSES } from '../data/statuses'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
+import type { AbilityDef, Cond, Effect, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
 import type { StatKey } from '../types/stats'
@@ -80,6 +81,8 @@ function joinFx(effects: readonly Effect[], self = false): string {
 /** self：这组效果施于出手者自己 */
 export function effectLine(e: Effect, self = false): string {
   switch (e.kind) {
+    case 'status':
+      return `${STATUSES[e.status].name} ${sec(e.ms)}`
     case 'blast':
       return `命中处爆开 ${grid(e.radius)}，波及 ${pct(e.ratio)} 伤害${e.breach ? `，炸掉约 ${e.breach} 立方米的墙` : ''}`
     case 'slow':
@@ -268,7 +271,7 @@ function condLine(c: Cond): string {
     case 'airborne':
       return '在空中'
     case 'marked':
-      return `带着${MARK_LABEL[c.mark]}`
+      return `带着${STATUSES[c.mark].keyed ? '你的' : ''}${STATUSES[c.mark].name}`
     case 'hpBelow':
       return `生命低于 ${pct(c.ratio)}`
     case 'boss':
@@ -276,23 +279,6 @@ function condLine(c: Cond): string {
     case 'not':
       return `不${condLine(c.cond)}`
   }
-}
-
-const MARK_LABEL: Record<MarkName, string> = {
-  stun: '眩晕',
-  root: '定身',
-  sleep: '睡眠',
-  fear: '恐惧',
-  charm: '魅惑',
-  slow: '减速',
-  poison: '中毒',
-  silence: '沉默',
-  disarm: '致盲',
-  stasis: '静止',
-  fuse: '你的引信',
-  stack: '你的叠层',
-  store: '你的存伤',
-  deathMark: '你的死亡印记',
 }
 
 function shapeLine(w: AbilityDef, s: Shape): string {

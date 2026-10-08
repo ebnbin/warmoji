@@ -23,6 +23,7 @@ import { RUNS } from '../defs/runs.ts'
 import { SFX } from '../defs/sfx.ts'
 import { STAMINA } from '../defs/stamina.ts'
 import { STATS } from '../defs/stats.ts'
+import { STATUSES } from '../defs/statuses.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
@@ -57,6 +58,7 @@ import { packSvg, parseEmojiPack } from '../src/emoji/pack.ts'
 import { splitSvg } from '../src/emoji/svgSplit.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { AbilityDef } from '../src/types/abilityDefs'
+import type { StatusDef } from '../src/types/statuses'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
@@ -1023,9 +1025,20 @@ const TABLES = {
   sfx: SFX,
   stamina: STAMINA,
   stats: STATS,
+  statuses: STATUSES,
   team: TEAM_BASELINE,
   timestop: TIMESTOP,
   weapons: WEAPONS,
+}
+
+/** 状态：底色的轻重、强制行为的先后各不相同；种类编号放得进一个字节 */
+{
+  const list = Object.entries(STATUSES) as [string, StatusDef][]
+  need(list.length < 255, `状态有 ${list.length} 种，超过了一个字节`)
+  const ranks = list.flatMap(([, d]) => (d.tint ? [d.tint.rank] : []))
+  need(new Set(ranks).size === ranks.length, `状态的底色轻重有重复：${ranks.join(',')}`)
+  const order = list.flatMap(([, d]) => (d.forces ? [d.forces.priority] : []))
+  need(new Set(order).size === order.length, `状态的强制行为先后有重复：${order.join(',')}`)
 }
 
 /** 键名里带 emoji 或 icon 的字段都是表情包里的码位，缺图的单位到运行时只会隐形 */

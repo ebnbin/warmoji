@@ -5,56 +5,13 @@ import { UNIT } from '../util/units'
 import { Ability, Alive, Ammo, Boss, Cd, Charges, Ctl, Drive, Elite, Faction, FACTION, Form, Hp, Mark, MARK, MARK_SLOTS, Owner, Phys, Radius, Res, Seat, Stats, Transform, Uid } from './components'
 import { abilityDef, bodyLook, enemyDef, resDef } from './store'
 import { staminaLeft } from './systems/shared/stamina'
+import { statusDef } from './utils/marks'
 import type { Sim } from './sim'
 import type { DriveDef } from '../types/enemies'
 
 /** 点选时离身体边缘多远以内还算点中，像素 */
 const PICK_SLACK = 0.6 * UNIT
 
-const MARK_LABEL: Record<keyof typeof MARK, string> = {
-  none: '无',
-  slow: '减速',
-  speed: '加速',
-  guard: '减伤',
-  dmg: '增伤',
-  cd: '冷却',
-  poison: '中毒',
-  stun: '眩晕',
-  hide: '隐匿',
-  taunt: '嘲讽',
-  invuln: '无敌',
-  morph: '变形',
-  morphImmune: '免疫变形',
-  root: '定身',
-  silence: '沉默',
-  disarm: '缴械',
-  ground: '禁锢',
-  sleep: '催眠',
-  fear: '恐惧',
-  charm: '魅惑',
-  berserk: '倒戈',
-  stasis: '静滞',
-  untargetable: '不可选中',
-  unstoppable: '霸体',
-  spellShield: '法术盾',
-  frontGuard: '正面格挡',
-  reveal: '显形',
-  undying: '不灭',
-  realm: '结界',
-  parry: '招架',
-  stealth: '潜行',
-  stack: '叠层',
-  fuse: '引信',
-  store: '存伤',
-  empower: '强化',
-  deathMark: '死亡印记',
-  mist: '墨云',
-  devoured: '被吞',
-  undead: '亡后残留',
-  grow: '成长',
-}
-
-const MARK_NAMES = new Map(Object.entries(MARK).map(([k, v]) => [v as number, MARK_LABEL[k as keyof typeof MARK]]))
 
 const DRIVE_LABEL: Record<DriveDef['kind'], string> = {
   chase: '追击',
@@ -114,7 +71,7 @@ function marks(sim: Sim, eid: number): string {
     if (kind === MARK.none) continue
     const until = Mark.until[base + i]!
     const a = Mark.a[base + i]!
-    out.push(`${MARK_NAMES.get(kind) ?? kind}${a !== 0 ? ` ${num(a)}` : ''} ${until === Infinity ? '常驻' : `剩 ${sec(until - sim.elapsedMs)}`}`)
+    out.push(`${statusDef(kind)?.name ?? kind}${a !== 0 ? ` ${num(a)}` : ''} ${until === Infinity ? '常驻' : `剩 ${sec(until - sim.elapsedMs)}`}`)
   }
   return out.length > 0 ? out.join(' · ') : '没有'
 }
