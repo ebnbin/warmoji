@@ -10,6 +10,7 @@ export interface ResolvedConfig {
   readonly mono: string
   readonly size: number
   readonly accent: number
+  readonly build: { readonly hash: string; readonly time: string } | null
   readonly layout: (scene: Phaser.Scene) => DevLayout
   readonly relayout: () => void
   readonly onTap: () => void
@@ -35,6 +36,7 @@ export function setDevConfig(cfg: DevToolsConfig): ResolvedConfig {
     mono: cfg.font?.mono ?? 'ui-monospace, Menlo, Consolas, monospace',
     size: cfg.font?.size ?? 13,
     accent: cfg.accent ?? 0xffd54f,
+    build: cfg.build ?? null,
     layout: cfg.layout ?? defaultLayout,
     relayout: cfg.relayout ?? ((): void => {}),
     onTap: cfg.onTap ?? ((): void => {}),

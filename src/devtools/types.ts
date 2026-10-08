@@ -104,6 +104,8 @@ export interface DevToolsConfig {
   /** size 是面板字号，CSS 像素 */
   readonly font?: { readonly family?: string; readonly mono?: string; readonly size?: number }
   readonly accent?: number
+  /** 构建号显示在面板标题旁，悬停看构建时间 */
+  readonly build?: { readonly hash: string; readonly time: string }
   /** 覆盖层每次布局时调用；须把 scene 主相机设置成与宿主其他场景一致 */
   readonly layout?: (scene: Phaser.Scene) => DevLayout
   /** 面板停靠方式变了时调用：宿主重新排版，排版时经 layoutDock 取游戏区 */

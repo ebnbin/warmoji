@@ -53,7 +53,7 @@ function Meter({ game }: { readonly game: Phaser.Game }): ReactNode {
     const tag = scale === 0 ? '暂停 · ' : scale === 1 ? '' : `×${scale} · `
     return `${tag}${Math.round(game.loop.actualFps)} fps · 画布 ${game.scale.width}×${game.scale.height}`
   })
-  return <span className="dt-meter">{text}</span>
+  return <span className="dt-note">{text}</span>
 }
 
 /** 拖动时只画一条参考线，松手才改尺寸：每改一次，游戏的界面都要按新尺寸重建 */
@@ -123,6 +123,11 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
       {docked && <Divider dock={dock} />}
       <header className="dt-head">
         <span className="dt-title">{cfg.title}</span>
+        {cfg.build && (
+          <span className="dt-note" title={`构建于 ${cfg.build.time}`}>
+            {cfg.build.hash}
+          </span>
+        )}
         <Meter game={game} />
         <span className="dt-grow" />
         <span className="dt-seg">

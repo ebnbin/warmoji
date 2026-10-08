@@ -28,12 +28,6 @@ import { runProvider } from './dev/run'
 import { settingsProvider } from './dev/settings'
 import { SceneKey } from './scene/keys'
 
-const badge = document.getElementById('build-badge')
-if (badge) {
-  badge.textContent = __BUILD_HASH__
-  badge.title = `构建于 ${__BUILD_TIME__}`
-}
-
 initSfx()
 initBgm()
 setSfxEnabled(loadSettings(browserStorage()).sound)
@@ -56,6 +50,7 @@ installDevTools(game, {
   storageKey: StorageKey.DevTools,
   accent: TONE.accent.face,
   font: { family: FONT_FAMILY, size: 13 },
+  build: { hash: __BUILD_HASH__, time: __BUILD_TIME__ },
   layout: (scene) => {
     applyCamera(scene)
     return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets }
