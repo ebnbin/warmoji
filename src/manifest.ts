@@ -165,6 +165,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
 export const PLAIN_EMOJIS: readonly string[] = ['1f4a5', SPAWN.markEmoji]
 
 export const PRELOAD_EMOJIS: readonly string[] = [
+  '1f9ed',
   ...Object.values(OUTLINED_EMOJIS).flat(),
   ...roster.flatMap((c) => c.carriers.map((cr) => cr.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),

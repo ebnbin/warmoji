@@ -1,17 +1,21 @@
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
-import { BOSSES, ELITE, ENEMIES, ENEMY_DEFS } from '../data/enemies'
+import { BOSSES, ELITE, ENEMIES, ENEMY_DEFS, TENACITY } from '../data/enemies'
 import { AFFIX_IDS, AFFIXES } from '../data/affixes'
-import type { EnemyDef, UnitTrait } from '../types/enemies'
+import { STATUSES } from '../data/statuses'
+import type { AffixId } from '../types/affixes'
+import type { Effect } from '../types/abilityDefs'
+import type { BodyRules, EnemyDef, Tenacity } from '../types/enemies'
+import type { StatusAction, StatusDef, StatusForce, StatusMerge } from '../types/statuses'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
-import { modTexts, statText } from '../data/stats'
+import { modTexts, STATS, statText } from '../data/stats'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
-import { abilityLabel, abilityStatLines, characterStatGroups, condLine, effectLine } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, condLine, effectLine, sec, traitLine } from './statLines'
 import { itemLines, TRAIT_LABEL } from './itemLines'
 import { mapStaminaLine } from './mapLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -69,11 +73,35 @@ function spanTag(s: Span | undefined): string {
   return lo > 0 ? '悬空' : hi < STANDARD[1] ? '矮' : hi > STANDARD[1] ? '高大' : '标准身高'
 }
 
-const UNIT_TRAIT_LABEL: Record<UnitTrait, string> = { swims: '会游泳', breathes: '要换气', phases: '穿墙', fireproof: '耐火', coldproof: '耐寒', anchored: '定身', wary: '识险' }
+/** 控制韧性的说法 */
+function tenacityLine(t: Tenacity): string {
+  return `被控制累计 ${sec(t.fillMs)}就解掉控制、霸体 ${sec(t.steadfastMs)}`
+}
 
-/** 单位的特质说成一串：会飞的看身段 */
-export function traitLine(traits: readonly UnitTrait[] | undefined, span: Span | undefined): string {
-  return [...(span && span[0] > 0 ? ['会飞'] : []), ...(traits ?? []).map((t) => UNIT_TRAIT_LABEL[t])].join('、')
+/** 身体的反应说成几行：致命、残血、闲着、死后、碰人、被碰、挨打、击杀、失巢 */
+function reactionLines(r: BodyRules): string[] {
+  const self = (fx: readonly Effect[]): string => fx.map((x) => effectLine(x, true)).join('，')
+  const lines: string[] = []
+  if (r.onLethal) lines.push(`致命一击时不死，改为：${self(r.onLethal)}`)
+  for (const l of r.onLowHp ?? []) lines.push(`生命第一次低于 ${Math.round(l.ratio * 100)}% 时：${self(l.effects)}`)
+  if (r.onIdle) lines.push(`${r.onIdle.ms / 1000} 秒没出手${r.onIdle.still ? '也没动' : ''}：${self(r.onIdle.effects)}`)
+  for (const fx of r.onDeath ?? []) {
+    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into?.name ?? '普通的同类'}`)
+    else if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
+    else lines.push(`亡语：${effectLine(fx)}`)
+  }
+  for (const fx of r.onTouch ?? []) lines.push(`接触附加：${effectLine(fx)}`)
+  for (const fx of r.onTouched ?? []) lines.push(`被碰到时：${effectLine(fx)}`)
+  for (const fx of r.onHurt ?? []) lines.push(`挨打时：${effectLine(fx)}`)
+  for (const fx of r.onKill ?? []) lines.push(`击杀时：${effectLine(fx)}`)
+  for (const fx of r.onAnchorLost ?? []) lines.push(`失巢暴走：${effectLine(fx)}`)
+  return lines
+}
+
+/** 精英词缀带几个 */
+function affixCount(): string {
+  const { min, max } = ELITE.affixes
+  return min === max ? `${min}` : `${min}–${max}`
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {
@@ -87,6 +115,11 @@ export function enemyStatLines(e: EnemyDef): string[] {
     ].join(' · '),
     `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${tireless ? ' · 不知疲倦' : ''}`,
   ]
+  lines.push(
+    e.role === 'boss'
+      ? `头目：不会成为精英；${tenacityLine(TENACITY.boss)}，韧性条在血条下面`
+      : `成为精英时：属性更强、掉落更多，随机带 ${affixCount()} 个精英词缀；${tenacityLine(TENACITY.elite)}（见「精英词缀」页）`,
+  )
   const traits = traitLine(e.traits, e.span)
   if (traits) lines.push(`特质：${traits}`)
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
@@ -103,24 +136,13 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
   if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
-  const r = rulesOf(e)
-  if (r.onLethal) lines.push(`致命一击时不死，改为：${r.onLethal.map((x) => effectLine(x, true)).join('，')}`)
-  for (const l of r.onLowHp ?? []) lines.push(`生命第一次低于 ${Math.round(l.ratio * 100)}% 时：${l.effects.map((x) => effectLine(x, true)).join('，')}`)
-  if (r.onIdle) lines.push(`${r.onIdle.ms / 1000} 秒没出手${r.onIdle.still ? '也没动' : ''}：${r.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
     const parts = [...(f.stats ? modTexts(f.stats) : []), f.traits ? `特质换成${traitLine(f.traits, f.span) || '无'}` : '', spanTag(f.span)].filter(Boolean).join(' · ')
     lines.push(`形态「${f.name ?? e.name}」${parts ? `：${parts}` : ''}`)
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
-  for (const fx of r.onDeath ?? []) {
-    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into?.name ?? '同类'}`)
-    else if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
-    else lines.push(`亡语：${effectLine(fx)}`)
-  }
-  for (const fx of r.onTouch ?? []) lines.push(`接触附加：${effectLine(fx)}`)
-  for (const fx of r.onHurt ?? []) lines.push(`挨打时：${effectLine(fx)}`)
-  for (const fx of r.onAnchorLost ?? []) lines.push(`失巢暴走：${effectLine(fx)}`)
+  lines.push(...reactionLines(rulesOf(e)))
   if (e.spawner) {
     lines.push(`巢穴：每 ${e.spawner.intervalMs / 1000} 秒生成 ${e.spawner.count} 只${e.spawner.into.name}`)
   }
@@ -139,18 +161,84 @@ function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   ]
 }
 
-/** 精英这一条：精英的倍率连同词缀表 */
+/** 精英词缀页的第一条：精英是怎么回事 */
 function eliteEntry(): WikiEntry {
-  const { min, max } = ELITE.affixes
   return {
     emoji: '2b50',
     name: '精英',
-    desc: `小怪都可能以精英出现：更强、给得更多，出生时随机挂 ${min === max ? min : `${min}–${max}`} 个不重样的词缀，词缀的图标顶在头上`,
+    desc: `小怪都可能以精英出现：更强、给得更多，出生时从 ${AFFIX_IDS.length} 个词缀里随机带 ${affixCount()} 个不重样的，词缀的图标顶在头上`,
     lines: [
-      `${modTexts(ELITE.stats).join(' · ')} · 经验 ×${ELITE.xpMul} · 金币 ×${ELITE.coinsMul}`,
-      ...AFFIX_IDS.map((id) => `{${AFFIXES[id].icon}} ${AFFIXES[id].name}：${AFFIXES[id].desc}`),
+      `属性：${modTexts(ELITE.stats).join(' · ')}`,
+      `掉落：经验 ×${ELITE.xpMul} · 金币 ×${ELITE.coinsMul}`,
+      `控制韧性：${tenacityLine(TENACITY.elite)}；打断一次蓄力或连发也记 ${sec(TENACITY.interruptMs)}，不被控制时 ${sec(TENACITY.drainMs)}回落到空`,
+      `词缀：${AFFIX_IDS.map((id) => AFFIXES[id].name).join('、')}，各自的效果见本页其余各条`,
+      '头目不会成为精英',
     ],
   }
+}
+
+/** 一个精英词缀：属性与反应都从词缀表来 */
+function affixEntry(id: AffixId): WikiEntry {
+  const a = AFFIXES[id]
+  return {
+    emoji: a.icon,
+    name: a.name,
+    desc: a.desc,
+    lines: [
+      ...(a.stats ? [`属性：${modTexts(a.stats).join(' · ')}`] : []),
+      ...reactionLines(rulesOf({ emoji: a.icon, name: a.name, reactions: a.reactions })),
+      `成为精英的小怪随机带 ${affixCount()} 个不重样的词缀，这是其中一个；头目不会带`,
+    ],
+  }
+}
+
+const ACTION_LABEL: Record<StatusAction, string> = { move: '走', act: '普通出手', cast: '放技能', dash: '冲刺、跳跃、闪现', touch: '接触伤人' }
+
+const FORCE_LABEL: Record<StatusForce['kind'], string> = { flee: '背离施加者逃跑', approach: '朝施加者走过去', taunted: '追着嘲讽它的人打' }
+
+const SAME_STRENGTH = '强度一样的只延长时间；不一样的各算各的、各自到期，生效时取'
+
+const MERGE_LABEL: Record<StatusMerge, string> = {
+  high: `${SAME_STRENGTH}参数最大的那条`,
+  low: `${SAME_STRENGTH}参数最小（最强）的那条`,
+  rate: `${SAME_STRENGTH}每秒伤害最高的那条`,
+  bySource: '按施加者分开记，生效的是施加者还在的里面最晚到期的那条',
+}
+
+/** 一种状态的规则，从状态表的字段说出来 */
+function statusLines(st: StatusDef): string[] {
+  const lines: string[] = []
+  if (st.cc) lines.push('控制：霸体挡得住，施加霸体或净化时解掉；头目与精英被控制会累进韧性条')
+  else if (st.cleansable) lines.push('净化能解掉')
+  if (st.blocks) lines.push(`封住：${st.blocks.map((b) => ACTION_LABEL[b]).join('、')}`)
+  if (st.forces) lines.push(`逼着${FORCE_LABEL[st.forces.kind]}${st.forces.pace === 1 ? '' : `（速度 ×${st.forces.pace}）`}`)
+  if (st.wander) lines.push(`自己慢慢乱逛（速度 ×${st.wander}）`)
+  if (st.stat) lines.push(`影响的属性：${STATS[st.stat.key].name}`)
+  const flags = [
+    st.untargetable ? '谁也选不中' : '',
+    st.untouchable ? '什么都落不到身上，持续伤害也不行' : '',
+    st.invulnerable ? '带伤害的一下打不进来，持续伤害照样' : '',
+    st.hidden ? '看不见，显形让它失效' : '',
+    st.reveals ? '让隐匿与潜行失效' : '',
+    st.steadfast ? '控制、被摆布、打断都不吃' : '',
+    st.turncoat ? '把自己人当敌人' : '',
+    st.halts ? '姿态与产出都停住' : '',
+    st.interrupts ? '中了就打断正在蓄的力与连发' : '',
+    st.pinned ? '身上的状态满了也不会被顶掉' : '',
+  ].filter(Boolean)
+  if (flags.length > 0) lines.push(flags.join('；'))
+  const again = st.merge ? MERGE_LABEL[st.merge] : st.keyed ? '按来源分开记，同一来源的只延长时间' : '只延长时间（取更长的），参数用新的'
+  lines.push(`再中一次：${again}`)
+  if (st.icon) lines.push(`头顶图标排第 ${st.icon.rank + 1}：同时有几种，只显示最靠前的三个`)
+  return lines
+}
+
+/** 带头顶图标的状态，按图标的先后排 */
+function statusEntries(): WikiEntry[] {
+  return Object.values<StatusDef>(STATUSES)
+    .flatMap((st) => (st.icon ? [{ st, icon: st.icon }] : []))
+    .sort((a, b) => a.icon.rank - b.icon.rank)
+    .map(({ st, icon }) => ({ emoji: icon.emoji, name: st.name, desc: st.desc, lines: statusLines(st) }))
 }
 
 function flatten(groups: readonly { title: string; lines: readonly string[] }[]): string[] {
@@ -193,8 +281,17 @@ export function wikiGroups(): WikiGroup[] {
           desc: e.desc,
           lines: enemyStatLines(e),
         })),
-        eliteEntry(),
       ],
+    },
+    {
+      icon: '2b50',
+      title: '精英词缀',
+      entries: [eliteEntry(), ...AFFIX_IDS.map(affixEntry)],
+    },
+    {
+      icon: '1f4ab',
+      title: '状态',
+      entries: statusEntries(),
     },
     {
       icon: '1f6e1',

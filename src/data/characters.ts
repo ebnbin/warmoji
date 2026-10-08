@@ -44,6 +44,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
     resource: src.resource,
+    traits: src.traits,
     reactions: src.reactions,
     forms: src.forms,
     instincts: src.instincts ?? ROLES[src.role].instincts,
