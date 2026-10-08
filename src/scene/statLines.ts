@@ -335,12 +335,17 @@ function selectorLine(s: Exclude<Selector, { readonly side: 'self' }>): string {
   return `${grid(s.radius)} 内${only}${side}${order}${n}`
 }
 
+/** 抛射弹落空也会在落点生效的命中效果：不挑目标的范围效果 */
+function landsAnyway(e: Effect): boolean {
+  return e.kind === 'blast' || e.kind === 'ground' || e.kind === 'spawnProjectile' || (e.kind === 'to' && e.who.side !== 'self')
+}
+
 function shapeLine(w: AbilityDef, s: Shape): string {
   switch (s.kind) {
     case 'bolt': {
       const p = s.projectile
       const f = p.flight
-      return `弹速 ${grid(p.speed)}/秒 · 弹体 ${grid(p.radius * 2)}${f?.kind === 'arc' ? ` · 抛射（拱起 ${f.peakM} 米，越过比它矮的墙，落下来才打得到人${w.onHit?.length ? '，落空也在落点结算命中效果' : ''}）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${f?.kind === 'homing' ? ` · 追踪（每秒转 ${f.degPerSec}°）` : ''}${p.split ? ` · 打中或飞完裂成 ${p.split.count} 发（每发 ${pct(p.split.ratio)} 伤害）` : ''}${p.linger ? ` · 飞完落地 ${sec(p.linger)} 等召回` : ''}`
+      return `弹速 ${grid(p.speed)}/秒 · 弹体 ${grid(p.radius * 2)}${f?.kind === 'arc' ? ` · 抛射（拱起 ${f.peakM} 米，越过比它矮的墙，落下来才打得到人${w.onHit?.some(landsAnyway) ? '，落空时爆炸、地面这类范围效果照样在落点生效' : ''}）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${f?.kind === 'homing' ? ` · 追踪（每秒转 ${f.degPerSec}°）` : ''}${p.split ? ` · 打中或飞完裂成 ${p.split.count} 发（每发 ${pct(p.split.ratio)} 伤害）` : ''}${p.linger ? ` · 飞完落地 ${sec(p.linger)} 等召回` : ''}`
     }
     case 'segment':
       return s.beam
