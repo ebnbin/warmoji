@@ -142,9 +142,9 @@ export function abilityEffects(a: AbilityDef): readonly EffectList[] {
   return [a.onHit, ...(a.reactions ?? []).map((r) => r.effects), a.boost?.onHit, a.ammo?.last, ...zone]
 }
 
-/** 能力里套着的能力：下一段、轮换的招式、装置出手用的，以及效果里放出的 */
+/** 能力里套着的能力：下一段、轮换的招式、装置出手用的、连招，以及效果里放出的 */
 export function childAbilities(a: AbilityDef): readonly AbilityDef[] {
-  const out: AbilityDef[] = [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : [])]
+  const out: AbilityDef[] = [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : []), ...(a.combo ?? [])]
   const walk = (list: EffectList): void => {
     for (const fx of list ?? []) {
       if (fx.kind === 'cast') out.push(fx.ability)

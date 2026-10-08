@@ -24,6 +24,7 @@ import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { Landmark } from '../landmark'
 import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 const ZERO: Point = { x: 0, y: 0 }
 /** 残垣按布景种子打散出自己的种子 */
@@ -562,7 +563,7 @@ function landFalls(sim: Sim, s: RuinsState): void {
   const src = hazardSource('collapse', FALL_TINT)
   const reach = cfg.fall.radiusU * UNIT
   for (const eid of [...query(sim.world, [Phys, Transform, Radius])]) {
-    if (!Alive.v[eid] || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) continue
+    if (!Alive.v[eid] || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard) || hasTrait(sim.world, eid, 'flies')) continue
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const r = Radius.v[eid]! + reach

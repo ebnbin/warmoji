@@ -1,6 +1,7 @@
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
-import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
-import type { EnemyDef } from '../types/enemies'
+import { BOSSES, ELITE, ENEMIES, ENEMY_DEFS } from '../data/enemies'
+import { AFFIX_IDS, AFFIXES } from '../data/affixes'
+import type { EnemyDef, UnitTrait } from '../types/enemies'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
@@ -10,7 +11,7 @@ import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
 import { modTexts, statText } from '../data/stats'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
-import { abilityLabel, abilityStatLines, characterStatGroups, effectLine } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, condLine, effectLine } from './statLines'
 import { itemLines, TRAIT_LABEL } from './itemLines'
 import { mapStaminaLine } from './mapLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -68,6 +69,13 @@ function spanTag(s: Span | undefined): string {
   return lo > 0 ? '悬空' : hi < STANDARD[1] ? '矮' : hi > STANDARD[1] ? '高大' : '标准身高'
 }
 
+const UNIT_TRAIT_LABEL: Record<UnitTrait, string> = { swims: '会游泳', breathes: '要换气', phases: '穿墙', fireproof: '耐火', coldproof: '耐寒', anchored: '定身', wary: '识险' }
+
+/** 单位的特质说成一串：会飞的看身段 */
+export function traitLine(traits: readonly UnitTrait[] | undefined, span: Span | undefined): string {
+  return [...(span && span[0] > 0 ? ['会飞'] : []), ...(traits ?? []).map((t) => UNIT_TRAIT_LABEL[t])].join('、')
+}
+
 export function enemyStatLines(e: EnemyDef): string[] {
   const tireless = e.stats?.exertion === 0
   const lines = [
@@ -77,27 +85,36 @@ export function enemyStatLines(e: EnemyDef): string[] {
         .filter((k) => !(k === 'exertion' && tireless))
         .map((k) => statText(k, e.stats![k]!)),
     ].join(' · '),
-    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${tireless ? ' · 不知疲倦' : ''}`,
+    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${tireless ? ' · 不知疲倦' : ''}`,
   ]
+  const traits = traitLine(e.traits, e.span)
+  if (traits) lines.push(`特质：${traits}`)
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
+  if (e.gcdMs) lines.push(`出完一招 ${e.gcdMs / 1000} 秒内不出下一招`)
+  for (const r of e.drives ?? []) lines.push(`${condLine(r.if)}时改为${DRIVE_LABEL[r.drive.kind]}`)
+  for (const p of e.phases ?? []) {
+    const enter = [p.drive ? `改为${DRIVE_LABEL[p.drive.kind]}` : '', ...(p.stats ? modTexts(p.stats) : []), ...(p.effects ?? []).map((x) => effectLine(x, true))].filter(Boolean)
+    lines.push(`阶段${p.name ? `「${p.name}」` : ''}：生命低于 ${Math.round(p.below * 100)}% 进入${enter.length > 0 ? `，${enter.join('，')}` : ''}`)
+    for (const w of p.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
+  }
   const span = e.span ? spanLine(e.span) : null
   if (span) lines.push(span)
-  if (e.phasesWalls) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
+  if (e.traits?.includes('phases')) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
   if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
   if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
   const r = rulesOf(e)
   if (r.onLethal) lines.push(`致命一击时不死，改为：${r.onLethal.map((x) => effectLine(x, true)).join('，')}`)
-  if (r.onLowHp) lines.push(`生命第一次低于 ${Math.round(r.onLowHp.ratio * 100)}% 时：${r.onLowHp.effects.map((x) => effectLine(x, true)).join('，')}`)
+  for (const l of r.onLowHp ?? []) lines.push(`生命第一次低于 ${Math.round(l.ratio * 100)}% 时：${l.effects.map((x) => effectLine(x, true)).join('，')}`)
   if (r.onIdle) lines.push(`${r.onIdle.ms / 1000} 秒没出手${r.onIdle.still ? '也没动' : ''}：${r.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
-    const traits = [...(f.stats ? modTexts(f.stats) : []), f.anchored ? '原地不动' : '', spanTag(f.span)].filter(Boolean).join(' · ')
-    lines.push(`形态「${f.name ?? e.name}」${traits ? `：${traits}` : ''}`)
+    const parts = [...(f.stats ? modTexts(f.stats) : []), f.traits ? `特质换成${traitLine(f.traits, f.span) || '无'}` : '', spanTag(f.span)].filter(Boolean).join(' · ')
+    lines.push(`形态「${f.name ?? e.name}」${parts ? `：${parts}` : ''}`)
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
   for (const fx of r.onDeath ?? []) {
-    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
+    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into?.name ?? '同类'}`)
     else if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
     else lines.push(`亡语：${effectLine(fx)}`)
   }
@@ -120,6 +137,20 @@ function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
     `头目 ${boss.name}`,
     `出没敌人 ${names.join('、')}`,
   ]
+}
+
+/** 精英这一条：精英的倍率连同词缀表 */
+function eliteEntry(): WikiEntry {
+  const { min, max } = ELITE.affixes
+  return {
+    emoji: '2b50',
+    name: '精英',
+    desc: `小怪都可能以精英出现：更强、给得更多，出生时随机挂 ${min === max ? min : `${min}–${max}`} 个不重样的词缀，词缀的图标顶在头上`,
+    lines: [
+      `${modTexts(ELITE.stats).join(' · ')} · 经验 ×${ELITE.xpMul} · 金币 ×${ELITE.coinsMul}`,
+      ...AFFIX_IDS.map((id) => `{${AFFIXES[id].icon}} ${AFFIXES[id].name}：${AFFIXES[id].desc}`),
+    ],
+  }
 }
 
 function flatten(groups: readonly { title: string; lines: readonly string[] }[]): string[] {
@@ -155,12 +186,15 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '1f9df',
       title: '敌人',
-      entries: [...ENEMY_DEFS, ...BOSSES].map((e) => ({
-        emoji: e.emoji,
-        name: e.role === 'boss' ? `${e.name}（Boss）` : e.name,
-        desc: e.desc,
-        lines: enemyStatLines(e),
-      })),
+      entries: [
+        ...[...ENEMY_DEFS, ...BOSSES].map((e) => ({
+          emoji: e.emoji,
+          name: e.role === 'boss' ? `${e.name}（Boss）` : e.name,
+          desc: e.desc,
+          lines: enemyStatLines(e),
+        })),
+        eliteEntry(),
+      ],
     },
     {
       icon: '1f6e1',

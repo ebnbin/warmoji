@@ -9,6 +9,7 @@ import type { BodyStep } from '../../ecs/systems/shared/body'
 import type { Flow, Water } from './water'
 import type { WadeConfig } from '../../types/maps'
 import type { Sim } from '../../ecs/sim'
+import { hasTrait } from '../../ecs/utils/traits'
 
 /** 水的密度，千克/米³ */
 const RHO = 1000
@@ -65,7 +66,7 @@ function bodyRadius(sim: Sim, eid: number): number {
 }
 
 /**
- * 水里的一步：掉落物落进水里跟落叶一样顺水漂，被吸向队伍的速度照加；身体站不住就随水漂、自己划水，站得住的按常规走；碎片照常。
+ * 水里的一步：掉落物落进水里跟落叶一样顺水漂，被吸向队伍的速度照加；身体站不住就随水漂、自己划水，站得住的与会游泳的按常规走；碎片照常。
  * swimming 按实体记着哪些身体正随水漂着（uid 对不上就是换了实体）。接管了这一步就返回 true
  */
 export function wade(sim: Sim, cfg: Wading, w: Water, swimming: Map<number, number>, eid: number, dt: number, x: number, y: number, vx: number, vy: number, out: BodyStep): boolean {
@@ -80,7 +81,7 @@ export function wade(sim: Sim, cfg: Wading, w: Water, swimming: Map<number, numb
   }
   const uid = Uid.v[eid]!
   const was = swimming.get(eid) === uid
-  if (FLOW.h < cfg.body.wetM || !swept(cfg, bodyRadius(sim, eid), (Span.hi[eid]! + 1) * LAYER_M, Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
+  if (FLOW.h < cfg.body.wetM || hasTrait(sim.world, eid, 'swims') || !swept(cfg, bodyRadius(sim, eid), (Span.hi[eid]! + 1) * LAYER_M, Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
     swimming.delete(eid)
     return false
   }

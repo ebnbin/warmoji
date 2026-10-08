@@ -3,7 +3,7 @@ import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
+import type { BossBar, FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { AimGuide, Announcer, StageDial, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, SubmarineDial, Sundial } from '../ui'
@@ -37,6 +37,9 @@ const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 
 const GOALS = { top: 124, step: 42 } as const
 /** 左上角的全队经验条，右边跟着等级与还没领的升级 */
 const XP_BAR = { x: 12, y: 12, w: 200, h: 16, gap: 12 } as const
+/** 头目的条在顶上居中往下排：最多几行、每行多高、条多宽，名字、生命条、韧性条各占多高 */
+const BOSS_ROWS = { max: 3, top: 50, step: 50, w: 320, name: 22, hp: 14, grit: 6 } as const
+
 /** 地图专属的表盘放在右上角计数下方：盘心离右边与上边多远、盘的半径 */
 const DIAL = { right: 64, top: 166, radius: 52 } as const
 
@@ -46,7 +49,10 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
   private levelLabel!: Label
   private levelUpsPill!: Pill
   private timePill!: Pill
-  private bossBar!: ProgressBar
+  private bossRows: { readonly name: Label; readonly hp: ProgressBar; readonly grit: ProgressBar }[] = []
+  private bossKey = ''
+  private bossLeft = 0
+  private bossTop = 0
   private killsPill!: Pill
   private coinsPill!: Pill
   private announcer!: Announcer
@@ -98,8 +104,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
       seconds: -1,
       remainMs: -1,
       goals: [],
-      bossHp: null,
-      bossMaxHp: 1,
+      bosses: [],
       battleFx: [],
       clock: null,
       submarine: null,
@@ -115,7 +120,8 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
     this.levelLabel = new Label(this, sL + XP_BAR.x + XP_BAR.w + XP_BAR.gap, barMid, '', { kind: 'label', bold: true, color: 'info', outline: true }).setOrigin(0, 0.5).setVisible(false)
     this.levelUpsPill = new Pill(this, 0, barMid + 4, { icon: PICKUPS.levelUp.emoji, outline: 'player', text: '', color: 'info', originX: 0 }).setVisible(false)
     this.timePill = new Pill(this, w / 2, sT + 32, { text: '' })
-    this.bossBar = new ProgressBar(this, w / 2 - 160, sT + 64, 320, 18, { tone: 'bad' }).setDepth(DEPTH.bar).setVisible(false)
+    this.bossLeft = w / 2 - BOSS_ROWS.w / 2
+    this.bossTop = sT + BOSS_ROWS.top
     const right = w - sR - 88
     this.killsPill = new Pill(this, right, sT + 32, { icon: '1f480', outline: 'player', text: '0', originX: 1 })
     this.coinsPill = new Pill(this, right, sT + 84, { icon: PICKUPS.coin.emoji, outline: 'player', text: '0', color: 'accent', originX: 1 })
@@ -205,11 +211,38 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
       const clock = formatTime(remainSec ?? s.seconds)
       this.timePill.setText(s.label ? `${s.label} ${clock}` : clock)
     }
-    if (s.bossHp !== this.last.bossHp) {
-      this.bossBar.setVisible(s.bossHp !== null)
-      if (s.bossHp !== null) this.bossBar.setValue(s.bossHp / s.bossMaxHp)
-    }
+    this.updateBosses(s.bosses)
     this.last = s
+  }
+
+  /** 头目的条：每个头目一行，名字下面是生命条，再下面是控制韧性，霸体中韧性条满格变金并标出来；场上的头目变了才重摆 */
+  private updateBosses(list: readonly BossBar[]): void {
+    const shown = list.slice(0, BOSS_ROWS.max)
+    const key = shown.map((b) => b.uid).join(',')
+    if (key !== this.bossKey) {
+      this.bossKey = key
+      for (const r of this.bossRows) {
+        r.name.destroy()
+        r.hp.destroy()
+        r.grit.destroy()
+      }
+      this.bossRows = shown.map((_, i) => {
+        const y = this.bossTop + i * BOSS_ROWS.step
+        const x = this.bossLeft
+        return {
+          name: new Label(this, x, y, '', { kind: 'caption', bold: true, color: 'bad', outline: true }).setDepth(DEPTH.bar),
+          hp: new ProgressBar(this, x, y + BOSS_ROWS.name, BOSS_ROWS.w, BOSS_ROWS.hp, { tone: 'bad' }).setDepth(DEPTH.bar),
+          grit: new ProgressBar(this, x, y + BOSS_ROWS.name + BOSS_ROWS.hp + 2, BOSS_ROWS.w, BOSS_ROWS.grit, { tone: 'steel' }).setDepth(DEPTH.bar),
+        }
+      })
+    }
+    shown.forEach((b, i) => {
+      const r = this.bossRows[i]!
+      const name = b.steadfast ? `${b.name} · 霸体` : b.name
+      if (r.name.text !== name) r.name.setText(name)
+      r.hp.setValue(b.hp / b.maxHp)
+      r.grit.setTone(b.steadfast ? 'accent' : 'steel').setValue(b.steadfast ? 1 : b.tenacity)
+    })
   }
 
   /** 经验条右边的等级，再往右是还没领的升级 */

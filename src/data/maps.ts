@@ -23,7 +23,7 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
     seen.add(def.kind)
     out.push(def)
     if (def.spawner) add(def.spawner.into)
-    for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split') add(fx.into)
+    for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split' && fx.into) add(fx.into)
   }
   for (const kind of MAPS[id].foes) add(ENEMIES[kind])
   add(bossFor(id))

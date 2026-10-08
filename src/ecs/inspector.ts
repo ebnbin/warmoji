@@ -1,9 +1,11 @@
 import { hasComponent, query } from 'bitecs'
 import { CHARACTERS } from '../data/characters'
 import { STAT_KEYS, STATS } from '../data/stats'
+import { AFFIXES } from '../data/affixes'
+import { INSTINCT_LABEL } from '../data/roles'
 import { UNIT } from '../util/units'
 import { Ability, Alive, Ammo, Boss, Cd, Charges, Ctl, Drive, Elite, Faction, FACTION, Form, Hp, Mark, MARK, MARK_SLOTS, Owner, Phys, Radius, Res, Seat, Stats, Transform, Uid } from './components'
-import { abilityDef, bodyLook, enemyDef, resDef } from './store'
+import { abilityDef, bodyLook, eliteAffixes, enemyDef, followerInstinct, resDef } from './store'
 import { staminaLeft } from './systems/shared/stamina'
 import { statusDef } from './utils/marks'
 import type { Sim } from './sim'
@@ -50,14 +52,17 @@ function title(sim: Sim, eid: number): string {
     return `${def.name} · ${eid === sim.leader ? '队长' : `队员 · 坑位 ${Seat.v[eid]}`}`
   }
   const def = enemyDef[eid]
-  const rank = Boss.v[eid] ? ' · 头目' : Elite.v[eid] ? ' · 精英' : ''
+  const affixes = (eliteAffixes[eid] ?? []).map((id) => AFFIXES[id].name)
+  const rank = Boss.v[eid] ? ' · 头目' : Elite.v[eid] ? ` · 精英${affixes.length > 0 ? `（${affixes.join('、')}）` : ''}` : ''
   const side = Faction.v[eid] === FACTION.team ? '我方' : Faction.v[eid] === FACTION.enemy ? '敌方' : '场地'
   return `${def?.name ?? '无名身体'} · ${side}${rank}`
 }
 
 function drive(sim: Sim, eid: number): string {
   const d = enemyDef[eid]?.drive
-  const how = sim.characters.includes(eid) ? (eid === sim.leader ? '摇杆' : '跟着坑位') : d ? `${DRIVE_LABEL[d.kind]} ${JSON.stringify(d)}` : '没有驱动'
+  const instinct = followerInstinct[eid]
+  const follow = instinct ? `本能 ${INSTINCT_LABEL[instinct.kind]} ${JSON.stringify(instinct)}` : '跟着坑位'
+  const how = sim.characters.includes(eid) ? (eid === sim.leader ? '摇杆' : follow) : d ? `${DRIVE_LABEL[d.kind]} ${JSON.stringify(d)}` : '没有驱动'
   const can = [Ctl.move[eid] ? '走' : '', Ctl.act[eid] ? '出手' : '', Ctl.cast[eid] ? '放技能' : '', Ctl.dash[eid] ? '位移' : ''].filter((s) => s !== '')
   const forced = Ctl.forced[eid] === 1 ? ' · 被迫逃离' : Ctl.forced[eid] === 2 ? ' · 被迫靠近' : ''
   return `驱动 ${how} · 能${can.length > 0 ? can.join('、') : '做的都被封住'}${forced}\n期望速度 (${cells(Drive.x[eid]!)}, ${cells(Drive.y[eid]!)}) · 速度 (${cells(Phys.vx[eid]!)}, ${cells(Phys.vy[eid]!)}) 格/秒`

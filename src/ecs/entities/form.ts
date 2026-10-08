@@ -1,7 +1,8 @@
-import { addComponent, hasComponent, removeComponent } from 'bitecs'
+import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
-import { Anchored, Anim, Borrowed, Contact, EnemyArm, Faction, Form, Manual, MARK, Motion, MOTION, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
-import { bodyLook, enemyDef, formEnd } from '../store'
+import { Ability, Act, Anchored, Anim, Borrowed, Cd, Charges, Contact, EnemyArm, Faction, Form, Granted, Manual, MARK, Motion, MOTION, Owner, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
+import { setTraits } from '../utils/traits'
+import { abilityDef, bodyLook, enemyDef, formEnd } from '../store'
 import { hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { armIdle } from '../systems/shared/anim'
@@ -11,8 +12,9 @@ import { STANDARD } from '../utils/pass'
 import { hoverPx } from '../utils/ground'
 import { equipAbility, unequipAbilities } from './ability'
 import { armCarriers } from './loadout'
-import type { Effect } from '../../types/abilityDefs'
-import type { FormDef } from '../../types/enemies'
+import type { AbilityDef, Effect } from '../../types/abilityDefs'
+import type { DriveDef, FormDef, PhaseDef } from '../../types/enemies'
+import type { StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
 
 /** 身体可切换的形态：非玩家身体取定义里的，角色取角色表里的 */
@@ -71,11 +73,54 @@ function isBorrowed(sim: Sim, e: number): boolean {
   return hasComponent(sim.world, e, Borrowed)
 }
 
-/** 非玩家身体当前形态的能力 */
-export function npcAbilities(sim: Sim, eid: number): FormDef['abilities'] {
+/** 到当前头目阶段为止，最近写了这一项的那一段的值；没进阶段或都没写是 undefined */
+function phaseField<K extends 'abilities' | 'drive' | 'stats'>(eid: number, key: K): PhaseDef[K] | undefined {
+  const phases = enemyDef[eid]?.phases
+  if (!phases) return undefined
+  for (let i = Act.phase[eid]!; i >= 0; i--) {
+    const v = phases[i]?.[key]
+    if (v !== undefined) return v
+  }
+  return undefined
+}
+
+function npcForm(sim: Sim, eid: number): FormDef | undefined {
   const idx = formOf(sim, eid)
-  const f = idx >= 0 ? enemyDef[eid]?.forms?.[idx] : undefined
-  return f?.abilities ?? enemyDef[eid]?.abilities
+  return idx >= 0 ? enemyDef[eid]?.forms?.[idx] : undefined
+}
+
+/** 非玩家身体此刻的能力：头目阶段写了的用阶段的，否则用当前形态的，再否则用本体的 */
+export function npcAbilities(sim: Sim, eid: number): FormDef['abilities'] {
+  return phaseField(eid, 'abilities') ?? npcForm(sim, eid)?.abilities ?? enemyDef[eid]?.abilities
+}
+
+/** 头目阶段的属性：到当前阶段为止最近写了的那一段 */
+export function phaseStats(eid: number): StatMods | undefined {
+  return phaseField(eid, 'stats')
+}
+
+/** 非玩家身体此刻的走法：按条件换走法的规则生效时用规则的；否则头目阶段的，再否则形态的，再否则本体的 */
+export function npcDrive(sim: Sim, eid: number): DriveDef {
+  const r = Act.rule[eid]!
+  const rule = r >= 0 ? enemyDef[eid]?.drives?.[r] : undefined
+  return rule?.drive ?? phaseField(eid, 'drive') ?? npcForm(sim, eid)?.drive ?? enemyDef[eid]!.drive
+}
+
+/** 非玩家身体换一套能力：同一招保留冷却与充能；借来的不动，效果放出的到用时再装 */
+export function rearmNpcKeep(sim: Sim, eid: number): void {
+  const kept = new Map<AbilityDef, { readonly left: number; readonly charges: number }>()
+  for (const e of query(sim.world, [Ability, Owner])) {
+    const d = abilityDef[e]
+    if (Owner.eid[e] === eid && d && !isBorrowed(sim, e) && !hasComponent(sim.world, e, Granted)) kept.set(d, { left: Cd.left[e]!, charges: Charges.n[e]! })
+  }
+  unequipAbilities(sim, eid, (e) => !isBorrowed(sim, e))
+  armNpc(sim, eid)
+  for (const e of query(sim.world, [Ability, Owner])) {
+    const k = Owner.eid[e] === eid ? kept.get(abilityDef[e]!) : undefined
+    if (!k) continue
+    Cd.left[e] = k.left
+    if (hasComponent(sim.world, e, Charges)) Charges.n[e] = k.charges
+  }
 }
 
 /** 切形态：外观、能力、走法、属性、锚定、接触伤害一起换，没写的沿用本体；给了 ms 到时切回本体并施加 onEnd；角色的永久形态记进本局 */
@@ -100,7 +145,7 @@ export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
 }
 
-/** 非玩家身体的走法、锚定、身段与接触伤害 */
+/** 非玩家身体的走法、特质、身段与接触伤害 */
 function npcBody(sim: Sim, eid: number, f: FormDef | undefined): void {
   const def = enemyDef[eid]!
   const span = f?.span ?? def.span ?? STANDARD
@@ -108,11 +153,9 @@ function npcBody(sim: Sim, eid: number, f: FormDef | undefined): void {
   Span.hi[eid] = span[1]
   if (Motion.kind[eid] !== MOTION.arc) VisOff.y[eid] = -hoverPx(eid)
   detachDrive(sim, eid)
-  attachDrive(sim, eid, f?.drive ?? def.drive)
-  const anchored = f?.anchored ?? def.kbImmune === true
-  if (anchored && !hasComponent(sim.world, eid, Anchored)) addComponent(sim.world, eid, Anchored)
-  if (!anchored && hasComponent(sim.world, eid, Anchored)) removeComponent(sim.world, eid, Anchored)
-  if (anchored) {
+  attachDrive(sim, eid, npcDrive(sim, eid))
+  setTraits(sim.world, eid, f?.traits ?? def.traits)
+  if (hasComponent(sim.world, eid, Anchored)) {
     Phys.vx[eid] = 0
     Phys.vy[eid] = 0
   }

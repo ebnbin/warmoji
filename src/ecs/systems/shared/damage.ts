@@ -1,8 +1,8 @@
 import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
-import { Alive, Boss, Elite, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
-import { hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot } from '../../utils/marks'
+import { Act, Alive, Boss, Elite, EnemyArm, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
+import { clearMarks, hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot, strongestSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
 import { nearestSummoned } from '../../entities/summon'
@@ -15,7 +15,9 @@ import { applyAbilityEffects, casterOf, PARRY_FX } from './effects'
 import { displace, FORCED } from './displace'
 import { die, grantIframe } from './combat'
 import { feedGut } from './gut'
-import { applyForm } from '../../entities/form'
+import { applyForm, npcAbilities, npcDrive, phaseStats, rearmNpcKeep } from '../../entities/form'
+import { attachDrive, detachDrive } from '../../entities/enemy'
+import { foldBody, setStatLayer } from '../../utils/stats'
 import { gearDodged, gearHurt, gearLethal, gearLowHp, gearStruck } from './gear'
 import { spawnFxCircle } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
@@ -115,12 +117,37 @@ function lethal(sim: Sim, target: number): boolean {
   return true
 }
 
-/** 残血：本条命第一次生命低于比例时施加一次 */
+/** 残血：本条命第一次生命低于每一条线时各施加一次，按位记哪几条已经施加过 */
 function lowHp(sim: Sim, target: number): void {
-  const rule = bodyRules[target]?.onLowHp
-  if (!rule || Lethal.low[target] || Hp.v[target]! >= Hp.max[target]! * rule.ratio) return
-  Lethal.low[target] = 1
-  applyAbilityEffects(sim, selfSource(sim, target), rule.effects, selfAt(target))
+  const rules = bodyRules[target]?.onLowHp
+  if (!rules) return
+  rules.forEach((rule, i) => {
+    const bit = 1 << i
+    if (Lethal.low[target]! & bit || Hp.v[target]! >= Hp.max[target]! * rule.ratio) return
+    Lethal.low[target] = Lethal.low[target]! | bit
+    applyAbilityEffects(sim, selfSource(sim, target), rule.effects, selfAt(target))
+  })
+}
+
+/** 进入第 i 个头目阶段：属性换上这一段的，能力换了就重装（同一招保留冷却），走法跟上，再对自己施加进入效果 */
+function enterPhase(sim: Sim, eid: number, i: number): void {
+  const before = npcAbilities(sim, eid)
+  Act.phase[eid] = i
+  const stats = phaseStats(eid)
+  setStatLayer(eid, 'phase', stats ? [stats] : undefined)
+  foldBody(sim.world, sim, eid)
+  if (EnemyArm.armed[eid] && npcAbilities(sim, eid) !== before) rearmNpcKeep(sim, eid)
+  detachDrive(sim, eid)
+  attachDrive(sim, eid, npcDrive(sim, eid))
+  const fx = enemyDef[eid]!.phases![i]!.effects
+  if (fx) applyAbilityEffects(sim, selfSource(sim, eid), fx, selfAt(eid))
+}
+
+/** 头目阶段：生命第一次低于下一段的线就进入，一下跨过几段就依次进入 */
+function advancePhase(sim: Sim, target: number): void {
+  const phases = enemyDef[target]?.phases
+  if (!phases || !hasComponent(sim.world, target, Act)) return
+  for (let next = Act.phase[target]! + 1; next < phases.length && Hp.v[target]! < Hp.max[target]! * phases[next]!.below; next++) enterPhase(sim, target, next)
 }
 
 /** 坐骑先扣：扣光就换成下马的形态，这一下不伤本体 */
@@ -232,10 +259,10 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   const now = sim.elapsedMs
   const atk = attackOf(sim, src)
   let raw = damage * tagMul(atk, tags) * (Boss.v[target] || Elite.v[target] ? atk.bossDamage : 1)
-  const sleep = markSlot(sim, target, MARK.sleep)
+  const sleep = strongestSlot(sim, target, MARK.sleep)
   if (sleep >= 0) {
     raw *= Mark.a[sleep]!
-    Mark.kind[sleep] = MARK.none
+    clearMarks(target, [MARK.sleep])
   }
   if ((tags & HIT.dot) === 0) raw *= armorTaken(Stats.armor[target]!)
   raw *= Stats.taken[target]!
@@ -271,6 +298,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   }
   Hp.v[target] = hp
   lowHp(sim, target)
+  advancePhase(sim, target)
   gearLowHp(sim, target)
   sim.out.events.push({ kind: 'flinch', eid: target, uid: Uid.v[target]!, team, tint: src.tint, at: now, fxAt: sim.fxMs })
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)

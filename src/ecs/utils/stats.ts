@@ -7,6 +7,7 @@ import { gearRules, statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
 import { fatigue, squadStamina, staminaLeft } from '../systems/shared/stamina'
 import { isSameEntity } from './identity'
+import { outranked } from './marks'
 import type { StatBase, StatKey, StatLayer, StatMods, StatValues } from '../../types/stats'
 import type { GearCount, GearWhen } from '../../types/items'
 import { foesNear, test } from './cond'
@@ -108,7 +109,7 @@ function condMods(sim: Sim, eid: number, when: readonly GearWhen[]): void {
   }
 }
 
-/** 身上限时的属性修正、所在阵营的战场效果、队伍道具定下的敌人移速、道具的条件属性与体力：队伍按最累的人走 */
+/** 身上限时的属性修正（同种同类只认最强的一条）、所在阵营的战场效果、队伍道具定下的敌人移速、道具的条件属性与体力：队伍按最累的人走 */
 function battleMods(sim: Sim, eid: number): void {
   const world = sim.world
   if (hasComponent(world, eid, Mark)) {
@@ -117,7 +118,7 @@ function battleMods(sim: Sim, eid: number): void {
       const f = FROM_MARK[Mark.kind[s]!]
       if (!f || Mark.until[s]! <= now) continue
       if (f.strongest) fold.strongest(f.stat, Mark.a[s]!)
-      else fold.times(f.stat, Mark.a[s]!)
+      else if (!outranked(sim, eid, s)) fold.times(f.stat, Mark.a[s]!)
     }
   }
   const side = Faction.v[eid]

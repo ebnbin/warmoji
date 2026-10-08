@@ -37,7 +37,7 @@ export interface RunCatalog {
 
 /** 一种敌人，连同它的巢穴生出的与死后分裂出的 */
 export function withNested(e: EnemyDef): EnemyDef[] {
-  return [e, ...(e.spawner ? withNested(e.spawner.into) : []), ...(rulesOf(e).onDeath ?? []).flatMap((fx) => (fx.kind === 'split' ? withNested(fx.into) : []))]
+  return [e, ...(e.spawner ? withNested(e.spawner.into) : []), ...(rulesOf(e).onDeath ?? []).flatMap((fx) => (fx.kind === 'split' && fx.into ? withNested(fx.into) : []))]
 }
 
 /** 位置里各层的说法；带下标的层写成第几个 */

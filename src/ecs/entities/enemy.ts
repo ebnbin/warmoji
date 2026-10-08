@@ -1,6 +1,8 @@
 import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { spawnBody } from './body'
-import { AI, ELITE, ENEMIES, SPAWN } from '../../data/enemies'
+import { AI, ELITE, ENEMIES, SPAWN, TENACITY } from '../../data/enemies'
+import { AFFIXES, AFFIX_IDS } from '../../data/affixes'
+import type { AffixId } from '../../types/affixes'
 import { ACQUIRE, ENEMY_BODY, MORPH } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
@@ -11,6 +13,7 @@ import type { DriveDef, EnemyDef, EnemyKind, EnemyMixEntry, NpcDef } from '../..
 import type { StatMods } from '../../types/stats'
 import type { OutlineKind } from '../../emoji/svg'
 import {
+  Act,
   Anchored,
   Anim,
   Boss,
@@ -36,15 +39,13 @@ import {
   Hp,
   Idle,
   March,
-  Mount,
   MARK,
+  Mount,
   Nest,
   Orbit,
-  Phasing,
   Pop,
   Radius,
   Ring,
-  Wander,
   Sprite,
   Standoff,
   TAG,
@@ -52,10 +53,13 @@ import {
   Tint,
   Transform,
   VisOff,
+  Wander,
 } from '../components'
-import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook, marchMark } from '../store'
+import { bodyRules, eliteAffixes, enemyDef, enemyLoot, enemyOf, bodyLook, marchMark } from '../store'
 import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
+import { setTraits } from '../utils/traits'
+import { attachTenacity } from '../systems/shared/tenacity'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { spawnTelegraph } from './telegraph'
@@ -76,7 +80,7 @@ import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
 import { clockWave } from '../fight/clock'
 import type { ByKind } from '../../util/record'
-import { rulesOf } from '../../data/reactions'
+import { rulesOf, withAffixes } from '../../data/reactions'
 
 type DriveOf = ByKind<DriveDef>
 
@@ -140,7 +144,21 @@ export function detachDrive(sim: Sim, eid: number): void {
   for (const c of DRIVE_COMPS) if (hasComponent(sim.world, eid, c)) removeComponent(sim.world, eid, c)
 }
 
-/** 一只敌人：带上关卡给这一批的属性修正、盯着队长与战利品倍率 */
+/** 精英的词缀：从词缀表里不重样地抽 min 到 max 个 */
+function rollAffixes(sim: Sim): AffixId[] {
+  const { min, max } = ELITE.affixes
+  const pool = [...AFFIX_IDS]
+  const n = min + Math.floor(sim.rng.next() * (max - min + 1))
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(sim.rng.next() * (pool.length - i))
+    const t = pool[i]!
+    pool[i] = pool[j]!
+    pool[j] = t
+  }
+  return pool.slice(0, n)
+}
+
+/** 一只敌人：带上关卡给这一批的属性修正、盯着队长与战利品倍率；精英挂上随机的词缀 */
 export function spawnEnemy(
   sim: Sim,
   atlas: FrameIndex,
@@ -152,15 +170,18 @@ export function spawnEnemy(
   boss: boolean,
   traits: SpawnTraits = {},
 ): number {
-  const eid = spawnNpc(sim, atlas, def, x, y, hp, { elite, boss, group: traits.stats, huntLeader: traits.huntLeader })
+  const affixes = elite ? rollAffixes(sim) : []
+  const body = affixes.length > 0 ? withAffixes(def, affixes.map((id) => AFFIXES[id])) : def
+  const eid = spawnNpc(sim, atlas, body, x, y, hp, { elite, boss, group: traits.stats, huntLeader: traits.huntLeader, affixes })
   enemyOf[eid] = def
   enemyLoot[eid] = traits.loot
   return eid
 }
 
-/** group 是关卡给这一批的属性修正，huntLeader 让追人的盯着队长 */
+/** group 是关卡给这一批的属性修正，huntLeader 让追人的盯着队长，affixes 是精英挂的词缀（反应已在定义里） */
 interface NpcOpts {
   readonly elite?: boolean
+  readonly affixes?: readonly AffixId[]
   readonly boss?: boolean
   readonly alpha?: number
   readonly faction?: number
@@ -194,11 +215,14 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim, Act)
+  Act.gcdUntil[eid] = 0
+  Act.phase[eid] = -1
+  Act.rule[eid] = -1
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
-  if (def.kbImmune) addComponent(world, eid, Anchored)
-  if (def.phasesWalls) addComponent(world, eid, Phasing)
+  if (boss || elite) attachTenacity(world, eid, boss ? TENACITY.boss : TENACITY.elite)
+  setTraits(world, eid, def.traits)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
@@ -236,7 +260,8 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Pop.alpha[eid] = alpha
   Depth.z[eid] = ENEMY_Z
   enemyDef[eid] = def
-  if (elite) setStatLayer(eid, 'elite', [ELITE.stats])
+  eliteAffixes[eid] = o.affixes
+  if (elite) setStatLayer(eid, 'elite', [ELITE.stats, ...(o.affixes ?? []).flatMap((id) => AFFIXES[id].stats ?? [])])
   setStatLayer(eid, 'fight', fightMods(sim.fight, faction))
   setStatLayer(eid, 'group', o.group ? [o.group] : undefined)
   foldBody(world, undefined, eid)
@@ -383,7 +408,7 @@ export function spawnBoss(sim: Sim): void {
   Telegraph.loud[t] = 1
 }
 
-/** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */
+/** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的易伤 */
 export function applyMorph(
   sim: Sim,
   atlas: FrameIndex,
@@ -395,7 +420,7 @@ export function applyMorph(
   const anchored = hasComponent(sim.world, eid, Anchored)
   addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH.recastMs)
   addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
-  addMark(eid, MARK.guard, TAG.morph, until, spec.vulnMul ?? 1)
+  if (spec.vulnMul !== undefined) addMark(eid, MARK.exposed, TAG.morph, until, spec.vulnMul)
   const outline = npcOutline(eid)
   Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
   armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)

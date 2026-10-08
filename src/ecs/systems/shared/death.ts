@@ -8,10 +8,14 @@ import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
 import { clockWave } from '../../fight/clock'
 import { rulesOf, without } from '../../../data/reactions'
+import { ENEMIES } from '../../../data/enemies'
+import { toPx } from '../../../data/px'
 
+/** 分裂：没写裂成什么的裂成自己这一种的普通版（不带精英词缀） */
 function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
-  if (sim.over) return
-  spawnBrood(sim, sim.frames, fx.into, fx.count, d.x, d.y, 0.5 * UNIT, -1)
+  const into = fx.into ?? (d.def.kind ? toPx(ENEMIES[d.def.kind]) : undefined)
+  if (sim.over || !into) return
+  spawnBrood(sim, sim.frames, into, fx.count, d.x, d.y, 0.5 * UNIT, -1)
 }
 
 function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): void {
@@ -23,7 +27,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
     drive: { kind: 'wander' as const },
     abilities: undefined,
     reactions: without(d.def.reactions, ['death']),
-    kbImmune: true,
+    traits: [...new Set([...(d.def.traits ?? []), 'anchored' as const])],
   }
   const eid = spawnNpc(sim, sim.frames, husk, d.x, d.y, Math.round(fx.hp * hpMul), { alpha: fx.alpha, faction: d.faction })
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs

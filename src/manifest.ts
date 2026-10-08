@@ -13,7 +13,9 @@ import type { MapDef } from './types/maps'
 import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 import { TAGS } from './data/tags'
-import { rulesOf } from './data/reactions'
+import { rulesOf, withAffixes } from './data/reactions'
+import { AFFIXES } from './data/affixes'
+import { STATUSES } from './data/statuses'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
@@ -76,7 +78,7 @@ function walkAbility(a: AbilityDef, side: Side): void {
 
 function walkRules(r: BodyRules | undefined, side: Side): void {
   if (!r) return
-  for (const list of [r.onHurt, r.onTouched, r.onTouch, r.onKill, r.onAnchorLost, r.onLethal, r.onLowHp?.effects, r.onIdle?.effects, r.resource?.full?.effects]) walkEffects(list, side)
+  for (const list of [r.onHurt, r.onTouched, r.onTouch, r.onKill, r.onAnchorLost, r.onLethal, ...(r.onLowHp ?? []).map((l) => l.effects), r.onIdle?.effects, r.resource?.full?.effects]) walkEffects(list, side)
 }
 
 function walkNpc(def: NpcDef, side: Side): void {
@@ -85,6 +87,10 @@ function walkNpc(def: NpcDef, side: Side): void {
   s.npcs.add(def)
   s.body.add(def.emoji)
   for (const a of def.abilities ?? []) walkAbility(a, side)
+  for (const ph of def.phases ?? []) {
+    for (const a of ph.abilities ?? []) walkAbility(a, side)
+    walkEffects(ph.effects, side)
+  }
   for (const f of def.forms ?? []) {
     if (f.emoji) s.body.add(f.emoji)
     for (const a of f.abilities ?? []) walkAbility(a, side)
@@ -95,8 +101,9 @@ function walkNpc(def: NpcDef, side: Side): void {
   const rules = rulesOf(def)
   walkRules(rules, side)
   for (const fx of rules.onDeath ?? []) {
-    if (fx.kind === 'split') walkNpc(fx.into, side)
-    else if (fx.kind !== 'decoy') walkEffects([fx], side)
+    if (fx.kind === 'decoy') continue
+    if (fx.kind !== 'split') walkEffects([fx], side)
+    else if (fx.into) walkNpc(fx.into, side)
   }
 }
 
@@ -118,6 +125,7 @@ for (const c of roster) {
   walkRules(rulesOf(c), 'team')
 }
 for (const e of [...ENEMY_DEFS, ...BOSSES]) walkNpc(e, 'enemy')
+for (const e of ENEMY_DEFS) walkNpc(withAffixes(e, Object.values(AFFIXES)), 'enemy')
 
 // 夺来的能力与拉起来的亡者换了阵营：再按新阵营走一遍，走到不再增加为止
 for (let changed = true; changed; ) {
@@ -144,6 +152,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       '1f6ab',
       '1f4a6',
       '1fad8',
+      ...Object.values(STATUSES).flatMap((s) => (s.icon ? [s.icon.emoji] : [])),
+      ...Object.values(AFFIXES).map((a) => a.icon),
       ...Object.values<MapDef>(MAPS).flatMap((m) => m.decor.emojis),
     ]),
   ],

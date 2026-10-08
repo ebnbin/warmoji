@@ -63,7 +63,7 @@ import { replayDeath } from './systems/shared/death'
 import { spawnBoss } from './entities/enemy'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
-import { Lifetime, Modifier, Radius, Uid } from './components'
+import { Act, Lifetime, Modifier, Radius, Uid } from './components'
 import { isSameEntity } from './utils/identity'
 import { bodyAt, describeBody } from './inspector'
 
@@ -82,11 +82,13 @@ import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { StageSnapshot, HudSnapshot, SubmarineSnapshot } from '../run/hudHost'
+import type { BossBar, StageSnapshot, HudSnapshot, SubmarineSnapshot } from '../run/hudHost'
 import { CHAPTERS, chapterOf } from '../maps/theater/model'
 import { amethystClock } from '../maps/amethyst/world'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
+import { isSteadfast } from './utils/marks'
+import { tenacityRatio } from './systems/shared/tenacity'
 import { drain } from './outbox'
 import { keepTape, TapePlayer, TapeRecorder } from './tape'
 import type { DevCommand, Tape, TapeEvent } from './tape'
@@ -152,6 +154,21 @@ function aimReach(a: AbilityDef): number {
     if (fx.kind === 'barrier' && fx.shape === 'wall') r = Math.max(r, fx.offset ?? 0)
   }
   return r
+}
+
+/** 头目的名字，进了有名字的阶段带上阶段名 */
+function bossName(eid: number): string {
+  const def = enemyDef[eid]
+  const phase = def?.phases?.[Act.phase[eid]!]
+  return phase?.name ? `${def!.name} · ${phase.name}` : (def?.name ?? '')
+}
+
+/** 场上活着的头目按出场先后排，各自的名字、生命与控制韧性 */
+function bossBars(sim: Sim): BossBar[] {
+  return [...query(sim.world, [Enemy, Boss])]
+    .filter((eid) => Boss.v[eid] === 1 && Alive.v[eid] === 1)
+    .sort((a, b) => Uid.v[a]! - Uid.v[b]!)
+    .map((eid) => ({ uid: Uid.v[eid]!, name: bossName(eid), hp: Hp.v[eid]!, maxHp: Hp.max[eid]!, tenacity: tenacityRatio(sim.world, eid), steadfast: isSteadfast(sim, eid) }))
 }
 
 export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost {
@@ -671,7 +688,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   hudSnapshot(): HudSnapshot {
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
-    const boss = sim ? query(this.world, [Enemy, Boss]).find((eid) => Boss.v[eid] === 1) : undefined
     const left = sim ? timeLeftMs(sim) : (timeLimitMs(this.fightDef.phases[0]!) ?? Infinity)
     const phases = this.fightDef.phases.length
     const name = this.fightDef.name
@@ -687,8 +703,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       seconds: Math.floor(elapsed / 1000),
       remainMs: Number.isFinite(left) ? Math.max(0, left) : null,
       goals: sim ? fightGoals(sim) : [],
-      bossHp: boss !== undefined ? Hp.v[boss]! : null,
-      bossMaxHp: boss !== undefined ? Hp.max[boss]! : 1,
+      bosses: sim ? bossBars(sim) : [],
       battleFx: (sim ? activeMods(sim) : []).map((e) => ({
         emoji: modDef[e]!.emoji,
         name: modDef[e]!.name,

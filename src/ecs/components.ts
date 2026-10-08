@@ -93,7 +93,7 @@ export const CharScale = { v: f32() }
 /** 倒地与归队：at 是复活的时刻；fell、rose 是倒下、归队时的画面时钟；drop 为 1 是正从空中落回坑位 */
 export const Revive = { at: f32(), fell: f32(), rose: f32(), drop: u8() }
 
-export const MARK_SLOTS = 12
+export const MARK_SLOTS = 16
 
 const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   const col = new ctor(INITIAL_CAPACITY * MARK_SLOTS)
@@ -104,7 +104,7 @@ const strided = <T extends Column>(ctor: new (length: number) => T): T => {
 /** 标记的种类编号：0 是空槽，其余按状态表的次序 */
 export const MARK = Object.fromEntries([['none', 0], ...STATUS_IDS.map((id, i) => [id, i + 1])]) as Readonly<Record<StatusId | 'none', number>>
 
-/** 标记的来源：同种同源的标记刷新而不叠加；world 是地图按自己的规则加的 */
+/** 标记的来源：同种同源的标记按状态表的并法刷新或分格，不叠加；world 是地图按自己的规则加的 */
 export const TAG = { effect: 0, morph: 1, perk: 3, world: 4 } as const
 
 /** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定）；ref 是所引用身体的 Uid */
@@ -118,6 +118,12 @@ export const Mark = {
   ref: strided(Uint32Array),
 }
 export const CharFlash = { until: f32() }
+
+/** 非玩家身体的出手节奏与阶段：公共冷却到何时、当前的头目阶段与生效的走法规则，-1 是没有 */
+export const Act = { gcdUntil: f32(), phase: i32Fill(-1), rule: i32Fill(-1) }
+
+/** 控制韧性：被控制累计了多少毫秒、填满要多少、满了霸体多久 */
+export const Tenacity = { ms: f32(), fill: f32(), hold: f32() }
 
 export const Enemy = {}
 
@@ -151,6 +157,9 @@ export const Anchored = {}
 
 /** 穿墙的身体：材质允许的障碍挡不住它 */
 export const Phasing = {}
+
+/** 单位的特质，按位记；推不动与穿墙另有 Anchored、Phasing，会不会飞看 Span */
+export const Traits = { v: u8() }
 
 export const Flash = { until: f32() }
 

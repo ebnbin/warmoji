@@ -1,5 +1,7 @@
 import { INITIAL_CAPACITY } from './world'
 import type { BodyRules, EnemyDef, NpcDef, ResourceDef } from '../types/enemies'
+import type { AffixId } from '../types/affixes'
+import type { InstinctDef } from '../types/roles'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Cond, Effect, Split } from '../types/abilityDefs'
 import type { Source } from './utils/source'
@@ -17,6 +19,12 @@ export const enemyDef = slots<NpcDef>()
 
 /** 敌人的身份（种类、经验、金币、Boss）：只有刷出来的敌人有，召唤出的身体没有 */
 export const enemyOf = slots<EnemyDef>()
+
+/** 精英身上挂的词缀 */
+export const eliteAffixes = slots<readonly AffixId[]>()
+
+/** 队员此刻按哪种本能站位，回坑位时没有 */
+export const followerInstinct = slots<InstinctDef>()
 
 /** 身体当前的外观（形态切换后），没有就用定义里的；角色与非玩家身体同一个 */
 export const bodyLook = slots<string>()
@@ -80,9 +88,14 @@ export const boltSplit = slots<Split>()
 /** 会分裂的弹体：裂开时照着自己的规格再射几发 */
 export const projSplit = slots<{ readonly spec: BoltSpec; readonly split: Split }>()
 
-export const poisonSrc = slots<Source>()
+/** 能力什么时候用、放完接着放的连招 */
+export const abilityWhen = slots<Cond>()
+export const abilityCombo = slots<readonly AbilityDef[]>()
 
-/** 每个身体每个标记槽位的来源：引信、存伤、叠层、死亡印记结算时用 */
+/** 非玩家身体正放着的连招：招式表与下一招的下标 */
+export const npcCombo = slots<{ readonly list: readonly AbilityDef[]; next: number }>()
+
+/** 每个身体每个标记槽位的来源：引信、存伤、叠层、死亡印记结算时用，中毒跳伤记在它名下 */
 export const markSrcs = slots<(Source | undefined)[]>()
 
 /** 能力的附加定义：打死人时施于出手者、出手条件、资源强化、弹匣最后一发 */

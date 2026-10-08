@@ -2,9 +2,9 @@ import type charactersJson from '../assets/characters.json'
 import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
-import type { BodyReaction, UnitBase } from './enemies'
+import type { BodyReaction, UnitBase, UnitTrait } from './enemies'
 import type { StatBase } from './stats'
-import type { RoleId } from './roles'
+import type { InstinctRule, RoleId } from './roles'
 
 /** 职责：在队伍里干什么 */
 export type DutyTag = 'damage' | 'defense' | 'support' | 'control'
@@ -60,6 +60,8 @@ export interface CharacterAuthoring extends UnitBase {
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
   readonly reactions?: readonly CharacterReaction[]
+  /** 跟队时的本能，不写就用定位的 */
+  readonly instincts?: readonly InstinctRule[]
 }
 /** 载体：tiers 是 1 级起每一级用的能力，到顶后一直用最后一档；cards 是 2 级起每一级亮出的升级卡 */
 export interface Carrier {
@@ -77,6 +79,8 @@ export interface CharacterDef extends UnitBase {
   readonly skill: SkillDef
   readonly carriers: readonly Carrier[]
   readonly reactions?: readonly CharacterReaction[]
+  /** 跟队时的本能：角色写了的，否则定位的 */
+  readonly instincts: readonly InstinctRule[]
 }
 export type CharacterId = keyof typeof charactersJson
 export interface TeamBaseline {
@@ -90,7 +94,10 @@ export interface TeamBaseline {
   readonly member: {
     readonly size: number
     readonly radius: number
-    /** 每个角色都有的基础属性 */
+    /** 每个角色都有的基础属性与特质 */
     readonly stats: StatBase
+    readonly traits: readonly UnitTrait[]
   }
+  /** 队员的本能：离队长不超过 leash 格；躲危险时离危险的边缘再留 margin 格 */
+  readonly instinct: { readonly leash: number; readonly margin: number }
 }

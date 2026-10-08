@@ -26,6 +26,7 @@ import type { ExitConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 /** 迷宫按布景种子打散出自己的种子 */
 const PLAN_SEED = 0x7a3e51
@@ -50,7 +51,7 @@ const HOLD_MARK_MS = 120
 /** 看守落在队伍那间的中心这么远（格）以内 */
 const WARDEN_U = 3
 
-/** 传送是被摆布：锚定的、霸体的、头目也照送 */
+/** 传送是被摆布：霸体的也照送；定身的站在门上也不送 */
 const SHIPPED: Mover = { self: false, free: true }
 
 const FIELD: Solid = { topM: Infinity, material: 'field' }
@@ -323,7 +324,7 @@ function depart(sim: Sim, s: ExitState, cfg: ExitConfig, door: Door, team: boole
   }
   let foes = 0
   for (const e of query(sim.world, ENEMY_SET)) {
-    if (!Alive.v[e] || inTransit(e) || !onDoor(cfg, door, Transform.x[e]!, Transform.y[e]!)) continue
+    if (!Alive.v[e] || inTransit(e) || hasTrait(sim.world, e, 'anchored') || !onDoor(cfg, door, Transform.x[e]!, Transform.y[e]!)) continue
     send(e, true)
     foes++
   }

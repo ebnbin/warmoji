@@ -18,8 +18,8 @@ export interface HudSnapshot {
   remainMs: number | null
   /** 这一场的目标与进度：warn 为真的是提醒会输的 */
   goals: readonly { readonly text: string; readonly warn: boolean }[]
-  bossHp: number | null
-  bossMaxHp: number
+  /** 场上活着的头目，按出场先后 */
+  bosses: readonly BossBar[]
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
   /** 在紫晶洞里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
   clock: ClockSnapshot | null
@@ -27,6 +27,16 @@ export interface HudSnapshot {
   submarine: SubmarineSnapshot | null
   /** 在舞台里打的一局才有：离下一次换幕还有多久，正在换还是快要换了，新一幕刚画好时这一章叫什么 */
   stage: StageSnapshot | null
+}
+
+/** 场上一个头目的条：名字、生命、控制韧性满了多少（0 到 1），霸体中 steadfast 为真 */
+export interface BossBar {
+  readonly uid: number
+  readonly name: string
+  readonly hp: number
+  readonly maxHp: number
+  readonly tenacity: number
+  readonly steadfast: boolean
 }
 
 /** 天上此刻的样子：太阳与月亮的时角（弧度，正午为 0、往西为正），月龄占朔望月的比例；night 为真时下一件事是天亮，inSec 是还有几秒 */

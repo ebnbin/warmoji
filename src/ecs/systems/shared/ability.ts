@@ -15,13 +15,19 @@ export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void 
   }
 }
 
-/** 打断：自己的冲刺停下，蓄力与延迟重复作废 */
-export function interrupt(sim: Sim, eid: number): void {
-  if (Motion.kind[eid] === MOTION.dash && Motion.self[eid]) endMotion(eid)
+/** 打断：自己的冲刺停下，蓄力与延迟重复作废；返回是否真打断了正在做的事 */
+export function interrupt(sim: Sim, eid: number): boolean {
+  let cut = Casting.until[eid]! > sim.elapsedMs
+  if (Motion.kind[eid] === MOTION.dash && Motion.self[eid]) {
+    endMotion(eid)
+    cut = true
+  }
   Casting.until[eid] = 0
   for (const e of query(sim.world, [Ability, Owner])) {
     if (Owner.eid[e] !== eid) continue
+    if (WindupState.until[e]! > 0 || RepeatState.left[e]! > 0) cut = true
     WindupState.until[e] = 0
     RepeatState.left[e] = 0
   }
+  return cut
 }

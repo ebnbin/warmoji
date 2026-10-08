@@ -23,10 +23,17 @@ export const DIFFICULTY = {
     stats: { mul: { maxHp: 4, moveSpeed: 1.25, damage: 2, healing: 2, scale: 1.2 } },
     xpMul: 4,
     coinsMul: 3,
+    affixes: { min: 1, max: 2 },
   },
   surge: {
     count: 14,
     elites: 3,
     spreadMs: 2600,
+  },
+  tenacity: {
+    boss: { fillMs: 3000, steadfastMs: 5000 },
+    elite: { fillMs: 2000, steadfastMs: 3000 },
+    interruptMs: 400,
+    drainMs: 6000,
   },
 } as const satisfies Difficulty

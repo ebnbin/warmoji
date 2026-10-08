@@ -29,12 +29,12 @@ export function rulesOf(unit: UnitBase): BodyRules {
   if (hit) return hit
   const all = unit.reactions ?? []
   const list = all.filter((r): r is Living => r.on !== 'death')
-  const low = list.find((r): r is Extract<Living, { readonly on: 'lowHp' }> => r.on === 'lowHp')
+  const lows = list.filter((r): r is Extract<Living, { readonly on: 'lowHp' }> => r.on === 'lowHp').sort((a, b) => b.ratio - a.ratio)
   const idle = list.find((r): r is Extract<Living, { readonly on: 'idle' }> => r.on === 'idle')
   const rules: BodyRules = {
     resource: unit.resource,
     onLethal: reactionEffects(list, 'lethal'),
-    onLowHp: low && { ratio: low.ratio, effects: reactionEffects(list, 'lowHp')! },
+    onLowHp: lows.length > 0 ? lows.map((r) => ({ ratio: r.ratio, effects: reactionEffects([r], 'lowHp')! })) : undefined,
     onIdle: idle && { ms: idle.ms, still: idle.still, effects: reactionEffects(list, 'idle')! },
     onHurt: reactionEffects(list, 'hurt'),
     onTouched: reactionEffects(list, 'touched'),
@@ -55,4 +55,11 @@ export function without(list: readonly BodyReaction[] | undefined, ons: readonly
 /** 换掉死亡反应，给了 effects 就换成它 */
 export function withDeath<T extends UnitBase>(unit: T, effects: readonly DeathEffect[] | undefined): T {
   return { ...unit, reactions: [...without(unit.reactions, ['death']), ...(effects ? [{ on: 'death', to: 'spot', effects } as const] : [])] }
+}
+
+/** 挂上精英词缀的反应：接在原有的后面，死亡反应并成一条 */
+export function withAffixes<T extends UnitBase>(unit: T, affixes: readonly { readonly reactions?: readonly BodyReaction[] }[]): T {
+  const reactions = [...(unit.reactions ?? []), ...affixes.flatMap((a) => a.reactions ?? [])]
+  const death = reactions.flatMap((r) => (r.on === 'death' ? r.effects : []))
+  return withDeath({ ...unit, reactions }, death.length > 0 ? death : undefined)
 }

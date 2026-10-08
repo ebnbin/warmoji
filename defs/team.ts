@@ -12,5 +12,7 @@ export const TEAM_BASELINE = {
     size: 1.2,
     radius: 0.45,
     stats: { maxHp: 100, iframes: 700, revive: 10_000, magnet: 2.25 },
+    traits: ['breathes'],
   },
+  instinct: { leash: 5, margin: 0.4 },
 } as const satisfies TeamBaseline

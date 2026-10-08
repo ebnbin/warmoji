@@ -20,7 +20,7 @@ const GHOST = {
   drive: { kind: 'chase' },
   emoji: '1f47b',
   name: '幽灵',
-  phasesWalls: true,
+  traits: ['phases'],
   desc: '飘得很快的追击者，血薄，能穿墙直取队伍，死亡时治疗周围同伴',
   size: 1.2,
   radius: 0.45,
@@ -266,7 +266,7 @@ const HIVE = {
   damage: 4,
   xp: 8,
   coins: 6,
-  kbImmune: true,
+  traits: ['anchored'],
   spawner: { into: LARVA, intervalMs: 4000, count: 2, maxAlive: 6, firstDelayMs: 2000 },
 } satisfies EnemyDef
 
@@ -342,7 +342,7 @@ const TURTLE = {
   damage: 8,
   xp: 7,
   coins: 5,
-  kbImmune: true,
+  traits: ['anchored', 'fireproof'],
   abilities: [
     {
       trigger: 'auto',
@@ -398,7 +398,7 @@ const GARGOYLE = {
   damage: 12,
   xp: 8,
   coins: 6,
-  kbImmune: true,
+  traits: ['anchored'],
   reactions: [{ on: 'lowHp', ratio: 0.4, to: 'self', effects: [{ kind: 'stasis', durationMs: 2500 }, { kind: 'healRatio', ratio: 0.35 }] }],
 } satisfies EnemyDef
 
@@ -718,7 +718,7 @@ const TREE = {
   damage: 0,
   xp: 3,
   coins: 2,
-  kbImmune: true,
+  traits: ['anchored'],
   abilities: [
     {
       trigger: 'auto',
@@ -748,7 +748,7 @@ const SAPLING = {
   damage: 0,
   xp: 1,
   coins: 0,
-  kbImmune: true,
+  traits: ['anchored'],
   grow: { ms: 6000, into: TREE },
 } satisfies EnemyDef
 
@@ -766,7 +766,7 @@ const PYLON = {
   damage: 0,
   xp: 2,
   coins: 1,
-  kbImmune: true,
+  traits: ['anchored'],
 } satisfies EnemyDef
 
 const FOREST_BOSS = {
@@ -784,7 +784,7 @@ const FOREST_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [
     {
@@ -835,7 +835,7 @@ const DESERT_BOSS = {
   damage: 22,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
@@ -901,7 +901,7 @@ const RIVER_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [
     {
@@ -964,7 +964,7 @@ const FACTORY_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   guardedBy: 'pylon',
   drive: { kind: 'chase' },
   abilities: [
@@ -997,7 +997,7 @@ const FACTORY_BOSS = {
       shape: { kind: 'drop', targets: 5, look: { emoji: '1f528', size: 1.1 }, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
-  reactions: [{ on: 'lowHp', ratio: 0.5, to: 'self', effects: [{ kind: 'form', to: 0 }, { kind: 'summon', of: { unit: PYLON, spread: 5 }, count: 2 }] }],
+  phases: [{ below: 0.5, name: '泄漏', effects: [{ kind: 'form', to: 0 }, { kind: 'summon', of: { unit: PYLON, spread: 5 }, count: 2 }] }],
   forms: [
     {
       emoji: '2623',
@@ -1055,7 +1055,7 @@ const RUINS_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
@@ -1113,7 +1113,7 @@ const DAYNIGHT_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [
     {
@@ -1203,7 +1203,7 @@ const SPACE_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [
     {
@@ -1276,7 +1276,7 @@ const ICE_BOSS = {
   damage: 20,
   xp: 60,
   coins: 60,
-  kbImmune: true,
+  traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [
     {
@@ -1314,7 +1314,7 @@ const ICE_BOSS = {
     },
   ],
   reactions: [{ on: 'lethal', to: 'self', effects: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'form', to: 0, ms: 6000, onEnd: [{ kind: 'healRatio', ratio: 1 }] }] }],
-  forms: [{ emoji: '1f95a', name: '冰蛋', span: [0, 3], stats: { mul: { scale: 0.7, moveSpeed: 0, dodge: 0 } }, anchored: true, drive: { kind: 'stay' }, abilities: [], damage: 0 }],
+  forms: [{ emoji: '1f95a', name: '冰蛋', span: [0, 3], stats: { mul: { scale: 0.7, moveSpeed: 0, dodge: 0 } }, drive: { kind: 'stay' }, abilities: [], damage: 0 }],
 } satisfies EnemyDef
 
 type EnemyTable = { readonly [K in EnemyKind]: EnemyDef & { readonly kind: K } }

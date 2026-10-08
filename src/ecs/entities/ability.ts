@@ -63,7 +63,7 @@ import {
   ZoneFollow,
   ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityBoost, boltSplit, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
+import { abilityArtEmoji, abilityBoost, abilityCombo, boltSplit, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, abilityWhen, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls, PET_TRAIL_MS, rewindMs } from '../../data/abilities'
 import { reactionEffects } from '../../data/reactions'
@@ -273,6 +273,8 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   Spend.hp[e] = def.hpCost ?? 0
   abilityBoost[e] = def.boost
   abilityRequires[e] = def.requires
+  abilityWhen[e] = def.when
+  abilityCombo[e] = def.combo
   abilityOnKill[e] = reactionEffects(def.reactions, 'kill')
   if (def.charges) {
     addComponent(world, e, Charges)

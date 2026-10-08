@@ -10,7 +10,7 @@ import type { NebulaMeteor, NebulaState } from './model'
 import { roomFor } from '../landmark'
 import type { Landmark } from '../landmark'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, ENEMY_SET, Hp, Motion, MOTION, Phys, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Transform, Uid } from '../../ecs/components'
+import { Alive, ENEMY_SET, Hp, Motion, MOTION, Phys, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Transform, Uid } from '../../ecs/components'
 import { bodyRules } from '../../ecs/store'
 import { hit } from '../../ecs/systems/shared/damage'
 import { die } from '../../ecs/systems/shared/combat'
@@ -21,6 +21,7 @@ import type { Sim } from '../../ecs/sim'
 import { leaderX, leaderY } from '../../ecs/utils/team'
 import { bounded } from '../../ecs/worlds/hooks'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 function clampToDisc(px: number, py: number, cx: number, cy: number, r: number): { x: number; y: number } {
   const dx = px - cx
@@ -194,7 +195,7 @@ export const nebula: WorldHooks = {
     return clampToDisc(next.x, next.y, L.cx, L.cy, (FRAME_U / 2 - SAFE_U) * UNIT - Radius.v[eid]!)
   },
   chaseDir(sim, eid, tx, ty) {
-    if (Boss.v[eid] !== 1) return bounded.chaseDir(sim, eid, tx, ty)
+    if (!hasTrait(sim.world, eid, 'wary')) return bounded.chaseDir(sim, eid, tx, ty)
     const s = nebulaOf(sim)
     const r = reachPx(s, Phys.mass[eid]! / Phys.drag[eid]!, Stats.moveSpeed[eid]!) + UNIT
     return aroundCircle(Transform.x[eid]!, Transform.y[eid]!, tx, ty, s.layout.hx, s.layout.hy, r)
@@ -223,6 +224,11 @@ export const nebula: WorldHooks = {
   canSpawn(sim, x, y, radius) {
     const s = nebulaOf(sim)
     return roomFor(s.cavity, x, y, radius) && Math.hypot(x - s.layout.hx, y - s.layout.hy) >= nebulaClearPx(sim)
+  },
+  /** 黑洞边上这具身体走不出来的那一圈，识险的敌人绕开的也是它 */
+  harms(sim, eid, x, y) {
+    const s = nebulaOf(sim)
+    return Math.hypot(x - s.layout.hx, y - s.layout.hy) < reachPx(s, Phys.mass[eid]! / Phys.drag[eid]!, Stats.moveSpeed[eid]!) + UNIT
   },
   /**
    * hole 是黑洞；meteor 是刚撞碎在壳层上的流星，碎块从那里的内壁甩进来，撞碎后一阵就没了；

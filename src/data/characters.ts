@@ -46,6 +46,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     resource: src.resource,
     reactions: src.reactions,
     forms: src.forms,
+    instincts: src.instincts ?? ROLES[src.role].instincts,
   }
 }
 
@@ -76,6 +77,7 @@ export function upgradeCardsFor(def: CharacterDef): readonly UpgradeCard[] {
 const TB = fromJson<TeamBaseline>(teamJson)
 export const TEAM = TB.team
 export const MEMBER = TB.member
+export const INSTINCT = TB.instinct
 
 /** 角色的基础属性：全队通用的一份，再盖上角色自己写的 */
 export function memberBase(def: CharacterDef): StatBase {

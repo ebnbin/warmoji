@@ -1,17 +1,18 @@
-import { hasComponent } from 'bitecs'
+import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
 import { OBSTACLES } from '../../data/obstacles'
-import { Alive, Hp, Radius, Slot, Transform } from '../../ecs/components'
+import { Alive, Hp, Radius, Stamina, Transform } from '../../ecs/components'
 import { hit } from '../../ecs/systems/shared/damage'
 import { fleeSteer } from '../../ecs/systems/shared/steer'
 import { staminaLeft } from '../../ecs/systems/shared/stamina'
 import { inTransit } from '../../ecs/utils/marks'
 import { hazardSource } from '../../ecs/utils/source'
 import { leaderPoint } from '../../ecs/utils/team'
-import { passCost, phases, probeZ } from '../../ecs/utils/pass'
+import { bandOf, passCost, phases, probeZ } from '../../ecs/utils/pass'
+import { hasTrait } from '../../ecs/utils/traits'
 import { bounded } from '../../ecs/worlds/hooks'
 import { mapEvent } from '../../ecs/fight/events'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
@@ -168,29 +169,35 @@ function stir(sim: Sim, s: DeepState): void {
   }
 }
 
-/** 气见底、又不在潜艇门口的队员呛水掉血：满血的标准身体 drownSec 秒呛死，每 tickMs 结算一次 */
+/** 气见底、又不在潜艇门口的要换气的身体呛水掉血：满血的标准身体 drownSec 秒呛死，每 tickMs 结算一次 */
 function drown(sim: Sim, s: DeepState, cfg: DeepConfig): void {
   const now = sim.elapsedMs
   if (now < s.drownAt) return
   const c = cfg.sub
   s.drownAt = now + c.tickMs
   const src = hazardSource('drown', DROWN_TINT)
-  for (const m of sim.characters) {
-    if (!Alive.v[m] || inTransit(m) || staminaLeft(m) > 0 || breathesAt(cfg, s, Transform.x[m]!, Transform.y[m]!)) continue
+  for (const m of [...query(sim.world, [Stamina, Hp, Transform])]) {
+    if (!Alive.v[m] || !hasTrait(sim.world, m, 'breathes') || inTransit(m) || staminaLeft(m) > 0 || breathesAt(cfg, s, Transform.x[m]!, Transform.y[m]!)) continue
     hit(sim, src, m, Math.max(1, Math.round((Hp.max[m]! * c.tickMs) / 1000 / c.drownSec)), { tick: true })
   }
+}
+
+/** 艇身挡不挡这个身体：停着的艇身从艇底往上高 heightM 米，和身体占的那一段高度有重叠就挡 */
+function hullBlocks(sim: Sim, s: DeepState, eid: number): boolean {
+  const [lo, hi] = bandOf(sim, eid)
+  return s.sub.h < hi && s.sub.h + cfgOf(sim).sub.heightM > lo
 }
 
 /**
  * 深海：能走的是两侧岩壁、上游岩堆与下游陡坎围着的一片谷底，谷底的大石头与鲸鱼的头骨挡路；岩壁和岩堆挡子弹和视线，大石头和头骨按高矮挡，陡坎外悬空，子弹从上面过去。
  * 一艘潜艇停在谷底上，艇身挡人、挡子弹也挡视线，敌人贴着艇壁绕过来；只有一舷开着门，门口那一片半圆喘得上气。
- * 队员离开门口只能憋着气：体力不回，一直往下掉，赶路掉得更快；回到门口走着也补。气见底了呛水掉血。
- * 潜艇隔一阵浮起来开到别处停下：开走的那一阵哪里都喘不上气，艇底高过身体就不再挡人，落下来压着谁就把谁挤开。海里的东西不用换气
+ * 要换气的（队员都要）离开门口只能憋着气：体力不回，一直往下掉，赶路掉得更快；回到门口走着也补。气见底了呛水掉血。
+ * 潜艇隔一阵浮起来开到别处停下：开走的那一阵哪里都喘不上气，艇底高过身体就不再挡它，落下来压着谁就把谁挤开。海里的东西不用换气
  */
 export const deep: WorldHooks = {
   ...bounded,
   breath(sim, eid) {
-    if (!hasComponent(sim.world, eid, Slot)) return 0
+    if (!hasTrait(sim.world, eid, 'breathes')) return 0
     const cfg = cfgOf(sim)
     return breathesAt(cfg, deepOf(sim), Transform.x[eid]!, Transform.y[eid]!) ? cfg.sub.breath : -cfg.sub.hold
   },
@@ -209,7 +216,7 @@ export const deep: WorldHooks = {
     if (phases(sim.world, eid, 'rock')) return bounded.constrainBody(sim, eid, from, next)
     const s = deepOf(sim)
     const r = Radius.v[eid]!
-    const p = grounded(s.sub) ? outOfHull(s.hull, s.sub, next.x, next.y, r) : next
+    const p = hullBlocks(sim, s, eid) ? outOfHull(s.hull, s.sub, next.x, next.y, r) : next
     return keepOut(s.plan.basin, p.x, p.y, r)
   },
   basin(sim) {
@@ -224,7 +231,7 @@ export const deep: WorldHooks = {
     if (phases(sim.world, eid, 'rock')) return norm(tx - x, ty - y)
     const s = deepOf(sim)
     const r = Radius.v[eid]!
-    const w = grounded(s.sub) ? aroundHull(s.hull, s.sub, x, y, tx, ty, r) : norm(tx - x, ty - y)
+    const w = hullBlocks(sim, s, eid) ? aroundHull(s.hull, s.sub, x, y, tx, ty, r) : norm(tx - x, ty - y)
     return alongWall(s.plan.basin, x, y, w.x, w.y, r + 0.3 * UNIT)
   },
   trace(sim, probe, ax, ay, bx, by) {
@@ -244,7 +251,7 @@ export const deep: WorldHooks = {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const r = Radius.v[eid]!
-    const d = grounded(s.sub) ? offHull(s.hull, s.sub, x, y, { x: dx, y: dy }, r + 0.6 * UNIT) : { x: dx, y: dy }
+    const d = hullBlocks(sim, s, eid) ? offHull(s.hull, s.sub, x, y, { x: dx, y: dy }, r + 0.6 * UNIT) : { x: dx, y: dy }
     if (roomAt(b, x, y) > r + 0.6 * UNIT) return d
     const n = awayFromWall(b, x, y)
     const dot = d.x * n.x + d.y * n.y
@@ -256,7 +263,7 @@ export const deep: WorldHooks = {
     const y = Transform.y[eid]!
     const r = Radius.v[eid]!
     const f = fleeSteer(x, y, awayX, awayY, sim.mapW, sim.mapH, 1.5 * UNIT)
-    const d = grounded(s.sub) ? offHull(s.hull, s.sub, x, y, f, r + 0.6 * UNIT) : f
+    const d = hullBlocks(sim, s, eid) ? offHull(s.hull, s.sub, x, y, f, r + 0.6 * UNIT) : f
     return alongWall(s.plan.basin, x, y, d.x, d.y, r + 1.5 * UNIT)
   },
   /** 刷怪点落在谷底上、离边与石头至少一格，不压着潜艇；头目离队长更远 */
