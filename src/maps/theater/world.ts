@@ -2,7 +2,7 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, ENEMY_SET, Motion, PICKUP_SET, Radius, Shard, Transform, TRANSIT, VisOff } from '../../ecs/components'
+import { Alive, ENEMY_SET, Motion, PICKUP_SET, Radius, Shard, Transform, TRANSIT, VisOff } from '../../ecs/components'
 import { pickupDef, pickupSfx } from '../../ecs/store'
 import { despawnEnemy } from '../../ecs/systems/shared/combat'
 import { displace, endMotion } from '../../ecs/systems/shared/displace'
@@ -26,6 +26,7 @@ import type { Crossing } from '../../ecs/utils/pass'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 /** 舞台按布景种子打散出自己的种子 */
 const STAGE_SEED = 0x5707b0
@@ -235,7 +236,7 @@ function hoist(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
   }
 }
 
-/** 推景：地布从右往左推过去时，地上的东西——敌人（头目除外）、掉落物、碎屑——都跟着地布一起往左挪，吊着的角色与飞在半空的不动；推进左边大幕的退场，不算打倒、不掉东西 */
+/** 推景：地布从右往左推过去时，地上的东西——敌人（定身的除外）、掉落物、碎屑——都跟着地布一起往左挪，吊着的角色与飞着的不动；推进左边大幕的退场，不算打倒、不掉东西 */
 function carry(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
   const u = slid(cfg, s.clock)
   const du = u - s.slidAt
@@ -244,7 +245,7 @@ function carry(sim: Sim, s: TheaterState, cfg: TheaterConfig): void {
   const dx = -du * (s.stage.x1 - s.stage.x0) * UNIT
   const edge = (s.stage.x0 + EXIT_U) * UNIT
   for (const eid of [...query(sim.world, ENEMY_SET)]) {
-    if (!Alive.v[eid] || Boss.v[eid] === 1 || inTransit(eid)) continue
+    if (!Alive.v[eid] || inTransit(eid) || hasTrait(sim.world, eid, 'anchored') || hasTrait(sim.world, eid, 'flies')) continue
     Transform.x[eid] = Transform.x[eid]! + dx
     if (Transform.x[eid]! - Radius.v[eid]! < edge) despawnEnemy(sim, eid, false)
   }

@@ -23,6 +23,7 @@ import { memberGear, memberGearMods } from './loadout'
 import type { EcsWorld } from '../world'
 import type { FrameIndex } from '../frames'
 import { rulesOf } from '../../data/reactions'
+import { setTraits } from '../utils/traits'
 
 interface CharacterPlacement {
   slot: number
@@ -63,6 +64,7 @@ export function spawnCharacter(
   CharScale.v[eid] = place.sizeMul
   Grow.r0[eid] = MEMBER.radius * UNIT
   Grow.s0[eid] = MEMBER.size * UNIT
+  setTraits(world, eid, [...MEMBER.traits, ...(def.traits ?? [])])
   setStatLayer(eid, 'role', [ROLES[def.role].stats])
   setStatLayer(eid, 'gear', memberGearMods(run, slot))
   setStatLayer(eid, 'fight', mods)

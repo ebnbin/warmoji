@@ -73,10 +73,17 @@ export interface BodyRules {
   readonly onDeath?: readonly DeathEffect[]
   readonly onAnchorLost?: readonly Effect[]
 }
-/** 角色与敌人共用的写法：外观、名字、反应、资源与形态 */
+/**
+ * 单位天生的特质，地图规则按它区别对待：swims 在水里照常游（不被水流冲走、追人时能下水），breathes 要换气（深海里离开气口会缺氧），
+ * phases 穿得过能穿的墙与岩石，fireproof 不怕岩浆，coldproof 不怕冰水，anchored 推不动、也不被地图机关搬走，wary 会绕开致命的地方；
+ * 会不会飞不写在这里，看身段：脚下那层离了地就是飞着的
+ */
+export type UnitTrait = 'swims' | 'breathes' | 'phases' | 'fireproof' | 'coldproof' | 'anchored' | 'wary'
+/** 角色与敌人共用的写法：外观、名字、特质、反应、资源与形态 */
 export interface UnitBase {
   readonly emoji: string
   readonly name: string
+  readonly traits?: readonly UnitTrait[]
   readonly reactions?: readonly BodyReaction[]
   readonly resource?: ResourceDef
   /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换；角色的主动技能不随形态换 */
@@ -129,7 +136,8 @@ export interface FormDef {
   readonly abilities?: readonly AbilityDef[]
   readonly drive?: DriveDef
   readonly stats?: StatMods
-  readonly anchored?: boolean
+  /** 换成这一形态时的特质，不写沿用本体 */
+  readonly traits?: readonly UnitTrait[]
   readonly damage?: number
 }
 /** 一个会动会打的非玩家身体：敌人、召唤出的分身与亡仆都用它；kind 是敌人的身份，召唤物没有 */
@@ -153,8 +161,6 @@ export interface NpcDef extends UnitBase {
     readonly maxAlive: number
     readonly firstDelayMs?: number
   }
-  readonly kbImmune?: boolean
-  readonly phasesWalls?: boolean
   /** 坐骑：先扣它的生命，扣光后切到 form 形态 */
   readonly mount?: { readonly hp: number; readonly form: number; readonly emoji?: string }
   /** 延时成长：出生 ms 后还活着就长成 into */

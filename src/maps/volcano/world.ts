@@ -14,11 +14,12 @@ import { hit } from '../../ecs/systems/shared/damage'
 import { hazardSource } from '../../ecs/utils/source'
 import type { Sim } from '../../ecs/sim'
 import type { Point } from '../../util/vec'
-import { grounded } from '../../ecs/utils/pass'
+import { grounded, phases } from '../../ecs/utils/pass'
 import { solidOf, solidsTrace, wallsOf } from '../../ecs/worlds/solids'
 import { bounded, wanderIn } from '../../ecs/worlds/hooks'
 import { mapEvent } from '../../ecs/fight/events'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 function volcanoCfg(sim: Sim): VolcanoConfig {
   return MAPS[sim.mapId].volcano!
@@ -66,14 +67,14 @@ function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   }
 }
 
-/** 脚下的熔岩没凝固就挨烫：脚不沾地的不烫 */
+/** 脚下的熔岩没凝固就挨烫：脚不沾地的、耐火的不烫 */
 function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   const now = sim.elapsedMs
   if (now < s.hurtAt) return
   s.hurtAt = now + cfg.lava.tickMs
   const frac = cfg.lava.tickMs / 1000
   const src = hazardSource('lava', LAVA_TINT)
-  const onLava = (eid: number): boolean => grounded(sim.world, eid) && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
+  const onLava = (eid: number): boolean => grounded(sim.world, eid) && !hasTrait(sim.world, eid, 'fireproof') && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
   const dmg = Math.round(cfg.lava.teamDps * frac)
   for (const m of sim.characters) if (Alive.v[m] && onLava(m)) hit(sim, src, m, dmg, { tick: true })
   const edmg = Math.round(cfg.lava.enemyDps * frac)
@@ -92,7 +93,8 @@ function clearGround(sim: Sim, p: Point): boolean {
  */
 export const volcano: WorldHooks = {
   ...bounded,
-  constrainBody(sim, eid, _from, next) {
+  constrainBody(sim, eid, from, next) {
+    if (phases(sim.world, eid, 'rock')) return bounded.constrainBody(sim, eid, from, next)
     return keepOut(volcanoOf(sim).field.basin, next.x, next.y, Radius.v[eid]!)
   },
   trace(sim, probe, ax, ay, bx, by) {

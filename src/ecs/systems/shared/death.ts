@@ -23,7 +23,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
     drive: { kind: 'wander' as const },
     abilities: undefined,
     reactions: without(d.def.reactions, ['death']),
-    kbImmune: true,
+    traits: [...new Set([...(d.def.traits ?? []), 'anchored' as const])],
   }
   const eid = spawnNpc(sim, sim.frames, husk, d.x, d.y, Math.round(fx.hp * hpMul), { alpha: fx.alpha, faction: d.faction })
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs

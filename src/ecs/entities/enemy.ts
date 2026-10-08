@@ -40,7 +40,6 @@ import {
   MARK,
   Nest,
   Orbit,
-  Phasing,
   Pop,
   Radius,
   Ring,
@@ -56,6 +55,7 @@ import {
 import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook, marchMark } from '../store'
 import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
+import { setTraits } from '../utils/traits'
 import { attachTenacity } from '../systems/shared/tenacity'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
@@ -199,8 +199,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   if (boss || elite) attachTenacity(world, eid, boss ? TENACITY.boss : TENACITY.elite)
-  if (def.kbImmune) addComponent(world, eid, Anchored)
-  if (def.phasesWalls) addComponent(world, eid, Phasing)
+  setTraits(world, eid, def.traits)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y

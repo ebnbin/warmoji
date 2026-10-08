@@ -1,6 +1,6 @@
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
 import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
-import type { EnemyDef } from '../types/enemies'
+import type { EnemyDef, UnitTrait } from '../types/enemies'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
@@ -68,6 +68,13 @@ function spanTag(s: Span | undefined): string {
   return lo > 0 ? '悬空' : hi < STANDARD[1] ? '矮' : hi > STANDARD[1] ? '高大' : '标准身高'
 }
 
+const UNIT_TRAIT_LABEL: Record<UnitTrait, string> = { swims: '会游泳', breathes: '要换气', phases: '穿墙', fireproof: '耐火', coldproof: '耐寒', anchored: '定身', wary: '识险' }
+
+/** 单位的特质说成一串：会飞的看身段 */
+export function traitLine(traits: readonly UnitTrait[] | undefined, span: Span | undefined): string {
+  return [...(span && span[0] > 0 ? ['会飞'] : []), ...(traits ?? []).map((t) => UNIT_TRAIT_LABEL[t])].join('、')
+}
+
 export function enemyStatLines(e: EnemyDef): string[] {
   const tireless = e.stats?.exertion === 0
   const lines = [
@@ -77,12 +84,14 @@ export function enemyStatLines(e: EnemyDef): string[] {
         .filter((k) => !(k === 'exertion' && tireless))
         .map((k) => statText(k, e.stats![k]!)),
     ].join(' · '),
-    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${tireless ? ' · 不知疲倦' : ''}`,
+    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${tireless ? ' · 不知疲倦' : ''}`,
   ]
+  const traits = traitLine(e.traits, e.span)
+  if (traits) lines.push(`特质：${traits}`)
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   const span = e.span ? spanLine(e.span) : null
   if (span) lines.push(span)
-  if (e.phasesWalls) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
+  if (e.traits?.includes('phases')) lines.push('穿墙：穿得过的墙与岩石挡不住它，直取队伍')
   if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
   if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
@@ -92,8 +101,8 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (r.onIdle) lines.push(`${r.onIdle.ms / 1000} 秒没出手${r.onIdle.still ? '也没动' : ''}：${r.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
-    const traits = [...(f.stats ? modTexts(f.stats) : []), f.anchored ? '原地不动' : '', spanTag(f.span)].filter(Boolean).join(' · ')
-    lines.push(`形态「${f.name ?? e.name}」${traits ? `：${traits}` : ''}`)
+    const parts = [...(f.stats ? modTexts(f.stats) : []), f.traits ? `特质换成${traitLine(f.traits, f.span) || '无'}` : '', spanTag(f.span)].filter(Boolean).join(' · ')
+    lines.push(`形态「${f.name ?? e.name}」${parts ? `：${parts}` : ''}`)
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
   for (const fx of r.onDeath ?? []) {

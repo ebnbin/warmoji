@@ -15,7 +15,7 @@ import { roomFor } from '../landmark'
 import { sakuraMarks } from './marks'
 import { bridgeLocal, forestDepth, sakuraPlan, toLocal, wallSide } from './layout'
 import { makeSolids, solidOf, solidsTrace } from '../../ecs/worlds/solids'
-import { topOf } from '../../ecs/utils/pass'
+import { phases, topOf } from '../../ecs/utils/pass'
 import type { Solid, Solids } from '../../ecs/worlds/solids'
 import { flowAt, solveSakura } from './water'
 import type { Along } from './channel'
@@ -25,6 +25,7 @@ import type { MapId, SakuraConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../../ecs/sim'
 import type { Landmark } from '../landmark'
+import { bounded } from '../../ecs/worlds/hooks'
 import type { Surface, WorldHooks } from '../../ecs/worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
@@ -277,6 +278,7 @@ export const sakura: WorldHooks = {
     return wade(sim, cfgOf(sim), s.water, s.swimming, eid, dt, x, y, vx, vy, out)
   },
   constrainBody(sim, eid, from, next) {
+    if (phases(sim.world, eid, 'earth')) return bounded.constrainBody(sim, eid, from, next)
     const s = sakuraOf(sim)
     const r = Radius.v[eid]!
     const p = keepOut(s.plan.basin, next.x, next.y, r)

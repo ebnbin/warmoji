@@ -155,6 +155,9 @@ export const Anchored = {}
 /** 穿墙的身体：材质允许的障碍挡不住它 */
 export const Phasing = {}
 
+/** 单位的特质，按位记；推不动与穿墙另有 Anchored、Phasing，会不会飞看 Span */
+export const Traits = { v: u8() }
+
 export const Flash = { until: f32() }
 
 export const EDir = { x: f32(), y: f32() }

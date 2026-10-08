@@ -10,7 +10,7 @@ import type { NebulaMeteor, NebulaState } from './model'
 import { roomFor } from '../landmark'
 import type { Landmark } from '../landmark'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, ENEMY_SET, Hp, Motion, MOTION, Phys, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Transform, Uid } from '../../ecs/components'
+import { Alive, ENEMY_SET, Hp, Motion, MOTION, Phys, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Transform, Uid } from '../../ecs/components'
 import { bodyRules } from '../../ecs/store'
 import { hit } from '../../ecs/systems/shared/damage'
 import { die } from '../../ecs/systems/shared/combat'
@@ -21,6 +21,7 @@ import type { Sim } from '../../ecs/sim'
 import { leaderX, leaderY } from '../../ecs/utils/team'
 import { bounded } from '../../ecs/worlds/hooks'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 function clampToDisc(px: number, py: number, cx: number, cy: number, r: number): { x: number; y: number } {
   const dx = px - cx
@@ -194,7 +195,7 @@ export const nebula: WorldHooks = {
     return clampToDisc(next.x, next.y, L.cx, L.cy, (FRAME_U / 2 - SAFE_U) * UNIT - Radius.v[eid]!)
   },
   chaseDir(sim, eid, tx, ty) {
-    if (Boss.v[eid] !== 1) return bounded.chaseDir(sim, eid, tx, ty)
+    if (!hasTrait(sim.world, eid, 'wary')) return bounded.chaseDir(sim, eid, tx, ty)
     const s = nebulaOf(sim)
     const r = reachPx(s, Phys.mass[eid]! / Phys.drag[eid]!, Stats.moveSpeed[eid]!) + UNIT
     return aroundCircle(Transform.x[eid]!, Transform.y[eid]!, tx, ty, s.layout.hx, s.layout.hy, r)

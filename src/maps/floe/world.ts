@@ -9,7 +9,7 @@ import { roomFor } from '../landmark'
 import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, gustSpan, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING, windAt, windPush } from './model'
 import type { FloeField, FloeState } from './model'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Drive, ENEMY_SET, GrantCoins, Hp, Motion, Phys, Pickup, Radius, Shard, Span, Transform, Uid } from '../../ecs/components'
+import { Alive, Drive, ENEMY_SET, GrantCoins, Hp, Motion, Phys, Pickup, Radius, Shard, Transform, Uid } from '../../ecs/components'
 import { hit } from '../../ecs/systems/shared/damage'
 import { inTransit } from '../../ecs/utils/marks'
 import { hazardSource } from '../../ecs/utils/source'
@@ -20,6 +20,7 @@ import { approach } from '../../ecs/systems/shared/body'
 import { bounded, GROUND, groundOf } from '../../ecs/worlds/hooks'
 import { mapEvent } from '../../ecs/fight/events'
 import type { WorldHooks } from '../../ecs/worlds/hooks'
+import { hasTrait } from '../../ecs/utils/traits'
 
 function floeCfg(sim: Sim): FloeConfig {
   return MAPS[sim.mapId].floe!
@@ -94,7 +95,7 @@ function tickGust(sim: Sim, s: FloeState, cfg: FloeConfig): void {
   mapEvent(sim, 'gust')
 }
 
-/** 泡在冰水里的按体温往下掉血：冻僵的时长与体型成正比（散热按表面积、热容按体积），满血的标准身体 freezeSec 秒冻死 */
+/** 泡在冰水里的按体温往下掉血，耐寒的不掉：冻僵的时长与体型成正比（散热按表面积、热容按体积），满血的标准身体 freezeSec 秒冻死 */
 function chill(sim: Sim, s: FloeState, cfg: FloeConfig): void {
   const now = sim.elapsedMs
   if (now < s.hurtAt) return
@@ -102,7 +103,7 @@ function chill(sim: Sim, s: FloeState, cfg: FloeConfig): void {
   const src = hazardSource('coldWater', WATER_TINT)
   const frac = cfg.coldTickMs / 1000
   const freeze = (eid: number): void => {
-    if (!Alive.v[eid] || inTransit(eid) || !inWater(s, eid, Uid.v[eid]!)) return
+    if (!Alive.v[eid] || inTransit(eid) || hasTrait(sim.world, eid, 'coldproof') || !inWater(s, eid, Uid.v[eid]!)) return
     const t = cfg.body.freezeSec * bulk(cfg, Radius.v[eid]!, Phys.mass[eid]!)
     hit(sim, src, eid, Math.max(1, Math.round((Hp.max[eid]! * frac) / t)), { tick: true })
   }
@@ -193,7 +194,7 @@ export const floe: WorldHooks = {
       else {
         const len = cfg.body.dragU * UNIT * bulk(cfg, r, Phys.mass[eid]!)
         const sp = Math.hypot(dx, dy)
-        const swim = sp * cfg.body.swimRatio
+        const swim = hasTrait(sim.world, eid, 'swims') ? sp : sp * cfg.body.swimRatio
         stepInWater(out, x, y, vx, vy, sp > 0 ? dx / sp : 0, sp > 0 ? dy / sp : 0, (swim * swim) / len, len, s.current.x, s.current.y, dt)
       }
       if (edgeAt(f, out.x, out.y) * UNIT >= r * cfg.body.climbFrac) {
@@ -228,7 +229,7 @@ export const floe: WorldHooks = {
     const s = floeOf(sim)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    if (inWater(s, eid, Uid.v[eid]!) || Span.lo[eid]! > 0) return norm(tx - x, ty - y)
+    if (inWater(s, eid, Uid.v[eid]!) || hasTrait(sim.world, eid, 'flies') || hasTrait(sim.world, eid, 'swims')) return norm(tx - x, ty - y)
     const reach = Radius.v[eid]! / UNIT + 0.6
     if (edgeAt(s.field, tx, ty) >= 0) return walkTo(s, x, y, tx, ty, reach)
     // 目标在水里：不跟着跳下去，走到离它最近的冰上守着

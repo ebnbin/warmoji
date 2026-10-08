@@ -1,6 +1,7 @@
 import { addComponent, hasComponent, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
 import { Anchored, Anim, Borrowed, Contact, EnemyArm, Faction, Form, Manual, MARK, Motion, MOTION, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
+import { setTraits } from '../utils/traits'
 import { bodyLook, enemyDef, formEnd } from '../store'
 import { hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
@@ -100,7 +101,7 @@ export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
 }
 
-/** 非玩家身体的走法、锚定、身段与接触伤害 */
+/** 非玩家身体的走法、特质、身段与接触伤害 */
 function npcBody(sim: Sim, eid: number, f: FormDef | undefined): void {
   const def = enemyDef[eid]!
   const span = f?.span ?? def.span ?? STANDARD
@@ -109,10 +110,8 @@ function npcBody(sim: Sim, eid: number, f: FormDef | undefined): void {
   if (Motion.kind[eid] !== MOTION.arc) VisOff.y[eid] = -hoverPx(eid)
   detachDrive(sim, eid)
   attachDrive(sim, eid, f?.drive ?? def.drive)
-  const anchored = f?.anchored ?? def.kbImmune === true
-  if (anchored && !hasComponent(sim.world, eid, Anchored)) addComponent(sim.world, eid, Anchored)
-  if (!anchored && hasComponent(sim.world, eid, Anchored)) removeComponent(sim.world, eid, Anchored)
-  if (anchored) {
+  setTraits(sim.world, eid, f?.traits ?? def.traits)
+  if (hasComponent(sim.world, eid, Anchored)) {
     Phys.vx[eid] = 0
     Phys.vy[eid] = 0
   }

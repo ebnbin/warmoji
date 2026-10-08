@@ -2,7 +2,7 @@ import type charactersJson from '../assets/characters.json'
 import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
-import type { BodyReaction, UnitBase } from './enemies'
+import type { BodyReaction, UnitBase, UnitTrait } from './enemies'
 import type { StatBase } from './stats'
 import type { RoleId } from './roles'
 
@@ -90,7 +90,8 @@ export interface TeamBaseline {
   readonly member: {
     readonly size: number
     readonly radius: number
-    /** 每个角色都有的基础属性 */
+    /** 每个角色都有的基础属性与特质 */
     readonly stats: StatBase
+    readonly traits: readonly UnitTrait[]
   }
 }
