@@ -18,6 +18,11 @@ export const SAFE: Rect = { x: SAFE_U * UNIT, y: SAFE_U * UNIT, w: (FRAME_U - SA
 /** 方框正中，像素：队伍在这里出生 */
 export const FRAME_MID: Point = { x: FRAME.w / 2, y: FRAME.h / 2 }
 
+/** inner 整块落在 outer 里面 */
+export function within(inner: Rect, outer: Rect): boolean {
+  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h
+}
+
 /** 摆在方框正中、wU × hU 格的地图矩形，像素 */
 export function centered(wU: number, hU: number): Rect {
   return { x: FRAME_MID.x - (wU * UNIT) / 2, y: FRAME_MID.y - (hU * UNIT) / 2, w: wU * UNIT, h: hU * UNIT }
