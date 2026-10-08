@@ -217,6 +217,32 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     eachCapable(sim, at, Mark, (t) => addMark(t, MARK.imbue, TAG.effect, until, elementIndex(fx.element)))
   },
 
+  attune: (sim, _src, fx, at) => {
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.attuned, TAG.effect, until, elementIndex(fx.element)))
+  },
+
+  shield: (sim, src, fx, at) => {
+    const until = sim.elapsedMs + fx.ms
+    const healing = attackOf(sim, src).healing
+    eachCapable(sim, at, Mark, (t) => {
+      const amount = (fx.amount + (fx.ratio ?? 0) * Hp.max[t]!) * healing
+      const s = markSlot(sim, t, MARK.shield)
+      if (s < 0) {
+        addMark(t, MARK.shield, TAG.effect, until, amount)
+        return
+      }
+      Mark.a[s] = Math.max(Mark.a[s]!, amount)
+      Mark.until[s] = Math.max(Mark.until[s]!, until)
+    })
+  },
+
+  mend: (sim, src, fx, at) => {
+    const now = sim.elapsedMs
+    const healing = attackOf(sim, src).healing
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.mending, TAG.effect, now + fx.durationMs, (fx.amount + (fx.ratio ?? 0) * Hp.max[t]!) * healing, fx.tickMs, now + fx.tickMs))
+  },
+
   attackSlow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
     eachCapable(sim, at, Mark, (t) => addMark(t, MARK.cd, TAG.effect, until, fx.mul))

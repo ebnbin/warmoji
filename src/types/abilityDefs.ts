@@ -310,6 +310,27 @@ interface ImbueEffect {
   readonly element: ElementId
   readonly ms: number
 }
+/** 转属：目标 ms 内变成这种元素，挨打按它算克制，出手也默认带它 */
+interface AttuneEffect {
+  readonly kind: 'attune'
+  readonly element: ElementId
+  readonly ms: number
+}
+/** 护盾：目标挡下 amount 加自己生命上限 ratio 倍的伤害（按出手方的治疗效果放大），ms 内挡满就碎；再上一层取强的 */
+interface ShieldEffect {
+  readonly kind: 'shield'
+  readonly amount: number
+  readonly ratio?: number
+  readonly ms: number
+}
+/** 回春：目标每 tickMs 回 amount 加自己生命上限 ratio 倍的生命（按出手方的治疗效果放大），持续 durationMs */
+interface MendEffect {
+  readonly kind: 'mend'
+  readonly amount: number
+  readonly ratio?: number
+  readonly tickMs: number
+  readonly durationMs: number
+}
 /** 条件看谁：self 是带着这条规则的身体（出手者、持有者），target 是这一下作用到的身体 */
 export type CondWho = 'self' | 'target'
 /** 条件：对 who 判断，能用 all（并且）、any（或者）、not（不是）组合 */
@@ -632,6 +653,9 @@ export type Effect =
   | DragEffect
   | RealmEffect
   | ImbueEffect
+  | AttuneEffect
+  | ShieldEffect
+  | MendEffect
 
 interface ZoneVisual {
   readonly color: number

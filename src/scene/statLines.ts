@@ -258,6 +258,12 @@ export function effectLine(e: Effect, self = false): string {
       return `把目标与自己拉进只有彼此的异界 ${sec(e.ms)}，界外谁也插不了手`
     case 'imbue':
       return `附${ELEMENTS[e.element].name}魔 ${sec(e.ms)}（出手都带${ELEMENTS[e.element].name}元素）`
+    case 'attune':
+      return `转为${ELEMENTS[e.element].name}元素 ${sec(e.ms)}`
+    case 'shield':
+      return `护盾 ${[e.amount ? `${e.amount}` : '', e.ratio ? `${pct(e.ratio)} 生命上限` : ''].filter(Boolean).join(' + ')}，持续 ${sec(e.ms)}`
+    case 'mend':
+      return `回春 ${[e.amount ? `${e.amount}` : '', e.ratio ? `${pct(e.ratio)} 生命上限` : ''].filter(Boolean).join(' + ')}/${sec(e.tickMs)}×${sec(e.durationMs)}`
   }
 }
 

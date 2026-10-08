@@ -13,11 +13,17 @@ AURA_MARK.forEach((kind, i) => {
   if (i > 0) AURA_OF[kind] = i
 })
 
+/** 身体此刻的元素：转了属就是转的，否则自己的；0 是无元素 */
+export function elementNow(sim: Sim, eid: number): number {
+  const s = hasComponent(sim.world, eid, Mark) ? markSlot(sim, eid, MARK.attuned) : -1
+  return s >= 0 ? Mark.a[s]! : Elem.v[eid]!
+}
+
 /** 身体出手带的元素：附了魔就是附的，否则能力写的，否则身体此刻的；0 是无元素 */
 export function strikeElement(sim: Sim, def: AbilityDef | undefined, body: number): number {
   const imbue = hasComponent(sim.world, body, Mark) ? markSlot(sim, body, MARK.imbue) : -1
   if (imbue >= 0) return Mark.a[imbue]!
-  return def?.element !== undefined ? elementIndex(def.element) : Elem.v[body]!
+  return def?.element !== undefined ? elementIndex(def.element) : elementNow(sim, body)
 }
 
 /** 带元素的一下落在身上：附着着能和它起反应的就消耗附着、返回反应；否则附着上这一种，换掉原来的 */
