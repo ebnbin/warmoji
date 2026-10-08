@@ -916,10 +916,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
 
 
+  /** 停住时 update 不跑：镜头当场按新尺寸摆好 */
   private onViewportChanged(): void {
     this.map.resize(this.ctx)
     this.framing = this.map.framing(this.ctx)
     this.lens.frame(this.framing)
+    this.aimLens(0)
   }
 
 
