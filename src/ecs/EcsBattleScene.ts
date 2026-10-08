@@ -63,7 +63,9 @@ import { replayDeath } from './systems/shared/death'
 import { spawnBoss } from './entities/enemy'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
-import { Lifetime, Modifier } from './components'
+import { Lifetime, Modifier, Radius, Uid } from './components'
+import { isSameEntity } from './utils/identity'
+import { bodyAt, describeBody } from './inspector'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { openWave, settleWave } from './systems/shared/wave'
@@ -233,6 +235,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private armedLevels: number[] = []
   /** 攒着还没走的时间，毫秒 */
   private pendingMs = 0
+  /** 模拟的快慢：0 是停住，停住时只走排着的那几步 */
+  private rate = 1
+  private queuedSteps = 0
+  /** 检视中的身体：编号对不上就是换了实体 */
+  private inspected: { readonly eid: number; readonly uid: number } | null = null
+  private inspectGfx?: Phaser.GameObjects.Graphics
   /** 这一场正录着的录像；回放时没有 */
   private recorder: TapeRecorder | null = null
   /** 照录像重打时的回放 */
@@ -276,6 +284,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.settling = false
     this.armedLevels = []
     this.pendingMs = 0
+    this.rate = 1
+    this.queuedSteps = 0
+    this.inspected = null
+    this.inspectGfx = undefined
     this.recorder = null
     this.player = null
     this.claimBase = null
@@ -376,6 +388,55 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       counts.set(name, (counts.get(name) ?? 0) + 1)
     }
     return [...counts].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n)
+  }
+
+  /** 模拟的快慢，0 是停住 */
+  simRate(): number {
+    return this.rate
+  }
+
+  setSimRate(rate: number): void {
+    this.rate = rate
+    this.queuedSteps = 0
+  }
+
+  /** 停住模拟，再往前走 n 步 */
+  stepTicks(n: number): void {
+    this.rate = 0
+    this.queuedSteps += n
+  }
+
+  /** 点选画布上的一点：离它最近的身体拿来检视，点空了就不再检视 */
+  inspectAt(px: number, py: number): void {
+    const sim = this.sim
+    if (!sim) return
+    const w = this.lens.screen.toWorld(px, py)
+    const eid = bodyAt(sim, w.x, w.y)
+    this.inspected = eid < 0 ? null : { eid, uid: Uid.v[eid]! }
+  }
+
+  inspectText(): string {
+    const sim = this.sim
+    const s = this.inspected
+    if (!sim || !s) return '没有在检视的单位：按"点选单位"，再点一下画面上的身体'
+    if (!isSameEntity(this.world, s.eid, s.uid)) return `检视的单位（uid ${s.uid}）已经不在了`
+    return describeBody(sim, s.eid)
+  }
+
+  /** 检视中的身体套一个圈 */
+  private drawInspected(): void {
+    const s = this.inspected
+    if (!s || !isSameEntity(this.world, s.eid, s.uid)) {
+      this.inspectGfx?.clear()
+      return
+    }
+    const g = (this.inspectGfx ??= this.add.graphics().setDepth(95))
+    g.clear()
+    const r = Math.max(0.3 * UNIT, Radius.v[s.eid]! + 0.15 * UNIT)
+    g.lineStyle(0.06 * UNIT, 0xffffff, 0.9)
+    g.strokeCircle(Transform.x[s.eid]!, Transform.y[s.eid]!, r)
+    g.lineStyle(0.03 * UNIT, 0x00e5ff, 1)
+    g.strokeCircle(Transform.x[s.eid]!, Transform.y[s.eid]!, r + 0.08 * UNIT)
   }
 
   private drawDevTargets(sim: Sim): void {
@@ -1006,6 +1067,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
     this.paint?.step(sim)
     this.drawDevTargets(sim)
+    this.drawInspected()
     this.drawDevWalls(sim)
     this.drawDevGates(sim)
     this.drawDevHeights(sim)
@@ -1023,7 +1085,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   /** 这一帧走几步：攒下的时间按步长四舍五入；落下太多就丢掉，免得越补越卡 */
   private stepsFor(delta: number): number {
-    this.pendingMs += delta
+    if (this.rate === 0) {
+      this.pendingMs = 0
+      const n = Math.min(this.queuedSteps, MAX_STEPS_PER_FRAME)
+      this.queuedSteps -= n
+      return n
+    }
+    this.pendingMs += delta * this.rate
     const n = Math.round(this.pendingMs / TICK_MS)
     if (n > MAX_STEPS_PER_FRAME) {
       this.pendingMs = 0

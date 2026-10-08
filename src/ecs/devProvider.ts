@@ -1,5 +1,5 @@
 import type { EcsBattleScene } from './EcsBattleScene'
-import { defineDevChoice, defineDevFlag, devFlagItem, markPerf, resetPerf } from '../devtools'
+import { defineDevChoice, defineDevFlag, devFlagItem, markPerf, pickOnce, resetPerf, TIME_SCALES } from '../devtools'
 import type { DevButtonsItem, DevItem, DevProvider } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
@@ -281,6 +281,28 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
   ]
 }
 
+/** 只停模拟：画面、镜头、开发面板与输入照常，停住时可一步一步往前走，点选身体看它此刻的样子 */
+function inspectItems(battle: EcsBattleScene): DevItem[] {
+  return [
+    {
+      kind: 'choice',
+      label: '模拟快慢',
+      options: TIME_SCALES.map((s) => ({ id: String(s), label: s === 0 ? '停' : `×${s}` })),
+      get: () => String(battle.simRate()),
+      set: (id) => battle.setSimRate(Number(id)),
+    },
+    {
+      kind: 'buttons',
+      buttons: [
+        { label: '走一步', run: () => battle.stepTicks(1) },
+        { label: '走一秒', run: () => battle.stepTicks(60) },
+        { label: '点选单位', run: () => pickOnce((px, py) => battle.inspectAt(px, py)) },
+      ],
+    },
+    { kind: 'text', label: '检视 · 停住时也照常刷新', mono: true, read: () => battle.inspectText() },
+  ]
+}
+
 /** 战斗 scene 专有能力；沙盒页签只在沙盒里出现 */
 export function battleDevProvider(battle: EcsBattleScene): DevProvider {
   return {
@@ -288,6 +310,7 @@ export function battleDevProvider(battle: EcsBattleScene): DevProvider {
     title: '战斗',
     sections: [
       { id: 'battle', title: '战斗', items: () => battleItems(battle) },
+      { id: 'inspect', title: '检视', items: () => inspectItems(battle) },
       ...(battle.knobs ? [{ id: 'sandbox', title: '沙盒', items: (): DevItem[] => sandboxItems(battle) }] : []),
     ],
   }

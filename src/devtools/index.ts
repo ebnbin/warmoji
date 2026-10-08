@@ -18,6 +18,7 @@ export type { DevChoiceDef, DevFlagDef } from './flags'
 export { markMetrics as markPerf, resetMetrics as resetPerf } from './metrics'
 export { refreshDevPanel } from './registry'
 export { setTimeScale, timeScale, TIME_SCALES } from './timeControl'
+export { pickOnce } from './inspect'
 
 /** 游戏级能力：与具体 scene 无关，随游戏常驻；scene 专有能力改由 scene 实现 devProvider() */
 export function registerGameProvider(provider: DevProvider): () => void {
