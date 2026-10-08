@@ -38,6 +38,7 @@ import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
 import { place } from './render/tri'
+import { nextRender, warmQuadShaders } from './render/warmup'
 import { Presentation } from './presentation'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill } from './views'
@@ -594,6 +595,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   }
 
   private async boot(gen: number, run: RunState, hint: Phaser.GameObjects.Text): Promise<void> {
+    const warm = warmQuadShaders(this)
     const atlas = await EcsAtlas.build(this, battleSprites(run))
     if (gen !== this.bootGen) return
     this.atlas = atlas
@@ -649,6 +651,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.sim.hooks.onStart(this.sim)
     hint.setText('绘制地图…')
     await this.map.onSimReady(this.ctx, this.sim)
+    // 地图的着色器在加载提示还在时先画一帧，编译不落在开打的第一帧
+    await Promise.all([warm, nextRender(this)])
     if (gen !== this.bootGen) return
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
