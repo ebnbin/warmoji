@@ -1,804 +1,102 @@
+import type { AbilityId } from '../src/types/abilities'
+import type { AbilityDef } from '../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../src/types/characters'
+import type { StatMods } from '../src/types/stats'
+import type { WeaponId, WeaponSource } from '../src/types/weapons'
+import { mapValues } from '../src/util/record.ts'
+import * as juggler from './common/characters/juggler.ts'
+import * as unicorn from './common/characters/unicorn.ts'
+import * as troll from './common/characters/troll.ts'
+import * as cowboy from './common/characters/cowboy.ts'
+import * as mage from './common/characters/mage.ts'
+import * as kangaroo from './common/characters/kangaroo.ts'
+import * as robot from './common/characters/robot.ts'
+import * as snowman from './common/characters/snowman.ts'
+import * as fairy from './common/characters/fairy.ts'
+import * as assassin from './common/characters/assassin.ts'
+import * as beaver from './common/characters/beaver.ts'
+import * as queenBee from './common/characters/queenBee.ts'
+import * as medic from './common/characters/medic.ts'
+import * as jellyfish from './common/characters/jellyfish.ts'
+import * as frog from './common/characters/frog.ts'
+import * as fox from './common/characters/fox.ts'
+import * as fencer from './common/characters/fencer.ts'
+import * as sloth from './common/characters/sloth.ts'
+import * as blackCat from './common/characters/blackCat.ts'
+import * as gorilla from './common/characters/gorilla.ts'
+import * as detective from './common/characters/detective.ts'
+import * as eagle from './common/characters/eagle.ts'
+import * as bear from './common/characters/bear.ts'
+import * as vampire from './common/characters/vampire.ts'
+import * as genie from './common/characters/genie.ts'
+import * as parrot from './common/characters/parrot.ts'
+import * as panda from './common/characters/panda.ts'
+import * as chipmunk from './common/characters/chipmunk.ts'
+import * as guard from './common/characters/guard.ts'
+import * as peacock from './common/characters/peacock.ts'
+import * as koala from './common/characters/koala.ts'
+import * as octopus from './common/characters/octopus.ts'
+import * as penguin from './common/characters/penguin.ts'
+import * as caterpillar from './common/characters/caterpillar.ts'
+import * as dragon from './common/characters/dragon.ts'
+import * as clown from './common/characters/clown.ts'
 
-export const CHARACTERS = {
-  juggler: {
-    emoji: '1f939',
-    name: '杂耍演员',
-    desc: '向最近的敌人连续抛掷番茄',
-    role: 'ranged',
-    tags: ['damage', 'control', 'ranged'],
-    body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 6, maxStamina: 110, staminaRegen: 70, exertion: 0.9 },
-    skill: { name: '全场蹦迪', icon: '1f57a', desc: '全场敌人跟着蹦迪两秒半，期间失去行动', cdMs: 16_000, ability: 'jugglerDance' },
-    weapons: [],
-    innate: [
-      {
-        name: '番茄连投',
-        icon: '1f345',
-        base: 'tomatoThrow',
-        upgrades: [
-          { ability: 'tomatoThrow2', card: { icon: '1f345', name: '三重抛掷', desc: '每次投掷同时抛出 3 枚番茄，扇形散开' } },
-          { ability: 'tomatoThrow3', card: { icon: '1f4a5', name: '爆浆番茄', desc: '番茄命中后爆裂，对周围敌人造成 60% 溅射伤害' } },
-        ],
-      },
-    ],
-  },
-  unicorn: {
-    emoji: '1f984',
-    name: '独角兽',
-    desc: '独角向前突刺，穿透沿途敌人',
-    role: 'bruiser',
-    tags: ['damage', 'melee', 'mobile'],
-    body: { drag: 4.5, mass: 1 },
-    stats: { moveSpeed: 7.56, maxStamina: 130, staminaRegen: 55, exertion: 0.9 },
-    skill: { name: '彩虹冲锋', icon: '1f308', desc: '朝指定方向冲刺三格半，沿途敌人受伤并被撞开', cdMs: 5000, ability: 'rainbowRush', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '独角突刺',
-        icon: '2694',
-        base: 'hornThrust',
-        upgrades: [
-          { ability: 'hornThrust2', card: { icon: '26a1', name: '二连突刺', desc: '每次出手连刺两段，第二段重新索敌' } },
-          { ability: 'hornThrust3', card: { icon: '1f308', name: '虹光震波', desc: '突刺终点爆发冲击波：60% 范围伤害并强力击退' } },
-        ],
-      },
-    ],
-  },
-  troll: {
-    emoji: '1f9d1_200d_1f692',
-    name: '消防员',
-    desc: '抡起消防斧，横扫身前扇形范围',
-    role: 'tank',
-    tags: ['defense', 'melee', 'area'],
-    body: { drag: 4.5, mass: 1.8 },
-    stats: { moveSpeed: 3.78, maxStamina: 140, staminaRegen: 45, exertion: 1.3 },
-    skill: { name: '吸引火力', icon: '1f4e2', desc: '举起喇叭大喊一声，四格半内的敌人两秒半内只追消防员，期间自己受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
-    weapons: ['axe'],
-    innate: [],
-  },
-  cowboy: {
-    emoji: '1f920',
-    name: '牛仔',
-    desc: '左右双枪齐发，射出高速水弹',
-    role: 'ranged',
-    tags: ['damage', 'control', 'ranged'],
-    body: { drag: 5, mass: 1 },
-    stats: { moveSpeed: 5.8, maxStamina: 120, staminaRegen: 60, exertion: 1 },
-    skill: { name: '套索', icon: '1faa2', desc: '甩出六格半的套索，套住的敌人被拴在身后拖行两秒半，期间动弹不得', cdMs: 12_000, ability: 'cowboyLasso' },
-    weapons: ['pistolLeft', 'pistolRight'],
-    innate: [],
-  },
-  mage: {
-    emoji: '1f9d9',
-    name: '法师',
-    desc: '在远处敌人脚下引爆奥术轰炸',
-    role: 'area',
-    tags: ['damage', 'ranged', 'area', 'mobile'],
-    body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 5, maxStamina: 80, staminaRegen: 60, exertion: 1.1 },
-    skill: { name: '传送阵', icon: '1f300', desc: '全队随法师朝指定方向瞬移六格，原地炸开一圈减速，把追兵甩在身后', cdMs: 14_000, ability: 'mageGate', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '奥术轰炸',
-        icon: '1f4a5',
-        base: 'arcaneBlast',
-        upgrades: [
-          { ability: 'arcaneBlast2', card: { icon: '1f525', name: '余烬秘火', desc: '轰炸在爆心留下灼烧地面，3 秒内持续烧伤敌人' } },
-          { ability: 'arcaneBlast3', card: { icon: '2728', name: '连锁轰炸', desc: '轰炸后 0.25 秒向随机敌人追加一次 75% 伤害的轰炸' } },
-        ],
-      },
-    ],
-  },
-  kangaroo: {
-    emoji: '1f998',
-    name: '袋鼠',
-    desc: '掷出回旋镖，去程回程皆可伤敌',
-    role: 'ranged',
-    tags: ['damage', 'ranged', 'mobile'],
-    body: { drag: 4, mass: 0.9 },
-    stats: { moveSpeed: 7, maxStamina: 100, staminaRegen: 65, exertion: 0.6 },
-    skill: { name: '弹跳践踏', icon: '1f4a5', desc: '朝指定方向跃出四格，落地时范围伤害并击退', cdMs: 9000, ability: 'bounceStomp', aim: true },
-    weapons: ['boomerang'],
-    innate: [],
-  },
-  robot: {
-    emoji: '1f916',
-    name: '机器人',
-    desc: '手持激光器，灼穿一条直线上的所有敌人',
-    role: 'ranged',
-    tags: ['damage', 'defense', 'ranged'],
-    body: { drag: 5, mass: 1.4 },
-    stats: { moveSpeed: 4.2, maxStamina: 150, staminaRegen: 40, exertion: 0.7, armor: 3 },
-    skill: { name: '镜面力场', icon: '1fa9e', desc: '身周张开五秒镜面，敌方弹体碰到就被反弹回去、归我方所有', cdMs: 16_000, ability: 'robotMirror' },
-    weapons: ['laserBeam'],
-    innate: [],
-  },
-  snowman: {
-    emoji: '26c4',
-    name: '雪人',
-    desc: '以自己为中心散发寒气，持续减速范围内的敌人',
-    role: 'controller',
-    tags: ['control', 'area'],
-    body: { drag: 5, mass: 1.5 },
-    stats: { moveSpeed: 3.5, maxStamina: 90, staminaRegen: 50, exertion: 1.1, armor: 3 },
-    skill: { name: '时停', icon: '23f3', desc: '时间停止八秒，静止时全场近乎凝固', cdMs: 25_000, ability: 'snowmanFreeze' },
-    weapons: [],
-    innate: [
-      {
-        name: '寒气光环',
-        icon: '2744',
-        base: 'frostAura',
-        upgrades: [
-          { ability: 'frostAura2', card: { icon: '1fa79', name: '冻伤', desc: '寒气光环每秒对范围内敌人造成 6 点伤害' } },
-          { ability: 'frostAura3', card: { icon: '1f328', name: '凛冬降临', desc: '每 5 秒光环脉冲一次，冻结范围内敌人 0.7 秒' } },
-        ],
-      },
-    ],
-  },
-  fairy: {
-    emoji: '1f9da',
-    name: '仙子',
-    desc: '魔尘弹把敌人整个变成一只无能力的绵羊——暂时失去攻击、被动与亡语，只保留血量，一段时间后恢复；同一敌人变羊有冷却',
-    role: 'controller',
-    tags: ['control', 'ranged'],
-    body: { drag: 5, mass: 0.5 },
-    stats: { moveSpeed: 6.4, maxStamina: 70, staminaRegen: 85, exertion: 0.6 },
-    skill: { name: '变形派对', icon: '1f411', desc: '三格内的敌人全部变成绵羊三秒', cdMs: 16_000, ability: 'sheepParty' },
-    weapons: [],
-    innate: [
-      {
-        name: '魔尘弹',
-        icon: '1fa84',
-        base: 'sparkleBolt',
-        upgrades: [
-          { ability: 'sparkleBolt2', card: { icon: '1f411', name: '持久变形', desc: '变形时长延长到 4 秒，魔尘弹可贯穿 1 名敌人' } },
-          { ability: 'sparkleBolt3', card: { icon: '1f494', name: '脆弱诅咒', desc: '被变形的敌人受到的所有伤害提高 40%' } },
-        ],
-      },
-    ],
-  },
-  assassin: {
-    emoji: '1f977',
-    name: '忍者',
-    desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
-    role: 'assassin',
-    tags: ['damage', 'melee', 'mobile'],
-    body: { drag: 4, mass: 0.7 },
-    stats: { moveSpeed: 8, maxStamina: 80, staminaRegen: 95, exertion: 1 },
-    skill: { name: '影遁', icon: '1f32b', desc: '两秒多内全队不被敌人锁定，敌人只会乱走', cdMs: 14_000, ability: 'shadowVeil' },
-    weapons: ['dagger'],
-    innate: [],
-  },
-  beaver: {
-    emoji: '1f9ab',
-    name: '河狸工程师',
-    desc: '自己不动手，定期在脚下架起自动开火的弩塔',
-    role: 'summoner',
-    tags: ['damage', 'summon'],
-    body: { drag: 5.5, mass: 1.1 },
-    stats: { moveSpeed: 4, maxStamina: 120, staminaRegen: 55, exertion: 1 },
-    skill: { name: '工程速建', icon: '1f3d7', desc: '立刻在周围架起三座弩塔，持续八秒', cdMs: 12_000, ability: 'quickBuild' },
-    weapons: [],
-    innate: [
-      {
-        name: '林木弩塔',
-        icon: '1f3f9',
-        base: 'woodTurret',
-        upgrades: [
-          { ability: 'woodTurret2', card: { icon: '1f3d7', name: '扩建工地', desc: '同时在场的弩塔上限 +1' } },
-          { ability: 'woodTurret3', card: { icon: '1f3af', name: '三连弩', desc: '弩塔每次开火改为 3 发扇形连射' } },
-        ],
-      },
-    ],
-  },
-  queenBee: {
-    emoji: '1f41d',
-    name: '蜂后',
-    desc: '每隔一阵放出一群小蜂，自主寻路蜇敌施毒后自毁，优先扑向未中毒的目标',
-    role: 'summoner',
-    tags: ['damage', 'control', 'summon'],
-    body: { drag: 4.5, mass: 0.8 },
-    stats: { moveSpeed: 5.56, maxStamina: 90, staminaRegen: 60, exertion: 0.8, dotDamage: 1.1 },
-    skill: { name: '蜂蜜陷阱', icon: '1f36f', desc: '在最近的敌人脚下泼一片三格蜂蜜：场内敌人减速挨蜇，三秒后仍陷在蜜里的被粘住两秒多', cdMs: 13_000, ability: 'beeHoney' },
-    weapons: [],
-    innate: [
-      {
-        name: '毒蜂群',
-        icon: '1f41d',
-        base: 'beeSwarm',
-        upgrades: [
-          { ability: 'beeSwarm2', card: { icon: '1f41d', name: '扩巢', desc: '每波小蜂 +1 只' } },
-          { ability: 'beeSwarm3', card: { icon: '1f9ea', name: '剧毒麻痹', desc: '毒素更烈，蜇中附带 45% 减速 1.2 秒' } },
-        ],
-      },
-    ],
-  },
-  medic: {
-    emoji: '1f9d1_200d_2695_fe0f',
-    name: '军医',
-    desc: '周期治疗附近血量最低的队友，顺手甩两支飞针',
-    role: 'support',
-    tags: ['support', 'ranged'],
-    body: { drag: 5, mass: 1 },
-    stats: { moveSpeed: 5.2, maxStamina: 110, staminaRegen: 75, exertion: 1 },
-    skill: { name: '急救包', icon: '2695', desc: '倒地队友立刻复活，存活者回血三成半，全队无敌一秒多', cdMs: 25_000, ability: 'medicRally' },
-    weapons: [],
-    innate: [
-      {
-        name: '战地医疗',
-        icon: '1f48a',
-        base: 'fieldMedkit',
-        upgrades: [
-          { ability: 'fieldMedkit2', card: { icon: '1f97c', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量' } },
-          { ability: 'fieldMedkit3', card: { icon: '26a1', name: '电击起搏', desc: '每次治疗时，为复活倒计时最长的阵亡队友减少 2 秒，不论远近' } },
-        ],
-      },
-      { name: '飞针', icon: '1f489', base: 'syringeDart', upgrades: [] },
-    ],
-  },
-  jellyfish: {
-    emoji: '1fabc',
-    name: '水母',
-    desc: '电弧在敌群间弹跳传导，敌人越密越疼',
-    role: 'area',
-    tags: ['damage', 'control', 'ranged', 'area'],
-    body: { drag: 3, mass: 0.8 },
-    stats: { moveSpeed: 4.5, maxStamina: 70, staminaRegen: 70, exertion: 0.7 },
-    skill: { name: '电网', icon: '1f945', desc: '五格内的敌人都被电丝连住两秒：撑到最后没挣断的被电晕一秒半，跑出六格半就挣断、只被减速', cdMs: 12_000, ability: 'jellyNet' },
-    weapons: [],
-    innate: [
-      {
-        name: '感电触须',
-        icon: '26a1',
-        base: 'voltArc',
-        upgrades: [
-          { ability: 'voltArc2', card: { icon: '1f517', name: '超导传递', desc: '电弧额外弹跳数提升到 4 跳' } },
-          { ability: 'voltArc3', card: { icon: '1f4a5', name: '过载爆裂', desc: '最后一跳落点爆出小范围电击，波及 60% 伤害' } },
-        ],
-      },
-    ],
-  },
-  frog: {
-    emoji: '1f438',
-    name: '青蛙',
-    desc: '长舌把远处的敌人一口卷到身边；荷叶跳台让谁都能穿梭',
-    role: 'controller',
-    tags: ['control', 'ranged', 'mobile'],
-    body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 5.4, maxStamina: 90, staminaRegen: 70, exertion: 0.8 },
-    skill: { name: '荷叶跳台', icon: '1fab7', desc: '脚下与前方六格各浮起一片荷叶，六秒内任何身体踏上一片就从另一片冒出来（敌我都算），青蛙自己先跳过去', cdMs: 12_000, ability: 'frogLily', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '长舌',
-        icon: '1f445',
-        base: 'frogTongue',
-        upgrades: [
-          { ability: 'frogTongue2', card: { icon: '1f36f', name: '粘舌', desc: '卷回来的敌人被舌头粘住一秒，走不动但能出手' } },
-          { ability: 'frogTongue3', card: { icon: '1faa2', name: '拉纤', desc: '拉不动的重家伙（锚定、霸体、Boss）改成把青蛙自己拽过去' } },
-        ],
-      },
-    ],
-  },
-  fox: {
-    emoji: '1f98a',
-    name: '灵狐',
-    desc: '媚眼让敌人不由自主地走向她；九尾分身替她挨打',
-    role: 'controller',
-    tags: ['control', 'ranged', 'summon'],
-    body: { drag: 5, mass: 0.7 },
-    stats: { moveSpeed: 6.2, maxStamina: 90, staminaRegen: 80, exertion: 0.9 },
-    skill: { name: '九尾分身', icon: '1f3ad', desc: '身边化出两只分身六秒，带着她一半威力的媚眼，分身被打散时魅惑周围敌人；本体隐匿一秒半', cdMs: 15_000, ability: 'foxClones' },
-    weapons: [],
-    innate: [
-      {
-        name: '媚眼',
-        icon: '1f496',
-        base: 'foxCharm',
-        upgrades: [
-          { ability: 'foxCharm2', card: { icon: '1f48b', name: '心醉', desc: '媚眼命中已被魅惑的敌人改为眩晕它并追加伤害' } },
-          { ability: 'foxCharm3', card: { icon: '1f494', name: '勾魂', desc: '被媚眼打中的敌人一秒半内死去，魅惑它身边的敌人' } },
-        ],
-      },
-    ],
-  },
-  fencer: {
-    emoji: '1f93a',
-    name: '剑客',
-    desc: '刺两剑卷一道旋风把敌人挑上天，再追着空中的敌人斩',
-    role: 'assassin',
-    tags: ['damage', 'control', 'melee', 'mobile'],
-    body: { drag: 4.5, mass: 0.9 },
-    stats: { moveSpeed: 7.11, maxStamina: 100, staminaRegen: 80, exertion: 0.9 },
-    skill: { name: '追风斩', icon: '1f32a', desc: '只能对空中的敌人出手：瞬身到八格内一个被挑飞的敌人身后重斩，再把它挑高', cdMs: 8_000, ability: 'fencerLastBreath' },
-    weapons: [],
-    innate: [
-      {
-        name: '疾风刺',
-        icon: '2694',
-        base: 'fencerCombo',
-        upgrades: [
-          { ability: 'fencerCombo2', card: { icon: '1f32c', name: '断风', desc: '旋风过处立起两秒风墙，吞掉敌方弹体' } },
-          { ability: 'fencerCombo3', card: { icon: '26a1', name: '落地惊雷', desc: '被旋风挑飞的敌人落地时眩晕' } },
-        ],
-      },
-    ],
-  },
-  sloth: {
-    emoji: '1f9a5',
-    name: '树懒',
-    desc: '往敌人身上挂定时炸弹，自己出事了就倒带回三秒前',
-    role: 'area',
-    tags: ['damage', 'ranged', 'area'],
-    body: { drag: 5, mass: 1.2 },
-    stats: { moveSpeed: 4, maxStamina: 60, staminaRegen: 30, exertion: 0.5 },
-    skill: { name: '倒带', icon: '23ea', desc: '沿直线闪回三秒前的位置，途中无敌，生命取那时与现在的较高者，并解除控制', cdMs: 12_000, ability: 'slothRewind' },
-    weapons: [],
-    innate: [
-      {
-        name: '定时炸弹',
-        icon: '23f0',
-        base: 'slothBomb',
-        upgrades: [
-          { ability: 'slothBomb2', card: { icon: '1f4a5', name: '连环引信', desc: '再打中挂着炸弹的敌人立刻引爆' } },
-          { ability: 'slothBomb3', card: { icon: '1f9e8', name: '延时连爆', desc: '挂弹的敌人先死了，炸弹跳到最近的敌人身上接着计时' } },
-        ],
-      },
-    ],
-  },
-  blackCat: {
-    emoji: '1f408',
-    name: '灵猫',
-    desc: '放出影子，猫爪镖从本体和影子上同时飞出',
-    role: 'ranged',
-    tags: ['damage', 'ranged', 'mobile'],
-    body: { drag: 4.5, mass: 0.6 },
-    stats: { moveSpeed: 7.33, maxStamina: 70, staminaRegen: 90, exertion: 0.9 },
-    skill: { name: '影子替身', icon: '1f311', desc: '朝指定方向四格外留下一个影子五秒（最多两个），猫爪镖也从影子上飞出；四秒内再按一次与最新的影子换位', cdMs: 10_000, ability: 'catShade', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '猫爪镖',
-        icon: '1f43e',
-        base: 'catPaw',
-        upgrades: [
-          { ability: 'catPaw2', card: { icon: '26d3', name: '影缚', desc: '零点八秒内同一敌人被两枚猫爪镖命中就定身' } },
-          { ability: 'catPaw3', card: { icon: '1f5e3', name: '影嘲', desc: '猫爪镖打死敌人时在身边留下一个嘲讽周围敌人的影子' } },
-        ],
-      },
-    ],
-  },
-  gorilla: {
-    emoji: '1f98d',
-    name: '怒猩',
-    desc: '打人攒怒气，满了一锤把敌人砸上天；开怒时怎么打都不倒',
-    role: 'bruiser',
-    tags: ['damage', 'defense', 'melee'],
-    body: { drag: 5, mass: 1.7 },
-    stats: { moveSpeed: 4.4, maxStamina: 130, staminaRegen: 50, exertion: 1.3 },
-    skill: { name: '不灭之怒', icon: '1f4a2', desc: '五秒内生命不低于 1，怒气立刻攒满，移速提升', cdMs: 20_000, ability: 'gorillaRage' },
-    weapons: [],
-    innate: [
-      {
-        name: '捶地',
-        icon: '1f44a',
-        base: 'gorillaSlam',
-        upgrades: [
-          { ability: 'gorillaSlam2', card: { icon: '1f4a5', name: '碎地', desc: '满怒的一锤还把敌人震飞出去，撞墙的眩晕' } },
-          { ability: 'gorillaSlam3', card: { icon: '1f525', name: '怒火不熄', desc: '捶地打死敌人回 35 怒气' } },
-        ],
-      },
-    ],
-    resource: { kind: 'fury', max: 100, onHit: 12, decay: 15, decayDelayMs: 2500 },
-  },
-  detective: {
-    emoji: '1f575',
-    name: '侦探',
-    desc: '对同一目标攒够三条证据当场结案；悬赏的目标一死，全队技能转好',
-    role: 'ranged',
-    tags: ['damage', 'support', 'ranged'],
-    body: { drag: 5, mass: 1 },
-    stats: { moveSpeed: 5.2, maxStamina: 120, staminaRegen: 50, exertion: 0.9 },
-    skill: { name: '悬赏令', icon: '1f4dc', desc: '给九格内血最厚的敌人下悬赏六秒：揭示它、它受伤增加三成；期间它死了，全队主动技能立刻转好', cdMs: 18_000, ability: 'detectiveWarrant' },
-    weapons: [],
-    innate: [
-      {
-        name: '放大镜',
-        icon: '1f50d',
-        base: 'detectiveLens',
-        upgrades: [
-          { ability: 'detectiveLens2', card: { icon: '1f4cb', name: '通缉', desc: '结案的目标三秒内死去，悬赏令冷却减三秒' } },
-          { ability: 'detectiveLens3', card: { icon: '1f6a8', name: '结案波及', desc: '结案时周围两格的敌人一起被眩晕' } },
-        ],
-      },
-    ],
-  },
-  eagle: {
-    emoji: '1f985',
-    name: '猎鹰',
-    desc: '一把抓起敌人砸到另一个敌人身上；蓄势越久俯冲越远越重',
-    role: 'assassin',
-    tags: ['damage', 'melee', 'mobile'],
-    body: { drag: 4.5, mass: 0.8 },
-    stats: { moveSpeed: 7.56, maxStamina: 90, staminaRegen: 70, exertion: 0.7 },
-    skill: { name: '蓄势俯冲', icon: '1f3af', desc: '按住蓄力，松手朝指定方向俯冲，蓄满时距离与伤害翻倍，落地挑飞周围敌人', cdMs: 9_000, ability: 'eagleDive', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '抓摔',
-        icon: '1f985',
-        base: 'eagleGrab',
-        upgrades: [
-          { ability: 'eagleGrab2', card: { icon: '1f4ab', name: '摔晕', desc: '被摔的敌人落地时眩晕一秒' } },
-          { ability: 'eagleGrab3', card: { icon: '1f4a5', name: '连摔', desc: '落地震起周围的敌人' } },
-        ],
-      },
-    ],
-  },
-  bear: {
-    emoji: '1f43b',
-    name: '拳王熊',
-    desc: '左右勾拳轮流出手；硬吃一拳，把挨的打加倍还回去',
-    role: 'bruiser',
-    tags: ['damage', 'defense', 'melee'],
-    body: { drag: 5, mass: 1.6 },
-    stats: { moveSpeed: 4.6, maxStamina: 150, staminaRegen: 60, exertion: 1.2 },
-    skill: { name: '硬吃一拳', icon: '1f94a', desc: '两秒半内受到的伤害减半并记下来，到时以记下的一倍六为伤害震开三格', cdMs: 13_000, ability: 'bearGrit' },
-    weapons: [],
-    innate: [
-      {
-        name: '左右勾拳',
-        icon: '1f91c',
-        base: 'bearHooks',
-        upgrades: [
-          { ability: 'bearHooks2', card: { icon: '1f4aa', name: '组合拳', desc: '右拳后的下一记左拳附带眩晕' } },
-          { ability: 'bearHooks3', card: { icon: '1f9f2', name: '贴身缠打', desc: '左拳把敌人拽到身前' } },
-        ],
-      },
-    ],
-  },
-  vampire: {
-    emoji: '1f607',
-    name: '天使',
-    desc: '每支圣光箭都耗自己的生命，射中了再补回来；倒下的敌人被救赎，站起来为天使而战',
-    role: 'ranged',
-    tags: ['damage', 'ranged', 'summon'],
-    body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 5.6, maxStamina: 100, staminaRegen: 65, exertion: 0.8 },
-    skill: { name: '救赎', icon: '1f54a', desc: '付 20 生命在四格半内洒下圣光，五秒内死去的敌人被救赎，站起来为天使而战十二秒', cdMs: 16_000, ability: 'vampRaise' },
-    weapons: [],
-    innate: [
-      {
-        name: '圣光箭',
-        icon: '1f31f',
-        base: 'vampBlade',
-        upgrades: [
-          { ability: 'vampBlade2', card: { icon: '1f64f', name: '感化', desc: '圣光箭打中残血敌人留下光印，它两秒内死去就被感化，站起来为天使而战' } },
-          { ability: 'vampBlade3', card: { icon: '1f47c', name: '神佑', desc: '自己生命低于一半时，圣光箭补回的生命翻倍' } },
-        ],
-      },
-    ],
-  },
-  genie: {
-    emoji: '1f9de',
-    name: '灯神',
-    desc: '火焰从神灯里喷出，灯在哪火就从哪来',
-    role: 'support',
-    tags: ['support', 'ranged'],
-    body: { drag: 5, mass: 0.8 },
-    stats: { moveSpeed: 5.2, maxStamina: 90, staminaRegen: 80, exertion: 0.7 },
-    skill: { name: '三个愿望', icon: '2728', desc: '全队获得三层法术护盾八秒，每层挡下一次命中', cdMs: 18_000, ability: 'genieWish' },
-    weapons: [],
-    innate: [
-      {
-        name: '灯火',
-        icon: '1fa94',
-        base: 'genieFlame',
-        upgrades: [
-          { ability: 'genieFlame2', card: { icon: '1f463', name: '灯影', desc: '神灯改为落在灯神一秒半前走过的地方，火从那里喷出' } },
-          { ability: 'genieFlame3', card: { icon: '1f91d', name: '灯随人护', desc: '神灯改为贴着血量最低的队友，火从队友身边喷出' } },
-        ],
-      },
-    ],
-  },
-  parrot: {
-    emoji: '1f99c',
-    name: '鹦鹉',
-    desc: '学舌：被它打中的敌人，招式借给它用六秒',
-    role: 'controller',
-    tags: ['control', 'ranged'],
-    body: { drag: 5, mass: 0.6 },
-    stats: { moveSpeed: 6, maxStamina: 80, staminaRegen: 75, exertion: 0.8 },
-    skill: { name: '喋喋不休', icon: '1f4ac', desc: '四格内的敌人被吵得沉默三秒半（放不出技能），正在蓄力的被打断', cdMs: 14_000, ability: 'parrotChatter' },
-    weapons: [],
-    innate: [
-      {
-        name: '学舌',
-        icon: '1f3b5',
-        base: 'parrotMimic',
-        upgrades: [
-          { ability: 'parrotMimic2', card: { icon: '1f910', name: '抢词', desc: '学舌时让对方沉默两秒' } },
-          { ability: 'parrotMimic3', card: { icon: '1f501', name: '回声', desc: '每第三次学舌立刻朝另一个敌人再学一遍' } },
-        ],
-      },
-    ],
-  },
-  panda: {
-    emoji: '1f43c',
-    name: '熊猫',
-    desc: '能量打出连环掌；太极卸下一切来招并反制',
-    role: 'bruiser',
-    tags: ['defense', 'control', 'melee'],
-    body: { drag: 5, mass: 1.5 },
-    stats: { moveSpeed: 4.8, maxStamina: 120, staminaRegen: 50, exertion: 1.1 },
-    skill: { name: '太极', icon: '262f', desc: '一秒半内挡下所有命中，每挡一下就眩晕出手者并还击，还回五十能量', cdMs: 11_000, ability: 'pandaTaiji' },
-    weapons: [],
-    innate: [
-      {
-        name: '连环掌',
-        icon: '1f590',
-        base: 'pandaPalm',
-        upgrades: [
-          { ability: 'pandaPalm2', card: { icon: '1f4a8', name: '推手', desc: '掌击把敌人推开' } },
-          { ability: 'pandaPalm3', card: { icon: '1f6d1', name: '化劲', desc: '掌击打断敌人的蓄力与连发' } },
-        ],
-      },
-    ],
-    resource: { kind: 'energy', max: 100, start: 100, regen: 18 },
-  },
-  chipmunk: {
-    emoji: '1f43f',
-    name: '松鼠',
-    desc: '六发橡果打空了要换弹；翻滚攒着三次随时用',
-    role: 'ranged',
-    tags: ['damage', 'ranged', 'mobile'],
-    body: { drag: 4.5, mass: 0.6 },
-    stats: { moveSpeed: 7.33, maxStamina: 70, staminaRegen: 95, exertion: 1 },
-    skill: { name: '翻滚', icon: '1f4a8', desc: '朝指定方向翻滚三格、翻滚中无敌；可攒三次，每次单独恢复', cdMs: 3_500, ability: 'chipRoll', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '橡果连射',
-        icon: '1f330',
-        base: 'chipAcorn',
-        upgrades: [
-          { ability: 'chipAcorn2', card: { icon: '1f504', name: '补给', desc: '橡果打死敌人补回一次翻滚' } },
-          { ability: 'chipAcorn3', card: { icon: '1f95c', name: '硬壳弹', desc: '橡果贯穿一名敌人，每匣最后一发眩晕' } },
-        ],
-      },
-    ],
-  },
-  guard: {
-    emoji: '1f482',
-    name: '卫兵',
-    desc: '盾击把敌人推到墙上砸晕；城墙挡人挡弹',
-    role: 'tank',
-    tags: ['defense', 'control', 'melee'],
-    body: { drag: 5, mass: 1.7 },
-    stats: { moveSpeed: 4.2, maxStamina: 140, staminaRegen: 50, exertion: 1.3 },
-    skill: { name: '城墙', icon: '1f9f1', desc: '在指定方向两格半处立起一道六格长的城墙五秒，挡住敌人和敌方弹体', cdMs: 14_000, ability: 'guardWall', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '盾击',
-        icon: '1f6e1',
-        base: 'guardBash',
-        upgrades: [
-          { ability: 'guardBash2', card: { icon: '26d3', name: '禁冲', desc: '被盾击的敌人两秒半内不能冲刺、跳跃、闪现' } },
-          { ability: 'guardBash3', card: { icon: '1f3f0', name: '围城', desc: '被推到墙上的敌人四周再围起一圈墙，谁也进出不得' } },
-        ],
-      },
-    ],
-  },
-  peacock: {
-    emoji: '1f99a',
-    name: '孔雀',
-    desc: '翎羽射出去落在地上，每射四根就把满地羽毛一齐收回，沿途再扎一遍',
-    role: 'ranged',
-    tags: ['damage', 'ranged'],
-    body: { drag: 5, mass: 0.8 },
-    stats: { moveSpeed: 5.8, maxStamina: 90, staminaRegen: 60, exertion: 1.1 },
-    skill: { name: '开屏', icon: '1faad', desc: '朝指定方向展开一道四格半的羽屏三秒半，吞掉敌方弹体', cdMs: 12_000, ability: 'peacockFan', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '翎羽',
-        icon: '1fab6',
-        base: 'peacockPlumes',
-        upgrades: [
-          { ability: 'peacockPlumes2', card: { icon: '1f4cc', name: '钉羽', desc: '一秒半内被三根羽毛扎中的敌人定身' } },
-          { ability: 'peacockPlumes3', card: { icon: '1faa4', name: '回羽钩', desc: '羽毛扎中的敌人被拽向孔雀' } },
-        ],
-      },
-    ],
-  },
-  koala: {
-    emoji: '1f428',
-    name: '考拉',
-    desc: '桉叶让敌人睡着；抱紧时全队挂在它身上',
-    role: 'tank',
-    tags: ['defense', 'support', 'control', 'ranged'],
-    body: { drag: 5.5, mass: 1.4 },
-    stats: { moveSpeed: 3.64, maxStamina: 70, staminaRegen: 40, exertion: 0.9 },
-    skill: { name: '抱紧', icon: '1f917', desc: '四秒内全体队友贴在考拉身上、不可选中但照常出手；考拉霸体并减伤四成', cdMs: 16_000, ability: 'koalaHug' },
-    weapons: [],
-    innate: [
-      {
-        name: '桉叶',
-        icon: '1f343',
-        base: 'koalaLeaf',
-        upgrades: [
-          { ability: 'koalaLeaf2', card: { icon: '1f4a4', name: '催眠雾', desc: '桉叶落处起一团雾，雾里的敌人一阵阵睡着' } },
-          { ability: 'koalaLeaf3', card: { icon: '1f6cc', name: '好梦', desc: '雾里连续待满一秒的敌人沉睡两秒半，雾散时减速' } },
-        ],
-      },
-    ],
-  },
-  octopus: {
-    emoji: '1f419',
-    name: '章鱼',
-    desc: '喷墨让敌人看不清；墨汁结界里的同伴只挨得到结界里的打',
-    role: 'controller',
-    tags: ['control', 'support', 'ranged'],
-    body: { drag: 4.5, mass: 1 },
-    stats: { moveSpeed: 5.56, maxStamina: 80, staminaRegen: 70, exertion: 1.2 },
-    skill: { name: '墨汁结界', icon: '1f32b', desc: '以自己为心张开三格半墨云五秒：云里的同伴只会被同在云里出手的敌人打到，云里的敌人一阵阵被致盲', cdMs: 15_000, ability: 'octoMist' },
-    weapons: [],
-    innate: [
-      {
-        name: '喷墨',
-        icon: '26ab',
-        base: 'octoInk',
-        upgrades: [
-          { ability: 'octoInk2', card: { icon: '1f311', name: '墨坑', desc: '墨汁落处留一滩墨，站进去的敌人被致盲' } },
-          { ability: 'octoInk3', card: { icon: '1f991', name: '缠绕', desc: '打中已被致盲的敌人改为缠住它一秒' } },
-        ],
-      },
-    ],
-  },
-  penguin: {
-    emoji: '1f427',
-    name: '企鹅',
-    desc: '冰球在地上铺冰，站在冰上谁都打滑；肚皮滑行撞开一切',
-    role: 'controller',
-    tags: ['control', 'area', 'mobile'],
-    body: { drag: 4, mass: 1.1 },
-    stats: { moveSpeed: 6, maxStamina: 100, staminaRegen: 60, exertion: 1.2 },
-    skill: { name: '肚皮滑行', icon: '1f6f7', desc: '朝指定方向肚皮滑出六格，撞伤沿途敌人；出发时解除控制并霸体', cdMs: 10_000, ability: 'penguinSlide', aim: true },
-    weapons: [],
-    innate: [
-      {
-        name: '冰球',
-        icon: '1f9ca',
-        base: 'penguinIce',
-        upgrades: [
-          { ability: 'penguinIce2', card: { icon: '1f976', name: '冻结', desc: '在冰面上连续站满一秒半的敌人被冻住' } },
-          { ability: 'penguinIce3', card: { icon: '1f300', name: '冰窝', desc: '冰面向中心倾斜，把敌人往中间带' } },
-        ],
-      },
-    ],
-  },
-  caterpillar: {
-    emoji: '1f425',
-    name: '丑小鸭',
-    desc: '扑腾水花溅敌人一身，打倒 25 个敌人就长成白天鹅，这一局都不再变回去',
-    role: 'ranged',
-    tags: ['damage', 'ranged'],
-    body: { drag: 5, mass: 1.1 },
-    stats: { moveSpeed: 3.8, maxStamina: 70, staminaRegen: 70, exertion: 1.3 },
-    skill: { name: '缩回蛋壳', icon: '1f423', desc: '缩回蛋壳两秒半：期间无敌不可选中、不能行动，回三成半生命，破壳时震开周围敌人', cdMs: 15_000, ability: 'caterCocoon' },
-    weapons: [],
-    innate: [
-      {
-        name: '扑水花',
-        icon: '1f4a6',
-        base: 'caterSilk',
-        upgrades: [
-          { ability: 'caterSilk2', card: { icon: '1f33f', name: '水草缠身', desc: '三秒内被水花溅中两次的敌人被水草缠住一秒半' } },
-          { ability: 'caterSilk3', card: { icon: '1f35e', name: '贪吃', desc: '水花打死敌人时体型长大一点、这一波都不消退，最多一倍三五' } },
-        ],
-      },
-    ],
-    resource: { kind: 'growth', max: 25, onKill: 1, keep: true, full: { effects: [{ kind: 'form', to: 0 }] } },
-    forms: [
-      {
-        emoji: '1f9a2',
-        name: '白天鹅',
-        stats: { mul: { scale: 1.15, moveSpeed: 1.2, exertion: 0.6 } },
-        abilities: [
-          {
-            trigger: 'auto',
-            cooldownMs: 700,
-            aim: 'nearest',
-            fireSfx: 'shoot',
-            damage: 14,
-            knockback: 1,
-            shape: { kind: 'bolt', projectile: { look: { emoji: '1fabd', size: 0.45, rotationOffsetDeg: 0 }, radius: 0.16, speed: 7, flight: { kind: 'homing', degPerSec: 240 } }, lifeMs: 2500 },
-            repeat: { count: 3, spreadDeg: 60 },
-            onHit: [{ kind: 'slow', factor: 0.7, durationMs: 1000 }],
-          },
-        ],
-      },
-    ],
-  },
-  dragon: {
-    emoji: '1f432',
-    name: '小龙',
-    desc: '喷火攒热量，过热就得歇两秒半；化龙时体型大增、换上龙焰与甩尾',
-    role: 'bruiser',
-    tags: ['damage', 'melee', 'area'],
-    body: { drag: 5, mass: 1.2 },
-    stats: { moveSpeed: 5, maxStamina: 110, staminaRegen: 55, exertion: 1 },
-    skill: { name: '化龙', icon: '1f409', desc: '化成巨龙八秒：体型变大、热量清空，换上烧地的龙焰与三百六十度甩尾', cdMs: 22_000, ability: 'dragonForm' },
-    weapons: [],
-    innate: [
-      {
-        name: '龙息',
-        icon: '1f525',
-        base: 'dragonBreath',
-        upgrades: [
-          { ability: 'dragonBreath2', card: { icon: '1f321', name: '危险区', desc: '热量高于七成时龙息更猛并在地上留火' } },
-          { ability: 'dragonBreath3', card: { icon: '1f4a8', name: '泄热', desc: '龙息打死敌人散掉四成热量' } },
-        ],
-      },
-    ],
-    resource: { kind: 'heat', max: 100, decay: 25, decayDelayMs: 900, full: { lockMs: 2500, reset: true } },
-    forms: [
-      {
-        emoji: '1f409',
-        name: '巨龙',
-        stats: { mul: { scale: 1.6, moveSpeed: 0.9 } },
-        abilities: [
-          {
-            trigger: 'auto',
-            cooldownMs: 500,
-            aim: 'nearest',
-            fireSfx: 'whoosh',
-            range: 4,
-            damage: 22,
-            knockback: 4,
-            color: 0xff3d00,
-            delivery: 'melee',
-            shape: { kind: 'segment', reach: 4, radius: 1, ms: 200, beam: true },
-            onHit: [{ kind: 'ground', def: { radius: 1.2, durationMs: 2000, tickMs: 400, damage: 5, color: 0xff7043, fillAlpha: 0.22, lineAlpha: 0.5, enterMs: 150 } }],
-          },
-          {
-            trigger: 'auto',
-            cooldownMs: 1600,
-            aim: 'nearest',
-            fireSfx: 'whoosh',
-            range: 2.4,
-            damage: 30,
-            knockback: 10,
-            shape: { kind: 'sector', radius: 2.6, arcDeg: 360, ms: 300 },
-          },
-        ],
-      },
-    ],
-  },
-  clown: {
-    emoji: '1f412',
-    name: '捣蛋猴',
-    desc: '一路丢下惊喜盒，敌人踩上就被吓跑；一串香蕉让它们为了抢食自相残杀',
-    role: 'controller',
-    tags: ['control', 'area'],
-    body: { drag: 5, mass: 0.8 },
-    stats: { moveSpeed: 5.8, maxStamina: 100, staminaRegen: 85, exertion: 0.9 },
-    skill: { name: '香蕉乱斗', icon: '1f34c', desc: '朝最近的敌人丢一串香蕉，两格半内的敌人为了抢香蕉倒戈三秒半，转头攻击自己人', cdMs: 16_000, ability: 'clownPotion' },
-    weapons: [],
-    innate: [
-      {
-        name: '惊喜盒',
-        icon: '1f381',
-        base: 'clownBox',
-        upgrades: [
-          { ability: 'clownBox2', card: { icon: '1f91b', name: '弹簧拳', desc: '惊喜盒弹开时还把敌人弹上天' } },
-          { ability: 'clownBox3', card: { icon: '1f606', name: '笑气', desc: '惊喜盒弹开后留下一团笑气，吸进去的敌人倒戈' } },
-        ],
-      },
-    ],
-  },
-} as const satisfies Record<string, CharacterAuthoring>
+/** 一名角色的文件：角色本身（默认导出）、它的能力、武器与 2 级起每一级的属性 */
+export interface CharacterFile {
+  readonly default: CharacterAuthoring
+  readonly abilities: Readonly<Record<string, AbilityDef>>
+  readonly weapons?: Readonly<Record<string, WeaponSource>>
+  readonly levels: readonly StatMods[]
+}
 
+/** 角色登记表：有哪些、按什么顺序；每名角色一个文件，文件名就是 id */
+export const CHARACTER_FILES = {
+  juggler,
+  unicorn,
+  troll,
+  cowboy,
+  mage,
+  kangaroo,
+  robot,
+  snowman,
+  fairy,
+  assassin,
+  beaver,
+  queenBee,
+  medic,
+  jellyfish,
+  frog,
+  fox,
+  fencer,
+  sloth,
+  blackCat,
+  gorilla,
+  detective,
+  eagle,
+  bear,
+  vampire,
+  genie,
+  parrot,
+  panda,
+  chipmunk,
+  guard,
+  peacock,
+  koala,
+  octopus,
+  penguin,
+  caterpillar,
+  dragon,
+  clown,
+} satisfies Record<string, CharacterFile>
+
+export const CHARACTERS = mapValues(CHARACTER_FILES, (f) => f.default)
+
+export const LEVEL_STATS = mapValues(CHARACTER_FILES, (f) => f.levels)
+
+const FILES: readonly CharacterFile[] = Object.values(CHARACTER_FILES)
+
+/** 各角色文件里的能力并成一张表，id 不重由构建期检查 */
+export const ABILITIES = Object.fromEntries(FILES.flatMap((f) => Object.entries(f.abilities))) as Readonly<Record<AbilityId, AbilityDef>>
+
+/** 各角色文件里的武器并成一张表，id 不重由构建期检查 */
+export const WEAPONS = Object.fromEntries(FILES.flatMap((f) => Object.entries(f.weapons ?? {}))) as Readonly<Record<WeaponId, WeaponSource>>

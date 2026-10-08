@@ -1,9 +1,9 @@
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { ABILITIES } from '../defs/abilities.ts'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
-import { CHARACTERS } from '../defs/characters.ts'
+import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, WEAPONS } from '../defs/characters.ts'
+import type { CharacterFile } from '../defs/characters.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
 import { ECONOMY } from '../defs/economy.ts'
@@ -12,7 +12,6 @@ import { ENEMIES } from '../defs/enemies.ts'
 import { EXPERIMENTS } from '../defs/experiments.ts'
 import { FEEL } from '../defs/feel.ts'
 import { ITEMS } from '../defs/items.ts'
-import { LEVEL_STATS } from '../defs/levels.ts'
 import { MAPS } from '../defs/maps.ts'
 import { MUTATORS } from '../defs/mutators.ts'
 import { OBSTACLES } from '../defs/obstacles.ts'
@@ -27,7 +26,6 @@ import { STATUSES } from '../defs/statuses.ts'
 import { AFFIXES } from '../defs/affixes.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
-import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/maps/nebula/physics.ts'
 import { depth, floeOutline, GRAVITY, simple } from '../src/maps/floe/model.ts'
@@ -1158,6 +1156,63 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
       need(a !== undefined, `characters.${id} 的 ${cr.at} 引用了不存在的能力：${ref}`)
       need(a === undefined || a.trigger === 'auto', `characters.${id} 的 ${cr.at} 的能力须自动出手：${ref}`)
     }
+  }
+}
+
+/**
+ * 内容一个单位一个文件：敌人与角色在 common 或某张图的目录里，地图与关卡在各自的目录里；文件名就是 id，每个文件都登记、只登记一次；
+ * 关卡在哪张图的目录里写的就是那张图；角色文件里的能力与武器 id 全局不重，角色用到的能力与武器都在它自己的文件里、文件里的也都用得上
+ */
+{
+  const defs = new URL('../defs/', import.meta.url)
+  const tsIn = (dir: URL): string[] => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.ts')) : [])
+  const where = (dir: URL, f: string): string => `defs/${new URL(f, dir).pathname.slice(defs.pathname.length)}`
+  const mapDirs = readdirSync(new URL('maps/', defs), { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? [d.name] : []))
+  const unitDirs = (kind: string): URL[] => [new URL(`common/${kind}/`, defs), ...mapDirs.map((m) => new URL(`maps/${m}/${kind}/`, defs))]
+
+  /** 一类单位的文件与登记表对得上：文件名就是登记的名字，登记的每一个都来自一个文件 */
+  const registered = async (kind: string, table: Readonly<Record<string, unknown>>, pick: (mod: Record<string, unknown>) => unknown): Promise<void> => {
+    let n = 0
+    for (const dir of unitDirs(kind)) {
+      for (const f of tsIn(dir)) {
+        n++
+        const mod = (await import(new URL(f, dir).href)) as Record<string, unknown>
+        need(table[f.slice(0, -3)] === pick(mod), `${where(dir, f)} 没在 defs/${kind}.ts 里登记，或登记的名字不是文件名`)
+      }
+    }
+    need(n === Object.keys(table).length, `defs/${kind}.ts 登记了 ${Object.keys(table).length} 个，目录里有 ${n} 个文件：每个一个文件、只登记一次`)
+  }
+  await registered('enemies', ENEMIES, (mod) => mod.default)
+  await registered('characters', CHARACTER_FILES, (mod) => mod)
+  for (const [k, e] of Object.entries<EnemyDef>(ENEMIES)) need(e.kind === k, `enemies.${k} 的 kind 须是 ${k}`)
+
+  let fights = 0
+  for (const m of mapDirs) {
+    const dir = new URL(`maps/${m}/`, defs)
+    need(existsSync(new URL('map.ts', dir)), `defs/maps/${m}/ 缺 map.ts`)
+    if (existsSync(new URL('map.ts', dir))) need((MAPS as Record<string, unknown>)[m] === ((await import(new URL('map.ts', dir).href)) as { default: unknown }).default, `defs/maps/${m}/map.ts 没在 defs/maps.ts 里登记，或登记的名字不是目录名`)
+    if (!existsSync(new URL('fights.ts', dir))) continue
+    const own = ((await import(new URL('fights.ts', dir).href)) as { FIGHTS: Record<string, ExperimentDef> }).FIGHTS
+    for (const [id, e] of Object.entries(own)) {
+      fights++
+      need(e.fight.map === m, `defs/maps/${m}/fights.ts 的 ${id} 打的是 ${e.fight.map}，须是 ${m}`)
+      need((EXPERIMENTS as Record<string, unknown>)[id] === e, `defs/maps/${m}/fights.ts 的 ${id} 没在 defs/experiments.ts 里接上，或和别的关卡重名`)
+    }
+  }
+  need(mapDirs.length === Object.keys(MAPS).length, `defs/maps.ts 登记了 ${Object.keys(MAPS).length} 张图，defs/maps/ 下有 ${mapDirs.length} 个目录`)
+  need(fights === Object.keys(EXPERIMENTS).length, `defs/experiments.ts 有 ${Object.keys(EXPERIMENTS).length} 个关卡，各图目录里一共 ${fights} 个`)
+
+  const files = Object.entries<CharacterFile>(CHARACTER_FILES)
+  need(files.reduce((n, [, f]) => n + Object.keys(f.abilities).length, 0) === Object.keys(ABILITIES).length, '角色文件里的能力 id 有重名')
+  need(files.reduce((n, [, f]) => n + Object.keys(f.weapons ?? {}).length, 0) === Object.keys(WEAPONS).length, '角色文件里的武器 id 有重名')
+  for (const [id, f] of files) {
+    const c = f.default
+    const weapons = c.weapons.map((w) => ({ w, def: f.weapons?.[w] }))
+    for (const { w, def } of weapons) need(def !== undefined, `characters.${id} 的武器 ${w} 须写在它自己的文件里`)
+    need(Object.keys(f.weapons ?? {}).every((w) => c.weapons.includes(w as never)), `characters.${id} 的文件里有它不用的武器`)
+    const refs = [c.skill.ability, ...c.innate.flatMap((i) => [i.base, ...i.upgrades.map((u) => u.ability)]), ...weapons.flatMap(({ def }) => (def ? [def.base, ...def.upgrades.map((u) => u.ability)] : []))]
+    for (const r of refs) need(r in f.abilities, `characters.${id} 用到的能力 ${r} 须写在它自己的文件里`)
+    for (const a of Object.keys(f.abilities)) need(refs.includes(a as never), `characters.${id} 的文件里有它不用的能力 ${a}`)
   }
 }
 

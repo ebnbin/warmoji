@@ -1,0 +1,62 @@
+import { hslToInt } from '../../../src/util/palette.ts'
+import type { MapDef } from '../../../src/types/maps'
+
+export default {
+  emoji: '1f3da',
+  name: '残垣',
+  desc: '山顶台地上一座塌了大半的石砌院落，四围的枫林一片橙黄，落叶铺了一地：中间是柱廊围着的回廊院，四周一圈房间，一角是塔楼。墙剩多高就挡多少，高度按层算——膝盖以下的残基跨得过，齐腰的矮墙挡人、子弹从上面飞过，齐头的墙挡人也挡子弹和视线，看不见的敌人不会被自动瞄准，只剩一道淡影；跨得过的残基贴着地面，挡路的墙露出一截立面，越高露得越多。矮墙后能探头开火，封门的木板挡人也挡视线，只有能穿透的子弹打得过去。冲锋的暴龙、自爆的怪和几种技能能把墙打出缺口，失去支撑的部分整片塌下来：落石砸人，墙脚堆起拖慢脚步的碎石，扬起的尘雾一时看不穿。怪物从你看不见的地方摸过来',
+  kind: 'ruins',
+  stamina: { exertion: 0.5, regen: 1 },
+  palette: {
+    bgFrom: 'hsl(30 52% 34%)',
+    bgTo: 'hsl(24 44% 11%)',
+    map: hslToInt(30, 0.5, 0.46),
+  },
+  light: { sun: 0xfff3e0, shade: 0xd0bca4, shadow: { color: 0x2a1a0a, alpha: 0.4, length: 0.85 } },
+  decor: {
+    emojis: ['1f342', '1f341', '1f344'],
+    sizeU: [0.28, 0.42],
+    alpha: [0.8, 0.92],
+    density: [0.006, 0.01],
+  },
+  foes: ['zombie', 'ghost', 'mushroom', 'snake', 'creeper', 'gargoyle', 'elf', 'skeleton', 'knight'],
+  gates: {
+    snapU: 3,
+    fallback: 'rise',
+    boss: 'slope',
+    kinds: {
+      door: { name: '院门', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
+      slope: { name: '山坡', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'maple', weight: 2, perSec: 1 },
+      wall: { name: '断墙', at: { kind: 'mark' }, enter: 'climb', weight: 1.5, perSec: 1, only: ['zombie', 'skeleton', 'snake', 'knight', 'gargoyle'] },
+      haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['ghost'] },
+    },
+  },
+  ruins: {
+    meterPerU: 0.5,
+    cellU: 0.25,
+    site: { marginU: [1.6, 2], waveU: 7, neckU: 0.8 },
+    plan: {
+      tiltDeg: [8, 24],
+      garthU: [5.8, 8],
+      walkU: 2.6,
+      depthU: [6.5, 8],
+      roomU: [6, 10],
+      doorU: [2.4, 3],
+      gates: [2, 4],
+      loops: 0.3,
+      wallU: { outer: 1.5, inner: 1, tower: 1.75, parapet: 0.75 },
+    },
+    masonry: { courseM: 0.28, density: 2200, bond: 2, heightM: { outer: [4.2, 5.6], inner: [3, 4.2], tower: [7, 9], parapet: 0.84, column: 3.4 } },
+    arcade: { radiusU: 0.4, spacingU: 2.9, entries: [1, 1] },
+    decay: { waveU: 6, keep: [0.1, 1], razed: [2, 4], razeU: [1.6, 3], breaches: [2, 4], breachM3: [0.6, 1.6], broken: 0.35, fallen: 0.2, rubble: 0.06 },
+    timber: { doors: [1, 3], heightM: 1.9, thickU: 0.3 },
+    rubble: { reposeDeg: 36, fullM: 0.4, viscosity: 1.6, exertion: 0.5 },
+    fall: { damagePerKJ: 8, radiusU: 0.35 },
+    dust: { perM3: 6, spreadU: 2.5, halfLifeS: 2.5, opaqueTau: 1.2 },
+    trees: { crownU: [1.3, 2.4], heightM: [6, 11], gapU: 2.6 },
+    bodyCapU: 0.8,
+    gapU: 2,
+    reflowMs: 150,
+  },
+  boss: 'rhino',
+} as const satisfies MapDef

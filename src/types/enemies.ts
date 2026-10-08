@@ -1,3 +1,4 @@
+import type enemiesJson from '../assets/enemies.json'
 import type { AbilityDef, Cond, Effect, ReactionBase } from './abilityDefs'
 import type { Span } from './obstacles'
 import type { StatBase, StatMods } from './stats'
@@ -91,45 +92,8 @@ export interface UnitBase {
   /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换；角色的主动技能不随形态换 */
   readonly forms?: readonly FormDef[]
 }
-export type EnemyKind =
-  | 'zombie'
-  | 'ghost'
-  | 'mushroom'
-  | 'blob'
-  | 'blobling'
-  | 'invader'
-  | 'boar'
-  | 'snake'
-  | 'rat'
-  | 'slime'
-  | 'hive'
-  | 'larva'
-  | 'creeper'
-  | 'rhino'
-  | 'treant'
-  | 'scorpion'
-  | 'croc'
-  | 'mecha'
-  | 'elf'
-  | 'turtle'
-  | 'locust'
-  | 'gargoyle'
-  | 'puffer'
-  | 'eclipse'
-  | 'ufo'
-  | 'alien'
-  | 'comet'
-  | 'blackhole'
-  | 'chameleon'
-  | 'skeleton'
-  | 'knight'
-  | 'crab'
-  | 'raccoon'
-  | 'siren'
-  | 'sapling'
-  | 'tree'
-  | 'pylon'
-  | 'swan'
+/** 敌人的种类：敌人登记表里的名字，也是各敌人的文件名 */
+export type EnemyKind = keyof typeof enemiesJson
 /** 一种形态：换外观、换能力、换走法、改属性、换身段；不写的沿用本体 */
 export interface FormDef {
   readonly emoji?: string
