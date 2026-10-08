@@ -2,9 +2,6 @@ import Phaser from 'phaser'
 import emojiOrderingUrl from '../assets/emoji/ordering.txt?url'
 import emojiBundleUrl from '../assets/emoji/twemoji.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
-import { setPaintedEmoji } from '../emoji/style'
-import { loadSettings } from '../save/settings'
-import { browserStorage } from '../util/storage'
 import { Label } from '../ui'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 import { SceneKey } from './keys'
@@ -38,7 +35,6 @@ export class PreloadScene extends Phaser.Scene {
       this.fail('资源解析失败，请刷新重试')
       return
     }
-    setPaintedEmoji(loadSettings(browserStorage()).paintedEmoji)
     loadEmojiTextures(this, PRELOAD_EMOJIS, OUTLINED_EMOJIS)
       .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`))
       .finally(() => this.scene.start(SceneKey.Menu))

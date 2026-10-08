@@ -1052,7 +1052,7 @@ export interface MapDef {
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
-  /** 开着新画风时战场上的精灵怎么受光、身体怎么投影 */
+  /** 战场上的精灵怎么受光、身体怎么投影 */
   readonly light: UnitLight
   readonly decor: MapDecor
   /** 这张图出没的小怪：沙盒、图鉴与出怪口按它，关卡里的配比另写 */

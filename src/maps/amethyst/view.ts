@@ -10,7 +10,6 @@ import { canvasTexture } from '../textures'
 import { FRAME, FRAME_MID } from '../frame'
 import { BoundedView } from '../../ecs/views'
 import { UprightMask } from '../../ecs/render/upright'
-import { paintedEmojiOn } from '../../emoji/style'
 import { charSize } from '../../ecs/systems/shared/scale'
 import { playSfx } from '../../audio/sfx'
 import { Alive, ENEMY_SET, Telegraph, Transform, Uid } from '../../ecs/components'
@@ -459,7 +458,7 @@ export class AmethystView extends BoundedView {
     this.lights = lights
     this.stepEyes(v.scene, sim, s, cfg, adapt, lights.spots, lights.lits)
     const view = v.lens.screen.view()
-    this.mask?.paint(view.x - view.w * MASK_PAD, view.y - view.h * MASK_PAD, view.w * (1 + 2 * MASK_PAD), view.h * (1 + 2 * MASK_PAD), paintedEmojiOn())
+    this.mask?.paint(view.x - view.w * MASK_PAD, view.y - view.h * MASK_PAD, view.w * (1 + 2 * MASK_PAD), view.h * (1 + 2 * MASK_PAD))
     this.stepImpacts(v, s)
     this.stepChill(v, s, sunDeg, now)
     this.stepBats(v, s, sunDeg, dt)

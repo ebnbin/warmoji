@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
 import { AWAY } from '../../data/light'
-import { paintedEmojiOn } from '../../emoji/style'
 import { EcsLayer } from './layer'
 import type { LayerType } from './layer'
 import { packTint, TINT_FILL } from './tint'
@@ -69,8 +68,6 @@ export class SpriteBatch extends EcsLayer {
   protected readonly paint: readonly PaintSprite[]
   private readonly light: UnitLight
   private readonly lightAt: LightAt | undefined
-  /** 这一帧打不打光：新画风随时能在设置里关掉 */
-  private lit = false
   private readonly local: LocalLight = { kx: 0, ky: 0, fx: 0, fy: 0, color: 0, fill: 0 }
   /** 四个角按 TL、BL、TR、BR 的染色 */
   private readonly tints = new Uint32Array(4)
@@ -97,10 +94,9 @@ export class SpriteBatch extends EcsLayer {
     for (const s of self.paint) self.drawPaint(node, drawingContext, s)
   }
 
-  /** 这台镜头这一帧怎么画：镜头的矩阵，打不打光 */
+  /** 这台镜头这一帧怎么画：镜头的矩阵 */
   protected aim(camera: Camera, drawingContext: Phaser.Renderer.WebGL.DrawingContext): void {
     this.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
-    this.lit = paintedEmojiOn()
   }
 
   protected drawPaint(node: QuadNode, drawingContext: Phaser.Renderer.WebGL.DrawingContext, s: PaintSprite): void {
@@ -129,7 +125,7 @@ export class SpriteBatch extends EcsLayer {
     let u1 = this.uv[2]!
     const v1 = this.uv[3]!
 
-    const light = this.lit && effect === 0 ? this.light : undefined
+    const light = effect === 0 ? this.light : undefined
     const l = this.local
     // 背光与补光的方向转进精灵自己的坐标，按对角线的一半归一
     let ax = 0

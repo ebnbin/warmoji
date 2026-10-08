@@ -30,14 +30,14 @@ export class UprightMask extends EcsLayer {
     this.tex = tex
   }
 
-  /** 重画 (x, y) 起 w×h 这块世界里立着的东西；on 为假时只清空 */
-  paint(x: number, y: number, w: number, h: number, on: boolean): void {
+  /** 重画 (x, y) 起 w×h 这块世界里立着的东西 */
+  paint(x: number, y: number, w: number, h: number): void {
     this.rect[0] = x
     this.rect[1] = y
     this.rect[2] = w
     this.rect[3] = h
     this.tex.clear()
-    if (on) this.tex.draw(this)
+    this.tex.draw(this)
     this.tex.render()
   }
 
