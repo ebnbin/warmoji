@@ -3,74 +3,7 @@ import { keysOf } from '../util/record'
 import { paintedDrawn, paintedRig } from './painted/index.ts'
 import { isPainted } from './style'
 import type { AnimClipId, AnimClipKind, AnimPart, AnimResource, FxDecl, FxGen, FxParams, FxSide, PartKeyframe } from '../types/anim'
-
-const OPEN_TAG = /<svg\b[^>]*>/
-const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|[^">])*?)(\/?)>/g
-
-interface SplitSvg {
-  open: string
-  defs: string
-  els: string[]
-}
-
-interface TopSegment {
-  tag: string
-  text: string
-  open: string | null
-  inner: string | null
-}
-
-function topLevelSegments(body: string): TopSegment[] {
-  const out: TopSegment[] = []
-  const re = new RegExp(TAG.source, 'g')
-  let depth = 0
-  let start = 0
-  let startTag = ''
-  let startOpen = ''
-  let m: RegExpExecArray | null
-  while ((m = re.exec(body))) {
-    const close = m[1] === '/'
-    const self = m[4] === '/'
-    if (close) {
-      depth--
-      if (depth < 0) throw new Error('SVG 标签不平衡')
-      if (depth === 0) {
-        out.push({
-          tag: startTag,
-          text: body.slice(start, m.index + m[0].length),
-          open: startOpen,
-          inner: body.slice(start + startOpen.length, m.index),
-        })
-      }
-    } else if (self) {
-      if (depth === 0) out.push({ tag: m[2]!, text: m[0], open: null, inner: null })
-    } else {
-      if (depth === 0) {
-        start = m.index
-        startTag = m[2]!
-        startOpen = m[0]
-      }
-      depth++
-    }
-  }
-  if (depth !== 0) throw new Error('SVG 标签不平衡')
-  return out
-}
-
-function splitSvg(svg: string): SplitSvg {
-  const open = OPEN_TAG.exec(svg)?.[0]
-  if (!open) throw new Error('不是有效的 SVG')
-  const closeIdx = svg.lastIndexOf('</svg>')
-  if (closeIdx < 0) throw new Error('SVG 缺少闭合标签')
-  const body = svg.slice(svg.indexOf(open) + open.length, closeIdx)
-  let defs = ''
-  const els: string[] = []
-  for (const seg of topLevelSegments(body)) {
-    if (seg.tag === 'defs') defs += seg.text
-    else els.push(seg.text)
-  }
-  return { open, defs, els }
-}
+import { OPEN_TAG, splitSvg, topLevelSegments } from './svgSplit'
 
 function replaceViewBox(open: string, viewBox: string): string {
   return open.replace(/viewBox="[^"]*"/, `viewBox="${viewBox}"`)
@@ -314,67 +247,6 @@ const FX_REGISTRY: { readonly [G in FxGen]: (params: FxParams[G]) => FxLayer } =
 
 const ANIM_CLIP_IDS = keysOf({ idle: 0, attack: 0 } satisfies Record<AnimClipId, 0>)
 
-const poseOf = (kf: PartKeyframe): PartPose => ({
-  rotate: kf.rotate ?? 0,
-  tx: kf.tx ?? 0,
-  ty: kf.ty ?? 0,
-  scale: kf.scale ?? 1,
-  scaleX: kf.scaleX ?? 1,
-  scaleY: kf.scaleY ?? 1,
-  opacity: kf.opacity ?? 1,
-})
-
-const poseEq = (a: PartPose, b: PartPose): boolean =>
-  Math.abs(a.rotate - b.rotate) < 1e-9 &&
-  Math.abs(a.tx - b.tx) < 1e-9 &&
-  Math.abs(a.ty - b.ty) < 1e-9 &&
-  Math.abs(a.scale - b.scale) < 1e-9 &&
-  Math.abs(a.scaleX - b.scaleX) < 1e-9 &&
-  Math.abs(a.scaleY - b.scaleY) < 1e-9 &&
-  Math.abs(a.opacity - b.opacity) < 1e-9
-
-function validateAnimResource(data: AnimResource): void {
-  if (!(data.def.frames >= 2) || !(data.def.durMs > 0)) {
-    throw new Error('动画资源 def 非法：frames 需 ≥2，durMs 需 >0')
-  }
-  for (const [key, entry] of Object.entries(data.animations)) {
-    const at = `animations.${key}`
-    if (!entry.emoji || !entry.name) throw new Error(`${at}: 缺少 emoji/name`)
-    if (Object.keys(entry.clips).length === 0) throw new Error(`${at}: 至少要有一个 clip`)
-    for (const [clipId, clip] of Object.entries(entry.clips)) {
-      const cat = `${at}.clips.${clipId}`
-      if (clip.frames !== undefined && (!Number.isInteger(clip.frames) || clip.frames < 2)) {
-        throw new Error(`${cat}: frames 需为 ≥2 的整数`)
-      }
-      if (clip.parts.length === 0 && (clip.fx?.length ?? 0) === 0) {
-        throw new Error(`${cat}: parts 与 fx 至少要有一项`)
-      }
-      const seen = new Set<number>()
-      clip.parts.forEach((part, pi) => {
-        const pat = `${cat}.parts[${pi}]`
-        if (part.indices.length === 0) throw new Error(`${pat}: indices 为空`)
-        for (const i of part.indices) {
-          if (!Number.isInteger(i) || i < 0) throw new Error(`${pat}: 非法下标 ${i}`)
-          if (seen.has(i)) throw new Error(`${pat}: 下标 ${i} 被多个部件占用`)
-          seen.add(i)
-        }
-        if (part.keyframes.length < 2) throw new Error(`${pat}: 关键帧不足 2 个`)
-        let prev = -Infinity
-        for (const kf of part.keyframes) {
-          if (kf.t < 0 || kf.t > 1) throw new Error(`${pat}: 关键帧 t=${kf.t} 超出 [0,1]`)
-          if (kf.t < prev) throw new Error(`${pat}: 关键帧 t 未按升序排列`)
-          prev = kf.t
-        }
-        const first = part.keyframes[0]!
-        const last = part.keyframes[part.keyframes.length - 1]!
-        if (!poseEq(poseOf(first), poseOf(last))) {
-          throw new Error(`${pat}: 首尾姿态不闭环（循环/连续周期播放会跳变）`)
-        }
-      })
-    }
-  }
-}
-
 function restoreFx<G extends FxGen>(decl: FxDecl<G>): FxLayer {
   const fx = FX_REGISTRY[decl.gen](decl.params)
   return decl.layer ? { ...fx, layer: decl.layer } : fx
@@ -395,7 +267,6 @@ interface AnimSet {
 }
 
 function loadAnimSets(data: AnimResource): AnimSet[] {
-  validateAnimResource(data)
   return Object.values(data.animations).map((entry) => ({
     emoji: entry.emoji,
     name: entry.name,

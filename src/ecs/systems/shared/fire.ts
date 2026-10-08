@@ -21,7 +21,6 @@ import {
   DropShape,
   EmplaceShape,
   Fired,
-  FlyerShape,
   Hp,
   LeapShape,
   MARK,
@@ -46,7 +45,6 @@ import {
   Transform,
   Uid,
   ZoneShape,
-  WorldShape,
   Bolt,
   Casting,
   Windup,
@@ -216,276 +214,282 @@ interface Mods {
 
 /** 一次出手：按形状覆盖目标，先伤害后效果，效果只施于真正打中的身体；返回是否真的出了手 */
 function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number, mods: Mods): boolean {
-  const w = sim.world
   const ox = anchorX(e)
   const oy = anchorY(e)
   const kb = Payload.knockback[e]!
   const color = Payload.color[e]!
   const onHit = mods.onHit
 
-  if (hasComponent(w, e, Bolt)) {
-    const from = muzzle(sim, e)
-    shoot(sim, e, from.x, from.y, angle, shotZ(sim, e, target), damage, onHit, target ?? undefined)
-    return true
-  }
-
-  if (hasComponent(w, e, Segment)) {
-    let reach = Segment.reach[e]! * mods.reach
-    const radius = Segment.radius[e]!
-    // 被障碍挡的一刺、一束只伸到撞上的地方
-    const wall = src.blocked ? reachBlock(sim, ox, oy, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach) : null
-    if (wall) reach *= wall.t
-    const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, reach + radius))
-    const origin = { x: ox, y: oy }
-    const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
-    applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
-    if (wall) {
-      impactAt(sim, wall)
-      breachAt(sim, wall.x, wall.y, layerZ(muzzleLayer(sim, e)), radius, breachOf(e))
-    }
-    if (Segment.beam[e]) spawnFxBeam(sim, ox, oy, angle, reach, radius, color)
-    Swing.startMs[e] = sim.fxMs
-    Swing.durMs[e] = Segment.ms[e]!
-    return true
-  }
-
-  if (hasComponent(w, e, Sector)) {
-    const radius = Sector.radius[e]!
-    const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, radius))
-    const origin = { x: ox, y: oy }
-    const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
-    applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
-    breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, layerZ(muzzleLayer(sim, e)), radius * 0.5, breachOf(e))
-    Swing.startMs[e] = sim.fxMs
-    Swing.durMs[e] = Sector.ms[e]!
-    return true
-  }
-
-  if (hasComponent(w, e, Disc)) {
-    const atTarget = Disc.at[e] === DISC_AT.target
-    if (atTarget && !target) return false
-    const cx = atTarget ? target!.x : ox
-    const cy = atTarget ? target!.y : oy
-    const r = Disc.radius[e]! * mods.reach
-    if (Disc.of[e] === DISC_OF.hurt) {
-      const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
-      const hurt: number[] = []
-      // 倒下的人留在倒下的地方、不跟队，复活类的效果够得着所有倒下的同伴
-      eachAlly(sim, src.faction, cx, cy, revives ? Infinity : r, revives, (t, x, y) => {
-        const dx = x - cx
-        const dy = y - cy
-        if (Alive.v[t] && dx * dx + dy * dy > r * r) return
-        if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
-      }, src.realm)
-      if (hurt.length === 0) return false
-      applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf), angle)
-      if (color !== 0) burst(sim, cx, cy, r, color, false)
+  switch (abilityDef[e]!.shape.kind) {
+    case 'bolt': {
+      const from = muzzle(sim, e)
+      shoot(sim, e, from.x, from.y, angle, shotZ(sim, e, target), damage, onHit, target ?? undefined)
       return true
     }
-    const list = covered(sim, src, cx, cy, targetsWithin(sim, src, cx, cy, r))
-    const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
-    const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy }, HIT.area)
-    applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
-    breachAt(sim, cx, cy, BLAST_M, r, breachOf(e))
-    if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
-    return true
-  }
 
-  if (hasComponent(w, e, Chain)) {
-    let cur = target
-    if (!cur) return false
-    const visited = new Set<number>()
-    const struck: Struck[] = []
-    const points: { x: number; y: number }[] = [{ x: ox, y: oy }]
-    let dmg = damage
-    let last: Found = cur
-    for (let hop = 0; hop <= Chain.hops[e]! && cur; hop++) {
-      visited.add(cur.eid)
-      const from = points[points.length - 1]!
-      points.push({ x: cur.x, y: cur.y })
-      const s = struckOf(cur.eid)
-      if (hit(sim, src, cur.eid, dmg, { knockback: kb, from })) struck.push(s)
-      last = cur
-      dmg *= Chain.decay[e]!
-      // 电弧从这一跳往下一跳传：够得着就行，不看施法者看不看得见
-      const at = cur
-      cur = nearestTarget(sim, { ...src, sight: undefined }, at.x, at.y, Chain.hopRange[e]!, visited, src.blocked ? (eid) => reaches(sim, at.x, at.y, Transform.x[eid]!, Transform.y[eid]!) : undefined)
-    }
-    applyOnHit(sim, src, onHit, last.x, last.y, dmg, struck, angle)
-    spawnFxBolt(sim, points, color)
-    return true
-  }
-
-  if (hasComponent(w, e, FlyerShape)) {
-    launch(sim, e, angle, damage)
-    return true
-  }
-
-  if (hasComponent(w, e, DropShape)) {
-    const seen = new Set<number>()
-    const nearest = targetsNear(sim, src, ox, oy, Infinity)
-      .map((t) => ({ t, d2: (t.x - ox) ** 2 + (t.y - oy) ** 2 }))
-      .sort((a, b) => a.d2 - b.d2)
-      .filter(({ t }) => !seen.has(t.eid) && (seen.add(t.eid), true))
-      .slice(0, DropShape.targets[e]!)
-    if (nearest.length === 0) return false
-    nearest.forEach(({ t }, i) =>
-      spawnDrop(sim, e, {
-        damage,
-        emoji: abilityArtEmoji[e]!,
-        size: DropShape.size[e]!,
-        target: t.eid,
-        x: t.x,
-        y: t.y,
-        fromAbove: DropShape.fromAbove[e]!,
-        dropMs: DropShape.dropMs[e]!,
-        delayMs: i * DropShape.staggerMs[e]!,
-      }),
-    )
-    return true
-  }
-
-  if (hasComponent(w, e, BlinkShape)) {
-    if (!target) return false
-    const m = Owner.eid[e]!
-    const dx = target.x - ox
-    const dy = target.y - oy
-    const d = Math.hypot(dx, dy) || 1
-    const behind = target.radius + BlinkShape.behindDist[e]!
-    const backX = Transform.x[m]!
-    const backY = Transform.y[m]!
-    if (!displace(sim, m, { kind: 'transit', x: target.x + (dx / d) * behind, y: target.y + (dy / d) * behind, ms: TRANSIT_MS.blink, look: 'streak', color: BLINK_COLOR }, { self: true })) return false
-    BlinkState.phase[e] = BLINK.going
-    BlinkState.x[e] = backX
-    BlinkState.y[e] = backY
-    blinkStrike[e] = { src, target: target.eid, uid: Uid.v[target.eid]!, damage, knockback: kb, onHit }
-    return true
-  }
-
-  if (hasComponent(w, e, SprintShape)) {
-    const m = Owner.eid[e]!
-    const seek = SprintShape.seek[e] && target ? target.eid : undefined
-    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach), seek }, { self: true, skill: e })) return false
-    Motion.dmg[m] = damage
-    Motion.breach[m] = breachOf(e)
-    if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
-      fill: color,
-      fillAlpha: 0.35,
-      stroke: color,
-      lineWidth: 3,
-      lineAlpha: 0.9,
-      fromScale: 0.4,
-      toScale: 1.6,
-      durationMs: 260,
-      depth: 8,
-    })
-    return true
-  }
-
-  if (hasComponent(w, e, LeapShape)) {
-    const m = Owner.eid[e]!
-    const dist = LeapShape.distance[e]! * mods.reach
-    const to = { x: Transform.x[m]! + Math.cos(angle) * dist, y: Transform.y[m]! + Math.sin(angle) * dist }
-    if (!displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })) return false
-    Motion.dmg[m] = damage
-    return true
-  }
-
-  if (hasComponent(w, e, AllShape)) {
-    if (AllShape.of[e] === ALL_OF.foes) {
-      const list = targetsWithin(sim, src, ox, oy, Infinity)
-      const struck: Struck[] = []
-      if (damage > 0) {
-        for (const t of list) {
-          const s = struckOf(t.eid)
-          if (hit(sim, src, t.eid, damage, { tags: HIT.area })) struck.push(s)
-        }
-        sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
-      } else {
-        for (const t of list) {
-          const s = struckOf(t.eid)
-          if (touch(sim, src, t.eid)) struck.push(s)
-        }
+    case 'segment': {
+      let reach = Segment.reach[e]! * mods.reach
+      const radius = Segment.radius[e]!
+      // 被障碍挡的一刺、一束只伸到撞上的地方
+      const wall = src.blocked ? reachBlock(sim, ox, oy, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach) : null
+      if (wall) reach *= wall.t
+      const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, reach + radius))
+      const origin = { x: ox, y: oy }
+      const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
+      applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
+      if (wall) {
+        impactAt(sim, wall)
+        breachAt(sim, wall.x, wall.y, layerZ(muzzleLayer(sim, e)), radius, breachOf(e))
       }
+      if (Segment.beam[e]) spawnFxBeam(sim, ox, oy, angle, reach, radius, color)
+      Swing.startMs[e] = sim.fxMs
+      Swing.durMs[e] = Segment.ms[e]!
+      return true
+    }
+
+    case 'sector': {
+      const radius = Sector.radius[e]!
+      const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, radius))
+      const origin = { x: ox, y: oy }
+      const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
       applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
-    } else {
-      const allies: number[] = []
-      eachAlly(sim, src.faction, ox, oy, Infinity, AllShape.downed[e] === 1, (t) => {
-        allies.push(t)
-      }, src.realm)
-      applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf), angle)
-      for (const t of allies) {
-        if (!Alive.v[t]) continue
-        CharFlash.until[t] = sim.fxMs + 320
-        Tint.color[t] = color !== 0 ? color : 0xffe082
-        Tint.effect[t] = 0
-      }
-    }
-    const fxR = Payload.fxRadius[e]!
-    if (fxR > 0) {
-      spawnFxCircle(sim, ox, oy, fxR, { fill: color, fillAlpha: 0.3, stroke: color, lineWidth: 4, lineAlpha: 0.9, fromScale: 0.4, toScale: 3, durationMs: 550, depth: 20 })
-    }
-    return true
-  }
-
-  if (hasComponent(w, e, ZoneShape)) {
-    const follow = ZoneShape.follow[e] === 1
-    if (follow && Aura.zone[e] !== 0) return false
-    const spec = {
-      x: ox,
-      y: oy,
-      radius: ZoneShape.radius[e]!,
-      src: flying(src),
-      durationMs: ZoneShape.durationMs[e]!,
-      enterMs: ZoneShape.enterMs[e]!,
-      color: ZoneShape.color[e]!,
-      fillAlpha: ZoneShape.fillAlpha[e]!,
-      lineAlpha: ZoneShape.lineAlpha[e]!,
-      lineWidth: ZoneShape.lineWidth[e]!,
-      tickMs: ZoneShape.tickMs[e]!,
-      damage,
-      mend: ZoneShape.mend[e]!,
-      effects: onHit,
-      follow: follow ? { of: Anchor.eid[e]!, owner: e } : undefined,
-      rules: zoneRules[e],
-    }
-    const pulseMs = ZoneShape.pulseMs[e]!
-    // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
-    const zone = spawnZone(sim, spec)
-    if (follow) Aura.zone[e] = zone
-    if (pulseMs > 0) {
-      spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0, rules: undefined })
-    }
-    return true
-  }
-
-  if (hasComponent(w, e, SummonShape)) {
-    const count = SummonShape.count[e]!
-    for (let i = 0; i < count; i++) spawnBee(sim, e, i)
-    return true
-  }
-
-  if (hasComponent(w, e, EmplaceShape)) {
-    const n = EmplaceShape.count[e]!
-    const r = EmplaceShape.spread[e]!
-    const life = EmplaceShape.lifeMs[e]!
-    if (n <= 1 || r <= 0) {
-      place(sim, e, undefined, life)
+      breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, layerZ(muzzleLayer(sim, e)), radius * 0.5, breachOf(e))
+      Swing.startMs[e] = sim.fxMs
+      Swing.durMs[e] = Sector.ms[e]!
       return true
     }
-    for (let i = 0; i < n; i++) {
-      const a = -Math.PI / 2 + (i * Math.PI * 2) / n
-      const at = sim.hooks.constrainBody(sim, Owner.eid[e]!, { x: ox, y: oy }, { x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r })
-      place(sim, e, at, life)
-    }
-    return true
-  }
 
-  if (hasComponent(w, e, WorldShape)) {
-    applyAbilityEffects(sim, src, onHit, { x: ox, y: oy, baseDamage: damage, angle })
-    return true
+    case 'disc': {
+      const atTarget = Disc.at[e] === DISC_AT.target
+      if (atTarget && !target) return false
+      const cx = atTarget ? target!.x : ox
+      const cy = atTarget ? target!.y : oy
+      const r = Disc.radius[e]! * mods.reach
+      if (Disc.of[e] === DISC_OF.hurt) {
+        const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
+        const hurt: number[] = []
+        // 倒下的人留在倒下的地方、不跟队，复活类的效果够得着所有倒下的同伴
+        eachAlly(sim, src.faction, cx, cy, revives ? Infinity : r, revives, (t, x, y) => {
+          const dx = x - cx
+          const dy = y - cy
+          if (Alive.v[t] && dx * dx + dy * dy > r * r) return
+          if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
+        }, src.realm)
+        if (hurt.length === 0) return false
+        applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf), angle)
+        if (color !== 0) burst(sim, cx, cy, r, color, false)
+        return true
+      }
+      const list = covered(sim, src, cx, cy, targetsWithin(sim, src, cx, cy, r))
+      const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
+      const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy }, HIT.area)
+      applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
+      breachAt(sim, cx, cy, BLAST_M, r, breachOf(e))
+      if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
+      return true
+    }
+
+    case 'chain': {
+      let cur = target
+      if (!cur) return false
+      const visited = new Set<number>()
+      const struck: Struck[] = []
+      const points: { x: number; y: number }[] = [{ x: ox, y: oy }]
+      let dmg = damage
+      let last: Found = cur
+      for (let hop = 0; hop <= Chain.hops[e]! && cur; hop++) {
+        visited.add(cur.eid)
+        const from = points[points.length - 1]!
+        points.push({ x: cur.x, y: cur.y })
+        const s = struckOf(cur.eid)
+        if (hit(sim, src, cur.eid, dmg, { knockback: kb, from })) struck.push(s)
+        last = cur
+        dmg *= Chain.decay[e]!
+        // 电弧从这一跳往下一跳传：够得着就行，不看施法者看不看得见
+        const at = cur
+        cur = nearestTarget(sim, { ...src, sight: undefined }, at.x, at.y, Chain.hopRange[e]!, visited, src.blocked ? (eid) => reaches(sim, at.x, at.y, Transform.x[eid]!, Transform.y[eid]!) : undefined)
+      }
+      applyOnHit(sim, src, onHit, last.x, last.y, dmg, struck, angle)
+      spawnFxBolt(sim, points, color)
+      return true
+    }
+
+    case 'flyer': {
+      launch(sim, e, angle, damage)
+      return true
+    }
+
+    case 'drop': {
+      const seen = new Set<number>()
+      const nearest = targetsNear(sim, src, ox, oy, Infinity)
+        .map((t) => ({ t, d2: (t.x - ox) ** 2 + (t.y - oy) ** 2 }))
+        .sort((a, b) => a.d2 - b.d2)
+        .filter(({ t }) => !seen.has(t.eid) && (seen.add(t.eid), true))
+        .slice(0, DropShape.targets[e]!)
+      if (nearest.length === 0) return false
+      nearest.forEach(({ t }, i) =>
+        spawnDrop(sim, e, {
+          damage,
+          emoji: abilityArtEmoji[e]!,
+          size: DropShape.size[e]!,
+          target: t.eid,
+          x: t.x,
+          y: t.y,
+          fromAbove: DropShape.fromAbove[e]!,
+          dropMs: DropShape.dropMs[e]!,
+          delayMs: i * DropShape.staggerMs[e]!,
+        }),
+      )
+      return true
+    }
+
+    case 'blink': {
+      if (!target) return false
+      const m = Owner.eid[e]!
+      const dx = target.x - ox
+      const dy = target.y - oy
+      const d = Math.hypot(dx, dy) || 1
+      const behind = target.radius + BlinkShape.behindDist[e]!
+      const backX = Transform.x[m]!
+      const backY = Transform.y[m]!
+      if (!displace(sim, m, { kind: 'transit', x: target.x + (dx / d) * behind, y: target.y + (dy / d) * behind, ms: TRANSIT_MS.blink, look: 'streak', color: BLINK_COLOR }, { self: true })) return false
+      BlinkState.phase[e] = BLINK.going
+      BlinkState.x[e] = backX
+      BlinkState.y[e] = backY
+      blinkStrike[e] = { src, target: target.eid, uid: Uid.v[target.eid]!, damage, knockback: kb, onHit }
+      return true
+    }
+
+    case 'sprint': {
+      const m = Owner.eid[e]!
+      const seek = SprintShape.seek[e] && target ? target.eid : undefined
+      if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach), seek }, { self: true, skill: e })) return false
+      Motion.dmg[m] = damage
+      Motion.breach[m] = breachOf(e)
+      if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
+        fill: color,
+        fillAlpha: 0.35,
+        stroke: color,
+        lineWidth: 3,
+        lineAlpha: 0.9,
+        fromScale: 0.4,
+        toScale: 1.6,
+        durationMs: 260,
+        depth: 8,
+      })
+      return true
+    }
+
+    case 'leap': {
+      const m = Owner.eid[e]!
+      const dist = LeapShape.distance[e]! * mods.reach
+      const to = { x: Transform.x[m]! + Math.cos(angle) * dist, y: Transform.y[m]! + Math.sin(angle) * dist }
+      if (!displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })) return false
+      Motion.dmg[m] = damage
+      return true
+    }
+
+    case 'all': {
+      if (AllShape.of[e] === ALL_OF.foes) {
+        const list = targetsWithin(sim, src, ox, oy, Infinity)
+        const struck: Struck[] = []
+        if (damage > 0) {
+          for (const t of list) {
+            const s = struckOf(t.eid)
+            if (hit(sim, src, t.eid, damage, { tags: HIT.area })) struck.push(s)
+          }
+          sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
+        } else {
+          for (const t of list) {
+            const s = struckOf(t.eid)
+            if (touch(sim, src, t.eid)) struck.push(s)
+          }
+        }
+        applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
+      } else {
+        const allies: number[] = []
+        eachAlly(sim, src.faction, ox, oy, Infinity, AllShape.downed[e] === 1, (t) => {
+          allies.push(t)
+        }, src.realm)
+        applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf), angle)
+        for (const t of allies) {
+          if (!Alive.v[t]) continue
+          CharFlash.until[t] = sim.fxMs + 320
+          Tint.color[t] = color !== 0 ? color : 0xffe082
+          Tint.effect[t] = 0
+        }
+      }
+      const fxR = Payload.fxRadius[e]!
+      if (fxR > 0) {
+        spawnFxCircle(sim, ox, oy, fxR, { fill: color, fillAlpha: 0.3, stroke: color, lineWidth: 4, lineAlpha: 0.9, fromScale: 0.4, toScale: 3, durationMs: 550, depth: 20 })
+      }
+      return true
+    }
+
+    case 'zone': {
+      const follow = ZoneShape.follow[e] === 1
+      if (follow && Aura.zone[e] !== 0) return false
+      const spec = {
+        x: ox,
+        y: oy,
+        radius: ZoneShape.radius[e]!,
+        src: flying(src),
+        durationMs: ZoneShape.durationMs[e]!,
+        enterMs: ZoneShape.enterMs[e]!,
+        color: ZoneShape.color[e]!,
+        fillAlpha: ZoneShape.fillAlpha[e]!,
+        lineAlpha: ZoneShape.lineAlpha[e]!,
+        lineWidth: ZoneShape.lineWidth[e]!,
+        tickMs: ZoneShape.tickMs[e]!,
+        damage,
+        mend: ZoneShape.mend[e]!,
+        effects: onHit,
+        follow: follow ? { of: Anchor.eid[e]!, owner: e } : undefined,
+        rules: zoneRules[e],
+      }
+      const pulseMs = ZoneShape.pulseMs[e]!
+      // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
+      const zone = spawnZone(sim, spec)
+      if (follow) Aura.zone[e] = zone
+      if (pulseMs > 0) {
+        spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0, rules: undefined })
+      }
+      return true
+    }
+
+    case 'summon': {
+      const count = SummonShape.count[e]!
+      for (let i = 0; i < count; i++) spawnBee(sim, e, i)
+      return true
+    }
+
+    case 'emplace': {
+      const n = EmplaceShape.count[e]!
+      const r = EmplaceShape.spread[e]!
+      const life = EmplaceShape.lifeMs[e]!
+      if (n <= 1 || r <= 0) {
+        place(sim, e, undefined, life)
+        return true
+      }
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI * 2) / n
+        const at = sim.hooks.constrainBody(sim, Owner.eid[e]!, { x: ox, y: oy }, { x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r })
+        place(sim, e, at, life)
+      }
+      return true
+    }
+
+    case 'world': {
+      applyAbilityEffects(sim, src, onHit, { x: ox, y: oy, baseDamage: damage, angle })
+      return true
+    }
+    default:
+      return unhandledShape(abilityDef[e]!.shape)
   }
-  return false
+}
+
+function unhandledShape(shape: never): never {
+  throw new Error(`能力的形状没有出手的处理：${JSON.stringify(shape)}`)
 }
 
 /** 能镜像的形状：从出手点打出去、不挪动施法者自己的 */

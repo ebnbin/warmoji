@@ -64,9 +64,75 @@ export function childEffects(fx: Effect): readonly EffectList[] {
       return [fx.onCross]
     case 'tether':
       return [fx.onHold, fx.onBreak]
-    default:
+    case 'damage':
+    case 'hpDamage':
+    case 'blast':
+    case 'poison':
+    case 'heal':
+    case 'healRatio':
+    case 'revive':
+    case 'reviveCut':
+    case 'undead':
+    case 'stun':
+    case 'root':
+    case 'silence':
+    case 'disarm':
+    case 'grounded':
+    case 'fear':
+    case 'charm':
+    case 'berserk':
+    case 'stasis':
+    case 'taunt':
+    case 'sleep':
+    case 'slow':
+    case 'attackSlow':
+    case 'morph':
+    case 'exhaust':
+    case 'interrupt':
+    case 'timeStop':
+    case 'buff':
+    case 'guard':
+    case 'invuln':
+    case 'untargetable':
+    case 'unstoppable':
+    case 'cleanse':
+    case 'spellShield':
+    case 'frontGuard':
+    case 'undying':
+    case 'hide':
+    case 'stealth':
+    case 'reveal':
+    case 'grow':
+    case 'pull':
+    case 'swap':
+    case 'warp':
+    case 'drag':
+    case 'attach':
+    case 'rewind':
+    case 'realm':
+    case 'devour':
+    case 'detonate':
+    case 'refresh':
+    case 'gain':
+    case 'portal':
+    case 'spawn':
+    case 'raise':
+    case 'shadow':
+    case 'shadowSwap':
+    case 'recall':
+    case 'steal':
+    case 'coins':
+    case 'interest':
+    case 'vanish':
       return []
+    default:
+      return unlisted(fx)
   }
+}
+
+/** 新效果须在上面写明套不套效果：漏写编译不过 */
+function unlisted(fx: never): never {
+  throw new Error(`效果没有登记套着的效果：${JSON.stringify(fx)}`)
 }
 
 /** 能力直接带的效果：命中、自身、出手前、击杀、强化、弹匣末发，领域还有脉冲、到期与停留 */
