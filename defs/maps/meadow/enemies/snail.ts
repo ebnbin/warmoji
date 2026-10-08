@@ -1,0 +1,32 @@
+import type { EnemyDef } from '../../../../src/types/enemies'
+import { patch } from '../../../kit.ts'
+
+const SNAIL = {
+  kind: 'snail',
+  emoji: '1f40c',
+  name: '蜗牛',
+  element: 'wood',
+  desc: '慢吞吞地爬，壳很硬；爬过的地方留下一道黏液，踩上去走不动',
+  size: 1.2,
+  radius: 0.46,
+  span: [0, 0],
+  hp: 80,
+  stats: { armor: 6 },
+  speed: 0.55,
+  damage: 5,
+  xp: 4,
+  coins: 3,
+  drive: { kind: 'chase' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 900,
+      firstDelayMs: 0,
+      aim: 'self',
+      shape: { kind: 'world' },
+      onHit: [{ kind: 'ground', def: patch(0.7, 4500, 0xc5e1a5, [{ kind: 'slow', factor: 0.5, durationMs: 600 }]) }],
+    },
+  ],
+} satisfies EnemyDef
+
+export default SNAIL
