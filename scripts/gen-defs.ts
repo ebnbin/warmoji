@@ -23,6 +23,7 @@ import { RUNS } from '../defs/runs.ts'
 import { SFX } from '../defs/sfx.ts'
 import { STAMINA } from '../defs/stamina.ts'
 import { STATS } from '../defs/stats.ts'
+import { STATUSES } from '../defs/statuses.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
@@ -56,9 +57,10 @@ import { animIssues } from '../src/emoji/animCheck.ts'
 import { packSvg, parseEmojiPack } from '../src/emoji/pack.ts'
 import { splitSvg } from '../src/emoji/svgSplit.ts'
 import type { Issue } from '../src/data/runCheck.ts'
-import type { AbilityDef } from '../src/types/abilityDefs'
+import type { AbilityDef, Cond, CondWho } from '../src/types/abilityDefs'
+import type { StatusDef } from '../src/types/statuses'
 import type { CharacterAuthoring } from '../src/types/characters'
-import type { EnemyDef, EnemyKind } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind, UnitBase } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
@@ -702,11 +704,18 @@ for (const [id, e] of Object.entries<EnemyDef>(ENEMIES)) checkStamina(e.stats, `
 
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   need(new Set(c.tags).size === c.tags.length, `characters.${id}.tags 不能重复`)
-  for (const k of [0, 1]) {
+  for (let k = 0; k < MAX_CHAR_LEVEL - 1; k++) {
     const tiers = [...c.weapons.map((w) => WEAPONS[w].upgrades[k]), ...c.innate.map((i) => i.upgrades[k])]
     const names = new Set(tiers.flatMap((t) => (t ? [t.card.name] : [])))
     need(names.size === 1, `characters.${id} 第 ${k + 1} 档升级卡须存在且各载体一致`)
   }
+  for (const u of [...c.weapons.map((w) => WEAPONS[w].upgrades), ...c.innate.map((i) => i.upgrades)]) need(u.length < MAX_CHAR_LEVEL, `characters.${id} 的载体升级档不能多过等级上限：${u.length} 档`)
+  need(LEVEL_STATS[id as keyof typeof LEVEL_STATS].length === MAX_CHAR_LEVEL - 1, `levels.${id} 须给 2 到 ${MAX_CHAR_LEVEL} 级每一级写属性`)
+}
+
+const units: [string, UnitBase][] = [...Object.values(ENEMIES).flatMap(withNested).map((e): [string, UnitBase] => [`enemies.${e.kind}`, e]), ...Object.entries<UnitBase>(CHARACTERS).map(([id, c]): [string, UnitBase] => [`characters.${id}`, c])]
+for (const [at, u] of units) {
+  for (const on of ['lowHp', 'idle', 'death'] as const) need((u.reactions ?? []).filter((r) => r.on === on).length <= 1, `${at} 的 ${on} 反应最多一条`)
 }
 
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {
@@ -852,6 +861,11 @@ for (const [id, m] of Object.entries<MutatorDef>(MUTATORS)) {
   report(`mutators.${id}.rules`, CHECKS.rules(m.rules))
 }
 
+/** 条件里每一处看的是谁 */
+function condWhos(c: Cond): CondWho[] {
+  return c.kind === 'all' || c.kind === 'any' ? c.of.flatMap(condWhos) : c.kind === 'not' ? condWhos(c.cond) : [c.who]
+}
+
 const itemEmojis = new Map<string, string>()
 for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(PACK.has(i.emoji), `items.${id} 的 emoji 不在表情包里：${i.emoji}`)
@@ -859,6 +873,7 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(dup === undefined, `items.${id} 与 items.${dup} 用了同一个 emoji`)
   itemEmojis.set(i.emoji, id)
   need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
+  for (const w of i.when ?? []) if ('if' in w) need(!condWhos(w.if).includes('target'), `items.${id}.when 的条件没有目标可看，只能看 self`)
 }
 
 /** 障碍：标准身体至少两层、跨得过贴地的一层，跨不过平射飞的那一层；贯穿次数是非负整数，强度为正 */
@@ -1023,9 +1038,20 @@ const TABLES = {
   sfx: SFX,
   stamina: STAMINA,
   stats: STATS,
+  statuses: STATUSES,
   team: TEAM_BASELINE,
   timestop: TIMESTOP,
   weapons: WEAPONS,
+}
+
+/** 状态：底色的轻重、强制行为的先后各不相同；种类编号放得进一个字节 */
+{
+  const list = Object.entries(STATUSES) as [string, StatusDef][]
+  need(list.length < 255, `状态有 ${list.length} 种，超过了一个字节`)
+  const ranks = list.flatMap(([, d]) => (d.tint ? [d.tint.rank] : []))
+  need(new Set(ranks).size === ranks.length, `状态的底色轻重有重复：${ranks.join(',')}`)
+  const order = list.flatMap(([, d]) => (d.forces ? [d.forces.priority] : []))
+  need(new Set(order).size === order.length, `状态的强制行为先后有重复：${order.join(',')}`)
 }
 
 /** 键名里带 emoji 或 icon 的字段都是表情包里的码位，缺图的单位到运行时只会隐形 */

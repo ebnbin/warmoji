@@ -1,8 +1,8 @@
 import { modLines, modTexts } from '../data/stats'
 import type { ModLine } from '../data/stats'
-import { abilityStatLines, effectLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
-import type { Effect } from '../types/abilityDefs'
-import type { GearCond, GearGrow, GearTrigger, GearWhen, ItemDef, Trait } from '../types/items'
+import { abilityStatLines, condLine, effectLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
+import type { Cond, Effect } from '../types/abilityDefs'
+import type { GearCount, GearGrow, GearWhen, ItemDef, ItemReaction, Trait } from '../types/items'
 
 export const TRAIT_LABEL: Record<Trait, string> = {
   ...SHAPE_LABEL,
@@ -14,7 +14,9 @@ export const TRAIT_LABEL: Record<Trait, string> = {
   heal: '治疗',
 }
 
-function condText(c: GearCond): string {
+/** 持有者的条件：常见的几种按道具的口吻说，其余照能力的说法 */
+function condText(c: Cond): string {
+  if (c.kind === 'all' || c.kind === 'any' || c.kind === 'not' || c.who !== 'self') return `${condLine(c)}时`
   switch (c.kind) {
     case 'still':
       return '站着不动时'
@@ -28,6 +30,13 @@ function condText(c: GearCond): string {
       return `身边 ${grid(c.radius)} 内没有敌人时`
     case 'afterSkill':
       return `放主动技能后 ${sec(c.ms)} 内`
+    default:
+      return `${condLine(c)}时`
+  }
+}
+
+function countText(c: GearCount): string {
+  switch (c.kind) {
     case 'foesNear':
       return `身边 ${grid(c.radius)} 内每有一个敌人`
     case 'waveTime':
@@ -38,11 +47,11 @@ function condText(c: GearCond): string {
 }
 
 function whenLine(w: GearWhen): string {
-  const cap = 'max' in w ? `，最多 ${w.max} 层${w.if.kind === 'unhurt' ? '，受伤清零' : ''}` : ''
-  return `${condText(w.if)}：${modTexts(w.stats).join('，')}${cap}`
+  if ('count' in w) return `${countText(w.count)}：${modTexts(w.stats).join('，')}，最多 ${w.max} 层${w.count.kind === 'unhurt' ? '，受伤清零' : ''}`
+  return `${condText(w.if)}：${modTexts(w.stats).join('，')}`
 }
 
-function onText(t: GearTrigger): string {
+function onText(t: ItemReaction): string {
   switch (t.on) {
     case 'hit':
       return '命中时'
@@ -66,21 +75,22 @@ function onText(t: GearTrigger): string {
 }
 
 /** 爆开写明在哪、打多少；落在尸体处的写明从哪来，改受伤倍率的写明改谁；其余效果照常 */
-function triggerEffect(t: GearTrigger, e: Effect): string {
+function triggerEffect(t: ItemReaction, e: Effect): string {
   if (e.kind === 'blast') {
-    const where = t.to === 'self' ? '在身边' : t.to === 'corpse' ? '在尸体处' : '在目标处'
+    const where = t.to === 'self' ? '在身边' : t.to === 'spot' ? '在尸体处' : '在目标处'
     const hurt = t.damage === undefined ? `波及这一下 ${pct(e.ratio)} 的伤害` : `造成 ${Math.round(t.damage * e.ratio)} 伤害`
     return `${where}爆开 ${grid(e.radius)}，${hurt}`
   }
   const line = effectLine(e, t.to === 'self')
-  if (t.to === 'corpse') return `从尸体处${line}`
+  if (t.to === 'spot') return `从尸体处${line}`
   return e.kind === 'guard' ? `让${t.to === 'self' ? '自己' : '目标'}${line}` : line
 }
 
-function triggerLine(t: GearTrigger): string {
+function triggerLine(t: ItemReaction): string {
   const chance = 'chance' in t && t.chance !== undefined ? ` ${pct(t.chance)} 几率` : ''
-  const who = t.to === 'foe' && (t.on === 'dodge' || t.on === 'hurt') ? '对出手者' : ''
-  return `${onText(t)}${chance}${t.on === 'lethal' ? '，' : '：'}${who}${t.effects.map((e) => triggerEffect(t, e)).join('，')}`
+  const cond = t.if ? `、${condText(t.if)}` : ''
+  const who = t.to === 'other' && (t.on === 'dodge' || t.on === 'hurt') ? '对出手者' : ''
+  return `${onText(t)}${cond}${chance}${t.on === 'lethal' ? '，' : '：'}${who}${t.effects.map((e) => triggerEffect(t, e)).join('，')}`
 }
 
 function growLine(g: GearGrow): string {
@@ -93,7 +103,7 @@ export function itemEffects(def: ItemDef): ModLine[] {
   return [
     ...(def.stats ? modLines(def.stats) : []),
     ...(def.when ?? []).map((w) => note(whenLine(w))),
-    ...(def.on ?? []).map((t) => note(triggerLine(t))),
+    ...(def.reactions ?? []).map((t) => note(triggerLine(t))),
     ...(def.ability ? [note(`自动出手：${abilityStatLines(def.ability).join('，').replaceAll(' · ', '，')}`)] : []),
     ...(def.grow ? [note(growLine(def.grow))] : []),
   ]

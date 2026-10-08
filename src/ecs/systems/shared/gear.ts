@@ -9,14 +9,15 @@ import { HIT } from '../../utils/hitTags'
 import { isSameEntity } from '../../utils/identity'
 import { applyAbilityEffects, casterOf } from './effects'
 import type { Point } from '../../../util/vec'
-import type { GearEvent, GearTrigger, GearWhen, ItemId } from '../../../types/items'
+import type { GearWhen, ItemEvent, ItemId, ItemReaction } from '../../../types/items'
+import { test } from '../../utils/cond'
 import type { Source } from '../../utils/source'
 import type { EcsWorld } from '../../world'
 import type { Sim } from '../../sim'
 
-/** 装好的一条触发：同一件道具有几件，带几率的几率相加（最多必定），不带的施加几次 */
+/** 装好的一条反应：同一件道具有几件，带几率的几率相加（最多必定），不带的施加几次 */
 interface Armed {
-  readonly t: GearTrigger
+  readonly t: ItemReaction
   readonly chance: number
   readonly times: number
 }
@@ -24,18 +25,18 @@ interface Armed {
 /** 角色身上道具汇总出的规则：条件属性每件一份，触发按时机分好 */
 export interface GearRules {
   readonly when: readonly GearWhen[]
-  readonly on: { readonly [E in GearEvent]?: readonly Armed[] }
+  readonly on: { readonly [E in ItemEvent]?: readonly Armed[] }
 }
 
 function compile(owned: readonly ItemId[]): GearRules | undefined {
   const count = new Map<ItemId, number>()
   for (const id of owned) count.set(id, (count.get(id) ?? 0) + 1)
   const when: GearWhen[] = []
-  const on: { [E in GearEvent]?: Armed[] } = {}
+  const on: { [E in ItemEvent]?: Armed[] } = {}
   for (const [id, n] of count) {
     const def = ITEMS[id]
     for (const w of toPx(def.when ?? [])) for (let i = 0; i < n; i++) when.push(w)
-    for (const t of toPx(def.on ?? [])) {
+    for (const t of toPx(def.reactions ?? [])) {
       const chance = 'chance' in t ? t.chance : undefined
       const list = (on[t.on] ??= [])
       list.push(chance === undefined ? { t, chance: 1, times: n } : { t, chance: Math.min(1, chance * n), times: 1 })
@@ -57,14 +58,15 @@ export function armGear(world: EcsWorld, eid: number, owned: readonly ItemId[]):
 /** 正在施加道具的效果：这期间的命中、击杀与受伤不再触发道具 */
 let busy = false
 
-/** 按几率施加一组触发：self 在持有者身上，foe 在对手身上（对手没了就只落在 at），corpse 落在 at */
+/** 按条件与几率施加一组反应：self 在持有者身上，other 在对手身上（对手没了就只落在 at），spot 落在 at */
 function fire(sim: Sim, holder: number, list: readonly Armed[] | undefined, at: Point, foe: number, base: number): void {
   if (!list || busy) return
   busy = true
   const src: Source = { ...selfSource(sim, holder), noCrit: true }
   for (const a of list) {
+    if (a.t.if && !test(sim, src, holder, foe, a.t.if)) continue
     if (a.chance < 1 && sim.rng.next() >= a.chance) continue
-    const on = a.t.to === 'self' ? holder : a.t.to === 'foe' ? foe : -1
+    const on = a.t.to === 'self' ? holder : a.t.to === 'other' ? foe : -1
     const spot = on >= 0 ? { x: Transform.x[on]!, y: Transform.y[on]!, targets: [on] } : { x: at.x, y: at.y, targets: [] }
     for (let i = 0; i < a.times; i++) applyAbilityEffects(sim, src, a.t.effects, { ...spot, baseDamage: a.t.damage ?? base })
   }

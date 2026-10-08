@@ -1,7 +1,7 @@
 import { ITEMS, ITEM_IDS, RARITY_ORDER } from '../data/items'
 import { abilityEffects, childAbilities, childEffects } from '../data/abilities'
 import { loadoutFor } from '../data/characters'
-import { CHAR_XP_THRESHOLDS, MAX_CHAR_LEVEL, characterLevel, tiersForLevel } from '../data/charLevel'
+import { CHAR_XP_THRESHOLDS, MAX_CHAR_LEVEL, characterLevel } from '../data/charLevel'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import type { ItemDef, ItemId, ItemRarity, Trait } from '../types/items'
 import type { AbilityDef, Effect } from '../types/abilityDefs'
@@ -46,9 +46,8 @@ function effectTraits(list: readonly Effect[] | undefined, out: Set<Trait>): boo
       case 'heal':
         out.add('heal')
         break
-      case 'spawn':
-      case 'clone':
-        out.add('summon')
+      case 'summon':
+        if (fx.of !== 'victim') out.add('summon')
         break
       default:
         break
@@ -94,7 +93,7 @@ function abilityTraits(a: AbilityDef, out: Set<Trait>): void {
 /** 角色这个等级的打法：看普通出手（含各形态的），治疗还看主动技能 */
 export function characterTraits(def: CharacterDef, level: number): ReadonlySet<Trait> {
   const out = new Set<Trait>()
-  for (const a of loadoutFor(def, tiersForLevel(level))) abilityTraits(a, out)
+  for (const a of loadoutFor(def, level)) abilityTraits(a, out)
   for (const f of def.forms ?? []) for (const a of f.abilities ?? []) abilityTraits(a, out)
   const skill = new Set<Trait>()
   abilityTraits(def.skill.ability, skill)

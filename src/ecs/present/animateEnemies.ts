@@ -1,8 +1,8 @@
 import { query } from 'bitecs'
-import { Casting, Depth, ENEMY_SET, EnemyPhase, MARK, Motion, MOTION, Phys, Sprite, TELEGRAPH, Transform } from '../components'
+import { Casting, Depth, ENEMY_SET, EnemyPhase, Motion, MOTION, Phys, Sprite, TELEGRAPH, Transform } from '../components'
 import { enemyZ } from '../entities/enemy'
 import { footY } from '../utils/ground'
-import { hasMark } from '../utils/marks'
+import { isHalted } from '../utils/marks'
 import { leaderX, leaderY } from '../utils/team'
 import { UNIT } from '../../util/units'
 import type { Sim } from '../sim'
@@ -14,7 +14,7 @@ export function animateEnemies(sim: Sim): void {
   const ly = leaderY(sim)
   for (const eid of query(sim.world, ENEMY_SET)) {
     Depth.z[eid] = enemyZ(sim.hooks.worldDelta(sim, lx, ly, Transform.x[eid]!, footY(sim.world, eid)).y / UNIT)
-    if (hasMark(sim, eid, MARK.morph) || hasMark(sim, eid, MARK.stun) || hasMark(sim, eid, MARK.stasis)) continue
+    if (isHalted(sim, eid)) continue
     if (Motion.kind[eid] === MOTION.dash) {
       const vx = Motion.vx[eid]!
       Transform.rot[eid] = (vx / (Math.hypot(vx, Motion.vy[eid]!) || 1)) * 0.3

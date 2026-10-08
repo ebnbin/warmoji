@@ -1,20 +1,6 @@
 import { MARK, Motion, Seen, Tint, TRANSIT, Uid } from '../components'
-import { hasMark, inTransit, isAirborne, isHidden } from './marks'
+import { hasMark, inTransit, isAirborne, isHidden, TINTED } from './marks'
 import type { Sim } from '../sim'
-
-/** 身上控制的底色，按轻重排：静止、亡后残留、眩晕、睡眠、恐惧、魅惑、倒戈、击飞、定身、沉默、致盲、身在异界；没有控制返回 0 */
-const TINTS: readonly (readonly [number, number])[] = [
-  [MARK.stasis, 0xb3e5fc],
-  [MARK.undead, 0x90a4ae],
-  [MARK.stun, 0xff9ff3],
-  [MARK.sleep, 0xb39ddb],
-  [MARK.fear, 0x9575cd],
-  [MARK.charm, 0xff80ab],
-  [MARK.berserk, 0xff5252],
-  [MARK.root, 0xbcaaa4],
-  [MARK.silence, 0xcfd8dc],
-  [MARK.disarm, 0x9e9e9e],
-]
 
 const REALM_TINT = 0x9575cd
 
@@ -41,10 +27,10 @@ export function hostShown(host: number): number {
   return Tint.alpha[host]!
 }
 
-/** 身上的底色：穿行中是穿行的颜色（吊起的不染色），其余按控制的轻重排 */
+/** 身上的底色：穿行中是穿行的颜色（吊起的不染色），其余按状态表里底色的轻重，再是被抛在空中、身在异界；什么都没有返回 0 */
 export function statusTint(sim: Sim, eid: number): number {
   if (inTransit(eid)) return Motion.look[eid] === TRANSIT.hoist ? 0 : Motion.color[eid]!
-  for (const [kind, color] of TINTS) if (hasMark(sim, eid, kind)) return color
+  for (const { kind, color } of TINTED) if (hasMark(sim, eid, kind)) return color
   if (isAirborne(eid)) return 0xfff59d
   return hasMark(sim, eid, MARK.realm) ? REALM_TINT : 0
 }

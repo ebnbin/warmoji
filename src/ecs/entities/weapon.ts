@@ -33,21 +33,21 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
   const e = newEntity(world)
   const outline = holderOutline(faction, holderEid)
   attachDrawable(world, e, sim.frames, {
-    id: held.emoji,
+    id: held.look.emoji,
     outline,
     x: Transform.x[holderEid]!,
     y: Transform.y[holderEid]!,
-    size: held.size,
+    size: held.look.size,
     z: 13,
   })
   addComponents(world, e, Held, Mounted)
   Mounted.host[e] = holderEid
   Mounted.show[e] = 1
   Held.restOffset[e] = held.restOffset
-  Held.rotOffset[e] = held.rotationOffsetDeg * DEG2RAD
+  Held.rotOffset[e] = (held.look.rotationOffsetDeg ?? 0) * DEG2RAD
   Held.side[e] = held.mountSide ?? 0
   Held.gap[e] = held.mountGap ?? 0
-  Held.size[e] = held.size
+  Held.size[e] = held.look.size
   return e
 }
 

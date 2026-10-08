@@ -1,9 +1,11 @@
-import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
+import type { Effect, Selector } from '../../../types/abilityDefs'
+import type { Found } from '../../utils/targets'
+import { test } from '../../utils/cond'
 import { circleHitIndices } from '../../utils/hit'
 import { TRANSIT_MS } from '../../../data/abilities'
 import { hasComponent, query } from 'bitecs'
 import { Ability, Alive, Anchored, Boss, Cd, Charges, Elite, Enemy, FACTION, Faction, Grow, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, Stats, TAG, Trace, Transform, Uid } from '../../components'
-import { addCc, addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
+import { addCc, addMark, CC_MARKS, CLEANSED, isSteadfast, markSlot, statusDef } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
 import { gainRes } from './resource'
@@ -24,7 +26,9 @@ import { spawnCoins } from '../../entities/pickup'
 import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
-import { healAllies } from './heal'
+import { fireAbility } from './fire'
+import { grantedAbility } from '../../entities/ability'
+import { healAllies, mend } from './heal'
 import { eachAlly, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
 import { aimLayer, BLAST_M, bandAt, breachAt, covered, FLOOR, hiOf, layerZ, loOf, STANDARD } from '../../utils/pass'
@@ -35,6 +39,7 @@ import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
 import { spawnFxCircle, spawnFxRing } from '../../entities/fx'
+import { withDeath } from '../../../data/reactions'
 
 interface HitCtx {
   readonly x: number
@@ -89,23 +94,6 @@ export const STORE_DEF = new Interned<EffectOfKind<'store'>>()
 export const DEATH_DEF = new Interned<EffectOfKind<'deathMark'>>()
 export const EMPOWER_DEF = new Interned<EffectOfKind<'empower'>>()
 
-const MARK_OF: Record<MarkName, number> = {
-  stun: MARK.stun,
-  root: MARK.root,
-  sleep: MARK.sleep,
-  fear: MARK.fear,
-  charm: MARK.charm,
-  slow: MARK.slow,
-  poison: MARK.poison,
-  silence: MARK.silence,
-  disarm: MARK.disarm,
-  stasis: MARK.stasis,
-  fuse: MARK.fuse,
-  stack: MARK.stack,
-  store: MARK.store,
-  deathMark: MARK.deathMark,
-}
-
 /** 加一条记着来源的标记：按来源分开记的以来源身体的编号为 ref */
 export function markFrom(t: number, kind: number, until: number, a: number, b: number, src: Source): number {
   const s = addMark(t, kind, TAG.effect, until, a, b, 0, src.bodyUid ?? 0)
@@ -115,25 +103,6 @@ export function markFrom(t: number, kind: number, until: number, a: number, b: n
 
 export function markSource(t: number, s: number): Source | undefined {
   return markSrcs[t]?.[s - t * MARK_SLOTS]
-}
-
-/** 条件：对目标判断；叠层、引信、存伤、死亡印记只认这个来源的 */
-export function test(sim: Sim, src: Source, t: number, cond: Cond): boolean {
-  switch (cond.kind) {
-    case 'airborne':
-      return isAirborne(t)
-    case 'marked': {
-      const kind = MARK_OF[cond.mark]
-      const keyed = kind === MARK.fuse || kind === MARK.stack || kind === MARK.store || kind === MARK.deathMark
-      return markSlot(sim, t, kind, keyed ? (src.bodyUid ?? 0) : 0) >= 0
-    }
-    case 'hpBelow':
-      return Hp.max[t]! > 0 && Hp.v[t]! / Hp.max[t]! < cond.ratio
-    case 'boss':
-      return Boss.v[t] === 1
-    case 'not':
-      return !test(sim, src, t, cond.cond)
-  }
 }
 
 /** 冷却：转好或减少；充能的补一次 */
@@ -176,6 +145,22 @@ export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | u
   applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: live, exclude: new Set(live), angle })
 }
 
+/** 按选择器从落点 (x, y) 选出身体：敌方是这一下打得到的，同伴按所在的界；再筛、排、取前几个 */
+function select(sim: Sim, src: Source, x: number, y: number, who: Exclude<Selector, { readonly side: 'self' }>): number[] {
+  let found: Found[] = []
+  if (who.side === 'foes') found = covered(sim, src, x, y, targetsWithin(sim, src, x, y, who.radius))
+  else eachAlly(sim, src.faction, x, y, who.radius, false, (eid, ax, ay, radius) => void found.push({ eid, x: ax, y: ay, radius }), src.realm)
+  if (who.filter) {
+    const self = casterOf(sim, src)
+    const cond = who.filter
+    found = found.filter((t) => test(sim, src, self, t.eid, cond))
+  }
+  if (who.sort === 'nearest') found.sort((a, b) => (a.x - x) ** 2 + (a.y - y) ** 2 - ((b.x - x) ** 2 + (b.y - y) ** 2))
+  else if (who.sort === 'weakest') found.sort((a, b) => Hp.v[a.eid]! / Hp.max[a.eid]! - Hp.v[b.eid]! / Hp.max[b.eid]!)
+  const picked = found.map((t) => t.eid)
+  return who.count === undefined ? picked : picked.slice(0, who.count)
+}
+
 function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
   for (const t of at.targets ?? []) {
     if (hasComponent(sim.world, t, comp)) apply(t)
@@ -188,6 +173,16 @@ type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K]
 
 /** 效果只看目标有没有对应的组件；金币只对队伍来源生效 */
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
+  status: (sim, _src, fx, at) => {
+    const kind = MARK[fx.status]
+    const def = statusDef(kind)!
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => {
+      const on = def.cc ? addCc(sim, t, kind, until, fx.value ?? 0) : addMark(t, kind, TAG.effect, until, fx.value ?? 0) >= 0
+      if (on && def.interrupts) interrupt(sim, t)
+    })
+  },
+
   blast: (sim, src, fx, at) => {
     applyBlast(sim, src, at.x, at.y, at.baseDamage * fx.ratio, fx.radius, fx.knockback, at.exclude)
     breachAt(sim, at.x, at.y, BLAST_M, fx.radius, fx.breach ?? 0)
@@ -209,7 +204,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   morph: (sim, _src, fx, at) => {
     eachCapable(sim, at, Enemy, (t) => {
-      if (!hasMark(sim, t, MARK.unstoppable)) applyMorph(sim, sim.frames, t, fx)
+      if (!isSteadfast(sim, t)) applyMorph(sim, sim.frames, t, fx)
     })
   },
 
@@ -249,31 +244,35 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (fx.scope === 'lowest') {
       let best = hurt[0]!
       for (const t of hurt) if (Hp.v[t]! / Hp.max[t]! < Hp.v[best]! / Hp.max[best]!) best = t
-      Hp.v[best] = Math.min(Hp.max[best]!, Hp.v[best]! + each)
+      mend(best, each)
       return
     }
-    for (const t of hurt) Hp.v[t] = Math.min(Hp.max[t]!, Hp.v[t]! + each)
+    for (const t of hurt) mend(t, each)
   },
 
   spawnProjectile: (sim, src, fx, at) => {
     const t = nearestTarget(sim, src, at.x, at.y, Infinity)
     if (!t) return
+    const p = fx.projectile
     spawnBolt(sim, at.x, at.y, Math.atan2(t.y - at.y, t.x - at.x), {
       faction: src.faction,
-      frame: sim.frames.index(fx.projectile.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
-      size: fx.projectile.size,
-      radius: fx.projectile.radius,
-      speed: fx.projectile.speed,
-      rotOffsetDeg: fx.projectile.rotationOffsetDeg,
+      frame: sim.frames.index(p.look.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
+      size: p.look.size,
+      radius: p.radius,
+      speed: p.speed,
+      rotOffsetDeg: p.look.rotationOffsetDeg ?? 0,
       lifeMs: fx.lifeMs,
       pierce: 0,
       damage: fx.damage,
       knockback: 0,
       src: flying(src),
       onHit: fx.onHit,
-      homingDeg: fx.projectile.homingDeg,
-      linger: fx.projectile.linger,
+      homingDeg: p.flight?.kind === 'homing' ? p.flight.degPerSec : undefined,
+      linger: p.linger,
       h: layerZ(aimLayer(STANDARD[0], STANDARD[1], loOf(sim.world, t.eid), hiOf(sim.world, t.eid))),
+      arc: p.flight?.kind === 'arc' ? p.flight.peakM : undefined,
+      reach: Math.hypot(t.x - at.x, t.y - at.y),
+      split: p.split,
     })
   },
 
@@ -338,7 +337,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   healRatio: (sim, _src, fx, at) => {
     eachCapable(sim, at, Hp, (t) => {
-      if (Alive.v[t]) Hp.v[t] = Math.min(Hp.max[t]!, Hp.v[t]! + Hp.max[t]! * fx.ratio)
+      if (Alive.v[t]) mend(t, Hp.max[t]! * fx.ratio)
     })
   },
 
@@ -437,7 +436,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   cleanse: (sim, _src, _fx, at) => {
-    eachCapable(sim, at, Mark, (t) => expireMarks(sim, t, [...CC_MARKS, MARK.slow]))
+    eachCapable(sim, at, Mark, (t) => expireMarks(sim, t, CLEANSED))
   },
 
   spellShield: (sim, _src, fx, at) => {
@@ -488,7 +487,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   knockup: (sim, src, fx, at) => {
     for (const t of at.targets ?? []) {
-      if (hasMark(sim, t, MARK.unstoppable)) continue
+      if (isSteadfast(sim, t)) continue
       if (displace(sim, t, { kind: 'arc', x: Transform.x[t]!, y: Transform.y[t]!, ms: fx.durationMs, height: fx.height }, { self: false, src, onLand: fx.onLand, base: at.baseDamage })) interrupt(sim, t)
     }
   },
@@ -498,7 +497,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const ox = by >= 0 ? Transform.x[by]! : at.x
     const oy = by >= 0 ? Transform.y[by]! : at.y
     for (const t of at.targets ?? []) {
-      if (t === by || hasMark(sim, t, MARK.unstoppable)) continue
+      if (t === by || isSteadfast(sim, t)) continue
       const d = sim.hooks.worldDelta(sim, ox, oy, Transform.x[t]!, Transform.y[t]!)
       const angle = Math.atan2(d.y, d.x)
       displace(sim, t, { kind: 'dash', angle, distance: fx.distance, ms: fx.ms }, { self: false, src, onWall: fx.onWall, base: at.baseDamage })
@@ -508,7 +507,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   throw: (sim, src, fx, at) => {
     const by = casterOf(sim, src)
     for (const t of at.targets ?? []) {
-      if (t === by || hasMark(sim, t, MARK.unstoppable)) continue
+      if (t === by || isSteadfast(sim, t)) continue
       const tx = Transform.x[t]!
       const ty = Transform.y[t]!
       let to: { x: number; y: number } | null = null
@@ -530,7 +529,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   if: (sim, src, fx, at) => {
     for (const t of at.targets ?? []) {
-      const then = test(sim, src, t, fx.when) ? fx.then : fx.else
+      const then = test(sim, src, casterOf(sim, src), t, fx.when) ? fx.then : fx.else
       if (then) applyAbilityEffects(sim, src, then, { ...at, targets: [t] })
     }
   },
@@ -599,20 +598,24 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     eachCapable(sim, at, Mark, (t) => addMark(t, MARK.empower, TAG.effect, Infinity, fx.hits, id))
   },
 
-  caster: (sim, src, fx, at) => {
-    const by = casterOf(sim, src)
-    if (by >= 0) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage, targets: [by] })
+  to: (sim, src, fx, at) => {
+    if (fx.who.side === 'self') {
+      const by = casterOf(sim, src)
+      if (by >= 0) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage, targets: [by] })
+      return
+    }
+    const picked = select(sim, src, at.x, at.y, fx.who)
+    if (picked.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: picked })
   },
 
-  area: (sim, src, fx, at) => {
-    const found = covered(sim, src, at.x, at.y, targetsWithin(sim, src, at.x, at.y, fx.radius)).map((t) => t.eid)
-    if (found.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: found })
+  chance: (sim, src, fx, at) => {
+    if (sim.rng.next() < fx.p) applyAbilityEffects(sim, src, fx.then, at)
   },
 
   swap: (sim, src, _fx, at) => {
     const by = casterOf(sim, src)
     const t = at.targets?.[0]
-    if (by < 0 || t === undefined || t === by || hasMark(sim, t, MARK.unstoppable)) return
+    if (by < 0 || t === undefined || t === by || isSteadfast(sim, t)) return
     const tx = Transform.x[t]!
     const ty = Transform.y[t]!
     const ms = TRANSIT_MS.swap
@@ -643,13 +646,25 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true)
   },
 
-  clone: (sim, src, fx) => {
+  summon: (sim, src, fx, at) => {
+    const of = fx.of
+    if (of === 'victim') {
+      if (at.victim !== undefined) raiseDead(sim, at.victim, src.faction, casterOf(sim, src), fx.lifeMs ?? Infinity, fx.hpRatio ?? 1, fx.onDeath)
+      return
+    }
     const by = casterOf(sim, src)
-    if (by >= 0) spawnClones(sim, by, fx.count, fx.lifeMs, fx.hpRatio, fx.dmgRatio, fx.onDeath)
+    if ('clone' in of) {
+      if (by >= 0) spawnClones(sim, by, fx.count, fx.lifeMs ?? Infinity, fx.hpRatio ?? 1, of.clone.dmgRatio, fx.onDeath)
+      return
+    }
+    const x = by >= 0 ? Transform.x[by]! : at.x
+    const y = by >= 0 ? Transform.y[by]! : at.y
+    spawnAround(sim, by, src.faction, fx.onDeath ? withDeath(of.unit, fx.onDeath) : of.unit, fx.count, of.spread, x, y, fx.lifeMs, fx.hpRatio)
   },
 
-  raise: (sim, src, fx, at) => {
-    if (at.victim !== undefined) raiseDead(sim, at.victim, src.faction, casterOf(sim, src), fx.lifeMs, fx.hpRatio)
+  cast: (sim, src, fx) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) fireAbility(sim, grantedAbility(sim, by, fx.ability))
   },
 
   devour: (sim, src, fx, at) => {
@@ -670,13 +685,6 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       if (!displace(sim, t, { kind: 'follow', host: by, ox: (d.x / len) * r, oy: (d.y / len) * r, ms: fx.ms }, { self: false, free: true })) continue
       addMark(t, MARK.untargetable, TAG.effect, until)
     }
-  },
-
-  spawn: (sim, src, fx, at) => {
-    const by = casterOf(sim, src)
-    const x = by >= 0 ? Transform.x[by]! : at.x
-    const y = by >= 0 ? Transform.y[by]! : at.y
-    spawnAround(sim, by, src.faction, fx.def, fx.count, fx.spread, x, y)
   },
 
   teleport: (sim, src, fx, at) => {
@@ -740,7 +748,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   interrupt: (sim, _src, _fx, at) => {
-    for (const t of at.targets ?? []) if (!hasMark(sim, t, MARK.unstoppable)) interrupt(sim, t)
+    for (const t of at.targets ?? []) if (!isSteadfast(sim, t)) interrupt(sim, t)
   },
 
   warp: (sim, src, fx, at) => {

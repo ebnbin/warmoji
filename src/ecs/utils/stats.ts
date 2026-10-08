@@ -1,25 +1,27 @@
 import { addComponent, hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { STATS, STAT_KEYS, StatFold, foldStats, stackMods } from '../../data/stats'
-import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK, MARK_SLOTS, Mark, Phys, Slot, Stamina, Stats, Summoned, Transform, Uid } from '../components'
+import { STATUSES, STATUS_IDS } from '../../data/statuses'
+import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK_SLOTS, Mark, Slot, Stamina, Stats, Summoned } from '../components'
 import { gearRules, statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
 import { fatigue, squadStamina, staminaLeft } from '../systems/shared/stamina'
 import { isSameEntity } from './identity'
 import type { StatBase, StatKey, StatLayer, StatMods, StatValues } from '../../types/stats'
-import type { GearCond, GearWhen } from '../../types/items'
+import type { GearCount, GearWhen } from '../../types/items'
+import { foesNear, test } from './cond'
+import { selfSource } from './source'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
 
-/** 限时的属性修正由效果以标记施加，按种类折进属性表；减速只取最强的一条 */
-const FROM_MARK: Partial<Record<number, { readonly stat: StatKey; readonly strongest?: boolean }>> = {
-  [MARK.dmg]: { stat: 'damage' },
-  [MARK.cd]: { stat: 'cooldown' },
-  [MARK.guard]: { stat: 'taken' },
-  [MARK.speed]: { stat: 'moveSpeed' },
-  [MARK.slow]: { stat: 'moveSpeed', strongest: true },
-  [MARK.grow]: { stat: 'scale' },
-}
+/** 限时的属性修正由效果以标记施加，按状态表折进属性表 */
+const FROM_MARK: readonly ({ readonly stat: StatKey; readonly strongest?: boolean } | undefined)[] = [
+  undefined,
+  ...STATUS_IDS.map((id) => {
+    const st = STATUSES[id].stat
+    return st ? { stat: st.key, strongest: st.strongest } : undefined
+  }),
+]
 
 const fold = new StatFold()
 
@@ -85,39 +87,10 @@ export function layerMul(eid: number, layer: StatLayer, k: StatKey): number {
   return v
 }
 
-/** 速度不超过它就算站着不动 */
-export const STILL = 0.3 * UNIT
-
-/** 身边 r 内活着的敌人数，敌人的体积也算 */
-function foesNear(sim: Sim, eid: number, r: number): number {
-  const x = Transform.x[eid]!
-  const y = Transform.y[eid]!
-  let n = 0
-  for (const t of sim.targets[FACTION.enemy]!) {
-    if (!t.alive || Uid.v[t.eid] !== t.uid) continue
-    const d = sim.hooks.worldDelta(sim, x, y, t.x, t.y)
-    const rr = r + t.radius
-    if (d.x * d.x + d.y * d.y <= rr * rr) n++
-  }
-  return n
-}
-
-/** 道具条件此刻数到几：满足与否是 1 或 0，可计数的照数 */
-function gearCount(sim: Sim, eid: number, c: GearCond): number {
+/** 可计数的条件此刻数到几 */
+function countOf(sim: Sim, eid: number, c: GearCount): number {
   const now = sim.elapsedMs
   switch (c.kind) {
-    case 'still':
-      return Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) <= STILL ? 1 : 0
-    case 'leader':
-      return eid === sim.leader ? 1 : 0
-    case 'follower':
-      return eid === sim.leader ? 0 : 1
-    case 'hpBelow':
-      return Hp.v[eid]! < Hp.max[eid]! * c.ratio ? 1 : 0
-    case 'noFoesNear':
-      return foesNear(sim, eid, c.radius) === 0 ? 1 : 0
-    case 'afterSkill':
-      return now - Gear.skillAt[eid]! < c.ms ? 1 : 0
     case 'foesNear':
       return foesNear(sim, eid, c.radius)
     case 'waveTime':
@@ -127,10 +100,10 @@ function gearCount(sim: Sim, eid: number, c: GearCond): number {
   }
 }
 
-/** 道具的条件属性：满足几层叠几层，可计数的封顶 */
+/** 道具的条件属性：条件成立加一份，可计数的数到几叠几份、封顶 */
 function condMods(sim: Sim, eid: number, when: readonly GearWhen[]): void {
   for (const w of when) {
-    const n = Math.min('max' in w ? w.max : 1, gearCount(sim, eid, w.if))
+    const n = 'count' in w ? Math.min(w.max, countOf(sim, eid, w.count)) : test(sim, selfSource(sim, eid), eid, eid, w.if) ? 1 : 0
     if (n > 0) fold.apply(stackMods(w.stats, n))
   }
 }

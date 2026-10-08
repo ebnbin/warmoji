@@ -1,9 +1,10 @@
 import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Disarmed, Frozen, Hp, Lifetime, MARK, Owner, Portal, PortCd, Radius, Ring, TAG, Tint, Transform, Uid, ZONE_SET, ZONE_WHO, Zone, ZoneFollow, ZoneHit } from '../components'
+import { Alive, Disarmed, Frozen, Lifetime, MARK, Owner, Portal, PortCd, Radius, Ring, TAG, Tint, Transform, Uid, ZONE_SET, ZONE_WHO, Zone, ZoneFollow, ZoneHit } from '../components'
 import { TRANSIT_MS } from '../../data/abilities'
 import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { displace } from './shared/displace'
+import { mend } from './shared/heal'
 import { backEaseOut } from '../utils/ease'
 import { addMark } from '../utils/marks'
 import { isSameEntity } from '../utils/identity'
@@ -147,10 +148,10 @@ export function updateZones(sim: Sim): void {
       port(sim, z, x, y, r)
       continue
     }
-    const mend = Zone.mend[z]! * attackOf(sim, src).healing
-    if (mend > 0) {
+    const rate = Zone.mend[z]! * attackOf(sim, src).healing
+    if (rate > 0) {
       eachAlly(sim, src.faction, x, y, r, false, (eid, tx, ty) => {
-        if (inside(x, y, r, tx, ty)) Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + mend * dt)
+        if (inside(x, y, r, tx, ty)) mend(eid, rate * dt)
       }, src.realm)
     }
     const pull = Zone.pull[z]!

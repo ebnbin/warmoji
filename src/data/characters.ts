@@ -7,14 +7,11 @@ import { ABILITIES } from './abilities'
 import type { AbilityDef } from '../types/abilityDefs'
 import { WEAPONS } from './weapons'
 import type { UpgradeCard, WeaponId } from '../types/weapons'
-import type { Carrier, CharacterAuthoring, CharacterDef, CharacterId, InnateSource, TeamBaseline, UpgradeTiers } from '../types/characters'
+import type { Carrier, CharacterAuthoring, CharacterDef, CharacterId, InnateSource, TeamBaseline } from '../types/characters'
+import { MAX_CHAR_LEVEL } from './charLevel'
 import { foldStats } from './stats'
 import { ROLES } from './roles'
 import type { StatBase, StatMods, StatValues } from '../types/stats'
-
-function tierLevel(tiers: UpgradeTiers): 0 | 1 | 2 {
-  return tiers.u2 ? 2 : tiers.u1 ? 1 : 0
-}
 
 function weaponCarrier(wid: WeaponId): Carrier {
   const w = WEAPONS[wid]
@@ -22,7 +19,7 @@ function weaponCarrier(wid: WeaponId): Carrier {
     name: w.name,
     icon: w.emoji,
     tiers: [w.base, ...w.upgrades.map((u) => u.ability)],
-    cards: [w.upgrades[0]?.card ?? null, w.upgrades[1]?.card ?? null],
+    cards: w.upgrades.map((u) => u.card),
   }
 }
 
@@ -31,7 +28,7 @@ function innateCarrier(i: InnateSource): Carrier {
     name: i.name,
     icon: i.icon,
     tiers: [ABILITIES[i.base], ...i.upgrades.map((u) => ABILITIES[u.ability])],
-    cards: [i.upgrades[0]?.card ?? null, i.upgrades[1]?.card ?? null],
+    cards: i.upgrades.map((u) => u.card),
   }
 }
 
@@ -47,7 +44,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
     resource: src.resource,
-    rules: src.rules,
+    reactions: src.reactions,
     forms: src.forms,
   }
 }
@@ -56,28 +53,24 @@ const CHARACTER_TABLE = fromJson<Record<CharacterId, CharacterAuthoring>>(charac
 export const CHARACTERS: Record<CharacterId, CharacterDef> = mapValues(CHARACTER_TABLE, hydrateCharacter)
 export const ROSTER_IDS: readonly CharacterId[] = keysOf(CHARACTERS)
 
-function carrierAbility(c: Carrier, level: 0 | 1 | 2): AbilityDef {
-  return c.tiers[Math.min(level, c.tiers.length - 1)]!
-}
-
-export function loadoutFor(def: CharacterDef, tiers: UpgradeTiers): readonly AbilityDef[] {
-  const level = tierLevel(tiers)
-  return def.carriers.map((c) => carrierAbility(c, level))
+/** 角色在这一级时各载体用的能力 */
+export function loadoutFor(def: CharacterDef, level: number): readonly AbilityDef[] {
+  return def.carriers.map((c) => c.tiers[Math.min(Math.min(level, MAX_CHAR_LEVEL), c.tiers.length) - 1]!)
 }
 
 export function baseLoadout(def: CharacterDef): readonly AbilityDef[] {
   return def.carriers.map((c) => c.tiers[0]!)
 }
 
-export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, UpgradeCard] {
-  const pick = (k: 0 | 1): UpgradeCard => {
+/** 2 级起每一级亮出的升级卡：取第一件在这一级有卡的载体 */
+export function upgradeCardsFor(def: CharacterDef): readonly UpgradeCard[] {
+  return Array.from({ length: MAX_CHAR_LEVEL - 1 }, (_, k) => {
     for (const c of def.carriers) {
       const card = c.cards[k]
       if (card) return card
     }
     throw new Error('角色缺升级档')
-  }
-  return [pick(0), pick(1)]
+  })
 }
 
 const TB = fromJson<TeamBaseline>(teamJson)

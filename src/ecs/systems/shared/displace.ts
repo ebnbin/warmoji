@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { BODY_MAX_SPEED } from '../../../data/abilities'
-import { Alive, Anchored, Ctl, MARK, Motion, MOTION, Phys, Radius, Transform, TRANSIT, Uid, VisOff } from '../../components'
-import { hasMark, inTransit } from '../../utils/marks'
+import { Alive, Anchored, Ctl, Motion, MOTION, Phys, Radius, Transform, TRANSIT, Uid, VisOff } from '../../components'
+import { inTransit, isSteadfast } from '../../utils/marks'
 import { hoverPx } from '../../utils/ground'
 import { motionFx } from '../../store'
 import { spawnFxCircle } from '../../entities/fx'
@@ -56,7 +56,7 @@ function impulse(sim: Sim, eid: number, jx: number, jy: number): void {
 export function movable(sim: Sim, eid: number, by: Mover): boolean {
   if (!hasComponent(sim.world, eid, Phys)) return false
   if (by.free) return true
-  return by.self ? Ctl.dash[eid] === 1 : !hasComponent(sim.world, eid, Anchored) && !hasMark(sim, eid, MARK.unstoppable)
+  return by.self ? Ctl.dash[eid] === 1 : !hasComponent(sim.world, eid, Anchored) && !isSteadfast(sim, eid)
 }
 
 /** 结束手头的脚本位移：弧线中的身体落回原来的高度 */
@@ -78,12 +78,12 @@ export function transitFlash(sim: Sim, eid: number, x: number, y: number, arrive
 export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boolean {
   if ((hasComponent(sim.world, eid, Alive) && !Alive.v[eid]) || inTransit(eid)) return false
   if (d.kind === 'push') {
-    if (hasMark(sim, eid, MARK.unstoppable)) return false
+    if (isSteadfast(sim, eid)) return false
     impulse(sim, eid, d.x, d.y)
     return true
   }
   if (d.kind === 'drift') {
-    if (hasMark(sim, eid, MARK.unstoppable) || !hasComponent(sim.world, eid, Phys) || Motion.kind[eid] !== MOTION.none) return false
+    if (isSteadfast(sim, eid) || !hasComponent(sim.world, eid, Phys) || Motion.kind[eid] !== MOTION.none) return false
     const s = sim.hooks.surface(sim, Transform.x[eid]!, Transform.y[eid]!, eid)
     const k = Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity * d.dt
     impulse(sim, eid, d.vx * k, d.vy * k)

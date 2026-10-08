@@ -13,6 +13,7 @@ import type { MapDef } from './types/maps'
 import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 import { TAGS } from './data/tags'
+import { rulesOf } from './data/reactions'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
@@ -42,16 +43,14 @@ function walkEffects(list: readonly Effect[] | undefined, side: Side): void {
         seen[OTHER[side]].body.add(fx.morphEmoji)
         break
       case 'spawnProjectile':
-        seen[side].shot.add(fx.projectile.emoji)
+        seen[side].shot.add(fx.projectile.look.emoji)
         break
-      case 'spawn':
-        walkNpc(fx.def, side)
+      case 'summon':
+        if (fx.of === 'victim') seen[side].raises = true
+        else if ('unit' in fx.of) walkNpc(fx.of.unit, side)
         break
       case 'steal':
         seen[side].steals = true
-        break
-      case 'raise':
-        seen[side].raises = true
         break
       default:
         break
@@ -65,12 +64,12 @@ function walkAbility(a: AbilityDef, side: Side): void {
   if (s.abilities.has(a)) return
   s.abilities.add(a)
   const sh = a.shape
-  if (a.held) s.body.add(a.held.emoji)
-  if (a.anchor) s.body.add(a.anchor.emoji)
-  if (sh.kind === 'bolt') s.shot.add(sh.projectile.emoji)
-  if (sh.kind === 'emplace') s.body.add(sh.turret.emoji)
-  if (sh.kind === 'summon') s.body.add(sh.minion.emoji)
-  if (sh.kind === 'drop') s.body.add(sh.emoji)
+  if (a.held) s.body.add(a.held.look.emoji)
+  if (a.anchor) s.body.add(a.anchor.look.emoji)
+  if (sh.kind === 'bolt') s.shot.add(sh.projectile.look.emoji)
+  if (sh.kind === 'emplace') s.body.add(sh.look.emoji)
+  if (sh.kind === 'summon') s.body.add(sh.minion.look.emoji)
+  if (sh.kind === 'drop') s.body.add(sh.look.emoji)
   for (const c of childAbilities(a)) walkAbility(c, side)
   for (const list of abilityEffects(a)) walkEffects(list, side)
 }
@@ -93,15 +92,16 @@ function walkNpc(def: NpcDef, side: Side): void {
   if (def.mount?.emoji) s.body.add(def.mount.emoji)
   if (def.grow) walkNpc(def.grow.into, side)
   if (def.spawner) walkNpc(def.spawner.into, side)
-  walkRules(def, side)
-  for (const fx of def.onDeath ?? []) {
+  const rules = rulesOf(def)
+  walkRules(rules, side)
+  for (const fx of rules.onDeath ?? []) {
     if (fx.kind === 'split') walkNpc(fx.into, side)
     else if (fx.kind !== 'decoy') walkEffects([fx], side)
   }
 }
 
 for (const i of Object.values<ItemDef>(ITEMS)) {
-  for (const t of i.on ?? []) walkEffects(t.effects, 'team')
+  for (const t of i.reactions ?? []) walkEffects(t.effects, 'team')
   if (i.ability) walkAbility(i.ability, 'team')
 }
 
@@ -115,7 +115,7 @@ for (const c of roster) {
     if (f.emoji) s.body.add(f.emoji)
     for (const a of f.abilities ?? []) walkAbility(a, 'team')
   }
-  walkRules({ ...c.rules, resource: c.resource }, 'team')
+  walkRules(rulesOf(c), 'team')
 }
 for (const e of [...ENEMY_DEFS, ...BOSSES]) walkNpc(e, 'enemy')
 

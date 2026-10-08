@@ -7,6 +7,7 @@ import { applyAbilityEffects } from './effects'
 import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
 import { clockWave } from '../../fight/clock'
+import { rulesOf, without } from '../../../data/reactions'
 
 function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
   if (sim.over) return
@@ -21,7 +22,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
     speed: 0,
     drive: { kind: 'wander' as const },
     abilities: undefined,
-    onDeath: undefined,
+    reactions: without(d.def.reactions, ['death']),
     kbImmune: true,
   }
   const eid = spawnNpc(sim, sim.frames, husk, d.x, d.y, Math.round(fx.hp * hpMul), { alpha: fx.alpha, faction: d.faction })
@@ -29,7 +30,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
 }
 
 export function replayDeath(sim: Sim, d: PendingDeath): void {
-  const effects = d.def.onDeath
+  const effects = rulesOf(d.def).onDeath
   if (!effects) return
   const hpMul = clockWave(sim).hpMultiplier
   const src = { ...enemySource(d.def.kind, d.atk), faction: d.faction }

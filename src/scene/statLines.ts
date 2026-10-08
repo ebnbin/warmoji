@@ -1,16 +1,18 @@
 import { KNOCKBACK_TAU_MS } from '../data/abilities'
+import { reactionEffects } from '../data/reactions'
 import { STAT_KEYS, STATS, modTexts, statText } from '../data/stats'
 import { CHARACTERS, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
 import { gearMods, resolveAbilityDef } from '../data/items'
-import { tiersForLevel } from '../data/charLevel'
+import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ROLES } from '../data/roles'
+import { STATUSES } from '../data/statuses'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
+import type { AbilityDef, Cond, Effect, Selector, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
 import type { StatKey } from '../types/stats'
@@ -80,6 +82,8 @@ function joinFx(effects: readonly Effect[], self = false): string {
 /** self：这组效果施于出手者自己 */
 export function effectLine(e: Effect, self = false): string {
   switch (e.kind) {
+    case 'status':
+      return `${STATUSES[e.status].name} ${sec(e.ms)}`
     case 'blast':
       return `命中处爆开 ${grid(e.radius)}，波及 ${pct(e.ratio)} 伤害${e.breach ? `，炸掉约 ${e.breach} 立方米的墙` : ''}`
     case 'slow':
@@ -196,10 +200,10 @@ export function effectLine(e: Effect, self = false): string {
       return `资源 ${e.amount >= 0 ? '+' : ''}${e.amount}`
     case 'empower':
       return `接下来 ${e.hits} 次普通出手附带：${joinFx(e.then)}`
-    case 'caster':
-      return `自身：${joinFx(e.then, true)}`
-    case 'area':
-      return `${grid(e.radius)} 内：${joinFx(e.then)}`
+    case 'to':
+      return e.who.side === 'self' ? `自身：${joinFx(e.then, true)}` : `${selectorLine(e.who)}：${joinFx(e.then)}`
+    case 'chance':
+      return `${pct(e.p)} 几率：${joinFx(e.then)}`
     case 'form':
       return `${e.to < 0 ? '变回本体' : '变身'}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? lead('，结束时', joinFx(e.onEnd)) : ''}`
     case 'grow':
@@ -208,16 +212,18 @@ export function effectLine(e: Effect, self = false): string {
       return `沿直线闪回 ${sec(e.ms)} 前的位置，途中无敌，生命取那时与现在的较高者`
     case 'steal':
       return `夺取目标的${e.skill ? '主动技能' : '一项能力'}，自己用 ${sec(e.ms)}（每 ${sec(e.cooldownMs)} 一次）${e.skill ? '；原主的冷却重新走，夺取者死了原主立刻转好' : ''}`
-    case 'clone':
-      return `造出 ${e.count} 个分身 ${sec(e.lifeMs)}：${pct(e.hpRatio)} 生命、${pct(e.dmgRatio)} 伤害${e.onDeath ? lead('，分身死时', joinFx(e.onDeath)) : ''}`
-    case 'raise':
-      return `死者为你而战 ${sec(e.lifeMs)}（${pct(e.hpRatio)} 生命）`
+    case 'summon': {
+      const life = e.lifeMs === undefined ? '' : ` ${sec(e.lifeMs)}`
+      if (e.of === 'victim') return `死者为你而战${life}（${pct(e.hpRatio ?? 1)} 生命）${e.onDeath ? lead('，它死时', joinFx(e.onDeath)) : ''}`
+      if ('clone' in e.of) return `造出 ${e.count} 个分身${life}：${pct(e.hpRatio ?? 1)} 生命、${pct(e.of.clone.dmgRatio)} 伤害${e.onDeath ? lead('，分身死时', joinFx(e.onDeath)) : ''}`
+      return `召出 ${e.count} 个${e.of.unit.name}${life}${e.hpRatio === undefined ? '' : `（${pct(e.hpRatio)} 生命）`}${e.onDeath ? lead('，它们死时', joinFx(e.onDeath)) : ''}`
+    }
+    case 'cast':
+      return `放出一次${abilityLabel(e.ability)}`
     case 'devour':
       return `吞下目标最多 ${sec(e.ms)}，每秒消化 ${e.dps}；挨够 ${e.escape} 伤害就吐出来`
     case 'attach':
       return `贴到施法者身上 ${sec(e.ms)}，期间不可选中，照常出手`
-    case 'spawn':
-      return `召出 ${e.count} 个${e.def.name}`
     case 'teleport':
       return `瞬移到离敌人最近的一个自己召出的${ENEMIES[e.of]?.name ?? e.of}旁${e.then ? lead('，落地时', joinFx(e.then)) : ''}`
     case 'shadow':
@@ -263,42 +269,55 @@ function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined, dama
   return parts.length > 0 ? `；${parts.join('；')}` : ''
 }
 
-function condLine(c: Cond): string {
+/** 条件的说法：对自己判断的前面加上自己 */
+export function condLine(c: Cond): string {
   switch (c.kind) {
-    case 'airborne':
-      return '在空中'
-    case 'marked':
-      return `带着${MARK_LABEL[c.mark]}`
-    case 'hpBelow':
-      return `生命低于 ${pct(c.ratio)}`
-    case 'boss':
-      return '是 Boss'
+    case 'all':
+      return c.of.map(condLine).join('且')
+    case 'any':
+      return c.of.map(condLine).join('或')
     case 'not':
       return `不${condLine(c.cond)}`
   }
+  const who = c.who === 'self' ? '自己' : ''
+  switch (c.kind) {
+    case 'airborne':
+      return `${who}在空中`
+    case 'marked':
+      return `${who}带着${STATUSES[c.mark].keyed ? '你的' : ''}${STATUSES[c.mark].name}`
+    case 'hpBelow':
+      return `${who}生命低于 ${pct(c.ratio)}`
+    case 'boss':
+      return `${who}是 Boss`
+    case 'still':
+      return `${who}站着不动`
+    case 'leader':
+      return `${who}是队长`
+    case 'follower':
+      return `${who}不是队长`
+    case 'noFoesNear':
+      return `${who}身边 ${grid(c.radius)} 内没有敌人`
+    case 'afterSkill':
+      return `${who}放主动技能后 ${sec(c.ms)} 内`
+  }
 }
 
-const MARK_LABEL: Record<MarkName, string> = {
-  stun: '眩晕',
-  root: '定身',
-  sleep: '睡眠',
-  fear: '恐惧',
-  charm: '魅惑',
-  slow: '减速',
-  poison: '中毒',
-  silence: '沉默',
-  disarm: '致盲',
-  stasis: '静止',
-  fuse: '你的引信',
-  stack: '你的叠层',
-  store: '你的存伤',
-  deathMark: '你的死亡印记',
+/** 选谁的说法 */
+function selectorLine(s: Exclude<Selector, { readonly side: 'self' }>): string {
+  const side = s.side === 'foes' ? '' : '的同伴'
+  const only = s.filter ? `${condLine(s.filter)}` : ''
+  const order = s.sort === 'nearest' ? '最近的' : s.sort === 'weakest' ? '生命比例最低的' : ''
+  const n = s.count === undefined ? '' : ` ${s.count} 个`
+  return `${grid(s.radius)} 内${only}${side}${order}${n}`
 }
 
 function shapeLine(w: AbilityDef, s: Shape): string {
   switch (s.kind) {
-    case 'bolt':
-      return `弹速 ${grid(s.projectile.speed)}/秒 · 弹体 ${grid(s.projectile.radius * 2)}${s.projectile.arc ? ` · 抛射（拱起 ${s.projectile.arc} 米，越过比它矮的墙，落下来才打得到人）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${s.projectile.homingDeg ? ` · 追踪（每秒转 ${s.projectile.homingDeg}°）` : ''}${s.projectile.linger ? ` · 飞完落地 ${sec(s.projectile.linger)} 等召回` : ''}`
+    case 'bolt': {
+      const p = s.projectile
+      const f = p.flight
+      return `弹速 ${grid(p.speed)}/秒 · 弹体 ${grid(p.radius * 2)}${f?.kind === 'arc' ? ` · 抛射（拱起 ${f.peakM} 米，越过比它矮的墙，落下来才打得到人）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${f?.kind === 'homing' ? ` · 追踪（每秒转 ${f.degPerSec}°）` : ''}${p.split ? ` · 打中或飞完裂成 ${p.split.count} 发（每发 ${pct(p.split.ratio)} 伤害）` : ''}${p.linger ? ` · 飞完落地 ${sec(p.linger)} 等召回` : ''}`
+    }
     case 'segment':
       return s.beam
         ? `射程 ${grid(s.reach)} · 束宽 ${grid(s.radius * 2)} · 贯穿直线全部敌人`
@@ -369,13 +388,16 @@ function availLines(w: AbilityDef): string[] {
   if (w.boost) out.push(`资源到 ${w.boost.at}${w.boost.spend ? ` 时消耗 ${w.boost.spend} ` : ' 以上时'}强化${w.boost.damageMul ? `：伤害 ×${w.boost.damageMul}` : ''}${w.boost.onHit ? `，${joinFx(w.boost.onHit)}` : ''}`)
   if (w.hpCost) out.push(`以血施法：每次扣 ${w.hpCost} 生命`)
   if (w.requires) out.push(`只对${condLine(w.requires)}的目标出手`)
-  if (w.onKill) out.push(`打死目标时：${joinFx(w.onKill)}`)
+  const onKill = reactionEffects(w.reactions, 'kill')
+  if (onKill) out.push(`打死目标时：${joinFx(onKill)}`)
   return out
 }
 
 /** 出手前的自身效果、命中效果、出手后的自身效果 */
 function selfAndHit(w: AbilityDef): string[] {
-  return [...(w.onCast ?? []).map((e) => `出手前自身：${effectLine(e, true)}`), ...(w.onHit ?? []).map((e) => effectLine(e)), ...(w.onSelf ?? []).map((e) => `自身：${effectLine(e, true)}`)]
+  const cast = reactionEffects(w.reactions, 'cast') ?? []
+  const fire = reactionEffects(w.reactions, 'fire') ?? []
+  return [...cast.map((e) => `出手前自身：${effectLine(e, true)}`), ...(w.onHit ?? []).map((e) => effectLine(e)), ...fire.map((e) => `自身：${effectLine(e, true)}`)]
 }
 
 /** 伤害按出手方式吃近战或远程伤害 */
@@ -413,8 +435,7 @@ export function characterStatGroups(
 ): StatGroup[] {
   const def = CHARACTERS[id]
   const stats = memberStats(def, gearMods(items, levelStatsFor(id, level), opts.growth))
-  const tiers = tiersForLevel(level)
-  const loadout = loadoutFor(def, tiers)
+  const loadout = loadoutFor(def, level)
   const groups: StatGroup[] = []
   if (opts.base !== false) {
     const baseLines = [
@@ -455,7 +476,7 @@ export function characterStatGroups(
       ],
     })
   }
-  const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
+  const tier = Math.min(level, MAX_CHAR_LEVEL) - 1
   for (const [i, carrier] of def.carriers.entries()) {
     const w = resolveAbilityDef(loadout[i]!, stats)
     const how = deliveryOf(w)

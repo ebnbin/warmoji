@@ -10,6 +10,7 @@ import { Alive, FACTION, Hp, Transform, Uid } from '../components'
 import { fightMods } from '../fight/state'
 import { startPop } from '../utils/pop'
 import { foldBody, setStatLayer } from '../utils/stats'
+import { mend } from '../systems/shared/heal'
 import { leaderX, leaderY } from '../utils/team'
 import { spawnCharacter } from './character'
 import { rearmCharacter } from './form'
@@ -87,7 +88,7 @@ export function relevel(sim: Sim, slot: number): void {
   const before = Hp.max[m]!
   setStatLayer(m, 'gear', memberGearMods(sim.run, slot))
   foldBody(sim.world, sim, m)
-  if (Alive.v[m]) Hp.v[m] = Math.min(Hp.max[m]!, Hp.v[m]! + Math.max(0, Hp.max[m]! - before))
+  if (Alive.v[m]) mend(m, Math.max(0, Hp.max[m]! - before))
   rearmCharacter(sim, m)
   glow(sim, m)
 }

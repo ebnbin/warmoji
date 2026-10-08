@@ -1,6 +1,6 @@
 import { query, removeEntity } from 'bitecs'
 import { Bolt, Faction, Linger, Payload, Proj, Uid } from '../../components'
-import { abilityDef, projHitUids, projOnHit, projSrc } from '../../store'
+import { abilityDef, boltSplit, projHitUids, projOnHit, projSplit, projSrc } from '../../store'
 import { abilityPiercesWalls } from '../../../data/abilities'
 import type { Effect } from '../../../types/abilityDefs'
 import type { Point } from '../../../util/vec'
@@ -31,10 +31,12 @@ export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, 
     reach: aim ? Math.hypot(aim.x - x, aim.y - y) : undefined,
     breach: def?.breach,
     through: def !== undefined && abilityPiercesWalls(def),
+    split: boltSplit[e],
   })
 }
 
 export function cullProjectile(sim: Sim, eid: number): void {
+  projSplit[eid] = undefined
   projOnHit[eid] = undefined
   projHitUids[eid] = undefined
   projSrc[eid] = undefined

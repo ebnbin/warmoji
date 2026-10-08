@@ -12,6 +12,7 @@ import type { EnemyDef, NpcDef } from '../../types/enemies'
 import type { StatBase, StatKey, StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
 import { clockWave } from '../fight/clock'
+import { without, withDeath } from '../../data/reactions'
 
 /** 记下召唤者：召唤物的伤害吃它的召唤物伤害、记在它名下 */
 function markSummoned(sim: Sim, eid: number, by: number): void {
@@ -40,13 +41,15 @@ function waveHp(sim: Sim): number {
   return clockWave(sim).hpMultiplier
 }
 
-/** 召出 count 个 def：敌方的按波次放大生命 */
-export function spawnAround(sim: Sim, by: number, faction: number, def: EnemyDef, count: number, spread: number, x: number, y: number): void {
-  const hp = Math.round(def.hp * (faction === FACTION.enemy ? waveHp(sim) : 1))
+/** 召出 count 个 def：敌方的按波次放大生命，给了 hpRatio 再乘上；给了 lifeMs 到时消失 */
+export function spawnAround(sim: Sim, by: number, faction: number, def: EnemyDef, count: number, spread: number, x: number, y: number, lifeMs?: number, hpRatio?: number): void {
+  const base = def.hp * (faction === FACTION.enemy ? waveHp(sim) : 1)
+  const hp = Math.round(hpRatio === undefined ? base : base * hpRatio)
   for (let i = 0; i < count; i++) {
     const a = sim.rng.next() * Math.PI * 2
     const r = count > 1 || spread > 0 ? spread * (0.5 + sim.rng.next() * 0.5) : 0
-    summonBody(sim, def, x + Math.cos(a) * r, y + Math.sin(a) * r, hp, faction, by)
+    const eid = summonBody(sim, def, x + Math.cos(a) * r, y + Math.sin(a) * r, hp, faction, by)
+    if (lifeMs !== undefined) Despawn.at[eid] = sim.elapsedMs + lifeMs
   }
 }
 
@@ -64,7 +67,7 @@ function ownAttacks(sim: Sim, by: number): number[] {
 function lookAlike(sim: Sim, by: number): NpcDef {
   const npc = enemyDef[by]
   const drive = { kind: 'chase' } as const
-  if (npc) return { ...npc, drive, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath: undefined, forms: undefined }
+  if (npc) return { ...npc, drive, spawner: undefined, grow: undefined, mount: undefined, reactions: without(npc.reactions, ['lethal', 'lowHp', 'death']), forms: undefined }
   const c = hasComponent(sim.world, by, Slot) ? CHARACTERS[sim.run.roster[Slot.v[by]!]!] : undefined
   return {
     emoji: bodyLook[by] ?? c?.emoji ?? '1f47b',
@@ -83,12 +86,12 @@ const OFFENSE: readonly StatKey[] = ['damage', 'meleeDamage', 'rangedDamage', 'a
 
 function offenseOnly(mods: StatMods): StatMods {
   const pick = (r: StatBase | undefined): StatBase => Object.fromEntries(OFFENSE.flatMap((k) => (r?.[k] === undefined ? [] : [[k, r[k]]])))
-  return { add: pick(mods.add), mul: pick(mods.mul) }
+  return { add: pick(mods.add), pct: pick(mods.pct), mul: pick(mods.mul) }
 }
 
 /** 分身：长得和施法者一样，带着它的普通出手（伤害打折），到时消失，死时施加 onDeath */
 export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number, hpRatio: number, dmgRatio: number, onDeath: readonly Effect[] | undefined): void {
-  const def = { ...lookAlike(sim, by), onDeath }
+  const def = withDeath(lookAlike(sim, by), onDeath)
   const attacks = ownAttacks(sim, by)
   const faction = Faction.v[by]!
   for (let i = 0; i < count; i++) {
@@ -109,10 +112,10 @@ export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number,
 }
 
 /** 亡者倒戈：死者以施法者的阵营站起来，到时消失；Boss 不会被拉起来 */
-export function raiseDead(sim: Sim, victim: number, faction: number, by: number, lifeMs: number, hpRatio: number): void {
+export function raiseDead(sim: Sim, victim: number, faction: number, by: number, lifeMs: number, hpRatio: number, onDeath: readonly Effect[] | undefined): void {
   const def = enemyDef[victim]
   if (!def || Boss.v[victim] || Faction.v[victim] === faction) return
-  const raised: NpcDef = { ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath: undefined }
+  const raised: NpcDef = withDeath({ ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, reactions: without(def.reactions, ['lethal', 'lowHp']) }, onDeath)
   const eid = spawnNpc(sim, sim.frames, raised, Transform.x[victim]!, Transform.y[victim]!, Math.max(1, Math.round(Hp.max[victim]! * hpRatio)), { faction })
   markSummoned(sim, eid, by)
   Despawn.at[eid] = sim.elapsedMs + lifeMs

@@ -1,10 +1,10 @@
 import { hasComponent } from 'bitecs'
-import { Anchor, FACTION, Faction, FlyerShape, MARK, Minion, Owner, Sector, Segment, Slot, SprintShape, SummonShape, Summoned, Uid, WallBlocked } from '../components'
+import { Anchor, FACTION, Faction, FlyerShape, Minion, Owner, Sector, Segment, Slot, SprintShape, SummonShape, Summoned, Uid, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { abilityDef, enemyDef } from '../store'
 import { attributionSlot, creditSlot } from './ability'
 import { deliveryOf, HIT } from './hitTags'
-import { hasMark, realmOf } from './marks'
+import { isTurncoat, realmOf } from './marks'
 import { isSameEntity } from './identity'
 import { NEUTRAL, offenseOf } from './stats'
 import { bandOf, eyeM } from './pass'
@@ -50,7 +50,7 @@ export interface Source {
 
 /** 出手者眼里的敌方阵营：倒戈时是自己的阵营 */
 function foesOf(sim: Sim, body: number, faction: number): readonly number[] | undefined {
-  return hasMark(sim, body, MARK.berserk) ? [faction] : undefined
+  return isTurncoat(sim, body) ? [faction] : undefined
 }
 
 /** 能力出手的来源：出手方式按能力定；蜂群、装置与被召出的身体出的手带召唤标签 */

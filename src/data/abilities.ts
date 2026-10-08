@@ -44,14 +44,14 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'store':
     case 'deathMark':
     case 'empower':
-    case 'caster':
-    case 'area':
+    case 'to':
+    case 'chance':
     case 'parry':
     case 'teleport':
       return [fx.then]
     case 'form':
       return [fx.onEnd]
-    case 'clone':
+    case 'summon':
       return [fx.onDeath]
     case 'shove':
       return [fx.onWall]
@@ -115,8 +115,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'refresh':
     case 'gain':
     case 'portal':
-    case 'spawn':
-    case 'raise':
+    case 'cast':
     case 'shadow':
     case 'shadowSwap':
     case 'recall':
@@ -124,6 +123,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'coins':
     case 'interest':
     case 'vanish':
+    case 'status':
       return []
     default:
       return unlisted(fx)
@@ -135,16 +135,24 @@ function unlisted(fx: never): never {
   throw new Error(`效果没有登记套着的效果：${JSON.stringify(fx)}`)
 }
 
-/** 能力直接带的效果：命中、自身、出手前、击杀、强化、弹匣末发，领域还有脉冲、到期与停留 */
+/** 能力直接带的效果：命中、各条反应、强化、弹匣末发，领域还有脉冲、到期与停留 */
 export function abilityEffects(a: AbilityDef): readonly EffectList[] {
   const s = a.shape
   const zone = s.kind === 'zone' ? [s.pulse?.onHit, s.onExpire, s.dwell?.effects] : []
-  return [a.onHit, a.onSelf, a.onCast, a.onKill, a.boost?.onHit, a.ammo?.last, ...zone]
+  return [a.onHit, ...(a.reactions ?? []).map((r) => r.effects), a.boost?.onHit, a.ammo?.last, ...zone]
 }
 
-/** 能力里套着的能力：下一段、轮换的招式、装置出手用的 */
+/** 能力里套着的能力：下一段、轮换的招式、装置出手用的，以及效果里放出的 */
 export function childAbilities(a: AbilityDef): readonly AbilityDef[] {
-  return [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : [])]
+  const out: AbilityDef[] = [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : [])]
+  const walk = (list: EffectList): void => {
+    for (const fx of list ?? []) {
+      if (fx.kind === 'cast') out.push(fx.ability)
+      for (const c of childEffects(fx)) walk(c)
+    }
+  }
+  for (const list of abilityEffects(a)) walk(list)
+  return out
 }
 
 /** 尾随的施法锚点落在宿主多久前走过的地方 */

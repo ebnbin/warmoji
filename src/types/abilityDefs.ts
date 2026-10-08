@@ -1,25 +1,34 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef, ZoneRules } from './groundEffects'
 import type { EnemyDef, EnemyKind } from './enemies'
+import type { StatusId } from './statuses'
 
-interface ProjectileSpec {
+/** 外观：用哪张图、显示多大（格）；rotationOffsetDeg 是图里尖头的朝向与出手方向差几度 */
+export interface Look {
   readonly emoji: string
   readonly size: number
+  readonly rotationOffsetDeg?: number
+}
+/** 弹体的飞法：不写是直飞；homing 每秒最多转 degPerSec 度转向最近的敌人；arc 从出手处抛向瞄准的地方，最高处比两头的连线高出 peakM 米，越过比它矮的障碍，落下来才打得到身体 */
+export type Flight = { readonly kind: 'homing'; readonly degPerSec: number } | { readonly kind: 'arc'; readonly peakM: number }
+/** 分裂：打中身体或飞完时裂成 count 发，在 spreadDeg 内散开，伤害 × ratio；裂出来的不再裂 */
+export interface Split {
+  readonly count: number
+  readonly spreadDeg: number
+  readonly ratio: number
+}
+interface ProjectileBase {
+  readonly look: Look
   readonly radius: number
   readonly speed: number
-  readonly rotationOffsetDeg: number
-  /** 追踪：每秒最多转这么多度，转向最近的敌人 */
-  readonly homingDeg?: number
-  /** 飞完不消失，落在地上 ms，等着被召回 */
-  readonly linger?: number
-  /** 抛射：从出手处抛向瞄准的地方，最高处比两头的连线高出这么多米；越过比它矮的障碍，落下来才打得到身体。不写是平射 */
-  readonly arc?: number
+  readonly flight?: Flight
 }
+/** linger：飞完不消失，落在地上 ms，等着被召回；落地的与分裂的二选一 */
+type ProjectileSpec = ProjectileBase & ({ readonly linger?: number; readonly split?: never } | { readonly linger?: never; readonly split?: Split })
+/** 拿在手里的武器：restOffset 是离持有者中心多远，mountSide 与 mountGap 是偏在哪一侧、偏多远，弹体也从这里出手 */
 export interface HeldVisual {
-  readonly emoji: string
-  readonly size: number
+  readonly look: Look
   readonly restOffset: number
-  readonly rotationOffsetDeg: number
   readonly mountSide?: -1 | 1
   readonly mountGap?: number
 }
@@ -285,15 +294,40 @@ interface ThrowEffect {
 interface SwapEffect {
   readonly kind: 'swap'
 }
-/** 身上能被条件认出来的标记 */
-export type MarkName = 'stun' | 'root' | 'sleep' | 'fear' | 'charm' | 'slow' | 'poison' | 'silence' | 'disarm' | 'stasis' | 'fuse' | 'stack' | 'store' | 'deathMark'
-/** 条件：对目标判断 */
+/** 按状态表施加一种状态，持续 ms；控制类的霸体不吃；value 是这种状态的参数，如倍率 */
+interface StatusEffect {
+  readonly kind: 'status'
+  readonly status: StatusId
+  readonly ms: number
+  readonly value?: number
+}
+/** 条件看谁：self 是带着这条规则的身体（出手者、持有者），target 是这一下作用到的身体 */
+export type CondWho = 'self' | 'target'
+/** 条件：对 who 判断，能用 all（并且）、any（或者）、not（不是）组合 */
 export type Cond =
-  | { readonly kind: 'airborne' }
-  | { readonly kind: 'marked'; readonly mark: MarkName }
-  | { readonly kind: 'hpBelow'; readonly ratio: number }
-  | { readonly kind: 'boss' }
+  | { readonly kind: 'all'; readonly of: readonly Cond[] }
+  | { readonly kind: 'any'; readonly of: readonly Cond[] }
   | { readonly kind: 'not'; readonly cond: Cond }
+  /** 被别人抛在空中 */
+  | { readonly kind: 'airborne'; readonly who: CondWho }
+  /** 身上带着这种状态；按来源分开记的状态只认这个来源施加的 */
+  | { readonly kind: 'marked'; readonly who: CondWho; readonly mark: StatusId }
+  | { readonly kind: 'hpBelow'; readonly who: CondWho; readonly ratio: number }
+  | { readonly kind: 'boss'; readonly who: CondWho }
+  /** 站着几乎没动 */
+  | { readonly kind: 'still'; readonly who: CondWho }
+  | { readonly kind: 'leader'; readonly who: CondWho }
+  | { readonly kind: 'follower'; readonly who: CondWho }
+  /** radius 内没有活着的敌人 */
+  | { readonly kind: 'noFoesNear'; readonly who: CondWho; readonly radius: number }
+  /** 放完主动技能还不到 ms */
+  | { readonly kind: 'afterSkill'; readonly who: CondWho; readonly ms: number }
+/** 几率：过了 p 的几率才施加 then */
+interface ChanceEffect {
+  readonly kind: 'chance'
+  readonly p: number
+  readonly then: readonly Effect[]
+}
 /** 条件效果：目标满足 when 施加 then，否则施加 else */
 interface IfEffect {
   readonly kind: 'if'
@@ -351,15 +385,21 @@ interface EmpowerEffect {
   readonly hits: number
   readonly then: readonly Effect[]
 }
-/** 施于施法者自己 */
-interface CasterEffect {
-  readonly kind: 'caster'
-  readonly then: readonly Effect[]
-}
-/** 施于落点 radius 内能打的身体 */
-interface AreaEffect {
-  readonly kind: 'area'
-  readonly radius: number
+/** 选谁：self 是出手者自己；foes 是落点 radius 内这一下打得到的敌方，allies 是落点 radius 内的同伴；只留满足 filter 的，按 sort 排好取前 count 个 */
+export type Selector =
+  | { readonly side: 'self' }
+  | {
+      readonly side: 'foes' | 'allies'
+      readonly radius: number
+      readonly filter?: Cond
+      /** nearest 离落点由近到远，weakest 生命比例由低到高 */
+      readonly sort?: 'nearest' | 'weakest'
+      readonly count?: number
+    }
+/** 换个对象施加：选出的身体吃 then，一个都没选到就不施加 */
+interface ToEffect {
+  readonly kind: 'to'
+  readonly who: Selector
   readonly then: readonly Effect[]
 }
 /** 形态：切到本体的第 to 个形态（-1 是本体）；给了 ms 就到时切回本体并施加 onEnd */
@@ -388,20 +428,19 @@ interface StealEffect {
   readonly cooldownMs: number
   readonly skill?: boolean
 }
-/** 分身：在施法者身边造 count 个复制体，生命为施法者上限的 hpRatio，带着它的普通出手（伤害 × dmgRatio），存在 lifeMs，死时施加 onDeath */
-interface CloneEffect {
-  readonly kind: 'clone'
+/** 召唤：召出 count 个身体，阵营随施法者、记在施法者名下；unit 是一种身体，在施法者身边 spread 内散开；clone 是施法者的分身，带着它的普通出手（伤害 × dmgRatio）；victim 是死亡印记结算时的死者，以施法者的阵营站起来（头目不会）；给了 lifeMs 到时消失，hpRatio 是生命比例（分身按施法者的上限、死者按原来的上限），onDeath 是它死时施加的 */
+interface SummonEffect {
+  readonly kind: 'summon'
+  readonly of: { readonly unit: EnemyDef; readonly spread: number } | { readonly clone: { readonly dmgRatio: number } } | 'victim'
   readonly count: number
-  readonly lifeMs: number
-  readonly hpRatio: number
-  readonly dmgRatio: number
+  readonly lifeMs?: number
+  readonly hpRatio?: number
   readonly onDeath?: readonly Effect[]
 }
-/** 亡者倒戈：死者（死亡印记结算时）以施法者的阵营站起来 lifeMs，生命为原来的 hpRatio */
-interface RaiseEffect {
-  readonly kind: 'raise'
-  readonly lifeMs: number
-  readonly hpRatio: number
+/** 放出另一个能力：从施法者身上照这个能力的瞄准与形状出手一次，吃施法者的属性；不耗冷却，也不算放了主动技能 */
+interface CastEffect {
+  readonly kind: 'cast'
+  readonly ability: Extract<AbilityDef, { readonly trigger: 'manual' }>
 }
 /** 吞噬：把目标吞进施法者肚子里最多 ms，每秒消化 dps；施法者挨够 escape 伤害或死了就吐出来；spit 是吐出时抛出的距离 */
 interface DevourEffect {
@@ -415,13 +454,6 @@ interface DevourEffect {
 interface AttachEffect {
   readonly kind: 'attach'
   readonly ms: number
-}
-/** 召出 count 个 def 的身体，阵营随施法者，记在施法者名下 */
-interface SpawnEffect {
-  readonly kind: 'spawn'
-  readonly def: EnemyDef
-  readonly count: number
-  readonly spread: number
 }
 /** 隐身穿行到自己召出的 of 身边（最靠近目标的那个），现身时施加 then */
 interface TeleportEffect {
@@ -505,6 +537,7 @@ interface RealmEffect {
   readonly ms: number
 }
 export type Effect =
+  | StatusEffect
   | BlastEffect
   | SlowEffect
   | PoisonEffect
@@ -561,17 +594,16 @@ export type Effect =
   | RefreshEffect
   | GainEffect
   | EmpowerEffect
-  | CasterEffect
-  | AreaEffect
+  | ToEffect
+  | ChanceEffect
   | FormEffect
   | GrowEffect
   | RewindEffect
   | StealEffect
-  | CloneEffect
-  | RaiseEffect
+  | SummonEffect
+  | CastEffect
   | DevourEffect
   | AttachEffect
-  | SpawnEffect
   | TeleportEffect
   | ShadowEffect
   | ShadowSwapEffect
@@ -614,8 +646,7 @@ export type Shape =
   | {
       readonly kind: 'drop'
       readonly targets: number
-      readonly emoji: string
-      readonly size: number
+      readonly look: Look
       readonly fromAbove: number
       readonly dropMs: number
       readonly staggerMs: number
@@ -638,8 +669,7 @@ export type Shape =
       readonly kind: 'summon'
       readonly count: number
       readonly minion: {
-        readonly emoji: string
-        readonly size: number
+        readonly look: Look
         readonly speed: number
         readonly orbit: { readonly radius: number; readonly spinRadPerSec: number }
       }
@@ -651,7 +681,7 @@ export type Shape =
       readonly spread?: number
       readonly maxAlive: number
       readonly lifeMs: number
-      readonly turret: { readonly emoji: string; readonly size: number }
+      readonly look: Look
       readonly ability: AbilityDef
     }
   | { readonly kind: 'world' }
@@ -689,9 +719,8 @@ interface AbilityBase {
   readonly damage?: number
   readonly knockback?: number
   readonly onHit?: readonly Effect[]
-  readonly onSelf?: readonly Effect[]
-  /** 出手前先施于自己的效果：结算后按新的状态判定这一下出不出得去（先解控再冲出去） */
-  readonly onCast?: readonly Effect[]
+  /** 出手的反应：cast 在出手前施于自己，结算后按新的状态判定这一下出不出得去（先解控再冲出去）；fire 在出手后施于自己；kill 在这条能力打死谁时施于自己 */
+  readonly reactions?: readonly AbilityReaction[]
   readonly repeat?: Repeat
   readonly held?: HeldVisual
   readonly fireSfx?: SfxId
@@ -718,13 +747,28 @@ interface AbilityBase {
   readonly hpCost?: number
   /** 只对满足条件的目标出手 */
   readonly requires?: Cond
-  /** 这条能力打死了谁，对出手者施加 */
-  readonly onKill?: readonly Effect[]
   /** 影子也照着出手 */
   readonly mirror?: boolean
   /** 施法锚点：这条能力从一个跟着宿主的物件上出手；orbit 绕宿主转、trail 落在宿主一秒半前的位置、ally 贴着血量最低的队友 */
-  readonly anchor?: { readonly emoji: string; readonly size: number; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
+  readonly anchor?: { readonly look: Look; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
 }
+/** 反应把效果施于谁：self 是带着这条反应的身体，other 是这件事里的另一方（打中的目标、出手打它的身体），spot 是这件事发生的地方（倒下处） */
+/** 反应：on 这件事发生时，满足 if、过了 chance 的几率，对 to 施加 effects */
+export interface ReactionBase {
+  readonly if?: Cond
+  readonly effects: readonly Effect[]
+}
+export type Reaction = ReactionBase &
+  (
+    | { readonly on: 'hit' | 'crit' | 'dodge' | 'hurt'; readonly to: 'self' | 'other'; readonly chance?: number }
+    | { readonly on: 'kill'; readonly to: 'self' | 'spot'; readonly chance?: number }
+    | { readonly on: 'skill'; readonly to: 'self'; readonly chance?: number }
+    | { readonly on: 'cast' | 'fire'; readonly to: 'self' }
+    | { readonly on: 'wave' | 'lethal'; readonly to: 'self' }
+    | { readonly on: 'lowHp'; readonly ratio: number; readonly to: 'self' }
+  )
+/** 能力的反应：出手前、出手后、打死谁时 */
+export type AbilityReaction = ReactionBase & { readonly on: 'cast' | 'fire' | 'kill'; readonly to: 'self' }
 /** 一个能力 = 触发 × 瞄准 × 形状 × 载荷 × 重复 */
 export type AbilityDef =
   | (AbilityBase & { readonly trigger: 'auto'; readonly cooldownMs: number; readonly firstDelayMs?: number })

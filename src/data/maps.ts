@@ -5,6 +5,7 @@ import { keysOf } from '../util/record'
 import { ENEMIES } from './enemies'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { DecorInstance, Hazard, MapDecor, MapDef, MapId } from '../types/maps'
+import { rulesOf } from './reactions'
 
 export const MAPS = fromJson<Record<MapId, MapDef>>(mapsJson)
 
@@ -22,7 +23,7 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
     seen.add(def.kind)
     out.push(def)
     if (def.spawner) add(def.spawner.into)
-    for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into)
+    for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split') add(fx.into)
   }
   for (const kind of MAPS[id].foes) add(ENEMIES[kind])
   add(bossFor(id))

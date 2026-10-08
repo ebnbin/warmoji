@@ -3,7 +3,7 @@ import { Alive, Idle, Phys, Transform } from '../components'
 import { bodyRules } from '../store'
 import { applyAbilityEffects } from './shared/effects'
 import { selfSource } from '../utils/source'
-import { STILL } from '../utils/stats'
+import { STILL } from '../utils/cond'
 import type { Sim } from '../sim'
 
 /** 闲着的规则：ms 内没出手（要求静止的还得没动）就施于自身一次，出手或走动后重新计 */

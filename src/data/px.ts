@@ -1,23 +1,22 @@
 import { UNIT } from '../util/units'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { EnemyDef } from '../types/enemies'
-import type { GearTrigger, GearWhen } from '../types/items'
+import type { GearWhen, ItemReaction } from '../types/items'
 
-/** 会经过 toPx 的数值字段名：stats 底下按属性表自己的单位，不算 */
+/** 会经过 toPx 的数值字段名：stats 底下按属性表自己的单位，不算；只能不写的字段也不算 */
 type NumField<T, Depth extends unknown[] = []> = Depth['length'] extends 6
   ? never
   : T extends readonly (infer U)[]
     ? NumField<U, Depth>
     : T extends object
-      ? { [K in Exclude<keyof T & string, 'stats'>]-?: (NonNullable<T[K]> extends number ? K : never) | NumField<NonNullable<T[K]>, [...Depth, 0]> }[Exclude<keyof T & string, 'stats'>]
+      ? { [K in Exclude<keyof T & string, 'stats'>]-?: [NonNullable<T[K]>] extends [never] ? never : (NonNullable<T[K]> extends number ? K : never) | NumField<NonNullable<T[K]>, [...Depth, 0]> }[Exclude<keyof T & string, 'stats'>]
       : never
 
 /** 每个数值字段都要说明是不是以格为单位的长度或速度：新字段不登记就编译不过 */
-const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 'cell' | 'plain'> = {
+const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | ItemReaction>, 'cell' | 'plain'> = {
   aggroRange: 'cell',
   alpha: 'plain',
   amount: 'plain',
-  arc: 'plain',
   arcDeg: 'plain',
   at: 'plain',
   behindDist: 'cell',
@@ -37,6 +36,7 @@ const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 
   dash: 'cell',
   decay: 'plain',
   decayDelayMs: 'plain',
+  degPerSec: 'plain',
   delayMs: 'plain',
   detectRange: 'cell',
   distance: 'cell',
@@ -60,7 +60,6 @@ const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 
   gap: 'cell',
   height: 'cell',
   hits: 'plain',
-  homingDeg: 'plain',
   hopRange: 'cell',
   hops: 'plain',
   hp: 'plain',
@@ -88,6 +87,8 @@ const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 
   onHurt: 'plain',
   onKill: 'plain',
   outMs: 'plain',
+  p: 'plain',
+  peakM: 'plain',
   pierce: 'plain',
   pull: 'cell',
   radius: 'cell',
@@ -117,6 +118,7 @@ const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 
   tickMs: 'plain',
   to: 'plain',
   traction: 'plain',
+  value: 'plain',
   vulnMul: 'plain',
   wakeMul: 'plain',
   windowMs: 'plain',

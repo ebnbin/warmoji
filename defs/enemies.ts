@@ -31,7 +31,7 @@ const GHOST = {
   damage: 5,
   xp: 2,
   coins: 2,
-  onDeath: [{ kind: 'heal', amount: 12, scope: 'all', range: 3 }],
+  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'heal', amount: 12, scope: 'all', range: 3 }] }],
 } satisfies EnemyDef
 
 const INVADER = {
@@ -53,16 +53,22 @@ const INVADER = {
       cooldownMs: 2800,
       aim: 'move',
       damage: 6,
-      shape: { kind: 'bolt', projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 }, lifeMs: 4500 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f534', size: 0.4, rotationOffsetDeg: 0 }, radius: 0.14, speed: 3 }, lifeMs: 4500 },
     },
   ],
-  onDeath: [
+  reactions: [
     {
-      kind: 'spawnProjectile',
-      aim: 'nearest',
-      damage: 8,
-      lifeMs: 6000,
-      projectile: { emoji: '1f6f8', size: 0.6, radius: 0.2, speed: 1.5, rotationOffsetDeg: 0 },
+      on: 'death',
+      to: 'spot',
+      effects: [
+        {
+          kind: 'spawnProjectile',
+          aim: 'nearest',
+          damage: 8,
+          lifeMs: 6000,
+          projectile: { look: { emoji: '1f6f8', size: 0.6, rotationOffsetDeg: 0 }, radius: 0.2, speed: 1.5 },
+        },
+      ],
     },
   ],
 } satisfies EnemyDef
@@ -93,7 +99,7 @@ const BOAR = {
       shape: { kind: 'sprint', distance: 3.5, ms: 437.5 },
     },
   ],
-  onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
+  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }] }],
 } satisfies EnemyDef
 
 const SNAKE = {
@@ -118,7 +124,7 @@ const SNAKE = {
       aim: 'nearest',
       range: 8,
       damage: 5,
-      shape: { kind: 'bolt', projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 4500 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f7e2', size: 0.4, rotationOffsetDeg: 0 }, radius: 0.14, speed: 3.2 }, lifeMs: 4500 },
     },
   ],
 } satisfies EnemyDef
@@ -136,19 +142,25 @@ const MUSHROOM = {
   damage: 6,
   xp: 4,
   coins: 3,
-  onDeath: [
+  reactions: [
     {
-      kind: 'ground',
-      def: {
-        radius: 1.6,
-        durationMs: 3000,
-        tickMs: 500,
-        damage: 4,
-        color: 0x7cb342,
-        fillAlpha: 0.22,
-        lineAlpha: 0.5,
-        enterMs: 220,
-      },
+      on: 'death',
+      to: 'spot',
+      effects: [
+        {
+          kind: 'ground',
+          def: {
+            radius: 1.6,
+            durationMs: 3000,
+            tickMs: 500,
+            damage: 4,
+            color: 0x7cb342,
+            fillAlpha: 0.22,
+            lineAlpha: 0.5,
+            enterMs: 220,
+          },
+        },
+      ],
     },
   ],
 } satisfies EnemyDef
@@ -185,7 +197,7 @@ const SLIME = {
   damage: 5,
   xp: 4,
   coins: 3,
-  onTouch: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
+  reactions: [{ on: 'touch', to: 'other', effects: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }] }],
 } satisfies EnemyDef
 
 const BLOBLING = {
@@ -218,13 +230,13 @@ const BLOB = {
   damage: 6,
   xp: 4,
   coins: 3,
-  onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
+  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'split', into: BLOBLING, count: 2 }] }],
 } satisfies EnemyDef
 
 const LARVA = {
   kind: 'larva',
   drive: { kind: 'orbit', radius: 2.5, aggroRange: 6 },
-  onAnchorLost: [{ kind: 'buff', speedMul: 1.7, damageMul: 2.5 }],
+  reactions: [{ on: 'anchorLost', to: 'self', effects: [{ kind: 'buff', speedMul: 1.7, damageMul: 2.5 }] }],
   emoji: '1fab0',
   name: '苍蝇',
   desc: '绕着垃圾桶嗡嗡盘旋，玩家逼近垃圾桶就扑上来；垃圾桶被拆后暴走直扑玩家',
@@ -285,7 +297,7 @@ const CREEPER = {
       fireSfx: 'boom',
       shape: { kind: 'disc', radius: 3.8, at: 'self' },
       breach: 1.2,
-      onSelf: [{ kind: 'vanish' }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'vanish' }] }],
     },
   ],
 } satisfies EnemyDef
@@ -338,7 +350,7 @@ const TURTLE = {
       firstDelayMs: 1500,
       aim: 'nearest',
       damage: 7,
-      shape: { kind: 'bolt', projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0, arc: 2.2 }, lifeMs: 5000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1faa8', size: 0.4, rotationOffsetDeg: 0 }, radius: 0.15, speed: 2.6, flight: { kind: 'arc', peakM: 2.2 } }, lifeMs: 5000 },
       repeat: { count: 3, spreadDeg: 36 },
     },
   ],
@@ -387,7 +399,7 @@ const GARGOYLE = {
   xp: 8,
   coins: 6,
   kbImmune: true,
-  onLowHp: { ratio: 0.4, effects: [{ kind: 'stasis', durationMs: 2500 }, { kind: 'healRatio', ratio: 0.35 }] },
+  reactions: [{ on: 'lowHp', ratio: 0.4, to: 'self', effects: [{ kind: 'stasis', durationMs: 2500 }, { kind: 'healRatio', ratio: 0.35 }] }],
 } satisfies EnemyDef
 
 const PUFFER = {
@@ -416,22 +428,28 @@ const PUFFER = {
       color: 0xff5252,
       fireSfx: 'boom',
       shape: { kind: 'disc', radius: 2.8, at: 'self' },
-      onSelf: [{ kind: 'vanish' }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'vanish' }] }],
     },
   ],
-  onDeath: [
+  reactions: [
     {
-      kind: 'ground',
-      def: {
-        radius: 2.2,
-        durationMs: 3200,
-        tickMs: 500,
-        damage: 5,
-        color: 0x8bc34a,
-        fillAlpha: 0.24,
-        lineAlpha: 0.5,
-        enterMs: 220,
-      },
+      on: 'death',
+      to: 'spot',
+      effects: [
+        {
+          kind: 'ground',
+          def: {
+            radius: 2.2,
+            durationMs: 3200,
+            tickMs: 500,
+            damage: 5,
+            color: 0x8bc34a,
+            fillAlpha: 0.24,
+            lineAlpha: 0.5,
+            enterMs: 220,
+          },
+        },
+      ],
     },
   ],
 } satisfies EnemyDef
@@ -458,7 +476,7 @@ const UFO = {
       aim: 'nearest',
       range: 9,
       damage: 6,
-      shape: { kind: 'bolt', projectile: { emoji: '1f7e1', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 }, lifeMs: 4500 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f7e1', size: 0.45, rotationOffsetDeg: 0 }, radius: 0.15, speed: 3.4 }, lifeMs: 4500 },
     },
   ],
 } satisfies EnemyDef
@@ -523,7 +541,7 @@ const CHAMELEON = {
   damage: 0,
   xp: 5,
   coins: 3,
-  onIdle: { ms: 2000, effects: [{ kind: 'stealth' }] },
+  reactions: [{ on: 'idle', ms: 2000, to: 'self', effects: [{ kind: 'stealth' }] }],
   abilities: [
     {
       trigger: 'auto',
@@ -551,9 +569,15 @@ const SKELETON = {
   damage: 7,
   xp: 4,
   coins: 3,
-  onLethal: [
-    { kind: 'undead', ms: 3000, hpRatio: 0.6 },
-    { kind: 'buff', speedMul: 1.5, damageMul: 1.3, durationMs: 3000 },
+  reactions: [
+    {
+      on: 'lethal',
+      to: 'self',
+      effects: [
+        { kind: 'undead', ms: 3000, hpRatio: 0.6 },
+        { kind: 'buff', speedMul: 1.5, damageMul: 1.3, durationMs: 3000 },
+      ],
+    },
   ],
 } satisfies EnemyDef
 
@@ -632,7 +656,7 @@ const CRAB = {
       firstDelayMs: 0,
       aim: 'self',
       shape: { kind: 'world' },
-      onSelf: [{ kind: 'frontGuard', durationMs: 1300, arcDeg: 150 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'frontGuard', durationMs: 1300, arcDeg: 150 }] }],
     },
   ],
 } satisfies EnemyDef
@@ -651,7 +675,7 @@ const RACCOON = {
   damage: 4,
   xp: 6,
   coins: 5,
-  onTouch: [{ kind: 'steal', ms: 12000, cooldownMs: 4000, skill: true }],
+  reactions: [{ on: 'touch', to: 'other', effects: [{ kind: 'steal', ms: 12000, cooldownMs: 4000, skill: true }] }],
 } satisfies EnemyDef
 
 const SIREN = {
@@ -675,7 +699,7 @@ const SIREN = {
       firstDelayMs: 1500,
       aim: 'nearest',
       range: 8,
-      shape: { kind: 'bolt', projectile: { emoji: '1f7e3', size: 0.45, radius: 0.16, speed: 5, rotationOffsetDeg: 0 }, lifeMs: 3000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f7e3', size: 0.45, rotationOffsetDeg: 0 }, radius: 0.16, speed: 5 }, lifeMs: 3000 },
       onHit: [{ kind: 'charm', durationMs: 1200 }],
     },
   ],
@@ -769,7 +793,7 @@ const FOREST_BOSS = {
       firstDelayMs: 2000,
       aim: 'nearest',
       damage: 8,
-      shape: { kind: 'bolt', projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 }, lifeMs: 6000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f7e2', size: 0.42, rotationOffsetDeg: 0 }, radius: 0.15, speed: 2.4 }, lifeMs: 6000 },
       repeat: { count: 7, spreadDeg: 160 },
     },
     {
@@ -780,7 +804,7 @@ const FOREST_BOSS = {
       aim: 'self',
       fireSfx: 'recruit',
       shape: { kind: 'world' },
-      onHit: [{ kind: 'spawn', def: SAPLING, count: 3, spread: 5 }],
+      onHit: [{ kind: 'summon', of: { unit: SAPLING, spread: 5 }, count: 3 }],
     },
     {
       trigger: 'auto',
@@ -791,7 +815,7 @@ const FOREST_BOSS = {
       windup: { ms: 600, lockAt: 'start', telegraph: 'blink' },
       fireSfx: 'whoosh',
       shape: { kind: 'world' },
-      onHit: [{ kind: 'teleport', of: 'tree', then: [{ kind: 'area', radius: 2.8, then: [{ kind: 'root', durationMs: 1400 }, { kind: 'damage', amount: 14 }] }] }],
+      onHit: [{ kind: 'teleport', of: 'tree', then: [{ kind: 'to', who: { side: 'foes', radius: 2.8 }, then: [{ kind: 'root', durationMs: 1400 }, { kind: 'damage', amount: 14 }] }] }],
     },
   ],
 } satisfies EnemyDef
@@ -830,7 +854,7 @@ const DESERT_BOSS = {
       firstDelayMs: 1800,
       aim: 'nearest',
       damage: 8,
-      shape: { kind: 'bolt', projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f7e3', size: 0.42, rotationOffsetDeg: 0 }, radius: 0.15, speed: 3.2 }, lifeMs: 5000 },
       repeat: { count: 5, spreadDeg: 70 },
       onHit: [{ kind: 'stack', max: 4, durationMs: 5000, then: [{ kind: 'exhaust' }] }],
     },
@@ -842,11 +866,11 @@ const DESERT_BOSS = {
       aim: 'self',
       fireSfx: 'whoosh',
       shape: { kind: 'world' },
-      onSelf: [
+      reactions: [{ on: 'fire', to: 'self', effects: [
         { kind: 'untargetable', durationMs: 1800 },
         { kind: 'buff', speedMul: 2.2, durationMs: 1800 },
-        { kind: 'fuse', ms: 1800, then: [{ kind: 'area', radius: 2.6, then: [{ kind: 'knockup', durationMs: 800, height: 1.4 }, { kind: 'damage', amount: 16 }] }] },
-      ],
+        { kind: 'fuse', ms: 1800, then: [{ kind: 'to', who: { side: 'foes', radius: 2.6 }, then: [{ kind: 'knockup', durationMs: 800, height: 1.4 }, { kind: 'damage', amount: 16 }] }] },
+      ] }],
     },
     {
       trigger: 'auto',
@@ -886,7 +910,7 @@ const RIVER_BOSS = {
       firstDelayMs: 1800,
       aim: 'nearest',
       damage: 9,
-      shape: { kind: 'bolt', projectile: { emoji: '1f535', size: 0.5, radius: 0.18, speed: 2.6, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f535', size: 0.5, rotationOffsetDeg: 0 }, radius: 0.18, speed: 2.6 }, lifeMs: 5000 },
       repeat: { count: 6, spreadDeg: 90 },
     },
     {
@@ -912,7 +936,7 @@ const RIVER_BOSS = {
       knockback: 12,
       shape: { kind: 'sector', radius: 2.8, arcDeg: 360, ms: 300 },
       repeat: { count: 4, delayMs: 300 },
-      onSelf: [{ kind: 'unstoppable', durationMs: 1300 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 1300 }] }],
     },
     {
       trigger: 'auto',
@@ -920,7 +944,7 @@ const RIVER_BOSS = {
       cooldownMs: 5000,
       aim: 'nearest',
       damage: 22,
-      shape: { kind: 'drop', targets: 4, emoji: '1f30a', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      shape: { kind: 'drop', targets: 4, look: { emoji: '1f30a', size: 1.0 }, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -952,7 +976,7 @@ const FACTORY_BOSS = {
       aim: 'self',
       fireSfx: 'recruit',
       shape: { kind: 'world' },
-      onHit: [{ kind: 'spawn', def: PYLON, count: 3, spread: 5 }],
+      onHit: [{ kind: 'summon', of: { unit: PYLON, spread: 5 }, count: 3 }],
     },
     {
       trigger: 'auto',
@@ -961,7 +985,7 @@ const FACTORY_BOSS = {
       aim: 'nearest',
       damage: 9,
       fireSfx: 'shoot',
-      shape: { kind: 'bolt', projectile: { emoji: '1f680', size: 0.5, radius: 0.17, speed: 4.2, rotationOffsetDeg: 45, homingDeg: 110 }, lifeMs: 4500 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f680', size: 0.5, rotationOffsetDeg: 45 }, radius: 0.17, speed: 4.2, flight: { kind: 'homing', degPerSec: 110 } }, lifeMs: 4500 },
       repeat: { count: 4, spreadDeg: 120 },
     },
     {
@@ -970,10 +994,10 @@ const FACTORY_BOSS = {
       cooldownMs: 4800,
       aim: 'nearest',
       damage: 24,
-      shape: { kind: 'drop', targets: 5, emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
+      shape: { kind: 'drop', targets: 5, look: { emoji: '1f528', size: 1.1 }, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
-  onLowHp: { ratio: 0.5, effects: [{ kind: 'form', to: 0 }, { kind: 'spawn', def: PYLON, count: 2, spread: 5 }] },
+  reactions: [{ on: 'lowHp', ratio: 0.5, to: 'self', effects: [{ kind: 'form', to: 0 }, { kind: 'summon', of: { unit: PYLON, spread: 5 }, count: 2 }] }],
   forms: [
     {
       emoji: '2623',
@@ -1000,7 +1024,7 @@ const FACTORY_BOSS = {
       aim: 'nearest',
       damage: 9,
       fireSfx: 'shoot',
-      shape: { kind: 'bolt', projectile: { emoji: '1f680', size: 0.5, radius: 0.17, speed: 4.2, rotationOffsetDeg: 45, homingDeg: 110 }, lifeMs: 4500 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f680', size: 0.5, rotationOffsetDeg: 45 }, radius: 0.17, speed: 4.2, flight: { kind: 'homing', degPerSec: 110 } }, lifeMs: 4500 },
       repeat: { count: 4, spreadDeg: 120 },
     },
         {
@@ -1009,7 +1033,7 @@ const FACTORY_BOSS = {
       cooldownMs: 4800,
       aim: 'nearest',
       damage: 24,
-      shape: { kind: 'drop', targets: 5, emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
+      shape: { kind: 'drop', targets: 5, look: { emoji: '1f528', size: 1.1 }, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
       ],
     },
@@ -1046,7 +1070,7 @@ const RUINS_BOSS = {
       damage: 18,
       shape: { kind: 'sprint', distance: 9, ms: 1100, radius: 1.1, seek: true },
       breach: 2.4,
-      onSelf: [{ kind: 'unstoppable', durationMs: 1200 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 1200 }] }],
       onHit: [{ kind: 'shove', distance: 3, ms: 280, onWall: [{ kind: 'stun', durationMs: 1500 }, { kind: 'damage', amount: 12 }] }],
     },
     {
@@ -1069,7 +1093,7 @@ const RUINS_BOSS = {
       cooldownMs: 4500,
       aim: 'nearest',
       damage: 24,
-      shape: { kind: 'drop', targets: 5, emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
+      shape: { kind: 'drop', targets: 5, look: { emoji: '1faa8', size: 1.1 }, fromAbove: 4, dropMs: 240, staggerMs: 90 },
     },
   ],
 } satisfies EnemyDef
@@ -1098,7 +1122,7 @@ const DAYNIGHT_BOSS = {
       firstDelayMs: 1600,
       aim: 'nearest',
       damage: 8,
-      shape: { kind: 'bolt', projectile: { emoji: '1fa78', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1fa78', size: 0.5, rotationOffsetDeg: 0 }, radius: 0.18, speed: 2.5 }, lifeMs: 5000 },
       repeat: { count: 14, spreadDeg: 360 },
     },
     {
@@ -1121,7 +1145,7 @@ const DAYNIGHT_BOSS = {
       aim: 'self',
       fireSfx: 'boom',
       shape: { kind: 'world' },
-      onSelf: [{ kind: 'form', to: 0, ms: 7000 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'form', to: 0, ms: 7000 }] }],
     },
     {
       trigger: 'auto',
@@ -1129,7 +1153,7 @@ const DAYNIGHT_BOSS = {
       cooldownMs: 4600,
       aim: 'nearest',
       damage: 22,
-      shape: { kind: 'drop', targets: 4, emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      shape: { kind: 'drop', targets: 4, look: { emoji: '1f319', size: 1.0 }, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
   forms: [
@@ -1157,7 +1181,7 @@ const DAYNIGHT_BOSS = {
       cooldownMs: 4600,
       aim: 'nearest',
       damage: 22,
-      shape: { kind: 'drop', targets: 4, emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      shape: { kind: 'drop', targets: 4, look: { emoji: '1f319', size: 1.0 }, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
       ],
     },
@@ -1188,7 +1212,7 @@ const SPACE_BOSS = {
       firstDelayMs: 1600,
       aim: 'nearest',
       damage: 8,
-      shape: { kind: 'bolt', projectile: { emoji: '1f7e3', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f7e3', size: 0.5, rotationOffsetDeg: 0 }, radius: 0.18, speed: 2.5 }, lifeMs: 5000 },
       repeat: { count: 16, spreadDeg: 360 },
     },
     {
@@ -1232,7 +1256,7 @@ const SPACE_BOSS = {
       cooldownMs: 4600,
       aim: 'nearest',
       damage: 22,
-      shape: { kind: 'drop', targets: 4, emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      shape: { kind: 'drop', targets: 4, look: { emoji: '1f311', size: 1.0 }, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -1261,7 +1285,7 @@ const ICE_BOSS = {
       firstDelayMs: 1500,
       aim: 'nearest',
       damage: 8,
-      shape: { kind: 'bolt', projectile: { emoji: '1f4a0', size: 0.5, radius: 0.17, speed: 3.5, rotationOffsetDeg: 0 }, lifeMs: 4500 },
+      shape: { kind: 'bolt', projectile: { look: { emoji: '1f4a0', size: 0.5, rotationOffsetDeg: 0 }, radius: 0.17, speed: 3.5 }, lifeMs: 4500 },
       repeat: { count: 7, spreadDeg: 100 },
       onHit: [{ kind: 'slow', factor: 0.6, durationMs: 1500 }],
     },
@@ -1285,11 +1309,11 @@ const ICE_BOSS = {
       firstDelayMs: 3000,
       aim: 'nearest',
       damage: 20,
-      shape: { kind: 'drop', targets: 3, emoji: '1f537', size: 1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
+      shape: { kind: 'drop', targets: 3, look: { emoji: '1f537', size: 1 }, fromAbove: 4, dropMs: 240, staggerMs: 90 },
       onHit: [{ kind: 'ground', def: { radius: 1.8, durationMs: 5000, tickMs: 0, damage: 0, color: 0xb3e5fc, fillAlpha: 0.3, lineAlpha: 0.6, enterMs: 150, traction: 0.15 } }],
     },
   ],
-  onLethal: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'form', to: 0, ms: 6000, onEnd: [{ kind: 'healRatio', ratio: 1 }] }],
+  reactions: [{ on: 'lethal', to: 'self', effects: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'form', to: 0, ms: 6000, onEnd: [{ kind: 'healRatio', ratio: 1 }] }] }],
   forms: [{ emoji: '1f95a', name: '冰蛋', span: [0, 3], stats: { mul: { scale: 0.7, moveSpeed: 0, dodge: 0 } }, anchored: true, drive: { kind: 'stay' }, abilities: [], damage: 0 }],
 } satisfies EnemyDef
 

@@ -2,15 +2,15 @@ import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import { Depth, Faction, Homing, Linger, PrevPos, Proj, Projectile, Quad, Sprite, Tint, Transform, Vel, VisOff } from '../components'
-import { projHitUids, projOnHit, projSrc } from '../store'
-import type { Effect } from '../../types/abilityDefs'
+import { projHitUids, projOnHit, projSplit, projSrc } from '../store'
+import type { Effect, Split } from '../../types/abilityDefs'
 import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
 /** 抛射最近抛出这么远，像素：贴脸的目标也画得出一道弧 */
 const MIN_LOB_PX = 24
 
-interface BoltSpec {
+export interface BoltSpec {
   readonly faction: number
   readonly frame: number
   readonly size: number
@@ -33,6 +33,7 @@ interface BoltSpec {
   /** 撞上障碍时的破坏力；through 为真的不受障碍阻挡 */
   readonly breach?: number
   readonly through?: boolean
+  readonly split?: Split
 }
 
 /** 平射的来源只打占着它此刻离地 z 米这个高度的身体 */
@@ -88,5 +89,20 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   projOnHit[eid] = spec.onHit
   projHitUids[eid] = new Set()
   projSrc[eid] = arc > 0 ? spec.src : flatSource(spec.src, Proj.z[eid]!)
+  if (spec.split) projSplit[eid] = { spec, split: spec.split }
   return eid
+}
+
+/** 弹体裂开：从它此刻的位置沿飞行方向在扇面里散开再射几发，阵营与来源取它此刻的（被反弹的算反弹方），伤害打折，已经打中过的不再打，裂出来的不再裂 */
+export function splitBolt(sim: Sim, eid: number): void {
+  const sp = projSplit[eid]
+  const src = projSrc[eid]
+  if (!sp || !src) return
+  const { count, spreadDeg, ratio } = sp.split
+  const heading = Math.atan2(Vel.y[eid]!, Vel.x[eid]!)
+  for (let i = 0; i < count; i++) {
+    const angle = count > 1 ? heading + spreadDeg * DEG2RAD * (i / (count - 1) - 0.5) : heading
+    const child = spawnBolt(sim, Transform.x[eid]!, Transform.y[eid]!, angle, { ...sp.spec, faction: Faction.v[eid]!, src, damage: Proj.damage[eid]! * ratio, h: Proj.z[eid]!, arc: 0, reach: undefined, split: undefined })
+    projHitUids[child] = new Set(projHitUids[eid])
+  }
 }
