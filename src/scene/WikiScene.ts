@@ -10,12 +10,12 @@ import type { PageFrame } from '../ui'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { SceneKey } from './keys'
-import type { DevProvider, DevProviderHost } from '../devtools'
+import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
 const ALL_TAB = -1
 const ICON = 100
 
-export class WikiScene extends Phaser.Scene implements DevProviderHost {
+export class WikiScene extends Phaser.Scene implements DevTabsHost {
   private preserveOnRestart = false
   private category = 0
   private focusedIndex = 0
@@ -229,14 +229,13 @@ export class WikiScene extends Phaser.Scene implements DevProviderHost {
     this.scene.restart()
   }
 
-  devProvider(): DevProvider {
+  devTabs(): DevSceneTabs {
     return {
-      id: 'wiki',
-      title: '图鉴页',
-      sections: [
+      title: '图鉴',
+      tabs: [
         {
           id: 'wiki',
-          title: '图鉴页',
+          title: '图鉴',
           items: () => [
             {
               kind: 'action',

@@ -17,15 +17,11 @@ import { browserStorage, StorageKey } from './util/storage'
 import { getRun } from './run/state'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
-import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
-import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, setGameArea, viewport } from './util/apply'
+import { initSfx, setSfxEnabled } from './audio/sfx'
+import { isStandalone, nudgeIosViewport, refreshViewport, setGameArea, viewport } from './util/apply'
 import { FONT_FAMILY, TONE } from './ui/theme'
-import { installDevTools, layoutDock, registerGameProvider } from './devtools'
-import { appProvider } from './dev/app'
-import { audioProvider } from './dev/audio'
-import { emojiProvider } from './dev/emoji'
-import { runProvider } from './dev/run'
-import { settingsProvider } from './dev/settings'
+import { installDevTools, layoutDock } from './devtools'
+import { registerGameDevTabs } from './dev'
 import { SceneKey } from './scene/keys'
 
 initSfx()
@@ -49,22 +45,12 @@ installDevTools(game, {
   key: SceneKey.DevTools,
   storageKey: StorageKey.DevTools,
   accent: TONE.accent.face,
-  font: { family: FONT_FAMILY, size: 13 },
+  font: { family: FONT_FAMILY },
   build: { hash: __BUILD_HASH__, time: __BUILD_TIME__ },
-  layout: (scene) => {
-    applyCamera(scene)
-    return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets }
-  },
   relayout: () => refreshViewport(game),
-  onTap: () => playSfx('click'),
 })
 setGameArea(layoutDock)
-
-registerGameProvider(appProvider(game))
-registerGameProvider(runProvider(game))
-registerGameProvider(settingsProvider())
-registerGameProvider(audioProvider())
-registerGameProvider(emojiProvider(game))
+registerGameDevTabs(game)
 
 game.events.once(Phaser.Core.Events.READY, () => {
   refreshViewport(game, true)

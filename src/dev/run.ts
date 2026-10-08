@@ -1,10 +1,7 @@
-import type Phaser from 'phaser'
-import type { DevProvider, DevSection } from '../devtools'
+import type { DevTab } from '../devtools'
 import { CHARACTERS } from '../data/characters'
 import { MAPS } from '../data/maps'
-import { currentRun, endRun, runDef, stepsOf } from '../run/state'
-import { SceneKey } from '../scene/keys'
-import { gotoScene } from './nav'
+import { currentRun, runDef, stepsOf } from '../run/state'
 
 function runText(): string {
   const run = currentRun()
@@ -17,47 +14,7 @@ function runText(): string {
   ].join('\n')
 }
 
-/** 游戏级：一局的状态与页面直跳，与当前停在哪一页无关 */
-function runSections(game: Phaser.Game): DevSection[] {
-  return [
-    {
-      id: 'status',
-      title: '对局',
-      items: () => [
-        { kind: 'text', mono: true, read: runText },
-        {
-          kind: 'buttons',
-          buttons: [
-            { label: '金币 +100', run: () => void (currentRun() && (currentRun()!.coins += 100)) },
-            { label: '金币 +1000', run: () => void (currentRun() && (currentRun()!.coins += 1000)) },
-            {
-              label: '结束本局回主菜单',
-              run: (): void => {
-                endRun()
-                gotoScene(game, SceneKey.Menu)
-              },
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'pages',
-      title: '页面',
-      items: () => [
-        {
-          kind: 'buttons',
-          buttons: [
-            { label: '图鉴', run: () => gotoScene(game, SceneKey.Wiki) },
-            { label: 'Studio', run: () => gotoScene(game, SceneKey.Studio) },
-            { label: '设置页', run: () => gotoScene(game, SceneKey.Settings) },
-          ],
-        },
-      ],
-    },
-  ]
-}
-
-export function runProvider(game: Phaser.Game): DevProvider {
-  return { id: 'run', title: '对局', sections: runSections(game) }
+/** 只读：改对局的作弊放在能正确处理它的场景里，战斗中的改动要录进录像 */
+export function runTab(): DevTab {
+  return { id: 'run', title: '对局', items: () => [{ kind: 'text', mono: true, read: runText }] }
 }

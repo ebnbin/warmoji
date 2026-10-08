@@ -1,48 +1,45 @@
 import type Phaser from 'phaser'
 import { setDevConfig } from './config'
-import { startLogCapture } from './log'
 import { installHistory } from './history'
-import { installInspect } from './inspect'
 import { installInputWatch } from './inputWatch'
-import { DevToolsScene } from './scene'
-import { installTimeControl } from './timeControl'
-import type { DevToolsConfig } from './types'
-
-import { registerDevProvider } from './registry'
+import { installInspect } from './inspect'
+import { startLogCapture } from './log'
+import { DevOverlayScene } from './overlayScene'
+import { registerTabs } from './registry'
 import { installSceneHosts } from './sceneHosts'
-import type { DevProvider } from './types'
+import { installTimeControl } from './timeControl'
+import type { DevTab, DevToolsConfig } from './types'
 
-export { defineDevChoice, defineDevFlag, devChoice, devFlag, devFlagItem, setDevChoice, setDevFlag } from './flags'
-export type { DevChoiceDef, DevFlagDef } from './flags'
-export { markMetrics as markPerf, resetMetrics as resetPerf } from './metrics'
+export { devChoice, devFlag } from './flags'
+export type { DevChoice, DevFlag } from './flags'
+export { addOverlayPainter } from './overlay'
+export type { OverlayCtx, OverlayPainter } from './overlay'
+export { markMetrics, resetMetrics } from './metrics'
 export { refreshDevPanel } from './registry'
-export { setTimeScale, timeScale, TIME_SCALES } from './timeControl'
 export { pickOnce } from './inspect'
 export { layoutDock } from './dock'
 export type { DevSize } from './dock'
-
-/** 游戏级能力：与具体 scene 无关，随游戏常驻；scene 专有能力改由 scene 实现 devProvider() */
-export function registerGameProvider(provider: DevProvider): () => void {
-  return registerDevProvider(provider, 'game')
-}
 export type {
   DevActionItem,
   DevButtonsItem,
   DevChoiceItem,
   DevCustomItem,
-  DevFlagsItem,
-  DevInsets,
   DevItem,
-  DevLayout,
+  DevLayer,
+  DevMultiItem,
   DevOption,
-  DevProvider,
-  DevProviderHost,
-  DevScope,
-  DevSection,
+  DevSceneTabs,
+  DevTab,
+  DevTabsHost,
   DevTextItem,
   DevToggleItem,
   DevToolsConfig,
 } from './types'
+
+/** 游戏层页签：与当前在哪个 scene 无关，一直都在 */
+export function registerGameTab(tab: DevTab): () => void {
+  return registerTabs('game', '', '', [tab])
+}
 
 let installed = false
 
@@ -57,7 +54,7 @@ export function installDevTools(game: Phaser.Game, config: DevToolsConfig = {}):
   installInputWatch(game)
   installHistory(game)
   installSceneHosts(game, cfg.key)
-  game.scene.add(cfg.key, DevToolsScene, true)
+  game.scene.add(cfg.key, DevOverlayScene, true)
   const host = document.createElement('div')
   host.className = 'dt'
   document.body.appendChild(host)

@@ -65,7 +65,7 @@
 .dt-panel.float {
   top: calc(12px + env(safe-area-inset-top));
   bottom: calc(12px + env(safe-area-inset-bottom));
-  width: min(var(--dt-float-w), calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  width: min(360px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
   background: rgb(11 13 18 / 0.93);
   border: 1px solid color-mix(in srgb, var(--dt-accent) 35%, transparent);
   border-radius: 12px;
@@ -201,6 +201,18 @@
   font-weight: 600;
 }
 
+.dt-cap-desc {
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.dt-owner {
+  align-self: center;
+  margin-left: 4px;
+  color: #9a9aa8;
+  font-size: 0.85em;
+}
+
 .dt-text,
 .dt-log {
   white-space: pre-wrap;
@@ -332,11 +344,11 @@
   border-color: color-mix(in srgb, var(--dt-accent) 45%, transparent);
 }
 
-.dt-root .dt-chip.dt-group {
+.dt-root .dt-chip.dt-layer {
   color: #9a9aa8;
 }
 
-.dt-root .dt-chip.dt-group.on {
+.dt-root .dt-chip.dt-layer.on {
   border-color: color-mix(in srgb, var(--dt-accent) 70%, transparent);
   background: color-mix(in srgb, var(--dt-accent) 16%, transparent);
   color: var(--dt-accent);

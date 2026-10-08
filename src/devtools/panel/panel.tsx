@@ -1,50 +1,34 @@
 import type Phaser from 'phaser'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, ReactNode } from 'react'
 import { devConfig } from '../config'
 import { dockRange, setDockSize, setPanelMode, setPanelOpen } from '../dock'
 import type { DockState } from '../dock'
 import { LOG_CHANGED, logEvents } from '../log'
-import { listDevProviders, PANEL_REFRESH, REGISTRY_CHANGED, registryEvents } from '../registry'
-import type { DevProviderEntry } from '../registry'
+import { listTabs, PANEL_REFRESH, REGISTRY_CHANGED, registryEvents } from '../registry'
 import { devSettings, updateDevSettings } from '../settings'
 import { timeScale } from '../timeControl'
-import type { DevScope, DevSection } from '../types'
+import type { DevLayer } from '../types'
 import { Item, keepFocus } from './items'
 import type { Tap } from './items'
 import { useEvent, useLive } from './live'
 
-const GROUPS: readonly { readonly scope: DevScope; readonly label: string }[] = [
-  { scope: 'scene', label: '场景' },
-  { scope: 'game', label: '游戏' },
-  { scope: 'engine', label: '引擎' },
+const LAYERS: readonly { readonly layer: DevLayer; readonly label: string }[] = [
+  { layer: 'scene', label: '场景' },
+  { layer: 'game', label: '游戏' },
+  { layer: 'engine', label: '引擎' },
 ]
 
-interface Tab {
-  readonly key: string
-  readonly label: string
-  readonly section: DevSection
-}
-
-function tabsOf(entries: readonly DevProviderEntry[]): Tab[] {
-  const multi = entries.length > 1
-  return entries.flatMap((e) =>
-    e.provider.sections.map((section) => ({
-      key: `${e.scope}/${e.provider.id}/${section.id}`,
-      label: multi && e.provider.sections.length > 1 ? `${e.provider.title}·${section.title}` : section.title,
-      section,
-    })),
-  )
-}
-
-const HINT: Readonly<Record<DevScope, string>> = {
-  scene: '当前活动的 scene 都没有注册能力：让 scene 实现 devProvider()',
-  game: '游戏还没有注册能力：用 registerGameProvider',
-  engine: '没有引擎能力',
+const HINT: Readonly<Record<DevLayer, string>> = {
+  scene: '当前活动的 scene 都没有页签：让 scene 实现 devTabs()',
+  game: '游戏还没有页签：用 registerGameTab 注册',
+  engine: '没有引擎页签',
 }
 
 const scrollByTab = new Map<string, number>()
-const tabByGroup = new Map<DevScope, string>()
+const tabByLayer = new Map<DevLayer, string>()
+
+const ownersOf = (layer: DevLayer): string[] => [...new Set(listTabs(layer).map((e) => e.owner))].filter((o) => o !== '')
 
 /** 面板开着时画布变小、填充变少，帧率要对照画布大小看 */
 function Meter({ game }: { readonly game: Phaser.Game }): ReactNode {
@@ -100,24 +84,18 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
   const body = useRef<HTMLDivElement>(null)
   const s = devSettings()
   const tap: Tap = (fn) => (): void => {
-    cfg.onTap()
     fn()
     setVersion((v) => v + 1)
   }
-  const tabs = tabsOf(listDevProviders(s.group))
-  const current = tabs.find((t) => t.key === s.tab) ?? tabs[0]
+  const entries = listTabs(s.layer)
+  const current = entries.find((e) => e.key === s.tab) ?? entries[0]
   const key = current?.key ?? ''
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = scrollByTab.get(key) ?? 0
   }, [key])
+  const owners = ownersOf(s.layer)
   const docked = s.mode === 'dock' && dock.size > 0
-  const style = (
-    docked ? (dock.edge === 'right' ? { width: dock.size } : { height: dock.size }) : { '--dt-float-w': s.wide ? '560px' : '360px' }
-  ) as CSSProperties
-  const click = (fn: () => void) => (): void => {
-    cfg.onTap()
-    fn()
-  }
+  const style: CSSProperties | undefined = docked ? (dock.edge === 'right' ? { width: dock.size } : { height: dock.size }) : undefined
   return (
     <section className={docked ? `dt-panel dock ${dock.edge}` : `dt-panel float ${s.side}`} style={style}>
       {docked && <Divider dock={dock} />}
@@ -132,67 +110,70 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
         <span className="dt-grow" />
         <span className="dt-seg">
           {(['dock', 'float'] as const).map((m) => (
-            <button key={m} className={s.mode === m ? 'on' : ''} onMouseDown={keepFocus} onClick={click(() => setPanelMode(m))}>
+            <button key={m} className={s.mode === m ? 'on' : ''} onMouseDown={keepFocus} onClick={() => setPanelMode(m)}>
               {m === 'dock' ? '停靠' : '悬浮'}
             </button>
           ))}
         </span>
         {!docked && (
-          <button className="dt-btn" onMouseDown={keepFocus} onClick={click(() => updateDevSettings({ side: s.side === 'right' ? 'left' : 'right' }))}>
+          <button className="dt-btn" onMouseDown={keepFocus} onClick={() => updateDevSettings({ side: s.side === 'right' ? 'left' : 'right' })}>
             {s.side === 'right' ? '靠左' : '靠右'}
           </button>
         )}
-        <button className="dt-btn" onMouseDown={keepFocus} onClick={click(() => setPanelOpen(false))}>
+        <button className="dt-btn" onMouseDown={keepFocus} onClick={() => setPanelOpen(false)}>
           收起
         </button>
       </header>
       <nav className="dt-chips dt-bar">
-        {GROUPS.map((g) => {
-          const entries = listDevProviders(g.scope)
-          const n = entries.reduce((sum, e) => sum + e.provider.sections.length, 0)
-          const owners = g.scope === 'scene' ? entries.map((e) => e.owner ?? e.provider.title).join('·') : ''
-          const on = g.scope === s.group
+        {LAYERS.map((l) => {
+          const n = listTabs(l.layer).length
+          const who = ownersOf(l.layer)
+          const on = l.layer === s.layer
           return (
             <button
-              key={g.scope}
-              className={on ? 'dt-chip dt-group on' : 'dt-chip dt-group'}
+              key={l.layer}
+              className={on ? 'dt-chip dt-layer on' : 'dt-chip dt-layer'}
               onMouseDown={keepFocus}
-              onClick={on ? undefined : click(() => updateDevSettings({ group: g.scope, tab: tabByGroup.get(g.scope) ?? null }))}
+              onClick={on ? undefined : () => updateDevSettings({ layer: l.layer, tab: tabByLayer.get(l.layer) ?? null })}
             >
-              {`${g.label} ${n}${owners ? ` · ${owners}` : ''}`}
+              {`${l.label} ${n}${who.length > 0 ? ` · ${who.join('·')}` : ''}`}
             </button>
           )
         })}
       </nav>
-      {tabs.length > 0 ? (
+      {entries.length > 0 ? (
         <nav className="dt-chips dt-bar">
-          {tabs.map((t) => {
-            const badge = t.section.badge?.() ?? ''
-            const on = t === current
+          {entries.map((e, i) => {
+            const badge = e.tab.badge?.() ?? ''
+            const on = e === current
+            // 同时有几个 scene 带页签时，页签不止一个的 scene 先标出名字
+            const lead = owners.length > 1 && e.owner !== entries[i - 1]?.owner && entries.filter((x) => x.owner === e.owner).length > 1
             return (
-              <button
-                key={t.key}
-                className={on ? 'dt-chip on' : 'dt-chip'}
-                onMouseDown={keepFocus}
-                onClick={
-                  on
-                    ? undefined
-                    : click(() => {
-                        tabByGroup.set(s.group, t.key)
-                        updateDevSettings({ tab: t.key })
-                      })
-                }
-              >
-                {badge === '' ? t.label : `${t.label} ${badge}`}
-              </button>
+              <Fragment key={e.key}>
+                {lead && <span className="dt-owner">{e.owner}</span>}
+                <button
+                  className={on ? 'dt-chip on' : 'dt-chip'}
+                  onMouseDown={keepFocus}
+                  onClick={
+                    on
+                      ? undefined
+                      : () => {
+                          tabByLayer.set(s.layer, e.key)
+                          updateDevSettings({ tab: e.key })
+                        }
+                  }
+                >
+                  {badge === '' ? e.tab.title : `${e.tab.title} ${badge}`}
+                </button>
+              </Fragment>
             )
           })}
         </nav>
       ) : (
-        <div className="dt-bar dt-muted">{HINT[s.group]}</div>
+        <div className="dt-bar dt-muted">{HINT[s.layer]}</div>
       )}
       <div className="dt-body" ref={body} onScroll={(e) => scrollByTab.set(key, e.currentTarget.scrollTop)}>
-        {current?.section.items().map((item, i) => <Item key={`${key}/${i}`} item={item} tap={tap} />)}
+        {current?.tab.items().map((item, i) => <Item key={`${key}/${i}`} item={item} tap={tap} />)}
       </div>
     </section>
   )

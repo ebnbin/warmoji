@@ -38,8 +38,9 @@ export function sceneItems(game: Phaser.Game, devKey: string): DevItem[] {
           ? [{ label: '继续', run: (): void => void m.resume(key) }, restart, stop]
           : st === Phaser.Scenes.SLEEPING
             ? [{ label: '唤醒', run: (): void => void m.wake(key) }, stop]
-            : [{ label: '启动', run: (): void => void m.start(key) }]
-    items.push({ kind: 'buttons', label: `${key} · ${sceneStatus(s)}`, buttons })
+            : null
+    // 启动一个 scene 往往要带数据，只有宿主知道带什么：跳页面归游戏层
+    if (buttons) items.push({ kind: 'buttons', label: key, desc: sceneStatus(s), buttons })
   }
   return items
 }

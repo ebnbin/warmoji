@@ -35,7 +35,6 @@ export function App({ game }: { readonly game: Phaser.Game }): ReactNode {
     if (code === null) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.code !== code || e.repeat || typing(e.target)) return
-      devConfig().onTap()
       setPanelOpen(!devSettings().open)
     }
     window.addEventListener('keydown', onKey, true)

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { COLOR } from './draw'
+import { MARK } from './draw'
 import { addOverlayPainter } from './overlay'
 import type { OverlayCtx } from './overlay'
 import type { DevItem } from './types'
@@ -56,7 +56,7 @@ function paint(g: Phaser.GameObjects.Graphics, ctx: OverlayCtx): void {
   for (const p of game.input.pointers) {
     if (!p.active) continue
     const l = ctx.canvasToLocal(p.x, p.y)
-    const color = p.isDown ? COLOR.warn : 0x80cbc4
+    const color = p.isDown ? MARK.hot : MARK.cold
     g.lineStyle(2, color, 0.9)
     g.strokeCircle(l.x, l.y, 24)
     g.lineBetween(l.x - 34, l.y, l.x + 34, l.y)
@@ -68,7 +68,7 @@ export function inputItems(): DevItem[] {
   return [
     { kind: 'toggle', label: '显示触点', desc: '在画面上标出每个活动指针的位置', get: () => showPointers, set: (on) => (showPointers = on) },
     { kind: 'text', label: '指针', mono: true, read: pointerText },
-    { kind: 'text', label: '键盘 · KeyboardEvent.code', mono: true, read: keyText },
+    { kind: 'text', label: '键盘', desc: 'KeyboardEvent.code', mono: true, read: keyText },
     { kind: 'text', label: '手柄', mono: true, read: gamepadText },
   ]
 }

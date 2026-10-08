@@ -1,19 +1,20 @@
 import Phaser from 'phaser'
-import { registerDevProvider } from './registry'
-import type { DevProviderHost } from './types'
+import { registerTabs } from './registry'
+import type { DevTabsHost } from './types'
 
 let game: Phaser.Game | undefined
 let devKey = ''
 const attached = new WeakSet<Phaser.Scene>()
 const unregisters = new WeakMap<Phaser.Scene, () => void>()
 
-function isHost(scene: Phaser.Scene): scene is Phaser.Scene & DevProviderHost {
-  return typeof (scene as Partial<DevProviderHost>).devProvider === 'function'
+function isHost(scene: Phaser.Scene): scene is Phaser.Scene & DevTabsHost {
+  return typeof (scene as Partial<DevTabsHost>).devTabs === 'function'
 }
 
-function register(scene: Phaser.Scene & DevProviderHost): void {
+function register(scene: Phaser.Scene & DevTabsHost): void {
   unregisters.get(scene)?.()
-  unregisters.set(scene, registerDevProvider(scene.devProvider(), 'scene', scene.scene.key))
+  const own = scene.devTabs()
+  unregisters.set(scene, registerTabs('scene', scene.scene.key, own.title, own.tabs))
 }
 
 function unregister(scene: Phaser.Scene): void {
@@ -35,7 +36,7 @@ export function installSceneHosts(g: Phaser.Game, devSceneKey: string): void {
   devKey = devSceneKey
 }
 
-/** 实现了 devProvider() 的 scene 由库按 CREATE / SHUTDOWN 自动注册与注销；每帧扫一遍以接住运行期新增的 scene */
+/** 每帧扫一遍，接住运行期新增的 scene */
 export function syncSceneHosts(): void {
   if (!game) return
   for (const scene of game.scene.getScenes(false)) {

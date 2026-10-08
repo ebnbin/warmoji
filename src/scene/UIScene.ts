@@ -10,7 +10,7 @@ import { AimGuide, Announcer, StageDial, Chip, DialButton, hasModal, Icon, IconB
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
-import type { DevProvider, DevProviderHost } from '../devtools'
+import type { DevSceneTabs, DevTabsHost } from '../devtools'
 import { handoverMs } from '../ecs/systems/shared/squad'
 import { staminaTone } from './statLines'
 
@@ -40,7 +40,7 @@ const XP_BAR = { x: 12, y: 12, w: 200, h: 16, gap: 12 } as const
 /** 地图专属的表盘放在右上角计数下方：盘心离右边与上边多远、盘的半径 */
 const DIAL = { right: 64, top: 166, radius: 52 } as const
 
-export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
+export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
   private joystick?: Joystick
   private xpBar!: ProgressBar
   private levelLabel!: Label
@@ -494,18 +494,18 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (s.reward) new Label(this, cx, cy + 84, s.reward, { kind: 'heading', color: 'good', outline: true }).setOrigin(0.5).setDepth(DEPTH.waveEnd + 1)
   }
 
-  devProvider(): DevProvider {
+  devTabs(): DevSceneTabs {
     return {
-      id: 'ui',
       title: 'HUD',
-      sections: [
+      tabs: [
         {
           id: 'hud',
           title: 'HUD',
           items: () => [
             {
               kind: 'buttons',
-              label: '预览提示 · 不必等战斗里真的发生',
+              label: '预览提示',
+              desc: '不必等战斗里真的发生',
               buttons: [
                 { label: '波次预警', run: () => this.onWaveWarning({ title: '预览：精英来袭', sub: '开发者工具触发的预警文案' }) },
                 { label: '拾取提示', run: () => this.onFieldCollected({ emoji: PICKUPS.coin.emoji, name: '预览拾取', desc: '开发者工具触发', polarity: 'buff' }) },

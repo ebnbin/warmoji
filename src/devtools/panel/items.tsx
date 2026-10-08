@@ -1,9 +1,9 @@
 import { Component } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
-import type { DevButtonsItem, DevChoiceItem, DevFlagsItem, DevItem, DevOption, DevTextItem, DevToggleItem } from '../types'
+import type { DevButtonsItem, DevChoiceItem, DevItem, DevMultiItem, DevOption, DevTextItem, DevToggleItem } from '../types'
 import { useLive } from './live'
 
-/** 包一层点击：执行后重建条目，并给出点按反馈 */
+/** 包一层点击：执行后重建条目 */
 export type Tap = (fn: () => void) => () => void
 
 /** 按下不抢焦点：点完面板，键盘照样操作游戏 */
@@ -11,15 +11,21 @@ export function keepFocus(e: MouseEvent): void {
   e.preventDefault()
 }
 
-function Caption({ text }: { readonly text: string | undefined }): ReactNode {
-  return text === undefined ? null : <div className="dt-cap">{text}</div>
+function Caption({ text, desc }: { readonly text: string | undefined; readonly desc?: string }): ReactNode {
+  if (text === undefined) return null
+  return (
+    <div className="dt-cap">
+      {text}
+      {desc !== undefined && <span className="dt-cap-desc">{desc}</span>}
+    </div>
+  )
 }
 
 function TextView({ item }: { readonly item: DevTextItem }): ReactNode {
   const text = useLive(item.read)
   return (
     <div>
-      <Caption text={item.label} />
+      <Caption text={item.label} desc={item.desc} />
       {text !== '' && <div className={item.mono ? 'dt-text dt-mono' : 'dt-text'}>{text}</div>}
     </div>
   )
@@ -56,16 +62,17 @@ function ToggleView({ item, tap }: { readonly item: DevToggleItem; readonly tap:
 
 interface ChipsProps {
   readonly label: string | undefined
+  readonly desc?: string
   readonly options: readonly DevOption[]
   readonly isOn: readonly boolean[]
   readonly pick: (o: DevOption) => void
   readonly tap: Tap
 }
 
-function Chips({ label, options, isOn, pick, tap }: ChipsProps): ReactNode {
+function Chips({ label, desc, options, isOn, pick, tap }: ChipsProps): ReactNode {
   return (
     <div>
-      <Caption text={label} />
+      <Caption text={label} desc={desc} />
       <div className="dt-chips">
         {options.map((o, i) => (
           <button key={o.id} className={isOn[i] ? 'dt-chip on' : 'dt-chip'} onMouseDown={keepFocus} onClick={tap(() => pick(o))}>
@@ -80,11 +87,11 @@ function Chips({ label, options, isOn, pick, tap }: ChipsProps): ReactNode {
 function ChoiceView({ item, tap }: { readonly item: DevChoiceItem; readonly tap: Tap }): ReactNode {
   const cur = useLive(item.get)
   if (!item.options.some((o) => o.desc !== undefined)) {
-    return <Chips label={item.label} options={item.options} isOn={item.options.map((o) => o.id === cur)} pick={(o) => item.set(o.id)} tap={tap} />
+    return <Chips label={item.label} desc={item.desc} options={item.options} isOn={item.options.map((o) => o.id === cur)} pick={(o) => item.set(o.id)} tap={tap} />
   }
   return (
     <div className="dt-list">
-      <Caption text={item.label} />
+      <Caption text={item.label} desc={item.desc} />
       {item.options.map((o) => (
         <Row key={o.id} label={o.label} desc={o.desc} on={o.id === cur} onClick={tap(() => item.set(o.id))} />
       ))}
@@ -92,15 +99,15 @@ function ChoiceView({ item, tap }: { readonly item: DevChoiceItem; readonly tap:
   )
 }
 
-function FlagsView({ item, tap }: { readonly item: DevFlagsItem; readonly tap: Tap }): ReactNode {
+function MultiView({ item, tap }: { readonly item: DevMultiItem; readonly tap: Tap }): ReactNode {
   const mask = useLive(() => item.options.map((o) => (item.has(o.id) ? '1' : '0')).join(''))
-  return <Chips label={item.label} options={item.options} isOn={[...mask].map((c) => c === '1')} pick={(o) => item.toggle(o.id)} tap={tap} />
+  return <Chips label={item.label} desc={item.desc} options={item.options} isOn={[...mask].map((c) => c === '1')} pick={(o) => item.toggle(o.id)} tap={tap} />
 }
 
 function ButtonsView({ item, tap }: { readonly item: DevButtonsItem; readonly tap: Tap }): ReactNode {
   return (
     <div>
-      <Caption text={item.label} />
+      <Caption text={item.label} desc={item.desc} />
       <div className="dt-chips">
         {item.buttons.map((b, i) => (
           <button key={i} className="dt-chip dt-action" onMouseDown={keepFocus} onClick={tap(b.run)}>
@@ -122,12 +129,17 @@ function ItemView({ item, tap }: { readonly item: DevItem; readonly tap: Tap }):
       return <ToggleView item={item} tap={tap} />
     case 'choice':
       return <ChoiceView item={item} tap={tap} />
-    case 'flags':
-      return <FlagsView item={item} tap={tap} />
+    case 'multi':
+      return <MultiView item={item} tap={tap} />
     case 'buttons':
       return <ButtonsView item={item} tap={tap} />
     case 'custom':
-      return item.render()
+      return (
+        <div>
+          <Caption text={item.label} desc={item.desc} />
+          {item.render()}
+        </div>
+      )
   }
 }
 

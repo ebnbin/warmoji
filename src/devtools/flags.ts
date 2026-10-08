@@ -1,96 +1,66 @@
-import { refreshDevPanel } from './registry'
 import { devSettings, updateDevSettings } from './settings'
-import type { DevItem, DevOption, DevToggleItem } from './types'
+import type { DevChoiceItem, DevOption, DevToggleItem } from './types'
 
-export interface DevFlagDef {
+/** 存下来的开发开关：调用即读当前值，item 由定义它的那一层摆进自己的页签 */
+export interface DevFlag {
+  (): boolean
+  readonly item: DevToggleItem
+}
+
+export interface DevChoice<T extends string> {
+  (): T
+  readonly item: DevChoiceItem
+}
+
+interface FlagDef {
   readonly id: string
   readonly label: string
   readonly desc?: string
-  readonly group?: string
   readonly default?: boolean
 }
 
-export interface DevChoiceDef {
+interface ChoiceDef<T extends string> {
   readonly id: string
   readonly label: string
   readonly desc?: string
-  readonly group?: string
-  readonly options: readonly DevOption[]
-  readonly default: string
+  readonly options: readonly (DevOption & { readonly id: T })[]
+  readonly default: T
 }
 
-const flagDefs = new Map<string, DevFlagDef>()
-const choiceDefs = new Map<string, DevChoiceDef>()
+const ids = new Set<string>()
 
-export function devFlag(id: string): boolean {
-  const def = flagDefs.get(id)
-  return devSettings().flags[id] ?? def?.default ?? false
+function claim(id: string): void {
+  if (ids.has(id)) throw new Error(`开发开关 id 重复：${id}`)
+  ids.add(id)
 }
 
-export function setDevFlag(id: string, on: boolean): void {
-  updateDevSettings({ flags: { ...devSettings().flags, [id]: on } })
-}
-
-/** 业务用返回的读取函数在任意位置分支；开关自动出现在"开关"页签并持久化 */
-export function defineDevFlag(def: DevFlagDef): () => boolean {
-  if (flagDefs.has(def.id)) throw new Error(`devtools 开关 id 重复：${def.id}`)
-  flagDefs.set(def.id, def)
-  refreshDevPanel()
-  return () => devFlag(def.id)
-}
-
-/** 让 provider 把自己的开关放进自己的页签 */
-export function devFlagItem(id: string): DevToggleItem {
-  const def = flagDefs.get(id)
-  if (!def) throw new Error(`devtools 开关未定义：${id}`)
-  return { kind: 'toggle', label: def.label, desc: def.desc, get: () => devFlag(id), set: (on) => setDevFlag(id, on) }
-}
-
-export function devChoice(id: string): string {
-  const def = choiceDefs.get(id)
-  const v = devSettings().choices[id]
-  if (def && v !== undefined && def.options.some((o) => o.id === v)) return v
-  return def?.default ?? ''
-}
-
-export function setDevChoice(id: string, value: string): void {
-  updateDevSettings({ choices: { ...devSettings().choices, [id]: value } })
-}
-
-export function defineDevChoice(def: DevChoiceDef): () => string {
-  if (choiceDefs.has(def.id)) throw new Error(`devtools 选项 id 重复：${def.id}`)
-  choiceDefs.set(def.id, def)
-  refreshDevPanel()
-  return () => devChoice(def.id)
-}
-
-const withGroup = (group: string | undefined, label: string): string => (group ? `${group} · ${label}` : label)
-
-export function flagItems(): DevItem[] {
-  const items: DevItem[] = []
-  for (const def of flagDefs.values()) {
-    items.push({
-      kind: 'toggle',
-      label: withGroup(def.group, def.label),
-      desc: def.desc,
-      get: () => devFlag(def.id),
-      set: (on) => setDevFlag(def.id, on),
-    })
+export function devFlag(def: FlagDef): DevFlag {
+  claim(def.id)
+  const on = (): boolean => devSettings().flags[def.id] ?? def.default ?? false
+  const item: DevToggleItem = {
+    kind: 'toggle',
+    label: def.label,
+    desc: def.desc,
+    get: on,
+    set: (v) => updateDevSettings({ flags: { ...devSettings().flags, [def.id]: v } }),
   }
-  for (const def of choiceDefs.values()) {
-    items.push({
-      kind: 'choice',
-      label: withGroup(def.group, def.label) + (def.desc ? ` · ${def.desc}` : ''),
-      options: def.options,
-      get: () => devChoice(def.id),
-      set: (id) => setDevChoice(def.id, id),
-    })
+  return Object.assign(on, { item })
+}
+
+/** 存下的值不在选项里时回到默认 */
+export function devChoice<T extends string>(def: ChoiceDef<T>): DevChoice<T> {
+  claim(def.id)
+  const get = (): T => {
+    const v = devSettings().choices[def.id]
+    return def.options.find((o) => o.id === v)?.id ?? def.default
   }
-  if (items.length === 0) items.push({ kind: 'text', read: () => '还没有注册任何开关：业务用 defineDevFlag / defineDevChoice 声明' })
-  items.push({
-    kind: 'action',
-    label: '全部恢复默认',
-    run: () => updateDevSettings({ flags: {}, choices: {} }),
-  })
-  return items
+  const item: DevChoiceItem = {
+    kind: 'choice',
+    label: def.label,
+    desc: def.desc,
+    options: def.options,
+    get,
+    set: (id) => updateDevSettings({ choices: { ...devSettings().choices, [def.id]: id } }),
+  }
+  return Object.assign(get, { item })
 }
