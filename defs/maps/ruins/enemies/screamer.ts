@@ -15,7 +15,7 @@ const SCREAMER = {
   xp: 6,
   coins: 4,
   traits: ['phases'],
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3.5 },
+  drive: { kind: 'standoff', standoffDist: 3.5 },
   abilities: [
     {
       trigger: 'auto',

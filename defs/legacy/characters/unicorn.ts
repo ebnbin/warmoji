@@ -9,7 +9,7 @@ const hornThrust = {
   fireSfx: 'whoosh',
   damage: 26,
   knockback: 9,
-  shape: { kind: 'segment', reach: 2.2, radius: 0.6, ms: 220, lungeDist: 1.0 },
+  shape: { kind: 'segment', reach: 1.2, radius: 0.6, ms: 220, lungeDist: 1.0 },
 } satisfies AbilityDef
 
 const rainbowRush = {

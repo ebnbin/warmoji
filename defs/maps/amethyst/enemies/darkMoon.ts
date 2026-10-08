@@ -15,7 +15,7 @@ const DARK_MOON = {
   damage: 0,
   xp: 6,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 4.5 },
+  drive: { kind: 'standoff', standoffDist: 4.5 },
   abilities: [
     {
       trigger: 'auto',

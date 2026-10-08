@@ -1,6 +1,5 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { EnemyDef } from '../../../../src/types/enemies'
-import { FRAME_U } from '../../../../src/util/units.ts'
 import { patch, shot } from '../../../kit.ts'
 import SPIDERLING from './spiderling.ts'
 
@@ -73,7 +72,7 @@ const SPIDER_QUEEN = {
   xp: 60,
   coins: 60,
   traits: ['anchored', 'wary'],
-  drive: { kind: 'standoff', detectRange: FRAME_U, standoffDist: 4 },
+  drive: { kind: 'standoff', standoffDist: 4 },
   abilities: [webShot, eggSac, pounce],
   phases: [
     { below: 0.6, name: '织网', abilities: [webShot, eggSac, pounce, webDrop] },

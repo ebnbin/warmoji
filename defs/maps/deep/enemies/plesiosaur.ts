@@ -12,7 +12,7 @@ const neckBite = {
   knockback: 2,
   fireSfx: 'gulp',
   windup: { ms: 400, lockAt: 'end', telegraph: 'shake' },
-  shape: { kind: 'segment', reach: 3.2, radius: 0.6, ms: 200, lungeDist: 1.2 },
+  shape: { kind: 'segment', reach: 2, radius: 0.6, ms: 200, lungeDist: 1.2 },
 } satisfies AbilityDef
 
 const waterBolt = {

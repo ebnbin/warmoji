@@ -13,7 +13,7 @@ const eagleGrab = {
   fireSfx: 'whoosh',
   range: 2.2,
   damage: 16,
-  shape: { kind: 'segment', reach: 1.9, radius: 0.5, ms: 200, lungeDist: 1.2 },
+  shape: { kind: 'segment', reach: 0.7, radius: 0.5, ms: 200, lungeDist: 1.2 },
   onHit: [{ kind: 'throw', to: 'foe', distance: 5, ms: 520, height: 1.8, onLand: eagleSlam }],
 } satisfies AbilityDef
 

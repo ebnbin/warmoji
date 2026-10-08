@@ -14,7 +14,7 @@ const MOSQUITO = {
   damage: 10,
   xp: 3,
   coins: 2,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3 },
+  drive: { kind: 'standoff', standoffDist: 3 },
   abilities: [
     {
       trigger: 'auto',

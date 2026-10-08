@@ -2,7 +2,7 @@ import type { EnemyDef } from '../../../src/types/enemies'
 
 const LARVA = {
   kind: 'larva',
-  drive: { kind: 'orbit', radius: 2.5, aggroRange: 6 },
+  drive: { kind: 'orbit', around: 'nest', radius: 2.5, aggroRange: 6 },
   reactions: [{ on: 'anchorLost', to: 'self', effects: [{ kind: 'buff', speedMul: 1.7, damageMul: 2.5 }] }],
   emoji: '1fab0',
   name: '苍蝇',

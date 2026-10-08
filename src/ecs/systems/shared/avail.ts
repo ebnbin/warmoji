@@ -57,10 +57,35 @@ export function spend(sim: Sim, e: number): void {
   }
   payRes(sim, e)
   if (hasComponent(w, e, Stage) && Stage.next[e] !== 0) Stage.open[Stage.next[e]!] = sim.elapsedMs + Stage.window[e]!
-  if (hasComponent(w, e, Turn)) {
-    const next = Turn.next[e]!
-    Turn.active[e] = 0
-    Turn.active[next] = 1
-    Cd.left[next] = Math.max(Cd.left[next]!, Cd.left[e]!)
+  if (hasComponent(w, e, Turn)) handoff(e)
+}
+
+/** 轮流出手交棒：出手权给下一式，冷却接着走 */
+function handoff(e: number): void {
+  const next = Turn.next[e]!
+  Turn.active[e] = 0
+  Turn.stuck[e] = 0
+  Turn.active[next] = 1
+  Cd.left[next] = Math.max(Cd.left[next]!, Cd.left[e]!)
+}
+
+/** 轮到的这一式能出手却没出去：再等它自己一个冷却，还出不去就让给下一式 */
+export function stall(sim: Sim, e: number): void {
+  if (!hasComponent(sim.world, e, Turn)) return
+  if (!Turn.stuck[e]) {
+    Turn.stuck[e] = 1
+    Turn.until[e] = sim.elapsedMs + Cd.base[e]! * cooldownMul(sim, e)
+    return
   }
+  if (sim.elapsedMs >= Turn.until[e]!) handoff(e)
+}
+
+/** 一组轮流出手里此刻轮到的那一式；不轮流的就是它自己 */
+export function turnOf(sim: Sim, e: number): number {
+  const seen = new Set<number>()
+  for (let s = e; hasComponent(sim.world, s, Turn) && !seen.has(s); s = Turn.next[s]!) {
+    if (Turn.active[s]) return s
+    seen.add(s)
+  }
+  return e
 }

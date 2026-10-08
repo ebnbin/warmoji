@@ -90,8 +90,10 @@ export function effectLine(e: Effect, self = false): string {
       const st = STATUSES[e.status]
       return `${st.name}${st.stat && e.value !== undefined ? `（${STATS[st.stat.key].name} ×${e.value}）` : ''} ${sec(e.ms)}`
     }
-    case 'blast':
-      return `命中处爆开 ${grid(e.radius)}，波及 ${pct(e.ratio)} 伤害${e.breach ? `，炸掉约 ${e.breach} 立方米的墙` : ''}`
+    case 'blast': {
+      const hurt = e.amount ? `造成 ${e.amount}${e.ratio ? ` + ${pct(e.ratio)}` : ''} 伤害` : e.ratio ? `波及 ${pct(e.ratio)} 伤害` : '只把人炸开'
+      return `命中处爆开 ${grid(e.radius)}，${hurt}${e.breach ? `，炸掉约 ${e.breach} 立方米的墙` : ''}`
+    }
     case 'slow':
       return e.factor === 0 ? `冻结 ${sec(e.durationMs)}` : `减速 ${pct(1 - e.factor)} ${sec(e.durationMs)}`
     case 'poison':
@@ -210,6 +212,8 @@ export function effectLine(e: Effect, self = false): string {
       return e.who.side === 'self' ? `自身：${joinFx(e.then, true)}` : `${selectorLine(e.who)}：${joinFx(e.then)}`
     case 'chance':
       return `${pct(e.p)} 几率：${joinFx(e.then)}`
+    case 'each':
+      return `在每个目标脚下各一次：${joinFx(e.then)}`
     case 'form':
       return `${e.to < 0 ? '变回本体' : '变身'}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? lead('，结束时', joinFx(e.onEnd)) : ''}`
     case 'grow':
@@ -336,12 +340,12 @@ function shapeLine(w: AbilityDef, s: Shape): string {
     case 'bolt': {
       const p = s.projectile
       const f = p.flight
-      return `弹速 ${grid(p.speed)}/秒 · 弹体 ${grid(p.radius * 2)}${f?.kind === 'arc' ? ` · 抛射（拱起 ${f.peakM} 米，越过比它矮的墙，落下来才打得到人）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${f?.kind === 'homing' ? ` · 追踪（每秒转 ${f.degPerSec}°）` : ''}${p.split ? ` · 打中或飞完裂成 ${p.split.count} 发（每发 ${pct(p.split.ratio)} 伤害）` : ''}${p.linger ? ` · 飞完落地 ${sec(p.linger)} 等召回` : ''}`
+      return `弹速 ${grid(p.speed)}/秒 · 弹体 ${grid(p.radius * 2)}${f?.kind === 'arc' ? ` · 抛射（拱起 ${f.peakM} 米，越过比它矮的墙，落下来才打得到人${w.onHit?.length ? '，落空也在落点结算命中效果' : ''}）` : ''}${s.pierce ? ` · 贯穿 ${s.pierce} 次（敌人或打得穿的障碍）` : ''}${f?.kind === 'homing' ? ` · 追踪（每秒转 ${f.degPerSec}°）` : ''}${p.split ? ` · 打中或飞完裂成 ${p.split.count} 发（每发 ${pct(p.split.ratio)} 伤害）` : ''}${p.linger ? ` · 飞完落地 ${sec(p.linger)} 等召回` : ''}`
     }
     case 'segment':
       return s.beam
         ? `射程 ${grid(s.reach)} · 束宽 ${grid(s.radius * 2)} · 贯穿直线全部敌人`
-        : `触及 ${grid(s.reach)} · 判定 ${grid(s.radius)}${s.lungeDist ? ` · 前冲 ${grid(s.lungeDist)}` : ''}`
+        : `触及 ${grid(s.reach + (s.lungeDist ?? 0))}${s.lungeDist ? `（含前冲 ${grid(s.lungeDist)}）` : ''} · 判定 ${grid(s.radius)}`
     case 'sector':
       return `半径 ${grid(s.radius)} · 弧宽 ${s.arcDeg}°`
     case 'disc':
@@ -357,13 +361,13 @@ function shapeLine(w: AbilityDef, s: Shape): string {
     case 'blink':
       return `索敌 ${grid(w.range ?? 0)} · 瞬移背刺血最厚的敌人 · 出手 ${sec(s.strikeMs)} 无敌${s.execute ? ` · 目标血量低于 ${pct(s.execute.hpRatio)} 时伤害 ×${s.execute.mul}` : ''}`
     case 'sprint':
-      return `朝瞄准方向冲刺 ${grid(s.distance)} · 用时 ${sec(s.ms)}${s.radius ? ` · 判定 ${grid(s.radius)}` : ''}`
+      return `朝瞄准方向冲刺 ${grid(s.distance)} · 用时 ${sec(s.ms)}${s.radius ? ` · 判定 ${grid(s.radius)}` : w.damage || w.knockback || w.onHit?.length ? ' · 判定按身体大小' : ''}`
     case 'leap':
       return `朝瞄准方向跃出 ${grid(s.distance)} · 用时 ${sec(s.ms)} · 落地范围 ${grid(s.radius)}`
     case 'all':
       return s.of === 'foes' ? '全场敌人（含 Boss）' : '全队'
     case 'zone':
-      return `${s.follow ? '以自己为圆心持续生效' : `领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}`}${s.tickMs && w.damage ? ` · 每 ${sec(s.tickMs)} ${w.damage} 伤` : ''}${s.mend ? ` · 队友每秒回复 ${s.mend}` : ''}${s.pulse ? ` · 每 ${sec(s.pulse.intervalMs)} 脉冲一次：${s.pulse.onHit.map((e) => effectLine(e)).join('，')}` : ''}${zoneRuleLine(s, w.onHit, w.damage ?? 0)}`
+      return `${s.follow ? (s.durationMs > 0 ? `跟着自己的领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}，消失后才能再放` : '以自己为圆心持续生效') : `领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}`}${s.tickMs && w.damage ? ` · 每 ${sec(s.tickMs)} ${w.damage} 伤` : ''}${s.mend ? ` · 队友每秒回复 ${s.mend}` : ''}${s.pulse ? ` · 每 ${sec(s.pulse.intervalMs)} 脉冲一次：${s.pulse.onHit.map((e) => effectLine(e)).join('，')}` : ''}${zoneRuleLine(s, w.onHit, w.damage ?? 0)}`
     case 'summon':
       return `每波 ${s.count} 只 · 撞击后自毁 · 存活 ${sec(s.lifeMs)}`
     case 'emplace':
@@ -378,12 +382,14 @@ function repeatLine(w: AbilityDef): string | null {
   if (!r) return null
   const ring = (r.spreadDeg ?? 0) >= 360
   const when = r.everyN ? `每第 ${r.everyN} 次出手` : ''
+  const fan = r.spreadDeg ?? 0
   const how = r.delayMs
-    ? `${r.reaim === 'nearest' ? '重新索敌' : r.reaim === 'random' ? '随机敌人' : ring ? '绕身一周' : '同一方向'}追加 ${r.count - 1} 发，间隔 ${sec(r.delayMs)}`
+    ? `${r.reaim === 'nearest' ? '重新索敌' : r.reaim === 'random' ? '随机敌人' : ring ? '绕身一周' : fan > 0 ? `在 ${fan}° 扇面里扫过去，` : '同一方向'}追加 ${r.count - 1} 发，间隔 ${sec(r.delayMs)}`
     : ring
       ? `${r.count} 发环形散开`
-      : `${r.count} 发扇形散开 ${r.spreadDeg ?? 0}°`
-  return `${lead(when, how)}${r.ratio && r.ratio !== 1 ? `，每发 ${pct(r.ratio)} 伤害` : ''}`
+      : `${r.count} 发扇形散开 ${fan}°`
+  const cut = r.delayMs ? '追加的每发' : ring ? '正对瞄准那发以外每发' : '最中间那发以外每发'
+  return `${lead(when, how)}${r.ratio && r.ratio !== 1 ? `，${cut} ${pct(r.ratio)} 伤害` : ''}`
 }
 
 /** 什么时候能出手：充能、连段、蓄力、弹匣、轮流、资源、以血施法、条件、击杀效果 */

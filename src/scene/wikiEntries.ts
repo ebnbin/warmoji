@@ -39,6 +39,12 @@ const DRIVE_LABEL: Record<EnemyDef['drive']['kind'], string> = {
   march: '朝某处行进',
 }
 
+function driveLabel(d: EnemyDef['drive']): string {
+  if (d.kind === 'chase' && d.at === 'leader') return '追击（盯队长）'
+  if (d.kind === 'orbit' && d.around === 'foe') return '绕人兜圈'
+  return DRIVE_LABEL[d.kind]
+}
+
 const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
   ruins: '残垣（山顶台地上塌了大半的石砌院落，四围枫林橙黄、一地落叶；墙按剩下的高度挡人、挡子弹、挡视线，看不见的敌人不会被自动瞄准、只剩淡影；封门的木板只有穿透的子弹打得过；冲锋、爆炸与几种技能能打出缺口，没了支撑的墙整片塌下，落石砸人·敌我通吃，碎石拖慢脚步，尘雾一时挡住视线；怪物从看不见的地方来）',
   volcano: '火山（32×32 以内崖壁围着的盆地；边上积雪的活火山挡路，隔两分半钟上下喷发一次，熔岩从火山口往四面八方流、把雪烧化，外围先凉、凝成岩石，盖住的地方敌我都挨烫；岩石凉透后雪又慢慢盖回来）',
@@ -116,7 +122,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
         .filter((k) => !(k === 'exertion' && tireless))
         .map((k) => statText(k, e.stats![k]!)),
     ].join(' · '),
-    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${tireless ? ' · 不知疲倦' : ''}`,
+    `行为 ${driveLabel(e.drive)} · 经验 ${e.xp} · 金币 ${e.coins}${tireless ? ' · 不知疲倦' : ''}`,
     elementLine(e.element),
   ]
   lines.push(
@@ -128,9 +134,9 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (traits) lines.push(`特质：${traits}`)
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   if (e.gcdMs) lines.push(`出完一招 ${e.gcdMs / 1000} 秒内不出下一招`)
-  for (const r of e.drives ?? []) lines.push(`${condLine(r.if)}时改为${DRIVE_LABEL[r.drive.kind]}`)
+  for (const r of e.drives ?? []) lines.push(`${condLine(r.if)}时改为${driveLabel(r.drive)}`)
   for (const p of e.phases ?? []) {
-    const enter = [p.drive ? `改为${DRIVE_LABEL[p.drive.kind]}` : '', p.element ? `元素转为${ELEMENTS[p.element].name}` : '', ...(p.stats ? modTexts(p.stats) : []), ...(p.effects ?? []).map((x) => effectLine(x, true))].filter(Boolean)
+    const enter = [p.drive ? `改为${driveLabel(p.drive)}` : '', p.element ? `元素转为${ELEMENTS[p.element].name}` : '', ...(p.stats ? modTexts(p.stats) : []), ...(p.effects ?? []).map((x) => effectLine(x, true))].filter(Boolean)
     lines.push(`阶段${p.name ? `「${p.name}」` : ''}：生命低于 ${Math.round(p.below * 100)}% 进入${enter.length > 0 ? `，${enter.join('，')}` : ''}`)
     for (const w of p.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }

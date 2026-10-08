@@ -78,7 +78,9 @@ function onText(t: ItemReaction): string {
 function triggerEffect(t: ItemReaction, e: Effect): string {
   if (e.kind === 'blast') {
     const where = t.to === 'self' ? '在身边' : t.to === 'spot' ? '在尸体处' : '在目标处'
-    const hurt = t.damage === undefined ? `波及这一下 ${pct(e.ratio)} 的伤害` : `造成 ${Math.round(t.damage * e.ratio)} 伤害`
+    const amount = e.amount ?? 0
+    const ratio = e.ratio ?? 0
+    const hurt = t.damage !== undefined ? `造成 ${Math.round(amount + t.damage * ratio)} 伤害` : amount ? `造成 ${amount}${ratio ? ` + 这一下 ${pct(ratio)}` : ''} 伤害` : `波及这一下 ${pct(ratio)} 的伤害`
     return `${where}爆开 ${grid(e.radius)}，${hurt}`
   }
   const line = effectLine(e, t.to === 'self')

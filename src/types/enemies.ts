@@ -5,15 +5,19 @@ import type { StatBase, StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
 import type { ElementId } from './elements'
 
-/** 驱动：身体没事时怎么走，march 是朝这张图那一组地标里最近的一处行进，不理会队伍；蓄力突刺、自爆这类"动作"是能力，不在这里 */
+/**
+ * 驱动：身体没事时怎么走，march 是朝这张图那一组地标里最近的一处行进，不理会队伍；蓄力突刺、自爆这类"动作"是能力，不在这里；
+ * orbit 绕着转：around 为 nest 时绕召出自己的身体，敌人进到它 aggroRange 内就扑上去，它没了就只剩追；为 foe 时绕最近的敌人兜圈
+ */
 export type DriveDef =
   | { readonly kind: 'chase'; readonly at?: 'leader' }
   | { readonly kind: 'wander' }
   | { readonly kind: 'stay' }
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
-  | { readonly kind: 'standoff'; readonly detectRange: number; readonly standoffDist: number }
-  | { readonly kind: 'orbit'; readonly radius: number; readonly aggroRange: number }
+  | { readonly kind: 'standoff'; readonly standoffDist: number }
+  | { readonly kind: 'orbit'; readonly around: 'nest'; readonly radius: number; readonly aggroRange: number }
+  | { readonly kind: 'orbit'; readonly around: 'foe'; readonly radius: number }
   | { readonly kind: 'march'; readonly mark: string }
 /** 分裂：死后裂成 count 只 into，不写 into 的裂成自己这一种的普通版 */
 export interface SplitEffect {

@@ -16,7 +16,7 @@ const IMP = {
   xp: 3,
   coins: 2,
   traits: ['fireproof'],
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3.5 },
+  drive: { kind: 'standoff', standoffDist: 3.5 },
   abilities: [
     {
       trigger: 'auto',

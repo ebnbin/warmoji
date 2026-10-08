@@ -13,7 +13,7 @@ const CHESHIRE = {
   damage: 10,
   xp: 6,
   coins: 4,
-  drive: { kind: 'standoff', detectRange: 14, standoffDist: 3 },
+  drive: { kind: 'standoff', standoffDist: 3 },
   reactions: [{ on: 'idle', ms: 1000, still: true, to: 'self', effects: [{ kind: 'stealth' }] }],
   abilities: [
     {

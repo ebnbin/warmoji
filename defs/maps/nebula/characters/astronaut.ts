@@ -15,11 +15,10 @@ const astronautPunch = {
   repeat: { count: 2, delayMs: 150 },
 } satisfies AbilityDef
 
-// 前冲只是画面上往前一扑，打得到多远看 reach，所以 reach 连前冲一起算
 const astronautPunch2 = {
   ...astronautPunch,
   range: 3.3,
-  shape: { kind: 'segment', reach: 3.3, radius: 0.45, ms: 200, lungeDist: 1.5 },
+  shape: { kind: 'segment', reach: 1.8, radius: 0.45, ms: 200, lungeDist: 1.5 },
   repeat: { count: 2, delayMs: 200 },
 } satisfies AbilityDef
 

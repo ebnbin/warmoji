@@ -12,7 +12,7 @@ const pandaPalm = {
   damage: 16,
   knockback: 2,
   cost: 10,
-  shape: { kind: 'segment', reach: 1.7, radius: 0.5, ms: 140, lungeDist: 0.4 },
+  shape: { kind: 'segment', reach: 1.3, radius: 0.5, ms: 140, lungeDist: 0.4 },
 } satisfies AbilityDef
 
 const pandaPalm2 = { ...pandaPalm, onHit: [{ kind: 'shove', distance: 1.2, ms: 160 }] } satisfies AbilityDef

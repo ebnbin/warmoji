@@ -31,17 +31,7 @@ const EXPLODER = {
       reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'vanish' }] }],
     },
   ],
-  reactions: [
-    {
-      on: 'death',
-      to: 'spot',
-      // 死时结算没有基础伤害：伤害写在 to 里，blast 只管击退与炸开的那一圈
-      effects: [
-        { kind: 'to', who: { side: 'foes', radius: 1.8 }, then: [{ kind: 'damage', amount: 28 }] },
-        { kind: 'blast', radius: 1.8, ratio: 0, knockback: 4, ring: ring(0xff7043) },
-      ],
-    },
-  ],
+  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'blast', radius: 1.8, amount: 28, knockback: 4, ring: ring(0xff7043) }] }],
 } satisfies EnemyDef
 
 export default EXPLODER

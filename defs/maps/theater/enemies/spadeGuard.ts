@@ -36,7 +36,7 @@ const SPADE_GUARD = {
       knockback: 1,
       fireSfx: 'whoosh',
       windup: { ms: 350, lockAt: 'end', telegraph: 'shake' },
-      shape: { kind: 'segment', reach: 2.2, radius: 0.35, ms: 160, lungeDist: 0.5 },
+      shape: { kind: 'segment', reach: 1.7, radius: 0.35, ms: 160, lungeDist: 0.5 },
     },
   ],
 } satisfies EnemyDef

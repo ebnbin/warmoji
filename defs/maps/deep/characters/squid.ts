@@ -11,7 +11,7 @@ const squidStab = {
   range: 2.6,
   damage: 26,
   fireSfx: 'whoosh',
-  shape: { kind: 'segment', reach: 2.5, radius: 0.45, ms: 160, lungeDist: 2.5 },
+  shape: { kind: 'segment', reach: 0, radius: 0.45, ms: 160, lungeDist: 2.5 },
 } satisfies AbilityDef
 
 const squidStab2 = { ...squidStab, onHit: [{ kind: 'disarm', durationMs: 1000 }] } satisfies AbilityDef

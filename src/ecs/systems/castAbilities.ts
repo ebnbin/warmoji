@@ -3,7 +3,7 @@ import { Ability, Act, Alive, BLINK, BlinkState, Casting, CastRequest, Cd, Manua
 import { abilityCombo, abilityDef, enemyDef, npcCombo } from '../store'
 import { grantedAbility } from '../entities/ability'
 import { fireAbility } from './shared/fire'
-import { ready, spend } from './shared/avail'
+import { ready, spend, stall } from './shared/avail'
 import { gearSkill } from './shared/gear'
 import type { Sim } from '../sim'
 
@@ -26,7 +26,7 @@ function busyBodies(sim: Sim): Set<number> {
   return out
 }
 
-/** 非玩家身体这一刻出一招：手上有事就等；连招没放完先放连招，瞄不到就断；否则过了公共冷却，从能出的招里按优先级挑第一招出得去的 */
+/** 非玩家身体这一刻出一招：手上有事就等；连招没放完先放连招，瞄不到就断；否则过了公共冷却，从能出的招里按优先级挑第一招出得去的，试过没出去的轮换记一笔 */
 function act(sim: Sim, o: number, candidates: readonly number[]): void {
   const combo = npcCombo[o]
   if (combo) {
@@ -38,7 +38,10 @@ function act(sim: Sim, o: number, candidates: readonly number[]): void {
   if (sim.elapsedMs < Act.gcdUntil[o]!) return
   const order = [...candidates].sort((a, b) => (abilityDef[b]?.priority ?? 0) - (abilityDef[a]?.priority ?? 0) || a - b)
   for (const e of order) {
-    if (!fireAbility(sim, e)) continue
+    if (!fireAbility(sim, e)) {
+      stall(sim, e)
+      continue
+    }
     spend(sim, e)
     Act.gcdUntil[o] = sim.elapsedMs + (enemyDef[o]?.gcdMs ?? 0)
     const list = abilityCombo[e]
@@ -47,7 +50,7 @@ function act(sim: Sim, o: number, candidates: readonly number[]): void {
   }
 }
 
-/** 自动能力：能出手就出手，出了手再记账；没出成手下一帧再试；非玩家身体一次只做一件事，见 act */
+/** 自动能力：能出手就出手，出了手再记账；没出成手下一帧再试，轮换的记一笔；非玩家身体一次只做一件事，见 act */
 export function castAbilities(sim: Sim): void {
   const npcs = new Map<number, number[]>()
   for (const e of [...query(sim.world, [Ability, Cd])]) {
@@ -67,7 +70,11 @@ export function castAbilities(sim: Sim): void {
       }
       continue
     }
-    if (!ready(sim, e) || !fireAbility(sim, e)) continue
+    if (!ready(sim, e)) continue
+    if (!fireAbility(sim, e)) {
+      stall(sim, e)
+      continue
+    }
     spend(sim, e)
   }
   const busy = busyBodies(sim)

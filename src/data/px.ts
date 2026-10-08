@@ -42,7 +42,6 @@ const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | ItemReaction |
   decayDelayMs: 'plain',
   degPerSec: 'plain',
   delayMs: 'plain',
-  detectRange: 'cell',
   distance: 'cell',
   dmgRatio: 'plain',
   dps: 'plain',

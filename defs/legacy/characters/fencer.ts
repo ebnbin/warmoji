@@ -11,7 +11,7 @@ const fencerThrust = {
   range: 2.6,
   damage: 20,
   knockback: 3,
-  shape: { kind: 'segment', reach: 2.4, radius: 0.45, ms: 160, lungeDist: 0.5 },
+  shape: { kind: 'segment', reach: 1.9, radius: 0.45, ms: 160, lungeDist: 0.5 },
 } satisfies AbilityDef
 
 const fencerGale = {
