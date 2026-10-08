@@ -1,18 +1,16 @@
 import { UNIT } from '../../util/units'
 import { endMotion } from './shared/displace'
 import { REJOIN } from '../../data/feel'
-import { Alive, Motion, MOTION, Revive, Transform } from '../components'
+import { Alive, Motion, MOTION, Revive, Transform, Uid } from '../components'
 import { spawnFxCircle } from '../entities/fx'
-import { startPop } from '../utils/pop'
 import type { Sim } from '../sim'
 
-/** 归队落地：脚下扩开一圈光环、扬起尘土，压扁再弹回 */
+/** 归队落地：脚下扩开一圈光环、扬起尘土 */
 function land(sim: Sim, eid: number): void {
   Revive.drop[eid] = 0
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
-  sim.out.sfx.push('revive')
-  startPop(sim, eid, REJOIN.bounceMs)
+  sim.out.events.push({ kind: 'rejoin', eid, uid: Uid.v[eid]!, fxAt: sim.fxMs })
   spawnFxCircle(sim, x, y, REJOIN.ringRadius * UNIT, {
     fill: 0xfff59d,
     fillAlpha: 0.25,

@@ -30,7 +30,7 @@ export function tickVisits(sim: Sim): void {
     if (g.ms < e.ms) return
     const m = marks[here]!
     sim.out.bursts.push({ x: m.x, y: m.y, count: 16, kind: 'coin' })
-    sim.out.sfx.push('upgrade')
+    sim.out.events.push({ kind: 'goal' })
     g.done.add(here)
     g.at = -1
     g.ms = 0

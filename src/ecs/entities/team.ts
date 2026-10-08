@@ -6,7 +6,7 @@ import { leaderSlot } from '../../run/state'
 import type { RunState } from '../../run/state'
 import type { StatMods } from '../../types/stats'
 import type { FrameIndex } from '../frames'
-import { Alive, CharFlash, FACTION, Hp, Tint, Transform } from '../components'
+import { Alive, FACTION, Hp, Transform, Uid } from '../components'
 import { fightMods } from '../fight/state'
 import { startPop } from '../utils/pop'
 import { foldBody, setStatLayer } from '../utils/stats'
@@ -64,10 +64,7 @@ function glow(sim: Sim, eid: number): void {
     depth: 7,
   })
   sim.out.bursts.push({ x, y, count: 12, kind: 'coin' })
-  if (!Alive.v[eid]) return
-  CharFlash.until[eid] = sim.fxMs + 360
-  Tint.color[eid] = LEVEL_UP_COLOR
-  Tint.effect[eid] = 0
+  if (Alive.v[eid]) sim.out.events.push({ kind: 'glow', eid, uid: Uid.v[eid]!, color: LEVEL_UP_COLOR, ms: 360, fxAt: sim.fxMs })
 }
 
 /** 半路入队：站到队长身后弹出来，带着这一场给队伍的修正，装好能力与主动技能 */

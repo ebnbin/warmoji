@@ -1,7 +1,7 @@
 import type { FieldPickupDef } from '../types/battlefield'
 import type { EntranceLook } from '../types/maps'
 import type { Banner } from '../types/runs'
-import type { SfxId } from '../types/sfx'
+import type { SimEvent } from './events'
 
 export interface Burst {
   x: number
@@ -16,12 +16,12 @@ export interface Outbox {
   collects: FieldPickupDef[]
   /** 要打出的横幅：精英来袭、头目登场 */
   banners: Banner[]
-  /** 要播的音效，按发生顺序 */
-  sfx: SfxId[]
+  /** 发生了的事，按先后 */
+  events: SimEvent[]
 }
 
 export function newOutbox(): Outbox {
-  return { flash: null, bursts: [], collects: [], banners: [], sfx: [] }
+  return { flash: null, bursts: [], collects: [], banners: [], events: [] }
 }
 
 export function drain<T>(q: T[], f: (items: readonly T[]) => void): void {

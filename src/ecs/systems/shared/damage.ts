@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
-import { Alive, Boss, CharFlash, Elite, FACTION, Faction, Flash, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Tint, Transform, Uid } from '../../components'
+import { Alive, Boss, Elite, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
 import { hasMark, inTransit, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
@@ -17,7 +17,7 @@ import { die, grantIframe } from './combat'
 import { feedGut } from './gut'
 import { applyForm } from '../../entities/form'
 import { gearDodged, gearHurt, gearLethal, gearLowHp, gearStruck } from './gear'
-import { spawnDamageNumber, spawnFxCircle, spawnMissText } from '../../entities/fx'
+import { spawnFxCircle } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
 import type { Offense } from '../../utils/stats'
 import type { Source } from '../../utils/source'
@@ -211,9 +211,7 @@ function harmless(sim: Sim, src: Source, target: number): boolean {
 
 /** 伤不了的一下：只闪一下、照样击退 */
 function shove(sim: Sim, src: Source, target: number, o: HitOpts): void {
-  Flash.until[target] = sim.elapsedMs + 70
-  Tint.effect[target] = 1
-  Tint.color[target] = 0xffffff
+  sim.out.events.push({ kind: 'shrug', eid: target, uid: Uid.v[target]!, at: sim.elapsedMs })
   const j = knockOf(sim, attackOf(sim, src), target, o)
   if (j.x !== 0 || j.y !== 0) displace(sim, target, { kind: 'push', x: j.x, y: j.y }, FORCED)
 }
@@ -227,7 +225,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   }
   const tags = hitTags(src.tags ?? 0, o.tags ?? 0, o.tick === true)
   if (dodged(sim, target, tags)) {
-    spawnMissText(sim, Transform.x[target]!, Transform.y[target]!)
+    sim.out.events.push({ kind: 'dodge', x: Transform.x[target]!, y: Transform.y[target]!, fxAt: sim.fxMs })
     gearDodged(sim, src, target)
     return false
   }
@@ -245,7 +243,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (crit) raw *= atk.critDamage
   const dmg = Math.max(1, Math.round(raw))
   const team = Faction.v[target] === FACTION.team
-  if (!team) spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
+  sim.out.events.push({ kind: 'damage', x: Transform.x[target]!, y: Transform.y[target]!, amount: dmg, crit, team, fxAt: sim.fxMs })
   record(sim, src, target, dmg)
   leech(sim, src, atk, dmg, tags)
   store(target, dmg)
@@ -259,7 +257,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })
   }
   gearHurt(sim, src, target, dmg, o.tick === true)
-  if (team) sim.characterHitCount++
   const { x: jx, y: jy } = knockOf(sim, atk, target, o)
   const at = { x: Transform.x[target]!, y: Transform.y[target]! }
   const uid = Uid.v[target]!
@@ -275,17 +272,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   Hp.v[target] = hp
   lowHp(sim, target)
   gearLowHp(sim, target)
-  if (team) {
-    sim.out.sfx.push('hurt')
-    CharFlash.until[target] = sim.fxMs + 120
-    Tint.color[target] = src.tint ?? 0xff7777
-    Tint.effect[target] = 0
-  } else {
-    sim.out.sfx.push('hit')
-    Flash.until[target] = now + 70
-    Tint.effect[target] = 1
-    Tint.color[target] = 0xffffff
-  }
+  sim.out.events.push({ kind: 'flinch', eid: target, uid: Uid.v[target]!, team, tint: src.tint, at: now, fxAt: sim.fxMs })
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
   gearStruck(sim, src, target, uid, at, damage, tags, crit)
   return true

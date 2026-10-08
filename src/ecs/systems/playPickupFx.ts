@@ -7,6 +7,6 @@ export function playPickupFx(sim: Sim): void {
   for (const eid of query(sim.world, [Collected, PickupFx, Transform])) {
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: PickupFx.burst[eid]!, kind: 'coin' })
     const sfx = pickupSfx[eid]
-    if (sfx) sim.out.sfx.push(sfx)
+    if (sfx) sim.out.events.push({ kind: 'pickup', sfx })
   }
 }

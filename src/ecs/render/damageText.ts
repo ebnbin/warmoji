@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { FONT_FAMILY } from '../../ui/theme'
-import { DAMAGE_NUMBER_RISE_MS, MISS } from '../damageNumbers'
-import type { DamageNumbers } from '../damageNumbers'
+import { DAMAGE_NUMBER_RISE_MS, MISS } from '../present/damageNumbers'
+import type { DamageNumbers } from '../present/damageNumbers'
 import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 

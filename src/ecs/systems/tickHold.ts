@@ -19,7 +19,7 @@ export function tickHold(sim: Sim): void {
   if (h.inside) h.heldMs += sim.wdtMs
   if (h.heldMs < h.rule.ms / h.rule.points.length) return
   sim.out.bursts.push({ x: spot.x, y: spot.y, count: 16, kind: 'coin' })
-  sim.out.sfx.push('upgrade')
+  sim.out.events.push({ kind: 'goal' })
   h.point++
   h.heldMs = 0
   h.inside = false

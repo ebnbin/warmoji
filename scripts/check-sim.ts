@@ -15,7 +15,7 @@ const LOOKS: Readonly<Record<string, readonly string[]>> = {
   Sprite: ['frame', 'flipX'],
   Tint: ['color', 'alpha', 'effect'],
   Depth: ['z'],
-  Pop: ['until'],
+  Pop: ['until', 'ms'],
   Breath: ['phase'],
   Flash: ['until'],
   CharFlash: ['until'],

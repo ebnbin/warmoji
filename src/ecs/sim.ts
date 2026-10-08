@@ -9,7 +9,6 @@ import { layoutTeam } from './systems/layoutTeam'
 import type { EcsWorld } from './world'
 import type { WorldHooks, WorldState } from './worlds/hooks'
 import type { Outbox } from './outbox'
-import type { DamageNumbers } from './damageNumbers'
 import type { RunState } from '../run/state'
 import type { Target } from './utils/targets'
 import type { FrameIndex } from './frames'
@@ -21,7 +20,6 @@ import { formTeam } from './entities/team'
 import { newWorldState } from './worlds/hooks'
 import { worldFor } from './worlds/registry'
 import { newOutbox } from './outbox'
-import { newDamageNumbers } from './damageNumbers'
 import { FACTION, Stats } from './components'
 import type { FightDef } from '../types/runs'
 import { fightMods, newFight } from './fight/state'
@@ -52,7 +50,6 @@ export interface Sim {
   over: boolean
   /** 这一场有头目倒下过 */
   bossDown: boolean
-  characterHitCount: number
   timeStopMsLeft: number
   chrono: number
   battleFx: BattleEffects
@@ -71,7 +68,6 @@ export interface Sim {
   fight: FightState
   pendingDeaths: PendingDeath[]
   out: Outbox
-  damageNumbers: DamageNumbers | null
   onDeathFx?: (d: PendingDeath) => void
   run: RunState
 }
@@ -140,7 +136,6 @@ export function makeSim(
   origin: { x: number; y: number },
   mapW: number,
   mapH: number,
-  damageNumbers: boolean,
   fight: FightDef,
 ): Sim {
   const state = newFight(fight, run)
@@ -165,7 +160,6 @@ export function makeSim(
     wdtMs: 0,
     over: false,
     bossDown: false,
-    characterHitCount: 0,
     timeStopMsLeft: 0,
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
@@ -178,7 +172,6 @@ export function makeSim(
     frames,
     pendingDeaths: [],
     out: newOutbox(),
-    damageNumbers: damageNumbers ? newDamageNumbers() : null,
     tick: 0,
     rng: new Rng(seed),
     fxRng: new Rng((seed ^ 0x5bd1e995) >>> 0),
