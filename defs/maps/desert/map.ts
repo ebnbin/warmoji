@@ -1,0 +1,60 @@
+import { hslToInt } from '../../../src/util/palette.ts'
+import type { MapDef } from '../../../src/types/maps'
+
+export default {
+  emoji: '1f3dc',
+  name: '沙漠',
+  desc: '一片走不出去的沙海：一直朝一个方向走，会从另一头绕回来，看到的还是那几座沙丘、那几样标志、那一群怪；沙丘和标志还都是一对一对的，分不清是回到了原地还是到了另一处。松沙上赶路、爬沙丘格外耗体力，丘间实一点的沙和踩实的脚印省力些，背阴处歇得回得快；走过的地方留下脚印，越累印子越深，见底时拖着脚走；脚印过一会儿就被风吹平',
+  kind: 'desert',
+  stamina: { exertion: 0.75, regen: 0.55 },
+  palette: {
+    bgFrom: 'hsl(35 43% 54%)',
+    bgTo: 'hsl(22 32% 20%)',
+    map: hslToInt(42, 0.84, 0.69),
+  },
+  light: { sun: 0xfff8ea, shade: 0xdac1a3, shadow: { color: 0x3a200c, alpha: 0.42, length: 1.05 } },
+  decor: {
+    emojis: ['1f9b4'],
+    sizeU: [0.3, 0.5],
+    alpha: [0.75, 0.9],
+    density: [0.002, 0.0035],
+  },
+  foes: ['zombie', 'locust', 'boar', 'snake', 'rat', 'creeper', 'turtle', 'skeleton', 'raccoon'],
+  gates: {
+    snapU: 3,
+    fallback: 'rise',
+    look: 'sand',
+    boss: 'burrow',
+    kinds: {
+      crest: { name: '丘顶', at: { kind: 'mark' }, enter: 'climb', look: 'sand', weight: 2, perSec: 1 },
+      marker: { name: '标志物', at: { kind: 'mark' }, enter: 'walk', look: 'sand', snapU: 4, weight: 3, perSec: 1, only: ['snake', 'rat', 'turtle', 'skeleton'] },
+      burrow: { name: '沙下', at: { kind: 'ground' }, enter: 'rise', look: 'sand', weight: 1 },
+    },
+  },
+  desert: {
+    meterPerU: 0.5,
+    viewMaxU: 26,
+    sunDeg: 36,
+    dunes: { pairs: [4, 7], heightM: [0.3, 0.6], lobes: [1, 3], stossSlope: 0.28, leeSlope: 0.48, width: 1, turnDeg: 25 },
+    windSpreadDeg: 50,
+    swell: { heightM: 0.15, waves: 5 },
+    flats: { loose: [0.4, 0.7], patches: 6 },
+    landmarks: { pairs: 6, gapU: 7 },
+    cacti: { pairs: [3, 5], gapU: 3 },
+    gait: { softSand: 1.8, packRelief: 0.5, maxPower: 2.6, downhillMax: 1.25 },
+    shadeRegen: 1.25,
+    tracks: {
+      perU: 32,
+      depthM: 0.018,
+      firm: 0.3,
+      tired: 2.6,
+      dragFrom: 0.25,
+      stride: 0.85,
+      foot: 0.62,
+      lifeS: 10,
+      pack: 0.12,
+      gaits: { zombie: 'foot', skeleton: 'foot', boar: 'hoof', snake: 'slither', rat: 'paw', raccoon: 'paw', turtle: 'paw', creeper: 'paw', locust: 'hop', scorpion: 'legs' },
+    },
+  },
+  boss: 'scorpion',
+} as const satisfies MapDef
