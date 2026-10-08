@@ -51,7 +51,7 @@ export function App({ game }: { readonly game: Phaser.Game }): ReactNode {
   } as CSSProperties
   return (
     <div className="dt-root" style={style} onKeyDown={keepKeys} onKeyUp={keepKeys}>
-      <Guard reset={changed}>{devSettings().open ? <Panel game={game} dock={dock} /> : <Pill game={game} win={dock.win} />}</Guard>
+      <Guard reset={changed}>{devSettings().open ? <Panel dock={dock} /> : <Pill game={game} win={dock.win} />}</Guard>
     </div>
   )
 }

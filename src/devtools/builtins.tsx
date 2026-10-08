@@ -17,16 +17,19 @@ import { clock, copyText, downloadDataUrl, stamp } from './util'
 
 const r = (v: number): string => String(Math.round(v))
 
-function canvasText(game: Phaser.Game): string {
+/** 面板开着时画布变小、填充变少，帧率要对照画布大小看 */
+function frameText(game: Phaser.Game): string {
   const s = game.scale
-  return `画布 ${s.width}×${s.height} px · 显示 ${r(s.displaySize.width)}×${r(s.displaySize.height)} · dpr ${window.devicePixelRatio}`
+  const scale = timeScale()
+  const speed = scale === 1 ? '' : scale === 0 ? ' · 已暂停' : ` · ×${scale}`
+  return `${Math.round(game.loop.actualFps)} fps${speed} · 画布 ${s.width}×${s.height} px · 显示 ${r(s.displaySize.width)}×${r(s.displaySize.height)} · dpr ${window.devicePixelRatio}`
 }
 
 function overviewItems(game: Phaser.Game): DevItem[] {
   const build = devConfig().build
   return [
     { kind: 'text', mono: true, read: () => `Phaser ${Phaser.VERSION} · ${rendererInfo(game)}${build ? `\n构建 ${build.hash} · ${build.time}` : ''}` },
-    { kind: 'text', mono: true, read: () => canvasText(game) },
+    { kind: 'text', mono: true, read: () => frameText(game) },
     { kind: 'text', label: '环境', mono: true, read: envText },
     {
       kind: 'buttons',
@@ -65,7 +68,7 @@ function diagnosticsText(game: Phaser.Game): string {
     `Phaser ${Phaser.VERSION} · ${rendererInfo(game)}`,
     ...(build ? [`构建 ${build.hash} · ${build.time}`] : []),
     envText(),
-    canvasText(game),
+    frameText(game),
     '',
     '## 场景',
     scenesText(game),

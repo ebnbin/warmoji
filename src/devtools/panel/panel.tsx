@@ -1,4 +1,3 @@
-import type Phaser from 'phaser'
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, ReactNode } from 'react'
 import { devConfig } from '../config'
@@ -7,16 +6,15 @@ import type { DockState } from '../dock'
 import { LOG_CHANGED, logEvents } from '../log'
 import { listTabs, PANEL_REFRESH, REGISTRY_CHANGED, registryEvents } from '../registry'
 import { devSettings, updateDevSettings } from '../settings'
-import { timeScale } from '../timeControl'
 import type { DevLayer } from '../types'
 import { Item, keepFocus } from './items'
 import type { Tap } from './items'
 import { useEvent, useLive } from './live'
 
 const LAYERS: readonly { readonly layer: DevLayer; readonly label: string }[] = [
-  { layer: 'scene', label: '场景' },
-  { layer: 'game', label: '游戏' },
   { layer: 'engine', label: '引擎' },
+  { layer: 'game', label: '游戏' },
+  { layer: 'scene', label: '场景' },
 ]
 
 const scrollByTab = new Map<string, number>()
@@ -26,16 +24,6 @@ const ownersOf = (layer: DevLayer): string[] => [...new Set(listTabs(layer).map(
 
 /** 页签随 scene 起落、随条件出没：变了就重画 */
 const tabsShape = (): string => LAYERS.map((l) => listTabs(l.layer).map((e) => e.key).join(',')).join('|')
-
-/** 面板开着时画布变小、填充变少，帧率要对照画布大小看 */
-function Meter({ game }: { readonly game: Phaser.Game }): ReactNode {
-  const text = useLive(() => {
-    const scale = timeScale()
-    const tag = scale === 0 ? '暂停 · ' : scale === 1 ? '' : `×${scale} · `
-    return `${tag}${Math.round(game.loop.actualFps)} fps · 画布 ${game.scale.width}×${game.scale.height}`
-  })
-  return <span className="dt-note">{text}</span>
-}
 
 /** 拖动时只画一条参考线，松手才改尺寸：每改一次，游戏的界面都要按新尺寸重建 */
 function Divider({ dock }: { readonly dock: DockState }): ReactNode {
@@ -72,7 +60,7 @@ function Divider({ dock }: { readonly dock: DockState }): ReactNode {
   )
 }
 
-export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly dock: DockState }): ReactNode {
+export function Panel({ dock }: { readonly dock: DockState }): ReactNode {
   const cfg = devConfig()
   useEvent(registryEvents, REGISTRY_CHANGED)
   useEvent(registryEvents, PANEL_REFRESH)
@@ -85,7 +73,7 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
     fn()
     setVersion((v) => v + 1)
   }
-  // 选中的层此刻没有页签时，先看下一层，不停在空页上
+  // 选中的层此刻没有页签就不显示，先看排在前面的层
   const layer = listTabs(s.layer).length > 0 ? s.layer : (LAYERS.find((l) => listTabs(l.layer).length > 0)?.layer ?? s.layer)
   const entries = listTabs(layer)
   const current = entries.find((e) => e.key === s.tab) ?? entries.find((e) => e.key === tabByLayer.get(layer)) ?? entries[0]
@@ -101,12 +89,6 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
       {docked && <Divider dock={dock} />}
       <header className="dt-head">
         <span className="dt-title">{cfg.title}</span>
-        {cfg.build && (
-          <span className="dt-note" title={`构建于 ${cfg.build.time}`}>
-            {cfg.build.hash}
-          </span>
-        )}
-        <Meter game={game} />
         <span className="dt-grow" />
         <span className="dt-seg">
           {(['dock', 'float'] as const).map((m) => (
@@ -125,22 +107,16 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
         </button>
       </header>
       <nav className="dt-chips dt-bar">
-        {LAYERS.map((l) => {
-          const n = listTabs(l.layer).length
-          const who = ownersOf(l.layer)
-          const on = l.layer === layer
-          return (
-            <button
-              key={l.layer}
-              className={on ? 'dt-chip dt-layer on' : 'dt-chip dt-layer'}
-              disabled={n === 0}
-              onMouseDown={keepFocus}
-              onClick={l.layer === s.layer ? undefined : () => updateDevSettings({ layer: l.layer, tab: tabByLayer.get(l.layer) ?? null })}
-            >
-              {`${l.label} ${n}${who.length > 0 ? ` · ${who.join('·')}` : ''}`}
-            </button>
-          )
-        })}
+        {LAYERS.filter((l) => listTabs(l.layer).length > 0).map((l) => (
+          <button
+            key={l.layer}
+            className={l.layer === layer ? 'dt-chip dt-layer on' : 'dt-chip dt-layer'}
+            onMouseDown={keepFocus}
+            onClick={l.layer === s.layer ? undefined : () => updateDevSettings({ layer: l.layer, tab: tabByLayer.get(l.layer) ?? null })}
+          >
+            {l.label}
+          </button>
+        ))}
       </nav>
       {entries.length > 0 && (
         <nav className="dt-chips dt-bar">

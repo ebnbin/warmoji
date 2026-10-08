@@ -140,13 +140,6 @@
   font-weight: 700;
 }
 
-.dt-note {
-  color: #9a9aa8;
-  font-family: var(--dt-mono);
-  font-size: 0.9em;
-  white-space: nowrap;
-}
-
 .dt-grow {
   flex: 1;
 }
@@ -346,11 +339,6 @@
 
 .dt-root .dt-chip.dt-layer {
   color: #9a9aa8;
-}
-
-.dt-root .dt-chip.dt-layer:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .dt-root .dt-chip.dt-layer.on {

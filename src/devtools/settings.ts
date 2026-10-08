@@ -26,7 +26,7 @@ interface DevSettings {
 export const SETTINGS_CHANGED = 'changed'
 export const settingsEvents = new Phaser.Events.EventEmitter()
 
-const DEFAULTS: DevSettings = { open: false, mode: 'dock', dockW: null, dockH: null, side: 'right', y: 1, layer: 'scene', tab: null, flags: {}, choices: {} }
+const DEFAULTS: DevSettings = { open: false, mode: 'dock', dockW: null, dockH: null, side: 'right', y: 1, layer: 'engine', tab: null, flags: {}, choices: {} }
 
 let current: DevSettings | undefined
 
@@ -47,7 +47,7 @@ function sanitize(raw: unknown): DevSettings {
     dockH: size('dockH'),
     side: o.side === 'left' ? 'left' : 'right',
     y: typeof o.y === 'number' && Number.isFinite(o.y) ? Math.min(1, Math.max(0, o.y)) : DEFAULTS.y,
-    layer: o.layer === 'game' || o.layer === 'engine' ? o.layer : 'scene',
+    layer: o.layer === 'game' || o.layer === 'scene' ? o.layer : 'engine',
     tab: typeof o.tab === 'string' ? o.tab : null,
     flags: record<boolean>('flags', 'boolean'),
     choices: record<string>('choices', 'string'),
