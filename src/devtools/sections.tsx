@@ -1,12 +1,10 @@
 import Phaser from 'phaser'
 import { currentLayout, devConfig } from './config'
-import { COLOR, textStyle } from './draw'
-import { clearDevLog, devLogEntries, infoCaptureOn, LOG_CHANGED, logEvents, markLogRead, setInfoCapture, unreadErrorCount } from './log'
+import { dockState } from './dock'
+import { clearDevLog, devLogEntries, infoCaptureOn, setInfoCapture, unreadErrorCount } from './log'
 import type { DevLogLevel } from './log'
 import { clock, copyText, downloadDataUrl, stamp } from './util'
 import { rendererInfo, resetMetrics } from './metrics'
-import { mountPerf } from './perf'
-import { mountHistory } from './history'
 import { refreshDevPanel, registerDevProvider } from './registry'
 import { resourceItems } from './resources'
 import { flagItems } from './flags'
@@ -15,13 +13,19 @@ import { inputItems } from './inputWatch'
 import { sceneItems, scenesText } from './scenes'
 import { pausedSceneCount, setTimeScale, stepOneFrame, TIME_SCALES, timeScale, timeText } from './timeControl'
 import { devSettings, updateDevSettings } from './settings'
-import type { DevItem, DevWidget, DevWidgetContext } from './types'
+import type { DevItem } from './types'
+import { HistoryView } from './panel/history'
+import { LogView } from './panel/log'
+import { PerfView } from './panel/perf'
 
 const r = (v: number): string => String(Math.round(v))
 
 function viewportText(game: Phaser.Game): string {
   const s = game.scale
+  const d = dockState()
+  const panel = !devSettings().open ? '收起' : d.size > 0 ? `停靠${d.edge === 'right' ? '右侧' : '底部'} ${d.size}` : '悬浮'
   const lines = [
+    `窗口 ${r(d.win.w)}×${r(d.win.h)} · 面板 ${panel}`,
     `画布 ${s.width}×${s.height} px · 显示 ${r(s.displaySize.width)}×${r(s.displaySize.height)} · dpr ${window.devicePixelRatio}`,
   ]
   const L = currentLayout()
@@ -44,7 +48,7 @@ function overviewItems(game: Phaser.Game): DevItem[] {
       get: () => devSettings().pillFps,
       set: (on) => updateDevSettings({ pillFps: on }),
     },
-    { kind: 'toggle', label: '宽面板', desc: '桌面上看长列表更省事', get: () => devSettings().wide, set: (on) => updateDevSettings({ wide: on }) },
+    { kind: 'toggle', label: '宽面板', desc: '悬浮时用宽一些的面板，看长列表更省事', get: () => devSettings().wide, set: (on) => updateDevSettings({ wide: on }) },
     {
       kind: 'toggle',
       label: '显示安全区边界',
@@ -112,52 +116,7 @@ function snapshot(game: Phaser.Game): void {
   })
 }
 
-const MAX_SHOWN = 80
-const LEVEL_COLOR: Readonly<Record<DevLogLevel, string>> = { error: COLOR.error, warn: COLOR.warnText, info: COLOR.text }
 let logFilter: DevLogLevel | 'all' = 'all'
-
-function mountLog(ctx: DevWidgetContext): DevWidget {
-  markLogRead()
-  const { scene, width, theme } = ctx
-  const objects: Phaser.GameObjects.GameObject[] = []
-  const entries = devLogEntries().filter((e) => logFilter === 'all' || e.level === logFilter)
-  const shown = entries.slice(-MAX_SHOWN).reverse()
-  let y = 0
-  for (const e of shown) {
-    const t = scene.add.text(
-      0,
-      y,
-      `${clock(e.at)}  ${e.text}`,
-      textStyle(theme, theme.caption, { mono: true, color: LEVEL_COLOR[e.level], wrap: width }),
-    )
-    objects.push(t)
-    y += t.height + theme.body * 0.35
-  }
-  if (entries.length > shown.length) {
-    const t = scene.add.text(0, y, `还有 ${entries.length - shown.length} 条更早的记录`, textStyle(theme, theme.caption, { color: COLOR.muted }))
-    objects.push(t)
-    y += t.height
-  }
-  let alive = true
-  let queued = false
-  const onChange = (): void => {
-    if (!alive || queued) return
-    queued = true
-    window.setTimeout(() => {
-      queued = false
-      if (alive) refreshDevPanel()
-    }, 300)
-  }
-  logEvents.on(LOG_CHANGED, onChange)
-  return {
-    objects,
-    height: y,
-    destroy(): void {
-      alive = false
-      logEvents.off(LOG_CHANGED, onChange)
-    },
-  }
-}
 
 const CAPTURE_DESC = '默认捕获 console.warn / console.error、未捕获异常与未处理的 Promise 拒绝'
 
@@ -187,7 +146,7 @@ function logItems(): DevItem[] {
       ],
     },
     { kind: 'text', read: () => lastNote },
-    { kind: 'custom', mount: mountLog },
+    { kind: 'custom', render: () => <LogView filter={logFilter} /> },
   ]
 }
 
@@ -327,10 +286,10 @@ export function registerBuiltins(game: Phaser.Game): void {
           id: 'perf',
           title: '性能',
           items: () => [
-            { kind: 'custom', mount: (ctx) => mountPerf(game, ctx) },
+            { kind: 'custom', render: () => <PerfView game={game} /> },
             { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
             { kind: 'text', label: '一分钟走势 · 面板收起时也在采样', read: () => '' },
-            { kind: 'custom', mount: mountHistory },
+            { kind: 'custom', render: () => <HistoryView /> },
           ],
         },
         { id: 'inspect', title: '检视', items: inspectItems },
