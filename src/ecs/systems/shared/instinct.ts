@@ -142,7 +142,7 @@ function spotOf(sim: Sim, f: number, src: Source, seat: Point, near: Found | nul
       const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
       const len = Math.hypot(d.x, d.y)
       if (len < 1e-6) return beside(sim, f, t)
-      const at = Math.max(0, Math.min(len - t.radius - Radius.v[f]!, how.reach))
+      const at = Math.min(how.reach, Math.max(Radius.v[sim.leader]! + Radius.v[f]!, len - t.radius - Radius.v[f]!))
       return { x: cx + (d.x / len) * at, y: cy + (d.y / len) * at }
     }
     case 'dive': {
