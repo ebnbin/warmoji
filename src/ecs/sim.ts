@@ -68,7 +68,11 @@ export interface Sim {
   /** 按阵营的可被打身体快照，每帧开头与身体走完后各刷新一次 */
   targets: Target[][]
   frames: FrameIndex
+  /** 走过的步数 */
+  tick: number
   rng: Rng
+  /** 只给画面效果用的随机：不占玩法那一路，开关画面效果也不改变战局 */
+  fxRng: Rng
   /** 这一场的规则与进行中的状态 */
   fight: FightState
   pendingDeaths: PendingDeath[]
@@ -151,6 +155,7 @@ export function makeSim(
   fight: FightDef,
 ): Sim {
   const state = newFight(fight, run)
+  const seed = (run.decorSeed ^ 0x9e37 ^ Math.imul(run.step, 0x9e3779b1)) >>> 0
   const team = formTeam(world, frames, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
   const sim: Sim = {
@@ -185,7 +190,9 @@ export function makeSim(
     pendingDeaths: [],
     out: newOutbox(),
     damageNumbers: damageNumbers ? newDamageNumbers() : null,
-    rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.step, 0x9e3779b1)) >>> 0),
+    tick: 0,
+    rng: new Rng(seed),
+    fxRng: new Rng((seed ^ 0x5bd1e995) >>> 0),
     fight: state,
     run,
     leader,

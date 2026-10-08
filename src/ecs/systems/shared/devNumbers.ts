@@ -14,6 +14,7 @@ type NumChoice = (id: string, label: string, desc: string, values: readonly numb
 
 const knobs: NumKnob[] = []
 let host: ((knob: NumKnob) => () => number) | null = null
+let pinned: Readonly<Record<string, number>> | null = null
 
 /** 一组数值型的开发者选项：在候选值里挑，默认值不在候选里就补进去 */
 export function numChoices(group: string): NumChoice {
@@ -22,8 +23,18 @@ export function numChoices(group: string): NumChoice {
     const knob: NumKnob = { id, group, label, desc, values: all, fallback, fmt, read: () => fallback }
     if (host) knob.read = host(knob)
     knobs.push(knob)
-    return () => knob.read()
+    return () => pinned?.[id] ?? knob.read()
   }
+}
+
+/** 每项此刻的取值 */
+export function numChoiceValues(): Record<string, number> {
+  return Object.fromEntries(knobs.map((k) => [k.id, pinned?.[k.id] ?? k.read()]))
+}
+
+/** 回放时把各项钉在录下的取值上，null 放开 */
+export function pinNumChoices(values: Readonly<Record<string, number>> | null): void {
+  pinned = values
 }
 
 /** 开发面板接管全部数值选项的读取，之后登记的也一样 */

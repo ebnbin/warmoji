@@ -22,8 +22,9 @@ import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
 import { updateZones } from '../updateZones'
 import { castRequests, stepAbilities } from './abilities'
-import { stepSim } from '../../sim'
+import { stepSim, worldTimeScale } from '../../sim'
 import type { Sim } from '../../sim'
+import { timeLeftMs } from '../../fight/state'
 import { pipeline, runPipeline } from './step'
 
 const FRAME_PIPELINE = pipeline([
@@ -55,6 +56,17 @@ const FRAME_PIPELINE = pipeline([
   { run: tickRescue, after: [stepSim] },
 ])
 
-export function stepFrame(sim: Sim): void {
+/** 一步的时长：模拟只按它走，画面快慢不同也走出同一场战斗 */
+export const TICK_MS = 1000 / 60
+
+/** 走一步：世界时间按时停缩放，打到时限的那一步只走剩下的；返回这一步是不是打到了时限 */
+export function stepFrame(sim: Sim): boolean {
+  sim.dtMs = TICK_MS
+  sim.wdtMs = TICK_MS * worldTimeScale(sim)
+  const leftMs = timeLeftMs(sim)
+  const last = sim.wdtMs >= leftMs
+  if (last) sim.wdtMs = leftMs
   runPipeline(FRAME_PIPELINE, sim)
+  sim.tick++
+  return last
 }

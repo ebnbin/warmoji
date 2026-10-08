@@ -1,6 +1,7 @@
 import type { Sim } from '../../sim'
 
 let profiling: () => boolean = () => false
+let clock: () => number = () => 0
 const acc = new Map<string, { ms: number; calls: number }>()
 let profiledFrames = 0
 
@@ -19,9 +20,10 @@ export function pipeline(steps: readonly Step[]): readonly System[] {
   return runs
 }
 
-/** 开发面板给出何时逐 system 计时 */
-export function profilePipelineWhen(on: () => boolean): void {
+/** 开发面板给出何时逐 system 计时与计时用的钟：模拟层自己不读钟 */
+export function profilePipelineWhen(on: () => boolean, now: () => number): void {
   profiling = on
+  clock = now
 }
 
 export function runPipeline(systems: readonly System[], sim: Sim): void {
@@ -31,10 +33,10 @@ export function runPipeline(systems: readonly System[], sim: Sim): void {
   }
   profiledFrames++
   for (const run of systems) {
-    const t0 = performance.now()
+    const t0 = clock()
     run(sim)
     const e = acc.get(run.name) ?? { ms: 0, calls: 0 }
-    e.ms += performance.now() - t0
+    e.ms += clock() - t0
     e.calls++
     acc.set(run.name, e)
   }

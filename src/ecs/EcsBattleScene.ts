@@ -18,8 +18,8 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, INVINCIBLE_HP, nextStep, runDef, stepOf } from '../run/state'
-import { claimNothing, levelUpOptions, pendingLevelUps } from '../run/levelUp'
+import { adoptRun, getRun, INVINCIBLE_HP, nextStep, runDef, stepOf } from '../run/state'
+import { claimNothing, claimRecruit, claimUpgrade, levelUpOptions, pendingLevelUps } from '../run/levelUp'
 import { memberLevel, teamLeveled } from '../run/members'
 import { goStep } from '../scene/teamPage'
 import { openLevelUp } from '../scene/levelUp'
@@ -51,14 +51,14 @@ import { abilityRequires, bodyLook, modDef, statBase } from './store'
 import { foldBody, lastingStats, setStatLayer, statsOf } from './utils/stats'
 import { aimAt } from './systems/shared/fire'
 import { sourceOf } from './utils/source'
-import { resetEntityStorage } from './storage'
+import { resetEntities } from './entities/entity'
 import { armTeam, memberGear } from './entities/loadout'
 import { levelUpsOnField, sweepLevelUps } from './entities/pickup'
 import { joinTeam, relevel } from './entities/team'
 import { requestCast } from './systems/shared/ability'
 import { openStage, ready } from './systems/shared/avail'
 import { skillRemainMs } from './systems/tickSkillCooldowns'
-import { stepFrame } from './systems/pipeline/frame'
+import { stepFrame, TICK_MS } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
 import { spawnBoss } from './entities/enemy'
 import { telegraphCount } from './entities/telegraph'
@@ -85,6 +85,9 @@ import { amethystClock } from '../maps/amethyst/world'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
+import { TapePlayer, TapeRecorder } from './tape'
+import type { DevCommand, Tape, TapeEvent } from './tape'
+import type { CharacterId } from '../types/characters'
 import type { Burst, Outbox } from './outbox'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
@@ -143,6 +146,19 @@ function liveCoins(world: EcsWorld): number {
     if (hasComponent(world, eid, GrantCoins)) n++
   }
   return n
+}
+
+/** 一帧最多补走几步：卡得更久就丢掉落下的时间 */
+const MAX_STEPS_PER_FRAME = 4
+
+/** 留几场录像：这一场与上一场 */
+const KEPT_TAPES = 2
+
+/** 最近几场的录像，新的在前；离开战斗以后还留着 */
+const TAPES: Tape[] = []
+
+function unknownCommand(cmd: never): never {
+  throw new Error(`开发指令没有处理：${JSON.stringify(cmd)}`)
 }
 
 /** 视野规则的黑幕有多黑 */
@@ -215,6 +231,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private settling = false
   /** 每名队员装上能力时的等级，按名单位置 */
   private armedLevels: number[] = []
+  /** 攒着还没走的时间，毫秒 */
+  private pendingMs = 0
+  /** 这一场正录着的录像；回放时没有 */
+  private recorder: TapeRecorder | null = null
+  /** 照录像重打时的回放 */
+  private player: TapePlayer | null = null
+  /** 弹出升级弹窗时的名单与各人等级：回来时比一比，就知道领了什么 */
+  private claimBase: { readonly roster: readonly CharacterId[]; readonly levels: readonly number[] } | null = null
 
   constructor() {
     super(SceneKey.Battle)
@@ -251,46 +275,75 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.choosing = false
     this.settling = false
     this.armedLevels = []
+    this.pendingMs = 0
+    this.recorder = null
+    this.player = null
+    this.claimBase = null
   }
 
   devProvider(): DevProvider {
     return battleDevProvider(this)
   }
 
-  devSpawn(kind: 'one' | 'elite' | 'surge' | 'boss'): void {
-    const sim = this.sim
-    if (!sim || sim.over) return
-    if (kind === 'one') telegraphOne(sim, { hpMul: 1 })
-    else if (kind === 'elite') telegraphOne(sim, { hpMul: 1, elite: true })
-    else if (kind === 'surge') callSquad(sim, SURGE)
-    else spawnBoss(sim)
+  /** 开发面板的指令：和玩家的操作一样录进录像 */
+  dev(cmd: DevCommand): void {
+    this.issue({ t: this.sim?.tick ?? 0, k: 'dev', cmd })
   }
 
-  devKillAll(): void {
-    const sim = this.sim
-    if (!sim || sim.over) return
-    for (const eid of [...query(this.world, [Enemy])]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
-  }
-
-  devGrant(kind: 'coins' | 'level'): void {
-    const sim = this.sim
-    if (!sim) return
-    if (kind === 'coins') this.run.coins += 1000
-    else gainTeamXp(sim, Math.max(1, xpToNext(this.run) - this.run.xp.xp))
-  }
-
-  devEndWave(): void {
-    const sim = this.sim
-    if (!sim || sim.over || this.ending || this.endless) return
-    settleWave(sim)
-    this.scheduleWaveEnd()
-  }
-
-  /** 跳过这一阶段，接上下一阶段；已是最后一个阶段就不动 */
-  devNextPhase(): void {
-    const sim = this.sim
-    if (!sim || sim.over || this.ending || lastPhase(sim.fight)) return
-    nextPhase(sim)
+  private devApply(sim: Sim, cmd: DevCommand): void {
+    switch (cmd.kind) {
+      case 'spawn':
+        if (sim.over) return
+        if (cmd.what === 'one') telegraphOne(sim, { hpMul: 1 })
+        else if (cmd.what === 'elite') telegraphOne(sim, { hpMul: 1, elite: true })
+        else if (cmd.what === 'surge') callSquad(sim, SURGE)
+        else spawnBoss(sim)
+        return
+      case 'killAll':
+        if (sim.over) return
+        for (const eid of [...query(this.world, [Enemy])]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
+        return
+      case 'grant':
+        if (cmd.what === 'coins') this.run.coins += 1000
+        else gainTeamXp(sim, Math.max(1, xpToNext(this.run) - this.run.xp.xp))
+        return
+      case 'endWave':
+        if (sim.over || this.ending || this.endless) return
+        settleWave(sim)
+        this.scheduleWaveEnd()
+        return
+      // 跳过这一阶段，接上下一阶段；已是最后一个阶段就不动
+      case 'nextPhase':
+        if (sim.over || this.ending || lastPhase(sim.fight)) return
+        nextPhase(sim)
+        return
+      case 'resetSkill':
+        this.run.skillCd.fill(0)
+        for (const e of sim.skills) {
+          Cd.left[e] = 0
+          if (hasComponent(this.world, e, Charges)) Charges.n[e] = Charges.max[e]!
+        }
+        return
+      // 无敌切换后立刻生效：换掉队员的生命上限，开无敌时补满
+      case 'invincible':
+        sim.run.invincible = cmd.on
+        sim.run.roster.forEach((id, slot) => {
+          const m = sim.characters[slot]!
+          const base = memberBase(CHARACTERS[id])
+          statBase[m] = cmd.on ? { ...base, maxHp: INVINCIBLE_HP } : base
+          foldBody(sim.world, sim, m)
+          if (cmd.on) Hp.v[m] = Hp.max[m]!
+        })
+        return
+      // 旋钮改了这一场给队伍的常驻修正后立刻换上
+      case 'knobs': {
+        const mods = fightMods(sim.fight, FACTION.team)
+        for (const eid of query(this.world, [Stats])) if (Faction.v[eid] === FACTION.team) setStatLayer(eid, 'fight', mods)
+        return
+      }
+      default:
+        return unknownCommand(cmd)
+    }
   }
 
   /** 这一阶段的进度：第几个阶段、开始了多久、难度时钟，每条连续刷怪此刻的间隔与放出了几只，各条目标 */
@@ -314,14 +367,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       ...st.rows.map((r) => `${r.name.padEnd(4, '　')} ${String(r.n).padStart(3)} 处 · 共 ${String(r.total).padStart(5)} · 十秒 ${String(r.recent).padStart(4)}`),
       `够不着出怪口、原地出来 ${st.misses} · 落点站不住换地方 ${st.moves}`,
     ].join('\n')
-  }
-
-  devResetSkill(): void {
-    this.run.skillCd.fill(0)
-    for (const e of this.sim?.skills ?? []) {
-      Cd.left[e] = 0
-      if (hasComponent(this.world, e, Charges)) Charges.n[e] = Charges.max[e]!
-    }
   }
 
   devEnemyCounts(): { name: string; n: number }[] {
@@ -431,11 +476,19 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.strokeRect(SAFE.x, SAFE.y, SAFE.w, SAFE.h)
   }
 
-  create(): void {
+  create(data?: { readonly tape?: Tape }): void {
     this.resetSceneFields()
     this.world = makeWorld()
 
+    const tape = data?.tape
+    if (tape) adoptRun(structuredClone(tape.run))
     const run = getRun()
+    if (tape) this.player = new TapePlayer(tape)
+    else {
+      this.recorder = new TapeRecorder(run)
+      TAPES.unshift(this.recorder.tape)
+      TAPES.length = Math.min(TAPES.length, KEPT_TAPES)
+    }
     this.run = run
     this.fightDef = enterFight(run)
     const mapDef = MAPS[run.mapId]
@@ -483,6 +536,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.events.on(Phaser.Scenes.Events.RESUME, this.onResume, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++
+      this.player?.stop()
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.events.off(Phaser.Scenes.Events.RESUME, this.onResume, this)
       this.scene.stop(SceneKey.Ui)
@@ -498,7 +552,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
     if (gen !== this.bootGen) return
     this.atlas = atlas
-    resetEntityStorage()
+    resetEntities()
     const paint = new Presentation()
     this.paint = paint
     const light = MAPS[run.mapId].light
@@ -681,8 +735,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 
   switchLeader(slot: number): boolean {
-    const sim = this.sim
-    if (!sim || this.ending) return false
+    return this.issue({ t: this.sim?.tick ?? 0, k: 'switch', slot })
+  }
+
+  private switchTo(sim: Sim, slot: number): boolean {
+    if (this.ending) return false
     const eid = sim.characters[slot]
     if (eid === undefined || !canSwitchLeader(sim, eid)) return false
     switchLeader(sim, eid)
@@ -721,10 +778,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
-  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向；连段开着时接下一段；按住蓄力的带上蓄了几成 */
   castLeaderSkill(dir: Point | null, holdRatio = 0): boolean {
-    const sim = this.sim
-    if (!sim || sim.over || this.ending || this.skillBlock()) return false
+    return this.issue({ t: this.sim?.tick ?? 0, k: 'cast', dir: dir && { x: dir.x, y: dir.y }, hold: holdRatio })
+  }
+
+  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向；连段开着时接下一段；按住蓄力的带上蓄了几成 */
+  private cast(sim: Sim, dir: Point | null, holdRatio: number): boolean {
+    if (sim.over || this.ending || this.skillBlock()) return false
     const leader = sim.leader
     if (!Alive.v[leader] || !Ctl.cast[leader]) return false
     const slot = sim.characters.indexOf(leader)
@@ -780,27 +840,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     return (this.sim ? phaseOf(this.sim.fight) : this.fightDef.phases[0]!).ends.length === 0
   }
 
-  /** 无敌切换后立刻生效：换掉队员的生命上限，开无敌时补满 */
-  applyInvincible(): void {
-    const sim = this.sim
-    if (!sim) return
-    sim.run.roster.forEach((id, slot) => {
-      const m = sim.characters[slot]!
-      const base = memberBase(CHARACTERS[id])
-      statBase[m] = sim.run.invincible ? { ...base, maxHp: INVINCIBLE_HP } : base
-      foldBody(sim.world, sim, m)
-      if (sim.run.invincible) Hp.v[m] = Hp.max[m]!
-    })
-  }
-
-  /** 旋钮改了这一场给队伍的常驻修正后立刻换上 */
-  applyKnobs(): void {
-    const sim = this.sim
-    if (!sim) return
-    const mods = fightMods(sim.fight, FACTION.team)
-    for (const eid of query(this.world, [Stats])) if (Faction.v[eid] === FACTION.team) setStatLayer(eid, 'fight', mods)
-  }
-
 
 
   private onViewportChanged(): void {
@@ -823,9 +862,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
 
 
-  /** 这一场赢了：记下队长、打出小结，稍后走到下一步 */
+  /** 这一场赢了：记下队长、打出小结，稍后走到下一步；回放就停在这一刻 */
   private scheduleWaveEnd(): void {
     this.ending = true
+    if (this.finishTape()) return
     const sim = this.sim!
     const run = sim.run
     run.leaderId = run.roster[sim.characters.indexOf(sim.leader)]!
@@ -862,7 +902,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       claimNothing(this.run)
       return false
     }
+    // 回放不弹窗：录下的领法在下一步之前放进来
+    if (this.player) return false
     this.choosing = true
+    this.claimBase = { roster: [...this.run.roster], levels: this.run.roster.map((_, slot) => memberLevel(this.run, slot)) }
     const onField = this.sim ? levelUpsOnField(this.sim).length : 0
     openLevelUp(this, { settling: this.settling, queued: pendingLevelUps(this.run) - onField })
     return true
@@ -878,8 +921,24 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private onResume(): void {
     if (!this.choosing) return
     this.choosing = false
-    if (this.settling) this.proceed()
-    else this.syncTeam()
+    if (this.settling) {
+      this.proceed()
+      return
+    }
+    this.recordClaims()
+    this.syncTeam()
+  }
+
+  /** 升级弹窗里领了什么：名单上添的人与各人涨的级，录进录像 */
+  private recordClaims(): void {
+    const base = this.claimBase
+    this.claimBase = null
+    const sim = this.sim
+    if (!base || !sim) return
+    const run = this.run
+    const recruits = run.roster.slice(base.roster.length)
+    const upgrades = base.levels.flatMap((lv, slot) => Array.from({ length: memberLevel(run, slot) - lv }, () => slot))
+    this.recorder?.push({ t: sim.tick, k: 'claims', recruits, upgrades })
   }
 
   /** 按本局的名单与等级补上新招的队员，给升了级的队员换上新能力 */
@@ -913,9 +972,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.aimLens(delta)
       return
     }
-    sim.dtMs = delta
-    sim.wdtMs = delta * worldTimeScale(sim)
     if (this.ending) {
+      sim.dtMs = delta
+      sim.wdtMs = delta * worldTimeScale(sim)
       stepFrozenVisuals(sim)
       drainSfx(sim.out)
       this.cues?.step(sim.fxMs)
@@ -924,27 +983,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.aimLens(delta)
       return
     }
-    const leftMs = timeLeftMs(sim)
-    const lastFrame = sim.wdtMs >= leftMs
-    if (lastFrame) sim.wdtMs = leftMs
-    const kx =
-      (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
-      (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
-    const ky =
-      (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
-      (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
-
-    const keyed = kx !== 0 || ky !== 0
-    const stick = hudMoveVector()
-    sim.teamDir = keyed ? norm(kx, ky) : stick
-    sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
-
     const seen = this.lens.screen.visible()
     sim.view.x = seen.x
     sim.view.y = seen.y
     sim.view.right = seen.x + seen.w
     sim.view.bottom = seen.y + seen.h
-    stepFrame(sim)
+    const steps = this.stepsFor(delta)
+    for (let i = 0; i < steps; i++) if (!this.tick(sim)) break
     if (sim.leader !== this.shownLeader) {
       this.shownLeader = sim.leader
       const def = CHARACTERS[this.run.roster[sim.characters.indexOf(sim.leader)]!]
@@ -965,10 +1010,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.drawDevGates(sim)
     this.drawDevHeights(sim)
     this.drawSkillAim(sim)
-    if (sim.over) {
-      this.lose('全军覆没')
-      return
-    }
     const camOff = handoverCamOffset(sim)
     this.anchor.x = leaderX(sim) + camOff.x
     this.anchor.y = leaderY(sim) + camOff.y
@@ -978,21 +1019,152 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
-    // 须在 stepFrame 与全灭判定之后：时限内全灭判负
+  }
+
+  /** 这一帧走几步：攒下的时间按步长四舍五入；落下太多就丢掉，免得越补越卡 */
+  private stepsFor(delta: number): number {
+    this.pendingMs += delta
+    const n = Math.round(this.pendingMs / TICK_MS)
+    if (n > MAX_STEPS_PER_FRAME) {
+      this.pendingMs = 0
+      return MAX_STEPS_PER_FRAME
+    }
+    this.pendingMs -= n * TICK_MS
+    return n
+  }
+
+  /** 走一步：放进这一步之前的输入，推进模拟，再判胜负、领升级；返回这一帧还能不能接着走 */
+  private tick(sim: Sim): boolean {
+    this.feed(sim)
+    if (this.ending) return false
+    const lastFrame = stepFrame(sim)
+    this.recorder?.check(sim)
+    this.player?.check(sim)
+    if (sim.over) {
+      this.lose('全军覆没')
+      return false
+    }
+    // 须在全灭判定之后：时限内全灭判负
     const verdict = fightVerdict(sim, lastFrame)
     if (verdict?.win) {
       settleWave(sim)
       this.scheduleWaveEnd()
-    } else if (verdict) {
+      return false
+    }
+    if (verdict) {
       this.lose(verdict.reason)
-    } else {
-      this.takeLevelUps(sim)
+      return false
+    }
+    this.takeLevelUps(sim)
+    return !this.choosing
+  }
+
+  /** 放进第 sim.tick 步之前的输入：回放照录像放，平时读键盘与摇杆并录下 */
+  private feed(sim: Sim): void {
+    const player = this.player
+    if (player) {
+      for (const e of player.due(sim.tick)) this.apply(sim, e)
+      const m = player.move()
+      this.steer(sim, m.x, m.y, m.raw)
+      return
+    }
+    const kx =
+      (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
+      (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
+    const ky =
+      (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
+      (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
+    const keyed = kx !== 0 || ky !== 0
+    const stick = hudMoveVector()
+    const dir = keyed ? norm(kx, ky) : stick
+    const raw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
+    this.recorder?.poll(sim.tick)
+    this.recorder?.move(sim.tick, dir.x, dir.y, raw)
+    this.steer(sim, dir.x, dir.y, raw)
+  }
+
+  private steer(sim: Sim, x: number, y: number, raw: number): void {
+    sim.teamDir.x = x
+    sim.teamDir.y = y
+    sim.moveInputRaw = raw
+  }
+
+  /** 实时的一条输入：放成了就录进录像；回放时只认录像里的 */
+  private issue(e: Exclude<TapeEvent, { k: 'move' | 'settings' | 'claims' }>): boolean {
+    const sim = this.sim
+    if (!sim || this.player) return false
+    this.recorder?.poll(sim.tick)
+    if (!this.apply(sim, e)) return false
+    this.recorder?.push(e)
+    return true
+  }
+
+  /** 放进一条输入：实时与回放走同一条路；返回放没放成 */
+  private apply(sim: Sim, e: Exclude<TapeEvent, { k: 'move' | 'settings' }>): boolean {
+    switch (e.k) {
+      case 'cast':
+        return this.cast(sim, e.dir, e.hold)
+      case 'switch':
+        return this.switchTo(sim, e.slot)
+      case 'dev':
+        this.devApply(sim, e.cmd)
+        return true
+      case 'claims':
+        for (const id of e.recruits) claimRecruit(this.run, id)
+        for (const slot of e.upgrades) claimUpgrade(this.run, slot)
+        this.syncTeam()
+        return true
     }
   }
 
-  /** 这一局输了：停在此刻，稍后去结算 */
+  /** 这一场打完：录像记下最后的校验值，回放比对；返回是不是在回放 */
+  private finishTape(): boolean {
+    const sim = this.sim!
+    this.recorder?.finish(sim)
+    const player = this.player
+    if (!player) return false
+    player.finish(sim)
+    console.info(this.tapeText())
+    return true
+  }
+
+  /** 正在回放的录像，不在回放时是这一场正录着的；离开战斗以后还留着 */
+  currentTape(): Tape | undefined {
+    return this.player?.tape ?? TAPES[0]
+  }
+
+  /** 这一场之前打的那一场的录像 */
+  previousTape(): Tape | undefined {
+    return this.player ? undefined : TAPES[1]
+  }
+
+  /** 照录像从头重打一场 */
+  replay(tape: Tape): void {
+    this.scene.restart({ tape })
+  }
+
+  tapeText(): string {
+    const sim = this.sim
+    const p = this.player
+    if (p) {
+      const t = sim?.tick ?? 0
+      const verdict =
+        p.divergedAt !== null
+          ? `从第 ${p.divergedAt} 步起对不上`
+          : sim && p.beyond(sim)
+            ? `录到的 ${p.tape.ticks} 步都对得上，再往后没有可比的`
+            : `对得上 · 比对了 ${p.matched} 处`
+      return `回放 · 第 ${t}/${p.tape.ticks} 步${p.over ? ' · 已打完' : ''}\n${verdict}`
+    }
+    const tape = TAPES[0]
+    if (!tape) return '还没有录像'
+    return `录制 · 第 ${tape.ticks} 步${tape.final !== null ? ' · 已打完' : ''}\n${tape.events.length} 条输入 · ${tape.checks.length} 个校验值`
+  }
+
+  /** 这一局输了：停在此刻，稍后去结算；回放就停在这一刻 */
   private lose(reason: string): void {
     this.ending = true
+    if (this.finishTape()) return
     this.run.combatMs += this.sim!.elapsedMs
     playSfx('over')
     this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false, reason }))
