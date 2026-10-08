@@ -85,12 +85,6 @@ interface Drop {
   life: number
 }
 
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
-}
-
 /**
  * 屏幕四边结起的霜：贴着边是一层厚薄不匀的白霜，角上最厚；霜上长出一丛丛羽毛似的冰花，
  * 主干微微打弯，两侧按六十度一路长出细刺，越往梢越短越淡
@@ -228,7 +222,10 @@ export class FloeView extends BoundedView {
     canvasTexture(scene, LEE_KEY, Math.round(rect[2]! / (LEE_CELL_U * UNIT)), Math.round(rect[3]! / (LEE_CELL_U * UNIT)), (ctx) =>
       drawLee(ctx, f, { x: rect[0]!, y: rect[1]!, w: rect[2]!, h: rect[3]! }, cfg.wind.fetchM / cfg.meterPerU),
     )
-    canvasTexture(scene, SEA_NOISE_KEY, NOISE_TILE, NOISE_TILE, (ctx) => drawSeaNoise(ctx, f.seed ^ 0x3a7)).setWrap(Phaser.Textures.WrapMode.REPEAT, Phaser.Textures.WrapMode.REPEAT)
+    const noise = canvasTexture(scene, SEA_NOISE_KEY, NOISE_TILE, NOISE_TILE, (ctx) => drawSeaNoise(ctx, f.seed ^ 0x3a7))
+    noise.setWrap(Phaser.Textures.WrapMode.REPEAT, Phaser.Textures.WrapMode.REPEAT)
+    // 噪声按各种尺度取，碎冰还按各块错开的坐标取：mipmap 会把它抹平、在块的接缝上取错层，只用线性插值
+    noise.setFilter(Phaser.Textures.FilterMode.LINEAR)
     const sea = new WindSea(f.windAngle, f.seed ^ 0x51a, cfg.wind.meanMs, cfg.wind.fetchM, cfg.meterPerU, FLOE_GRAVITY)
     const long = canvasTexture(scene, SEA_LONG_KEY, SEA_N, SEA_N)
     const short = canvasTexture(scene, SEA_SHORT_KEY, SEA_N, SEA_N)
@@ -236,7 +233,7 @@ export class FloeView extends BoundedView {
     await painting
     if (this.painter !== painter) return
     this.painter = undefined
-    upload(tex)
+    tex.refresh()
     this.visuals.push(scene.add.image(frame.x0, frame.y0, FLOE_KEY).setOrigin(0, 0).setDisplaySize((frame.w / FLOE_PPU) * UNIT, (frame.h / FLOE_PPU) * UNIT).setDepth(-1))
     const swellAngle = f.windAngle + (new Rng(f.seed ^ 0x5e11).next() * 2 - 1) * 1.2
     const k = (Math.PI * 2) / SWELL_U
@@ -339,8 +336,8 @@ export class FloeView extends BoundedView {
     w.sea.frame(now / 1000, w.longPx.data, w.shortPx.data)
     w.long.getContext().putImageData(w.longPx, 0, 0)
     w.short.getContext().putImageData(w.shortPx, 0, 0)
-    upload(w.long)
-    upload(w.short)
+    w.long.refresh()
+    w.short.refresh()
   }
 
   /** 风吹雪：按风速的三次方在镜头里撒雪，从上风那一侧吹进来；贴地的拖成短线，少数飞起来的是小点 */

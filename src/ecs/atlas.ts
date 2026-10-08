@@ -29,15 +29,6 @@ function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLI
   return svgToImage(setSvgSize(svg, CELL))
 }
 
-/** 把一页画布传上显卡，缩小着画按三线性的 mipmap 取样：高分屏开了 pixelArt，引擎缺省的最近点会让单位边缘起锯齿、动起来闪 */
-function upload(page: Phaser.Textures.CanvasTexture): void {
-  const src = page.get().source
-  const tex = src.glTexture
-  if (!tex || !('gl' in src.renderer)) return
-  const gl = src.renderer.gl
-  tex.update(page.canvas, page.width, page.height, tex.flipY, tex.wrapS, tex.wrapT, gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, tex.format)
-}
-
 const NO_CLIP = { base: -1, frames: 0 }
 
 let atlasSerial = 0
@@ -151,10 +142,7 @@ export class EcsAtlas {
       this.place(frame, img)
       touched.add(Math.floor(frame / PER_PAGE))
     }
-    for (const p of touched) {
-      const page = this.pages[p]
-      if (page) upload(page)
-    }
+    for (const p of touched) this.pages[p]?.refresh()
     this.clips.set(key, { base, frames: clip.frames })
   }
 
@@ -256,9 +244,7 @@ export class EcsAtlas {
     for (let p = 0; p < atlas.canvases.length; p++) {
       const key = `ecs-atlas-${atlas.serial}-${p}`
       if (scene.textures.exists(key)) scene.textures.remove(key)
-      const page = scene.textures.addCanvas(key, atlas.canvases[p]!)!
-      upload(page)
-      atlas.pages.push(page)
+      atlas.pages.push(scene.textures.addCanvas(key, atlas.canvases[p]!)!)
     }
     return atlas
   }

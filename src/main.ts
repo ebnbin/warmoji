@@ -33,7 +33,7 @@ const game = new Phaser.Game({
   type: Phaser.WEBGL,
   parent: 'game',
   transparent: true,
-  render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR', pixelArt: viewport.dpr !== 1 },
+  render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR' },
   width: Math.round(viewport.cssWidth * viewport.dpr),
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },

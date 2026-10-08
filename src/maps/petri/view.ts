@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import { UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
 import { SUN } from '../../data/light'
@@ -26,12 +26,6 @@ const PAINT_THREADS = 4
 const STRIP_PX = 64
 /** 菌落层画在躺着的布景之上、身体的影子之下 */
 const COLONY_DEPTH = 1.6
-
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
-}
 
 /**
  * 培养皿：灯箱、玻璃皿壁、琼脂和皿底的记号笔是开局在后台线程画好的贴图；菌落按菌落场编成的数据图由着色器画在琼脂上，
@@ -81,7 +75,7 @@ export class PetriView implements MapView {
     painter.close()
     if (this.painter !== painter) return
     this.painter = undefined
-    upload(tex)
+    tex.refresh()
     const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.colonyLayer(v, st)
@@ -131,7 +125,7 @@ export class PetriView implements MapView {
     c.version = st.version
     encodeColony(c.field, v.def.petri!.colony.matureS, c.img.data)
     c.tex.getContext().putImageData(c.img, 0, 0)
-    upload(c.tex)
+    c.tex.refresh()
   }
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {

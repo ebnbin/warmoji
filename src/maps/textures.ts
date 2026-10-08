@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import { fbm } from '../util/noise'
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -8,7 +8,6 @@ export function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: nu
   const tex = scene.textures.createCanvas(key, w, h)!
   if (draw) draw(tex.getContext())
   tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
   return tex
 }
 

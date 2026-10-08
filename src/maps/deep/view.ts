@@ -106,12 +106,6 @@ interface Flake {
   readonly img: Phaser.GameObjects.Image
 }
 
-/** 把画布重新传上显卡：重传会按游戏的像素风退回最近邻取样，这几张图都要线性插值 */
-function refreshLinear(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
-}
-
 /**
  * 深海：谷底是开局在后台线程画好的固有色与高度，光照由着色器逐点算——头顶透下一层幽蓝的微光，整片谷底看得清个大概；潜艇门上的灯、艇首的探照灯与队员的头灯照出一圈圈暖白，
  * 光在水里走得越远越只剩青蓝，灯四周罩着一团泛青的光晕；被搅动的浮游生物发出蓝绿的冷光，游过的身体与飞过的子弹身后拖着一道道光痕。
@@ -197,9 +191,9 @@ export class DeepView extends BoundedView {
     if (this.painter !== painter) return
     painter.close()
     this.painter = undefined
-    refreshLinear(albedo)
-    refreshLinear(geo)
-    refreshLinear(norm)
+    albedo.refresh()
+    geo.refresh()
+    norm.refresh()
     this.relief = paintScene(s.plan, cfg.meterPerU)
     const n = FRAME_U * GLOW_PPU
     const glowTex = canvasTexture(scene, GLOW_KEY, n, n)
@@ -364,7 +358,7 @@ export class DeepView extends BoundedView {
       d[i * 4 + 3] = 255
     }
     g.tex.getContext().putImageData(g.img, 0, 0)
-    refreshLinear(g.tex)
+    g.tex.refresh()
   }
 
   /** 停在谷底上的潜艇贴着地画；浮起来按透视越画越大、越往画面外偏，暗下去变淡，过了身体的头顶就画到身体前面；预兆时艇身一抖一抖。门开着时画门洞与踏板，门口罩一团暖光 */

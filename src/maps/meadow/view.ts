@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
 import { FRAME_U, UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
@@ -9,6 +9,7 @@ import { playSfx } from '../../audio/sfx'
 import { decorSprite } from '../../ecs/decor'
 import { Alive, Pickup, Radius, Span, Transform } from '../../ecs/components'
 import { roomAt } from '../basin'
+import { canvasTexture } from '../textures'
 import { CANOPY_PPU, grassMask, GROUND_AREA, MASK_PPU, textureSize } from './ground'
 import { MeadowPainter } from './painter'
 import { GRASS_FRAG } from './shader'
@@ -90,20 +91,6 @@ interface Bird {
   readonly vy: number
   flap: number
   readonly img: Phaser.GameObjects.Image
-}
-
-function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
-  if (scene.textures.exists(key)) scene.textures.remove(key)
-  const tex = scene.textures.createCanvas(key, w, h)!
-  if (draw) draw(tex.getContext())
-  upload(tex)
-  return tex
-}
-
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
 }
 
 /** 小生灵的贴图只画一次，之后每局都用 */
@@ -191,7 +178,7 @@ export class MeadowView implements MapView {
     painter.close()
     if (this.painter !== painter) return
     this.painter = undefined
-    for (const t of Object.values(tex)) upload(t)
+    for (const t of Object.values(tex)) t.refresh()
     const ga = GROUND_AREA
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, GROUND_KEY).setOrigin(0, 0).setDisplaySize((sizes.ground.w / GROUND_PPU) * UNIT, (sizes.ground.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.grass(v, sc, plan, ga)

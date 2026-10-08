@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { rollDecor } from '../../data/maps'
@@ -8,6 +8,7 @@ import { Rng } from '../../util/rng'
 import { decorSprite, keepDecor } from '../../ecs/decor'
 import { Alive, Depth, Phys, Pickup, Radius, Span, Transform, Uid } from '../../ecs/components'
 import { roomAt } from '../basin'
+import { canvasTexture } from '../textures'
 import { flowAt } from './water'
 import { Wakes } from './wakes'
 import { CANOPY_PPU, groundArea, textureSize } from './ground'
@@ -77,20 +78,6 @@ interface Falling {
   rot: number
   landed: number
   readonly img: Phaser.GameObjects.Image
-}
-
-function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
-  if (scene.textures.exists(key)) scene.textures.remove(key)
-  const tex = scene.textures.createCanvas(key, w, h)!
-  if (draw) draw(tex.getContext())
-  upload(tex)
-  return tex
-}
-
-/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
-function upload(tex: Phaser.Textures.CanvasTexture): void {
-  tex.refresh()
-  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
 }
 
 /** 花瓣的贴图只画一次，之后每局都用 */
@@ -178,7 +165,7 @@ export class SakuraView implements MapView {
     this.painter = undefined
     const water = s.water
     if (!water) return
-    for (const l of layers) upload(tex[l])
+    for (const l of layers) tex[l].refresh()
     const ga = groundArea(sc)
     this.visuals.push(scene.add.image(ga.x0 * UNIT, ga.y0 * UNIT, KEYS.ground).setOrigin(0, 0).setDisplaySize((sizes.ground.w / GROUND_PPU) * UNIT, (sizes.ground.h / GROUND_PPU) * UNIT).setDepth(-1))
     this.water(v, plan, water)

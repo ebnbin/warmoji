@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { GROUND_PPU } from '../../data/texel'
@@ -270,7 +270,6 @@ export class TheaterView implements MapView {
     if (this.painter !== painter) return
     this.painter = undefined
     tex.refresh()
-    tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
     this.back = tex.getSourceImage() as HTMLCanvasElement
     this.visuals.push(scene.add.image(0, 0, BACK_KEY).setOrigin(0, 0).setDisplaySize((size.w / GROUND_PPU) * UNIT, (size.h / GROUND_PPU) * UNIT).setDepth(-1))
     const img = (depth: number): Phaser.GameObjects.Image => scene.add.image(0, 0, '__WHITE').setOrigin(0, 0).setDepth(depth)
@@ -488,7 +487,6 @@ export class TheaterView implements MapView {
     })
     ctx.globalCompositeOperation = 'source-over'
     this.darkTex!.refresh()
-    this.darkTex!.setFilter(Phaser.Textures.FilterMode.LINEAR)
   }
 
   /** 被吊起来的角色头顶两根吊绳，一直通到台框上面 */
