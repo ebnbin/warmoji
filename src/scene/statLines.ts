@@ -11,6 +11,8 @@ import { gearMods, resolveAbilityDef } from '../data/items'
 import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ROLES } from '../data/roles'
 import { STATUSES } from '../data/statuses'
+import { ELEMENT_IDS, ELEMENTS } from '../data/elements'
+import type { ElementId } from '../types/elements'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { GrowthProgress, ItemId } from '../types/items'
@@ -93,7 +95,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'slow':
       return e.factor === 0 ? `冻结 ${sec(e.durationMs)}` : `减速 ${pct(1 - e.factor)} ${sec(e.durationMs)}`
     case 'poison':
-      return `中毒 ${e.damage}/${sec(e.tickMs)}×${sec(e.durationMs)}`
+      return `中毒 ${[e.damage ? `${e.damage}` : '', e.ratio ? `${pct(e.ratio)} 基础伤害` : ''].filter(Boolean).join(' + ')}/${sec(e.tickMs)}×${sec(e.durationMs)}`
     case 'ground':
       return `留下 ${grid(e.def.radius)} 的${e.def.trap ? '陷阱' : '场地'} ${sec(e.def.durationMs)}${e.def.damage && e.def.tickMs ? `，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤` : ''}${e.def.effects && !e.def.trap ? `，每 ${sec(e.def.tickMs)} ${joinFx(e.def.effects)}` : ''}${zoneRuleLine(e.def, e.def.effects, e.def.damage)}`
     case 'morph':
@@ -255,6 +257,14 @@ export function effectLine(e: Effect, self = false): string {
       return `拴在身后拖行 ${sec(e.ms)}，期间不能行动`
     case 'realm':
       return `把目标与自己拉进只有彼此的异界 ${sec(e.ms)}，界外谁也插不了手`
+    case 'imbue':
+      return `附${ELEMENTS[e.element].name}魔 ${sec(e.ms)}（出手都带${ELEMENTS[e.element].name}元素）`
+    case 'attune':
+      return `转为${ELEMENTS[e.element].name}元素 ${sec(e.ms)}`
+    case 'shield':
+      return `护盾 ${[e.amount ? `${e.amount}` : '', e.ratio ? `${pct(e.ratio)} 生命上限` : ''].filter(Boolean).join(' + ')}，持续 ${sec(e.ms)}`
+    case 'mend':
+      return `回春 ${[e.amount ? `${e.amount}` : '', e.ratio ? `${pct(e.ratio)} 生命上限` : ''].filter(Boolean).join(' + ')}/${sec(e.tickMs)}×${sec(e.durationMs)}`
   }
 }
 
@@ -307,6 +317,8 @@ export function condLine(c: Cond): string {
       return `离自己 ${grid(c.radius)} 以内`
     case 'afterSkill':
       return `${who}放主动技能后 ${sec(c.ms)} 内`
+    case 'element':
+      return `${who}是${ELEMENTS[c.element].name}元素`
   }
 }
 
@@ -411,9 +423,22 @@ function selfAndHit(w: AbilityDef): string[] {
 /** 伤害按出手方式吃近战或远程伤害 */
 const DELIVERY_NAME: Partial<Record<number, string>> = { [HIT.melee]: '近战', [HIT.ranged]: '远程' }
 
+/** 一种元素克制谁、被谁克制 */
+export function counterText(el: ElementId): string {
+  const beats = ELEMENTS[el].beats.map((b) => ELEMENTS[b].name).join('、')
+  const by = ELEMENT_IDS.filter((o) => ELEMENTS[o].beats.includes(el)).map((o) => ELEMENTS[o].name).join('、')
+  return `克制${beats}，被${by}克制`
+}
+
+/** 单位的元素：挨打按它算克制，出手默认带它 */
+export function elementLine(el: ElementId | undefined): string {
+  return el ? `元素 ${ELEMENTS[el].name}：${counterText(el)}；出手默认带${ELEMENTS[el].name}元素` : '元素 无：挨打不吃克制，出手不带元素'
+}
+
 export function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
   const how = DELIVERY_NAME[deliveryOf(w)]
+  if (w.element) base.push(`${ELEMENTS[w.element].name}元素`)
   if (w.damage) base.push(`伤害 ${w.damage}${how ? `（${how}）` : ''}`)
   if (w.trigger === 'auto' && w.cooldownMs > 0) base.push(`冷却 ${sec(w.cooldownMs)}`)
   if (w.knockback) base.push(`击退 ${kbGrid(w.knockback)}`)
@@ -485,6 +510,7 @@ export function characterStatGroups(
     if (rest.length > 0) baseLines.push(rest.join(' · '))
     if (def.resource) baseLines.push(resourceLine(def.resource))
     baseLines.push(`特质：${traitLine([...MEMBER.traits, ...(def.traits ?? [])], undefined) || '无'}`)
+    baseLines.push(elementLine(def.element))
     groups.push({ icon: '2764', title: `基础 · ${ROLES[def.role].name}`, lines: baseLines })
     groups.push({
       icon: '1f9ed',
@@ -520,7 +546,7 @@ export function characterStatGroups(
       icon: f.emoji ?? def.emoji,
       title: `形态 · ${f.name ?? def.name}`,
       lines: [
-        [...(f.stats ? modTexts(f.stats) : []), '自动能力换成：'].join(' · '),
+        [...(f.stats ? modTexts(f.stats) : []), ...(f.element ? [`元素换成${ELEMENTS[f.element].name}`] : []), '自动能力换成：'].join(' · '),
         ...(f.abilities ?? []).flatMap((w) => [`「${abilityLabel(w)}」`, ...abilityStatLines(w)]),
       ],
     })

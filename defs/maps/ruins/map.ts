@@ -58,5 +58,5 @@ export default {
     gapU: 2,
     reflowMs: 150,
   },
-  boss: 'rhino',
+  bosses: ['rhino'],
 } as const satisfies MapDef

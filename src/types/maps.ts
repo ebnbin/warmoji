@@ -1055,7 +1055,7 @@ export interface MapDef {
   /** 战场上的精灵怎么受光、身体怎么投影 */
   readonly light: UnitLight
   readonly decor: MapDecor
-  /** 这张图出没的小怪：沙盒、图鉴与出怪口按它，关卡里的配比另写 */
+  /** 这张图出没的小怪，敌人就靠它绑到地图上：沙盒、图鉴与出怪口按它，关卡里的配比另写 */
   readonly foes: readonly EnemyKind[]
   /** 敌人从地图上哪些地方、怎么进场 */
   readonly gates: GatesConfig
@@ -1071,7 +1071,8 @@ export interface MapDef {
   readonly petri?: PetriConfig
   readonly theater?: TheaterConfig
   readonly exit?: ExitConfig
-  readonly boss: EnemyKind
+  /** 这张图的头目，在不同的阶段登场；关卡里的头目阶段默认放第一个 */
+  readonly bosses: readonly EnemyKind[]
 }
 export type MapId = keyof typeof mapsJson
 export type MapKind = MapDef['kind']

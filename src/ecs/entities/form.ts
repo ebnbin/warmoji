@@ -1,6 +1,6 @@
 import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
-import { Ability, Act, Anchored, Anim, Borrowed, Cd, Charges, Contact, EnemyArm, Faction, Form, Granted, Manual, MARK, Motion, MOTION, Owner, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
+import { Ability, Act, Anchored, Anim, Borrowed, Cd, Charges, Contact, Elem, EnemyArm, Faction, Form, Granted, Manual, MARK, Motion, MOTION, Owner, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
 import { setTraits } from '../utils/traits'
 import { abilityDef, bodyLook, enemyDef, formEnd } from '../store'
 import { hasMark } from '../utils/marks'
@@ -16,6 +16,7 @@ import type { AbilityDef, Effect } from '../../types/abilityDefs'
 import type { DriveDef, FormDef, PhaseDef } from '../../types/enemies'
 import type { StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
+import { elementIndex } from '../../data/elements'
 
 /** 身体可切换的形态：非玩家身体取定义里的，角色取角色表里的 */
 function formsOf(sim: Sim, eid: number): readonly FormDef[] | undefined {
@@ -74,7 +75,7 @@ function isBorrowed(sim: Sim, e: number): boolean {
 }
 
 /** 到当前头目阶段为止，最近写了这一项的那一段的值；没进阶段或都没写是 undefined */
-function phaseField<K extends 'abilities' | 'drive' | 'stats'>(eid: number, key: K): PhaseDef[K] | undefined {
+function phaseField<K extends 'abilities' | 'drive' | 'stats' | 'element'>(eid: number, key: K): PhaseDef[K] | undefined {
   const phases = enemyDef[eid]?.phases
   if (!phases) return undefined
   for (let i = Act.phase[eid]!; i >= 0; i--) {
@@ -92,6 +93,15 @@ function npcForm(sim: Sim, eid: number): FormDef | undefined {
 /** 非玩家身体此刻的能力：头目阶段写了的用阶段的，否则用当前形态的，再否则用本体的 */
 export function npcAbilities(sim: Sim, eid: number): FormDef['abilities'] {
   return phaseField(eid, 'abilities') ?? npcForm(sim, eid)?.abilities ?? enemyDef[eid]?.abilities
+}
+
+/** 身体此刻的元素编号：头目阶段写了的用阶段的，否则当前形态的，再否则本体的 */
+export function bodyElement(sim: Sim, eid: number): number {
+  const forms = formsOf(sim, eid)
+  const idx = formOf(sim, eid)
+  const form = idx >= 0 ? forms?.[idx]?.element : undefined
+  if (hasComponent(sim.world, eid, Slot)) return elementIndex(form ?? CHARACTERS[sim.run.roster[Slot.v[eid]!]!]?.element)
+  return elementIndex(phaseField(eid, 'element') ?? form ?? enemyDef[eid]?.element)
 }
 
 /** 头目阶段的属性：到当前阶段为止最近写了的那一段 */
@@ -137,6 +147,7 @@ export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?
   Form.idx[eid] = to
   const f = to >= 0 ? forms![to] : undefined
   relook(sim, eid, f?.emoji ?? baseLook(sim, eid))
+  Elem.v[eid] = bodyElement(sim, eid)
   setStatLayer(eid, 'form', f?.stats ? [f.stats] : undefined)
   foldBody(sim.world, sim, eid)
   if (f?.abilities || was?.abilities) rearm(sim, eid, f)

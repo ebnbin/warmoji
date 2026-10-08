@@ -2,6 +2,7 @@ import type { SfxId } from './sfx'
 import type { GroundEffectDef, ZoneRules } from './groundEffects'
 import type { EnemyDef, EnemyKind } from './enemies'
 import type { StatusId } from './statuses'
+import type { ElementId } from './elements'
 
 /** 外观：用哪张图、显示多大（格）；rotationOffsetDeg 是图里尖头的朝向与出手方向差几度 */
 export interface Look {
@@ -53,9 +54,11 @@ interface SlowEffect {
   readonly factor: number
   readonly durationMs: number
 }
+/** 中毒：每 tickMs 掉 damage 加基础伤害 ratio 倍的血 */
 interface PoisonEffect {
   readonly kind: 'poison'
   readonly damage: number
+  readonly ratio?: number
   readonly tickMs: number
   readonly durationMs: number
 }
@@ -301,6 +304,33 @@ interface StatusEffect {
   readonly ms: number
   readonly value?: number
 }
+/** 附魔：目标 ms 内出手都带上这种元素，盖过能力与自己的元素 */
+interface ImbueEffect {
+  readonly kind: 'imbue'
+  readonly element: ElementId
+  readonly ms: number
+}
+/** 转属：目标 ms 内变成这种元素，挨打按它算克制，出手也默认带它 */
+interface AttuneEffect {
+  readonly kind: 'attune'
+  readonly element: ElementId
+  readonly ms: number
+}
+/** 护盾：目标挡下 amount 加自己生命上限 ratio 倍的伤害（按出手方的治疗效果放大），ms 内挡满就碎；再上一层取强的 */
+interface ShieldEffect {
+  readonly kind: 'shield'
+  readonly amount: number
+  readonly ratio?: number
+  readonly ms: number
+}
+/** 回春：目标每 tickMs 回 amount 加自己生命上限 ratio 倍的生命（按出手方的治疗效果放大），持续 durationMs */
+interface MendEffect {
+  readonly kind: 'mend'
+  readonly amount: number
+  readonly ratio?: number
+  readonly tickMs: number
+  readonly durationMs: number
+}
 /** 条件看谁：self 是带着这条规则的身体（出手者、持有者），target 是这一下作用到的身体 */
 export type CondWho = 'self' | 'target'
 /** 条件：对 who 判断，能用 all（并且）、any（或者）、not（不是）组合 */
@@ -326,6 +356,8 @@ export type Cond =
   | { readonly kind: 'within'; readonly who: 'target'; readonly radius: number }
   /** 放完主动技能还不到 ms */
   | { readonly kind: 'afterSkill'; readonly who: CondWho; readonly ms: number }
+  /** 身体此刻是这种元素 */
+  | { readonly kind: 'element'; readonly who: CondWho; readonly element: ElementId }
 /** 几率：过了 p 的几率才施加 then */
 interface ChanceEffect {
   readonly kind: 'chance'
@@ -620,6 +652,10 @@ export type Effect =
   | WarpEffect
   | DragEffect
   | RealmEffect
+  | ImbueEffect
+  | AttuneEffect
+  | ShieldEffect
+  | MendEffect
 
 interface ZoneVisual {
   readonly color: number
@@ -720,6 +756,8 @@ interface AbilityBase {
   readonly shape: Shape
   /** 出手方式，决定吃近战伤害还是远程伤害；不写按形状定 */
   readonly delivery?: Delivery
+  /** 这一下的元素，不写按出手的身体的；附了魔的按附的 */
+  readonly element?: ElementId
   readonly damage?: number
   readonly knockback?: number
   readonly onHit?: readonly Effect[]

@@ -62,5 +62,5 @@ export default {
     light: { levels: [1, 0.5, 0.25], wakeMs: 500, dimMs: 1600 },
     tiles: { teamFadeMs: 4500, foeFadeMs: 2600 },
   },
-  boss: 'mecha',
+  bosses: ['mecha'],
 } as const satisfies MapDef

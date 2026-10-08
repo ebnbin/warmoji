@@ -2,7 +2,7 @@ import type { EcsBattleScene } from './EcsBattleScene'
 import { devChoice, devFlag, markMetrics, pickOnce, resetMetrics } from '../devtools'
 import type { DevChoice, DevItem, DevSceneTabs, DevTab } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
-import { mapEnemyRoster } from '../data/maps'
+import { bossesOf, mapEnemyRoster } from '../data/maps'
 import { beginSandbox } from '../run/state'
 import {
   applySandboxPreset,
@@ -144,7 +144,7 @@ function commandsTab(battle: EcsBattleScene): DevTab {
           { label: '1 只', run: () => battle.dev({ kind: 'spawn', what: 'one' }) },
           { label: '1 只精英', run: () => battle.dev({ kind: 'spawn', what: 'elite' }) },
           { label: '精英潮', run: () => battle.dev({ kind: 'spawn', what: 'surge' }) },
-          { label: 'Boss', run: () => battle.dev({ kind: 'spawn', what: 'boss' }) },
+          ...bossesOf(battle.run.mapId).map((b, n) => ({ label: b.name, run: (): void => battle.dev({ kind: 'spawn', what: 'boss', n }) })),
           { label: '全灭', run: () => battle.dev({ kind: 'killAll' }) },
         ],
       },

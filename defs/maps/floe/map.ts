@@ -79,5 +79,5 @@ export default {
     waterRegen: 0.2,
     coldTickMs: 250,
   },
-  boss: 'swan',
+  bosses: ['swan'],
 } as const satisfies MapDef

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
-import { bossFor, MAP_IDS, MAPS } from '../data/maps'
+import { bossesOf, MAP_IDS, MAPS } from '../data/maps'
 import { CHARACTERS } from '../data/characters'
 import { fightCount, RUN_IDS, RUNS } from '../data/runs'
 import { heatOf, MUTATOR_IDS, MUTATORS } from '../data/mutators'
@@ -214,7 +214,7 @@ export class MapScene extends Phaser.Scene {
     flow.heading('地面装饰', GROUP_ICONS.decor).icons(def.decor.emojis, { outline: 'player' }).gap(4)
     flow.heading('玩法', GROUP_ICONS.play)
     for (const line of mapPlayLines(def)) flow.text(line)
-    flow.text(`头目 ${bossFor(this.boxId).name}`, { color: 'muted' })
+    flow.text(`头目 ${bossesOf(this.boxId).map((b) => b.name).join('、')}`, { color: 'muted' })
     flow.gap(10).heading(SANDBOX.name, SANDBOX.emoji).text(SANDBOX.desc)
     flow.finish()
   }

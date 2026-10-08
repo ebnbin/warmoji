@@ -70,5 +70,5 @@ export default {
     },
     snow: { radiusU: 17, edgeU: 6.5, wobble: 0.2, shiftU: 2, warmMs: 8000, coverMs: 40000, buryMs: 45000 },
   },
-  boss: 'rhino',
+  bosses: ['rhino'],
 } as const satisfies MapDef

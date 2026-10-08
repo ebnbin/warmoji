@@ -44,6 +44,11 @@ export class HoldTable<S> {
     return { ready: Promise.all(waits).then(() => undefined), done: waits.length === 0 }
   }
 
+  /** 等一个已经在载的纹理载好；没在载的立刻好 */
+  waitFor(key: string): Promise<void> {
+    return this.entries.get(key)?.ready ?? Promise.resolve()
+  }
+
   stats(): HoldStats {
     let refs = 0
     let loading = 0

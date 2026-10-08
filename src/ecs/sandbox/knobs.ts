@@ -1,5 +1,5 @@
 import { ROSTER_IDS, TEAM } from '../../data/characters'
-import { ENEMY_DEFS } from '../../data/enemies'
+import { MAP_IDS, MAPS } from '../../data/maps'
 import type { CharacterId } from '../../types/characters'
 import type { EnemyKind } from '../../types/enemies'
 import type { StatMods } from '../../types/stats'
@@ -60,16 +60,15 @@ interface SandboxPreset {
   readonly scale: SandboxScale
   readonly difficulty: SandboxMul
   readonly fireRate: SandboxMul
-  readonly kinds: number
 }
 
 export const SANDBOX_PRESETS: readonly SandboxPreset[] = [
-  { id: 'normal', label: '正常一局', desc: '4 人基础档 · 中规模 —— 真实游戏的量级', team: 4, level: 0, scale: 'mid', difficulty: 1, fireRate: 1, kinds: 6 },
-  { id: 'busy', label: '繁忙', desc: '8 人一阶 · 高规模 · 攻速 ×3 —— 后期大混战', team: 8, level: 1, scale: 'high', difficulty: 3, fireRate: 3, kinds: 12 },
-  { id: 'heavy', label: '重载', desc: '8 人二阶 · 爆满 · 全种类 —— 数百只同场', team: 8, level: 2, scale: 'max', difficulty: 10, fireRate: 10, kinds: ENEMY_DEFS.length },
-  { id: 'k2', label: '2 千', desc: '把真实刷怪器开到 2000 并发', team: 8, level: 2, scale: 'k2', difficulty: 10, fireRate: 10, kinds: ENEMY_DEFS.length },
-  { id: 'k4', label: '4 千', desc: '把真实刷怪器开到 4000 并发', team: 8, level: 2, scale: 'k4', difficulty: 10, fireRate: 10, kinds: ENEMY_DEFS.length },
-  { id: 'k8', label: '8 千', desc: '把真实刷怪器开到 8000 并发', team: 8, level: 2, scale: 'k8', difficulty: 10, fireRate: 10, kinds: ENEMY_DEFS.length },
+  { id: 'normal', label: '正常一局', desc: '4 人基础档 · 中规模 —— 真实游戏的量级', team: 4, level: 0, scale: 'mid', difficulty: 1, fireRate: 1 },
+  { id: 'busy', label: '繁忙', desc: '8 人一阶 · 高规模 · 攻速 ×3 —— 后期大混战', team: 8, level: 1, scale: 'high', difficulty: 3, fireRate: 3 },
+  { id: 'heavy', label: '重载', desc: '8 人二阶 · 爆满 · 全种类 —— 数百只同场', team: 8, level: 2, scale: 'max', difficulty: 10, fireRate: 10 },
+  { id: 'k2', label: '2 千', desc: '把真实刷怪器开到 2000 并发', team: 8, level: 2, scale: 'k2', difficulty: 10, fireRate: 10 },
+  { id: 'k4', label: '4 千', desc: '把真实刷怪器开到 4000 并发', team: 8, level: 2, scale: 'k4', difficulty: 10, fireRate: 10 },
+  { id: 'k8', label: '8 千', desc: '把真实刷怪器开到 8000 并发', team: 8, level: 2, scale: 'k8', difficulty: 10, fireRate: 10 },
 ]
 
 let presetId: SandboxPresetId | undefined
@@ -89,7 +88,7 @@ export function applySandboxPreset(id: SandboxPresetId): void {
   const p = SANDBOX_PRESETS.find((x) => x.id === id)!
   setSandboxRoster(ROSTER_IDS.slice(0, Math.min(p.team, ROSTER_IDS.length)))
   setSandboxLevel(p.level)
-  setSandboxEnemies(ENEMY_DEFS.slice(0, p.kinds).map((e) => e.kind))
+  setSandboxEnemies(MAP_IDS.flatMap((id) => MAPS[id].foes))
   setSandboxScale(p.scale)
   setSandboxDifficulty(p.difficulty)
   setSandboxFireRate(p.fireRate)

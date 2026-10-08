@@ -3,6 +3,7 @@ import type { AbilityDef, Cond, Effect, ReactionBase } from './abilityDefs'
 import type { Span } from './obstacles'
 import type { StatBase, StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
+import type { ElementId } from './elements'
 
 /** 驱动：身体没事时怎么走，march 是朝这张图那一组地标里最近的一处行进，不理会队伍；蓄力突刺、自爆这类"动作"是能力，不在这里 */
 export type DriveDef =
@@ -86,6 +87,8 @@ export type UnitTrait = 'swims' | 'breathes' | 'phases' | 'fireproof' | 'coldpro
 export interface UnitBase {
   readonly emoji: string
   readonly name: string
+  /** 元素：决定挨打时的克制，也是出手默认带的元素；不写是无元素 */
+  readonly element?: ElementId
   readonly traits?: readonly UnitTrait[]
   readonly reactions?: readonly BodyReaction[]
   readonly resource?: ResourceDef
@@ -104,6 +107,7 @@ export interface FormDef {
   readonly stats?: StatMods
   /** 换成这一形态时的特质，不写沿用本体 */
   readonly traits?: readonly UnitTrait[]
+  readonly element?: ElementId
   readonly damage?: number
 }
 /** 按条件换走法：self 是自己，target 是离自己最近的敌人 */
@@ -118,6 +122,7 @@ export interface PhaseDef {
   readonly abilities?: readonly AbilityDef[]
   readonly drive?: DriveDef
   readonly stats?: StatMods
+  readonly element?: ElementId
   readonly effects?: readonly Effect[]
 }
 /** 一个会动会打的非玩家身体：敌人、召唤出的分身与亡仆都用它；kind 是敌人的身份，召唤物没有；一个身体同一时间只做一件事，前摇、连发、冲刺没完别的招等着 */

@@ -8,6 +8,9 @@ import { isTurncoat, realmOf } from './marks'
 import { isSameEntity } from './identity'
 import { NEUTRAL, offenseOf } from './stats'
 import { bandOf, eyeM } from './pass'
+import { strikeElement } from './element'
+import { ENEMIES } from '../../data/enemies'
+import { elementIndex } from '../../data/elements'
 import type { Band } from './pass'
 import type { Offense } from './stats'
 import type { Sim } from '../sim'
@@ -46,6 +49,8 @@ export interface Source {
   readonly from?: { readonly x: number; readonly y: number }
   /** 伤害标签（见 hitTags）：出手方式与是否来自召唤物；范围与持续由出手处补上 */
   readonly tags?: number
+  /** 这一下的元素编号，0 或不写是无元素 */
+  readonly element?: number
 }
 
 /** 出手者眼里的敌方阵营：倒戈时是自己的阵营 */
@@ -74,6 +79,7 @@ export function sourceOf(sim: Sim, e: number): Source {
     sight: WallBlocked.v[e] ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]!, eye: eyeM(sim.world, Anchor.eid[e]!) } : undefined,
     blocked: WallBlocked.v[e] === 1,
     tags: deliveryOf(abilityDef[e]) | (summon ? HIT.summon : 0),
+    element: strikeElement(sim, abilityDef[e], o),
   }
 }
 
@@ -93,7 +99,7 @@ export function bodySource(sim: Sim, eid: number): Source {
 /** 身体自己作为伤害来源，按自己的属性表结算：角色归因到槽位，我方召唤物归因到召唤者，敌人归因到种类；不带出手方式，由出手处给 */
 export function selfSource(sim: Sim, eid: number): Source {
   const tags = hasComponent(sim.world, eid, Summoned) ? HIT.summon : 0
-  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! }, tags }
+  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! }, tags, element: strikeElement(sim, undefined, eid) }
   const atk = offenseOf(sim.world, eid)
   if (hasComponent(sim.world, eid, Slot)) return { faction: FACTION.team, slot: Slot.v[eid]!, atk, ...own }
   const def = enemyDef[eid]
@@ -107,7 +113,7 @@ export function flying(src: Source): Source {
 }
 
 export function enemySource(enemy: EnemyKind | undefined, atk: Offense): Source {
-  return { faction: FACTION.enemy, slot: -1, atk, enemy }
+  return { faction: FACTION.enemy, slot: -1, atk, enemy, element: elementIndex(enemy === undefined ? undefined : ENEMIES[enemy].element) }
 }
 
 export function hazardSource(hazard: Hazard, tint: number): Source {

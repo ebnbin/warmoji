@@ -1,5 +1,8 @@
-import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
-import { BOSSES, ELITE, ENEMIES, ENEMY_DEFS, TENACITY } from '../data/enemies'
+import { CHARACTERS, LEGACY_ROSTER_IDS, ROSTER_IDS, baseLoadout } from '../data/characters'
+import { ELITE, ENEMIES, LEGACY_ENEMIES, NEW_ENEMIES, TENACITY } from '../data/enemies'
+import { AURA_MS, ELEMENT_IDS, ELEMENT_MUL, ELEMENTS, REACTIONS } from '../data/elements'
+import type { ElementId } from '../types/elements'
+import type { CharacterId } from '../types/characters'
 import { AFFIX_IDS, AFFIXES } from '../data/affixes'
 import { STATUSES } from '../data/statuses'
 import type { AffixId } from '../types/affixes'
@@ -8,14 +11,14 @@ import type { BodyRules, EnemyDef, Tenacity } from '../types/enemies'
 import type { StatusAction, StatusDef, StatusForce, StatusMerge } from '../types/statuses'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
-import { MAP_IDS, MAPS, bossFor } from '../data/maps'
+import { MAP_IDS, MAPS, bossesOf } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
 import { modTexts, STATS, statText } from '../data/stats'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
-import { abilityLabel, abilityStatLines, characterStatGroups, condLine, effectLine, sec, traitLine } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, condLine, counterText, effectLine, elementLine, sec, traitLine } from './statLines'
 import { itemLines, TRAIT_LABEL } from './itemLines'
 import { mapStaminaLine } from './mapLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -114,6 +117,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
         .map((k) => statText(k, e.stats![k]!)),
     ].join(' · '),
     `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${tireless ? ' · 不知疲倦' : ''}`,
+    elementLine(e.element),
   ]
   lines.push(
     e.role === 'boss'
@@ -126,7 +130,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (e.gcdMs) lines.push(`出完一招 ${e.gcdMs / 1000} 秒内不出下一招`)
   for (const r of e.drives ?? []) lines.push(`${condLine(r.if)}时改为${DRIVE_LABEL[r.drive.kind]}`)
   for (const p of e.phases ?? []) {
-    const enter = [p.drive ? `改为${DRIVE_LABEL[p.drive.kind]}` : '', ...(p.stats ? modTexts(p.stats) : []), ...(p.effects ?? []).map((x) => effectLine(x, true))].filter(Boolean)
+    const enter = [p.drive ? `改为${DRIVE_LABEL[p.drive.kind]}` : '', p.element ? `元素转为${ELEMENTS[p.element].name}` : '', ...(p.stats ? modTexts(p.stats) : []), ...(p.effects ?? []).map((x) => effectLine(x, true))].filter(Boolean)
     lines.push(`阶段${p.name ? `「${p.name}」` : ''}：生命低于 ${Math.round(p.below * 100)}% 进入${enter.length > 0 ? `，${enter.join('，')}` : ''}`)
     for (const w of p.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
@@ -138,7 +142,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
-    const parts = [...(f.stats ? modTexts(f.stats) : []), f.traits ? `特质换成${traitLine(f.traits, f.span) || '无'}` : '', spanTag(f.span)].filter(Boolean).join(' · ')
+    const parts = [...(f.stats ? modTexts(f.stats) : []), f.traits ? `特质换成${traitLine(f.traits, f.span) || '无'}` : '', f.element ? `元素换成${ELEMENTS[f.element].name}` : '', spanTag(f.span)].filter(Boolean).join(' · ')
     lines.push(`形态「${f.name ?? e.name}」${parts ? `：${parts}` : ''}`)
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
@@ -151,13 +155,18 @@ export function enemyStatLines(e: EnemyDef): string[] {
 
 function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   const m = MAPS[id]
-  const boss = bossFor(id)
   const names = m.foes.map((k) => ENEMIES[k].name)
+  const count = new Map<ElementId, number>()
+  for (const k of [...m.foes, ...m.bosses]) {
+    const el = ENEMIES[k].element
+    if (el) count.set(el, (count.get(el) ?? 0) + 1)
+  }
   return [
     `世界规则 ${MAP_KIND_LABEL[m.kind]}`,
     mapStaminaLine(m),
-    `头目 ${boss.name}`,
+    `头目 ${bossesOf(id).map((b) => b.name).join('、')}`,
     `出没敌人 ${names.join('、')}`,
+    ...(count.size > 0 ? [`敌人的元素 ${[...count].map(([el, n]) => `${ELEMENTS[el].name}×${n}`).join('、')}`] : []),
   ]
 }
 
@@ -245,6 +254,59 @@ function flatten(groups: readonly { title: string; lines: readonly string[] }[])
   return groups.flatMap((g) => [`◆ ${g.title}`, ...g.lines])
 }
 
+/** 一名角色的图鉴条目：1 到 3 级各一页 */
+function characterEntry(id: CharacterId): WikiEntry {
+  return {
+    emoji: CHARACTERS[id].emoji,
+    name: CHARACTERS[id].name,
+    desc: CHARACTERS[id].desc,
+    lines: flatten(characterStatGroups(id, [], 1, { path: false })),
+    levels: [1, 2, 3].map((lv) => ({
+      label: `${lv} 级`,
+      lines: flatten(characterStatGroups(id, [], lv, { path: false })),
+    })),
+  }
+}
+
+function enemyEntry(e: EnemyDef): WikiEntry {
+  return { emoji: e.emoji, name: e.role === 'boss' ? `${e.name}（Boss）` : e.name, desc: e.desc, lines: enemyStatLines(e) }
+}
+
+/** 元素页的第一条：克制、附着与反应的规则 */
+function elementRulesEntry(): WikiEntry {
+  const { strong, weak, same } = ELEMENT_MUL
+  return {
+    emoji: '1f308',
+    name: '元素与克制',
+    desc: '带元素的一下打在身上，按出手的元素与挨打的元素算克制，还会让它附着上这种元素；附着着一种时被另一种打中，可能起元素反应',
+    lines: [
+      `伤害倍率：克制 ×${strong} · 被克 ×${weak} · 同元素 ×${same} · 其余 ×1；没有元素的不吃克制`,
+      '六种基础元素两两相克：每种克两种、被两种克，和剩下的一种两不相干；光与暗互相克制',
+      `附着 ${sec(AURA_MS)}：同一种再打只延长时间；另一种打中时能起反应就消耗附着、起反应，否则换成新的这一种；持续伤害不附着`,
+      '反应的效果由出手的一方施加，不再带元素',
+      ...REACTIONS.map((r) => `${r.name}（${ELEMENTS[r.of[0]].name}+${ELEMENTS[r.of[1]].name}）：${r.desc}`),
+    ],
+  }
+}
+
+/** 一种元素：克制谁、附着状态与能起的反应 */
+function elementEntry(id: ElementId): WikiEntry {
+  const el = ELEMENTS[id]
+  const names = (ids: readonly ElementId[]): string => ids.map((o) => ELEMENTS[o].name).join('、') || '无'
+  const by = ELEMENT_IDS.filter((o) => ELEMENTS[o].beats.includes(id))
+  const { strong, weak, same } = ELEMENT_MUL
+  return {
+    emoji: el.icon,
+    name: `${el.name}元素`,
+    desc: counterText(id),
+    lines: [
+      `打${names(el.beats)} ×${strong} · 打${names(by)} ×${weak} · 打${el.name} ×${same}`,
+      `被打中的身上附着「${STATUSES[el.aura].name}」${sec(AURA_MS)}`,
+      ...REACTIONS.filter((r) => r.of.includes(id)).map((r) => `遇上${ELEMENTS[r.of[0] === id ? r.of[1] : r.of[0]].name}：${r.name}——${r.desc}`),
+    ],
+  }
+}
+
 export function wikiGroups(): WikiGroup[] {
   return [
     {
@@ -257,32 +319,9 @@ export function wikiGroups(): WikiGroup[] {
         lines: mapStatLines(id),
       })),
     },
-    {
-      icon: '1f939',
-      title: '角色',
-      entries: ROSTER_IDS.map((id) => ({
-        emoji: CHARACTERS[id].emoji,
-        name: CHARACTERS[id].name,
-        desc: CHARACTERS[id].desc,
-        lines: flatten(characterStatGroups(id, [], 1, { path: false })),
-        levels: [1, 2, 3].map((lv) => ({
-          label: `${lv} 级`,
-          lines: flatten(characterStatGroups(id, [], lv, { path: false })),
-        })),
-      })),
-    },
-    {
-      icon: '1f9df',
-      title: '敌人',
-      entries: [
-        ...[...ENEMY_DEFS, ...BOSSES].map((e) => ({
-          emoji: e.emoji,
-          name: e.role === 'boss' ? `${e.name}（Boss）` : e.name,
-          desc: e.desc,
-          lines: enemyStatLines(e),
-        })),
-      ],
-    },
+    { icon: '1f939', title: '新角色', entries: ROSTER_IDS.map(characterEntry) },
+    { icon: '1f9df', title: '新敌人', entries: NEW_ENEMIES.map(enemyEntry) },
+    { icon: '1f308', title: '元素', entries: [elementRulesEntry(), ...ELEMENT_IDS.map(elementEntry)] },
     {
       icon: '2b50',
       title: '精英词缀',
@@ -306,6 +345,8 @@ export function wikiGroups(): WikiGroup[] {
         ],
       })),
     },
+    { icon: '1f474', title: '旧角色', entries: LEGACY_ROSTER_IDS.map(characterEntry) },
+    { icon: '1f480', title: '旧敌人', entries: LEGACY_ENEMIES.map(enemyEntry) },
   ]
 }
 
@@ -334,7 +375,7 @@ export function usedEmojiSet(): Set<string> {
     }
   }
   for (const c of Object.values(CHARACTERS)) for (const f of c.forms ?? []) if (f.emoji) used.add(f.emoji)
-  for (const e of [...ENEMY_DEFS, ...BOSSES]) {
+  for (const e of Object.values(ENEMIES)) {
     for (const f of e.forms ?? []) if (f.emoji) used.add(f.emoji)
     for (const w of e.abilities ?? []) {
       if (w.shape.kind === 'bolt') used.add(w.shape.projectile.look.emoji)

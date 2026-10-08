@@ -41,5 +41,5 @@ export default {
     stick: { viscosity: 10, exertion: 0.6 },
     lysis: { radiusU: 2, holdS: 12, halfLifeS: 4, lysePerS: 4 },
   },
-  boss: 'treant',
+  bosses: ['treant'],
 } as const satisfies MapDef

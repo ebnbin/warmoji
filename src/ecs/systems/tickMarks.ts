@@ -8,6 +8,7 @@ import { hit } from './shared/damage'
 import { applyAbilityEffects, FUSE_DEF, markSource, STORE_DEF } from './shared/effects'
 import { strongestSlot } from '../utils/marks'
 import { die } from './shared/combat'
+import { mend } from './shared/heal'
 import type { Sim } from '../sim'
 
 /** 到期反应：变形要把外观、锚定还回去并让它缓一下，定身要把身体摆正；引信在身上引爆，存伤以存下的伤害为基础结算 */
@@ -33,7 +34,7 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
   }
 }
 
-/** 标记的时钟：中毒只有最强的一条按节拍跳伤，落后一拍以上的从现在重新数；亡后残留的按秒流失、流失殆尽即死；到期的清掉并执行到期反应 */
+/** 标记的时钟：中毒只有最强的一条按节拍跳伤、回春只有最强的一条按节拍回血，落后一拍以上的从现在重新数；亡后残留的按秒流失、流失殆尽即死；到期的清掉并执行到期反应 */
 export function tickMarks(sim: Sim): void {
   const now = sim.elapsedMs
   const dt = sim.wdtMs / 1000
@@ -41,6 +42,7 @@ export function tickMarks(sim: Sim): void {
     if (!hasComponent(sim.world, eid, Mark)) continue
     const base = eid * MARK_SLOTS
     const poison = strongestSlot(sim, eid, MARK.poison)
+    const mending = strongestSlot(sim, eid, MARK.mending)
     for (let i = 0; i < MARK_SLOTS; i++) {
       const s = base + i
       const kind = Mark.kind[s]!
@@ -51,6 +53,11 @@ export function tickMarks(sim: Sim): void {
         Mark.c[s] = next <= now ? now + Mark.b[s]! : next
         hit(sim, markSource(eid, s) ?? WORLD_SOURCE, eid, Mark.a[s]!, { tick: true })
         if (!hasComponent(sim.world, eid, Mark)) break
+      }
+      if (s === mending && now >= Mark.c[s]! && Mark.c[s]! <= until) {
+        const next = Mark.c[s]! + Mark.b[s]!
+        Mark.c[s] = next <= now ? now + Mark.b[s]! : next
+        if (Alive.v[eid]) mend(eid, Mark.a[s]!)
       }
       if (kind === MARK.undead && Alive.v[eid]) {
         Hp.v[eid] = Hp.v[eid]! - Mark.a[s]! * dt

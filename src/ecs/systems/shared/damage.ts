@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
-import { Act, Alive, Boss, Elite, EnemyArm, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
+import { Act, Alive, Boss, Elem, Elite, EnemyArm, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
 import { clearMarks, hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot, strongestSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
@@ -15,11 +15,15 @@ import { applyAbilityEffects, casterOf, PARRY_FX } from './effects'
 import { displace, FORCED } from './displace'
 import { die, grantIframe } from './combat'
 import { feedGut } from './gut'
-import { applyForm, npcAbilities, npcDrive, phaseStats, rearmNpcKeep } from '../../entities/form'
+import { applyForm, bodyElement, npcAbilities, npcDrive, phaseStats, rearmNpcKeep } from '../../entities/form'
 import { attachDrive, detachDrive } from '../../entities/enemy'
 import { foldBody, setStatLayer } from '../../utils/stats'
 import { gearDodged, gearHurt, gearLethal, gearLowHp, gearStruck } from './gear'
 import { spawnFxCircle } from '../../entities/fx'
+import { counterMul } from '../../../data/elements'
+import { toPx } from '../../../data/px'
+import { elementNow, touchElement } from '../../utils/element'
+import type { ElementReaction } from '../../../types/elements'
 import type { Point } from '../../../util/vec'
 import type { Offense } from '../../utils/stats'
 import type { Source } from '../../utils/source'
@@ -88,6 +92,21 @@ function blocked(sim: Sim, src: Source, target: number, o: HitOpts): boolean {
   return false
 }
 
+const SHIELD_COLOR = 0x80cbc4
+
+/** 护盾先挡：挡下的从护盾里扣，挡满就碎；返回剩下要扣血的 */
+function soak(sim: Sim, target: number, dmg: number): number {
+  const s = markSlot(sim, target, MARK.shield)
+  if (s < 0) return dmg
+  const left = Mark.a[s]! - dmg
+  if (left > 0) {
+    Mark.a[s] = left
+    return 0
+  }
+  Mark.kind[s] = MARK.none
+  return -left
+}
+
 /** 资源随命中涨：出手的涨 onHit，挨打的涨 onHurt */
 function fuel(sim: Sim, src: Source, target: number): void {
   const by = casterOf(sim, src)
@@ -133,6 +152,7 @@ function lowHp(sim: Sim, target: number): void {
 function enterPhase(sim: Sim, eid: number, i: number): void {
   const before = npcAbilities(sim, eid)
   Act.phase[eid] = i
+  Elem.v[eid] = bodyElement(sim, eid)
   const stats = phaseStats(eid)
   setStatLayer(eid, 'phase', stats ? [stats] : undefined)
   foldBody(sim.world, sim, eid)
@@ -243,7 +263,16 @@ function shove(sim: Sim, src: Source, target: number, o: HitOpts): void {
   if (j.x !== 0 || j.y !== 0) displace(sim, target, { kind: 'push', x: j.x, y: j.y }, FORCED)
 }
 
-/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、暴击，只在最后取整；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
+/** 元素反应：在被打中处闪一圈，再由出手方施加反应的效果，效果不带元素；被打中的已经倒下就只施加不看目标的 */
+function reacted(sim: Sim, src: Source, target: number, uid: number, r: ElementReaction, at: Point, dmg: number): void {
+  spawnFxCircle(sim, at.x, at.y, 24, { fill: r.color, fillAlpha: 0.4, stroke: r.color, lineWidth: 4, lineAlpha: 0.9, fromScale: 0.5, toScale: 1.8, durationMs: 320, depth: 14 })
+  const effects = toPx(r).effects
+  if (!effects) return
+  const alive = Alive.v[target] === 1 && Uid.v[target] === uid
+  applyAbilityEffects(sim, { ...src, element: 0 }, effects, { x: at.x, y: at.y, baseDamage: dmg, targets: alive ? [target] : [] })
+}
+
+/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (!lands(sim, src, target, o, true)) return false
   if (harmless(sim, src, target)) {
@@ -266,9 +295,18 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   }
   if ((tags & HIT.dot) === 0) raw *= armorTaken(Stats.armor[target]!)
   raw *= Stats.taken[target]!
+  const el = src.element ?? 0
+  const react = el > 0 && !o.tick ? touchElement(sim, target, el) : undefined
+  if (el > 0) raw *= counterMul(el, elementNow(sim, target)) * (react?.mul ?? 1)
   const crit = !o.tick && !src.noCrit && atk.crit > 0 && sim.rng.next() < atk.crit
   if (crit) raw *= atk.critDamage
-  const dmg = Math.max(1, Math.round(raw))
+  const dealt = Math.max(1, Math.round(raw))
+  const dmg = soak(sim, target, dealt)
+  if (dmg <= 0) {
+    blockFx(sim, target, SHIELD_COLOR)
+    if (react) reacted(sim, src, target, Uid.v[target]!, react, { x: Transform.x[target]!, y: Transform.y[target]! }, dealt)
+    return true
+  }
   const team = Faction.v[target] === FACTION.team
   sim.out.events.push({ kind: 'damage', x: Transform.x[target]!, y: Transform.y[target]!, amount: dmg, crit, team, fxAt: sim.fxMs })
   record(sim, src, target, dmg)
@@ -294,6 +332,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (hp <= 0) {
     die(sim, target, src, jx, jy)
     gearStruck(sim, src, target, uid, at, damage, tags, crit)
+    if (react) reacted(sim, src, target, uid, react, at, dmg)
     return true
   }
   Hp.v[target] = hp
@@ -303,5 +342,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   sim.out.events.push({ kind: 'flinch', eid: target, uid: Uid.v[target]!, team, tint: src.tint, at: now, fxAt: sim.fxMs })
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
   gearStruck(sim, src, target, uid, at, damage, tags, crit)
+  if (react) reacted(sim, src, target, uid, react, at, dmg)
   return true
 }
