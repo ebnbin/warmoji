@@ -1,0 +1,43 @@
+import type { EnemyDef } from '../../../../src/types/enemies'
+import { patch } from '../../../kit.ts'
+
+const FIRE_METEOR = {
+  kind: 'fireMeteor',
+  emoji: '2604',
+  name: '火流星',
+  element: 'fire',
+  desc: '喷发时从火山口抛出来的火流星，不怕岩浆：一落地就闪一下炸开一圈，之后满地乱窜，身后拖着一路火，每隔三秒又闪一下再炸',
+  size: 1.2,
+  radius: 0.45,
+  span: [0, 1],
+  hp: 70,
+  speed: 1.6,
+  damage: 10,
+  xp: 5,
+  coins: 3,
+  traits: ['fireproof'],
+  drive: { kind: 'wander' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 3000,
+      firstDelayMs: 100,
+      aim: 'self',
+      damage: 20,
+      color: 0xff7043,
+      fireSfx: 'boom',
+      windup: { ms: 300, lockAt: 'start', telegraph: 'blink' },
+      shape: { kind: 'disc', radius: 1.8, at: 'self' },
+    },
+    {
+      trigger: 'auto',
+      cooldownMs: 1000,
+      firstDelayMs: 300,
+      aim: 'self',
+      shape: { kind: 'world' },
+      onHit: [{ kind: 'ground', def: patch(0.9, 2000, 0xff8a65, undefined, 4, 500) }],
+    },
+  ],
+} satisfies EnemyDef
+
+export default FIRE_METEOR

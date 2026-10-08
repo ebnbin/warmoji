@@ -20,19 +20,19 @@ export default {
     alpha: [0.2, 0.34],
     density: [0.03, 0.05],
   },
-  foes: ['zombie', 'turtle', 'creeper', 'skeleton', 'comet', 'boar', 'gargoyle'],
-  // 崖脚的洞里走出来、崖顶跳下来、喷气孔里钻出来、喷发时火山口抛出来、骷髅从灰里爬起来；暴龙从山坡上下来
+  foes: ['imp', 'bison', 'chili', 'meltling', 'steamer', 'fireMeteor', 'lavaGiant', 'quaker'],
+  // 崖脚的洞里走出来、崖顶跳下来、喷气孔里钻出来、喷发时火山口抛出来、骷髅从灰里爬起来；炎魔与不死鸟从山坡上下来
   gates: {
     snapU: 3,
     fallback: 'rise',
     boss: 'foot',
     kinds: {
-      cave: { name: '洞穴', at: { kind: 'nooks', spacingU: 6, away: { mark: 'cone', minU: 9 } }, enter: 'walk', snapU: 5, weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'creeper', 'skeleton'] },
-      cliff: { name: '崖顶', at: { kind: 'rim', segU: 3, away: { mark: 'cone', minU: 9 } }, enter: 'climb', snapU: 5, weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie'] },
-      vent: { name: '喷气孔', at: { kind: 'mark' }, enter: 'rise', look: 'steam', weight: 2, perSec: 1, only: ['turtle', 'creeper'] },
-      crater: { name: '火山口', at: { kind: 'mark' }, enter: 'lob', look: 'sparks', weight: 4, perSec: 4, reachU: 14, only: ['comet', 'turtle'] },
+      cave: { name: '洞穴', at: { kind: 'nooks', spacingU: 6, away: { mark: 'cone', minU: 9 } }, enter: 'walk', snapU: 5, weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'creeper', 'skeleton', 'imp', 'bison', 'chili', 'lavaGiant', 'quaker'] },
+      cliff: { name: '崖顶', at: { kind: 'rim', segU: 3, away: { mark: 'cone', minU: 9 } }, enter: 'climb', snapU: 5, weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie', 'bison', 'quaker'] },
+      vent: { name: '喷气孔', at: { kind: 'mark' }, enter: 'rise', look: 'steam', weight: 2, perSec: 1, only: ['turtle', 'creeper', 'chili', 'meltling', 'steamer'] },
+      crater: { name: '火山口', at: { kind: 'mark' }, enter: 'lob', look: 'sparks', weight: 4, perSec: 4, reachU: 14, only: ['comet', 'turtle', 'fireMeteor'] },
       ash: { name: '灰地', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
-      foot: { name: '山坡', at: { kind: 'mark' }, enter: 'walk', weight: 1, only: ['rhino'] },
+      foot: { name: '山坡', at: { kind: 'mark' }, enter: 'walk', weight: 1, only: ['rhino', 'demonLord', 'phoenix'] },
     },
   },
   volcano: {
@@ -70,5 +70,5 @@ export default {
     },
     snow: { radiusU: 17, edgeU: 6.5, wobble: 0.2, shiftU: 2, warmMs: 8000, coverMs: 40000, buryMs: 45000 },
   },
-  bosses: ['rhino'],
+  bosses: ['demonLord', 'phoenix'],
 } as const satisfies MapDef

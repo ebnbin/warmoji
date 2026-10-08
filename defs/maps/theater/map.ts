@@ -20,8 +20,8 @@ export default {
     alpha: [0, 0],
     density: [0, 0],
   },
-  foes: ['zombie', 'rat', 'mushroom', 'ghost', 'knight', 'skeleton', 'gargoyle', 'elf', 'raccoon'],
-  // 从台上的活门里升上来、从台边爬上来、从布景后面走出来、从地布底下钻出来；夜伯爵从活门里升上来
+  foes: ['comedyMask', 'tragedyMask', 'madClown', 'spadeGuard', 'usher', 'flirt', 'matryoshka', 'cheshire'],
+  // 从台上的活门里升上来、从台边爬上来、从布景后面走出来、从地布底下钻出来；提线之手与鬼牌从活门里升上来
   gates: {
     snapU: 3,
     fallback: 'rise',
@@ -29,8 +29,8 @@ export default {
     boss: 'trap',
     kinds: {
       trap: { name: '活门', at: { kind: 'mark' }, enter: 'rise', look: 'paper', snapU: 1, weight: 3, perSec: 1.5 },
-      edge: { name: '台边', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'paper', weight: 3, perSec: 1.5, only: ['zombie', 'rat', 'skeleton', 'knight', 'mushroom', 'raccoon', 'elf'] },
-      wings: { name: '布景后', at: { kind: 'mark' }, enter: 'walk', look: 'paper', snapU: 5, weight: 3, perSec: 1, only: ['zombie', 'skeleton', 'knight', 'rat', 'raccoon', 'elf', 'gargoyle', 'mushroom'] },
+      edge: { name: '台边', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'paper', weight: 3, perSec: 1.5, only: ['zombie', 'rat', 'skeleton', 'knight', 'mushroom', 'raccoon', 'elf', 'comedyMask', 'tragedyMask', 'madClown', 'spadeGuard'] },
+      wings: { name: '布景后', at: { kind: 'mark' }, enter: 'walk', look: 'paper', snapU: 5, weight: 3, perSec: 1, only: ['zombie', 'skeleton', 'knight', 'rat', 'raccoon', 'elf', 'gargoyle', 'mushroom', 'comedyMask', 'tragedyMask', 'spadeGuard', 'usher', 'flirt', 'cheshire'] },
       print: { name: '地布下', at: { kind: 'ground' }, enter: 'rise', look: 'paper', weight: 1 },
     },
   },
@@ -44,5 +44,5 @@ export default {
     turn: { firstMs: 20000, intervalMs: 20000, jitterMs: 0, lightMs: 700, staggerMs: 900, flyMs: 900, slideMs: 1600 },
     reflowMs: 300,
   },
-  bosses: ['eclipse'],
+  bosses: ['puppeteer', 'joker'],
 } as const satisfies MapDef

@@ -20,7 +20,7 @@ export default {
     alpha: [0, 0],
     density: [0, 0],
   },
-  foes: ['zombie', 'blob', 'slime', 'rat', 'mushroom', 'crab', 'ghost'],
+  foes: ['sneezer', 'nauseous', 'roach', 'mosquito', 'acidVial', 'mold', 'vomiter', 'mutant'],
   gates: {
     snapU: 3,
     fallback: 'drop',
@@ -41,5 +41,5 @@ export default {
     stick: { viscosity: 10, exertion: 0.6 },
     lysis: { radiusU: 2, holdS: 12, halfLifeS: 4, lysePerS: 4 },
   },
-  bosses: ['treant'],
+  bosses: ['zombieHost', 'superbug'],
 } as const satisfies MapDef

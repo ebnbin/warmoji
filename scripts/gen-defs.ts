@@ -76,14 +76,13 @@ const need = (ok: boolean, msg: string): void => {
   if (!ok) errors.push(msg)
 }
 
+/** 地图的小怪与头目只从新敌人里挑，旧敌人只留给旧关卡 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  for (const kind of m.foes) {
-    const e = ENEMIES[kind]
-    need(e !== undefined && e.role !== 'boss', `maps.${id}.foes 须引用非 Boss 的敌人：${kind}`)
-  }
+  const fresh = NEW_ENEMIES as Readonly<Record<string, EnemyDef>>
+  for (const kind of m.foes) need(fresh[kind] !== undefined && fresh[kind].role !== 'boss', `maps.${id}.foes 须引用非头目的新敌人：${kind}`)
   need(new Set(m.foes).size === m.foes.length, `maps.${id}.foes 不能重复`)
   need(m.bosses.length > 0 && new Set(m.bosses).size === m.bosses.length, `maps.${id}.bosses 至少一个、不能重复`)
-  for (const kind of m.bosses) need(ENEMIES[kind]?.role === 'boss', `maps.${id}.bosses 须引用头目：${kind}`)
+  for (const kind of m.bosses) need(fresh[kind]?.role === 'boss', `maps.${id}.bosses 须引用新头目：${kind}`)
 }
 
 /** 新敌人都绑在至少一张图上：写进某张图的小怪或头目，或由绑了的敌人召出、分裂出、生出、长成 */

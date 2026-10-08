@@ -21,7 +21,7 @@ export default {
     alpha: [0.6, 0.85],
     density: [0.02, 0.035],
   },
-  foes: ['zombie', 'skeleton', 'crab', 'rat', 'chameleon', 'creeper', 'gargoyle'],
+  foes: ['caveBat', 'geodeling', 'lurker', 'hollow', 'peeker', 'caveTroll', 'coffin', 'darkMoon'],
   gates: {
     snapU: 3,
     fallback: 'rise',
@@ -29,10 +29,10 @@ export default {
     boss: 'breach',
     kinds: {
       tunnel: { name: '暗道', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
-      seam: { name: '晶缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'passage', minU: 2.5 } }, enter: 'walk', look: 'shards', weight: 2, perSec: 1, only: ['rat', 'crab', 'chameleon', 'zombie', 'skeleton'] },
-      geode: { name: '晶洞', at: { kind: 'mark' }, enter: 'rise', look: 'shards', weight: 2, perSec: 1, only: ['crab', 'chameleon', 'rat', 'creeper'] },
-      rift: { name: '顶缝', at: { kind: 'mark' }, enter: 'drop', weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie', 'skeleton'] },
-      breach: { name: '塌顶', at: { kind: 'mark' }, enter: 'drop', weight: 1, only: ['eclipse'] },
+      seam: { name: '晶缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'passage', minU: 2.5 } }, enter: 'walk', look: 'shards', weight: 2, perSec: 1, only: ['rat', 'crab', 'chameleon', 'zombie', 'skeleton', 'geodeling', 'lurker', 'peeker'] },
+      geode: { name: '晶洞', at: { kind: 'mark' }, enter: 'rise', look: 'shards', weight: 2, perSec: 1, only: ['crab', 'chameleon', 'rat', 'creeper', 'geodeling', 'coffin'] },
+      rift: { name: '顶缝', at: { kind: 'mark' }, enter: 'drop', weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie', 'skeleton', 'caveBat', 'darkMoon'] },
+      breach: { name: '塌顶', at: { kind: 'mark' }, enter: 'drop', weight: 1, only: ['eclipse', 'vampireCount', 'fullMoon'] },
       dark: { name: '暗处', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
     },
   },
@@ -49,5 +49,5 @@ export default {
     view: { dayU: 18, nightU: 7, darkLux: 0.5, brightLux: 30, clearLux: 2 },
     spawnLux: 1,
   },
-  bosses: ['eclipse'],
+  bosses: ['vampireCount', 'fullMoon'],
 } as const satisfies MapDef

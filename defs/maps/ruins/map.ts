@@ -19,7 +19,7 @@ export default {
     alpha: [0.8, 0.92],
     density: [0.006, 0.01],
   },
-  foes: ['zombie', 'ghost', 'mushroom', 'snake', 'creeper', 'gargoyle', 'elf', 'skeleton', 'knight'],
+  foes: ['plagueRat', 'crow', 'hedgehog', 'deathcap', 'screamer', 'wallRhino', 'moai', 'tombstone'],
   gates: {
     snapU: 3,
     fallback: 'rise',
@@ -27,8 +27,8 @@ export default {
     kinds: {
       door: { name: '院门', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
       slope: { name: '山坡', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'maple', weight: 2, perSec: 1 },
-      wall: { name: '断墙', at: { kind: 'mark' }, enter: 'climb', weight: 1.5, perSec: 1, only: ['zombie', 'skeleton', 'snake', 'knight', 'gargoyle'] },
-      haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['ghost'] },
+      wall: { name: '断墙', at: { kind: 'mark' }, enter: 'climb', weight: 1.5, perSec: 1, only: ['zombie', 'skeleton', 'snake', 'knight', 'gargoyle', 'plagueRat', 'crow', 'deathcap', 'screamer', 'moai'] },
+      haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['ghost', 'screamer'] },
     },
   },
   ruins: {
@@ -58,5 +58,5 @@ export default {
     gapU: 2,
     reflowMs: 150,
   },
-  bosses: ['rhino'],
+  bosses: ['pumpkinKing', 'tyrant'],
 } as const satisfies MapDef

@@ -1,0 +1,85 @@
+import type { EnemyDef } from '../../../../src/types/enemies'
+import { shot } from '../../../kit.ts'
+
+const LEECH = [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'healRatio', ratio: 0.02 }] }] as const
+
+const VAMPIRE_COUNT = {
+  kind: 'vampireCount',
+  role: 'boss',
+  emoji: '1f9db',
+  name: '吸血伯爵',
+  element: 'dark',
+  desc: '住在晶洞深处的吸血伯爵：扑上来咬一口，吸回自己 2% 的生命；一挥手洒出三发血弹；隔一阵化作一只大蝙蝠，4 秒里飞得又高又快，俯冲着吸血；血掉到四成迎来血月，伤害 ×1.25，霸体 2 秒',
+  size: 3.3,
+  radius: 1.1,
+  span: [0, 6],
+  hp: 3900,
+  stats: { armor: 4, exertion: 0 },
+  speed: 1.3,
+  damage: 18,
+  xp: 40,
+  coins: 40,
+  traits: ['anchored', 'wary'],
+  drive: { kind: 'chase' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 2200,
+      firstDelayMs: 900,
+      aim: 'nearest',
+      range: 2.2,
+      damage: 22,
+      knockback: 1,
+      fireSfx: 'gulp',
+      windup: { ms: 400, lockAt: 'end', telegraph: 'shake' },
+      shape: { kind: 'segment', reach: 1.8, radius: 0.6, ms: 180 },
+      onHit: LEECH,
+    },
+    {
+      trigger: 'auto',
+      cooldownMs: 3200,
+      firstDelayMs: 1800,
+      aim: 'nearest',
+      range: 8,
+      damage: 14,
+      fireSfx: 'shoot',
+      shape: { kind: 'bolt', projectile: shot('1fa78', 6.5, 0.5), lifeMs: 1800 },
+      repeat: { count: 3, spreadDeg: 30 },
+    },
+    {
+      trigger: 'auto',
+      class: 'skill',
+      cooldownMs: 13000,
+      firstDelayMs: 7000,
+      aim: 'self',
+      fireSfx: 'flutter',
+      shape: { kind: 'world' },
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'form', to: 0, ms: 4000 }] }],
+    },
+  ],
+  forms: [
+    {
+      emoji: '1f987',
+      name: '蝠形',
+      span: [2, 3],
+      stats: { mul: { moveSpeed: 1.8 } },
+      abilities: [
+        {
+          trigger: 'auto',
+          cooldownMs: 1300,
+          firstDelayMs: 300,
+          aim: 'nearest',
+          range: 4.5,
+          damage: 16,
+          knockback: 2,
+          fireSfx: 'whoosh',
+          shape: { kind: 'sprint', distance: 4, ms: 360, radius: 1.5 },
+          onHit: LEECH,
+        },
+      ],
+    },
+  ],
+  phases: [{ below: 0.4, name: '血月', stats: { mul: { damage: 1.25 } }, effects: [{ kind: 'unstoppable', durationMs: 2000 }] }],
+} satisfies EnemyDef
+
+export default VAMPIRE_COUNT
