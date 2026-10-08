@@ -6,6 +6,7 @@ import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
 import type { AnimClipId } from '../types/anim'
 import type { BattleSprites } from '../manifest'
+import { canvasToTexture, rebuildMips, uploadRegion } from './render/upload'
 
 const CELL = 256
 const PAGE = 2048
@@ -31,6 +32,19 @@ function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLI
 }
 
 const NO_CLIP = { base: -1, frames: 0 }
+
+/** 烘好的一帧先画进这块一格大的画布，再只把这一格传给已有纹理的页 */
+let cellScratch: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | undefined
+
+function cellCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  if (!cellScratch) {
+    const canvas = document.createElement('canvas')
+    canvas.width = CELL
+    canvas.height = CELL
+    cellScratch = { canvas, ctx: canvas.getContext('2d')! }
+  }
+  return cellScratch
+}
 
 interface Variant {
   readonly id: string
@@ -61,7 +75,7 @@ export class EcsAtlas {
   private readonly pageOf: Int32Array
   private readonly keyToFrame = new Map<VariantKey, number>()
   private readonly reportedMissing = new Set<VariantKey>()
-  private readonly pages: Phaser.Textures.CanvasTexture[] = []
+  private readonly pages: Phaser.Textures.Texture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
   private cursor = 0
@@ -106,17 +120,18 @@ export class EcsAtlas {
     return frame
   }
 
+  /** 新开一页画布；它的纹理等画好了第一批格子再建，只传一次 */
   private addPage(): void {
     const cv = document.createElement('canvas')
     cv.width = PAGE
     cv.height = PAGE
     this.canvases.push(cv)
     this.ctxs.push(cv.getContext('2d')!)
-    const scene = this.scene
-    if (!scene) return
-    const key = `ecs-atlas-${this.serial}-${this.pages.length}`
-    if (scene.textures.exists(key)) scene.textures.remove(key)
-    this.pages.push(scene.textures.addCanvas(key, cv)!)
+  }
+
+  /** 还没有纹理的页整张建一次 */
+  private publish(scene: Phaser.Scene): void {
+    for (let p = this.pages.length; p < this.canvases.length; p++) this.pages.push(canvasToTexture(scene, `ecs-atlas-${this.serial}-${p}`, this.canvases[p]!))
   }
 
   private place(frame: number, img: HTMLImageElement | HTMLCanvasElement): void {
@@ -172,12 +187,21 @@ export class EcsAtlas {
     }
     const base = this.cursor
     const touched = new Set<number>()
+    const cell = cellCanvas()
     for (const img of imgs) {
       const frame = this.alloc()
       this.place(frame, img)
+      const page = this.pages[Math.floor(frame / PER_PAGE)]
+      if (!page) continue
+      // 已有纹理的页只传这一格：在一格大的画布上照样画一遍，传上去的像素与整页重传相同
+      const local = frame % PER_PAGE
+      cell.ctx.clearRect(0, 0, CELL, CELL)
+      cell.ctx.drawImage(img, 0, 0, CELL, CELL)
+      uploadRegion(scene, page, cell.canvas, (local % COLS) * CELL, Math.floor(local / COLS) * CELL, false)
       touched.add(Math.floor(frame / PER_PAGE))
     }
-    for (const p of touched) this.pages[p]?.refresh()
+    for (const p of touched) rebuildMips(scene, this.pages[p]!)
+    this.publish(scene)
     this.clips.set(key, { base, frames: clip.frames })
   }
 
@@ -263,11 +287,7 @@ export class EcsAtlas {
       atlas.keyToFrame.set(variantKey(id, outline), frame)
     }
     atlas.scene = scene
-    for (let p = 0; p < atlas.canvases.length; p++) {
-      const key = `ecs-atlas-${atlas.serial}-${p}`
-      if (scene.textures.exists(key)) scene.textures.remove(key)
-      atlas.pages.push(scene.textures.addCanvas(key, atlas.canvases[p]!)!)
-    }
+    atlas.publish(scene)
     return atlas
   }
 }
