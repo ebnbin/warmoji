@@ -1,5 +1,6 @@
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
-import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
+import { BOSSES, ELITE, ENEMIES, ENEMY_DEFS } from '../data/enemies'
+import { AFFIX_IDS, AFFIXES } from '../data/affixes'
 import type { EnemyDef, UnitTrait } from '../types/enemies'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
@@ -113,7 +114,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }
   for (const fx of r.onDeath ?? []) {
-    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
+    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into?.name ?? '同类'}`)
     else if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
     else lines.push(`亡语：${effectLine(fx)}`)
   }
@@ -136,6 +137,20 @@ function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
     `头目 ${boss.name}`,
     `出没敌人 ${names.join('、')}`,
   ]
+}
+
+/** 精英这一条：精英的倍率连同词缀表 */
+function eliteEntry(): WikiEntry {
+  const { min, max } = ELITE.affixes
+  return {
+    emoji: '2b50',
+    name: '精英',
+    desc: `小怪都可能以精英出现：更强、给得更多，出生时随机挂 ${min === max ? min : `${min}–${max}`} 个不重样的词缀，词缀的图标顶在头上`,
+    lines: [
+      `${modTexts(ELITE.stats).join(' · ')} · 经验 ×${ELITE.xpMul} · 金币 ×${ELITE.coinsMul}`,
+      ...AFFIX_IDS.map((id) => `{${AFFIXES[id].icon}} ${AFFIXES[id].name}：${AFFIXES[id].desc}`),
+    ],
+  }
 }
 
 function flatten(groups: readonly { title: string; lines: readonly string[] }[]): string[] {
@@ -171,12 +186,15 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '1f9df',
       title: '敌人',
-      entries: [...ENEMY_DEFS, ...BOSSES].map((e) => ({
-        emoji: e.emoji,
-        name: e.role === 'boss' ? `${e.name}（Boss）` : e.name,
-        desc: e.desc,
-        lines: enemyStatLines(e),
-      })),
+      entries: [
+        ...[...ENEMY_DEFS, ...BOSSES].map((e) => ({
+          emoji: e.emoji,
+          name: e.role === 'boss' ? `${e.name}（Boss）` : e.name,
+          desc: e.desc,
+          lines: enemyStatLines(e),
+        })),
+        eliteEntry(),
+      ],
     },
     {
       icon: '1f6e1',

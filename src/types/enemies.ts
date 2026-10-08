@@ -13,9 +13,10 @@ export type DriveDef =
   | { readonly kind: 'standoff'; readonly detectRange: number; readonly standoffDist: number }
   | { readonly kind: 'orbit'; readonly radius: number; readonly aggroRange: number }
   | { readonly kind: 'march'; readonly mark: string }
+/** 分裂：死后裂成 count 只 into，不写 into 的裂成自己这一种的普通版 */
 export interface SplitEffect {
   readonly kind: 'split'
-  readonly into: EnemyDef
+  readonly into?: EnemyDef
   readonly count: number
 }
 export interface DecoyEffect {
@@ -211,6 +212,8 @@ export interface Difficulty {
     readonly stats: StatMods
     readonly xpMul: number
     readonly coinsMul: number
+    /** 精英出生时随机挂上 min 到 max 个不重样的词缀 */
+    readonly affixes: { readonly min: number; readonly max: number }
   }
   readonly surge: {
     readonly count: number

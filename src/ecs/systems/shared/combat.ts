@@ -11,7 +11,7 @@ import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Gear, 
 import { isSameEntity } from '../../utils/identity'
 import { addMark, hasMark } from '../../utils/marks'
 import { offenseOf } from '../../utils/stats'
-import { abilityOnKill, bodyRules, enemyCarries, enemyDef, enemyLoot, enemyOf, resDef } from '../../store'
+import { abilityOnKill, bodyRules, eliteAffixes, enemyCarries, enemyDef, enemyLoot, enemyOf, resDef } from '../../store'
 import { flying, selfSource } from '../../utils/source'
 import { nearestTarget } from '../../utils/targets'
 import { gainRes } from './resource'
@@ -168,6 +168,7 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
   enemyDef[eid] = undefined
   enemyOf[eid] = undefined
   enemyLoot[eid] = undefined
+  eliteAffixes[eid] = undefined
   removeEntity(sim.world, eid)
 }
 
@@ -217,6 +218,7 @@ export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   enemyLoot[eid] = undefined
   unequipAbilities(sim, eid)
   enemyDef[eid] = undefined
+  eliteAffixes[eid] = undefined
   removeEntity(sim.world, eid)
 }
 

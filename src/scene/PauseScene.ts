@@ -117,7 +117,7 @@ function runFoes(run: RunState): Foe[] {
     since.set(def.kind, n)
     order.push(def)
     if (def.spawner) add(def.spawner.into, n)
-    for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split') add(fx.into, n)
+    for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split' && fx.into) add(fx.into, n)
   }
   if (runDef(run).team === 'knobs') {
     for (const e of mapEnemyRoster(run.mapId)) add(e, 1)

@@ -1,5 +1,6 @@
 import { INITIAL_CAPACITY } from './world'
 import type { BodyRules, EnemyDef, NpcDef, ResourceDef } from '../types/enemies'
+import type { AffixId } from '../types/affixes'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Cond, Effect, Split } from '../types/abilityDefs'
 import type { Source } from './utils/source'
@@ -17,6 +18,9 @@ export const enemyDef = slots<NpcDef>()
 
 /** 敌人的身份（种类、经验、金币、Boss）：只有刷出来的敌人有，召唤出的身体没有 */
 export const enemyOf = slots<EnemyDef>()
+
+/** 精英身上挂的词缀 */
+export const eliteAffixes = slots<readonly AffixId[]>()
 
 /** 身体当前的外观（形态切换后），没有就用定义里的；角色与非玩家身体同一个 */
 export const bodyLook = slots<string>()

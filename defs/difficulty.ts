@@ -23,6 +23,7 @@ export const DIFFICULTY = {
     stats: { mul: { maxHp: 4, moveSpeed: 1.25, damage: 2, healing: 2, scale: 1.2 } },
     xpMul: 4,
     coinsMul: 3,
+    affixes: { min: 1, max: 2 },
   },
   surge: {
     count: 14,

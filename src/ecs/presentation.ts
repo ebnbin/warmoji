@@ -4,11 +4,12 @@ import { UNIT } from '../util/units'
 import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
 import { rewindMs } from '../data/abilities'
+import { AFFIXES } from '../data/affixes'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
 import { Alive, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, Slot, Transform, VisOff } from './components'
-import { abilityDef, resDef } from './store'
+import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
 import { goalSpot, holdSpot, leakRings, nearestTo, visitRings } from './fight/state'
@@ -127,28 +128,31 @@ function sweats(sim: Sim, out: PaintSprite[]): void {
   }
 }
 
-/** 头顶的状态图标：带时限、正生效的状态按图标的轻重排，最多三个，在头顶横排；倒下的不画 */
+/** 头顶横排的一排图标，row 是从头顶往上数的第几排 */
+function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly string[], row: number): void {
+  const h = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.h[eid]!
+  const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((emojis.length - 1) * ICON_SIZE) / 2
+  const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * (0.55 + row)
+  const alpha = hostShown(eid)
+  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji, 'player'), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha }))
+}
+
+/** 头顶的图标：精英的词缀贴着头顶一排；带时限、正生效的状态按图标的轻重排，最多三个，再上面一排；倒下的不画 */
 function statusIcons(sim: Sim, out: PaintSprite[]): void {
   const now = sim.elapsedMs
   const kinds: number[] = []
   for (const eid of query(sim.world, [Mark, Transform])) {
     if (!Alive.v[eid]) continue
+    const affixes = eliteAffixes[eid] ?? []
+    iconRow(sim, out, eid, affixes.map((id) => AFFIXES[id].icon), 0)
     kinds.length = 0
     for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
       const k = Mark.kind[s]!
       const until = Mark.until[s]!
       if (statusDef(k)?.icon && until > now && until !== Infinity && !kinds.includes(k)) kinds.push(k)
     }
-    if (kinds.length === 0) continue
     kinds.sort((a, b) => statusDef(a)!.icon!.rank - statusDef(b)!.icon!.rank)
-    const n = Math.min(ICON_MAX, kinds.length)
-    const h = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.h[eid]!
-    const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((n - 1) * ICON_SIZE) / 2
-    const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * 0.55
-    const alpha = hostShown(eid)
-    for (let j = 0; j < n; j++) {
-      out.push({ z: SWEAT_Z, frame: sim.frames.index(statusDef(kinds[j]!)!.icon!.emoji, 'player'), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha })
-    }
+    iconRow(sim, out, eid, kinds.slice(0, ICON_MAX).map((k) => statusDef(k)!.icon!.emoji), affixes.length > 0 ? 1 : 0)
   }
 }
 

@@ -1,9 +1,10 @@
 import { hasComponent, query } from 'bitecs'
 import { CHARACTERS } from '../data/characters'
 import { STAT_KEYS, STATS } from '../data/stats'
+import { AFFIXES } from '../data/affixes'
 import { UNIT } from '../util/units'
 import { Ability, Alive, Ammo, Boss, Cd, Charges, Ctl, Drive, Elite, Faction, FACTION, Form, Hp, Mark, MARK, MARK_SLOTS, Owner, Phys, Radius, Res, Seat, Stats, Transform, Uid } from './components'
-import { abilityDef, bodyLook, enemyDef, resDef } from './store'
+import { abilityDef, bodyLook, eliteAffixes, enemyDef, resDef } from './store'
 import { staminaLeft } from './systems/shared/stamina'
 import { statusDef } from './utils/marks'
 import type { Sim } from './sim'
@@ -50,7 +51,8 @@ function title(sim: Sim, eid: number): string {
     return `${def.name} · ${eid === sim.leader ? '队长' : `队员 · 坑位 ${Seat.v[eid]}`}`
   }
   const def = enemyDef[eid]
-  const rank = Boss.v[eid] ? ' · 头目' : Elite.v[eid] ? ' · 精英' : ''
+  const affixes = (eliteAffixes[eid] ?? []).map((id) => AFFIXES[id].name)
+  const rank = Boss.v[eid] ? ' · 头目' : Elite.v[eid] ? ` · 精英${affixes.length > 0 ? `（${affixes.join('、')}）` : ''}` : ''
   const side = Faction.v[eid] === FACTION.team ? '我方' : Faction.v[eid] === FACTION.enemy ? '敌方' : '场地'
   return `${def?.name ?? '无名身体'} · ${side}${rank}`
 }

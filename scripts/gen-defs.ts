@@ -24,6 +24,7 @@ import { SFX } from '../defs/sfx.ts'
 import { STAMINA } from '../defs/stamina.ts'
 import { STATS } from '../defs/stats.ts'
 import { STATUSES } from '../defs/statuses.ts'
+import { AFFIXES } from '../defs/affixes.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
@@ -51,6 +52,7 @@ import { COLS, splits, stacks, exitPlan } from '../src/maps/exit/layout.ts'
 import { SUN } from '../src/data/light.ts'
 import { HEIGHT_SPAN, TIME_QUANT } from '../src/maps/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
+import { withAffixes } from '../src/data/reactions.ts'
 import { SIGNALS } from '../src/data/signals.ts'
 import type { MapSignals } from '../src/data/signals.ts'
 import { animIssues } from '../src/emoji/animCheck.ts'
@@ -59,6 +61,7 @@ import { splitSvg } from '../src/emoji/svgSplit.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { AbilityDef, Cond, CondWho } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
+import type { AffixDef } from '../src/types/affixes'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind, UnitBase } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
@@ -713,7 +716,11 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   need(LEVEL_STATS[id as keyof typeof LEVEL_STATS].length === MAX_CHAR_LEVEL - 1, `levels.${id} 须给 2 到 ${MAX_CHAR_LEVEL} 级每一级写属性`)
 }
 
-const units: [string, UnitBase][] = [...Object.values(ENEMIES).flatMap(withNested).map((e): [string, UnitBase] => [`enemies.${e.kind}`, e]), ...Object.entries<UnitBase>(CHARACTERS).map(([id, c]): [string, UnitBase] => [`characters.${id}`, c])]
+const units: [string, UnitBase][] = [
+  ...Object.values(ENEMIES).flatMap(withNested).map((e): [string, UnitBase] => [`enemies.${e.kind}`, e]),
+  ...Object.values<EnemyDef>(ENEMIES).filter((e) => e.role !== 'boss').map((e): [string, UnitBase] => [`enemies.${e.kind} 挂满精英词缀`, withAffixes(e, Object.values<AffixDef>(AFFIXES))]),
+  ...Object.entries<UnitBase>(CHARACTERS).map(([id, c]): [string, UnitBase] => [`characters.${id}`, c]),
+]
 for (const [at, u] of units) {
   for (const on of ['idle', 'death'] as const) need((u.reactions ?? []).filter((r) => r.on === on).length <= 1, `${at} 的 ${on} 反应最多一条`)
   need((u.reactions ?? []).filter((r) => r.on === 'lowHp').length <= 8, `${at} 的残血线最多八条`)
@@ -1047,6 +1054,7 @@ const TABLES = {
   stamina: STAMINA,
   stats: STATS,
   statuses: STATUSES,
+  affixes: AFFIXES,
   team: TEAM_BASELINE,
   timestop: TIMESTOP,
   weapons: WEAPONS,
@@ -1063,6 +1071,13 @@ const TABLES = {
   const icons = list.flatMap(([, d]) => (d.icon ? [d.icon.rank] : []))
   need(new Set(icons).size === icons.length, `状态的图标轻重有重复：${icons.join(',')}`)
   for (const [id, d] of list) need(d.merge !== 'bySource' || d.forces !== undefined, `statuses.${id} 按施加者分格的只能是牵着走的状态`)
+}
+
+/** 精英词缀：抽得出 min 到 max 个不重样的 */
+{
+  const { min, max } = DIFFICULTY.elite.affixes
+  const n = Object.keys(AFFIXES).length
+  need(Number.isInteger(min) && Number.isInteger(max) && min >= 0 && min <= max && max <= n, `difficulty.elite.affixes 须是 0 ≤ min ≤ max ≤ ${n}（词缀数）的整数`)
 }
 
 /** 减伤的倍率小于 1：受到更多伤害用易伤状态 */
