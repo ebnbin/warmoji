@@ -5,7 +5,6 @@ import { GROUND_PPU } from '../../data/texel'
 import { viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
 import { fbm } from '../../util/noise'
-import { devFlag } from '../../devtools'
 import { decorSprite } from '../../ecs/decor'
 import type { Decor } from '../../ecs/decor'
 import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
@@ -45,8 +44,7 @@ const TRACK_UPLOAD_MS = 50
 const CANOPY_DEPTH = 20
 const RAG_DEPTH = 21
 const RAG_SHADOW_DEPTH = -0.5
-/** 开发工具里"显示碰撞边界"的开关：打开时标志物挡人的轮廓和别的地图的岩壁一样勾在一切之上 */
-const WALLS_FLAG = 'battle.walls'
+/** 碰撞边界开着时，标志物挡人的轮廓和别的地图的岩壁一样勾在一切之上 */
 const WALLS_DEPTH = 1001
 /** 脚下扬起的沙每格²每秒最多这么多团：人多的时候不糊成一片，一圈里各处一样 */
 const PUFFS_PER_U2_S = 0.18
@@ -304,7 +302,7 @@ export class DesertView implements MapView {
       p.s.x = mid.x + wrapU(p.x - mid.x, v.w)
       p.s.y = mid.y + wrapU(p.y - mid.y, v.h)
     }
-    this.placeLandmarks(s, mid, now)
+    this.placeLandmarks(s, mid, now, v.showWalls())
   }
 
   /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；松沙上的脚步扬起一小团沙 */
@@ -340,9 +338,9 @@ export class DesertView implements MapView {
 
   /**
    * 每样标志物挪到离镜头最近的那一份上；破布条顺着盛行风飘，微风一阵紧一阵松，紧时飘得平、抖得急，影子落在杆影的尽头。
-   * 打开了显示碰撞边界就把挡人的轮廓也勾在那一份上
+   * outline 时把挡人的轮廓也勾在那一份上
    */
-  private placeLandmarks(s: DesertState, mid: Point, now: number): void {
+  private placeLandmarks(s: DesertState, mid: Point, now: number, outline: boolean): void {
     const size = s.plan.sizeU * UNIT
     const rag = this.ragGfx!
     const shade = this.ragShadow!
@@ -350,9 +348,8 @@ export class DesertView implements MapView {
     rag.clear()
     shade.clear()
     walls.clear()
-    const showWalls = devFlag(WALLS_FLAG)
-    walls.setVisible(showWalls)
-    if (showWalls) walls.lineStyle(0.05 * UNIT, 0xff00ff, 1)
+    walls.setVisible(outline)
+    if (outline) walls.lineStyle(0.05 * UNIT, 0xff00ff, 1)
     const wx = Math.cos(s.plan.windAngle)
     const wy = Math.sin(s.plan.windAngle)
     const gust = 0.26 + 0.05 * Math.sin(now / 1700) + 0.03 * Math.sin(now / 430 + 1.1)
@@ -360,7 +357,7 @@ export class DesertView implements MapView {
       const x = mid.x + wrapU(m.land.x * UNIT - mid.x, size)
       const y = mid.y + wrapU(m.land.y * UNIT - mid.y, size)
       m.img?.setPosition(x, y)
-      if (showWalls) for (const sol of m.land.shape.solids) strokeSolid(walls, x, y, sol)
+      if (outline) for (const sol of m.land.shape.solids) strokeSolid(walls, x, y, sol)
       if (!m.rag) continue
       const pole = m.land.shape.limbs[0]!
       const top = pole.z1

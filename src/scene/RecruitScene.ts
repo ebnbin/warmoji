@@ -17,7 +17,6 @@ import type { LevelUpWake } from './levelUp'
 import { characterStatGroups } from './statLines'
 import { finishStep, flowStatGroups, isLeaving, runExit } from './teamPage'
 import { SceneKey } from './keys'
-import type { DevProvider, DevProviderHost } from '../devtools'
 
 /** 详情区顶上的队伍栏高度 */
 const STRIP_H = 84
@@ -37,7 +36,7 @@ function tagLabel(t: CharacterTag): string {
 }
 
 /** 招募页：全部角色都能招；按标签筛选，点一名看详情，确认后招进队伍。升级时来招人的盖在停住的战斗上，招一人就回去 */
-export class RecruitScene extends Phaser.Scene implements DevProviderHost {
+export class RecruitScene extends Phaser.Scene {
   /** 升级时来招人 */
   private readonly forLevelUp: boolean
   private preserveOnRestart = false
@@ -368,38 +367,6 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
-  }
-
-  devProvider(): DevProvider {
-    return {
-      id: this.forLevelUp ? 'levelUpRecruit' : 'recruit',
-      title: '招募页',
-      sections: [
-        {
-          id: 'recruit',
-          title: '招募页',
-          items: () => [
-            {
-              kind: 'action',
-              label: '自动补齐并入队',
-              desc: '按名单顺序把空位招满后直接继续，省去逐个点选',
-              run: (): void => {
-                if (this.forLevelUp) {
-                  this.focus = recruitCandidates(this.run)[0] ?? null
-                  this.confirm()
-                  return
-                }
-                for (const id of ROSTER_IDS) {
-                  if (recruitDueCount(this.run) === 0) break
-                  recruitMember(this.run, id)
-                }
-                this.proceed()
-              },
-            },
-          ],
-        },
-      ],
-    }
   }
 }
 

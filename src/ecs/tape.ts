@@ -76,6 +76,21 @@ const sameTuning = (a: Readonly<Record<string, number>>, b: Readonly<Record<stri
   return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k])
 }
 
+/** 留几场录像：这一场与上一场 */
+const KEPT_TAPES = 2
+
+/** 最近几场的录像，新的在前；离开战斗以后还留着 */
+const kept: Tape[] = []
+
+export function keepTape(tape: Tape): void {
+  kept.unshift(tape)
+  kept.length = Math.min(kept.length, KEPT_TAPES)
+}
+
+export function keptTapes(): readonly Tape[] {
+  return kept
+}
+
 /** 录一场：进场前记下这一局，之后每步之前记下变了的输入 */
 export class TapeRecorder {
   readonly tape: Tape

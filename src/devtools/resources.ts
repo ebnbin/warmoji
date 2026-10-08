@@ -69,8 +69,8 @@ function loaderText(game: Phaser.Game): string {
 
 export function resourceItems(game: Phaser.Game): DevItem[] {
   return [
-    { kind: 'text', label: '纹理 · 按估算显存降序', mono: true, read: () => textureText(game) },
-    { kind: 'text', label: '缓存 · 各类型条目数', mono: true, read: () => cacheText(game) },
+    { kind: 'text', label: '纹理', desc: '按估算显存降序', mono: true, read: () => textureText(game) },
+    { kind: 'text', label: '缓存', desc: '各类型条目数', mono: true, read: () => cacheText(game) },
     { kind: 'text', label: '加载中', mono: true, read: () => loaderText(game) },
   ]
 }

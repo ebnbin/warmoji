@@ -35,7 +35,6 @@ export function App({ game }: { readonly game: Phaser.Game }): ReactNode {
     if (code === null) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.code !== code || e.repeat || typing(e.target)) return
-      devConfig().onTap()
       setPanelOpen(!devSettings().open)
     }
     window.addEventListener('keydown', onKey, true)
@@ -52,7 +51,7 @@ export function App({ game }: { readonly game: Phaser.Game }): ReactNode {
   } as CSSProperties
   return (
     <div className="dt-root" style={style} onKeyDown={keepKeys} onKeyUp={keepKeys}>
-      <Guard reset={changed}>{devSettings().open ? <Panel game={game} dock={dock} /> : <Pill game={game} win={dock.win} />}</Guard>
+      <Guard reset={changed}>{devSettings().open ? <Panel dock={dock} /> : <Pill game={game} win={dock.win} />}</Guard>
     </div>
   )
 }

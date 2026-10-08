@@ -1,64 +1,38 @@
 import Phaser from 'phaser'
-import { currentLayout, devConfig } from './config'
-import { dockState } from './dock'
+import { devConfig } from './config'
+import { inputItems } from './inputWatch'
+import { objectItems } from './inspect'
 import { clearDevLog, devLogEntries, infoCaptureOn, setInfoCapture, unreadErrorCount } from './log'
 import type { DevLogLevel } from './log'
-import { clock, copyText, downloadDataUrl, stamp } from './util'
 import { rendererInfo, resetMetrics } from './metrics'
-import { refreshDevPanel, registerDevProvider } from './registry'
-import { resourceItems } from './resources'
-import { flagItems } from './flags'
-import { inspectItems } from './inspect'
-import { inputItems } from './inputWatch'
-import { sceneItems, scenesText } from './scenes'
-import { pausedSceneCount, setTimeScale, stepOneFrame, TIME_SCALES, timeScale, timeText } from './timeControl'
-import { devSettings, updateDevSettings } from './settings'
-import type { DevItem } from './types'
 import { HistoryView } from './panel/history'
 import { LogView } from './panel/log'
 import { PerfView } from './panel/perf'
+import { refreshDevPanel, registerTabs } from './registry'
+import { resourceItems } from './resources'
+import { sceneItems, scenesText } from './scenes'
+import { pausedSceneCount, setTimeScale, stepOneFrame, TIME_SCALES, timeScale, timeText } from './timeControl'
+import type { DevItem } from './types'
+import { clock, copyText, downloadDataUrl, stamp } from './util'
 
 const r = (v: number): string => String(Math.round(v))
 
-function viewportText(game: Phaser.Game): string {
+/** 面板开着时画布变小、填充变少，帧率要对照画布大小看 */
+function frameText(game: Phaser.Game): string {
   const s = game.scale
-  const d = dockState()
-  const panel = !devSettings().open ? '收起' : d.size > 0 ? `停靠${d.edge === 'right' ? '右侧' : '底部'} ${d.size}` : '悬浮'
-  const lines = [
-    `窗口 ${r(d.win.w)}×${r(d.win.h)} · 面板 ${panel}`,
-    `画布 ${s.width}×${s.height} px · 显示 ${r(s.displaySize.width)}×${r(s.displaySize.height)} · dpr ${window.devicePixelRatio}`,
-  ]
-  const L = currentLayout()
-  if (L) {
-    const i = L.insets
-    lines.push(`逻辑 ${r(L.width)}×${r(L.height)} · 安全区 上${r(i.top)} 右${r(i.right)} 下${r(i.bottom)} 左${r(i.left)}`)
-  }
-  return lines.join('\n')
+  const scale = timeScale()
+  const speed = scale === 1 ? '' : scale === 0 ? ' · 已暂停' : ` · ×${scale}`
+  return `${Math.round(game.loop.actualFps)} fps${speed} · 画布 ${s.width}×${s.height} px · 显示 ${r(s.displaySize.width)}×${r(s.displaySize.height)} · dpr ${window.devicePixelRatio}`
 }
 
 function overviewItems(game: Phaser.Game): DevItem[] {
+  const build = devConfig().build
   return [
-    { kind: 'text', mono: true, read: () => `Phaser ${Phaser.VERSION} · ${rendererInfo(game)}` },
-    { kind: 'text', mono: true, read: () => viewportText(game) },
+    { kind: 'text', mono: true, read: () => `Phaser ${Phaser.VERSION} · ${rendererInfo(game)}${build ? `\n构建 ${build.hash} · ${build.time}` : ''}` },
+    { kind: 'text', mono: true, read: () => frameText(game) },
     { kind: 'text', label: '环境', mono: true, read: envText },
-    { kind: 'text', label: '场景 · 状态 · GameObject 数', mono: true, read: () => scenesText(game) },
-    {
-      kind: 'toggle',
-      label: '胶囊显示帧率',
-      get: () => devSettings().pillFps,
-      set: (on) => updateDevSettings({ pillFps: on }),
-    },
-    { kind: 'toggle', label: '宽面板', desc: '悬浮时用宽一些的面板，看长列表更省事', get: () => devSettings().wide, set: (on) => updateDevSettings({ wide: on }) },
-    {
-      kind: 'toggle',
-      label: '显示安全区边界',
-      desc: '勾出布局安全边距与逻辑视口边缘',
-      get: () => devSettings().safeArea,
-      set: (on) => updateDevSettings({ safeArea: on }),
-    },
     {
       kind: 'buttons',
-      label: '操作',
       buttons: [
         { label: '复制诊断信息', run: () => void copyText(diagnosticsText(game)).then((ok) => note(ok ? '诊断信息已复制' : '复制失败：剪贴板不可用')) },
         { label: '下载截图', run: () => snapshot(game) },
@@ -88,11 +62,13 @@ function envText(): string {
 
 function diagnosticsText(game: Phaser.Game): string {
   const logs = devLogEntries().slice(-30)
+  const build = devConfig().build
   return [
     `# 诊断 ${new Date().toISOString()}`,
     `Phaser ${Phaser.VERSION} · ${rendererInfo(game)}`,
+    ...(build ? [`构建 ${build.hash} · ${build.time}`] : []),
     envText(),
-    viewportText(game),
+    frameText(game),
     '',
     '## 场景',
     scenesText(game),
@@ -126,7 +102,8 @@ function logItems(): DevItem[] {
   return [
     {
       kind: 'choice',
-      label: `筛选 · 共 ${all.length} 条`,
+      label: '筛选',
+      desc: `共 ${all.length} 条`,
       options: [
         { id: 'all', label: '全部' },
         { id: 'error', label: `错误 ${count('error')}` },
@@ -142,7 +119,6 @@ function logItems(): DevItem[] {
       buttons: [
         { label: '复制全部', run: () => void copyText(all.map((e) => `${clock(e.at)} ${e.level} ${e.text}`).join('\n')).then((ok) => note(ok ? '日志已复制' : '复制失败：剪贴板不可用')) },
         { label: '清空', run: clearDevLog },
-        { label: '写一条测试错误', run: () => console.error('devtools 测试错误', { at: Date.now() }) },
       ],
     },
     { kind: 'text', read: () => lastNote },
@@ -214,7 +190,8 @@ function storageItems(): DevItem[] {
     const expanded = expandedKey === k
     items.push({
       kind: 'buttons',
-      label: `${k} · ${preview(k)}`,
+      label: k,
+      desc: preview(k),
       buttons: [
         { label: expanded ? '收起' : '查看', run: () => (expandedKey = expanded ? undefined : k) },
         { label: '复制值', run: () => void copyText(fullValue(k)).then((ok) => note(ok ? `已复制 ${k}` : '复制失败：剪贴板不可用')) },
@@ -262,7 +239,8 @@ function timeItems(): DevItem[] {
   return [
     {
       kind: 'choice',
-      label: '游戏速度 · 暂停与单步逐 scene 暂停，慢放与快进驱动引擎时钟',
+      label: '游戏速度',
+      desc: '暂停与单步逐 scene 暂停，慢放与快进驱动引擎时钟',
       options: TIME_SCALES.map((s) => ({ id: String(s), label: s === 0 ? '暂停' : `×${s}` })),
       get: () => String(timeScale()),
       set: (id) => setTimeScale(Number(id)),
@@ -272,33 +250,25 @@ function timeItems(): DevItem[] {
   ]
 }
 
-export function registerBuiltins(game: Phaser.Game): void {
-  registerDevProvider(
+/** 引擎层：只放任何 Phaser 游戏都用得上的能力 */
+export function registerEngineTabs(game: Phaser.Game): void {
+  registerTabs('engine', '', '', [
+    { id: 'overview', title: '概览', items: () => overviewItems(game) },
+    { id: 'scenes', title: '场景栈', items: () => sceneItems(game, devConfig().key) },
+    { id: 'time', title: '时间', items: timeItems },
     {
-      id: 'engine',
-      title: '引擎',
-      sections: [
-        { id: 'overview', title: '概览', items: () => overviewItems(game) },
-        { id: 'scenes', title: '场景', items: () => sceneItems(game, devConfig().key) },
-        { id: 'flags', title: '开关', items: flagItems },
-        { id: 'time', title: '时间', items: timeItems },
-        {
-          id: 'perf',
-          title: '性能',
-          items: () => [
-            { kind: 'custom', render: () => <PerfView game={game} /> },
-            { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
-            { kind: 'text', label: '一分钟走势 · 面板收起时也在采样', read: () => '' },
-            { kind: 'custom', render: () => <HistoryView /> },
-          ],
-        },
-        { id: 'inspect', title: '检视', items: inspectItems },
-        { id: 'input', title: '输入', items: inputItems },
-        { id: 'resources', title: '资源', items: () => resourceItems(game) },
-        { id: 'log', title: '日志', badge: () => (unreadErrorCount() > 0 ? String(unreadErrorCount()) : ''), items: logItems },
-        { id: 'storage', title: '存储', items: storageItems },
+      id: 'perf',
+      title: '性能',
+      items: () => [
+        { kind: 'custom', render: () => <PerfView game={game} /> },
+        { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
+        { kind: 'custom', label: '一分钟走势', desc: '面板收起时也在采样', render: () => <HistoryView /> },
       ],
     },
-    'engine',
-  )
+    { id: 'objects', title: '对象', items: objectItems },
+    { id: 'input', title: '输入', items: inputItems },
+    { id: 'resources', title: '资源', items: () => resourceItems(game) },
+    { id: 'log', title: '日志', badge: () => (unreadErrorCount() > 0 ? String(unreadErrorCount()) : ''), items: logItems },
+    { id: 'storage', title: '存储', items: storageItems },
+  ])
 }

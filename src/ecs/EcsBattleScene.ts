@@ -44,8 +44,8 @@ import { Fog, setOverlayFill } from './views'
 import { viewFor } from './viewRegistry'
 import type { MapView, ViewCtx } from './views'
 import { SAFE } from '../maps/frame'
-import { Lens, LENS_MODES } from './lens'
-import type { Framing, LensMode } from './lens'
+import { Lens } from './lens'
+import type { Framing } from './lens'
 import { makeSim } from './sim'
 import { abilityRequires, bodyLook, modDef, statBase } from './store'
 import { foldBody, lastingStats, setStatLayer, statsOf } from './utils/stats'
@@ -88,7 +88,7 @@ import { amethystClock } from '../maps/amethyst/world'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
-import { TapePlayer, TapeRecorder } from './tape'
+import { keepTape, TapePlayer, TapeRecorder } from './tape'
 import type { DevCommand, Tape, TapeEvent } from './tape'
 import type { CharacterId } from '../types/characters'
 import type { Burst } from './outbox'
@@ -97,47 +97,17 @@ import type { Show } from './present/feedback'
 import { newDamageNumbers } from './present/damageNumbers'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
-import { battleDevProvider, watchSandboxSteady } from './devProvider'
-import { defineDevChoice, defineDevFlag } from '../devtools'
-import type { DevProvider, DevProviderHost } from '../devtools'
+import { battleDevTabs, lensMode, showGates, showGrid, showHeights, showTargets, showWalls, watchSandboxSteady } from './devTabs'
+import type { DevSceneTabs, DevTabsHost } from '../devtools'
 import { gainTeamXp } from './systems/shared/combat'
 import { hit } from './systems/shared/damage'
 import { bodySource, WORLD_SOURCE } from './utils/source'
 import { nearestTarget } from './utils/targets'
-import { LAYER_M } from './utils/pass'
 import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 import { wallLoops } from '../maps/basin'
 import { gateLoad, gatesNow, gateStats } from './worlds/gates'
-
-const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
-const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体，残垣里标准身高跨不过的墙，沙漠的标志物' })
-const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
-const meters = (layers: number): string => `${+(layers * LAYER_M).toFixed(1)} 米`
-const showHeights = defineDevFlag({
-  id: 'battle.heights',
-  group: '战斗',
-  label: '显示高度',
-  desc: `地形按挡到第几层上色：绿到离地 ${meters(1)}、黄到 ${meters(2)}、橙到 ${meters(3)}、红更高、紫一直高上去；填满的挡子弹，棋盘格的只挡身体，灰色斜纹是没有高度的硬边界。身体旁的小标尺一格一层，占着的层上色，白线以下的高度跨得过；子弹的圈按它此刻飞在哪一层上色`,
-})
-const showGrid = defineDevFlag({ id: 'battle.grid', group: '战斗', label: '显示坐标网格', desc: '每格一条白线；红线是 y = 0，绿线是 x = 0，两条相交处就是原点；黄框是能走的地方与地图的边不能越出的安全区' })
-const LENS_LABELS: Record<LensMode, string> = { follow: '跟随', map: '完整地图' }
-const lensChoice = defineDevChoice({
-  id: 'battle.lens',
-  group: '战斗',
-  label: '镜头',
-  desc: '完整地图不跟随队长，整张图放进一屏',
-  options: LENS_MODES.map((id) => ({ id, label: LENS_LABELS[id] })),
-  default: 'follow',
-})
-
-function lensMode(): LensMode {
-  const id = lensChoice()
-  const mode = LENS_MODES.find((m) => m === id)
-  if (!mode) throw new Error(`没有这种镜头模式：${id}`)
-  return mode
-}
 
 /** 出怪口按种类上色 */
 const GATE_COLORS = [0x00e5ff, 0xffd740, 0x69f0ae, 0xff6e40, 0xe040fb, 0xb2ff59, 0xff4081, 0x40c4ff] as const
@@ -156,12 +126,6 @@ function liveCoins(world: EcsWorld): number {
 
 /** 一帧最多补走几步：卡得更久就丢掉落下的时间 */
 const MAX_STEPS_PER_FRAME = 4
-
-/** 留几场录像：这一场与上一场 */
-const KEPT_TAPES = 2
-
-/** 最近几场的录像，新的在前；离开战斗以后还留着 */
-const TAPES: Tape[] = []
 
 function unknownCommand(cmd: never): never {
   throw new Error(`开发指令没有处理：${JSON.stringify(cmd)}`)
@@ -190,7 +154,7 @@ function aimReach(a: AbilityDef): number {
   return r
 }
 
-export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProviderHost {
+export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost {
   private world!: EcsWorld
   private map!: MapView
   private ctx!: ViewCtx
@@ -297,8 +261,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.claimBase = null
   }
 
-  devProvider(): DevProvider {
-    return battleDevProvider(this)
+  devTabs(): DevSceneTabs {
+    return battleDevTabs(this)
   }
 
   /** 开发面板的指令：和玩家的操作一样录进录像 */
@@ -551,8 +515,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (tape) this.player = new TapePlayer(tape)
     else {
       this.recorder = new TapeRecorder(run)
-      TAPES.unshift(this.recorder.tape)
-      TAPES.length = Math.min(TAPES.length, KEPT_TAPES)
+      keepTape(this.recorder.tape)
     }
     this.run = run
     this.fightDef = enterFight(run)
@@ -560,7 +523,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
     this.lens = new Lens(this)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, decor: [], w: 0, h: 0 }
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, lens: this.lens, decor: [], w: 0, h: 0, showWalls }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
@@ -745,7 +708,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     projectiles: number
     coins: number
     pending: number
-    objects: number
     spawnIntervalMs: number
     atlasPages: number
   } {
@@ -756,7 +718,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       projectiles: query(this.world, [Projectile]).length,
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,
-      objects: this.children.list.length,
       spawnIntervalMs: Math.round(sim?.fight.knobs ? spawnParams().intervalMs : wave.spawnIntervalMs),
       atlasPages: this.atlas?.pageCount ?? 0,
     }
@@ -1208,21 +1169,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     return true
   }
 
-  /** 正在回放的录像，不在回放时是这一场正录着的；离开战斗以后还留着 */
-  currentTape(): Tape | undefined {
-    return this.player?.tape ?? TAPES[0]
-  }
-
-  /** 这一场之前打的那一场的录像 */
-  previousTape(): Tape | undefined {
-    return this.player ? undefined : TAPES[1]
-  }
-
-  /** 照录像从头重打一场 */
-  replay(tape: Tape): void {
-    this.scene.restart({ tape })
-  }
-
   tapeText(): string {
     const sim = this.sim
     const p = this.player
@@ -1236,8 +1182,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
             : `对得上 · 比对了 ${p.matched} 处`
       return `回放 · 第 ${t}/${p.tape.ticks} 步${p.over ? ' · 已打完' : ''}\n${verdict}`
     }
-    const tape = TAPES[0]
-    if (!tape) return '还没有录像'
+    const tape = this.recorder?.tape
+    if (!tape) return '战斗还没开始'
     return `录制 · 第 ${tape.ticks} 步${tape.final !== null ? ' · 已打完' : ''}\n${tape.events.length} 条输入 · ${tape.checks.length} 个校验值`
   }
 

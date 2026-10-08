@@ -17,22 +17,12 @@ import { browserStorage, StorageKey } from './util/storage'
 import { getRun } from './run/state'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
-import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
-import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, setGameArea, viewport } from './util/apply'
+import { initSfx, setSfxEnabled } from './audio/sfx'
+import { isStandalone, nudgeIosViewport, refreshViewport, setGameArea, viewport } from './util/apply'
 import { FONT_FAMILY, TONE } from './ui/theme'
-import { installDevTools, layoutDock, registerGameProvider } from './devtools'
-import { appProvider } from './dev/app'
-import { audioProvider } from './dev/audio'
-import { emojiProvider } from './dev/emoji'
-import { runProvider } from './dev/run'
-import { settingsProvider } from './dev/settings'
+import { installDevTools, layoutDock } from './devtools'
+import { registerGameDevTabs } from './dev'
 import { SceneKey } from './scene/keys'
-
-const badge = document.getElementById('build-badge')
-if (badge) {
-  badge.textContent = __BUILD_HASH__
-  badge.title = `构建于 ${__BUILD_TIME__}`
-}
 
 initSfx()
 initBgm()
@@ -55,21 +45,12 @@ installDevTools(game, {
   key: SceneKey.DevTools,
   storageKey: StorageKey.DevTools,
   accent: TONE.accent.face,
-  font: { family: FONT_FAMILY, size: 13 },
-  layout: (scene) => {
-    applyCamera(scene)
-    return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets }
-  },
+  font: { family: FONT_FAMILY },
+  build: { hash: __BUILD_HASH__, time: __BUILD_TIME__ },
   relayout: () => refreshViewport(game),
-  onTap: () => playSfx('click'),
 })
 setGameArea(layoutDock)
-
-registerGameProvider(appProvider(game))
-registerGameProvider(runProvider(game))
-registerGameProvider(settingsProvider())
-registerGameProvider(audioProvider())
-registerGameProvider(emojiProvider(game))
+registerGameDevTabs(game)
 
 game.events.once(Phaser.Core.Events.READY, () => {
   refreshViewport(game, true)
@@ -90,7 +71,8 @@ game.events.once(Phaser.Core.Events.READY, () => {
   for (const key of lobby) {
     game.scene.getScene(key).events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
   }
-  game.scene.getScene(SceneKey.Battle).events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
+  // 回放时战斗在 create 里才换成录像里的那一局
+  game.scene.getScene(SceneKey.Battle).events.on(Phaser.Scenes.Events.CREATE, () => playBgm(getRun().mapId))
 })
 
 let resizeTimer: number | undefined

@@ -1,13 +1,16 @@
 import type Phaser from 'phaser'
 
+/** 覆盖层的坐标以 CSS 像素计，原点在画布左上角 */
 export interface OverlayCtx {
   readonly game: Phaser.Game
-  /** 业务 scene 主相机的世界坐标 → 覆盖层逻辑坐标 */
+  /** 业务 scene 主相机下的世界坐标 → 覆盖层坐标 */
   toLocal(scene: Phaser.Scene, x: number, y: number, sfx?: number, sfy?: number): { x: number; y: number }
+  /** 画布像素 → 覆盖层坐标 */
   canvasToLocal(px: number, py: number): { x: number; y: number }
 }
 
-type OverlayPainter = (g: Phaser.GameObjects.Graphics, ctx: OverlayCtx) => void
+/** 每帧在清空过的画笔上重画一遍 */
+export type OverlayPainter = (g: Phaser.GameObjects.Graphics, ctx: OverlayCtx) => void
 
 const painters = new Set<OverlayPainter>()
 
