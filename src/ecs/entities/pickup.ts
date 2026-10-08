@@ -213,7 +213,7 @@ export function dropLevelUp(sim: Sim, x: number, y: number): void {
     y = ly + u.y * away
   }
   sim.out.bursts.push({ x, y, count: 10, kind: 'coin' })
-  sim.out.sfx.push('upgrade')
+  sim.out.events.push({ kind: 'levelUpDrop' })
   spawnPickup(sim, x, y, levelUpSpec())
 }
 
@@ -267,6 +267,6 @@ export function animatePickup(sim: Sim, eid: number): void {
 export function spawnCoins(sim: Sim, x: number, y: number, count: number): void {
   if (sim.over) return
   sim.out.bursts.push({ x, y, count: 6, kind: 'coin' })
-  sim.out.sfx.push('coin')
+  sim.out.events.push({ kind: 'coins' })
   dropCoins(sim, x, y, count)
 }

@@ -67,7 +67,8 @@ import { Lifetime, Modifier, Radius, Uid } from './components'
 import { isSameEntity } from './utils/identity'
 import { bodyAt, describeBody } from './inspector'
 
-import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
+import { initialLayout, stepFrozen } from './sim'
+import { presentFrame, presentFrozen } from './present/frame'
 import { openWave, settleWave } from './systems/shared/wave'
 import { waveAt, WAVE } from '../data/waves'
 import { SURGE } from '../data/enemies'
@@ -90,7 +91,10 @@ import { drain } from './outbox'
 import { TapePlayer, TapeRecorder } from './tape'
 import type { DevCommand, Tape, TapeEvent } from './tape'
 import type { CharacterId } from '../types/characters'
-import type { Burst, Outbox } from './outbox'
+import type { Burst } from './outbox'
+import { feedback } from './present/feedback'
+import type { Show } from './present/feedback'
+import { newDamageNumbers } from './present/damageNumbers'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
@@ -203,7 +207,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private waveBaseKills = 0
   private waveBaseCoins = 0
   private hitShakeOn = false
-  private seenHitCount = 0
+  /** 演出要用到的：开局时按设置备好 */
+  private show!: Show
   private shownLeader = -1
   private skillAim: Point | null = null
   private aimGfx?: Phaser.GameObjects.Graphics
@@ -267,7 +272,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.ending = false
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
-    this.seenHitCount = 0
     this.shownLeader = -1
     this.skillAim = null
     this.aimGfx = undefined
@@ -649,10 +653,19 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       paper: burstEmitter(this, [0xfbf3df, 0xf1e4c4, 0xffffff, 0xe6d3ad], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
-    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
-    if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
+    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.fightDef)
+    const numbers = settings.damageNumbers ? newDamageNumbers() : null
+    if (numbers) this.damageText = new DamageTextLayer(this, numbers)
+    this.show = {
+      sfx: playSfx,
+      shake: () => {
+        if (this.hitShakeOn) this.lens.screen.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
+      },
+      numbers,
+    }
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
+    presentFrame(this.sim, 0)
     this.sim.hooks.onStart(this.sim)
     hint.setText('绘制地图…')
     await this.map.onSimReady(this.ctx, this.sim)
@@ -674,7 +687,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   private drainOutbox(): void {
     const out = this.sim!.out
-    drainSfx(out)
+    drain(out.events, (es) => feedback(es, this.show))
     drain(out.banners, (bs) => {
       for (const b of bs) this.hud.emit(HudEvent.WaveWarning, b)
     })
@@ -1034,10 +1047,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return
     }
     if (this.ending) {
-      sim.dtMs = delta
-      sim.wdtMs = delta * worldTimeScale(sim)
-      stepFrozenVisuals(sim)
-      drainSfx(sim.out)
+      stepFrozen(sim, delta)
+      drain(sim.out.events, (es) => feedback(es, this.show))
+      presentFrozen(sim)
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)
@@ -1050,7 +1062,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.view.right = seen.x + seen.w
     sim.view.bottom = seen.y + seen.h
     const steps = this.stepsFor(delta)
+    const from = sim.tick
     for (let i = 0; i < steps; i++) if (!this.tick(sim)) break
+    this.drainOutbox()
+    presentFrame(sim, (sim.tick - from) * TICK_MS)
     if (sim.leader !== this.shownLeader) {
       this.shownLeader = sim.leader
       const def = CHARACTERS[this.run.roster[sim.characters.indexOf(sim.leader)]!]
@@ -1060,11 +1075,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
-    this.drainOutbox()
-    if (sim.characterHitCount > this.seenHitCount) {
-      this.seenHitCount = sim.characterHitCount
-      if (this.hitShakeOn) this.lens.screen.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
-    }
     this.paint?.step(sim)
     this.drawDevTargets(sim)
     this.drawInspected()
@@ -1237,12 +1247,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     playSfx('over')
     this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false, reason }))
   }
-}
-
-function drainSfx(out: Outbox): void {
-  drain(out.sfx, (ids) => {
-    for (const id of ids) playSfx(id)
-  })
 }
 
 /** 在深海打的一局：潜艇的倒计时 */

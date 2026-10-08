@@ -4,10 +4,26 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 // 模拟层是 src/ecs 里表现层之外的部分：不碰引擎、渲染、界面、音频、存档与开发面板，运行期（含间接）只依赖 bitecs；声音与画面经 outbox 交给表现层，开发面板的开关经注入
 // 战斗要能照录像重打：它运行期用到的 src/ecs 与 src/maps 代码不读钟，随机只走 sim 上的随机流
 const ecs = resolve('src/ecs')
-const VIEW = ['EcsBattleScene.ts', 'atlas.ts', 'decor.ts', 'devProvider.ts', 'lens.ts', 'presentation.ts', 'render', 'viewRegistry.ts', 'views.ts'].map((p) => join(ecs, p))
+const VIEW = ['EcsBattleScene.ts', 'atlas.ts', 'decor.ts', 'devProvider.ts', 'lens.ts', 'present', 'presentation.ts', 'render', 'viewRegistry.ts', 'views.ts'].map((p) => join(ecs, p))
 const BANNED = [...VIEW, ...['src/audio', 'src/dev', 'src/devtools', 'src/editor', 'src/save', 'src/scene', 'src/ui'].map((p) => resolve(p))]
 const PACKAGES = new Set(['bitecs'])
 const BATTLE = ['src/ecs', 'src/maps'].map((p) => resolve(p))
+// 表现层每帧照战局算外观：只写画面用的这些字段，不建、不删实体，也不加减组件，回放才与画面无关
+const present = join(ecs, 'present')
+const LOOKS: Readonly<Record<string, readonly string[]>> = {
+  Transform: ['w', 'h', 'rot'],
+  Sprite: ['frame', 'flipX'],
+  Tint: ['color', 'alpha', 'effect'],
+  Depth: ['z'],
+  Pop: ['until', 'ms'],
+  Breath: ['phase'],
+  Flash: ['until'],
+  CharFlash: ['until'],
+  Anim: ['frames', 'base', 'onceFrames'],
+  Seen: ['v', 'want', 'at', 'uid'],
+}
+const WRITE = /\b([A-Z]\w*)\.(\w+)\[[^\]]*\]!?\s*(?:[-+*/]?=(?!=))/g
+const LIFECYCLE = /\b(?:addEntity|newEntity|removeEntity|addComponents?|removeComponent)\s*\(/
 const NONDETERMINISTIC = /\bMath\.random\s*\(|\bDate\.now\s*\(|\bperformance\.now\s*\(|\bnew\s+Date\s*\(/
 
 const under = (file: string, roots: readonly string[]): boolean => roots.some((r) => file === r || file.startsWith(r + sep))
@@ -80,6 +96,18 @@ while (queue.length > 0) {
       queue.push(target)
     }
   }
+}
+
+for (const file of files.filter((f) => under(f, [present]))) {
+  readFileSync(file, 'utf8')
+    .split('\n')
+    .forEach((line, i) => {
+      const at = `${relative('.', file)}:${i + 1}`
+      if (LIFECYCLE.test(line)) errors.push(`${at} 表现层不建、不删实体，也不加减组件：${line.trim()}`)
+      for (const m of line.matchAll(WRITE)) {
+        if (!LOOKS[m[1]!]?.includes(m[2]!)) errors.push(`${at} 表现层只写画面用的字段，${m[1]}.${m[2]} 不在其中：${line.trim()}`)
+      }
+    })
 }
 
 for (const file of via.keys()) {

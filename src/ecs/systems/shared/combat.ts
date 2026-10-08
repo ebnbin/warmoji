@@ -129,7 +129,7 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
     if (src.slot >= 0 && src.slot < st.kills.length) st.kills[src.slot] = (st.kills[src.slot] ?? 0) + 1
     if (src.hazard) st.hazardKills[src.hazard] = (st.hazardKills[src.hazard] ?? 0) + 1
   }
-  sim.out.sfx.push('kill')
+  sim.out.events.push({ kind: 'kill' })
   const def = enemyDef[eid]
   const who = hostile ? enemyOf[eid] : undefined
   const elite = Elite.v[eid] === 1
@@ -175,7 +175,7 @@ export function gainTeamXp(sim: Sim, amount: number, x?: number, y?: number): vo
   const gained = gainXp(sim.run, amount)
   if (gained === 0) return
   if (!teamLeveled(sim.run)) {
-    sim.out.sfx.push('levelup')
+    sim.out.events.push({ kind: 'teamLevel' })
     return
   }
   const cx = x ?? Transform.x[sim.leader]! + UNIT

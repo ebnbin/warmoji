@@ -13,7 +13,6 @@ import {
   BlinkShape,
   BlinkState,
   Chain,
-  CharFlash,
   Disc,
   DISC_AT,
   DISC_OF,
@@ -40,7 +39,6 @@ import {
   SummonShape,
   Swing,
   Thrown,
-  Tint,
   Transform,
   Uid,
   ZoneShape,
@@ -412,10 +410,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         }, src.realm)
         applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf), angle)
         for (const t of allies) {
-          if (!Alive.v[t]) continue
-          CharFlash.until[t] = sim.fxMs + 320
-          Tint.color[t] = color !== 0 ? color : 0xffe082
-          Tint.effect[t] = 0
+          if (Alive.v[t]) sim.out.events.push({ kind: 'glow', eid: t, uid: Uid.v[t]!, color: color !== 0 ? color : 0xffe082, ms: 320, fxAt: sim.fxMs })
         }
       }
       const fxR = Payload.fxRadius[e]!
@@ -590,7 +585,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
     if (!fired) return false
   }
   const sfx = abilityFireSfx[e]
-  if (sfx) sim.out.sfx.push(sfx)
+  if (sfx) sim.out.events.push({ kind: 'fire', sfx })
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
   // 潜行出手即现形，闲着的计时重来
@@ -636,6 +631,6 @@ export function fireRepeat(sim: Sim, e: number): boolean {
   Aim.rad[e] = angle
   if (!fireMirrored(sim, e, src, angle, target, RepeatState.damage[e]! * Repeat.ratio[e]!, { onHit: abilityOnHit[e], reach: 1 })) return false
   const sfx = abilityFireSfx[e]
-  if (sfx) sim.out.sfx.push(sfx)
+  if (sfx) sim.out.events.push({ kind: 'fire', sfx })
   return true
 }

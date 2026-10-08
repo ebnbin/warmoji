@@ -2,7 +2,6 @@ import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
 import { boltPts } from '../store'
-import { MISS, pushDamageNumber } from '../damageNumbers'
 import { attachDrawable } from './drawable'
 import type { Sim } from '../sim'
 
@@ -125,18 +124,6 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
     z: BOOM_Z,
   })
   return eid
-}
-
-/** 伤害数字从 (x, y) 上方飘起 */
-export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): void {
-  if (!sim.damageNumbers) return
-  pushDamageNumber(sim.damageNumbers, x, y - 14, amount, crit, sim.fxMs)
-}
-
-/** 躲开的一下：飘一个"闪避" */
-export function spawnMissText(sim: Sim, x: number, y: number): void {
-  if (!sim.damageNumbers) return
-  pushDamageNumber(sim.damageNumbers, x, y - 14, MISS, false, sim.fxMs)
 }
 
 export function spawnFxSlash(sim: Sim, x: number, y: number, angle: number, radius: number): number {
