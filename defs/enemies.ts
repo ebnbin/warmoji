@@ -285,7 +285,7 @@ const CREEPER = {
       fireSfx: 'boom',
       shape: { kind: 'disc', radius: 3.8, at: 'self' },
       breach: 1.2,
-      onSelf: [{ kind: 'vanish' }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'vanish' }] }],
     },
   ],
 } satisfies EnemyDef
@@ -416,7 +416,7 @@ const PUFFER = {
       color: 0xff5252,
       fireSfx: 'boom',
       shape: { kind: 'disc', radius: 2.8, at: 'self' },
-      onSelf: [{ kind: 'vanish' }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'vanish' }] }],
     },
   ],
   onDeath: [
@@ -632,7 +632,7 @@ const CRAB = {
       firstDelayMs: 0,
       aim: 'self',
       shape: { kind: 'world' },
-      onSelf: [{ kind: 'frontGuard', durationMs: 1300, arcDeg: 150 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'frontGuard', durationMs: 1300, arcDeg: 150 }] }],
     },
   ],
 } satisfies EnemyDef
@@ -791,7 +791,7 @@ const FOREST_BOSS = {
       windup: { ms: 600, lockAt: 'start', telegraph: 'blink' },
       fireSfx: 'whoosh',
       shape: { kind: 'world' },
-      onHit: [{ kind: 'teleport', of: 'tree', then: [{ kind: 'area', radius: 2.8, then: [{ kind: 'root', durationMs: 1400 }, { kind: 'damage', amount: 14 }] }] }],
+      onHit: [{ kind: 'teleport', of: 'tree', then: [{ kind: 'to', who: { side: 'foes', radius: 2.8 }, then: [{ kind: 'root', durationMs: 1400 }, { kind: 'damage', amount: 14 }] }] }],
     },
   ],
 } satisfies EnemyDef
@@ -842,11 +842,11 @@ const DESERT_BOSS = {
       aim: 'self',
       fireSfx: 'whoosh',
       shape: { kind: 'world' },
-      onSelf: [
+      reactions: [{ on: 'fire', to: 'self', effects: [
         { kind: 'untargetable', durationMs: 1800 },
         { kind: 'buff', speedMul: 2.2, durationMs: 1800 },
-        { kind: 'fuse', ms: 1800, then: [{ kind: 'area', radius: 2.6, then: [{ kind: 'knockup', durationMs: 800, height: 1.4 }, { kind: 'damage', amount: 16 }] }] },
-      ],
+        { kind: 'fuse', ms: 1800, then: [{ kind: 'to', who: { side: 'foes', radius: 2.6 }, then: [{ kind: 'knockup', durationMs: 800, height: 1.4 }, { kind: 'damage', amount: 16 }] }] },
+      ] }],
     },
     {
       trigger: 'auto',
@@ -912,7 +912,7 @@ const RIVER_BOSS = {
       knockback: 12,
       shape: { kind: 'sector', radius: 2.8, arcDeg: 360, ms: 300 },
       repeat: { count: 4, delayMs: 300 },
-      onSelf: [{ kind: 'unstoppable', durationMs: 1300 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 1300 }] }],
     },
     {
       trigger: 'auto',
@@ -1046,7 +1046,7 @@ const RUINS_BOSS = {
       damage: 18,
       shape: { kind: 'sprint', distance: 9, ms: 1100, radius: 1.1, seek: true },
       breach: 2.4,
-      onSelf: [{ kind: 'unstoppable', durationMs: 1200 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 1200 }] }],
       onHit: [{ kind: 'shove', distance: 3, ms: 280, onWall: [{ kind: 'stun', durationMs: 1500 }, { kind: 'damage', amount: 12 }] }],
     },
     {
@@ -1121,7 +1121,7 @@ const DAYNIGHT_BOSS = {
       aim: 'self',
       fireSfx: 'boom',
       shape: { kind: 'world' },
-      onSelf: [{ kind: 'form', to: 0, ms: 7000 }],
+      reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'form', to: 0, ms: 7000 }] }],
     },
     {
       trigger: 'auto',

@@ -57,7 +57,7 @@ import { animIssues } from '../src/emoji/animCheck.ts'
 import { packSvg, parseEmojiPack } from '../src/emoji/pack.ts'
 import { splitSvg } from '../src/emoji/svgSplit.ts'
 import type { Issue } from '../src/data/runCheck.ts'
-import type { AbilityDef } from '../src/types/abilityDefs'
+import type { AbilityDef, Cond, CondWho } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
@@ -854,6 +854,11 @@ for (const [id, m] of Object.entries<MutatorDef>(MUTATORS)) {
   report(`mutators.${id}.rules`, CHECKS.rules(m.rules))
 }
 
+/** 条件里每一处看的是谁 */
+function condWhos(c: Cond): CondWho[] {
+  return c.kind === 'all' || c.kind === 'any' ? c.of.flatMap(condWhos) : c.kind === 'not' ? condWhos(c.cond) : [c.who]
+}
+
 const itemEmojis = new Map<string, string>()
 for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(PACK.has(i.emoji), `items.${id} 的 emoji 不在表情包里：${i.emoji}`)
@@ -861,6 +866,7 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(dup === undefined, `items.${id} 与 items.${dup} 用了同一个 emoji`)
   itemEmojis.set(i.emoji, id)
   need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
+  for (const w of i.when ?? []) if ('if' in w) need(!condWhos(w.if).includes('target'), `items.${id}.when 的条件没有目标可看，只能看 self`)
 }
 
 /** 障碍：标准身体至少两层、跨得过贴地的一层，跨不过平射飞的那一层；贯穿次数是非负整数，强度为正 */

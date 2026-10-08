@@ -1,7 +1,7 @@
 import { UNIT } from '../util/units'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { EnemyDef } from '../types/enemies'
-import type { GearTrigger, GearWhen } from '../types/items'
+import type { GearWhen, ItemReaction } from '../types/items'
 
 /** 会经过 toPx 的数值字段名：stats 底下按属性表自己的单位，不算 */
 type NumField<T, Depth extends unknown[] = []> = Depth['length'] extends 6
@@ -13,7 +13,7 @@ type NumField<T, Depth extends unknown[] = []> = Depth['length'] extends 6
       : never
 
 /** 每个数值字段都要说明是不是以格为单位的长度或速度：新字段不登记就编译不过 */
-const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 'cell' | 'plain'> = {
+const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | ItemReaction>, 'cell' | 'plain'> = {
   aggroRange: 'cell',
   alpha: 'plain',
   amount: 'plain',
@@ -88,6 +88,7 @@ const UNIT_OF: Record<NumField<EnemyDef | AbilityDef | GearWhen | GearTrigger>, 
   onHurt: 'plain',
   onKill: 'plain',
   outMs: 'plain',
+  p: 'plain',
   pierce: 'plain',
   pull: 'cell',
   radius: 'cell',

@@ -144,7 +144,7 @@ export const ITEMS = {
     rarity: 'common',
     price: 22,
     maxStacks: 4,
-    on: [{ on: 'hit', chance: 0.25, to: 'foe', effects: [{ kind: 'poison', damage: 3, tickMs: 1000, durationMs: 3000 }] }],
+    reactions: [{ on: 'hit', chance: 0.25, to: 'other', effects: [{ kind: 'poison', damage: 3, tickMs: 1000, durationMs: 3000 }] }],
   },
   uglyTooth: {
     emoji: '1f62c',
@@ -153,14 +153,14 @@ export const ITEMS = {
     price: 25,
     maxStacks: 1,
     stats: { mul: { moveSpeed: 0.97 } },
-    on: [{ on: 'hit', to: 'foe', effects: [{ kind: 'slow', factor: 0.85, durationMs: 2000 }] }],
+    reactions: [{ on: 'hit', to: 'other', effects: [{ kind: 'slow', factor: 0.85, durationMs: 2000 }] }],
   },
   grail: {
     emoji: '1f377',
     name: '圣杯',
     rarity: 'common',
     price: 25,
-    on: [{ on: 'kill', chance: 0.15, to: 'self', effects: [{ kind: 'heal', amount: 3 }] }],
+    reactions: [{ on: 'kill', chance: 0.15, to: 'self', effects: [{ kind: 'heal', amount: 3 }] }],
   },
   mine: {
     emoji: '1faa4',
@@ -383,14 +383,14 @@ export const ITEMS = {
     name: '王冠',
     rarity: 'rare',
     price: 45,
-    when: [{ if: { kind: 'leader' }, stats: { mul: { damage: 1.2, moveSpeed: 1.1 } } }],
+    when: [{ if: { kind: 'leader', who: 'self' }, stats: { mul: { damage: 1.2, moveSpeed: 1.1 } } }],
   },
   rearShield: {
     emoji: '1f530',
     name: '后卫盾',
     rarity: 'rare',
     price: 40,
-    when: [{ if: { kind: 'follower' }, stats: { add: { armor: 5 } } }],
+    when: [{ if: { kind: 'follower', who: 'self' }, stats: { add: { armor: 5 } } }],
   },
   owl: {
     emoji: '1f989',
@@ -398,25 +398,25 @@ export const ITEMS = {
     rarity: 'rare',
     price: 45,
     for: ['ranged'],
-    when: [{ if: { kind: 'noFoesNear', radius: 4 }, stats: { mul: { rangedDamage: 1.3 } } }],
+    when: [{ if: { kind: 'noFoesNear', who: 'self', radius: 4 }, stats: { mul: { rangedDamage: 1.3 } } }],
   },
   chill: {
     emoji: '1f976',
     name: '寒气',
     rarity: 'rare',
     price: 45,
-    on: [{ on: 'hit', chance: 0.15, to: 'foe', effects: [{ kind: 'stun', durationMs: 800 }] }],
+    reactions: [{ on: 'hit', chance: 0.15, to: 'other', effects: [{ kind: 'stun', durationMs: 800 }] }],
   },
   shockBand: {
     emoji: '1f329',
     name: '电击手环',
     rarity: 'rare',
     price: 50,
-    on: [
+    reactions: [
       {
         on: 'hit',
         chance: 0.15,
-        to: 'foe',
+        to: 'other',
         effects: [{ kind: 'blast', radius: 1.5, ratio: 0.6, knockback: 0, ring: { color: 0xffee58, fillAlpha: 0.25, lineWidth: 3, lineAlpha: 0.9, durMs: 220 } }],
       },
     ],
@@ -426,7 +426,7 @@ export const ITEMS = {
     name: '连击护腕',
     rarity: 'rare',
     price: 45,
-    on: [{ on: 'hit', to: 'foe', effects: [{ kind: 'stack', max: 5, durationMs: 30000, then: [{ kind: 'damage', amount: 30 }] }] }],
+    reactions: [{ on: 'hit', to: 'other', effects: [{ kind: 'stack', max: 5, durationMs: 30000, then: [{ kind: 'damage', amount: 30 }] }] }],
   },
   awl: {
     emoji: '1faa1',
@@ -434,14 +434,14 @@ export const ITEMS = {
     rarity: 'rare',
     price: 45,
     maxStacks: 1,
-    on: [{ on: 'crit', to: 'foe', effects: [{ kind: 'guard', mul: 1.2, durationMs: 3000 }] }],
+    reactions: [{ on: 'crit', to: 'other', effects: [{ kind: 'guard', mul: 1.2, durationMs: 3000 }] }],
   },
   coolChip: {
     emoji: '1f4be',
     name: '冷却芯片',
     rarity: 'rare',
     price: 45,
-    on: [{ on: 'kill', to: 'self', effects: [{ kind: 'refresh', what: 'skill', ms: 300 }] }],
+    reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'refresh', what: 'skill', ms: 300 }] }],
   },
   counterSword: {
     emoji: '2694',
@@ -449,14 +449,14 @@ export const ITEMS = {
     rarity: 'rare',
     price: 45,
     stats: { add: { dodge: 0.03 } },
-    on: [{ on: 'dodge', to: 'foe', effects: [{ kind: 'damage', amount: 30 }] }],
+    reactions: [{ on: 'dodge', to: 'other', effects: [{ kind: 'damage', amount: 30 }] }],
   },
   hedgehog: {
     emoji: '1f994',
     name: '刺猬壳',
     rarity: 'rare',
     price: 45,
-    on: [
+    reactions: [
       {
         on: 'hurt',
         to: 'self',
@@ -470,7 +470,7 @@ export const ITEMS = {
     name: '过载线圈',
     rarity: 'rare',
     price: 45,
-    when: [{ if: { kind: 'afterSkill', ms: 4000 }, stats: { mul: { cooldown: 0.769 } } }],
+    when: [{ if: { kind: 'afterSkill', who: 'self', ms: 4000 }, stats: { mul: { cooldown: 0.769 } } }],
   },
   amulet: {
     emoji: '1fa84',
@@ -478,7 +478,7 @@ export const ITEMS = {
     rarity: 'rare',
     price: 45,
     maxStacks: 1,
-    on: [{ on: 'skill', to: 'self', effects: [{ kind: 'spellShield', count: 1, durationMs: 5000 }] }],
+    reactions: [{ on: 'skill', to: 'self', effects: [{ kind: 'spellShield', count: 1, durationMs: 5000 }] }],
   },
   ladybugs: {
     emoji: '1f41e',
@@ -546,7 +546,7 @@ export const ITEMS = {
     rarity: 'rare',
     price: 45,
     maxStacks: 1,
-    on: [{ on: 'wave', to: 'self', effects: [{ kind: 'interest', ratio: 0.15, max: 30 }] }],
+    reactions: [{ on: 'wave', to: 'self', effects: [{ kind: 'interest', ratio: 0.15, max: 30 }] }],
   },
   snail: {
     emoji: '1f40c',
@@ -603,7 +603,7 @@ export const ITEMS = {
     rarity: 'epic',
     price: 75,
     stats: { mul: { moveSpeed: 0.9 } },
-    when: [{ if: { kind: 'still' }, stats: { mul: { cooldown: 0.714 } } }],
+    when: [{ if: { kind: 'still', who: 'self' }, stats: { mul: { cooldown: 0.714 } } }],
   },
   mimicry: {
     emoji: '1fae5',
@@ -611,14 +611,14 @@ export const ITEMS = {
     rarity: 'epic',
     price: 75,
     stats: { add: { dodge: 0.03 }, mul: { damage: 0.96 } },
-    when: [{ if: { kind: 'still' }, stats: { add: { dodge: 0.2 } } }],
+    when: [{ if: { kind: 'still', who: 'self' }, stats: { add: { dodge: 0.2 } } }],
   },
   lastStand: {
     emoji: '1f624',
     name: '背水一战',
     rarity: 'epic',
     price: 70,
-    when: [{ if: { kind: 'hpBelow', ratio: 0.4 }, stats: { add: { lifesteal: 0.1 }, mul: { cooldown: 0.714 } } }],
+    when: [{ if: { kind: 'hpBelow', who: 'self', ratio: 0.4 }, stats: { add: { lifesteal: 0.1 }, mul: { cooldown: 0.714 } } }],
   },
   bisonHide: {
     emoji: '1f9ac',
@@ -626,7 +626,7 @@ export const ITEMS = {
     rarity: 'epic',
     price: 70,
     stats: { mul: { moveSpeed: 0.97 } },
-    when: [{ if: { kind: 'foesNear', radius: 3 }, stats: { add: { armor: 1 } }, max: 6 }],
+    when: [{ count: { kind: 'foesNear', radius: 3 }, stats: { add: { armor: 1 } }, max: 6 }],
   },
   wisdomBook: {
     emoji: '1f4d6',
@@ -634,7 +634,7 @@ export const ITEMS = {
     rarity: 'epic',
     price: 75,
     stats: { mul: { damage: 0.85 } },
-    when: [{ if: { kind: 'waveTime', everyMs: 5000 }, stats: { mul: { damage: 1.05 } }, max: 8 }],
+    when: [{ count: { kind: 'waveTime', everyMs: 5000 }, stats: { mul: { damage: 1.05 } }, max: 8 }],
   },
   crystal: {
     emoji: '1f52e',
@@ -642,7 +642,7 @@ export const ITEMS = {
     rarity: 'epic',
     price: 80,
     stats: { mul: { cooldown: 0.952 } },
-    when: [{ if: { kind: 'unhurt', everyMs: 1000 }, stats: { mul: { cooldown: 0.99 } }, max: 30 }],
+    when: [{ count: { kind: 'unhurt', everyMs: 1000 }, stats: { mul: { cooldown: 0.99 } }, max: 30 }],
   },
   corpseBlast: {
     emoji: '26b0',
@@ -650,11 +650,11 @@ export const ITEMS = {
     rarity: 'epic',
     price: 70,
     maxStacks: 5,
-    on: [
+    reactions: [
       {
         on: 'kill',
         chance: 0.2,
-        to: 'corpse',
+        to: 'spot',
         damage: 20,
         effects: [{ kind: 'blast', radius: 1.5, ratio: 1, knockback: 3, ring: { color: 0x8d6e63, fillAlpha: 0.3, lineWidth: 4, lineAlpha: 0.9, durMs: 260 } }],
       },
@@ -666,10 +666,10 @@ export const ITEMS = {
     rarity: 'epic',
     price: 75,
     stats: { mul: { range: 0.9 } },
-    on: [
+    reactions: [
       {
         on: 'kill',
-        to: 'corpse',
+        to: 'spot',
         effects: [
           {
             kind: 'spawnProjectile',
@@ -696,7 +696,7 @@ export const ITEMS = {
     price: 70,
     maxStacks: 1,
     stats: { add: { dodge: 0.05 } },
-    on: [{ on: 'dodge', chance: 0.5, to: 'self', effects: [{ kind: 'heal', amount: 5 }] }],
+    reactions: [{ on: 'dodge', chance: 0.5, to: 'self', effects: [{ kind: 'heal', amount: 5 }] }],
   },
   bell: {
     emoji: '1f514',
@@ -704,7 +704,7 @@ export const ITEMS = {
     rarity: 'epic',
     price: 80,
     maxStacks: 1,
-    on: [
+    reactions: [
       {
         on: 'lowHp',
         ratio: 0.4,
@@ -719,7 +719,7 @@ export const ITEMS = {
     name: '震荡器',
     rarity: 'epic',
     price: 70,
-    on: [
+    reactions: [
       {
         on: 'skill',
         to: 'self',
@@ -773,7 +773,7 @@ export const ITEMS = {
     rarity: 'legendary',
     price: 90,
     stats: { add: { regen: 2 } },
-    when: [{ if: { kind: 'hpBelow', ratio: 0.5 }, stats: { add: { regen: 2 } } }],
+    when: [{ if: { kind: 'hpBelow', who: 'self', ratio: 0.5 }, stats: { add: { regen: 2 } } }],
   },
   giantBelt: {
     emoji: '1f9b4',
@@ -781,7 +781,7 @@ export const ITEMS = {
     rarity: 'legendary',
     price: 110,
     maxStacks: 1,
-    on: [{ on: 'crit', to: 'foe', effects: [{ kind: 'hpDamage', ratio: 0.1, bossRatio: 0.01 }] }],
+    reactions: [{ on: 'crit', to: 'other', effects: [{ kind: 'hpDamage', ratio: 0.1, bossRatio: 0.01 }] }],
   },
   clover: {
     emoji: '1f340',
@@ -789,7 +789,7 @@ export const ITEMS = {
     rarity: 'legendary',
     price: 120,
     maxStacks: 1,
-    on: [{ on: 'lethal', to: 'self', effects: [{ kind: 'invuln', ms: 1500 }] }],
+    reactions: [{ on: 'lethal', to: 'self', effects: [{ kind: 'invuln', ms: 1500 }] }],
   },
   lantern: {
     emoji: '1f3ee',

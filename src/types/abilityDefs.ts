@@ -293,13 +293,33 @@ interface StatusEffect {
   readonly ms: number
   readonly value?: number
 }
-/** 条件：对目标判断 */
+/** 条件看谁：self 是带着这条规则的身体（出手者、持有者），target 是这一下作用到的身体 */
+export type CondWho = 'self' | 'target'
+/** 条件：对 who 判断，能用 all（并且）、any（或者）、not（不是）组合 */
 export type Cond =
-  | { readonly kind: 'airborne' }
-  | { readonly kind: 'marked'; readonly mark: StatusId }
-  | { readonly kind: 'hpBelow'; readonly ratio: number }
-  | { readonly kind: 'boss' }
+  | { readonly kind: 'all'; readonly of: readonly Cond[] }
+  | { readonly kind: 'any'; readonly of: readonly Cond[] }
   | { readonly kind: 'not'; readonly cond: Cond }
+  /** 被别人抛在空中 */
+  | { readonly kind: 'airborne'; readonly who: CondWho }
+  /** 身上带着这种状态；按来源分开记的状态只认这个来源施加的 */
+  | { readonly kind: 'marked'; readonly who: CondWho; readonly mark: StatusId }
+  | { readonly kind: 'hpBelow'; readonly who: CondWho; readonly ratio: number }
+  | { readonly kind: 'boss'; readonly who: CondWho }
+  /** 站着几乎没动 */
+  | { readonly kind: 'still'; readonly who: CondWho }
+  | { readonly kind: 'leader'; readonly who: CondWho }
+  | { readonly kind: 'follower'; readonly who: CondWho }
+  /** radius 内没有活着的敌人 */
+  | { readonly kind: 'noFoesNear'; readonly who: CondWho; readonly radius: number }
+  /** 放完主动技能还不到 ms */
+  | { readonly kind: 'afterSkill'; readonly who: CondWho; readonly ms: number }
+/** 几率：过了 p 的几率才施加 then */
+interface ChanceEffect {
+  readonly kind: 'chance'
+  readonly p: number
+  readonly then: readonly Effect[]
+}
 /** 条件效果：目标满足 when 施加 then，否则施加 else */
 interface IfEffect {
   readonly kind: 'if'
@@ -357,15 +377,21 @@ interface EmpowerEffect {
   readonly hits: number
   readonly then: readonly Effect[]
 }
-/** 施于施法者自己 */
-interface CasterEffect {
-  readonly kind: 'caster'
-  readonly then: readonly Effect[]
-}
-/** 施于落点 radius 内能打的身体 */
-interface AreaEffect {
-  readonly kind: 'area'
-  readonly radius: number
+/** 选谁：self 是出手者自己；foes 是落点 radius 内这一下打得到的敌方，allies 是落点 radius 内的同伴；只留满足 filter 的，按 sort 排好取前 count 个 */
+export type Selector =
+  | { readonly side: 'self' }
+  | {
+      readonly side: 'foes' | 'allies'
+      readonly radius: number
+      readonly filter?: Cond
+      /** nearest 离落点由近到远，weakest 生命比例由低到高 */
+      readonly sort?: 'nearest' | 'weakest'
+      readonly count?: number
+    }
+/** 换个对象施加：选出的身体吃 then，一个都没选到就不施加 */
+interface ToEffect {
+  readonly kind: 'to'
+  readonly who: Selector
   readonly then: readonly Effect[]
 }
 /** 形态：切到本体的第 to 个形态（-1 是本体）；给了 ms 就到时切回本体并施加 onEnd */
@@ -568,8 +594,8 @@ export type Effect =
   | RefreshEffect
   | GainEffect
   | EmpowerEffect
-  | CasterEffect
-  | AreaEffect
+  | ToEffect
+  | ChanceEffect
   | FormEffect
   | GrowEffect
   | RewindEffect
@@ -696,9 +722,8 @@ interface AbilityBase {
   readonly damage?: number
   readonly knockback?: number
   readonly onHit?: readonly Effect[]
-  readonly onSelf?: readonly Effect[]
-  /** 出手前先施于自己的效果：结算后按新的状态判定这一下出不出得去（先解控再冲出去） */
-  readonly onCast?: readonly Effect[]
+  /** 出手的反应：cast 在出手前施于自己，结算后按新的状态判定这一下出不出得去（先解控再冲出去）；fire 在出手后施于自己；kill 在这条能力打死谁时施于自己 */
+  readonly reactions?: readonly AbilityReaction[]
   readonly repeat?: Repeat
   readonly held?: HeldVisual
   readonly fireSfx?: SfxId
@@ -725,13 +750,31 @@ interface AbilityBase {
   readonly hpCost?: number
   /** 只对满足条件的目标出手 */
   readonly requires?: Cond
-  /** 这条能力打死了谁，对出手者施加 */
-  readonly onKill?: readonly Effect[]
   /** 影子也照着出手 */
   readonly mirror?: boolean
   /** 施法锚点：这条能力从一个跟着宿主的物件上出手；orbit 绕宿主转、trail 落在宿主一秒半前的位置、ally 贴着血量最低的队友 */
   readonly anchor?: { readonly emoji: string; readonly size: number; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
 }
+/** 反应把效果施于谁：self 是带着这条反应的身体，other 是这件事里的另一方（打中的目标、出手打它的身体），spot 是这件事发生的地方（倒下处） */
+export type ReactTo = 'self' | 'other' | 'spot'
+/** 反应：on 这件事发生时，满足 if、过了 chance 的几率，对 to 施加 effects；damage 是这些效果的基础伤害，不写取这件事的伤害 */
+interface ReactionBase {
+  readonly if?: Cond
+  readonly damage?: number
+  readonly effects: readonly Effect[]
+}
+export type Reaction = ReactionBase &
+  (
+    | { readonly on: 'hit' | 'crit' | 'dodge' | 'hurt'; readonly to: 'self' | 'other'; readonly chance?: number }
+    | { readonly on: 'kill'; readonly to: 'self' | 'spot'; readonly chance?: number }
+    | { readonly on: 'skill'; readonly to: 'self'; readonly chance?: number }
+    | { readonly on: 'cast' | 'fire'; readonly to: 'self' }
+    | { readonly on: 'wave' | 'lethal'; readonly to: 'self' }
+    | { readonly on: 'lowHp'; readonly ratio: number; readonly to: 'self' }
+  )
+export type ReactionOn = Reaction['on']
+/** 能力的反应：出手前、出手后、打死谁时 */
+export type AbilityReaction = ReactionBase & { readonly on: 'cast' | 'fire' | 'kill'; readonly to: 'self' }
 /** 一个能力 = 触发 × 瞄准 × 形状 × 载荷 × 重复 */
 export type AbilityDef =
   | (AbilityBase & { readonly trigger: 'auto'; readonly cooldownMs: number; readonly firstDelayMs?: number })

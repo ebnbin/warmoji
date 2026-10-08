@@ -64,7 +64,7 @@ import {
 } from '../components'
 import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
-import { ACQUIRE, abilityPiercesWalls, PET_TRAIL_MS, rewindMs } from '../../data/abilities'
+import { ACQUIRE, abilityPiercesWalls, PET_TRAIL_MS, reactionEffects, rewindMs } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import { holderOutline, spawnWeaponBody } from './weapon'
 import { keepTrace } from '../systems/shared/trace'
@@ -269,7 +269,7 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   Spend.hp[e] = def.hpCost ?? 0
   abilityBoost[e] = def.boost
   abilityRequires[e] = def.requires
-  abilityOnKill[e] = def.onKill
+  abilityOnKill[e] = reactionEffects(def.reactions, 'kill')
   if (def.charges) {
     addComponent(world, e, Charges)
     Charges.max[e] = def.charges
@@ -318,8 +318,8 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
     WindupState.angle[e] = 0
   }
   abilityOnHit[e] = def.onHit
-  abilityOnSelf[e] = def.onSelf
-  abilityOnCast[e] = def.onCast
+  abilityOnSelf[e] = reactionEffects(def.reactions, 'fire')
+  abilityOnCast[e] = reactionEffects(def.reactions, 'cast')
   abilityFireSfx[e] = def.fireSfx
   abilityDef[e] = def
   if (def.mirror) addComponent(world, e, Mirror)

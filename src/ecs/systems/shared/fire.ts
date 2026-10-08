@@ -65,7 +65,8 @@ import { strongestTarget } from '../../utils/assassinate'
 import { headingOf, muzzle } from '../../utils/projectile'
 import { leaderPoint } from '../../utils/team'
 import { hit, strike, touch } from './damage'
-import { applyAbilityEffects, applyOnHit, EMPOWER_DEF, struckOf, test } from './effects'
+import { applyAbilityEffects, applyOnHit, casterOf, EMPOWER_DEF, struckOf } from './effects'
+import { test } from '../../utils/cond'
 import { takeBoost } from './resource'
 import type { Struck } from './effects'
 import { displace } from './displace'
@@ -96,7 +97,8 @@ export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
   const ox = anchorX(e)
   const oy = anchorY(e)
   const cond = abilityRequires[e]
-  const accept = cond ? (t: number): boolean => test(sim, src, t, cond) : undefined
+  const self = casterOf(sim, src)
+  const accept = cond ? (t: number): boolean => test(sim, src, self, t, cond) : undefined
   switch (Aim.kind[e]) {
     case AIM.nearest: {
       const t = nearestHittable(sim, e, src, ox, oy, Aim.range[e]!, accept)

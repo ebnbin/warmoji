@@ -1,4 +1,4 @@
-import { KNOCKBACK_TAU_MS } from '../data/abilities'
+import { KNOCKBACK_TAU_MS, reactionEffects } from '../data/abilities'
 import { STAT_KEYS, STATS, modTexts, statText } from '../data/stats'
 import { CHARACTERS, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
@@ -11,7 +11,7 @@ import { STATUSES } from '../data/statuses'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { AbilityDef, Cond, Effect, Shape, ShapeKind } from '../types/abilityDefs'
+import type { AbilityDef, Cond, Effect, Selector, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
 import type { StatKey } from '../types/stats'
@@ -199,10 +199,10 @@ export function effectLine(e: Effect, self = false): string {
       return `资源 ${e.amount >= 0 ? '+' : ''}${e.amount}`
     case 'empower':
       return `接下来 ${e.hits} 次普通出手附带：${joinFx(e.then)}`
-    case 'caster':
-      return `自身：${joinFx(e.then, true)}`
-    case 'area':
-      return `${grid(e.radius)} 内：${joinFx(e.then)}`
+    case 'to':
+      return e.who.side === 'self' ? `自身：${joinFx(e.then, true)}` : `${selectorLine(e.who)}：${joinFx(e.then)}`
+    case 'chance':
+      return `${pct(e.p)} 几率：${joinFx(e.then)}`
     case 'form':
       return `${e.to < 0 ? '变回本体' : '变身'}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? lead('，结束时', joinFx(e.onEnd)) : ''}`
     case 'grow':
@@ -266,19 +266,46 @@ function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined, dama
   return parts.length > 0 ? `；${parts.join('；')}` : ''
 }
 
-function condLine(c: Cond): string {
+/** 条件的说法：对自己判断的前面加上自己 */
+export function condLine(c: Cond): string {
   switch (c.kind) {
-    case 'airborne':
-      return '在空中'
-    case 'marked':
-      return `带着${STATUSES[c.mark].keyed ? '你的' : ''}${STATUSES[c.mark].name}`
-    case 'hpBelow':
-      return `生命低于 ${pct(c.ratio)}`
-    case 'boss':
-      return '是 Boss'
+    case 'all':
+      return c.of.map(condLine).join('且')
+    case 'any':
+      return c.of.map(condLine).join('或')
     case 'not':
       return `不${condLine(c.cond)}`
   }
+  const who = c.who === 'self' ? '自己' : ''
+  switch (c.kind) {
+    case 'airborne':
+      return `${who}在空中`
+    case 'marked':
+      return `${who}带着${STATUSES[c.mark].keyed ? '你的' : ''}${STATUSES[c.mark].name}`
+    case 'hpBelow':
+      return `${who}生命低于 ${pct(c.ratio)}`
+    case 'boss':
+      return `${who}是 Boss`
+    case 'still':
+      return `${who}站着不动`
+    case 'leader':
+      return `${who}是队长`
+    case 'follower':
+      return `${who}不是队长`
+    case 'noFoesNear':
+      return `${who}身边 ${grid(c.radius)} 内没有敌人`
+    case 'afterSkill':
+      return `${who}放主动技能后 ${sec(c.ms)} 内`
+  }
+}
+
+/** 选谁的说法 */
+function selectorLine(s: Exclude<Selector, { readonly side: 'self' }>): string {
+  const side = s.side === 'foes' ? '' : '的同伴'
+  const only = s.filter ? `${condLine(s.filter)}` : ''
+  const order = s.sort === 'nearest' ? '最近的' : s.sort === 'weakest' ? '生命比例最低的' : ''
+  const n = s.count === undefined ? '' : ` ${s.count} 个`
+  return `${grid(s.radius)} 内${only}${side}${order}${n}`
 }
 
 function shapeLine(w: AbilityDef, s: Shape): string {
@@ -355,13 +382,16 @@ function availLines(w: AbilityDef): string[] {
   if (w.boost) out.push(`资源到 ${w.boost.at}${w.boost.spend ? ` 时消耗 ${w.boost.spend} ` : ' 以上时'}强化${w.boost.damageMul ? `：伤害 ×${w.boost.damageMul}` : ''}${w.boost.onHit ? `，${joinFx(w.boost.onHit)}` : ''}`)
   if (w.hpCost) out.push(`以血施法：每次扣 ${w.hpCost} 生命`)
   if (w.requires) out.push(`只对${condLine(w.requires)}的目标出手`)
-  if (w.onKill) out.push(`打死目标时：${joinFx(w.onKill)}`)
+  const onKill = reactionEffects(w.reactions, 'kill')
+  if (onKill) out.push(`打死目标时：${joinFx(onKill)}`)
   return out
 }
 
 /** 出手前的自身效果、命中效果、出手后的自身效果 */
 function selfAndHit(w: AbilityDef): string[] {
-  return [...(w.onCast ?? []).map((e) => `出手前自身：${effectLine(e, true)}`), ...(w.onHit ?? []).map((e) => effectLine(e)), ...(w.onSelf ?? []).map((e) => `自身：${effectLine(e, true)}`)]
+  const cast = reactionEffects(w.reactions, 'cast') ?? []
+  const fire = reactionEffects(w.reactions, 'fire') ?? []
+  return [...cast.map((e) => `出手前自身：${effectLine(e, true)}`), ...(w.onHit ?? []).map((e) => effectLine(e)), ...fire.map((e) => `自身：${effectLine(e, true)}`)]
 }
 
 /** 伤害按出手方式吃近战或远程伤害 */

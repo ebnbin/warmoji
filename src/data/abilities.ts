@@ -1,7 +1,7 @@
 import abilitiesJson from '../assets/abilities.json'
 import combatJson from '../assets/combat.json'
 import { fromJson } from './json'
-import type { AbilityDef, Effect } from '../types/abilityDefs'
+import type { AbilityDef, Effect, Reaction, ReactionOn } from '../types/abilityDefs'
 import type { AbilityId, CombatTuning } from '../types/abilities'
 
 const CT = fromJson<CombatTuning>(combatJson)
@@ -44,8 +44,8 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'store':
     case 'deathMark':
     case 'empower':
-    case 'caster':
-    case 'area':
+    case 'to':
+    case 'chance':
     case 'parry':
     case 'teleport':
       return [fx.then]
@@ -136,11 +136,22 @@ function unlisted(fx: never): never {
   throw new Error(`效果没有登记套着的效果：${JSON.stringify(fx)}`)
 }
 
-/** 能力直接带的效果：命中、自身、出手前、击杀、强化、弹匣末发，领域还有脉冲、到期与停留 */
+/** 能力直接带的效果：命中、各条反应、强化、弹匣末发，领域还有脉冲、到期与停留 */
 export function abilityEffects(a: AbilityDef): readonly EffectList[] {
   const s = a.shape
   const zone = s.kind === 'zone' ? [s.pulse?.onHit, s.onExpire, s.dwell?.effects] : []
-  return [a.onHit, a.onSelf, a.onCast, a.onKill, a.boost?.onHit, a.ammo?.last, ...zone]
+  return [a.onHit, ...(a.reactions ?? []).map((r) => r.effects), a.boost?.onHit, a.ammo?.last, ...zone]
+}
+
+/** 一组反应里 on 这件事的，连成一串效果：带条件的套上 if，带几率的套上 chance；一条都没有返回 undefined */
+export function reactionEffects(list: readonly Reaction[] | undefined, on: ReactionOn): readonly Effect[] | undefined {
+  const hits = (list ?? []).filter((r) => r.on === on)
+  if (hits.length === 0) return undefined
+  if (hits.length === 1 && !hits[0]!.if && !('chance' in hits[0]! && hits[0].chance !== undefined)) return hits[0]!.effects
+  return hits.flatMap((r): Effect[] => {
+    const gated: Effect[] = r.if ? [{ kind: 'if', when: r.if, then: r.effects }] : [...r.effects]
+    return 'chance' in r && r.chance !== undefined ? [{ kind: 'chance', p: r.chance, then: gated }] : gated
+  })
 }
 
 /** 能力里套着的能力：下一段、轮换的招式、装置出手用的 */

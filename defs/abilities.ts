@@ -257,7 +257,7 @@ const BASE = {
     color: 0xef5350,
     shape: { kind: 'disc', radius: 4.5, at: 'self' },
     onHit: [{ kind: 'taunt', durationMs: 2500 }],
-    onSelf: [{ kind: 'guard', mul: 0.6, durationMs: 2500 }],
+    reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'guard', mul: 0.6, durationMs: 2500 }] }],
   } satisfies AbilityDef,
   shadowVeil: {
     trigger: 'manual',
@@ -489,22 +489,22 @@ const foxCharm = {
   onHit: [{ kind: 'charm', durationMs: 1300 }],
 } satisfies AbilityDef
 const foxKiss = [
-  { kind: 'if', when: { kind: 'marked', mark: 'charm' }, then: [{ kind: 'stun', durationMs: 1200 }, { kind: 'damage', amount: 0, ratio: 1 }], else: [{ kind: 'charm', durationMs: 1300 }] },
+  { kind: 'if', when: { kind: 'marked', who: 'target', mark: 'charm' }, then: [{ kind: 'stun', durationMs: 1200 }, { kind: 'damage', amount: 0, ratio: 1 }], else: [{ kind: 'charm', durationMs: 1300 }] },
 ] as const
 const foxCharm2 = { ...foxCharm, onHit: foxKiss } satisfies AbilityDef
 const foxCharm3 = {
   ...foxCharm,
-  onHit: [...foxKiss, { kind: 'deathMark', ms: 1500, then: [{ kind: 'area', radius: 2.2, then: [{ kind: 'charm', durationMs: 1000 }] }] }],
+  onHit: [...foxKiss, { kind: 'deathMark', ms: 1500, then: [{ kind: 'to', who: { side: 'foes', radius: 2.2 }, then: [{ kind: 'charm', durationMs: 1000 }] }] }],
 } satisfies AbilityDef
 const foxClones = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'whoosh',
   shape: { kind: 'world' },
-  onSelf: [
-    { kind: 'clone', count: 2, lifeMs: 6000, hpRatio: 0.4, dmgRatio: 0.5, onDeath: [{ kind: 'area', radius: 2.5, then: [{ kind: 'charm', durationMs: 1500 }] }] },
+  reactions: [{ on: 'fire', to: 'self', effects: [
+    { kind: 'clone', count: 2, lifeMs: 6000, hpRatio: 0.4, dmgRatio: 0.5, onDeath: [{ kind: 'to', who: { side: 'foes', radius: 2.5 }, then: [{ kind: 'charm', durationMs: 1500 }] }] },
     { kind: 'hide', durationMs: 1500 },
-  ],
+  ] }],
 } satisfies AbilityDef
 
 // 🤺 剑客：第三下挑飞，只对空中的敌人追斩
@@ -529,16 +529,16 @@ const fencerGale = {
 } satisfies AbilityDef
 const galeWall = { kind: 'barrier', shape: 'wall', length: 3, offset: 1.5, durationMs: 2000, bodies: 'none', shots: true, color: 0xb3e5fc } as const
 const fencerCombo = { ...fencerThrust, cycle: [fencerThrust, fencerGale] } satisfies AbilityDef
-const fencerCombo2 = { ...fencerThrust, cycle: [fencerThrust, { ...fencerGale, onSelf: [galeWall] }] } satisfies AbilityDef
+const fencerCombo2 = { ...fencerThrust, cycle: [fencerThrust, { ...fencerGale, reactions: [{ on: 'fire', to: 'self', effects: [galeWall] }] }] } satisfies AbilityDef
 const fencerCombo3 = {
   ...fencerThrust,
-  cycle: [fencerThrust, { ...fencerGale, onSelf: [galeWall], onHit: [{ kind: 'knockup', durationMs: 750, height: 1.3, onLand: [{ kind: 'stun', durationMs: 700 }] }] }],
+  cycle: [fencerThrust, { ...fencerGale, reactions: [{ on: 'fire', to: 'self', effects: [galeWall] }], onHit: [{ kind: 'knockup', durationMs: 750, height: 1.3, onLand: [{ kind: 'stun', durationMs: 700 }] }] }],
 } satisfies AbilityDef
 const fencerLastBreath = {
   trigger: 'manual',
   aim: 'nearest',
   range: 8,
-  requires: { kind: 'airborne' },
+  requires: { kind: 'airborne', who: 'target' },
   fireSfx: 'whoosh',
   damage: 55,
   shape: { kind: 'blink', behindDist: 0.5, strikeMs: 450 },
@@ -559,18 +559,18 @@ const slothBomb = {
 } satisfies AbilityDef
 const slothBomb2 = {
   ...slothBomb,
-  onHit: [{ kind: 'if', when: { kind: 'marked', mark: 'fuse' }, then: [{ kind: 'detonate', mark: 'fuse' }], else: [slothFuse] }],
+  onHit: [{ kind: 'if', when: { kind: 'marked', who: 'target', mark: 'fuse' }, then: [{ kind: 'detonate', mark: 'fuse' }], else: [slothFuse] }],
 } satisfies AbilityDef
 const slothBomb3 = {
   ...slothBomb,
-  onHit: [{ kind: 'if', when: { kind: 'marked', mark: 'fuse' }, then: [{ kind: 'detonate', mark: 'fuse' }], else: [{ ...slothFuse, jump: true }] }],
+  onHit: [{ kind: 'if', when: { kind: 'marked', who: 'target', mark: 'fuse' }, then: [{ kind: 'detonate', mark: 'fuse' }], else: [{ ...slothFuse, jump: true }] }],
 } satisfies AbilityDef
 const slothRewind = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'whoosh',
   shape: { kind: 'world' },
-  onSelf: [{ kind: 'rewind', ms: 3000 }, { kind: 'cleanse' }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'rewind', ms: 3000 }, { kind: 'cleanse' }] }],
 } satisfies AbilityDef
 
 // 🐈 灵猫：影子，同时在两个地方出手
@@ -589,7 +589,7 @@ const catPaw2 = { ...catPaw, onHit: [catBind] } satisfies AbilityDef
 const catPaw3 = {
   ...catPaw,
   onHit: [catBind],
-  onKill: [{ kind: 'shadow', lifeMs: 3000, max: 3, dash: 0, taunt: { radius: 2.5, ms: 1500 } }],
+  reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'shadow', lifeMs: 3000, max: 3, dash: 0, taunt: { radius: 2.5, ms: 1500 } }] }],
 } satisfies AbilityDef
 const catShade = {
   trigger: 'manual',
@@ -616,13 +616,13 @@ const gorillaSlam2 = {
   ...gorillaSlam,
   boost: { at: 100, spend: 100, damageMul: 2, onHit: [{ kind: 'knockup', durationMs: 600, height: 1.2 }, { kind: 'shove', distance: 2, ms: 220, onWall: [{ kind: 'stun', durationMs: 1000 }] }] },
 } satisfies AbilityDef
-const gorillaSlam3 = { ...gorillaSlam2, onKill: [{ kind: 'gain', amount: 35 }] } satisfies AbilityDef
+const gorillaSlam3 = { ...gorillaSlam2, reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'gain', amount: 35 }] }] } satisfies AbilityDef
 const gorillaRage = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'over',
   shape: { kind: 'world' },
-  onSelf: [{ kind: 'undying', durationMs: 5000 }, { kind: 'gain', amount: 100 }, { kind: 'buff', speedMul: 1.25, durationMs: 5000 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'undying', durationMs: 5000 }, { kind: 'gain', amount: 100 }, { kind: 'buff', speedMul: 1.25, durationMs: 5000 }] }],
 } satisfies AbilityDef
 
 // 🕵 侦探：同一目标攒够三条证据才结案
@@ -648,7 +648,7 @@ const detectiveLens3 = {
       kind: 'stack',
       max: 3,
       durationMs: 4000,
-      then: [...caseClosed, { kind: 'deathMark', ms: 3000, then: [{ kind: 'refresh', what: 'skill', ms: 3000 }] }, { kind: 'area', radius: 2.2, then: [{ kind: 'stun', durationMs: 800 }] }],
+      then: [...caseClosed, { kind: 'deathMark', ms: 3000, then: [{ kind: 'refresh', what: 'skill', ms: 3000 }] }, { kind: 'to', who: { side: 'foes', radius: 2.2 }, then: [{ kind: 'stun', durationMs: 800 }] }],
     },
   ],
 } satisfies AbilityDef
@@ -681,7 +681,7 @@ const eagleGrab2 = {
 const eagleGrab3 = {
   ...eagleGrab,
   onHit: [
-    { kind: 'throw', to: 'foe', distance: 5, ms: 520, height: 1.8, onLand: [...eagleSlam, { kind: 'stun', durationMs: 1000 }, { kind: 'area', radius: 1.6, then: [{ kind: 'knockup', durationMs: 500, height: 1 }] }] },
+    { kind: 'throw', to: 'foe', distance: 5, ms: 520, height: 1.8, onLand: [...eagleSlam, { kind: 'stun', durationMs: 1000 }, { kind: 'to', who: { side: 'foes', radius: 1.6 }, then: [{ kind: 'knockup', durationMs: 500, height: 1 }] }] },
   ],
 } satisfies AbilityDef
 const eagleDive = {
@@ -710,17 +710,17 @@ const bearLeft = {
 const bearRight = { ...bearLeft, damage: 20, knockback: 7 } satisfies AbilityDef
 const bearEmpower = { kind: 'empower', hits: 1, then: [{ kind: 'stun', durationMs: 700 }] } as const
 const bearHooks = { ...bearLeft, cycle: [bearRight] } satisfies AbilityDef
-const bearHooks2 = { ...bearLeft, cycle: [{ ...bearRight, onSelf: [bearEmpower] }] } satisfies AbilityDef
-const bearHooks3 = { ...bearLeft, onHit: [{ kind: 'pull', speed: 10, gap: 0.2 }], cycle: [{ ...bearRight, onSelf: [bearEmpower] }] } satisfies AbilityDef
+const bearHooks2 = { ...bearLeft, cycle: [{ ...bearRight, reactions: [{ on: 'fire', to: 'self', effects: [bearEmpower] }] }] } satisfies AbilityDef
+const bearHooks3 = { ...bearLeft, onHit: [{ kind: 'pull', speed: 10, gap: 0.2 }], cycle: [{ ...bearRight, reactions: [{ on: 'fire', to: 'self', effects: [bearEmpower] }] }] } satisfies AbilityDef
 const bearGrit = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'over',
   shape: { kind: 'world' },
-  onSelf: [
+  reactions: [{ on: 'fire', to: 'self', effects: [
     { kind: 'store', ms: 2500, ratio: 1.6, then: [{ kind: 'blast', radius: 3, ratio: 1, knockback: 10, ring: RING(0xff7043) }] },
     { kind: 'guard', mul: 0.5, durationMs: 2500 },
-  ],
+  ] }],
 } satisfies AbilityDef
 
 // 😇 天使：拿自己的生命换圣光，救赎倒下的敌人
@@ -733,13 +733,13 @@ const vampBlade = {
   knockback: 1.5,
   hpCost: 3,
   shape: { kind: 'bolt', projectile: shot('1f31f', 12), lifeMs: 1600 },
-  onHit: [{ kind: 'caster', then: [{ kind: 'heal', amount: 5 }] }],
+  onHit: [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'heal', amount: 5 }] }],
 } satisfies AbilityDef
-const vampMark = { kind: 'if', when: { kind: 'hpBelow', ratio: 0.35 }, then: [{ kind: 'deathMark', ms: 2000, then: [{ kind: 'raise', lifeMs: 8000, hpRatio: 0.4 }] }] } as const
-const vampBlade2 = { ...vampBlade, onHit: [{ kind: 'caster', then: [{ kind: 'heal', amount: 5 }] }, vampMark] } satisfies AbilityDef
+const vampMark = { kind: 'if', when: { kind: 'hpBelow', who: 'target', ratio: 0.35 }, then: [{ kind: 'deathMark', ms: 2000, then: [{ kind: 'raise', lifeMs: 8000, hpRatio: 0.4 }] }] } as const
+const vampBlade2 = { ...vampBlade, onHit: [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'heal', amount: 5 }] }, vampMark] } satisfies AbilityDef
 const vampBlade3 = {
   ...vampBlade,
-  onHit: [{ kind: 'caster', then: [{ kind: 'heal', amount: 5 }, { kind: 'if', when: { kind: 'hpBelow', ratio: 0.5 }, then: [{ kind: 'heal', amount: 5 }] }] }, vampMark],
+  onHit: [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'heal', amount: 5 }, { kind: 'if', when: { kind: 'hpBelow', who: 'target', ratio: 0.5 }, then: [{ kind: 'heal', amount: 5 }] }] }, vampMark],
 } satisfies AbilityDef
 const vampRaise = {
   trigger: 'manual',
@@ -817,7 +817,7 @@ const pandaTaiji = {
   aim: 'self',
   fireSfx: 'upgrade',
   shape: { kind: 'world' },
-  onSelf: [{ kind: 'parry', durationMs: 1600, then: [{ kind: 'stun', durationMs: 1200 }, { kind: 'damage', amount: 30 }] }, { kind: 'gain', amount: 50 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'parry', durationMs: 1600, then: [{ kind: 'stun', durationMs: 1200 }, { kind: 'damage', amount: 30 }] }, { kind: 'gain', amount: 50 }] }],
 } satisfies AbilityDef
 
 // 🐿 松鼠：弹匣打空换弹，翻滚攒着次数用
@@ -831,7 +831,7 @@ const chipAcorn = {
   shape: { kind: 'bolt', projectile: shot('1f330', 13), lifeMs: 1400 },
   ammo: { count: 6, reloadMs: 1700 },
 } satisfies AbilityDef
-const chipAcorn2 = { ...chipAcorn, onKill: [{ kind: 'refresh', what: 'skill' }] } satisfies AbilityDef
+const chipAcorn2 = { ...chipAcorn, reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'refresh', what: 'skill' }] }] } satisfies AbilityDef
 const chipAcorn3 = {
   ...chipAcorn2,
   shape: { ...chipAcorn.shape, pierce: 1 },
@@ -843,7 +843,7 @@ const chipRoll = {
   fireSfx: 'whoosh',
   charges: 3,
   shape: { kind: 'sprint', distance: 3, ms: 200 },
-  onSelf: [{ kind: 'invuln', ms: 250 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'invuln', ms: 250 }] }],
 } satisfies AbilityDef
 
 // 💂 卫兵：把敌人按在墙上
@@ -929,7 +929,7 @@ const koalaHug = {
   fireSfx: 'upgrade',
   shape: { kind: 'all', of: 'allies' },
   onHit: [{ kind: 'attach', ms: 4000 }],
-  onSelf: [{ kind: 'unstoppable', durationMs: 4000 }, { kind: 'guard', mul: 0.6, durationMs: 4000 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 4000 }, { kind: 'guard', mul: 0.6, durationMs: 4000 }] }],
 } satisfies AbilityDef
 
 // 🐙 章鱼：墨汁里谁也看不清
@@ -947,7 +947,7 @@ const octoInk = {
 const octoInk2 = { ...octoInk, onHit: [{ kind: 'disarm', durationMs: 1600 }, inkPuddle] } satisfies AbilityDef
 const octoInk3 = {
   ...octoInk,
-  onHit: [{ kind: 'if', when: { kind: 'marked', mark: 'disarm' }, then: [{ kind: 'root', durationMs: 1000 }], else: [{ kind: 'disarm', durationMs: 1600 }] }, inkPuddle],
+  onHit: [{ kind: 'if', when: { kind: 'marked', who: 'target', mark: 'disarm' }, then: [{ kind: 'root', durationMs: 1000 }], else: [{ kind: 'disarm', durationMs: 1600 }] }, inkPuddle],
 } satisfies AbilityDef
 const octoMist = {
   trigger: 'manual',
@@ -981,7 +981,7 @@ const penguinSlide = {
   color: 0x81d4fa,
   shape: { kind: 'sprint', distance: 6, ms: 600, radius: 0.8 },
   breach: 1,
-  onCast: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 700 }],
+  reactions: [{ on: 'cast', to: 'self', effects: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 700 }] }],
 } satisfies AbilityDef
 
 // 🐥 丑小鸭：长够了就变成白天鹅
@@ -997,18 +997,18 @@ const caterSilk = {
 } satisfies AbilityDef
 const silkBind = { kind: 'stack', max: 2, durationMs: 3000, then: [{ kind: 'root', durationMs: 1500 }] } as const
 const caterSilk2 = { ...caterSilk, onHit: [{ kind: 'slow', factor: 0.6, durationMs: 1500 }, silkBind] } satisfies AbilityDef
-const caterSilk3 = { ...caterSilk2, onKill: [{ kind: 'grow', mul: 1.04, max: 1.35 }] } satisfies AbilityDef
+const caterSilk3 = { ...caterSilk2, reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'grow', mul: 1.04, max: 1.35 }] }] } satisfies AbilityDef
 const caterCocoon = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'upgrade',
   damage: 30,
   shape: { kind: 'world' },
-  onSelf: [
+  reactions: [{ on: 'fire', to: 'self', effects: [
     { kind: 'stasis', durationMs: 2500 },
     { kind: 'healRatio', ratio: 0.35 },
     { kind: 'fuse', ms: 2500, then: [{ kind: 'blast', radius: 2.6, ratio: 1.5, knockback: 12, ring: RING(0xfff9c4) }] },
-  ],
+  ] }],
 } satisfies AbilityDef
 
 // 🐲 小龙：喷火攒热量，过热就得歇；化成巨龙
@@ -1027,13 +1027,13 @@ const dragonBreath = {
 } satisfies AbilityDef
 const burn = { kind: 'ground', def: { radius: 1.1, durationMs: 2000, tickMs: 400, damage: 5, color: 0xff7043, fillAlpha: 0.22, lineAlpha: 0.5, enterMs: 150 } } as const
 const dragonBreath2 = { ...dragonBreath, boost: { at: 70, spend: 0, damageMul: 1.6, onHit: [burn] } } satisfies AbilityDef
-const dragonBreath3 = { ...dragonBreath2, onKill: [{ kind: 'gain', amount: -40 }] } satisfies AbilityDef
+const dragonBreath3 = { ...dragonBreath2, reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'gain', amount: -40 }] }] } satisfies AbilityDef
 const dragonForm = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'boom',
   shape: { kind: 'world' },
-  onSelf: [{ kind: 'form', to: 0, ms: 8000 }, { kind: 'gain', amount: -100 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'form', to: 0, ms: 8000 }, { kind: 'gain', amount: -100 }] }],
 } satisfies AbilityDef
 
 // 🐒 捣蛋猴：满地惊喜盒，一串香蕉让敌人自相残杀
@@ -1079,7 +1079,7 @@ const mageGate = {
   aim: 'stick',
   fireSfx: 'whoosh',
   shape: { kind: 'world' },
-  onHit: [{ kind: 'warp', distance: 6, allies: true }, { kind: 'area', radius: 2.5, then: [{ kind: 'slow', factor: 0.4, durationMs: 1500 }] }],
+  onHit: [{ kind: 'warp', distance: 6, allies: true }, { kind: 'to', who: { side: 'foes', radius: 2.5 }, then: [{ kind: 'slow', factor: 0.4, durationMs: 1500 }] }],
 } satisfies AbilityDef
 const jellyNet = {
   trigger: 'manual',

@@ -101,7 +101,7 @@ function walkNpc(def: NpcDef, side: Side): void {
 }
 
 for (const i of Object.values<ItemDef>(ITEMS)) {
-  for (const t of i.on ?? []) walkEffects(t.effects, 'team')
+  for (const t of i.reactions ?? []) walkEffects(t.effects, 'team')
   if (i.ability) walkAbility(i.ability, 'team')
 }
 

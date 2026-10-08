@@ -1,9 +1,11 @@
-import type { Cond, Effect } from '../../../types/abilityDefs'
+import type { Effect, Selector } from '../../../types/abilityDefs'
+import type { Found } from '../../utils/targets'
+import { test } from '../../utils/cond'
 import { circleHitIndices } from '../../utils/hit'
 import { TRANSIT_MS } from '../../../data/abilities'
 import { hasComponent, query } from 'bitecs'
 import { Ability, Alive, Anchored, Boss, Cd, Charges, Elite, Enemy, FACTION, Faction, Grow, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, Stats, TAG, Trace, Transform, Uid } from '../../components'
-import { addCc, addMark, CC_MARKS, CLEANSED, isAirborne, isSteadfast, markSlot, statusDef } from '../../utils/marks'
+import { addCc, addMark, CC_MARKS, CLEANSED, isSteadfast, markSlot, statusDef } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
 import { gainRes } from './resource'
@@ -100,24 +102,6 @@ export function markSource(t: number, s: number): Source | undefined {
   return markSrcs[t]?.[s - t * MARK_SLOTS]
 }
 
-/** 条件：对目标判断；叠层、引信、存伤、死亡印记只认这个来源的 */
-export function test(sim: Sim, src: Source, t: number, cond: Cond): boolean {
-  switch (cond.kind) {
-    case 'airborne':
-      return isAirborne(t)
-    case 'marked': {
-      const kind = MARK[cond.mark]
-      return markSlot(sim, t, kind, statusDef(kind)?.keyed ? (src.bodyUid ?? 0) : 0) >= 0
-    }
-    case 'hpBelow':
-      return Hp.max[t]! > 0 && Hp.v[t]! / Hp.max[t]! < cond.ratio
-    case 'boss':
-      return Boss.v[t] === 1
-    case 'not':
-      return !test(sim, src, t, cond.cond)
-  }
-}
-
 /** 冷却：转好或减少；充能的补一次 */
 function refreshOne(sim: Sim, e: number, ms: number | undefined): void {
   if (hasComponent(sim.world, e, Charges)) {
@@ -156,6 +140,22 @@ export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | u
   if (!effects || struck.length === 0) return
   const live = struck.filter((s) => isSameEntity(sim.world, s.eid, s.uid)).map((s) => s.eid)
   applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: live, exclude: new Set(live), angle })
+}
+
+/** 按选择器从落点 (x, y) 选出身体：敌方是这一下打得到的，同伴按所在的界；再筛、排、取前几个 */
+function select(sim: Sim, src: Source, x: number, y: number, who: Exclude<Selector, { readonly side: 'self' }>): number[] {
+  let found: Found[] = []
+  if (who.side === 'foes') found = covered(sim, src, x, y, targetsWithin(sim, src, x, y, who.radius))
+  else eachAlly(sim, src.faction, x, y, who.radius, false, (eid, ax, ay, radius) => void found.push({ eid, x: ax, y: ay, radius }), src.realm)
+  if (who.filter) {
+    const self = casterOf(sim, src)
+    const cond = who.filter
+    found = found.filter((t) => test(sim, src, self, t.eid, cond))
+  }
+  if (who.sort === 'nearest') found.sort((a, b) => (a.x - x) ** 2 + (a.y - y) ** 2 - ((b.x - x) ** 2 + (b.y - y) ** 2))
+  else if (who.sort === 'weakest') found.sort((a, b) => Hp.v[a.eid]! / Hp.max[a.eid]! - Hp.v[b.eid]! / Hp.max[b.eid]!)
+  const picked = found.map((t) => t.eid)
+  return who.count === undefined ? picked : picked.slice(0, who.count)
 }
 
 function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
@@ -522,7 +522,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   if: (sim, src, fx, at) => {
     for (const t of at.targets ?? []) {
-      const then = test(sim, src, t, fx.when) ? fx.then : fx.else
+      const then = test(sim, src, casterOf(sim, src), t, fx.when) ? fx.then : fx.else
       if (then) applyAbilityEffects(sim, src, then, { ...at, targets: [t] })
     }
   },
@@ -591,14 +591,18 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     eachCapable(sim, at, Mark, (t) => addMark(t, MARK.empower, TAG.effect, Infinity, fx.hits, id))
   },
 
-  caster: (sim, src, fx, at) => {
-    const by = casterOf(sim, src)
-    if (by >= 0) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage, targets: [by] })
+  to: (sim, src, fx, at) => {
+    if (fx.who.side === 'self') {
+      const by = casterOf(sim, src)
+      if (by >= 0) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage, targets: [by] })
+      return
+    }
+    const picked = select(sim, src, at.x, at.y, fx.who)
+    if (picked.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: picked })
   },
 
-  area: (sim, src, fx, at) => {
-    const found = covered(sim, src, at.x, at.y, targetsWithin(sim, src, at.x, at.y, fx.radius)).map((t) => t.eid)
-    if (found.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: found })
+  chance: (sim, src, fx, at) => {
+    if (sim.rng.next() < fx.p) applyAbilityEffects(sim, src, fx.then, at)
   },
 
   swap: (sim, src, _fx, at) => {
