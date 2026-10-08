@@ -348,6 +348,11 @@
   color: #9a9aa8;
 }
 
+.dt-root .dt-chip.dt-layer:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .dt-root .dt-chip.dt-layer.on {
   border-color: color-mix(in srgb, var(--dt-accent) 70%, transparent);
   background: color-mix(in srgb, var(--dt-accent) 16%, transparent);

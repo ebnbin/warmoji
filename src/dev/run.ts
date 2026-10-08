@@ -5,7 +5,7 @@ import { currentRun, runDef, stepsOf } from '../run/state'
 
 function runText(): string {
   const run = currentRun()
-  if (!run) return '当前没有进行中的一局'
+  if (!run) return ''
   return [
     `${MAPS[run.mapId].name} · ${runDef(run).name} · 第 ${run.step + 1}/${stepsOf(run).length} 步`,
     `金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）`,
@@ -16,5 +16,5 @@ function runText(): string {
 
 /** 只读：改对局的作弊放在能正确处理它的场景里，战斗中的改动要录进录像 */
 export function runTab(): DevTab {
-  return { id: 'run', title: '对局', items: () => [{ kind: 'text', mono: true, read: runText }] }
+  return { id: 'run', title: '对局', when: () => currentRun() !== undefined, items: () => [{ kind: 'text', mono: true, read: runText }] }
 }

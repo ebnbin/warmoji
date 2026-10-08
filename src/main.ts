@@ -71,7 +71,8 @@ game.events.once(Phaser.Core.Events.READY, () => {
   for (const key of lobby) {
     game.scene.getScene(key).events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
   }
-  game.scene.getScene(SceneKey.Battle).events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
+  // 回放时战斗在 create 里才换成录像里的那一局
+  game.scene.getScene(SceneKey.Battle).events.on(Phaser.Scenes.Events.CREATE, () => playBgm(getRun().mapId))
 })
 
 let resizeTimer: number | undefined

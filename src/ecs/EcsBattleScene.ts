@@ -88,7 +88,7 @@ import { amethystClock } from '../maps/amethyst/world'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
-import { TapePlayer, TapeRecorder } from './tape'
+import { keepTape, TapePlayer, TapeRecorder } from './tape'
 import type { DevCommand, Tape, TapeEvent } from './tape'
 import type { CharacterId } from '../types/characters'
 import type { Burst } from './outbox'
@@ -126,12 +126,6 @@ function liveCoins(world: EcsWorld): number {
 
 /** 一帧最多补走几步：卡得更久就丢掉落下的时间 */
 const MAX_STEPS_PER_FRAME = 4
-
-/** 留几场录像：这一场与上一场 */
-const KEPT_TAPES = 2
-
-/** 最近几场的录像，新的在前；离开战斗以后还留着 */
-const TAPES: Tape[] = []
 
 function unknownCommand(cmd: never): never {
   throw new Error(`开发指令没有处理：${JSON.stringify(cmd)}`)
@@ -521,8 +515,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     if (tape) this.player = new TapePlayer(tape)
     else {
       this.recorder = new TapeRecorder(run)
-      TAPES.unshift(this.recorder.tape)
-      TAPES.length = Math.min(TAPES.length, KEPT_TAPES)
+      keepTape(this.recorder.tape)
     }
     this.run = run
     this.fightDef = enterFight(run)
@@ -715,7 +708,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     projectiles: number
     coins: number
     pending: number
-    objects: number
     spawnIntervalMs: number
     atlasPages: number
   } {
@@ -726,7 +718,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       projectiles: query(this.world, [Projectile]).length,
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,
-      objects: this.children.list.length,
       spawnIntervalMs: Math.round(sim?.fight.knobs ? spawnParams().intervalMs : wave.spawnIntervalMs),
       atlasPages: this.atlas?.pageCount ?? 0,
     }
@@ -1178,21 +1169,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     return true
   }
 
-  /** 正在回放的录像，不在回放时是这一场正录着的；离开战斗以后还留着 */
-  currentTape(): Tape | undefined {
-    return this.player?.tape ?? TAPES[0]
-  }
-
-  /** 这一场之前打的那一场的录像 */
-  previousTape(): Tape | undefined {
-    return this.player ? undefined : TAPES[1]
-  }
-
-  /** 照录像从头重打一场 */
-  replay(tape: Tape): void {
-    this.scene.restart({ tape })
-  }
-
   tapeText(): string {
     const sim = this.sim
     const p = this.player
@@ -1206,8 +1182,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
             : `对得上 · 比对了 ${p.matched} 处`
       return `回放 · 第 ${t}/${p.tape.ticks} 步${p.over ? ' · 已打完' : ''}\n${verdict}`
     }
-    const tape = TAPES[0]
-    if (!tape) return '还没有录像'
+    const tape = this.recorder?.tape
+    if (!tape) return '战斗还没开始'
     return `录制 · 第 ${tape.ticks} 步${tape.final !== null ? ' · 已打完' : ''}\n${tape.events.length} 条输入 · ${tape.checks.length} 个校验值`
   }
 

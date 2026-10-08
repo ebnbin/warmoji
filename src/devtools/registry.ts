@@ -33,8 +33,9 @@ export function registerTabs(layer: DevLayer, ownerKey: string, owner: string, t
   }
 }
 
+/** 只列此刻该出现的 */
 export function listTabs(layer: DevLayer): readonly DevTabEntry[] {
-  return entries.filter((e) => e.layer === layer)
+  return entries.filter((e) => e.layer === layer && (e.tab.when?.() ?? true))
 }
 
 /** 条目的样子取决于面板之外的状态时，状态变了调用它让面板重建 */

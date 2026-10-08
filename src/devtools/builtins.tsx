@@ -251,7 +251,7 @@ function timeItems(): DevItem[] {
 export function registerEngineTabs(game: Phaser.Game): void {
   registerTabs('engine', '', '', [
     { id: 'overview', title: '概览', items: () => overviewItems(game) },
-    { id: 'scenes', title: '场景', items: () => sceneItems(game, devConfig().key) },
+    { id: 'scenes', title: '场景栈', items: () => sceneItems(game, devConfig().key) },
     { id: 'time', title: '时间', items: timeItems },
     {
       id: 'perf',

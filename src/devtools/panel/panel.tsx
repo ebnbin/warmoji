@@ -19,16 +19,13 @@ const LAYERS: readonly { readonly layer: DevLayer; readonly label: string }[] = 
   { layer: 'engine', label: '引擎' },
 ]
 
-const HINT: Readonly<Record<DevLayer, string>> = {
-  scene: '当前活动的 scene 都没有页签：让 scene 实现 devTabs()',
-  game: '游戏还没有页签：用 registerGameTab 注册',
-  engine: '没有引擎页签',
-}
-
 const scrollByTab = new Map<string, number>()
 const tabByLayer = new Map<DevLayer, string>()
 
 const ownersOf = (layer: DevLayer): string[] => [...new Set(listTabs(layer).map((e) => e.owner))].filter((o) => o !== '')
+
+/** 页签随 scene 起落、随条件出没：变了就重画 */
+const tabsShape = (): string => LAYERS.map((l) => listTabs(l.layer).map((e) => e.key).join(',')).join('|')
 
 /** 面板开着时画布变小、填充变少，帧率要对照画布大小看 */
 function Meter({ game }: { readonly game: Phaser.Game }): ReactNode {
@@ -80,6 +77,7 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
   useEvent(registryEvents, REGISTRY_CHANGED)
   useEvent(registryEvents, PANEL_REFRESH)
   useEvent(logEvents, LOG_CHANGED, 300)
+  useLive(tabsShape)
   const [, setVersion] = useState(0)
   const body = useRef<HTMLDivElement>(null)
   const s = devSettings()
@@ -87,13 +85,15 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
     fn()
     setVersion((v) => v + 1)
   }
-  const entries = listTabs(s.layer)
-  const current = entries.find((e) => e.key === s.tab) ?? entries[0]
+  // 选中的层此刻没有页签时，先看下一层，不停在空页上
+  const layer = listTabs(s.layer).length > 0 ? s.layer : (LAYERS.find((l) => listTabs(l.layer).length > 0)?.layer ?? s.layer)
+  const entries = listTabs(layer)
+  const current = entries.find((e) => e.key === s.tab) ?? entries.find((e) => e.key === tabByLayer.get(layer)) ?? entries[0]
   const key = current?.key ?? ''
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = scrollByTab.get(key) ?? 0
   }, [key])
-  const owners = ownersOf(s.layer)
+  const owners = ownersOf(layer)
   const docked = s.mode === 'dock' && dock.size > 0
   const style: CSSProperties | undefined = docked ? (dock.edge === 'right' ? { width: dock.size } : { height: dock.size }) : undefined
   return (
@@ -128,20 +128,21 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
         {LAYERS.map((l) => {
           const n = listTabs(l.layer).length
           const who = ownersOf(l.layer)
-          const on = l.layer === s.layer
+          const on = l.layer === layer
           return (
             <button
               key={l.layer}
               className={on ? 'dt-chip dt-layer on' : 'dt-chip dt-layer'}
+              disabled={n === 0}
               onMouseDown={keepFocus}
-              onClick={on ? undefined : () => updateDevSettings({ layer: l.layer, tab: tabByLayer.get(l.layer) ?? null })}
+              onClick={l.layer === s.layer ? undefined : () => updateDevSettings({ layer: l.layer, tab: tabByLayer.get(l.layer) ?? null })}
             >
               {`${l.label} ${n}${who.length > 0 ? ` · ${who.join('·')}` : ''}`}
             </button>
           )
         })}
       </nav>
-      {entries.length > 0 ? (
+      {entries.length > 0 && (
         <nav className="dt-chips dt-bar">
           {entries.map((e, i) => {
             const badge = e.tab.badge?.() ?? ''
@@ -158,7 +159,7 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
                     on
                       ? undefined
                       : () => {
-                          tabByLayer.set(s.layer, e.key)
+                          tabByLayer.set(layer, e.key)
                           updateDevSettings({ tab: e.key })
                         }
                   }
@@ -169,8 +170,6 @@ export function Panel({ game, dock }: { readonly game: Phaser.Game; readonly doc
             )
           })}
         </nav>
-      ) : (
-        <div className="dt-bar dt-muted">{HINT[s.layer]}</div>
       )}
       <div className="dt-body" ref={body} onScroll={(e) => scrollByTab.set(key, e.currentTarget.scrollTop)}>
         {current?.tab.items().map((item, i) => <Item key={`${key}/${i}`} item={item} tap={tap} />)}

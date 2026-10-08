@@ -1,6 +1,6 @@
 import type { EcsBattleScene } from './EcsBattleScene'
 import { devChoice, devFlag, markMetrics, pickOnce, resetMetrics } from '../devtools'
-import type { DevButtonsItem, DevItem, DevSceneTabs, DevTab } from '../devtools'
+import type { DevChoice, DevItem, DevSceneTabs, DevTab } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
 import { beginSandbox } from '../run/state'
@@ -30,8 +30,7 @@ import type { SandboxLevel, SandboxMul } from './sandbox/knobs'
 import { LENS_MODES } from './lens'
 import type { LensMode } from './lens'
 import { pipelineProfile, profilePipelineWhen, resetPipelineProfile } from './systems/pipeline/step'
-import { decodeTape, encodeTape } from './tape'
-import type { Tape } from './tape'
+import { hostNumChoices } from './systems/shared/devNumbers'
 import { LAYER_M } from './utils/pass'
 
 export const showTargets = devFlag({ id: 'battle.targets', label: '队员目标连线', desc: '从每个队员画到其当前目标' })
@@ -53,9 +52,28 @@ export const lensMode = devChoice<LensMode>({
   default: 'follow',
 })
 
-// 模拟层不依赖开发面板：剖析开关从这里注入
+// 模拟层不依赖开发面板：剖析开关与玩法数值从这里注入，持久化与显示归开发面板；回放时模拟层按录下的数值钉住
 const profiling = devFlag({ id: 'battle.profile', label: '流水线剖析', desc: '逐 system 计时，有一点开销' })
 profilePipelineWhen(profiling, () => performance.now())
+
+interface Tuned {
+  readonly choice: DevChoice<string>
+  readonly fallback: string
+}
+
+const tuned: Tuned[] = []
+hostNumChoices((k) => {
+  const choice = devChoice({
+    id: k.id,
+    label: `${k.group} · ${k.label}`,
+    desc: `${k.desc ? `${k.desc} · ` : ''}默认 ${k.fmt(k.fallback)}`,
+    options: k.values.map((v) => ({ id: String(v), label: k.fmt(v) })),
+    default: String(k.fallback),
+  })
+  tuned.push({ choice, fallback: String(k.fallback) })
+  return () => Number(choice())
+})
+const tunedCount = (): number => tuned.filter((t) => t.choice() !== t.fallback).length
 
 /** 0 是停住 */
 const SIM_RATES: readonly number[] = [0, 0.1, 0.25, 0.5, 1, 2, 4]
@@ -76,7 +94,6 @@ function statusText(battle: EcsBattleScene): string {
     `金币      ${p.coins}`,
     `刷怪预告  ${p.pending}`,
     `刷怪间隔  ${p.spawnIntervalMs} ms`,
-    `GameObject ${p.objects}`,
     `图集页    ${p.atlasPages}`,
     `按种类    ${kinds.length > 0 ? kinds.slice(0, 8).map((k) => `${k.name} ${k.n}`).join(' · ') : '无'}`,
   ].join('\n')
@@ -101,42 +118,6 @@ function profileText(): string {
   ].join('\n')
 }
 
-/** 录像存成文件：名字带上地图与步数 */
-function saveTape(battle: EcsBattleScene, tape: Tape): void {
-  const url = URL.createObjectURL(new Blob([encodeTape(tape)], { type: 'application/json' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `warmoji-${battle.run.mapId}-${tape.ticks}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-/** 选一个录像文件，读出来就照着重打 */
-function loadTape(battle: EcsBattleScene): void {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'application/json,.json'
-  input.onchange = (): void => {
-    const file = input.files?.[0]
-    if (!file) return
-    file
-      .text()
-      .then((text) => battle.replay(decodeTape(text)))
-      .catch((e: unknown) => console.error('读不了这份录像', e))
-  }
-  input.click()
-}
-
-function tapeButtons(battle: EcsBattleScene): DevButtonsItem['buttons'] {
-  const now = battle.currentTape()
-  const before = battle.previousTape()
-  return [
-    ...(now ? [{ label: '从头回放这一场', run: (): void => battle.replay(now) }, { label: '存下录像', run: (): void => saveTape(battle, now) }] : []),
-    ...(before ? [{ label: '回放上一场', run: (): void => battle.replay(before) }] : []),
-    { label: '读入录像回放', run: (): void => loadTape(battle) },
-  ]
-}
-
 function statusTab(battle: EcsBattleScene): DevTab {
   return {
     id: 'status',
@@ -145,7 +126,7 @@ function statusTab(battle: EcsBattleScene): DevTab {
       { kind: 'text', mono: true, read: () => statusText(battle) },
       { kind: 'text', label: '关卡', mono: true, read: () => battle.devPhaseText() },
       { kind: 'text', label: '出怪口', mono: true, read: () => battle.devGateText() },
-      { kind: 'text', label: '队伍物理', desc: '极速是属性表的移速，响应 = 质量 ÷ 阻力', mono: true, read: () => teamText(battle) },
+      { kind: 'text', label: '录像', desc: '每步之前的输入都录下，回放照着重打，每秒比对一次战局', mono: true, read: () => battle.tapeText() },
     ],
   }
 }
@@ -217,13 +198,21 @@ function viewTab(): DevTab {
   }
 }
 
-function tapeTab(battle: EcsBattleScene): DevTab {
+/** 改过的值会存下来，之后每一局都按它打 */
+function tuningTab(battle: EcsBattleScene): DevTab {
   return {
-    id: 'tape',
-    title: '录像',
-    items: () => [
-      { kind: 'text', label: '录像', desc: '每步之前的输入都录下，回放照着重打，每秒比对一次战局', mono: true, read: () => battle.tapeText() },
-      { kind: 'buttons', buttons: tapeButtons(battle) },
+    id: 'tuning',
+    title: '调参',
+    badge: () => (tunedCount() > 0 ? String(tunedCount()) : ''),
+    items: (): DevItem[] => [
+      { kind: 'text', label: '队伍物理', desc: '极速是属性表的移速，响应 = 质量 ÷ 阻力', mono: true, read: () => teamText(battle) },
+      {
+        kind: 'action',
+        label: '全部恢复默认',
+        desc: tunedCount() > 0 ? `改过 ${tunedCount()} 项` : '都是默认值',
+        run: () => tuned.forEach((t) => t.choice.item.set(t.fallback)),
+      },
+      ...tuned.map((t) => t.choice.item),
     ],
   }
 }
@@ -366,7 +355,7 @@ export function battleDevTabs(battle: EcsBattleScene): DevSceneTabs {
       commandsTab(battle),
       simTab(battle),
       viewTab(),
-      tapeTab(battle),
+      tuningTab(battle),
       profileTab(),
       ...(battle.knobs ? [sandboxTab(battle)] : []),
     ],

@@ -70,6 +70,8 @@ export interface DevTab {
   readonly title: string
   /** 页签名后面的短文本，如未读数 */
   readonly badge?: () => string
+  /** 只在它成立时出现，用于依附某种状态的页签 */
+  readonly when?: () => boolean
   readonly items: () => readonly DevItem[]
 }
 
