@@ -9,7 +9,7 @@ import type { MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import type { XpState } from '../types/xp'
 import type { SceneKey } from '../scene/keys'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
-import { sandboxRun } from './sandbox'
+import { rollSandbox, sandboxRun } from './sandbox'
 
 /** 无敌时的生命上限 */
 export const INVINCIBLE_HP = 10_000_000
@@ -101,6 +101,12 @@ export function beginRun(id: RunId, mutators: readonly MutatorId[] = []): RunSta
 /** 在这张图上开一局沙盒 */
 export function beginSandbox(map: MapId): RunState {
   return openRun(sandboxRun(map), {})
+}
+
+/** 从选图页进一张图的沙盒：先在这张图对应的角色、小怪与头目里重抽一遍 */
+export function enterSandbox(map: MapId): RunState {
+  rollSandbox(map)
+  return beginSandbox(map)
 }
 
 /** 按一份关卡数据开一局，离开时回到 origin */

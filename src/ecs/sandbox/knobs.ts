@@ -1,7 +1,8 @@
-import { ROSTER_IDS, TEAM } from '../../data/characters'
+import { MAP_ROSTER, ROSTER_IDS, TEAM } from '../../data/characters'
 import { MAP_IDS, MAPS } from '../../data/maps'
 import type { CharacterId } from '../../types/characters'
 import type { EnemyKind } from '../../types/enemies'
+import type { MapId } from '../../types/maps'
 import type { StatMods } from '../../types/stats'
 
 const enemies = new Set<EnemyKind>()
@@ -84,16 +85,23 @@ export function sandboxPresetId(): SandboxPresetId | undefined {
   return presetId
 }
 
-export function applySandboxPreset(id: SandboxPresetId): void {
+/** 预设的队伍取这张图对应的角色的前几名、敌人是这张图的全部小怪，其余旋钮照预设 */
+export function applySandboxPreset(id: SandboxPresetId, map: MapId): void {
   const p = SANDBOX_PRESETS.find((x) => x.id === id)!
-  setSandboxRoster(ROSTER_IDS.slice(0, Math.min(p.team, ROSTER_IDS.length)))
+  setSandboxRoster(MAP_ROSTER[map].slice(0, Math.min(p.team, TEAM.maxSize)))
   setSandboxLevel(p.level)
-  setSandboxEnemies(MAP_IDS.flatMap((id) => MAPS[id].foes))
+  setSandboxEnemies(MAPS[map].foes)
   setSandboxScale(p.scale)
   setSandboxDifficulty(p.difficulty)
   setSandboxFireRate(p.fireRate)
   setSandboxInvincible(true)
   presetId = p.id
+}
+
+/** 换一套队伍与敌人：进图时抽好的结果从这里放进来 */
+export function pickSandbox(ids: readonly CharacterId[], kinds: readonly EnemyKind[]): void {
+  setSandboxRoster(ids)
+  setSandboxEnemies(kinds)
 }
 
 export function sandboxEnemySet(): ReadonlySet<EnemyKind> {
@@ -230,4 +238,4 @@ export function sandboxVersion(): number {
   return version
 }
 
-applySandboxPreset(SANDBOX_PRESETS[0]!.id)
+applySandboxPreset(SANDBOX_PRESETS[0]!.id, MAP_IDS[0]!)

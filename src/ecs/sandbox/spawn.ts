@@ -1,13 +1,22 @@
+import { query } from 'bitecs'
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { mapEnemyRoster } from '../../data/maps'
 import { toPx } from '../../data/px'
 import type { EnemyKind } from '../../types/enemies'
+import { Alive, Boss, ENEMY_SET, FACTION, Faction, Telegraph } from '../components'
 import { foeCount, placeFoe } from '../entities/enemy'
 import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
 import { sandboxDifficulty, sandboxEnemySet, spawnParams } from './knobs'
 import type { Sim } from '../sim'
 
-/** 沙盒按旋钮刷怪：每隔一阵来一批，种类、规模与血量都看旋钮，场上满了就不刷 */
+/** 场上已经有头目，或者正有头目要出场 */
+function bossOut(sim: Sim): boolean {
+  for (const t of query(sim.world, [Telegraph])) if (Telegraph.boss[t]) return true
+  for (const e of query(sim.world, ENEMY_SET)) if (Boss.v[e] && Alive.v[e] && Faction.v[e] === FACTION.enemy) return true
+  return false
+}
+
+/** 沙盒按旋钮刷怪：每隔一阵来一批，种类、规模与血量都看旋钮，场上满了就不刷；头目同时只在场一个，没有头目时才轮得到它 */
 export function runKnobs(sim: Sim, st: { cooldownMs: number }, deltaMs: number): void {
   st.cooldownMs -= deltaMs
   if (st.cooldownMs > 0) return
@@ -18,11 +27,15 @@ export function runKnobs(sim: Sim, st: { cooldownMs: number }, deltaMs: number):
   if (kinds.length === 0) return
   const hpMul = sandboxDifficulty()
   let live = foeCount(sim) + telegraphCount(sim)
+  let bossy = bossOut(sim)
   for (let i = 0; i < d.batch; i++, live++) {
     if (live >= d.cap) return
-    const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]
+    const pool = bossy ? kinds.filter((k) => ENEMIES[k].role !== 'boss') : kinds
+    if (pool.length === 0) return
+    const raw = ENEMIES[pool[Math.floor(sim.rng.next() * pool.length)]!]
     const def = toPx(raw)
     const boss = raw.role === 'boss'
+    if (boss) bossy = true
     const pos = placeFoe(sim, { hpMul }, raw.kind, boss)
     spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, boss, {}, SPAWN.telegraphMs, pos.entry)
   }
