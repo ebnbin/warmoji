@@ -75,16 +75,11 @@ function readSafeInsets(fitScale: number, area: Size, win: Size): SafeInsets {
   }
 }
 
-/** 游戏区里的 DOM 也只避让游戏区贴着的那几边 */
-function placeGame(area: Size, win: Size): void {
+function placeGame(area: Size): void {
   const el = document.getElementById('game')
   if (!el) return
   el.style.width = `${area.w}px`
   el.style.height = `${area.h}px`
-  if (area.w < win.w) el.style.setProperty('--safe-right', '0px')
-  else el.style.removeProperty('--safe-right')
-  if (area.h < win.h) el.style.setProperty('--safe-bottom', '0px')
-  else el.style.removeProperty('--safe-bottom')
 }
 
 export function textRes(): number {
@@ -101,7 +96,7 @@ export function applyCamera(scene: Phaser.Scene): void {
 export function refreshViewport(game: Phaser.Game, force = false): void {
   const win = windowSize()
   const area = carve(win)
-  placeGame(area, win)
+  placeGame(area)
   const next = computeViewport(area.w, area.h, window.devicePixelRatio)
   const nextInsets = readSafeInsets(next.fitScale, area, win)
   const same =

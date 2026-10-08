@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 // 模拟层是 src/ecs 里表现层之外的部分：不碰引擎、渲染、界面、音频、存档与开发面板，运行期（含间接）只依赖 bitecs；声音与画面经 outbox 交给表现层，开发面板的开关经注入
 // 战斗要能照录像重打：它运行期用到的 src/ecs 与 src/maps 代码不读钟，随机只走 sim 上的随机流
 const ecs = resolve('src/ecs')
-const VIEW = ['EcsBattleScene.ts', 'atlas.ts', 'decor.ts', 'devProvider.ts', 'lens.ts', 'present', 'presentation.ts', 'render', 'viewRegistry.ts', 'views.ts'].map((p) => join(ecs, p))
+const VIEW = ['EcsBattleScene.ts', 'atlas.ts', 'decor.ts', 'devTabs.ts', 'lens.ts', 'present', 'presentation.ts', 'render', 'viewRegistry.ts', 'views.ts'].map((p) => join(ecs, p))
 const BANNED = [...VIEW, ...['src/audio', 'src/dev', 'src/devtools', 'src/editor', 'src/save', 'src/scene', 'src/ui'].map((p) => resolve(p))]
 const PACKAGES = new Set(['bitecs'])
 const BATTLE = ['src/ecs', 'src/maps'].map((p) => resolve(p))

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { DevProvider } from '../devtools'
+import type { DevTab } from '../devtools'
 import { emojiHoldStats } from '../emoji/hold'
 import { emojiPackStats, emojiTextureStats, evictUnpinnedEmoji } from '../emoji/textures'
 import { emojiThumbStats } from '../emoji/thumbs'
@@ -18,22 +18,20 @@ function emojiText(game: Phaser.Game): string {
   ].join('\n')
 }
 
-/** 游戏级：emoji 资源流水线的状态 */
-export function emojiProvider(game: Phaser.Game): DevProvider {
+let released: string | undefined
+
+/** emoji 资源流水线的状态 */
+export function emojiTab(game: Phaser.Game): DevTab {
   return {
     id: 'emoji',
     title: 'emoji',
-    sections: [
+    items: () => [
+      { kind: 'text', mono: true, read: () => emojiText(game) },
       {
-        id: 'emoji',
-        title: 'emoji',
-        items: () => [
-          { kind: 'text', mono: true, read: () => emojiText(game) },
-          {
-            kind: 'buttons',
-            buttons: [{ label: '释放未固定的 emoji 纹理', run: () => console.warn(`释放了 ${evictUnpinnedEmoji(game.textures)} 个 emoji 纹理`) }],
-          },
-        ],
+        kind: 'action',
+        label: '释放未固定的 emoji 纹理',
+        desc: released,
+        run: () => (released = `刚才释放了 ${evictUnpinnedEmoji(game.textures)} 个`),
       },
     ],
   }

@@ -37,7 +37,7 @@ import {
 import type { PageFrame, Rect } from '../ui'
 import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
-import type { DevProvider, DevProviderHost } from '../devtools'
+import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
 const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
@@ -67,7 +67,7 @@ interface AnatUi {
 
 const DEFAULT_SUBJECT = '1f939'
 
-export class StudioScene extends Phaser.Scene implements DevProviderHost {
+export class StudioScene extends Phaser.Scene implements DevTabsHost {
   private preserveOnRestart = false
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
@@ -612,11 +612,10 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
     this.scene.restart()
   }
 
-  devProvider(): DevProvider {
+  devTabs(): DevSceneTabs {
     return {
-      id: 'studio',
       title: 'Studio',
-      sections: [
+      tabs: [
         {
           id: 'studio',
           title: 'Studio',

@@ -17,7 +17,7 @@ import type { LevelUpWake } from './levelUp'
 import { characterStatGroups } from './statLines'
 import { finishStep, flowStatGroups, isLeaving, runExit } from './teamPage'
 import { SceneKey } from './keys'
-import type { DevProvider, DevProviderHost } from '../devtools'
+import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
 /** 详情区顶上的队伍栏高度 */
 const STRIP_H = 84
@@ -37,7 +37,7 @@ function tagLabel(t: CharacterTag): string {
 }
 
 /** 招募页：全部角色都能招；按标签筛选，点一名看详情，确认后招进队伍。升级时来招人的盖在停住的战斗上，招一人就回去 */
-export class RecruitScene extends Phaser.Scene implements DevProviderHost {
+export class RecruitScene extends Phaser.Scene implements DevTabsHost {
   /** 升级时来招人 */
   private readonly forLevelUp: boolean
   private preserveOnRestart = false
@@ -370,14 +370,13 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     this.scene.restart()
   }
 
-  devProvider(): DevProvider {
+  devTabs(): DevSceneTabs {
     return {
-      id: this.forLevelUp ? 'levelUpRecruit' : 'recruit',
-      title: '招募页',
-      sections: [
+      title: this.forLevelUp ? '升级招募' : '招募',
+      tabs: [
         {
           id: 'recruit',
-          title: '招募页',
+          title: this.forLevelUp ? '升级招募' : '招募',
           items: () => [
             {
               kind: 'action',

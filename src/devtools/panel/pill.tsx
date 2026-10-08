@@ -1,7 +1,6 @@
 import type Phaser from 'phaser'
 import { useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, ReactNode } from 'react'
-import { devConfig } from '../config'
 import { setPanelOpen } from '../dock'
 import type { DevSize } from '../dock'
 import { unreadErrorCount } from '../log'
@@ -42,14 +41,13 @@ interface Drag {
   moved: boolean
 }
 
-/** 面板收起时悬在游戏上的胶囊：点一下展开，拖到左右两侧停靠 */
+/** 面板收起时悬在游戏上的胶囊：一直显示帧率，点一下展开，拖到左右两侧 */
 export function Pill({ game, win }: { readonly game: Phaser.Game; readonly win: DevSize }): ReactNode {
   const s = devSettings()
   const label = useLive(() => {
     const scale = timeScale()
-    const tag = scale === 0 ? '暂停' : scale === 1 ? '' : `×${scale}`
-    const body = devSettings().pillFps ? `${Math.round(game.loop.actualFps)} fps` : 'dev'
-    return tag ? `${tag} ${body}` : body
+    const fps = `${Math.round(game.loop.actualFps)} fps`
+    return scale === 1 ? fps : `${scale === 0 ? '暂停' : `×${scale}`} ${fps}`
   })
   const altered = useLive(() => timeScale() !== 1)
   const unread = useLive(unreadErrorCount)
@@ -88,7 +86,6 @@ export function Pill({ game, win }: { readonly game: Phaser.Game; readonly win: 
         drag.current = null
         if (!d || d.id !== e.pointerId) return
         if (!d.moved) {
-          devConfig().onTap()
           setPanelOpen(true)
           return
         }

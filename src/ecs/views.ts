@@ -31,6 +31,8 @@ export interface ViewCtx {
   readonly lens: Lens
   /** 地上的布景：不是实体，地图往里放、删、挪；场景的布景层按列表的次序、按地图的光画在躺着的精灵那一层 */
   readonly decor: PaintSprite[]
+  /** 开发面板要看碰撞边界：地图自己挡人的东西（标志物、会塌的墙）由地图勾在一切之上 */
+  readonly showWalls: () => boolean
   w: number
   h: number
   atlas?: EcsAtlas

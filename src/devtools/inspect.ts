@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { COLOR } from './draw'
+import { MARK } from './draw'
 import { addOverlayPainter, canvasToWorld } from './overlay'
 import type { OverlayCtx } from './overlay'
 import { refreshDevPanel } from './registry'
@@ -158,7 +158,7 @@ function paint(g: Phaser.GameObjects.Graphics, ctx: OverlayCtx): void {
         if (!hasBounds(o) || prop<boolean>(o, 'visible') === false) continue
         const interactive = o.input?.enabled === true
         if (!(showBounds || (showHitAreas && interactive))) continue
-        drawBounds(g, ctx, scene, o.getBounds(), scrollFactor(o), interactive ? COLOR.warn : 0x80cbc4, interactive ? 0.8 : 0.35, 1)
+        drawBounds(g, ctx, scene, o.getBounds(), scrollFactor(o), interactive ? MARK.hot : MARK.cold, interactive ? 0.8 : 0.35, 1)
         n++
       }
     }
@@ -166,7 +166,7 @@ function paint(g: Phaser.GameObjects.Graphics, ctx: OverlayCtx): void {
   picked.forEach((p, i) => {
     if (!p.obj.active || !p.scene.sys.isActive()) return
     const on = i === selected
-    drawBounds(g, ctx, p.scene, p.obj.getBounds(), scrollFactor(p.obj), on ? 0xffffff : COLOR.danger, on ? 1 : 0.5, on ? 3 : 1)
+    drawBounds(g, ctx, p.scene, p.obj.getBounds(), scrollFactor(p.obj), on ? MARK.selected : MARK.picked, on ? 1 : 0.5, on ? 3 : 1)
   })
 }
 
@@ -182,12 +182,12 @@ function breakdownText(): string {
   return lines.length > 0 ? lines.join('\n') : '没有活动的业务 scene'
 }
 
-export function inspectItems(): DevItem[] {
+export function objectItems(): DevItem[] {
   const items: DevItem[] = [
     {
       kind: 'toggle',
       label: '拾取模式',
-      desc: '开启后点一下面板外的画面，列出该点下的对象并画出边界；拾取一次后自动关闭',
+      desc: '开启后点一下画面，列出该点下的对象并画出边界；拾取一次后自动关闭',
       get: () => pickMode,
       set: setPickMode,
     },
@@ -198,7 +198,8 @@ export function inspectItems(): DevItem[] {
     items.push(
       {
         kind: 'choice',
-        label: `拾取到 ${picked.length} 个对象 · 上层在前 · 点选高亮`,
+        label: `拾取到 ${picked.length} 个对象`,
+        desc: '上层在前，点选高亮',
         options: picked.map((p, i) => ({ id: String(i), label: p.label, desc: p.desc })),
         get: () => String(selected),
         set: (id) => (selected = Number(id)),
@@ -206,6 +207,6 @@ export function inspectItems(): DevItem[] {
       { kind: 'action', label: '清除拾取结果', run: () => (picked = []) },
     )
   }
-  items.push({ kind: 'text', label: '显示列表 · 按类型计数（含容器内）', mono: true, read: breakdownText })
+  items.push({ kind: 'text', label: '显示列表', desc: '按类型计数，含容器内', mono: true, read: breakdownText })
   return items
 }

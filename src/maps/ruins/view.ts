@@ -9,7 +9,6 @@ import { loadSettings } from '../../save/settings'
 import { browserStorage } from '../../util/storage'
 import { decorSprite } from '../../ecs/decor'
 import { Alive, Transform } from '../../ecs/components'
-import { devFlag } from '../../devtools'
 import { roomAt } from '../basin'
 import { CANOPY_PPU } from '../foliage'
 import { ensureLeaves, FallingLeaves } from '../leaves'
@@ -48,8 +47,6 @@ const TILE_PX = 64
 const REPAINT_MS = 200
 /** 风往哪吹，像素/秒：扬尘顺风飘 */
 const WIND = { x: 10, y: -4 }
-/** 开发者工具里「显示碰撞边界」的开关 */
-const DEV_WALLS = 'battle.walls'
 /** 乌鸦停在多高（米）以上的墙头 */
 const PERCH_M = 2
 const CROWS = 7
@@ -326,7 +323,7 @@ export class RuinsView implements MapView {
 
   /** 开发者工具的碰撞边界：标准身高的身体跨不过的墙，墙塌了就重画；盖在一切之上 */
   private stepDevWalls(v: ViewCtx, s: RuinsState): void {
-    if (!devFlag(DEV_WALLS)) {
+    if (!v.showWalls()) {
       this.devWalls?.setVisible(false)
       return
     }

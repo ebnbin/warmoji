@@ -46,20 +46,10 @@
         height: 100%;
         overflow: hidden;
       }
-      #build-badge {
-        position: absolute;
-        right: calc(6px + var(--safe-right));
-        bottom: calc(4px + var(--safe-bottom));
-        z-index: 10;
-        font: 10px/1.4 ui-monospace, monospace;
-        color: rgba(255, 255, 255, 0.35);
-        pointer-events: none;
-        user-select: none;
-      }
     </style>
   </head>
   <body>
-    <div id="game"><div id="build-badge"></div></div>
+    <div id="game"></div>
     <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>

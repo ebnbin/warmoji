@@ -20,7 +20,7 @@ import { itemEffects } from './itemLines'
 import { openPause } from './pause'
 import { finishStep, runExit } from './teamPage'
 import { SceneKey } from './keys'
-import type { DevProvider, DevProviderHost } from '../devtools'
+import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
 /** 这一轮摆给一名队员的货；id 为 null 是他能买的都买满了 */
 interface Offer {
@@ -35,7 +35,7 @@ const CARDS = { gap: 18, colW: 360, colH: 560, rowH: 260, rowsFrom: 3 } as const
 const REVEAL_STEP = 60
 
 /** 商店：每名队员一格货，全队一起刷新 */
-export class ShopScene extends Phaser.Scene implements DevProviderHost {
+export class ShopScene extends Phaser.Scene implements DevTabsHost {
   private preserveOnRestart = false
   private run!: RunState
   private offers: Offer[] = []
@@ -330,14 +330,13 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.scene.restart()
   }
 
-  devProvider(): DevProvider {
+  devTabs(): DevSceneTabs {
     return {
-      id: 'shop',
-      title: '商店页',
-      sections: [
+      title: '商店',
+      tabs: [
         {
           id: 'shop',
-          title: '商店页',
+          title: '商店',
           items: () => [
             {
               kind: 'buttons',
