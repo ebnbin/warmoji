@@ -8,8 +8,8 @@ import type { Scratch } from './tri'
 const MAX_SAG = 0.25
 const MIN_SEGS = 6
 const MAX_SEGS = 128
-/** 一个形状记几个数：种类、x、y、rx、ry、转角、起角、止角、线宽、颜色、透明度 */
-const STRIDE = 11
+/** 一个形状记几个数：种类、x、y、rx、ry、转角、起角、止角、线宽、颜色、透明度、分几段（0 是按屏幕大小定） */
+const STRIDE = 12
 
 enum Kind {
   Fill,
@@ -104,16 +104,16 @@ export class ShapeLayer extends EcsLayer {
     return this.push(Kind.Stroke, x, y, w / 2, h / 2, rotation, 0, Math.PI * 2, this.lineWidth, this.line, this.lineAlpha)
   }
 
-  /** 椭圆上从 a0 到 a1 的一段弧，按线宽描出来；圆弧时 rx、ry 相等 */
-  strokeArc(x: number, y: number, rx: number, ry: number, a0: number, a1: number, rotation = 0): this {
-    return this.push(Kind.Stroke, x, y, rx, ry, rotation, a0, a1, this.lineWidth, this.line, this.lineAlpha)
+  /** 椭圆上从 a0 到 a1 的一段弧，按线宽描出来；圆弧时 rx、ry 相等。给了 segs 就照它分段，用来顶替原本按几个点连成的折线 */
+  strokeArc(x: number, y: number, rx: number, ry: number, a0: number, a1: number, rotation = 0, segs = 0): this {
+    return this.push(Kind.Stroke, x, y, rx, ry, rotation, a0, a1, this.lineWidth, this.line, this.lineAlpha, segs)
   }
 
   lineBetween(x0: number, y0: number, x1: number, y1: number): this {
     return this.push(Kind.Line, x0, y0, x1, y1, 0, 0, 0, this.lineWidth, this.line, this.lineAlpha)
   }
 
-  private push(kind: Kind, x: number, y: number, rx: number, ry: number, rot: number, a0: number, a1: number, width: number, color: number, alpha: number): this {
+  private push(kind: Kind, x: number, y: number, rx: number, ry: number, rot: number, a0: number, a1: number, width: number, color: number, alpha: number, segs = 0): this {
     if (alpha <= 0) return this
     let rec = this.rec
     const o = this.count * STRIDE
@@ -133,6 +133,7 @@ export class ShapeLayer extends EcsLayer {
     rec[o + 8] = width
     rec[o + 9] = color
     rec[o + 10] = alpha
+    rec[o + 11] = segs
     this.count++
     return this
   }
@@ -168,7 +169,7 @@ export class ShapeLayer extends EcsLayer {
     const a0 = rec[b + 6]!
     const span = rec[b + 7]! - a0
     const full = Math.abs(span) >= Math.PI * 2 - 1e-9
-    const n = Math.max(1, Math.ceil((segments(Math.max(rx, ry) * scale) * Math.abs(span)) / (Math.PI * 2)))
+    const n = rec[b + 11]! > 0 ? rec[b + 11]! : Math.max(1, Math.ceil((segments(Math.max(rx, ry) * scale) * Math.abs(span)) / (Math.PI * 2)))
     const d = span / n
     const base = o.c.length
     if (kind === Kind.Fill) {
