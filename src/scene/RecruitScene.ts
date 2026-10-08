@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
+import { ELEMENTS } from '../data/elements'
 import { ROLES } from '../data/roles'
 import { modTexts } from '../data/stats'
 import { DUTY_TAGS, TAG_IDS, TAGS, tagsOf } from '../data/tags'
@@ -202,7 +203,7 @@ export class RecruitScene extends Phaser.Scene {
       this.matching(tags).map((id): TileItem<CharacterId> => {
         const def = CHARACTERS[id]
         const joined = roster.includes(id)
-        return { key: id, emoji: def.emoji, outline: 'player', title: def.name, icons: tagsOf(def).map((t) => TAGS[t].icon), badge: joined ? '1f396' : undefined, dim: joined }
+        return { key: id, emoji: def.emoji, outline: 'player', title: def.name, icons: [...(def.element ? [ELEMENTS[def.element].icon] : []), ...tagsOf(def).map((t) => TAGS[t].icon)], badge: joined ? '1f396' : undefined, dim: joined }
       }),
     )
     this.grid.setSelected(this.focus)
@@ -253,7 +254,7 @@ export class RecruitScene extends Phaser.Scene {
     const x = 118
     view.add(new Icon(this, 62, 54, def.emoji, 84, 'player'))
     const name = new Label(this, x, 30, def.name, { kind: 'lead' }).setOrigin(0, 0.5)
-    view.add([name, new Chip(this, name.x + name.width + 12, 30, ROLES[def.role].name, { tone: 'steel', originX: 0 })])
+    view.add([name, new Chip(this, name.x + name.width + 12, 30, def.element ? `${ROLES[def.role].name} · ${ELEMENTS[def.element].name}` : ROLES[def.role].name, { tone: 'steel', originX: 0 })])
     const desc = new Label(this, x, 54, def.desc, { kind: 'label', color: 'muted', wrap: w - x - 20 })
     view.add(desc)
     let y = Math.max(114, desc.y + desc.height + 14)

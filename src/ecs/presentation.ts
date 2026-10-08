@@ -5,10 +5,11 @@ import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
 import { rewindMs } from '../data/abilities'
 import { AFFIXES } from '../data/affixes'
+import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, Slot, Transform, VisOff } from './components'
+import { Alive, Boss, Elite, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, Slot, Transform, VisOff } from './components'
 import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -21,6 +22,7 @@ import { traceAt, tracePath } from './systems/shared/trace'
 import { rescuing } from './systems/tickRescue'
 import { hostShown } from './utils/statusTint'
 import { statusDef } from './utils/marks'
+import { elementNow } from './utils/element'
 import { leaderX, leaderY } from './utils/team'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
@@ -137,14 +139,20 @@ function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly str
   emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji, 'player'), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha }))
 }
 
-/** 头顶的图标：精英的词缀贴着头顶一排；带时限、正生效的状态按图标的轻重排，最多三个，再上面一排；倒下的不画 */
+/** 精英与头目头顶第一排打头的元素图标：小怪太多不标，靠图鉴认 */
+function elementIcon(sim: Sim, eid: number): string[] {
+  const el = elementAt(hasComponent(sim.world, eid, Elite) && (Elite.v[eid] || Boss.v[eid]) ? elementNow(sim, eid) : 0)
+  return el ? [ELEMENTS[el].icon] : []
+}
+
+/** 头顶的图标：精英与头目的元素和精英的词缀贴着头顶一排；带时限、正生效的状态按图标的轻重排，最多三个，再上面一排；倒下的不画 */
 function statusIcons(sim: Sim, out: PaintSprite[]): void {
   const now = sim.elapsedMs
   const kinds: number[] = []
   for (const eid of query(sim.world, [Mark, Transform])) {
     if (!Alive.v[eid]) continue
-    const affixes = eliteAffixes[eid] ?? []
-    iconRow(sim, out, eid, affixes.map((id) => AFFIXES[id].icon), 0)
+    const head = [...elementIcon(sim, eid), ...(eliteAffixes[eid] ?? []).map((id) => AFFIXES[id].icon)]
+    iconRow(sim, out, eid, head, 0)
     kinds.length = 0
     for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
       const k = Mark.kind[s]!
@@ -152,7 +160,7 @@ function statusIcons(sim: Sim, out: PaintSprite[]): void {
       if (statusDef(k)?.icon && until > now && until !== Infinity && !kinds.includes(k)) kinds.push(k)
     }
     kinds.sort((a, b) => statusDef(a)!.icon!.rank - statusDef(b)!.icon!.rank)
-    iconRow(sim, out, eid, kinds.slice(0, ICON_MAX).map((k) => statusDef(k)!.icon!.emoji), affixes.length > 0 ? 1 : 0)
+    iconRow(sim, out, eid, kinds.slice(0, ICON_MAX).map((k) => statusDef(k)!.icon!.emoji), head.length > 0 ? 1 : 0)
   }
 }
 

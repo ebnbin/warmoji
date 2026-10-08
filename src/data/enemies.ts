@@ -7,8 +7,10 @@ import type { AiTuning, Difficulty, EnemyDef, EnemyKind } from '../types/enemies
 
 export const ENEMIES = fromJson<Record<EnemyKind, EnemyDef>>(enemiesJson)
 const ROSTER = fromJson<{ readonly enemies: readonly EnemyKind[]; readonly legacyEnemies: readonly EnemyKind[] }>(rosterJson)
-const NEW_ENEMIES = ROSTER.enemies.map((k) => ENEMIES[k])
-const LEGACY_ENEMIES = ROSTER.legacyEnemies.map((k) => ENEMIES[k])
+/** 新敌人，按地图的先后、各图里按登记的先后 */
+export const NEW_ENEMIES = ROSTER.enemies.map((k) => ENEMIES[k])
+/** 旧敌人，按原来的先后 */
+export const LEGACY_ENEMIES = ROSTER.legacyEnemies.map((k) => ENEMIES[k])
 /** 新敌人里的小怪与头目，按地图的先后 */
 export const ENEMY_DEFS = NEW_ENEMIES.filter((e) => e.role !== 'boss')
 export const BOSSES = NEW_ENEMIES.filter((e) => e.role === 'boss')
