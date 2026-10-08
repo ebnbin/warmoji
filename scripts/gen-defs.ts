@@ -60,7 +60,7 @@ import type { Issue } from '../src/data/runCheck.ts'
 import type { AbilityDef, Cond, CondWho } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
 import type { CharacterAuthoring } from '../src/types/characters'
-import type { EnemyDef, EnemyKind } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind, UnitBase } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
@@ -711,6 +711,11 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   }
   for (const u of [...c.weapons.map((w) => WEAPONS[w].upgrades), ...c.innate.map((i) => i.upgrades)]) need(u.length < MAX_CHAR_LEVEL, `characters.${id} 的载体升级档不能多过等级上限：${u.length} 档`)
   need(LEVEL_STATS[id as keyof typeof LEVEL_STATS].length === MAX_CHAR_LEVEL - 1, `levels.${id} 须给 2 到 ${MAX_CHAR_LEVEL} 级每一级写属性`)
+}
+
+const units: [string, UnitBase][] = [...Object.values(ENEMIES).flatMap(withNested).map((e): [string, UnitBase] => [`enemies.${e.kind}`, e]), ...Object.entries<UnitBase>(CHARACTERS).map(([id, c]): [string, UnitBase] => [`characters.${id}`, c])]
+for (const [at, u] of units) {
+  for (const on of ['lowHp', 'idle', 'death'] as const) need((u.reactions ?? []).filter((r) => r.on === on).length <= 1, `${at} 的 ${on} 反应最多一条`)
 }
 
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {

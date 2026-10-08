@@ -29,6 +29,7 @@ import { gearKill } from './gear'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import { clockSec, runCurve } from '../../fight/clock'
+import { rulesOf } from '../../../data/reactions'
 
 /** 生命归零：击杀者先反应，带复活计时的身体倒地等待，其余身体死亡移除，敌人移除后再触发击杀者道具的击杀规则 */
 export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
@@ -141,7 +142,7 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
   if (hostile && boss) sim.bossDown = true
   if (who) grantKillRewards(sim, eid, who, elite)
   const hexed = hasMark(sim, eid, MARK.morph)
-  if (!hexed && def?.onDeath) {
+  if (!hexed && def && rulesOf(def).onDeath) {
     const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, atk: offenseOf(sim.world, eid), faction: Faction.v[eid]! }
     if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)

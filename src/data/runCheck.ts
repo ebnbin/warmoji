@@ -8,6 +8,7 @@ import type { MapSignals } from './signals.ts'
 // 构建脚本也跑这些检查，本地模块写全扩展名
 import { isLose } from './ends.ts'
 import { hasSignal } from './signals.ts'
+import { rulesOf } from './reactions.ts'
 
 /** 定义里的位置：一层层的属性名与下标 */
 export type Path = readonly (string | number)[]
@@ -36,7 +37,7 @@ export interface RunCatalog {
 
 /** 一种敌人，连同它的巢穴生出的与死后分裂出的 */
 export function withNested(e: EnemyDef): EnemyDef[] {
-  return [e, ...(e.spawner ? withNested(e.spawner.into) : []), ...(e.onDeath ?? []).flatMap((fx) => (fx.kind === 'split' ? withNested(fx.into) : []))]
+  return [e, ...(e.spawner ? withNested(e.spawner.into) : []), ...(rulesOf(e).onDeath ?? []).flatMap((fx) => (fx.kind === 'split' ? withNested(fx.into) : []))]
 }
 
 /** 位置里各层的说法；带下标的层写成第几个 */

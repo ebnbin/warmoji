@@ -39,6 +39,7 @@ import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
 import { spawnFxCircle, spawnFxRing } from '../../entities/fx'
+import { withDeath } from '../../../data/reactions'
 
 interface HitCtx {
   readonly x: number
@@ -658,7 +659,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     }
     const x = by >= 0 ? Transform.x[by]! : at.x
     const y = by >= 0 ? Transform.y[by]! : at.y
-    spawnAround(sim, by, src.faction, fx.onDeath ? { ...of.unit, onDeath: fx.onDeath } : of.unit, fx.count, of.spread, x, y, fx.lifeMs, fx.hpRatio)
+    spawnAround(sim, by, src.faction, fx.onDeath ? withDeath(of.unit, fx.onDeath) : of.unit, fx.count, of.spread, x, y, fx.lifeMs, fx.hpRatio)
   },
 
   cast: (sim, src, fx) => {

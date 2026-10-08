@@ -22,6 +22,7 @@ import { memberGear, memberGearMods } from './loadout'
 
 import type { EcsWorld } from '../world'
 import type { FrameIndex } from '../frames'
+import { rulesOf } from '../../data/reactions'
 
 interface CharacterPlacement {
   slot: number
@@ -67,7 +68,7 @@ export function spawnCharacter(
   setStatLayer(eid, 'fight', mods)
   foldBody(world, undefined, eid)
   Hp.v[eid] = waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)
-  bodyRules[eid] = { ...def.rules, resource: def.resource }
+  bodyRules[eid] = rulesOf(def)
   armGear(world, eid, owned)
   attachResource(world, eid, def.resource, run.memberRes[slot] ?? -1)
   Seat.v[eid] = -1

@@ -753,11 +753,9 @@ interface AbilityBase {
   readonly anchor?: { readonly look: Look; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
 }
 /** 反应把效果施于谁：self 是带着这条反应的身体，other 是这件事里的另一方（打中的目标、出手打它的身体），spot 是这件事发生的地方（倒下处） */
-export type ReactTo = 'self' | 'other' | 'spot'
-/** 反应：on 这件事发生时，满足 if、过了 chance 的几率，对 to 施加 effects；damage 是这些效果的基础伤害，不写取这件事的伤害 */
-interface ReactionBase {
+/** 反应：on 这件事发生时，满足 if、过了 chance 的几率，对 to 施加 effects */
+export interface ReactionBase {
   readonly if?: Cond
-  readonly damage?: number
   readonly effects: readonly Effect[]
 }
 export type Reaction = ReactionBase &
@@ -769,7 +767,6 @@ export type Reaction = ReactionBase &
     | { readonly on: 'wave' | 'lethal'; readonly to: 'self' }
     | { readonly on: 'lowHp'; readonly ratio: number; readonly to: 'self' }
   )
-export type ReactionOn = Reaction['on']
 /** 能力的反应：出手前、出手后、打死谁时 */
 export type AbilityReaction = ReactionBase & { readonly on: 'cast' | 'fire' | 'kill'; readonly to: 'self' }
 /** 一个能力 = 触发 × 瞄准 × 形状 × 载荷 × 重复 */

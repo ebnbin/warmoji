@@ -1,4 +1,5 @@
-import { KNOCKBACK_TAU_MS, reactionEffects } from '../data/abilities'
+import { KNOCKBACK_TAU_MS } from '../data/abilities'
+import { reactionEffects } from '../data/reactions'
 import { STAT_KEYS, STATS, modTexts, statText } from '../data/stats'
 import { CHARACTERS, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
 import { ENEMIES } from '../data/enemies'

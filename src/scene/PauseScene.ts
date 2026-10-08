@@ -55,6 +55,7 @@ import { characterStatGroups, staminaTone } from './statLines'
 import { flowStatGroups } from './teamPage'
 import { enemyStatLines } from './wikiEntries'
 import { SceneKey } from './keys'
+import { rulesOf } from '../data/reactions'
 
 type Tab = 'stats' | 'skills' | 'items' | 'run' | 'foes'
 
@@ -116,7 +117,7 @@ function runFoes(run: RunState): Foe[] {
     since.set(def.kind, n)
     order.push(def)
     if (def.spawner) add(def.spawner.into, n)
-    for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into, n)
+    for (const fx of rulesOf(def).onDeath ?? []) if (fx.kind === 'split') add(fx.into, n)
   }
   if (runDef(run).team === 'knobs') {
     for (const e of mapEnemyRoster(run.mapId)) add(e, 1)

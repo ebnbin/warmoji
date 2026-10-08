@@ -1,4 +1,4 @@
-import type { AbilityDef, Effect } from './abilityDefs'
+import type { AbilityDef, Effect, ReactionBase } from './abilityDefs'
 import type { Span } from './obstacles'
 import type { StatBase, StatMods } from './stats'
 import type { DifficultyCurve } from './waves'
@@ -24,7 +24,7 @@ export interface DecoyEffect {
   readonly durationMs: number
   readonly alpha: number
 }
-type DeathEffect = Effect | SplitEffect | DecoyEffect
+export type DeathEffect = Effect | SplitEffect | DecoyEffect
 /** 资源：能量按秒回复、出手消耗；怒气打中人涨、闲了掉；热量出手涨、满了过热；成长击杀涨、满了触发 full；full 是攒满时施于自身的效果，lockMs 期间耗资源的能力出不了手；keep 为真时角色的资源跨波保留 */
 export interface ResourceDef {
   readonly kind: 'energy' | 'fury' | 'heat' | 'growth'
@@ -39,14 +39,32 @@ export interface ResourceDef {
   readonly onKill?: number
   readonly full?: { readonly effects?: readonly Effect[]; readonly lockMs?: number; readonly reset?: boolean }
 }
-/** 身体自己的规则：被命中、击杀、锚点消失时施于自身；被接触时施于碰我的人；接触时施于被我碰到的人；死亡以尸体位置为落点 */
+/** 死亡：以尸体位置为落点，还能分裂、留下替身 */
+interface DeathReaction {
+  readonly on: 'death'
+  readonly to: 'spot'
+  readonly effects: readonly DeathEffect[]
+}
+/**
+ * 身体的反应：hurt 挨打、kill 击杀、anchorLost 锚点消失时施于自身；lethal 本条命第一次生命归零时不死，改施加这些；lowHp 本条命第一次生命低于 ratio 时施于自身；
+ * idle ms 内没出手（still 为真时还要没动）就施于自身，出手后重新计；touched 被接触时施于碰我的人，touch 接触时施于被我碰到的人；lowHp、idle、death 每种最多一条
+ */
+export type BodyReaction =
+  | (ReactionBase &
+      (
+        | { readonly on: 'hurt' | 'kill'; readonly to: 'self'; readonly chance?: number }
+        | { readonly on: 'touch' | 'touched'; readonly to: 'other'; readonly chance?: number }
+        | { readonly on: 'lethal'; readonly to: 'self' }
+        | { readonly on: 'anchorLost'; readonly to: 'self' }
+        | { readonly on: 'lowHp'; readonly ratio: number; readonly to: 'self' }
+        | { readonly on: 'idle'; readonly ms: number; readonly still?: boolean; readonly to: 'self' }
+      ))
+  | DeathReaction
+/** 身体的规则表：反应按事件编好，运行时按事件查 */
 export interface BodyRules {
   readonly resource?: ResourceDef
-  /** 致命一击：本条命第一次生命归零时不死，改施加这些效果 */
   readonly onLethal?: readonly Effect[]
-  /** 残血：本条命第一次生命低于 ratio 时施于自身 */
   readonly onLowHp?: { readonly ratio: number; readonly effects: readonly Effect[] }
-  /** 闲着：ms 内没出手（still 为真时还要没动）就施于自身，出手后重新计 */
   readonly onIdle?: { readonly ms: number; readonly still?: boolean; readonly effects: readonly Effect[] }
   readonly onHurt?: readonly Effect[]
   readonly onTouched?: readonly Effect[]
@@ -54,6 +72,15 @@ export interface BodyRules {
   readonly onKill?: readonly Effect[]
   readonly onDeath?: readonly DeathEffect[]
   readonly onAnchorLost?: readonly Effect[]
+}
+/** 角色与敌人共用的写法：外观、名字、反应、资源与形态 */
+export interface UnitBase {
+  readonly emoji: string
+  readonly name: string
+  readonly reactions?: readonly BodyReaction[]
+  readonly resource?: ResourceDef
+  /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换；角色的主动技能不随形态换 */
+  readonly forms?: readonly FormDef[]
 }
 export type EnemyKind =
   | 'zombie'
@@ -106,10 +133,8 @@ export interface FormDef {
   readonly damage?: number
 }
 /** 一个会动会打的非玩家身体：敌人、召唤出的分身与亡仆都用它；kind 是敌人的身份，召唤物没有 */
-export interface NpcDef extends BodyRules {
+export interface NpcDef extends UnitBase {
   readonly kind?: EnemyKind
-  readonly emoji: string
-  readonly name: string
   readonly size: number
   readonly radius: number
   /** 竖直方向占哪几层，不写是标准身体 */
@@ -130,8 +155,6 @@ export interface NpcDef extends BodyRules {
   }
   readonly kbImmune?: boolean
   readonly phasesWalls?: boolean
-  /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换 */
-  readonly forms?: readonly FormDef[]
   /** 坐骑：先扣它的生命，扣光后切到 form 形态 */
   readonly mount?: { readonly hp: number; readonly form: number; readonly emoji?: string }
   /** 延时成长：出生 ms 后还活着就长成 into */

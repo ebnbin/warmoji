@@ -76,6 +76,7 @@ import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
 import { clockWave } from '../fight/clock'
 import type { ByKind } from '../../util/record'
+import { rulesOf } from '../../data/reactions'
 
 type DriveOf = ByKind<DriveDef>
 
@@ -210,7 +211,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     addComponent(world, eid, Contact)
     Contact.damage[eid] = def.damage
   }
-  bodyRules[eid] = def
+  bodyRules[eid] = rulesOf(def)
   attachResource(world, eid, def.resource)
   if (def.grow) {
     addComponent(world, eid, GrowUp)

@@ -12,6 +12,7 @@ import type { EnemyDef, NpcDef } from '../../types/enemies'
 import type { StatBase, StatKey, StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
 import { clockWave } from '../fight/clock'
+import { without, withDeath } from '../../data/reactions'
 
 /** 记下召唤者：召唤物的伤害吃它的召唤物伤害、记在它名下 */
 function markSummoned(sim: Sim, eid: number, by: number): void {
@@ -66,7 +67,7 @@ function ownAttacks(sim: Sim, by: number): number[] {
 function lookAlike(sim: Sim, by: number): NpcDef {
   const npc = enemyDef[by]
   const drive = { kind: 'chase' } as const
-  if (npc) return { ...npc, drive, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath: undefined, forms: undefined }
+  if (npc) return { ...npc, drive, spawner: undefined, grow: undefined, mount: undefined, reactions: without(npc.reactions, ['lethal', 'lowHp', 'death']), forms: undefined }
   const c = hasComponent(sim.world, by, Slot) ? CHARACTERS[sim.run.roster[Slot.v[by]!]!] : undefined
   return {
     emoji: bodyLook[by] ?? c?.emoji ?? '1f47b',
@@ -90,7 +91,7 @@ function offenseOnly(mods: StatMods): StatMods {
 
 /** 分身：长得和施法者一样，带着它的普通出手（伤害打折），到时消失，死时施加 onDeath */
 export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number, hpRatio: number, dmgRatio: number, onDeath: readonly Effect[] | undefined): void {
-  const def = { ...lookAlike(sim, by), onDeath }
+  const def = withDeath(lookAlike(sim, by), onDeath)
   const attacks = ownAttacks(sim, by)
   const faction = Faction.v[by]!
   for (let i = 0; i < count; i++) {
@@ -114,7 +115,7 @@ export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number,
 export function raiseDead(sim: Sim, victim: number, faction: number, by: number, lifeMs: number, hpRatio: number, onDeath: readonly Effect[] | undefined): void {
   const def = enemyDef[victim]
   if (!def || Boss.v[victim] || Faction.v[victim] === faction) return
-  const raised: NpcDef = { ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath }
+  const raised: NpcDef = withDeath({ ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, reactions: without(def.reactions, ['lethal', 'lowHp']) }, onDeath)
   const eid = spawnNpc(sim, sim.frames, raised, Transform.x[victim]!, Transform.y[victim]!, Math.max(1, Math.round(Hp.max[victim]! * hpRatio)), { faction })
   markSummoned(sim, eid, by)
   Despawn.at[eid] = sim.elapsedMs + lifeMs

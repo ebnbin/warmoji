@@ -2,7 +2,7 @@ import type charactersJson from '../assets/characters.json'
 import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
-import type { BodyRules, FormDef, ResourceDef } from './enemies'
+import type { BodyReaction, UnitBase } from './enemies'
 import type { StatBase } from './stats'
 import type { RoleId } from './roles'
 
@@ -48,9 +48,9 @@ interface SkillDef {
   readonly ability: AbilityDef
   readonly aim: boolean
 }
-export interface CharacterAuthoring {
-  readonly emoji: string
-  readonly name: string
+/** 角色的反应：没有锚点，也不会死（倒下等人扶） */
+export type CharacterReaction = Exclude<BodyReaction, { readonly on: 'anchorLost' | 'death' }>
+export interface CharacterAuthoring extends UnitBase {
   readonly desc: string
   readonly role: RoleId
   readonly tags: CharacterTags
@@ -59,13 +59,8 @@ export interface CharacterAuthoring {
   readonly skill: SkillSource
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
-  /** 资源与被动：角色身体自己的规则，和敌人同一套 */
-  readonly resource?: ResourceDef
-  readonly rules?: CharacterRules
-  /** 可切换的形态：换外观、换自动能力、换体型；主动技能不换 */
-  readonly forms?: readonly FormDef[]
+  readonly reactions?: readonly CharacterReaction[]
 }
-type CharacterRules = Pick<BodyRules, 'onHurt' | 'onKill' | 'onTouched' | 'onTouch' | 'onLethal' | 'onLowHp' | 'onIdle'>
 /** 载体：tiers 是 1 级起每一级用的能力，到顶后一直用最后一档；cards 是 2 级起每一级亮出的升级卡 */
 export interface Carrier {
   readonly name: string
@@ -73,9 +68,7 @@ export interface Carrier {
   readonly tiers: readonly AbilityDef[]
   readonly cards: readonly UpgradeCard[]
 }
-export interface CharacterDef {
-  readonly emoji: string
-  readonly name: string
+export interface CharacterDef extends UnitBase {
   readonly desc: string
   readonly role: RoleId
   readonly tags: CharacterTags
@@ -83,9 +76,7 @@ export interface CharacterDef {
   readonly stats: CharacterStats
   readonly skill: SkillDef
   readonly carriers: readonly Carrier[]
-  readonly resource?: ResourceDef
-  readonly rules?: CharacterRules
-  readonly forms?: readonly FormDef[]
+  readonly reactions?: readonly CharacterReaction[]
 }
 export type CharacterId = keyof typeof charactersJson
 export interface TeamBaseline {

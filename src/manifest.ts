@@ -13,6 +13,7 @@ import type { MapDef } from './types/maps'
 import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 import { TAGS } from './data/tags'
+import { rulesOf } from './data/reactions'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
@@ -91,8 +92,9 @@ function walkNpc(def: NpcDef, side: Side): void {
   if (def.mount?.emoji) s.body.add(def.mount.emoji)
   if (def.grow) walkNpc(def.grow.into, side)
   if (def.spawner) walkNpc(def.spawner.into, side)
-  walkRules(def, side)
-  for (const fx of def.onDeath ?? []) {
+  const rules = rulesOf(def)
+  walkRules(rules, side)
+  for (const fx of rules.onDeath ?? []) {
     if (fx.kind === 'split') walkNpc(fx.into, side)
     else if (fx.kind !== 'decoy') walkEffects([fx], side)
   }
@@ -113,7 +115,7 @@ for (const c of roster) {
     if (f.emoji) s.body.add(f.emoji)
     for (const a of f.abilities ?? []) walkAbility(a, 'team')
   }
-  walkRules({ ...c.rules, resource: c.resource }, 'team')
+  walkRules(rulesOf(c), 'team')
 }
 for (const e of [...ENEMY_DEFS, ...BOSSES]) walkNpc(e, 'enemy')
 

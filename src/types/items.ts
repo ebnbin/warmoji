@@ -24,7 +24,8 @@ export type GearCount =
 /** 条件属性：满足 if 时加一份 stats；按 count 数到几就叠几份（倍率按涨跌线性叠加），最多 max 份 */
 export type GearWhen = { readonly if: Cond; readonly stats: StatMods } | { readonly count: GearCount; readonly stats: StatMods; readonly max: number }
 /** 道具的反应：wave 是每波开始，残血与致命每条命各一次，这三种不带几率 */
-export type ItemReaction = Extract<Reaction, { readonly on: 'hit' | 'crit' | 'dodge' | 'hurt' | 'kill' | 'skill' | 'wave' | 'lethal' | 'lowHp' }>
+/** 道具的反应：damage 是这些效果的基础伤害，不写取这件事的伤害 */
+export type ItemReaction = Extract<Reaction, { readonly on: 'hit' | 'crit' | 'dodge' | 'hurt' | 'kill' | 'skill' | 'wave' | 'lethal' | 'lowHp' }> & { readonly damage?: number }
 export type ItemEvent = ItemReaction['on']
 /** 本局成长：每波结束、或这名角色每击杀 count 个敌人，永久多一份 stats（按份数线性叠加） */
 export type GearGrow = { readonly each: 'wave'; readonly stats: StatMods } | { readonly each: 'kills'; readonly count: number; readonly stats: StatMods }
