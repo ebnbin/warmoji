@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../src/types/characters'
 import type { StatMods } from '../../../src/types/stats'
 import { shot } from '../abilityKit.ts'
 
-// 🐙 章鱼：墨汁里谁也看不清
+// 🐙 八爪鱼：墨汁里谁也看不清
 const inkPuddle = { kind: 'ground', def: { radius: 1.4, durationMs: 3000, tickMs: 500, damage: 0, color: 0x37474f, fillAlpha: 0.3, lineAlpha: 0.5, enterMs: 200, effects: [{ kind: 'disarm', durationMs: 700 }] } } as const
 
 const octoInk = {
@@ -46,7 +46,7 @@ export const levels = [{ add: { maxHp: 25 }, mul: { damage: 1.2 } }, { add: { ma
 
 export default {
   emoji: '1f419',
-  name: '章鱼',
+  name: '八爪鱼',
   desc: '喷墨让敌人看不清；墨汁结界里的同伴只挨得到结界里的打',
   role: 'controller',
   tags: ['control', 'support', 'ranged'],

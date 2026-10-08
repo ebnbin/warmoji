@@ -5,7 +5,7 @@ const FOREST_BOSS = {
   kind: 'treant',
   role: 'boss',
   emoji: '1f577',
-  name: '蛛后',
+  name: '织网蛛母',
   desc: '一路产下六秒后结成蛛网的蛛卵，瞬移到离你最近的蛛网旁把周围的人缠住，毒液扇幕封走位；击退免疫',
   size: 3.4,
   radius: 1.1,

@@ -47,7 +47,7 @@ export const levels = [{ add: { maxHp: 25 }, mul: { damage: 1.25 } }, { add: { m
 
 export default {
   emoji: '1f984',
-  name: '独角兽',
+  name: '独角驹',
   desc: '独角向前突刺，穿透沿途敌人',
   role: 'bruiser',
   tags: ['damage', 'melee', 'mobile'],

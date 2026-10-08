@@ -3,7 +3,7 @@ import type { EnemyDef } from '../../../src/types/enemies'
 const BOAR = {
   kind: 'boar',
   emoji: '1f417',
-  name: '野猪',
+  name: '山猪',
   desc: '发现猎物后蓄力直线突刺，横向可躲，死亡留半透明尸壳诱骗火力',
   size: 1.4,
   radius: 0.52,

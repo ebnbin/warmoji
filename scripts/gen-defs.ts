@@ -743,6 +743,15 @@ for (const [at, u] of units) {
   need((u.reactions ?? []).filter((r) => r.on === 'lowHp').length <= 8, `${at} 的残血线最多八条`)
 }
 
+/** 角色与敌人新旧放在一起，id 各不相同、名字也各不相同 */
+{
+  const dup = (list: readonly string[]): string[] => [...new Set(list.filter((k, i) => list.indexOf(k) !== i))]
+  const ids = dup([...Object.keys(CHARACTERS), ...Object.keys(ENEMIES)])
+  need(ids.length === 0, `角色与敌人的 id 有重复：${ids.join('，')}`)
+  const names = dup([...Object.values<CharacterAuthoring>(CHARACTERS).map((c) => c.name), ...Object.values<EnemyDef>(ENEMIES).map((e) => e.name)])
+  need(names.length === 0, `角色与敌人的名字有重复：${names.join('，')}`)
+}
+
 /** 头目阶段：生命线在 0 到 1 之间、一段比一段低；阶段换招式的不能再有换招式的形态，免得两边抢着装 */
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {
   const lines = (e.phases ?? []).map((p) => p.below)

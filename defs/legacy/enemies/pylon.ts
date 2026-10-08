@@ -5,7 +5,7 @@ const PYLON = {
   drive: { kind: 'stay' },
   emoji: '1f50b',
   name: '护盾塔',
-  desc: '失控核心立起的供能塔：只要还有一座立着，核心就刀枪不入',
+  desc: '核能机甲立起的供能塔：只要还有一座立着，机甲就刀枪不入',
   size: 1.3,
   radius: 0.5,
   span: [0, 3],

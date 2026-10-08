@@ -74,7 +74,7 @@ export const FIGHTS = {
   sandHunt: {
     emoji: '1f43e',
     name: '沙海追猎',
-    desc: '两名怪盗在沙海里逃窜，第 30 秒又追加一名狼骑：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
+    desc: '两名神偷在沙海里逃窜，第 30 秒又追加一名狼骑：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
     note: '环面上的追逐：逃跑的目标永远有路可走，追不上就只能抄近路截它',
     team: { slots: [{ tags: ['mobile', 'damage'] }, { tags: ['ranged'] }, { tags: ['control'] }], level: 2 },
     stars: [{ kind: 'time', ms: 80_000 }, { kind: 'downs', count: 0 }],
@@ -96,7 +96,7 @@ export const FIGHTS = {
               kind: 'batch',
               atMs: 2000,
               squad: { count: 2, enemy: 'raccoon', elites: 2, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
-              banner: { title: '悬赏发布', sub: '两名怪盗在沙海里逃窜' },
+              banner: { title: '悬赏发布', sub: '两名神偷在沙海里逃窜' },
             },
             {
               kind: 'batch',

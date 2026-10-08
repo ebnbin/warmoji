@@ -4,7 +4,7 @@ const SPACE_BOSS = {
   kind: 'blackhole',
   role: 'boss',
   emoji: '1f573',
-  name: '奇点',
+  name: '视界之主',
   desc: '张开事件视界，越过那道圈的人（进出都算）当场被定住；引力换位把一名队员和自己对调；吸积盘环爆与坍缩坠击，击退免疫',
   size: 3.4,
   radius: 1.1,

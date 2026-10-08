@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../src/types/characters'
 import type { StatMods } from '../../../src/types/stats'
 import { shot } from '../abilityKit.ts'
 
-// 🧞 灯神：火从神灯里出来，灯在哪火就从哪来
+// 🧞 神灯精灵：火从神灯里出来，灯在哪火就从哪来
 const genieFlame = {
   trigger: 'auto',
   cooldownMs: 900,
@@ -42,7 +42,7 @@ export const levels = [{ add: { maxHp: 15 }, mul: { damage: 1.25 } }, { add: { m
 
 export default {
   emoji: '1f9de',
-  name: '灯神',
+  name: '神灯精灵',
   desc: '火焰从神灯里喷出，灯在哪火就从哪来',
   role: 'support',
   tags: ['support', 'ranged'],
@@ -56,7 +56,7 @@ export default {
       icon: '1fa94',
       base: 'genieFlame',
       upgrades: [
-        { ability: 'genieFlame2', card: { icon: '1f463', name: '灯影', desc: '神灯改为落在灯神一秒半前走过的地方，火从那里喷出' } },
+        { ability: 'genieFlame2', card: { icon: '1f463', name: '灯影', desc: '神灯改为落在神灯精灵一秒半前走过的地方，火从那里喷出' } },
         { ability: 'genieFlame3', card: { icon: '1f91d', name: '灯随人护', desc: '神灯改为贴着血量最低的队友，火从队友身边喷出' } },
       ],
     },

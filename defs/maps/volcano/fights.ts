@@ -7,7 +7,7 @@ export const FIGHTS = {
     name: '引火烧身',
     desc: '我方伤不了敌人，击退却格外有劲：火山隔一阵就喷发，熔岩顺着地势漫下来，敌人追人时会直直穿过熔岩；让 15 只敌人被熔岩烧死',
     note: '只能借地形杀敌：熔岩敌我都烫，要算着喷发的节奏，把敌人引进去、自己站在岩石上',
-    team: { slots: ['bear', 'mage', 'kangaroo'], level: 2 },
+    team: { slots: ['boxerBear', 'mage', 'kangaroo'], level: 2 },
     stars: [{ kind: 'hazard', by: 'lava', damage: 0 }, { kind: 'time', ms: 110_000 }],
     fight: {
       name: '引火烧身',
@@ -35,7 +35,7 @@ export const FIGHTS = {
   eruptionCycle: {
     emoji: '1f30b',
     name: '喷发周期',
-    desc: '火山每 45 秒喷发一次，每次喷发都从火山口抛出火山怪与流星，熔岩随后漫过盆地；撑到第三次喷发',
+    desc: '火山每 45 秒喷发一次，每次喷发都从火山口抛出火山怪与彗星，熔岩随后漫过盆地；撑到第三次喷发',
     note: '让地图事件刷怪：每次喷发既是一波敌人也是一片熔岩，平静的那段是喘息也是准备',
     team: { slots: [{ tags: ['defense'] }, { tags: ['area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
     stars: [{ kind: 'downs', count: 0 }, { kind: 'hazard', by: 'lava', damage: 100 }],

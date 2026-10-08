@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../src/types/characters'
 import type { StatMods } from '../../../src/types/stats'
 import { shot } from '../abilityKit.ts'
 
-// 🐧 企鹅：冰面打滑，站久了会冻住
+// 🐧 冰球企鹅：冰面打滑，站久了会冻住
 const icePatch = { radius: 1.7, durationMs: 4000, tickMs: 0, damage: 0, color: 0xb3e5fc, fillAlpha: 0.3, lineAlpha: 0.6, enterMs: 150, traction: 0.12 } as const
 
 const penguinIce = {
@@ -46,7 +46,7 @@ export const levels = [{ add: { maxHp: 35 }, mul: { damage: 1.2 } }, { add: { ma
 
 export default {
   emoji: '1f427',
-  name: '企鹅',
+  name: '冰球企鹅',
   desc: '冰球在地上铺冰，站在冰上谁都打滑；肚皮滑行撞开一切',
   role: 'controller',
   tags: ['control', 'area', 'mobile'],

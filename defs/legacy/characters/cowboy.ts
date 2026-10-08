@@ -91,7 +91,7 @@ export const levels = [{ add: { maxHp: 15 }, mul: { cooldown: 0.88 } }, { add: {
 
 export default {
   emoji: '1f920',
-  name: '牛仔',
+  name: '双枪牛仔',
   desc: '左右双枪齐发，射出高速水弹',
   role: 'ranged',
   tags: ['damage', 'control', 'ranged'],

@@ -59,7 +59,7 @@ export const levels = [{ add: { crit: 0.1 }, mul: { damage: 1.3 } }, { add: { cr
 
 export default {
   emoji: '1f977',
-  name: '忍者',
+  name: '影忍',
   desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

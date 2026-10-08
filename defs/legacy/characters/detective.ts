@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../src/types/characters'
 import type { StatMods } from '../../../src/types/stats'
 import { shot } from '../abilityKit.ts'
 
-// 🕵 侦探：同一目标攒够三条证据才结案
+// 🕵 名侦探：同一目标攒够三条证据才结案
 const caseClosed = [{ kind: 'stun', durationMs: 1200 }, { kind: 'reveal', durationMs: 5000 }, { kind: 'damage', amount: 0, ratio: 2.5 }] as const
 
 const detectiveLens = {
@@ -57,7 +57,7 @@ export const levels = [{ add: { maxHp: 20 }, mul: { damage: 1.25 } }, { add: { m
 
 export default {
   emoji: '1f575',
-  name: '侦探',
+  name: '名侦探',
   desc: '对同一目标攒够三条证据当场结案；悬赏的目标一死，全队技能转好',
   role: 'ranged',
   tags: ['damage', 'support', 'ranged'],

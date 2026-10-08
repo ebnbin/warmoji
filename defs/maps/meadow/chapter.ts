@@ -26,19 +26,19 @@ const MEADOW_WARMUP: PhaseDef = {
 
 /** 接力的收尾：击杀数到了，倒木后面再翻过来一队，连同场上剩下的清干净；击杀再快，这一场也打满一分钟上下 */
 const MEADOW_RELAY_END: PhaseDef = {
-  intro: { title: '最后一棒', sub: '倒木后面翻过来一头精英野猪和一群跟班，把场上的都清掉' },
+  intro: { title: '最后一棒', sub: '倒木后面翻过来一头精英山猪和一群跟班，把场上的都清掉' },
   spawns: [{ kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'boar', elites: 1, escort: { enemy: 'zombie', count: 6 }, at: { kind: 'gate', gate: 'log' } } }],
   ends: [{ kind: 'cleared' }],
 }
 
-/** 草甸的头目战：先清掉蛛后产下的卵，她从林缘爬出来，打到一半暴走，坡顶也冲下野猪 */
+/** 草甸的头目战：先清掉织网蛛母产下的卵，她从林缘爬出来，打到一半暴走，坡顶也冲下山猪 */
 const MEADOW_BOSS: FightDef = {
-  name: '1-4 蛛后',
+  name: '1-4 织网蛛母',
   map: 'meadow',
   clockSec: 300,
   phases: [
     {
-      intro: { title: '蛛卵', sub: '草地上到处是蛛后产下的卵，6 秒内不打破就结成缠人的蛛网；清空草地，她就会爬出来' },
+      intro: { title: '蛛卵', sub: '草地上到处是织网蛛母产下的卵，6 秒内不打破就结成缠人的蛛网；清空草地，她就会爬出来' },
       mix: [
         { kind: 'zombie', weight: 3 },
         { kind: 'locust', weight: 2 },
@@ -57,12 +57,12 @@ const MEADOW_BOSS: FightDef = {
       ],
       spawns: [
         { kind: 'stream', intervalMs: 2200 },
-        { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'treant', stats: { mul: { maxHp: 0.7 } } }, banner: { title: '蛛后现身', sub: '她从林缘爬出来了：打破她一路产下的卵，别被蛛网缠住' } },
+        { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'treant', stats: { mul: { maxHp: 0.7 } } }, banner: { title: '织网蛛母现身', sub: '她从林缘爬出来了：打破她一路产下的卵，别被蛛网缠住' } },
       ],
       ends: [{ kind: 'bossHp', below: 0.5 }],
     },
     {
-      intro: { title: '蛛后暴走', sub: '她只剩一半了，林子里的东西全涌了出来；一口气打倒她' },
+      intro: { title: '织网蛛母暴走', sub: '她只剩一半了，林子里的东西全涌了出来；一口气打倒她' },
       mix: [
         { kind: 'zombie', weight: 2 },
         { kind: 'locust', weight: 2 },
@@ -71,7 +71,7 @@ const MEADOW_BOSS: FightDef = {
       spawns: [
         { kind: 'stream', intervalMs: 1300 },
         { kind: 'batch', atMs: 800, squad: { count: 8, enemy: 'locust', at: { kind: 'gate', gate: 'swarm' } }, banner: { title: '蝗群', sub: '一大群跳蝗从天上扑下来' } },
-        { kind: 'batch', atMs: 12_000, squad: { count: 5, enemy: 'boar', at: { kind: 'gate', gate: 'bank' } }, banner: { title: '坡顶', sub: '野猪从坡顶冲下来了' } },
+        { kind: 'batch', atMs: 12_000, squad: { count: 5, enemy: 'boar', at: { kind: 'gate', gate: 'bank' } }, banner: { title: '坡顶', sub: '山猪从坡顶冲下来了' } },
       ],
       ends: [{ kind: 'boss' }],
     },
@@ -82,7 +82,7 @@ const MEADOW_BOSS: FightDef = {
 export const CHAPTER = {
   emoji: '1f33c',
   name: '草甸',
-  desc: '林子边上的一片草甸：守住闩着的栅栏门，轮流当队长清怪，顶住从坡顶抛下来的敌人，最后打倒从林缘爬出来的蛛后。选一名首发出发，击杀攒全队经验，升级时招人或给队员升级；每逛完一次商店，回到战场就是一片新生成的草甸',
+  desc: '林子边上的一片草甸：守住闩着的栅栏门，轮流当队长清怪，顶住从坡顶抛下来的敌人，最后打倒从林缘爬出来的织网蛛母。选一名首发出发，击杀攒全队经验，升级时招人或给队员升级；每逛完一次商店，回到战场就是一片新生成的草甸',
   chapter: 'meadow',
   stars: [{ kind: 'downs', count: 5 }, { kind: 'time', ms: 380_000 }],
   rules: { between: 'rest' },

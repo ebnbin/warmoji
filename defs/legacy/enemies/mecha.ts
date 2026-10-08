@@ -5,7 +5,7 @@ const FACTORY_BOSS = {
   kind: 'mecha',
   role: 'boss',
   emoji: '2622',
-  name: '失控核心',
+  name: '核能机甲',
   desc: '立起护盾塔，塔还立着核心就打不动；追踪导弹紧咬不放；血过半开始泄漏、再立两座塔，环扫激光与重锤齐下；击退免疫',
   size: 3.4,
   radius: 1.1,

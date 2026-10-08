@@ -45,7 +45,7 @@ export const levels = [{ add: { maxHp: 50 }, mul: { damage: 1.15 } }, { add: { m
 
 export default {
   emoji: '26c4',
-  name: '雪人',
+  name: '雪娃娃',
   desc: '以自己为中心散发寒气，持续减速范围内的敌人',
   role: 'controller',
   tags: ['control', 'area'],
