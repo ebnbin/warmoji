@@ -17,7 +17,7 @@ import type { Point } from '../util/vec'
 import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
-import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
+import { battleSprites } from '../manifest'
 import { adoptRun, getRun, INVINCIBLE_HP, nextStep, runDef, stepOf } from '../run/state'
 import { claimNothing, claimRecruit, claimUpgrade, levelUpOptions, pendingLevelUps } from '../run/levelUp'
 import { memberLevel, teamLeveled } from '../run/members'
@@ -594,7 +594,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   }
 
   private async boot(gen: number, run: RunState, hint: Phaser.GameObjects.Text): Promise<void> {
-    const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
+    const atlas = await EcsAtlas.build(this, battleSprites(run))
     if (gen !== this.bootGen) return
     this.atlas = atlas
     resetEntities()

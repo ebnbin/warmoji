@@ -51,7 +51,6 @@ class HoldFile extends Phaser.Loader.File {
 
 let table: HoldTable<HTMLImageElement> | undefined
 const holdsOf = new Map<Phaser.Scene, Set<Hold>>()
-const reported = new Set<string>()
 let settleQueued = false
 let fileSerial = 0
 
@@ -93,6 +92,9 @@ function scheduleSettle(game: Phaser.Game): void {
   })
 }
 
+/** 每个场景持有的纹理 key，场景关掉时随持有一起清掉 */
+const heldKeys = new Map<Phaser.Scene, Set<string>>()
+
 function hold(scene: Phaser.Scene, refs: readonly EmojiRef[]): Hold {
   const specs = new Map<string, TextureSpec<HTMLImageElement>>()
   for (const r of refs) {
@@ -105,13 +107,26 @@ function hold(scene: Phaser.Scene, refs: readonly EmojiRef[]): Hold {
   if (!mine) {
     const set = (mine = new Set<Hold>())
     holdsOf.set(scene, set)
+    heldKeys.set(scene, new Set())
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       holdsOf.delete(scene)
+      heldKeys.delete(scene)
       for (const x of set) x.release()
     })
   }
   mine.add(h)
+  const keys = heldKeys.get(scene)!
+  for (const k of h.keys) keys.add(k)
   return h
+}
+
+/** 场景要显示一个 emoji：由这个场景持有到它关掉；纹理已经在了 ready 是 undefined，否则等它载好 */
+export function holdEmoji(scene: Phaser.Scene, ref: EmojiRef): { readonly key: string; readonly ready?: Promise<void> } {
+  const key = emojiKey(ref.id, ref.outline)
+  if (heldKeys.get(scene)?.has(key) && scene.textures.exists(key)) return { key }
+  const h = heldKeys.get(scene)?.has(key) ? undefined : hold(scene, [ref])
+  if (scene.textures.exists(key)) return { key }
+  return { key, ready: h?.ready ?? tableOf(scene.game).waitFor(key) }
 }
 
 export function emojiHoldStats(game: Phaser.Game): { table: HoldStats; scenes: { key: string; holds: number }[] } {
@@ -125,21 +140,3 @@ export function preloadEmojis(scene: Phaser.Scene, refs: readonly EmojiRef[]): v
   const h = hold(scene, refs)
   if (!h.done) scene.load.addFile(new HoldFile(scene.load, h))
 }
-
-function assertHeld(scene: Phaser.Scene, key: string): void {
-  const mine = holdsOf.get(scene)
-  if (!mine) return
-  for (const h of mine) if (h.keys.has(key)) return
-  const tag = `${scene.scene.key}|${key}`
-  if (reported.has(tag)) return
-  reported.add(tag)
-  console.error(`${scene.scene.key} 未持有 emoji 纹理：${key}`)
-}
-
-/** 场景已持有的 emoji 纹理 key；未持有时报错一次 */
-export function heldEmojiKey(scene: Phaser.Scene, id: string, outline?: OutlineKind): string {
-  const key = emojiKey(id, outline)
-  assertHeld(scene, key)
-  return key
-}
-

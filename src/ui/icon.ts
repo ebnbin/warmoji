@@ -1,22 +1,27 @@
 import Phaser from 'phaser'
-import { heldEmojiKey } from '../emoji/hold'
+import { holdEmoji } from '../emoji/hold'
 import type { OutlineKind } from '../emoji/svg'
-import { ensureEmoji } from '../emoji/textures'
 
-/** 场景已预载的 emoji 图标 */
+/** emoji 图标：所在场景持有它的纹理到场景关掉；纹理还没载好时先空着，载好了自己换上 */
 export class Icon extends Phaser.GameObjects.Image {
   private side: number
+  private want = 0
 
   constructor(scene: Phaser.Scene, x: number, y: number, id: string, size: number, outline?: OutlineKind) {
-    super(scene, x, y, heldEmojiKey(scene, id, outline))
+    super(scene, x, y, '__DEFAULT')
     this.side = size
     scene.add.existing(this)
-    this.setDisplaySize(size, size)
+    this.setEmoji(id, outline)
   }
 
   setEmoji(id: string, outline?: OutlineKind): this {
-    this.setTexture(heldEmojiKey(this.scene, id, outline))
-    return this.setDisplaySize(this.side, this.side)
+    const ticket = ++this.want
+    const { key, ready } = holdEmoji(this.scene, { id, outline })
+    if (!ready) return this.setTexture(key).setDisplaySize(this.side, this.side)
+    void ready.then(() => {
+      if (ticket === this.want && this.active && this.scene.textures.exists(key)) this.setTexture(key).setDisplaySize(this.side, this.side)
+    })
+    return this.setTexture('__DEFAULT').setDisplaySize(this.side, this.side)
   }
 
   setSide(size: number): this {
@@ -25,7 +30,7 @@ export class Icon extends Phaser.GameObjects.Image {
   }
 }
 
-/** 显示任意纹理的方形图；未就绪前隐藏，可异步加载未预载的 emoji */
+/** 显示任意纹理的方形图；未就绪前隐藏，emoji 由所在场景持有、载好再显示 */
 export class Picture extends Phaser.GameObjects.Image {
   private side: number
   private want = 0
@@ -51,11 +56,10 @@ export class Picture extends Phaser.GameObjects.Image {
   showEmoji(id: string, size = this.side): void {
     const ticket = ++this.want
     this.setVisible(false)
-    void ensureEmoji(this.scene, id)
-      .then((key) => {
-        if (ticket !== this.want || !this.active) return
-        this.show(key, size)
-      })
-      .catch((err: unknown) => console.warn(`emoji 加载失败 ${id}: ${String(err)}`))
+    const { key, ready } = holdEmoji(this.scene, { id })
+    void (ready ?? Promise.resolve()).then(() => {
+      if (ticket !== this.want || !this.active || !this.scene.textures.exists(key)) return
+      this.show(key, size)
+    })
   }
 }

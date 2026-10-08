@@ -5,6 +5,7 @@ import { keysOf } from '../util/record'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
 import type { AnimClipId } from '../types/anim'
+import type { BattleSprites } from '../manifest'
 
 const CELL = 256
 const PAGE = 2048
@@ -31,6 +32,26 @@ function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLI
 
 const NO_CLIP = { base: -1, frames: 0 }
 
+interface Variant {
+  readonly id: string
+  readonly outline: OutlineKind | undefined
+}
+
+/** 要画的变体去重排好：先按描边、再是不描边的 */
+function variantsOf(sprites: BattleSprites): Variant[] {
+  const out: Variant[] = []
+  const seen = new Set<VariantKey>()
+  const take = (id: string, outline: OutlineKind | undefined): void => {
+    const k = variantKey(id, outline)
+    if (seen.has(k)) return
+    seen.add(k)
+    out.push({ id, outline })
+  }
+  for (const outline of keysOf(sprites.outlined)) for (const id of sprites.outlined[outline]) take(id, outline)
+  for (const id of sprites.plain) take(id, undefined)
+  return out
+}
+
 let atlasSerial = 0
 let shared: EcsAtlas | undefined
 let building: Promise<EcsAtlas> | undefined
@@ -50,6 +71,20 @@ export class EcsAtlas {
 
   dispose(): void {
     this.disposed = true
+  }
+
+  /** 换成别的图集时放掉图集页的纹理 */
+  private release(scene: Phaser.Scene): void {
+    this.disposed = true
+    for (const p of this.pages) if (scene.textures.exists(p.key)) scene.textures.remove(p.key)
+    this.pages.length = 0
+    this.canvases.length = 0
+    this.ctxs.length = 0
+  }
+
+  /** 收没收这一局要画的全部变体 */
+  private covers(variants: readonly Variant[]): boolean {
+    return variants.every((v) => this.keyToFrame.has(variantKey(v.id, v.outline)))
   }
 
   private rebind(scene: Phaser.Scene): void {
@@ -185,14 +220,17 @@ export class EcsAtlas {
     return this.pages[page]!.get().source.glTexture!
   }
 
-  static async build(
-    scene: Phaser.Scene,
-    outlined: Record<OutlineKind, readonly string[]>,
-    plain: readonly string[],
-  ): Promise<EcsAtlas> {
-    if (!shared) {
-      building ??= EcsAtlas.create(scene, outlined, plain)
-        .then((a) => (shared = a))
+  /** 这一局的图集：手上的收全了这一局要画的就接着用，否则只按这一局的重建，放掉原来的 */
+  static async build(scene: Phaser.Scene, sprites: BattleSprites): Promise<EcsAtlas> {
+    const variants = variantsOf(sprites)
+    while (building) await building
+    if (!shared?.covers(variants)) {
+      const old = shared
+      building = EcsAtlas.create(scene, variants)
+        .then((a) => {
+          old?.release(scene)
+          return (shared = a)
+        })
         .finally(() => {
           building = undefined
         })
@@ -203,24 +241,8 @@ export class EcsAtlas {
     return atlas
   }
 
-  private static async create(
-    scene: Phaser.Scene,
-    outlined: Record<OutlineKind, readonly string[]>,
-    plain: readonly string[],
-  ): Promise<EcsAtlas> {
-    const variants: { id: string; outline: OutlineKind | undefined }[] = []
-    const seen = new Set<VariantKey>()
-    const take = (id: string, outline: OutlineKind | undefined): void => {
-      const k = variantKey(id, outline)
-      if (seen.has(k)) return
-      seen.add(k)
-      variants.push({ id, outline })
-    }
-    for (const outline of keysOf(outlined)) {
-      for (const id of outlined[outline]) take(id, outline)
-    }
-    for (const id of plain) take(id, undefined)
-
+  private static async create(scene: Phaser.Scene, variants: readonly Variant[]): Promise<EcsAtlas> {
+    if (variants.length > MAX_FRAMES) console.error(`图集放不下这一局要画的 ${variants.length} 个变体，上限 ${MAX_FRAMES}`)
     const atlas = new EcsAtlas()
     const imgs = await Promise.all(
       variants.map(async ({ id, outline }) => {
@@ -232,7 +254,7 @@ export class EcsAtlas {
         }
       }),
     )
-    for (let i = 0; i < variants.length; i++) {
+    for (let i = 0; i < variants.length && atlas.hasRoom(1); i++) {
       const img = imgs[i]
       if (!img) continue
       const { id, outline } = variants[i]!
