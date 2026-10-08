@@ -21,6 +21,7 @@ import { foldBody, setStatLayer } from '../../utils/stats'
 import { gearDodged, gearHurt, gearLethal, gearLowHp, gearStruck } from './gear'
 import { spawnFxCircle } from '../../entities/fx'
 import { counterMul } from '../../../data/elements'
+import { toPx } from '../../../data/px'
 import { elementNow, touchElement } from '../../utils/element'
 import type { ElementReaction } from '../../../types/elements'
 import type { Point } from '../../../util/vec'
@@ -265,9 +266,10 @@ function shove(sim: Sim, src: Source, target: number, o: HitOpts): void {
 /** 元素反应：在被打中处闪一圈，再由出手方施加反应的效果，效果不带元素；被打中的已经倒下就只施加不看目标的 */
 function reacted(sim: Sim, src: Source, target: number, uid: number, r: ElementReaction, at: Point, dmg: number): void {
   spawnFxCircle(sim, at.x, at.y, 24, { fill: r.color, fillAlpha: 0.4, stroke: r.color, lineWidth: 4, lineAlpha: 0.9, fromScale: 0.5, toScale: 1.8, durationMs: 320, depth: 14 })
-  if (!r.effects) return
+  const effects = toPx(r).effects
+  if (!effects) return
   const alive = Alive.v[target] === 1 && Uid.v[target] === uid
-  applyAbilityEffects(sim, { ...src, element: 0 }, r.effects, { x: at.x, y: at.y, baseDamage: dmg, targets: alive ? [target] : [] })
+  applyAbilityEffects(sim, { ...src, element: 0 }, effects, { x: at.x, y: at.y, baseDamage: dmg, targets: alive ? [target] : [] })
 }
 
 /** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
