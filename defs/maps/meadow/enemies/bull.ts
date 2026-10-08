@@ -27,7 +27,7 @@ const BULL = {
       knockback: 6,
       fireSfx: 'charge',
       windup: { ms: 900, lockAt: 'start', telegraph: 'shake' },
-      shape: { kind: 'sprint', distance: 8, ms: 800 },
+      shape: { kind: 'sprint', distance: 8, ms: 800, radius: 1 },
       reactions: [{ on: 'cast', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 1000 }] }],
     },
   ],

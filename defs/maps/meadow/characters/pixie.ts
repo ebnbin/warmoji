@@ -1,35 +1,37 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
+import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧚 花仙子：花粉治最伤的队友，花瓣打敌人，两样轮着来；技能给全队挂上护盾并解掉控制
-const pixiePollen = {
-  trigger: 'auto',
-  cooldownMs: 1300,
-  aim: 'self',
-  fireSfx: 'chirp',
-  shape: { kind: 'disc', radius: 5, at: 'self', of: 'hurt' },
-  onHit: [{ kind: 'heal', amount: 12, scope: 'lowest' }],
-} satisfies AbilityDef
+// 花粉不论有没有人受伤都放出去，免得没人受伤时轮不到花瓣
+const pollen = (then: readonly Effect[]) =>
+  ({
+    trigger: 'auto',
+    cooldownMs: 1300,
+    aim: 'self',
+    fireSfx: 'chirp',
+    shape: { kind: 'world' },
+    onHit: [{ kind: 'to', who: { side: 'allies', radius: 5, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 }, then }],
+  }) satisfies AbilityDef
 
 const pixiePetal = {
   trigger: 'auto',
   cooldownMs: 1300,
   aim: 'nearest',
   range: 6,
-  damage: 10,
+  damage: 13,
   fireSfx: 'shoot',
   shape: { kind: 'bolt', projectile: shot('1f338', 9, 0.42), lifeMs: 1400 },
 } satisfies AbilityDef
 
-const pixieDance = { ...pixiePollen, cycle: [pixiePetal] } satisfies AbilityDef
+const HEAL = { kind: 'heal', amount: 12 } as const satisfies Effect
+const MEND = { kind: 'mend', amount: 4, tickMs: 500, durationMs: 3000 } as const satisfies Effect
+const GARLAND = { kind: 'shield', amount: 0, ratio: 0.08, ms: 3000 } as const satisfies Effect
 
-const pixiePollen2 = { ...pixiePollen, onHit: [{ kind: 'heal', amount: 8, scope: 'lowest' }, { kind: 'mend', amount: 4, tickMs: 500, durationMs: 3000 }] } satisfies AbilityDef
-const pixieDance2 = { ...pixiePollen2, cycle: [pixiePetal] } satisfies AbilityDef
-
-const pixiePollen3 = { ...pixiePollen2, onHit: [...pixiePollen2.onHit, { kind: 'shield', amount: 0, ratio: 0.08, ms: 3000 }] } satisfies AbilityDef
-const pixieDance3 = { ...pixiePollen3, cycle: [pixiePetal] } satisfies AbilityDef
+const pixieDance = { ...pollen([HEAL]), cycle: [pixiePetal] } satisfies AbilityDef
+const pixieDance2 = { ...pollen([{ ...HEAL, amount: 8 }, MEND]), cycle: [pixiePetal] } satisfies AbilityDef
+const pixieDance3 = { ...pollen([{ ...HEAL, amount: 8 }, MEND, GARLAND]), cycle: [pixiePetal] } satisfies AbilityDef
 
 const pixieBlessing = {
   trigger: 'manual',

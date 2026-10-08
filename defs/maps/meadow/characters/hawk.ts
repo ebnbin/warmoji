@@ -14,7 +14,7 @@ const hawkFeather = {
   shape: { kind: 'bolt', projectile: shot('1fab6', 12, 0.45, 45), lifeMs: 1200, pierce: 1 },
 } satisfies AbilityDef
 
-const hawkFeather2 = { ...hawkFeather, repeat: { count: 3, spreadDeg: 24, ratio: 0.7 } } satisfies AbilityDef
+const hawkFeather2 = { ...hawkFeather, damage: 9, repeat: { count: 3, spreadDeg: 24 } } satisfies AbilityDef
 
 const hawkBolt = {
   ...hawkFeather,

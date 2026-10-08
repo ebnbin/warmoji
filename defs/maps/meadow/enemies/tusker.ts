@@ -27,7 +27,7 @@ const TUSKER = {
       knockback: 4,
       fireSfx: 'charge',
       windup: { ms: 750, lockAt: 'start', telegraph: 'shake' },
-      shape: { kind: 'sprint', distance: 5, ms: 520 },
+      shape: { kind: 'sprint', distance: 5, ms: 520, radius: 0.9 },
     },
   ],
 } satisfies EnemyDef

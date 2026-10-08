@@ -25,7 +25,7 @@ const GOAT = {
       damage: 8,
       fireSfx: 'bleat',
       windup: { ms: 420, lockAt: 'start', telegraph: 'shake' },
-      shape: { kind: 'sprint', distance: 2.6, ms: 280 },
+      shape: { kind: 'sprint', distance: 2.6, ms: 280, radius: 0.85 },
       onHit: [{ kind: 'shove', distance: 3.2, ms: 320 }],
     },
   ],

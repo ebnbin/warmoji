@@ -54,7 +54,7 @@ const BEAR = {
       knockback: 6,
       fireSfx: 'charge',
       windup: { ms: 800, lockAt: 'start', telegraph: 'shake' },
-      shape: { kind: 'sprint', distance: 7, ms: 700 },
+      shape: { kind: 'sprint', distance: 7, ms: 700, radius: 1.5 },
     },
   ],
   phases: [{ below: 0.5, name: '暴怒', stats: { mul: { moveSpeed: 1.3, damage: 1.2, cooldown: 0.8 } }, effects: [{ kind: 'unstoppable', durationMs: 2500 }] }],
