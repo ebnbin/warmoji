@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Hp, Transform } from './components'
+import { Fx, Hp, Shard, Transform } from './components'
 import { restoreSandbox, sandboxState, sandboxVersion } from './sandbox/knobs'
 import type { SandboxState } from './sandbox/knobs'
 import { numChoiceValues, pinNumChoices } from './systems/shared/devNumbers'
@@ -50,29 +50,25 @@ export interface Tape {
 const f64 = new Float64Array(1)
 const u32 = new Uint32Array(f64.buffer)
 
-/** 战局的校验值：步数、世界时间、随机数、队长、战果，与每个有位置的实体的编号、坐标、生命 */
+const mix = (h: number, v: number): number => {
+  f64[0] = v
+  return Math.imul(Math.imul(h ^ u32[0]!, 0x01000193) ^ u32[1]!, 0x01000193)
+}
+
+/** 战局的校验值：步数、世界时间、随机数、队长、战果，与每个玩法实体的坐标和生命；特效与碎片只给画面看，不算；与实体编号和遍历次序无关 */
 export function stateHash(sim: Sim): number {
   let h = 0x811c9dc5
-  const mix = (v: number): void => {
-    f64[0] = v
-    h = Math.imul(h ^ u32[0]!, 0x01000193)
-    h = Math.imul(h ^ u32[1]!, 0x01000193)
-  }
-  mix(sim.tick)
-  mix(sim.elapsedMs)
-  mix(sim.rng.snapshot())
-  mix(sim.leader)
-  mix(sim.run.kills)
-  mix(sim.run.coins)
-  mix(sim.run.xp.level)
-  mix(sim.run.xp.xp)
+  for (const v of [sim.tick, sim.elapsedMs, sim.rng.snapshot(), sim.leader, sim.run.kills, sim.run.coins, sim.run.xp.level, sim.run.xp.xp]) h = mix(h, v)
+  let sum = 0
+  let n = 0
   for (const eid of query(sim.world, [Transform])) {
-    mix(eid)
-    mix(Transform.x[eid]!)
-    mix(Transform.y[eid]!)
-    if (hasComponent(sim.world, eid, Hp)) mix(Hp.v[eid]!)
+    if (hasComponent(sim.world, eid, Fx) || hasComponent(sim.world, eid, Shard)) continue
+    let e = mix(mix(0x811c9dc5, Transform.x[eid]!), Transform.y[eid]!)
+    if (hasComponent(sim.world, eid, Hp)) e = mix(e, Hp.v[eid]!)
+    sum = (sum + e) >>> 0
+    n++
   }
-  return h >>> 0
+  return mix(mix(h, n), sum) >>> 0
 }
 
 const sameTuning = (a: Readonly<Record<string, number>>, b: Readonly<Record<string, number>>): boolean => {
