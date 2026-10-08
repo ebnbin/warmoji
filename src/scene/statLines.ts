@@ -1,10 +1,11 @@
 import { KNOCKBACK_TAU_MS } from '../data/abilities'
 import { reactionEffects } from '../data/reactions'
 import { STAT_KEYS, STATS, modTexts, statText } from '../data/stats'
-import { CHARACTERS, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
+import { CHARACTERS, INSTINCT, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
+import type { InstinctDef, InstinctRule } from '../types/roles'
 import { gearMods, resolveAbilityDef } from '../data/items'
 import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ROLES } from '../data/roles'
@@ -431,6 +432,27 @@ export function abilityStatLines(w: AbilityDef): string[] {
   return lines
 }
 
+function instinctWhat(d: InstinctDef): string {
+  switch (d.kind) {
+    case 'engage':
+      return '贴上最近的敌人打'
+    case 'guard':
+      return `站到队长与离队长最近的敌人之间，离队长至多 ${grid(d.reach)}`
+    case 'dive':
+      return `扑向 ${grid(d.radius)} 内生命低于 ${pct(d.ratio)} 的敌人里最残的那个`
+    case 'kite':
+      return `和敌人保持 ${grid(d.distance)}，被贴近就后撤`
+    case 'tend':
+      return `靠到生命低于 ${pct(d.ratio)} 的队友里最残的那个身边`
+  }
+}
+
+/** 一条本能的说法：条件里的目标是离自己最近的敌人 */
+export function instinctLine(r: InstinctRule): string {
+  if (!r.if) return instinctWhat(r.do)
+  return r.if.kind === 'within' ? `敌人进到 ${grid(r.if.radius)} 内时${instinctWhat(r.do)}` : `${condLine(r.if)}时${instinctWhat(r.do)}`
+}
+
 /** 属性面板开头三行固定显示的属性：生命、行动与体力，其余与默认值不同的排在后面 */
 const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'revive', 'maxStamina', 'staminaRegen', 'exertion']
 
@@ -454,6 +476,7 @@ export function characterStatGroups(
     const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
     if (rest.length > 0) baseLines.push(rest.join(' · '))
     if (def.resource) baseLines.push(resourceLine(def.resource))
+    baseLines.push(`跟队时：${def.instincts.map(instinctLine).join('；')}；都不成就回坑位，离队长不超过 ${grid(INSTINCT.leash)}，躲开危险的地方`)
     groups.push({ icon: '2764', title: `基础 · ${ROLES[def.role].name}`, lines: baseLines })
   }
   groups.push({

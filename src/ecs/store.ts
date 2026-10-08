@@ -1,6 +1,7 @@
 import { INITIAL_CAPACITY } from './world'
 import type { BodyRules, EnemyDef, NpcDef, ResourceDef } from '../types/enemies'
 import type { AffixId } from '../types/affixes'
+import type { InstinctDef } from '../types/roles'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Cond, Effect, Split } from '../types/abilityDefs'
 import type { Source } from './utils/source'
@@ -21,6 +22,9 @@ export const enemyOf = slots<EnemyDef>()
 
 /** 精英身上挂的词缀 */
 export const eliteAffixes = slots<readonly AffixId[]>()
+
+/** 队员此刻按哪种本能站位，回坑位时没有 */
+export const followerInstinct = slots<InstinctDef>()
 
 /** 身体当前的外观（形态切换后），没有就用定义里的；角色与非玩家身体同一个 */
 export const bodyLook = slots<string>()

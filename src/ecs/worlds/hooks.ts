@@ -122,6 +122,8 @@ export interface WorldHooks {
   landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
   /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（浮冰是风速）；不偏为零 */
   lean(sim: Sim): Point
+  /** 身体 eid 站在 (x, y) 会不会被地图伤到：队员的本能不往这种地方站；不写就哪里都不伤 */
+  harms?(sim: Sim, eid: number, x: number, y: number): boolean
   /** 队员在队长 from 身后的坑位 at 落在不该站的地方时挪开；不写就不挪 */
   seat?(sim: Sim, from: Point, at: Point): Point
   /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */

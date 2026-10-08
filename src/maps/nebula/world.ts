@@ -225,6 +225,11 @@ export const nebula: WorldHooks = {
     const s = nebulaOf(sim)
     return roomFor(s.cavity, x, y, radius) && Math.hypot(x - s.layout.hx, y - s.layout.hy) >= nebulaClearPx(sim)
   },
+  /** 黑洞边上这具身体走不出来的那一圈，识险的敌人绕开的也是它 */
+  harms(sim, eid, x, y) {
+    const s = nebulaOf(sim)
+    return Math.hypot(x - s.layout.hx, y - s.layout.hy) < reachPx(s, Phys.mass[eid]! / Phys.drag[eid]!, Stats.moveSpeed[eid]!) + UNIT
+  },
   /**
    * hole 是黑洞；meteor 是刚撞碎在壳层上的流星，碎块从那里的内壁甩进来，撞碎后一阵就没了；
    * horizon 是黑洞朝着队长那一侧、最慢的敌人刚好走得出来的地方，朝着队长

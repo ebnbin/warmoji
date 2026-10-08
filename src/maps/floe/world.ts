@@ -276,6 +276,10 @@ export const floe: WorldHooks = {
     return floeOf(sim).ground
   },
   /** 落在冰上离冰缘留得出身体；此刻的风推得动它的地方（光冰、新冰）离冰缘再多留一截 */
+  /** 冰缘外是冰水，离冰缘不到身体半径就掉得进去：会飞的、耐寒的不怕 */
+  harms(sim, eid, x, y) {
+    return !hasTrait(sim.world, eid, 'flies') && !hasTrait(sim.world, eid, 'coldproof') && edgeAt(floeOf(sim).field, x, y) * UNIT < Radius.v[eid]!
+  },
   canSpawn(sim, x, y, radius) {
     const s = floeOf(sim)
     if (!roomFor(s.ground, x, y, radius)) return false

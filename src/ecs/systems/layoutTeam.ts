@@ -8,6 +8,8 @@ import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
 import { fanDistance, fanSpreadDeg, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
+import { dangers, followerGoal } from './shared/instinct'
+import { followerInstinct } from '../store'
 
 const HEADING_MIN = 0.5
 /** 队员离坑位比这（格）远时按地图的寻路走 */
@@ -62,7 +64,10 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位（远了按地图的寻路绕过障碍），扇形只给活着的队员留坑；进占位半径即占位、同位取最近；这一帧不能自己走时不动；离队长的路（地图认得传送门就按穿门的路）太远直接拉回目标位 */
+/**
+ * 队员的驱动指向本能挑的地方，没有就是队长身后扇形上的目标位（远了按地图的寻路绕过障碍），都躲开危险；扇形只给活着的队员留坑；进占位半径即占位、同位取最近；
+ * 这一帧不能自己走时不动；离队长的路（地图认得传送门就按穿门的路）太远直接拉回目标位
+ */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -95,6 +100,8 @@ export function layoutTeam(sim: Sim): void {
     Seat.v[f] = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
   }
   const recall = recallDist() > 0 ? recallDist() * UNIT : Infinity
+  const danger = dangers(sim)
+  for (const c of sim.characters) followerInstinct[c] = undefined
   for (const f of followers) {
     Phys.grip[f] = TEAM.followerGrip
     if (!Ctl.move[f]) continue
@@ -109,11 +116,14 @@ export function layoutTeam(sim: Sim): void {
       Phys.vy[f] = 0
       continue
     }
-    const d = sim.hooks.worldDelta(sim, x, y, seat.x, seat.y)
+    const goal = followerGoal(sim, f, seat, danger)
+    followerInstinct[f] = goal.how ?? undefined
+    const at = goal.at
+    const d = sim.hooks.worldDelta(sim, x, y, at.x, at.y)
     const dist = Math.hypot(d.x, d.y)
     if (dist <= seatR) continue
-    // 离坑位远了就按地图的寻路走，近了直奔坑位
-    const way = dist > NAVIGATE_U * UNIT ? sim.hooks.chaseDir(sim, f, seat.x, seat.y) : { x: d.x / dist, y: d.y / dist }
+    // 离要去的地方远了就按地图的寻路走，近了直奔过去
+    const way = dist > NAVIGATE_U * UNIT ? sim.hooks.chaseDir(sim, f, at.x, at.y) : { x: d.x / dist, y: d.y / dist }
     const nx = way.x
     const ny = way.y
     const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1

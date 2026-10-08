@@ -62,6 +62,7 @@ import type { Issue } from '../src/data/runCheck.ts'
 import type { AbilityDef, Cond, CondWho } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
 import type { AffixDef } from '../src/types/affixes'
+import type { InstinctDef, InstinctRule, RoleDef } from '../src/types/roles'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind, UnitBase } from '../src/types/enemies'
 import type { Span } from '../src/types/obstacles'
@@ -1071,6 +1072,31 @@ const TABLES = {
   const icons = list.flatMap(([, d]) => (d.icon ? [d.icon.rank] : []))
   need(new Set(icons).size === icons.length, `状态的图标轻重有重复：${icons.join(',')}`)
   for (const [id, d] of list) need(d.merge !== 'bySource' || d.forces !== undefined, `statuses.${id} 按施加者分格的只能是牵着走的状态`)
+}
+
+/** 本能：生命比例在 (0, 1] 内、距离为正；队员离队长的绳长为正，躲危险的余量不为负 */
+{
+  const ok = (d: InstinctDef): boolean => {
+    switch (d.kind) {
+      case 'engage':
+        return true
+      case 'guard':
+        return d.reach > 0
+      case 'dive':
+        return d.radius > 0 && d.ratio > 0 && d.ratio <= 1
+      case 'kite':
+        return d.distance > 0
+      case 'tend':
+        return d.ratio > 0 && d.ratio <= 1
+    }
+  }
+  const lists: [string, readonly InstinctRule[]][] = [
+    ...Object.entries<RoleDef>(ROLES).map(([id, r]): [string, readonly InstinctRule[]] => [`roles.${id}`, r.instincts]),
+    ...Object.entries<CharacterAuthoring>(CHARACTERS).map(([id, c]): [string, readonly InstinctRule[]] => [`characters.${id}`, c.instincts ?? []]),
+  ]
+  for (const [at, list] of lists) for (const r of list) need(ok(r.do), `${at} 的本能取值不对：${JSON.stringify(r.do)}`)
+  const { leash, margin } = TEAM_BASELINE.instinct
+  need(leash > 0 && margin >= 0, `team.instinct 的绳长须为正、余量不为负`)
 }
 
 /** 精英词缀：抽得出 min 到 max 个不重样的 */

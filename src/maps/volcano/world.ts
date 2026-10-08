@@ -132,6 +132,10 @@ export const volcano: WorldHooks = {
     const f = volcanoOf(sim).field
     return roomFor(f.basin, x, y, radius) && !moltenAt(f, x, y)
   },
+  /** 没凝固的熔岩烫脚：会飞的、耐火的不怕 */
+  harms(sim, eid, x, y) {
+    return !hasTrait(sim.world, eid, 'flies') && !hasTrait(sim.world, eid, 'fireproof') && moltenAt(volcanoOf(sim).field, x, y)
+  },
   /** 关卡要它喷发：平静时立刻起预兆，正在喷发的这一次出完立刻再起预兆，已经在预兆的照旧 */
   cue(sim, c) {
     const s = volcanoOf(sim)
