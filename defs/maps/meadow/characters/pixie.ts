@@ -4,7 +4,7 @@ import type { StatMods } from '../../../../src/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧚 花仙子：花粉治最伤的队友，花瓣打敌人，两样轮着来；技能给全队挂上护盾并解掉控制
-// 花粉不论有没有人受伤都放出去，免得没人受伤时轮不到花瓣
+// 花粉与花瓣都用 world 出手，没人受伤或没有敌人时也照样轮下去
 const pollen = (then: readonly Effect[]) =>
   ({
     trigger: 'auto',
@@ -18,11 +18,22 @@ const pollen = (then: readonly Effect[]) =>
 const pixiePetal = {
   trigger: 'auto',
   cooldownMs: 1300,
-  aim: 'nearest',
-  range: 6,
-  damage: 13,
-  fireSfx: 'shoot',
-  shape: { kind: 'bolt', projectile: shot('1f338', 9, 0.42), lifeMs: 1400 },
+  aim: 'self',
+  shape: { kind: 'world' },
+  onHit: [
+    {
+      kind: 'cast',
+      ability: {
+        trigger: 'manual',
+        class: 'attack',
+        aim: 'nearest',
+        range: 6,
+        damage: 13,
+        fireSfx: 'shoot',
+        shape: { kind: 'bolt', projectile: shot('1f338', 9, 0.42), lifeMs: 1400 },
+      },
+    },
+  ],
 } satisfies AbilityDef
 
 const HEAL = { kind: 'heal', amount: 12 } as const satisfies Effect

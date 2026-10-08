@@ -5,7 +5,7 @@ const STORM_CLOUD = {
   emoji: '26c8',
   name: '雷雨云',
   element: 'thunder',
-  desc: '开阔的草甸上没处躲：雷雨云飘在半空绕着队伍转，隔一阵往队员脚下劈雷，劈中的麻一下',
+  desc: '开阔的草甸上没处躲：雷雨云飘在半空、离队伍四格远远跟着，隔一阵往队员脚下劈雷，劈中的麻一下',
   size: 1.6,
   radius: 0.55,
   span: [2, 3],
@@ -14,7 +14,7 @@ const STORM_CLOUD = {
   damage: 0,
   xp: 5,
   coins: 3,
-  drive: { kind: 'orbit', radius: 4, aggroRange: 9 },
+  drive: { kind: 'standoff', detectRange: 9, standoffDist: 4 },
   abilities: [
     {
       trigger: 'auto',

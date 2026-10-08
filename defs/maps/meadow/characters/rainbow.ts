@@ -1,9 +1,9 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
-import { patch, zoneLook } from '../../../kit.ts'
+import { zoneLook } from '../../../kit.ts'
 
-// 🦄 独角兽：角上射出一道虹光，扫过的地上留一片余晖；技能在脚下架一座彩虹桥
+// 🦄 独角兽：角上射出一道虹光，照到的敌人身上留着余晖；技能在脚下架一座彩虹桥
 const rainbowBeam = {
   trigger: 'auto',
   cooldownMs: 1300,
@@ -15,7 +15,7 @@ const rainbowBeam = {
   shape: { kind: 'segment', reach: 5, radius: 0.55, ms: 200, beam: true },
 } satisfies AbilityDef
 
-const rainbowBeam2 = { ...rainbowBeam, onHit: [{ kind: 'ground', def: patch(1.2, 2500, 0xfff59d, undefined, 4, 500) }] } satisfies AbilityDef
+const rainbowBeam2 = { ...rainbowBeam, onHit: [{ kind: 'poison', damage: 4, tickMs: 500, durationMs: 2500 }] } satisfies AbilityDef
 
 const rainbowBeam3 = { ...rainbowBeam2, repeat: { count: 3, spreadDeg: 50 } } satisfies AbilityDef
 
@@ -36,7 +36,7 @@ export default {
   emoji: '1f984',
   name: '独角兽',
   element: 'light',
-  desc: '角上射出一道穿过一排敌人的虹光，扫过的地方留一片余晖；技能在脚下架一座彩虹桥，桥下的敌人走不快，桥上的队友回血',
+  desc: '角上射出一道穿过一排敌人的虹光，照到的敌人身上留着灼人的余晖；技能在脚下架一座彩虹桥，桥下的敌人走不快，桥上的队友回血',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],
   body: { drag: 5, mass: 1 },
@@ -49,7 +49,7 @@ export default {
       icon: '1f984',
       base: 'rainbowBeam',
       upgrades: [
-        { ability: 'rainbowBeam2', card: { icon: '1f305', name: '余晖', desc: '虹光照到的敌人脚下留一片 2.5 秒的余晖，每半秒烫一下' } },
+        { ability: 'rainbowBeam2', card: { icon: '1f305', name: '余晖', desc: '虹光照到的敌人身上留着余晖，2.5 秒里每半秒烫一下' } },
         { ability: 'rainbowBeam3', card: { icon: '1f48e', name: '棱镜', desc: '一次射出三道虹光，散开 50 度' } },
       ],
     },
