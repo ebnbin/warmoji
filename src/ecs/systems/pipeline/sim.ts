@@ -21,6 +21,7 @@ import { tickMarks } from '../tickMarks'
 import { tickResources } from '../tickResources'
 import { tickForms } from '../tickForms'
 import { tickIdle } from '../tickIdle'
+import { tickTenacity } from '../tickTenacity'
 import { tickGrowUp } from '../tickGrowUp'
 import { tickPets } from '../tickPets'
 import { tickBorrowed } from '../shared/steal'
@@ -51,10 +52,11 @@ export const SIM_PIPELINE = pipeline([
   { run: tickShadows, after: [tickMarks] },
   { run: tickGrowUp, after: [tickMarks] },
   { run: tickIdle, after: [tickMarks] },
+  { run: tickTenacity, after: [tickMarks] },
   { run: tickBarriers, after: [tickMarks] },
   { run: tickStats, after: [refoldBattleFx, tickMarks, tickForms] },
   { run: tickRegen, after: [tickStats] },
-  { run: updateControl, after: [tickStats, tickMarks] },
+  { run: updateControl, after: [tickStats, tickMarks, tickTenacity] },
   { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
   despawnExpired,

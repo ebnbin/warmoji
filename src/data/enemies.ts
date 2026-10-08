@@ -15,5 +15,6 @@ export const CURVE = DIFF.curve
 export const SPAWN = DIFF.spawn
 export const ELITE = DIFF.elite
 export const SURGE = DIFF.surge
+export const TENACITY = DIFF.tenacity
 
 export const AI = fromJson<AiTuning>(aiJson)

@@ -190,6 +190,18 @@ export interface Difficulty {
     readonly elites: number
     readonly spreadMs: number
   }
+  /** 控制韧性：头目与精英被控制的时间累进条里，打断了正在蓄的力或连发也算 interruptMs；满了解掉控制、霸体 steadfastMs 并清空；不被控制时整条 drainMs 回落到空 */
+  readonly tenacity: {
+    readonly boss: Tenacity
+    readonly elite: Tenacity
+    readonly interruptMs: number
+    readonly drainMs: number
+  }
+}
+/** 多少毫秒的控制填满条，满了霸体多久 */
+export interface Tenacity {
+  readonly fillMs: number
+  readonly steadfastMs: number
 }
 export interface AiTuning {
   readonly wander: {

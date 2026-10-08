@@ -1,6 +1,6 @@
 import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { spawnBody } from './body'
-import { AI, ELITE, ENEMIES, SPAWN } from '../../data/enemies'
+import { AI, ELITE, ENEMIES, SPAWN, TENACITY } from '../../data/enemies'
 import { ACQUIRE, ENEMY_BODY, MORPH } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
@@ -56,6 +56,7 @@ import {
 import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook, marchMark } from '../store'
 import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
+import { attachTenacity } from '../systems/shared/tenacity'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { spawnTelegraph } from './telegraph'
@@ -197,6 +198,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim)
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
+  if (boss || elite) attachTenacity(world, eid, boss ? TENACITY.boss : TENACITY.elite)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })

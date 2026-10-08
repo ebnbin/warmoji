@@ -29,4 +29,10 @@ export const DIFFICULTY = {
     elites: 3,
     spreadMs: 2600,
   },
+  tenacity: {
+    boss: { fillMs: 3000, steadfastMs: 5000 },
+    elite: { fillMs: 2000, steadfastMs: 3000 },
+    interruptMs: 400,
+    drainMs: 6000,
+  },
 } as const satisfies Difficulty

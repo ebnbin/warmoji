@@ -119,6 +119,9 @@ export const Mark = {
 }
 export const CharFlash = { until: f32() }
 
+/** 控制韧性：被控制累计了多少毫秒、填满要多少、满了霸体多久 */
+export const Tenacity = { ms: f32(), fill: f32(), hold: f32() }
+
 export const Enemy = {}
 
 export const Hp = { v: f32(), max: f32() }

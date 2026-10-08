@@ -25,8 +25,10 @@ const STEADFAST = kindsWhere((d) => d.steadfast === true)
 const TURNCOAT = kindsWhere((d) => d.turncoat === true)
 const HALTS = kindsWhere((d) => d.halts === true)
 
+const CC = kindsWhere((d) => d.cc === true)
+
 /** 控制：霸体挡它们，施加霸体时解掉它们 */
-export const CC_MARKS: readonly number[] = [...kindsWhere((d) => d.cc === true)]
+export const CC_MARKS: readonly number[] = [...CC]
 
 /** 净化解掉的：控制与可净化的 */
 export const CLEANSED: readonly number[] = [...kindsWhere((d) => d.cc === true || d.cleansable === true)]
@@ -86,6 +88,11 @@ export function wanderPace(sim: Sim, eid: number): number {
     if (w !== undefined && Mark.until[s]! > now) return w
   }
   return 0
+}
+
+/** 身上有没有正生效的控制 */
+export function isControlled(sim: Sim, eid: number): boolean {
+  return anyOf(sim, eid, CC)
 }
 
 /** 按名字查身上有没有这种状态 */

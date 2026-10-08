@@ -26,6 +26,8 @@ import { spawnCoins } from '../../entities/pickup'
 import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
+import { bumpTenacity } from './tenacity'
+import { TENACITY } from '../../../data/enemies'
 import { fireAbility } from './fire'
 import { grantedAbility } from '../../entities/ability'
 import { healAllies, mend } from './heal'
@@ -748,7 +750,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   interrupt: (sim, _src, _fx, at) => {
-    for (const t of at.targets ?? []) if (!isSteadfast(sim, t)) interrupt(sim, t)
+    for (const t of at.targets ?? []) if (!isSteadfast(sim, t) && interrupt(sim, t)) bumpTenacity(sim.world, t, TENACITY.interruptMs)
   },
 
   warp: (sim, src, fx, at) => {
