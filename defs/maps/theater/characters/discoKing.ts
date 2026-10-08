@@ -9,7 +9,7 @@ const discoKingSpin = {
   cooldownMs: 1000,
   aim: 'nearest',
   range: 2.2,
-  damage: 12,
+  damage: 8,
   fireSfx: 'whoosh',
   color: 0xb388ff,
   shape: { kind: 'disc', radius: 1.7, at: 'self' },
@@ -23,7 +23,7 @@ const discoKingSpin3 = { ...discoKingSpin2, reactions: [{ on: 'fire', to: 'self'
 const discoKingFloor = {
   trigger: 'manual',
   aim: 'self',
-  damage: 10,
+  damage: 5,
   fireSfx: 'upgrade',
   shape: {
     kind: 'zone',
