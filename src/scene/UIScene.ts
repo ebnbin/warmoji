@@ -165,6 +165,8 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       this.events.off(Phaser.Scenes.Events.PAUSE, this.releaseInput, this)
       setActiveHudInput(undefined)
     })
+    // 停住时 update 不跑：重建后当场按战局填好
+    this.update()
   }
 
   /** 打开暂停页：战斗与 HUD 一起停住 */

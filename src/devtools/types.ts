@@ -1,4 +1,5 @@
 import type Phaser from 'phaser'
+import type { ReactNode } from 'react'
 
 export interface DevOption {
   readonly id: string
@@ -51,36 +52,13 @@ export interface DevButtonsItem {
   readonly buttons: readonly { readonly label: string; readonly run: () => void }[]
 }
 
+/** 每次重建条目都会再调用 render：返回同一种组件，React 才保留它的状态 */
 export interface DevCustomItem {
   readonly kind: 'custom'
-  readonly mount: (ctx: DevWidgetContext) => DevWidget
+  readonly render: () => ReactNode
 }
 
 export type DevItem = DevTextItem | DevActionItem | DevToggleItem | DevChoiceItem | DevFlagsItem | DevButtonsItem | DevCustomItem
-
-export interface DevTheme {
-  readonly font: string
-  readonly mono: string
-  readonly caption: number
-  readonly body: number
-  readonly strong: number
-  readonly accent: number
-  readonly res: number
-}
-
-export interface DevWidgetContext {
-  readonly scene: Phaser.Scene
-  readonly width: number
-  readonly theme: DevTheme
-}
-
-/** objects 的坐标以部件左上角为原点 */
-export interface DevWidget {
-  readonly objects: readonly Phaser.GameObjects.GameObject[]
-  readonly height: number
-  update?(time: number): void
-  destroy?(): void
-}
 
 export interface DevSection {
   readonly id: string
@@ -115,18 +93,20 @@ export interface DevLayout {
   readonly width: number
   readonly height: number
   readonly insets: DevInsets
-  readonly textResolution: number
 }
 
 export interface DevToolsConfig {
   readonly key?: string
   readonly storageKey?: string
-  /** Phaser 键名；null 关闭快捷键 */
+  /** KeyboardEvent.code；null 关闭快捷键 */
   readonly hotkey?: string | null
   readonly title?: string
+  /** size 是面板字号，CSS 像素 */
   readonly font?: { readonly family?: string; readonly mono?: string; readonly size?: number }
   readonly accent?: number
-  /** 每次布局时调用；须把 scene 主相机设置成与宿主其他场景一致 */
+  /** 覆盖层每次布局时调用；须把 scene 主相机设置成与宿主其他场景一致 */
   readonly layout?: (scene: Phaser.Scene) => DevLayout
+  /** 面板停靠方式变了时调用：宿主重新排版，排版时经 layoutDock 取游戏区 */
+  readonly relayout?: () => void
   readonly onTap?: () => void
 }

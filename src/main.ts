@@ -18,9 +18,9 @@ import { getRun } from './run/state'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
 import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
-import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, textRes, viewport } from './util/apply'
+import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, setGameArea, viewport } from './util/apply'
 import { FONT_FAMILY, TONE } from './ui/theme'
-import { installDevTools, registerGameProvider } from './devtools'
+import { installDevTools, layoutDock, registerGameProvider } from './devtools'
 import { appProvider } from './dev/app'
 import { audioProvider } from './dev/audio'
 import { emojiProvider } from './dev/emoji'
@@ -55,13 +55,15 @@ installDevTools(game, {
   key: SceneKey.DevTools,
   storageKey: StorageKey.DevTools,
   accent: TONE.accent.face,
-  font: { family: FONT_FAMILY, size: 22 },
+  font: { family: FONT_FAMILY, size: 13 },
   layout: (scene) => {
     applyCamera(scene)
-    return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets, textResolution: textRes() }
+    return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets }
   },
+  relayout: () => refreshViewport(game),
   onTap: () => playSfx('click'),
 })
+setGameArea(layoutDock)
 
 registerGameProvider(appProvider(game))
 registerGameProvider(runProvider(game))
@@ -98,8 +100,7 @@ const scheduleRefresh = (): void => {
 }
 window.addEventListener('resize', scheduleRefresh)
 window.visualViewport?.addEventListener('resize', scheduleRefresh)
-const gameEl = document.getElementById('game')
-if (gameEl) new ResizeObserver(scheduleRefresh).observe(gameEl)
+new ResizeObserver(scheduleRefresh).observe(document.body)
 window.addEventListener('orientationchange', () => {
   if (isStandalone()) {
     refreshViewport(game)

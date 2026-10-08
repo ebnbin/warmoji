@@ -1,14 +1,15 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 
-// src/devtools 是可抽成独立库的中立层：只许依赖 phaser 与目录内模块
+// src/devtools 是可抽成独立库的中立层：只许依赖 phaser、react 与目录内模块
 const root = resolve('src/devtools')
+const PACKAGES = new Set(['phaser', 'react', 'react-dom/client'])
 const files: string[] = []
 const walk = (dir: string): void => {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) walk(p)
-    else if (p.endsWith('.ts')) files.push(p)
+    else if (/\.tsx?$/.test(p)) files.push(p)
   }
 }
 walk(root)
@@ -18,9 +19,9 @@ const errors: string[] = []
 for (const file of files) {
   for (const m of readFileSync(file, 'utf8').matchAll(IMPORT)) {
     const spec = m[1] ?? m[2] ?? m[3]
-    if (spec === undefined || spec === 'phaser') continue
+    if (spec === undefined || PACKAGES.has(spec)) continue
     if (!spec.startsWith('.')) {
-      errors.push(`${file}: devtools 只能依赖 phaser：${spec}`)
+      errors.push(`${file}: devtools 只能依赖 ${[...PACKAGES].join('、')}：${spec}`)
       continue
     }
     const target = resolve(dirname(file), spec)

@@ -37,12 +37,17 @@
         background: #292f33;
         overflow: hidden;
       }
+      /* 游戏区贴着左上角，尺寸由脚本按开发面板的停靠写入 */
       #game {
+        position: absolute;
+        left: 0;
+        top: 0;
         width: 100%;
         height: 100%;
+        overflow: hidden;
       }
       #build-badge {
-        position: fixed;
+        position: absolute;
         right: calc(6px + var(--safe-right));
         bottom: calc(4px + var(--safe-bottom));
         z-index: 10;
@@ -54,8 +59,7 @@
     </style>
   </head>
   <body>
-    <div id="game"></div>
-    <div id="build-badge"></div>
+    <div id="game"><div id="build-badge"></div></div>
     <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>

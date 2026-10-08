@@ -20,21 +20,34 @@ export function nudgeIosViewport(onDone: () => void): void {
   })
 }
 
-function cssSize(): { w: number; h: number } {
+export interface Size {
+  readonly w: number
+  readonly h: number
+}
+
+function windowSize(): Size {
   if (isStandalone()) {
     const short = Math.min(screen.width, screen.height)
     const long = Math.max(screen.width, screen.height)
     const landscape = window.matchMedia('(orientation: landscape)').matches
     return landscape ? { w: long, h: short } : { w: short, h: long }
   }
-  const rect = document.getElementById('game')?.getBoundingClientRect()
+  const rect = document.body.getBoundingClientRect()
   return {
-    w: rect?.width || window.innerWidth,
-    h: rect?.height || window.innerHeight,
+    w: rect.width || window.innerWidth,
+    h: rect.height || window.innerHeight,
   }
 }
 
-const initial = cssSize()
+/** 窗口里留给游戏的一块，贴着左上角：开发面板停靠时从右边或下边让出地方 */
+let carve = (win: Size): Size => win
+
+export function setGameArea(fn: (win: Size) => Size): void {
+  carve = fn
+}
+
+const initialWin = windowSize()
+const initial = carve(initialWin)
 export let viewport: Viewport = computeViewport(
   initial.w,
   initial.h,
@@ -48,17 +61,30 @@ interface SafeInsets {
   left: number
 }
 
-export let safeInsets: SafeInsets = readSafeInsets(viewport.fitScale)
+export let safeInsets: SafeInsets = readSafeInsets(viewport.fitScale, initial, initialWin)
 
-function readSafeInsets(fitScale: number): SafeInsets {
+/** 游戏区没贴到窗口的那一边不算刘海与导航条 */
+function readSafeInsets(fitScale: number, area: Size, win: Size): SafeInsets {
   const style = getComputedStyle(document.documentElement)
   const px = (side: keyof SafeInsets): number => parseFloat(style.getPropertyValue(`--safe-${side}`)) || 0
   return {
     top: px('top') / fitScale,
-    right: px('right') / fitScale,
-    bottom: px('bottom') / fitScale,
+    right: area.w < win.w ? 0 : px('right') / fitScale,
+    bottom: area.h < win.h ? 0 : px('bottom') / fitScale,
     left: px('left') / fitScale,
   }
+}
+
+/** 游戏区里的 DOM 也只避让游戏区贴着的那几边 */
+function placeGame(area: Size, win: Size): void {
+  const el = document.getElementById('game')
+  if (!el) return
+  el.style.width = `${area.w}px`
+  el.style.height = `${area.h}px`
+  if (area.w < win.w) el.style.setProperty('--safe-right', '0px')
+  else el.style.removeProperty('--safe-right')
+  if (area.h < win.h) el.style.setProperty('--safe-bottom', '0px')
+  else el.style.removeProperty('--safe-bottom')
 }
 
 export function textRes(): number {
@@ -73,9 +99,11 @@ export function applyCamera(scene: Phaser.Scene): void {
 
 /** 无实际变化时须跳过：iOS 视口异步稳定需要多次复查，不能每次都重启场景 */
 export function refreshViewport(game: Phaser.Game, force = false): void {
-  const css = cssSize()
-  const next = computeViewport(css.w, css.h, window.devicePixelRatio)
-  const nextInsets = readSafeInsets(next.fitScale)
+  const win = windowSize()
+  const area = carve(win)
+  placeGame(area, win)
+  const next = computeViewport(area.w, area.h, window.devicePixelRatio)
+  const nextInsets = readSafeInsets(next.fitScale, area, win)
   const same =
     Math.abs(next.cssWidth - viewport.cssWidth) < 0.5 &&
     Math.abs(next.cssHeight - viewport.cssHeight) < 0.5 &&
