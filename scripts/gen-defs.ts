@@ -1052,6 +1052,22 @@ const TABLES = {
   need(new Set(ranks).size === ranks.length, `状态的底色轻重有重复：${ranks.join(',')}`)
   const order = list.flatMap(([, d]) => (d.forces ? [d.forces.priority] : []))
   need(new Set(order).size === order.length, `状态的强制行为先后有重复：${order.join(',')}`)
+  const icons = list.flatMap(([, d]) => (d.icon ? [d.icon.rank] : []))
+  need(new Set(icons).size === icons.length, `状态的图标轻重有重复：${icons.join(',')}`)
+  for (const [id, d] of list) need(d.merge !== 'bySource' || d.forces !== undefined, `statuses.${id} 按施加者分格的只能是牵着走的状态`)
+}
+
+/** 减伤的倍率小于 1：受到更多伤害用易伤状态 */
+{
+  const scan = (v: unknown, path: string): void => {
+    if (Array.isArray(v)) v.forEach((x, i) => scan(x, `${path}[${i}]`))
+    else if (v !== null && typeof v === 'object') {
+      const o = v as Record<string, unknown>
+      if (o.kind === 'guard' && 'mul' in o) need(typeof o.mul === 'number' && o.mul < 1, `${path} 的减伤倍率须小于 1，受到更多伤害用易伤状态`)
+      for (const [k, x] of Object.entries(o)) scan(x, `${path}.${k}`)
+    }
+  }
+  for (const [name, data] of Object.entries(TABLES)) scan(data, name)
 }
 
 /** 键名里带 emoji 或 icon 的字段都是表情包里的码位，缺图的单位到运行时只会隐形 */

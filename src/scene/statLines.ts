@@ -82,8 +82,10 @@ function joinFx(effects: readonly Effect[], self = false): string {
 /** self：这组效果施于出手者自己 */
 export function effectLine(e: Effect, self = false): string {
   switch (e.kind) {
-    case 'status':
-      return `${STATUSES[e.status].name} ${sec(e.ms)}`
+    case 'status': {
+      const st = STATUSES[e.status]
+      return `${st.name}${st.stat && e.value !== undefined ? `（${STATS[st.stat.key].name} ×${e.value}）` : ''} ${sec(e.ms)}`
+    }
     case 'blast':
       return `命中处爆开 ${grid(e.radius)}，波及 ${pct(e.ratio)} 伤害${e.breach ? `，炸掉约 ${e.breach} 立方米的墙` : ''}`
     case 'slow':

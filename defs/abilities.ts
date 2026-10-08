@@ -633,7 +633,7 @@ const detectiveWarrant = {
   fireSfx: 'zap',
   color: 0xffd54f,
   shape: { kind: 'disc', radius: 0.6, at: 'target' },
-  onHit: [{ kind: 'deathMark', ms: 6000, then: [{ kind: 'refresh', what: 'skill', who: 'team' }] }, { kind: 'reveal', durationMs: 6000 }, { kind: 'guard', mul: 1.3, durationMs: 6000 }],
+  onHit: [{ kind: 'deathMark', ms: 6000, then: [{ kind: 'refresh', what: 'skill', who: 'team' }] }, { kind: 'reveal', durationMs: 6000 }, { kind: 'status', status: 'exposed', ms: 6000, value: 1.3 }],
 } satisfies AbilityDef
 
 // 🦅 猎鹰：抓起敌人砸向另一个敌人

@@ -14,6 +14,7 @@ import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 import { TAGS } from './data/tags'
 import { rulesOf } from './data/reactions'
+import { STATUSES } from './data/statuses'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
@@ -144,6 +145,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       '1f6ab',
       '1f4a6',
       '1fad8',
+      ...Object.values(STATUSES).flatMap((s) => (s.icon ? [s.icon.emoji] : [])),
       ...Object.values<MapDef>(MAPS).flatMap((m) => m.decor.emojis),
     ]),
   ],

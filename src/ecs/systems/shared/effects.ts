@@ -9,7 +9,7 @@ import { addCc, addMark, CC_MARKS, CLEANSED, isSteadfast, markSlot, statusDef } 
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
 import { gainRes } from './resource'
-import { markSrcs, poisonSrc } from '../../store'
+import { markSrcs } from '../../store'
 import { applyMorph } from '../../entities/enemy'
 import { applyForm } from '../../entities/form'
 import { nearestSummoned, raiseDead, spawnAround, spawnClones } from '../../entities/summon'
@@ -197,8 +197,8 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   poison: (sim, src, fx, at) => {
     const now = sim.elapsedMs
     eachCapable(sim, at, Mark, (t) => {
-      addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
-      poisonSrc[t] = src
+      const s = addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
+      if (s >= 0) (markSrcs[t] ??= [])[s - t * MARK_SLOTS] = src
     })
   },
 

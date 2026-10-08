@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { Casting, Ctl, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Transform } from '../components'
-import { BLOCK, blockedBits, FORCING, hasMark, inTransit, isAirborne, markedBy, markSlot, wanderPace } from '../utils/marks'
+import { BLOCK, blockedBits, FORCING, hasMark, inTransit, isAirborne, leadSlot, markedBy, wanderPace } from '../utils/marks'
 import { norm } from '../../util/vec'
 import { wanderDir } from './shared/steer'
 import { moveSpeed } from '../utils/stats'
@@ -9,9 +9,9 @@ import type { Sim } from '../sim'
 const FLEE = 1
 const APPROACH = 2
 
-/** 牵着走的控制：施加者还在就对着它，否则对着记下的位置 */
+/** 牵着走的控制：施加者还在就对着它，否则对着记下的位置；几个施加者的取 leadSlot 那一格 */
 function ledPoint(sim: Sim, eid: number, kind: number): { x: number; y: number } | null {
-  const s = markSlot(sim, eid, kind)
+  const s = leadSlot(sim, eid, kind)
   if (s < 0) return null
   const by = markedBy(sim, eid, kind)
   if (by >= 0) {

@@ -7,7 +7,7 @@ import { rewindMs } from '../data/abilities'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, ENEMY_SET, Hp, Res, Transform, VisOff } from './components'
+import { Alive, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, Slot, Transform, VisOff } from './components'
 import { abilityDef, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -19,6 +19,7 @@ import { dragging, staminaLeft } from './systems/shared/stamina'
 import { traceAt, tracePath } from './systems/shared/trace'
 import { rescuing } from './systems/tickRescue'
 import { hostShown } from './utils/statusTint'
+import { statusDef } from './utils/marks'
 import { leaderX, leaderY } from './utils/team'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
@@ -32,6 +33,9 @@ const WORLD = new Phaser.GameObjects.Components.TransformMatrix()
 const SWEAT = '1f4a6'
 const SWEAT_SIZE = 0.42 * UNIT
 const SWEAT_Z = 29
+
+const ICON_SIZE = 0.34 * UNIT
+const ICON_MAX = 3
 
 const BAR_W = 0.8 * UNIT
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
@@ -64,7 +68,7 @@ interface Mark {
 
 /** 呈现：身体、队长与这一场的目标的数据画出来的样子，不是实体、不存位置，画在身体上的随身体显隐；每帧推进后按数据重画，收尾时停在最后一帧 */
 export class Presentation {
-  /** 按 z 排好的精灵：身体头上的汗、队长的倒带残影 */
+  /** 按 z 排好的精灵：身体头上的汗与状态图标、队长的倒带残影 */
   readonly sprites: PaintSprite[] = []
   /** 压在实体的圈下面：据点、要到访的地标、不许敌人走到的地方与救援的圈 */
   readonly marks: Scratch = newScratch()
@@ -81,6 +85,7 @@ export class Presentation {
     this.sprites.length = 0
     for (const s of [this.marks, this.trail, this.bars, this.pointer]) resetScratch(s)
     sweats(sim, this.sprites)
+    statusIcons(sim, this.sprites)
     echo(sim, this.sprites, this.trail)
     this.sprites.sort((a, b) => a.z - b.z)
     bars(sim, this.bars)
@@ -119,6 +124,31 @@ function sweats(sim: Sim, out: PaintSprite[]): void {
   for (const eid of query(sim.world, ENEMY_SET)) {
     if (!Alive.v[eid] || staminaLeft(eid) >= STAMINA.slowFrom) continue
     sweat(sim, out, eid, Transform.h[eid]!)
+  }
+}
+
+/** 头顶的状态图标：带时限、正生效的状态按图标的轻重排，最多三个，在头顶横排；倒下的不画 */
+function statusIcons(sim: Sim, out: PaintSprite[]): void {
+  const now = sim.elapsedMs
+  const kinds: number[] = []
+  for (const eid of query(sim.world, [Mark, Transform])) {
+    if (!Alive.v[eid]) continue
+    kinds.length = 0
+    for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
+      const k = Mark.kind[s]!
+      const until = Mark.until[s]!
+      if (statusDef(k)?.icon && until > now && until !== Infinity && !kinds.includes(k)) kinds.push(k)
+    }
+    if (kinds.length === 0) continue
+    kinds.sort((a, b) => statusDef(a)!.icon!.rank - statusDef(b)!.icon!.rank)
+    const n = Math.min(ICON_MAX, kinds.length)
+    const h = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.h[eid]!
+    const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((n - 1) * ICON_SIZE) / 2
+    const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * 0.55
+    const alpha = hostShown(eid)
+    for (let j = 0; j < n; j++) {
+      out.push({ z: SWEAT_Z, frame: sim.frames.index(statusDef(kinds[j]!)!.icon!.emoji, 'player'), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha })
+    }
   }
 }
 

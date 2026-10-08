@@ -434,7 +434,7 @@ export const ITEMS = {
     rarity: 'rare',
     price: 45,
     maxStacks: 1,
-    reactions: [{ on: 'crit', to: 'other', effects: [{ kind: 'guard', mul: 1.2, durationMs: 3000 }] }],
+    reactions: [{ on: 'crit', to: 'other', effects: [{ kind: 'status', status: 'exposed', ms: 3000, value: 1.2 }] }],
   },
   coolChip: {
     emoji: '1f4be',

@@ -13,11 +13,19 @@ export interface StatusForce {
   readonly priority: number
 }
 
+/**
+ * 同一种状态再上一次怎么并：high、low、rate 按强弱分格，强度一样的只刷新时长（取长的），不一样的各占一格、各自到期，生效时只取最强的一条——
+ * high 是参数 a 越大越强，low 是越小越强，rate 是 a ÷ b 越大越强；bySource 按施加者分格，生效的是施加者还在的里面最晚到期的一条
+ */
+export type StatusMerge = 'high' | 'low' | 'rate' | 'bySource'
+
 /** 一种状态：身体上一条带时限的标记，规则都写在这里，按名字施加与判断 */
 export interface StatusDef {
   readonly name: string
-  /** 头顶显示的图标，emoji 码位；不写就不显示 */
-  readonly icon?: string
+  /** 带时限时头顶显示的图标：emoji 码位，同时有几个时 rank 小的在前；不写就不显示 */
+  readonly icon?: { readonly emoji: string; readonly rank: number }
+  /** 不写的同种只刷新时长（取长的），参数用新的 */
+  readonly merge?: StatusMerge
   /** 控制：霸体挡它，施加霸体与净化时解掉它 */
   readonly cc?: true
   /** 不是控制、净化也解掉它 */

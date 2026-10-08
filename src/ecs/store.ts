@@ -80,9 +80,7 @@ export const boltSplit = slots<Split>()
 /** 会分裂的弹体：裂开时照着自己的规格再射几发 */
 export const projSplit = slots<{ readonly spec: BoltSpec; readonly split: Split }>()
 
-export const poisonSrc = slots<Source>()
-
-/** 每个身体每个标记槽位的来源：引信、存伤、叠层、死亡印记结算时用 */
+/** 每个身体每个标记槽位的来源：引信、存伤、叠层、死亡印记结算时用，中毒跳伤记在它名下 */
 export const markSrcs = slots<(Source | undefined)[]>()
 
 /** 能力的附加定义：打死人时施于出手者、出手条件、资源强化、弹匣最后一发 */

@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
 import { Alive, Boss, Elite, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
-import { hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot } from '../../utils/marks'
+import { clearMarks, hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot, strongestSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
 import { nearestSummoned } from '../../entities/summon'
@@ -232,10 +232,10 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   const now = sim.elapsedMs
   const atk = attackOf(sim, src)
   let raw = damage * tagMul(atk, tags) * (Boss.v[target] || Elite.v[target] ? atk.bossDamage : 1)
-  const sleep = markSlot(sim, target, MARK.sleep)
+  const sleep = strongestSlot(sim, target, MARK.sleep)
   if (sleep >= 0) {
     raw *= Mark.a[sleep]!
-    Mark.kind[sleep] = MARK.none
+    clearMarks(target, [MARK.sleep])
   }
   if ((tags & HIT.dot) === 0) raw *= armorTaken(Stats.armor[target]!)
   raw *= Stats.taken[target]!

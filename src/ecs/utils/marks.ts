@@ -1,7 +1,7 @@
 import { Alive, MARK, MARK_SLOTS, Mark, Motion, MOTION, TAG } from '../components'
 import { STATUSES, STATUS_IDS } from '../../data/statuses'
 import { isSameEntity } from './identity'
-import type { StatusAction, StatusDef, StatusId } from '../../types/statuses'
+import type { StatusAction, StatusDef, StatusId, StatusMerge } from '../../types/statuses'
 import type { Sim } from '../sim'
 
 const DEFS: readonly (StatusDef | undefined)[] = [undefined, ...STATUS_IDS.map((id) => STATUSES[id])]
@@ -14,6 +14,7 @@ export function statusDef(kind: number): StatusDef | undefined {
 const kindsWhere = (p: (d: StatusDef) => boolean): ReadonlySet<number> => new Set(STATUS_IDS.filter((id) => p(STATUSES[id])).map((id) => MARK[id]))
 
 const KEYED = kindsWhere((d) => d.keyed === true)
+const MERGE: readonly (StatusMerge | undefined)[] = DEFS.map((d) => d?.merge)
 const PINNED = kindsWhere((d) => d.pinned === true)
 const HIDDEN = kindsWhere((d) => d.hidden === true)
 const REVEALS = kindsWhere((d) => d.reveals === true)
@@ -92,9 +93,39 @@ export function hasStatus(sim: Sim, eid: number, id: StatusId): boolean {
   return hasMark(sim, eid, MARK[id])
 }
 
+/** 已有的这一格算不算同一条：按来源分开记的看 ref 与定义号 b，按施加者分格的看 ref，分强弱的看强度 */
+function sameEntry(s: number, kind: number, a: number, b: number, ref: number): boolean {
+  if (KEYED.has(kind)) return Mark.ref[s] === ref && Mark.b[s] === b
+  switch (MERGE[kind]) {
+    case 'bySource':
+      return Mark.ref[s] === ref
+    case 'high':
+    case 'low':
+      return Mark.a[s] === Math.fround(a)
+    case 'rate':
+      return Mark.a[s] === Math.fround(a) && Mark.b[s] === Math.fround(b)
+    default:
+      return true
+  }
+}
+
+/** 按状态表的并法，s 这一条是不是比 t 那一条强；不分强弱的谁也不比谁强 */
+function stronger(merge: StatusMerge | undefined, s: number, t: number): boolean {
+  switch (merge) {
+    case 'high':
+      return Mark.a[s]! > Mark.a[t]!
+    case 'low':
+      return Mark.a[s]! < Mark.a[t]!
+    case 'rate':
+      return Mark.a[s]! / Mark.b[s]! > Mark.a[t]! / Mark.b[t]!
+    default:
+      return false
+  }
+}
+
 /**
- * 加一条标记，返回槽位下标，加不上返回 -1：同种同源的已存在则刷新，时长只延长不缩短、参数取新值；按来源分开记的还要同一个 ref 与定义号 b；
- * 槽位满了顶掉最先到期的一条，变形的两条不顶（顶掉就没有到期反应）。
+ * 加一条标记，返回槽位下标，加不上返回 -1：同一条已存在则刷新，时长只延长不缩短；分强弱的参数不动，其余参数取新值。
+ * 同一条怎么算见 sameEntry 与状态表的并法；槽位满了顶掉最先到期的一条，变形的两条不顶（顶掉就没有到期反应）。
  * a/b/c 的含义：slow/speed/guard/dmg/cd/grow 是倍率；poison 是跳伤、节拍、下次跳的时刻；taunt/fear/charm 是施加者的 eid 与最后见到它的位置；
  * morph 是是否曾锚定；sleep 是醒来那一下的倍率；spellShield 是剩余次数；frontGuard 是朝向与半角；stack 是层数与定义号；fuse/deathMark/parry/empower 是定义号；
  * store 是已存的伤害与定义号；undead 是每秒流失；ref 是所引用身体的 Uid 或所在界的编号
@@ -111,8 +142,9 @@ export function addMark(eid: number, kind: number, tag: number, until: number, a
       if (free < 0) free = i
       continue
     }
-    if (k === kind && Mark.tag[s] === tag && (!keyed || (Mark.ref[s] === ref && Mark.b[s] === b))) {
+    if (k === kind && Mark.tag[s] === tag && sameEntry(s, kind, a, b, ref)) {
       Mark.until[s] = Math.max(Mark.until[s]!, until)
+      if (!keyed && MERGE[kind] !== 'bySource' && MERGE[kind] !== undefined) return s
       Mark.a[s] = a
       Mark.b[s] = b
       Mark.c[s] = c
@@ -149,6 +181,35 @@ export function hasMark(sim: Sim, eid: number, kind: number): boolean {
   return markSlot(sim, eid, kind) >= 0
 }
 
+/** 身上这种状态生效的各条里最强的一条的槽位，没有则 -1；不分强弱的取第一条 */
+export function strongestSlot(sim: Sim, eid: number, kind: number): number {
+  const now = sim.elapsedMs
+  const base = eid * MARK_SLOTS
+  const merge = MERGE[kind]
+  let best = -1
+  for (let i = 0; i < MARK_SLOTS; i++) {
+    const s = base + i
+    if (Mark.kind[s] !== kind || Mark.until[s]! <= now) continue
+    if (best < 0 || stronger(merge, s, best)) best = s
+  }
+  return best
+}
+
+/** 同种同类的另一条生效的更强，一样强时下标小的算数：属性只认最强的那一条 */
+export function outranked(sim: Sim, eid: number, s: number): boolean {
+  const kind = Mark.kind[s]!
+  const merge = MERGE[kind]
+  if (merge !== 'high' && merge !== 'low' && merge !== 'rate') return false
+  const now = sim.elapsedMs
+  const base = eid * MARK_SLOTS
+  for (let i = 0; i < MARK_SLOTS; i++) {
+    const t = base + i
+    if (t === s || Mark.kind[t] !== kind || Mark.tag[t] !== Mark.tag[s] || Mark.until[t]! <= now) continue
+    if (stronger(merge, t, s) || (!stronger(merge, s, t) && t < s)) return true
+  }
+  return false
+}
+
 /** 加一条控制：霸体的身体不吃 */
 export function addCc(sim: Sim, t: number, kind: number, until: number, a = 0, b = 0, c = 0, ref = 0): boolean {
   if (isSteadfast(sim, t)) return false
@@ -176,12 +237,34 @@ export function slowFactor(sim: Sim, eid: number): number {
   return mul
 }
 
-/** 标记指向的那个身体（嘲讽者、恐惧与魅惑的施加者），已倒下或编号已被复用则 -1 */
-export function markedBy(sim: Sim, eid: number, kind: number): number {
-  const s = markSlot(sim, eid, kind)
-  if (s < 0) return -1
+/** 这一格的施加者（嘲讽者、恐惧与魅惑的施加者），已倒下或编号已被复用则 -1 */
+function casterAt(sim: Sim, s: number): number {
   const by = Mark.a[s]!
   return isSameEntity(sim.world, by, Mark.ref[s]!) && Alive.v[by] ? by : -1
+}
+
+/** 牵着这个身体走的那一格（嘲讽、恐惧、魅惑按施加者分格）：施加者还在的里面最晚到期的，都不在了取最晚到期的；没有则 -1 */
+export function leadSlot(sim: Sim, eid: number, kind: number): number {
+  const now = sim.elapsedMs
+  const base = eid * MARK_SLOTS
+  let best = -1
+  let bestLive = false
+  for (let i = 0; i < MARK_SLOTS; i++) {
+    const s = base + i
+    if (Mark.kind[s] !== kind || Mark.until[s]! <= now) continue
+    const live = casterAt(sim, s) >= 0
+    if (best < 0 || (live && !bestLive) || (live === bestLive && Mark.until[s]! > Mark.until[best]!)) {
+      best = s
+      bestLive = live
+    }
+  }
+  return best
+}
+
+/** 牵着这个身体走的施加者，已倒下或编号已被复用则 -1 */
+export function markedBy(sim: Sim, eid: number, kind: number): number {
+  const s = leadSlot(sim, eid, kind)
+  return s < 0 ? -1 : casterAt(sim, s)
 }
 
 /** 被谁嘲讽着，没有则 -1 */
