@@ -21,7 +21,7 @@ export default {
     alpha: [0, 0],
     density: [0, 0],
   },
-  foes: ['zombie', 'ghost', 'alien', 'crab', 'locust', 'invader', 'gargoyle', 'chameleon', 'blob', 'ufo', 'turtle', 'siren', 'hive'],
+  foes: ['smiley', 'commuter', 'stander', 'zipper', 'poster', 'upsideDown', 'mouthless', 'floatingSuit'],
   // 每间舱室的出怪板按那一季的配方只放出那几种：一季幽灵、一季肉盾、一季成群的小东西、一季什么都有；吸附半径盖满整张图，敌人按种类去配方接它的那几间。头目从队伍那间的天花板上落下来
   gates: {
     snapU: 60,
@@ -29,11 +29,11 @@ export default {
     look: 'glow',
     boss: 'warden',
     kinds: {
-      ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren'] },
-      tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle'] },
-      swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob', 'hive'] },
+      ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren', 'stander', 'zipper', 'upsideDown', 'mouthless'] },
+      tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle', 'poster', 'floatingSuit'] },
+      swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob', 'hive', 'smiley', 'commuter'] },
       mixed: { name: '混编舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
-      warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha'] },
+      warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha', 'watcher', 'reactor'] },
     },
   },
   exit: {
@@ -62,5 +62,5 @@ export default {
     light: { levels: [1, 0.5, 0.25], wakeMs: 500, dimMs: 1600 },
     tiles: { teamFadeMs: 4500, foeFadeMs: 2600 },
   },
-  bosses: ['mecha'],
+  bosses: ['watcher', 'reactor'],
 } as const satisfies MapDef
