@@ -60,7 +60,7 @@ export const FIGHTS = {
               ms: 32_000,
               radius: 2,
               points: [
-                { mark: 'sector', nth: 0 },
+                { mark: 'sector' },
                 { mark: 'sector', nth: 1 },
                 { mark: 'sector', nth: 2 },
                 { mark: 'sector', nth: 3 },

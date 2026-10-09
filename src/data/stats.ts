@@ -145,6 +145,11 @@ function addText(unit: StatUnit, v: number): string {
   }
 }
 
+/** 加在一项属性上的值按单位写成文字，如"+25""+10%""-0.5秒" */
+export function addValue(k: StatKey, v: number): string {
+  return addText(STATS[k].unit, v)
+}
+
 /** 一项属性的值按单位写成文字，如"×1.15""40%""6格/秒" */
 export function statValue(k: StatKey, v: number): string {
   return valueText(STATS[k].unit, v)

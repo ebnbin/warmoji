@@ -41,6 +41,11 @@ export function hasSignal(kind: MapKind, field: keyof MapSignals, name: string):
   return BY_KIND[kind]?.[field]?.[name] !== undefined
 }
 
+/** 这种地图这一类信号里的全部名字 */
+export function signalsOf(kind: MapKind, field: keyof MapSignals): string[] {
+  return Object.keys(BY_KIND[kind]?.[field] ?? {})
+}
+
 /** 这一类信号里这个名字的说法：同一个名字在哪种地图上说法都一样（构建期查过） */
 export function signalName(field: keyof MapSignals, name: string): string {
   for (const s of Object.values<MapSignals>(SIGNALS)) {
