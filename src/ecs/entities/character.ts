@@ -9,12 +9,11 @@ import { ROLES } from '../../data/roles'
 import { elementIndex } from '../../data/elements'
 
 import { INVINCIBLE_HP, waveStartHp } from '../../run/state'
-import { armIdle } from '../systems/shared/anim'
 import { armGear } from '../systems/shared/gear'
 
 import type { RunState } from '../../run/state'
 import type { StatMods } from '../../types/stats'
-import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
+import { Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
 import { bodyRules } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { STANDARD } from '../utils/pass'
@@ -60,7 +59,7 @@ export function spawnCharacter(
     ownClock: true,
     element: elementIndex(def.element),
   })
-  addComponents(world, eid, Slot, Breath, Pop, CharScale, Seat, Facing, Revive, CharFlash, Anim)
+  addComponents(world, eid, Slot, Breath, Pop, CharScale, Seat, Facing, Revive, CharFlash)
   Slot.v[eid] = slot
   Breath.phase[eid] = slot * 1.3
   CharScale.v[eid] = place.sizeMul
@@ -80,7 +79,6 @@ export function spawnCharacter(
   Transform.w[eid] = size
   Transform.h[eid] = size
   Sprite.frame[eid] = atlas.index(def.emoji, 'player')
-  armIdle(eid, def.emoji, 'player', Sprite.frame[eid]!, slot * 173)
   Depth.z[eid] = 10 + place.depthOffsetY
   return eid
 }

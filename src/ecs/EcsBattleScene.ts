@@ -580,7 +580,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.events.off(Phaser.Scenes.Events.RESUME, this.onResume, this)
       this.scene.stop(SceneKey.Ui)
-      this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
       this.damageText?.destroy()

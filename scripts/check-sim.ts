@@ -19,7 +19,6 @@ const LOOKS: Readonly<Record<string, readonly string[]>> = {
   Breath: ['phase'],
   Flash: ['until'],
   CharFlash: ['until'],
-  Anim: ['frames', 'base', 'onceFrames'],
   Seen: ['v', 'want', 'at', 'uid'],
 }
 const WRITE = /\b([A-Z]\w*)\.(\w+)\[[^\]]*\]!?\s*(?:[-+*/]?=(?!=))/g

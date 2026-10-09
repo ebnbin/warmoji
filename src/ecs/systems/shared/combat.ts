@@ -7,7 +7,7 @@ import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Seat, Slot, Sprite, Stamina, Stats, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Seat, Slot, Sprite, Stamina, Stats, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
 import { addMark, hasMark } from '../../utils/marks'
 import { offenseOf } from '../../utils/stats'
@@ -99,8 +99,6 @@ export function layDown(sim: Sim, eid: number): void {
   Revive.drop[eid] = 0
   Seat.v[eid] = -1
   Tint.color[eid] = 0x888888
-  Anim.frames[eid] = -1
-  Anim.onceFrames[eid] = 0
   Transform.w[eid] = charSize(eid)
   Transform.h[eid] = charSize(eid)
 }
@@ -253,7 +251,6 @@ export function raise(sim: Sim, eid: number): void {
   Alive.v[eid] = 1
   Lethal.used[eid] = 0
   Lethal.low[eid] = 0
-  Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
   Stamina.used[eid] = 0
   Stamina.restMs[eid] = 0

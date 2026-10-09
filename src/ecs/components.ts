@@ -171,19 +171,6 @@ export const ETurn = { at: f32() }
 
 export const Despawn = { at: f32() }
 
-export const Anim = {
-  base: i32(),
-  frames: i32(),
-  durMs: f32(),
-  offset: f32(),
-  onceBase: i32(),
-  onceFrames: i32(),
-  onceDur: f32(),
-  onceAt: f32(),
-  still: i32(),
-}
-export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
-
 export const Quad = { v: u8() }
 
 export const Shard = { startMs: f32(), until: f32(), rot: f32(), size: f32() }
