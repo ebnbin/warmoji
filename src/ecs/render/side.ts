@@ -3,9 +3,10 @@ import { FACTION, Faction, Projectile, RIM, Tint } from '../components'
 import type { Rim } from '../components'
 import type { EcsWorld } from '../world'
 
-/** 敌我的颜色：我方冷、敌方暖，红绿色弱也分得开 */
+/** 敌我的颜色：我方冷、敌方暖，红绿色弱也分得开；队长另用金色 */
 export const SIDE = {
   team: 0x40c4ff,
+  lead: 0xffd54f,
   elite: 0xffab00,
   foe: 0xff3d00,
   ink: 0x14171a,

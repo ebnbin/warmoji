@@ -86,6 +86,31 @@ export function ringStrip(
   }
 }
 
+/** 平躺在地上的一圈：横半径 rx、竖半径 ry，fill 填满，line 是宽 width 的边、内外各让半个线宽 */
+export function ellipse(
+  o: Scratch, m: Matrix,
+  cx: number, cy: number, rx: number, ry: number, width: number, fill: number, line: number,
+): void {
+  const n = segsFor(rx)
+  const d = (Math.PI * 2) / n
+  const h = width / 2
+  for (let k = 0; k < n; k++) {
+    const ca = Math.cos(k * d)
+    const sa = Math.sin(k * d)
+    const cb = Math.cos((k + 1) * d)
+    const sb = Math.sin((k + 1) * d)
+    if (fill >>> 24) tri(o, m, cx, cy, cx + ca * rx, cy + sa * ry, cx + cb * rx, cy + sb * ry, fill)
+    quad(
+      o, m,
+      cx + ca * (rx - h), cy + sa * (ry - h),
+      cx + ca * (rx + h), cy + sa * (ry + h),
+      cx + cb * (rx + h), cy + sb * (ry + h),
+      cx + cb * (rx - h), cy + sb * (ry - h),
+      line,
+    )
+  }
+}
+
 export function segment(
   o: Scratch, m: Matrix,
   x0: number, y0: number, x1: number, y1: number, width: number, color: number,
