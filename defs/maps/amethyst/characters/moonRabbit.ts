@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, shot } from '../../../kit.ts'
 
-// 🐰 玉兔：捣药给最伤的队友回血，再扔月饼砸敌人，两样轮着来；技能给全队挂护盾，并在脚下铺开广寒宫
+// 🐰 玉兔：本身是冰，捣药给最伤的队友回血，再扔冰皮月饼砸敌人叠寒冷，两样轮着来；技能给全队挂护盾，并在脚下铺开广寒宫：队友回血，敌人发冷
 const POUND = { side: 'allies', radius: 4.5, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 } as const
 
 const rabbitPound = {
@@ -19,7 +19,7 @@ const cakeShot = {
   class: 'attack',
   aim: 'nearest',
   range: 6.5,
-  damage: 10,
+  damage: 8,
   fireSfx: 'plip',
   shape: { kind: 'bolt', projectile: shot('1f96e', 9, 0.45), lifeMs: 1200 },
 } satisfies AbilityDef
@@ -57,6 +57,7 @@ const rabbitPalace = {
   onHit: [
     { kind: 'shield', amount: 0, ratio: 0.15, ms: 4000 },
     { kind: 'ground', def: { ...patch(4, 6000, 0xfff9c4, [{ kind: 'heal', amount: 4 }], 0, 500), who: 'allies' } },
+    { kind: 'ground', def: patch(4, 6000, 0x80deea, undefined, 0, 1500) },
   ],
 } satisfies AbilityDef
 
@@ -67,7 +68,8 @@ export const levels = [{ mul: { healing: 1.2, damage: 1.1 } }, { add: { maxHp: 2
 export default {
   emoji: '1f430',
   name: '玉兔',
-  desc: '从月亮上下来过中秋的玉兔：捣药给 4.5 格内最伤的队友回 11 点血，再朝 6.5 格内最近的敌人扔月饼，两样轮着来，轮到的那样没有对象就空过一次；技能给全队挂上护盾，并在脚下铺开一片回血的广寒宫',
+  element: 'ice',
+  desc: '从广寒宫下来过中秋的玉兔，本身是冰，冻不住、不怕冰水：捣药给 4.5 格内最伤的队友回 11 点血，再朝 6.5 格内最近的敌人扔冰皮月饼，砸中的叠一层寒冷，两样轮着来，轮到的那样没有对象就空过一次；中了毒的队友治不动，护盾却照样挡；技能给全队挂上护盾，并在脚下铺开广寒宫，队友在里面回血，敌人在里面发冷',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 4.5, mass: 0.6 },
@@ -75,7 +77,7 @@ export default {
   skill: {
     name: '广寒宫',
     icon: '1f3ef',
-    desc: '全队挂上生命 15% 的护盾 4 秒；脚下铺开 4 格的广寒宫 6 秒，站在里面的队友每半秒回 4 点血',
+    desc: '全队挂上生命 15% 的护盾 4 秒；脚下铺开 4 格的广寒宫 6 秒，站在里面的队友每半秒回 4 点血，敌人每 1.5 秒叠一层寒冷',
     cdMs: 15_000,
     ability: 'rabbitPalace',
   },
@@ -87,7 +89,7 @@ export default {
       base: 'rabbitDance',
       upgrades: [
         { ability: 'rabbitDance2', card: { icon: '1f315', name: '月华', desc: '捣药治的那名队友还挂上回春：3 秒里每半秒回 3 点' } },
-        { ability: 'rabbitDance3', card: { icon: '1f52a', name: '掰月饼', desc: '月饼砸中敌人或飞到头时裂成三块继续飞，每块打五成伤害' } },
+        { ability: 'rabbitDance3', card: { icon: '1f52a', name: '掰月饼', desc: '冰皮月饼砸中敌人或飞到头时裂成三块继续飞，每块打五成伤害，也叠寒冷' } },
       ],
     },
   ],

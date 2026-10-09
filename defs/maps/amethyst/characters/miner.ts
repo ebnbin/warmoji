@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🧔 矿工：矿镐刨中的敌人更吃痛，第三下砸地震晕一圈；技能撑起跟着自己的坑道支架，把敌人挡在圈外、招到自己身上
+// 🧔 矿工：护甲厚的老矿工，矿镐刨中的敌人更吃痛、刨得开砌墙，撬到墙上就晕，第三下砸地震晕一圈；技能撑起跟着自己的坑道支架，把敌人挡在圈外、招到自己身上
 const minerPick = {
   trigger: 'auto',
   cooldownMs: 1100,
@@ -10,6 +10,7 @@ const minerPick = {
   range: 1.9,
   damage: 16,
   knockback: 1.5,
+  breach: 0.4,
   fireSfx: 'chip',
   shape: { kind: 'sector', radius: 1.8, arcDeg: 100, ms: 180 },
   onHit: [{ kind: 'status', status: 'exposed', ms: 2000, value: 1.15 }],
@@ -17,15 +18,16 @@ const minerPick = {
 
 const minerPick2 = {
   ...minerPick,
-  onHit: [...minerPick.onHit, { kind: 'reveal', durationMs: 3000 }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'guard', mul: 0.85, durationMs: 1000 }] }],
+  knockback: 0,
+  onHit: [...minerPick.onHit, { kind: 'reveal', durationMs: 3000 }, { kind: 'shove', distance: 1.6, ms: 220, onWall: [{ kind: 'stun', durationMs: 800 }] }],
 } satisfies AbilityDef
 
 const minerSlam = {
   ...minerPick2,
   range: 2,
-  damage: 20,
+  damage: 22,
   knockback: 2,
+  breach: 1,
   fireSfx: 'crumble',
   color: 0x8d6e63,
   shape: { kind: 'disc', radius: 2, at: 'self' },
@@ -60,11 +62,11 @@ export const levels = [{ add: { maxHp: 25, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f9d4',
   name: '矿工',
-  desc: '在晶洞里挖了一辈子矿的老矿工：矿镐刨中的敌人更吃痛；撑起一圈坑道支架把队友护在里面，把敌人都招到自己身上',
+  desc: '在晶洞里挖了一辈子矿的老矿工，裹着一身厚皮袄（护甲 4），刀砍牙咬伤不了他多少，燃烧与中毒却照样往里钻：矿镐刨中的敌人更吃痛，刨得开砌墙，冻住的挨一镐就碎冰；撑起一圈坑道支架把队友护在里面，把敌人都招到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.7 },
-  stats: { moveSpeed: 4, maxStamina: 150, staminaRegen: 45, exertion: 1.2 },
+  stats: { moveSpeed: 4, maxStamina: 150, staminaRegen: 45, exertion: 1.2, armor: 4 },
   skill: {
     name: '坑道支护',
     icon: '1f6a7',
@@ -79,8 +81,8 @@ export default {
       icon: '26cf',
       base: 'minerPick',
       upgrades: [
-        { ability: 'minerPick2', card: { icon: '1f526', name: '矿灯', desc: '打中的敌人显形 3 秒；每次出手后 1 秒内自己受到的伤害 ×0.85' } },
-        { ability: 'minerPick3', card: { icon: '1f4a5', name: '塌方', desc: '每第三下改成砸地：身边 2 格内的敌人挨 20 点并眩晕 0.8 秒' } },
+        { ability: 'minerPick2', card: { icon: '1f526', name: '矿灯', desc: '打中的敌人显形 3 秒，并被一镐撬出 1.6 格，撞上墙或晶簇就晕 0.8 秒' } },
+        { ability: 'minerPick3', card: { icon: '1f4a5', name: '塌方', desc: '每第三下改成砸地：身边 2 格内的敌人挨 22 点、被震开并眩晕 0.8 秒，砌墙也砸得塌' } },
       ],
     },
   ],
