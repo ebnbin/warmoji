@@ -7,6 +7,7 @@ import type { UnitLight } from '../../types/maps'
 import { LayerType } from './layer'
 import { quadNode, SpriteBatch } from './sprites'
 import type { LightAt, PaintSprite } from './sprites'
+import { rimOf } from './side'
 export { SPRITE_BANDS } from './bands'
 
 /** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画 */
@@ -15,13 +16,16 @@ export class EcsSpriteBatch extends SpriteBatch {
   private order: number[] = []
   private readonly zMin: number
   private readonly zMax: number
+  /** 此刻的队长，还没开打是 -1 */
+  private readonly leader: () => number
 
   /** paint 须按 z 从小到大排好 */
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight, lightAt: LightAt | undefined) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight, lightAt: LightAt | undefined, leader: () => number) {
     super(scene, LayerType.Sprite, depth, atlas, paint, light, lightAt)
     this.world = world
     this.zMin = zMin
     this.zMax = zMax
+    this.leader = leader
   }
 
   renderWebGL(
@@ -48,6 +52,7 @@ export class EcsSpriteBatch extends SpriteBatch {
     order.sort((a, b) => Depth.z[a]! - Depth.z[b]! || a - b)
 
     self.aim(camera, drawingContext)
+    const leader = self.leader()
 
     for (let i = 0; i < order.length; i++) {
       const eid = order[i]!
@@ -62,7 +67,7 @@ export class EcsSpriteBatch extends SpriteBatch {
         node, drawingContext,
         gx + VisOff.x[eid]!, gy + VisOff.y[eid]!, Transform.rot[eid]!,
         w, h, Sprite.flipX[eid]!, frame, Quad.v[eid]!,
-        Tint.color[eid]!, Tint.alpha[eid]!, Tint.effect[eid]!,
+        Tint.color[eid]!, Tint.alpha[eid]!, Tint.effect[eid]!, rimOf(self.world, eid, leader),
       )
     }
     for (; p < paint.length && paint[p]!.z < self.zMax; p++) self.drawPaint(node, drawingContext, paint[p]!)

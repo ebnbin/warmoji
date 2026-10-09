@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { Icon } from './icon'
 import { Label, RichLabel } from './label'
 import type { ScrollView } from './scrollView'

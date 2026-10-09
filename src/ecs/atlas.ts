@@ -1,11 +1,8 @@
 import type Phaser from 'phaser'
-import { OUTLINE, outlineSvg, setSvgSize } from '../emoji/svg'
-import type { OutlineKind } from '../emoji/svg'
-import { keysOf } from '../util/record'
+import { setSvgSize } from '../emoji/svg'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
 import type { AnimClipId } from '../types/anim'
-import type { BattleSprites } from '../manifest'
 
 const CELL = 256
 const PAGE = 2048
@@ -13,44 +10,13 @@ const COLS = PAGE / CELL
 const PER_PAGE = COLS * COLS
 const MAX_FRAMES = 2048
 
-type VariantKey = `${string}|${OutlineKind | ''}`
+type ClipKey = `${string}|${AnimClipId}`
 
-type ClipKey = `${VariantKey}|${AnimClipId}`
-
-function variantKey(id: string, outline: OutlineKind | undefined): VariantKey {
-  return `${id}|${outline ?? ''}`
-}
-
-function clipKey(id: string, outline: OutlineKind | undefined, clipId: AnimClipId): ClipKey {
-  return `${variantKey(id, outline)}|${clipId}`
-}
-
-function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLImageElement> {
-  const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
-  return svgToImage(setSvgSize(svg, CELL))
+function rasterize(raw: string): Promise<HTMLImageElement> {
+  return svgToImage(setSvgSize(raw, CELL))
 }
 
 const NO_CLIP = { base: -1, frames: 0 }
-
-interface Variant {
-  readonly id: string
-  readonly outline: OutlineKind | undefined
-}
-
-/** 要画的变体去重排好：先按描边、再是不描边的 */
-function variantsOf(sprites: BattleSprites): Variant[] {
-  const out: Variant[] = []
-  const seen = new Set<VariantKey>()
-  const take = (id: string, outline: OutlineKind | undefined): void => {
-    const k = variantKey(id, outline)
-    if (seen.has(k)) return
-    seen.add(k)
-    out.push({ id, outline })
-  }
-  for (const outline of keysOf(sprites.outlined)) for (const id of sprites.outlined[outline]) take(id, outline)
-  for (const id of sprites.plain) take(id, undefined)
-  return out
-}
 
 let atlasSerial = 0
 let shared: EcsAtlas | undefined
@@ -59,8 +25,8 @@ let building: Promise<EcsAtlas> | undefined
 export class EcsAtlas {
   private readonly uv: Float32Array
   private readonly pageOf: Int32Array
-  private readonly keyToFrame = new Map<VariantKey, number>()
-  private readonly reportedMissing = new Set<VariantKey>()
+  private readonly keyToFrame = new Map<string, number>()
+  private readonly reportedMissing = new Set<string>()
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
@@ -82,9 +48,9 @@ export class EcsAtlas {
     this.ctxs.length = 0
   }
 
-  /** 收没收这一局要画的全部变体 */
-  private covers(variants: readonly Variant[]): boolean {
-    return variants.every((v) => this.keyToFrame.has(variantKey(v.id, v.outline)))
+  /** 收没收这一局要画的全部 emoji */
+  private covers(ids: readonly string[]): boolean {
+    return ids.every((id) => this.keyToFrame.has(id))
   }
 
   private rebind(scene: Phaser.Scene): void {
@@ -133,13 +99,13 @@ export class EcsAtlas {
     this.pageOf[frame] = page
   }
 
-  clip(id: string, outline: OutlineKind | undefined, clipId: AnimClipId): { base: number; frames: number } {
-    const key = clipKey(id, outline, clipId)
+  clip(id: string, clipId: AnimClipId): { base: number; frames: number } {
+    const key: ClipKey = `${id}|${clipId}`
     const hit = this.clips.get(key)
     if (hit) return hit
     if (!this.baking.has(key)) {
       this.baking.add(key)
-      void this.bakeClip(id, outline, clipId, key)
+      void this.bakeClip(id, clipId, key)
         .catch(() => {
           this.clips.set(key, NO_CLIP)
         })
@@ -152,7 +118,7 @@ export class EcsAtlas {
     return this.cursor + n <= MAX_FRAMES
   }
 
-  private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: AnimClipId, key: ClipKey): Promise<void> {
+  private async bakeClip(id: string, clipId: AnimClipId, key: ClipKey): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
     if (!scene || this.disposed) return
@@ -163,7 +129,7 @@ export class EcsAtlas {
     const raw = await emojiSvgText(id)
     const recipe = { ...clip, viewBox: undefined }
     const imgs = await Promise.all(
-      Array.from({ length: clip.frames }, (_, i) => rasterize(bakeAnimFrame(raw, recipe, i / clip.frames), outline)),
+      Array.from({ length: clip.frames }, (_, i) => rasterize(bakeAnimFrame(raw, recipe, i / clip.frames))),
     )
     if (this.disposed || !scene.textures) return
     if (!this.hasRoom(imgs.length)) {
@@ -181,13 +147,12 @@ export class EcsAtlas {
     this.clips.set(key, { base, frames: clip.frames })
   }
 
-  index(id: string, outline: OutlineKind | undefined): number {
-    const k = variantKey(id, outline)
-    const frame = this.keyToFrame.get(k)
+  index(id: string): number {
+    const frame = this.keyToFrame.get(id)
     if (frame !== undefined) return frame
-    if (!this.reportedMissing.has(k)) {
-      this.reportedMissing.add(k)
-      console.error(`图集未收录变体：${k}`)
+    if (!this.reportedMissing.has(id)) {
+      this.reportedMissing.add(id)
+      console.error(`图集未收录：${id}`)
     }
     return -1
   }
@@ -221,12 +186,11 @@ export class EcsAtlas {
   }
 
   /** 这一局的图集：手上的收全了这一局要画的就接着用，否则只按这一局的重建，放掉原来的 */
-  static async build(scene: Phaser.Scene, sprites: BattleSprites): Promise<EcsAtlas> {
-    const variants = variantsOf(sprites)
+  static async build(scene: Phaser.Scene, ids: readonly string[]): Promise<EcsAtlas> {
     while (building) await building
-    if (!shared?.covers(variants)) {
+    if (!shared?.covers(ids)) {
       const old = shared
-      building = EcsAtlas.create(scene, variants)
+      building = EcsAtlas.create(scene, ids)
         .then((a) => {
           old?.release(scene)
           return (shared = a)
@@ -241,26 +205,25 @@ export class EcsAtlas {
     return atlas
   }
 
-  private static async create(scene: Phaser.Scene, variants: readonly Variant[]): Promise<EcsAtlas> {
-    if (variants.length > MAX_FRAMES) console.error(`图集放不下这一局要画的 ${variants.length} 个变体，上限 ${MAX_FRAMES}`)
+  private static async create(scene: Phaser.Scene, ids: readonly string[]): Promise<EcsAtlas> {
+    if (ids.length > MAX_FRAMES) console.error(`图集放不下这一局要画的 ${ids.length} 个 emoji，上限 ${MAX_FRAMES}`)
     const atlas = new EcsAtlas()
     const imgs = await Promise.all(
-      variants.map(async ({ id, outline }) => {
+      ids.map(async (id) => {
         try {
-          return await rasterize(await emojiSvgText(id), outline)
+          return await rasterize(await emojiSvgText(id))
         } catch (e) {
-          console.error(`图集变体光栅化失败：${variantKey(id, outline)}`, e)
+          console.error(`图集光栅化失败：${id}`, e)
           return undefined
         }
       }),
     )
-    for (let i = 0; i < variants.length && atlas.hasRoom(1); i++) {
+    for (let i = 0; i < ids.length && atlas.hasRoom(1); i++) {
       const img = imgs[i]
       if (!img) continue
-      const { id, outline } = variants[i]!
       const frame = atlas.alloc()
       atlas.place(frame, img)
-      atlas.keyToFrame.set(variantKey(id, outline), frame)
+      atlas.keyToFrame.set(ids[i]!, frame)
     }
     atlas.scene = scene
     for (let p = 0; p < atlas.canvases.length; p++) {

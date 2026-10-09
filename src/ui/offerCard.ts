@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { Button } from './button'
 import { Chip } from './chip'
 import { drawBlock, drawDisc } from './draw'

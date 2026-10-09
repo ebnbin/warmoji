@@ -63,10 +63,16 @@ export const Sprite = {
   flipX: u8(),
 }
 
+/** 描边的种类：画面按它挑颜色与粗细，队伍里的队长另算；弹体不看它，按此刻的阵营 */
+export const RIM = { none: 0, team: 1, elite: 2, item: 3 } as const
+
+export type Rim = (typeof RIM)[keyof typeof RIM]
+
 export const Tint = {
   color: u32(),
   effect: u8(),
   alpha: f32(),
+  rim: u8(),
 }
 
 export const Depth = {

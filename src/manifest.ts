@@ -1,6 +1,5 @@
 import { CHARACTERS, ROSTER_IDS, TEAM } from './data/characters'
 import type { CharacterDef, CharacterId } from './types/characters'
-import type { OutlineKind } from './emoji/svg'
 import type { AbilityDef, Effect } from './types/abilityDefs'
 import type { BodyRules, EnemyDef, EnemyKind, NpcDef } from './types/enemies'
 import { ENEMIES, SPAWN } from './data/enemies'
@@ -19,102 +18,86 @@ import { rulesOf, withAffixes } from './data/reactions'
 import { AFFIXES } from './data/affixes'
 import { STATUSES } from './data/statuses'
 
-type Side = 'team' | 'enemy'
-
-const OTHER: Record<Side, Side> = { team: 'enemy', enemy: 'team' }
-
-/** 一个阵营在场上可能画出来的东西：身体、弹体；会夺取与会拉起亡者的阵营还要带上对面的能力与身体 */
+/** 场上可能画出来的 emoji，与走过的能力和身体：夺来的能力与拉起的亡者不换图，走一遍就收全了 */
 interface Seen {
-  readonly body: Set<string>
-  readonly shot: Set<string>
+  readonly ids: Set<string>
   readonly abilities: Set<AbilityDef>
   readonly npcs: Set<NpcDef>
-  steals: boolean
-  raises: boolean
 }
 
-type Sides = Record<Side, Seen>
-
-function walkEffects(seen: Sides, list: readonly Effect[] | undefined, side: Side): void {
+function walkEffects(seen: Seen, list: readonly Effect[] | undefined): void {
   for (const fx of list ?? []) {
     switch (fx.kind) {
       case 'morph':
-        seen[OTHER[side]].body.add(fx.morphEmoji)
+        seen.ids.add(fx.morphEmoji)
         break
       case 'spawnProjectile':
-        seen[side].shot.add(fx.projectile.look.emoji)
+        seen.ids.add(fx.projectile.look.emoji)
         break
       case 'summon':
-        if (fx.of === 'victim') seen[side].raises = true
-        else if ('unit' in fx.of) walkNpc(seen, fx.of.unit, side)
-        break
-      case 'steal':
-        seen[side].steals = true
+        if (fx.of !== 'victim' && 'unit' in fx.of) walkNpc(seen, fx.of.unit)
         break
       default:
         break
     }
-    for (const sub of childEffects(fx)) walkEffects(seen, sub, side)
+    for (const sub of childEffects(fx)) walkEffects(seen, sub)
   }
 }
 
-function walkAbility(seen: Sides, a: AbilityDef, side: Side): void {
-  const s = seen[side]
-  if (s.abilities.has(a)) return
-  s.abilities.add(a)
+function walkAbility(seen: Seen, a: AbilityDef): void {
+  if (seen.abilities.has(a)) return
+  seen.abilities.add(a)
   const sh = a.shape
-  if (a.held) s.body.add(a.held.look.emoji)
-  if (a.anchor) s.body.add(a.anchor.look.emoji)
-  if (sh.kind === 'bolt') s.shot.add(sh.projectile.look.emoji)
-  if (sh.kind === 'emplace') s.body.add(sh.look.emoji)
-  if (sh.kind === 'summon') s.body.add(sh.minion.look.emoji)
-  if (sh.kind === 'drop') s.body.add(sh.look.emoji)
-  for (const c of childAbilities(a)) walkAbility(seen, c, side)
-  for (const list of abilityEffects(a)) walkEffects(seen, list, side)
+  if (a.held) seen.ids.add(a.held.look.emoji)
+  if (a.anchor) seen.ids.add(a.anchor.look.emoji)
+  if (sh.kind === 'bolt') seen.ids.add(sh.projectile.look.emoji)
+  if (sh.kind === 'emplace') seen.ids.add(sh.look.emoji)
+  if (sh.kind === 'summon') seen.ids.add(sh.minion.look.emoji)
+  if (sh.kind === 'drop') seen.ids.add(sh.look.emoji)
+  for (const c of childAbilities(a)) walkAbility(seen, c)
+  for (const list of abilityEffects(a)) walkEffects(seen, list)
 }
 
-function walkRules(seen: Sides, r: BodyRules | undefined, side: Side): void {
+function walkRules(seen: Seen, r: BodyRules | undefined): void {
   if (!r) return
-  for (const list of [r.onHurt, r.onTouched, r.onTouch, r.onKill, r.onAnchorLost, r.onLethal, ...(r.onLowHp ?? []).map((l) => l.effects), r.onIdle?.effects, r.resource?.full?.effects]) walkEffects(seen, list, side)
+  for (const list of [r.onHurt, r.onTouched, r.onTouch, r.onKill, r.onAnchorLost, r.onLethal, ...(r.onLowHp ?? []).map((l) => l.effects), r.onIdle?.effects, r.resource?.full?.effects]) walkEffects(seen, list)
 }
 
-function walkNpc(seen: Sides, def: NpcDef, side: Side): void {
-  const s = seen[side]
-  if (s.npcs.has(def)) return
-  s.npcs.add(def)
-  s.body.add(def.emoji)
-  for (const a of def.abilities ?? []) walkAbility(seen, a, side)
+function walkNpc(seen: Seen, def: NpcDef): void {
+  if (seen.npcs.has(def)) return
+  seen.npcs.add(def)
+  seen.ids.add(def.emoji)
+  for (const a of def.abilities ?? []) walkAbility(seen, a)
   for (const ph of def.phases ?? []) {
-    for (const a of ph.abilities ?? []) walkAbility(seen, a, side)
-    walkEffects(seen, ph.effects, side)
+    for (const a of ph.abilities ?? []) walkAbility(seen, a)
+    walkEffects(seen, ph.effects)
   }
   for (const f of def.forms ?? []) {
-    if (f.emoji) s.body.add(f.emoji)
-    for (const a of f.abilities ?? []) walkAbility(seen, a, side)
+    if (f.emoji) seen.ids.add(f.emoji)
+    for (const a of f.abilities ?? []) walkAbility(seen, a)
   }
-  if (def.mount?.emoji) s.body.add(def.mount.emoji)
-  if (def.grow) walkNpc(seen, def.grow.into, side)
-  if (def.spawner) walkNpc(seen, def.spawner.into, side)
+  if (def.mount?.emoji) seen.ids.add(def.mount.emoji)
+  if (def.grow) walkNpc(seen, def.grow.into)
+  if (def.spawner) walkNpc(seen, def.spawner.into)
   const rules = rulesOf(def)
-  walkRules(seen, rules, side)
+  walkRules(seen, rules)
   for (const fx of rules.onDeath ?? []) {
     if (fx.kind === 'decoy') continue
-    if (fx.kind !== 'split') walkEffects(seen, [fx], side)
-    else if (fx.into) walkNpc(seen, fx.into, side)
+    if (fx.kind !== 'split') walkEffects(seen, [fx])
+    else if (fx.into) walkNpc(seen, fx.into)
   }
 }
 
-function walkCharacter(seen: Sides, c: CharacterDef): void {
-  const s = seen.team
-  s.body.add(c.emoji)
-  s.body.add(c.skill.icon)
-  for (const cr of c.carriers) for (const t of cr.tiers) walkAbility(seen, t, 'team')
-  walkAbility(seen, c.skill.ability, 'team')
+function walkCharacter(seen: Seen, c: CharacterDef): void {
+  seen.ids.add(c.emoji)
+  seen.ids.add(c.skill.icon)
+  for (const cr of c.carriers) for (const t of cr.tiers) walkAbility(seen, t)
+  walkAbility(seen, c.skill.ability)
   for (const f of c.forms ?? []) {
-    if (f.emoji) s.body.add(f.emoji)
-    for (const a of f.abilities ?? []) walkAbility(seen, a, 'team')
+    if (f.emoji) seen.ids.add(f.emoji)
+    for (const a of f.abilities ?? []) walkAbility(seen, a)
   }
-  walkRules(seen, rulesOf(c), 'team')
+  walkRules(seen, rulesOf(c))
 }
 
 /** 一场战斗里写到的敌人：配比里的、指定的与护卫 */
@@ -133,66 +116,38 @@ function fightEnemies(fight: FightDef): EnemyKind[] {
   return out
 }
 
-/** 战斗图集要收的变体：按描边分组的 emoji 与不描边的 */
-export interface BattleSprites {
-  readonly outlined: Record<OutlineKind, readonly string[]>
-  readonly plain: readonly string[]
-}
-
-/** 这一局在这张图上可能画出来的：队伍连同还能招来的角色、这张图与这一局在这张图上的各场里的敌人（精英带上词缀）、道具、拾取物、状态与词缀的图标、这张图的布景 */
-export function battleSprites(run: RunState): BattleSprites {
-  const seen: Sides = {
-    team: { body: new Set(), shot: new Set(), abilities: new Set(), npcs: new Set(), steals: false, raises: false },
-    enemy: { body: new Set(), shot: new Set(), abilities: new Set(), npcs: new Set(), steals: false, raises: false },
-  }
+/** 这一局在这张图上可能画出来的 emoji：队伍连同还能招来的角色、这张图与这一局在这张图上的各场里的敌人（精英带上词缀）、道具、拾取物、状态与词缀的图标、这张图的布景 */
+export function battleSprites(run: RunState): readonly string[] {
+  const seen: Seen = { ids: new Set(), abilities: new Set(), npcs: new Set() }
   for (const i of Object.values<ItemDef>(ITEMS)) {
-    for (const t of i.reactions ?? []) walkEffects(seen, t.effects, 'team')
-    if (i.ability) walkAbility(seen, i.ability, 'team')
+    for (const t of i.reactions ?? []) walkEffects(seen, t.effects)
+    if (i.ability) walkAbility(seen, i.ability)
   }
   const team = new Set<CharacterId>([...run.roster, ...(run.roster.length < TEAM.maxSize ? ROSTER_IDS : [])])
   for (const id of team) walkCharacter(seen, CHARACTERS[id])
   const foes = new Set<EnemyDef>(mapEnemyRoster(run.mapId))
   for (const f of plannedFights(run)) if (f.map === run.mapId) for (const k of fightEnemies(f)) foes.add(ENEMIES[k])
   for (const e of foes) {
-    walkNpc(seen, e, 'enemy')
-    if (e.role !== 'boss') walkNpc(seen, withAffixes(e, Object.values(AFFIXES)), 'enemy')
+    walkNpc(seen, e)
+    if (e.role !== 'boss') walkNpc(seen, withAffixes(e, Object.values(AFFIXES)))
   }
-  // 夺来的能力与拉起来的亡者换了阵营：再按新阵营走一遍，走到不再增加为止
-  for (let changed = true; changed; ) {
-    changed = false
-    for (const side of ['team', 'enemy'] as const) {
-      const s = seen[side]
-      const o = seen[OTHER[side]]
-      const before = s.abilities.size + s.npcs.size
-      if (s.steals) for (const a of [...o.abilities]) walkAbility(seen, a, side)
-      if (s.raises) for (const n of [...o.npcs]) walkNpc(seen, n, side)
-      if (s.abilities.size + s.npcs.size !== before) changed = true
-    }
-  }
-  return {
-    outlined: {
-      player: [
-        ...new Set([
-          ...seen.team.body,
-          ...seen.team.shot,
-          ...Object.values(PICKUPS).map((p) => p.emoji),
-          ...FIELD_PICKUPS.map((p) => p.emoji),
-          '2795',
-          '1f480',
-          '1f6ab',
-          '1f4a6',
-          '1fad8',
-          ...Object.values(STATUSES).flatMap((s) => (s.icon ? [s.icon.emoji] : [])),
-          ...Object.values(AFFIXES).map((a) => a.icon),
-          ...MAPS[run.mapId].decor.emojis,
-        ]),
-      ],
-      enemy: [...seen.enemy.body],
-      enemyProjectile: [...seen.enemy.shot],
-      elite: [...seen.enemy.body],
-    },
-    plain: ['1f4a5', SPAWN.markEmoji],
-  }
+  return [
+    ...new Set([
+      ...seen.ids,
+      ...Object.values(PICKUPS).map((p) => p.emoji),
+      ...FIELD_PICKUPS.map((p) => p.emoji),
+      '2795',
+      '1f480',
+      '1f6ab',
+      '1f4a6',
+      '1fad8',
+      ...Object.values(STATUSES).flatMap((s) => (s.icon ? [s.icon.emoji] : [])),
+      ...Object.values(AFFIXES).map((a) => a.icon),
+      ...MAPS[run.mapId].decor.emojis,
+      '1f4a5',
+      SPAWN.markEmoji,
+    ]),
+  ]
 }
 
 /** 启动时就载好的界面图标；单位、道具这些显示时再载 */

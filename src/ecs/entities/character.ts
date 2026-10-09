@@ -14,7 +14,7 @@ import { armGear } from '../systems/shared/gear'
 
 import type { RunState } from '../../run/state'
 import type { StatMods } from '../../types/stats'
-import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
+import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, RIM, Seat, Slot, Sprite, Tint, Transform } from '../components'
 import { bodyRules } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { STANDARD } from '../utils/pass'
@@ -79,8 +79,9 @@ export function spawnCharacter(
   Facing.y[eid] = -1
   Transform.w[eid] = size
   Transform.h[eid] = size
-  Sprite.frame[eid] = atlas.index(def.emoji, 'player')
-  armIdle(eid, def.emoji, 'player', Sprite.frame[eid]!, slot * 173)
+  Sprite.frame[eid] = atlas.index(def.emoji)
+  Tint.rim[eid] = RIM.team
+  armIdle(eid, def.emoji, Sprite.frame[eid]!, slot * 173)
   Depth.z[eid] = 10 + place.depthOffsetY
   return eid
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { viewport } from '../util/apply'
 import { Dialog, DIALOG_HEAD } from './dialog'
 import { drawBlock } from './draw'

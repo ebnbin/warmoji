@@ -5,7 +5,7 @@ import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS, SWARM_SPAN } from '../../da
 import { EMPLACE } from '../../data/feel'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
-import { holderOutline } from './weapon'
+import { holderRim } from './weapon'
 import {
   Alive,
   AROUND,
@@ -56,11 +56,10 @@ interface MinionSpec {
 }
 
 function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
-  const outline = holderOutline(Faction.v[weaponEid]!, Owner.eid[weaponEid]!)
   const m = newEntity(sim.world)
   attachDrawable(sim.world, m, sim.frames, {
     id: spec.emoji,
-    outline,
+    rim: holderRim(Faction.v[weaponEid]!, Owner.eid[weaponEid]!),
     x: spec.x,
     y: spec.y,
     size: spec.size * spec.bornScale,
@@ -75,7 +74,7 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   Minion.ability[m] = 0
   if (spec.animOffsetMs !== undefined) {
     addComponent(sim.world, m, Anim)
-    armIdle(m, spec.emoji, outline, Sprite.frame[m]!, spec.animOffsetMs)
+    armIdle(m, spec.emoji, Sprite.frame[m]!, spec.animOffsetMs)
   }
   return m
 }

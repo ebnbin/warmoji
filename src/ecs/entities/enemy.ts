@@ -11,7 +11,6 @@ import { POP } from '../../data/feel'
 import { startPop } from '../utils/pop'
 import type { DriveDef, EnemyDef, EnemyKind, EnemyMixEntry, NpcDef } from '../../types/enemies'
 import type { StatMods } from '../../types/stats'
-import type { OutlineKind } from '../../emoji/svg'
 import {
   Act,
   Anchored,
@@ -51,6 +50,7 @@ import {
   Standoff,
   TAG,
   Telegraph,
+  RIM,
   Tint,
   Transform,
   VisOff,
@@ -192,10 +192,6 @@ interface NpcOpts {
   readonly huntLeader?: boolean
 }
 
-/** 非玩家身体的描边：己方的按角色描，敌方的按精英与否 */
-export function npcOutline(eid: number): OutlineKind {
-  return Faction.v[eid] === FACTION.team ? 'player' : Elite.v[eid] || Boss.v[eid] ? 'elite' : 'enemy'
-}
 
 /** 一个非玩家身体：敌人、分身、亡仆同一条出生路径，阵营由出生时给 */
 export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y: number, hp: number, o: NpcOpts = {}): number {
@@ -204,7 +200,6 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   const boss = o.boss === true
   const alpha = o.alpha ?? 1
   const faction = o.faction ?? FACTION.enemy
-  const outline: OutlineKind = faction === FACTION.team ? 'player' : elite || boss ? 'elite' : 'enemy'
   const size = def.size
   const eid = spawnBody(world, {
     faction,
@@ -254,8 +249,9 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   EnemyArm.fireDelayMs[eid] = AI.firstShot.minMs + sim.rng.next() * AI.firstShot.jitterMs
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
-  Sprite.frame[eid] = atlas.index(def.emoji, outline)
-  armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
+  Sprite.frame[eid] = atlas.index(def.emoji)
+  Tint.rim[eid] = faction === FACTION.team ? RIM.team : elite || boss ? RIM.elite : RIM.none
+  armIdle(eid, def.emoji, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.alpha[eid] = boss ? 0.2 : 0.3
   startPop(sim, eid, boss ? POP.bossMs : POP.enemyMs)
   Pop.size[eid] = size
@@ -427,9 +423,8 @@ export function applyMorph(
   addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH.recastMs)
   addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
   if (spec.vulnMul !== undefined) addMark(eid, MARK.exposed, TAG.morph, until, spec.vulnMul)
-  const outline = npcOutline(eid)
-  Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
-  armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
+  Sprite.frame[eid] = atlas.index(spec.morphEmoji)
+  armIdle(eid, spec.morphEmoji, Sprite.frame[eid]!, Anim.offset[eid]!)
   interrupt(sim, eid)
   Transform.rot[eid] = 0
   if (anchored) removeComponent(sim.world, eid, Anchored)
@@ -441,8 +436,7 @@ export function restoreMorph(sim: Sim, atlas: FrameIndex, eid: number, anchored:
   const def = enemyDef[eid]
   if (!def) return
   if (anchored) addComponent(sim.world, eid, Anchored)
-  const outline = npcOutline(eid)
   const emoji = bodyLook[eid] ?? def.emoji
-  Sprite.frame[eid] = atlas.index(emoji, outline)
-  armIdle(eid, emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
+  Sprite.frame[eid] = atlas.index(emoji)
+  armIdle(eid, emoji, Sprite.frame[eid]!, Anim.offset[eid]!)
 }

@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import { OUTLINE } from './svg'
-import type { OutlineKind } from './svg'
+import { OUTLINE, outlinePx, outlineRaster } from './outline'
+import type { OutlineKind } from './outline'
 import { packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
-import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
+import { EMOJI_PAD, padSvg, setSvgSize } from './svg'
 
 const RASTER = 256
 const LRU_LIMIT = 256
@@ -77,13 +77,13 @@ export function emojiKey(id: string, outline?: OutlineKind): string {
   return `emoji-${id}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
-export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))
+async function blobToImage(blob: Blob, failure: string): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(blob)
   try {
     const img = new Image()
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
-      img.onerror = () => reject(new Error('SVG 光栅化失败'))
+      img.onerror = () => reject(new Error(failure))
       img.src = url
     })
     return img
@@ -92,10 +92,19 @@ export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   }
 }
 
+export function svgToImage(svgText: string): Promise<HTMLImageElement> {
+  return blobToImage(new Blob([svgText], { type: 'image/svg+xml' }), 'SVG 光栅化失败')
+}
+
+async function canvasToImage(cv: HTMLCanvasElement): Promise<HTMLImageElement> {
+  const blob = await new Promise<Blob>((resolve, reject) => cv.toBlob((b) => (b ? resolve(b) : reject(new Error('描边导出失败')))))
+  return blobToImage(blob, '描边载入失败')
+}
+
 export async function emojiRaster(id: string, outline?: OutlineKind): Promise<HTMLImageElement> {
-  const raw = await emojiSvgText(id)
-  const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
-  return svgToImage(setSvgSize(svg, RASTER))
+  const img = await svgToImage(setSvgSize(await emojiSvgText(id), RASTER))
+  if (!outline) return img
+  return canvasToImage(outlineRaster(img, RASTER, outlinePx(RASTER), OUTLINE.colors[outline]))
 }
 
 async function createTexture(scene: Phaser.Scene, id: string, outline?: OutlineKind): Promise<string> {

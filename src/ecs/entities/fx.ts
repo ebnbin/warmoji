@@ -116,7 +116,6 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
   FxBoom.size[eid] = size
   attachDrawable(sim.world, eid, sim.frames, {
     id: '1f4a5',
-    outline: undefined,
     x,
     y,
     size: size * 0.4,

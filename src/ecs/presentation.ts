@@ -9,7 +9,7 @@ import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, Boss, Elite, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, Slot, Transform, VisOff } from './components'
+import { Alive, Boss, Elite, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, RIM, Slot, Transform, VisOff } from './components'
 import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -111,13 +111,14 @@ export class Presentation {
 function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
   out.push({
     z: SWEAT_Z,
-    frame: sim.frames.index(SWEAT, 'player'),
+    frame: sim.frames.index(SWEAT),
     x: Transform.x[body]! + VisOff.x[body]! + size * 0.34,
     y: Transform.y[body]! + VisOff.y[body]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4,
     w: SWEAT_SIZE,
     h: SWEAT_SIZE,
     color: 0xffffff,
     alpha: hostShown(body),
+    rim: RIM.item,
   })
 }
 
@@ -136,7 +137,7 @@ function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly str
   const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((emojis.length - 1) * ICON_SIZE) / 2
   const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * (0.55 + row)
   const alpha = hostShown(eid)
-  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji, 'player'), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha }))
+  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, rim: RIM.item }))
 }
 
 /** 精英与头目头顶第一排打头的元素图标：小怪太多不标，靠图鉴认 */
@@ -224,7 +225,7 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const dim = (cooled(sim, cur) ? 1 : COOLING_DIM) * hostShown(lead)
   sprites.push({
     z: ECHO_Z,
-    frame: sim.frames.index(lookOf(sim, lead), 'player'),
+    frame: sim.frames.index(lookOf(sim, lead)),
     x: at.x,
     y: at.y,
     w: Transform.w[lead]!,

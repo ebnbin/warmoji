@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { textRes } from '../util/apply'
 import { Icon } from './icon'
 import { css, FONT_FAMILY, SURFACE, TEXT, textColor } from './theme'

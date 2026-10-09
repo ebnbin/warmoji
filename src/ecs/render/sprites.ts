@@ -2,12 +2,24 @@ import Phaser from 'phaser'
 import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
 import { AWAY } from '../../data/light'
+import { viewport } from '../../util/apply'
+import type { Rim } from '../components'
 import { EcsLayer } from './layer'
 import type { LayerType } from './layer'
+import { RIMS } from './side'
+import type { RimStyle } from './side'
 import { packTint, TINT_FILL } from './tint'
 
 /** 补光里不论朝向、整个身体都吃到的那一份 */
 const FILL_AMBIENT = 0.15
+
+/** 描边：剪影往这八个方向各挪一段画一遍，再把本体盖上去 */
+const RIM_DIRS = Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)] as const)
+
+/** 每一份剪影的浓度：八份叠起来正好是 alpha 的三次方，半透明的身体底下不透出一整块描边色 */
+function rimAlpha(alpha: number): number {
+  return 1 - Math.pow(1 - alpha * alpha * alpha, 1 / RIM_DIRS.length)
+}
 
 /**
  * 一个单位此刻受的光，由地图按它的位置写入：k 指向主光，长 1 时明暗按 sun 到 shade 分满，短些就淡些，为 0 就是四面一样亮；
@@ -44,6 +56,7 @@ export interface PaintSprite {
   readonly rot?: number
   readonly color: number
   readonly alpha: number
+  readonly rim?: Rim
 }
 
 type QuadNode = Phaser.Renderer.WebGL.RenderNodes.BatchHandlerQuad
@@ -101,15 +114,15 @@ export class SpriteBatch extends EcsLayer {
 
   protected drawPaint(node: QuadNode, drawingContext: Phaser.Renderer.WebGL.DrawingContext, s: PaintSprite): void {
     if (s.frame < 0) return
-    this.draw(node, drawingContext, s.x, s.y, s.rot ?? 0, s.w, s.h, 0, s.frame, 0, s.color, s.alpha, 0)
+    this.draw(node, drawingContext, s.x, s.y, s.rot ?? 0, s.w, s.h, 0, s.frame, 0, s.color, s.alpha, 0, s.rim === undefined ? null : RIMS[s.rim])
   }
 
-  /** 画一张图：(x, y) 为中心转 rot，宽高 w×h，flipX 水平翻转，quad 非零时只取四分之一格 */
+  /** 画一张图：(x, y) 为中心转 rot，宽高 w×h，flipX 水平翻转，quad 非零时只取四分之一格；rim 是垫在下面的描边 */
   protected draw(
     node: QuadNode,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
     x: number, y: number, rot: number, w: number, h: number, flipX: number, frame: number, quad: number,
-    color: number, alpha: number, effect: number,
+    color: number, alpha: number, effect: number, rim: RimStyle | null,
   ): void {
     let hw = (flipX ? -1 : 1) * w * 0.5
     const hh = h * 0.5
@@ -166,6 +179,16 @@ export class SpriteBatch extends EcsLayer {
     const x3 = calc.getX(xb, yb)
     const y3 = calc.getY(xb, yb)
     const tex = this.atlas.pageGlTexture(this.atlas.page(frame))
+    if (rim && alpha > 0) {
+      // 顶点已在屏幕像素里：挪的是屏幕上的距离
+      const d = rim.px * viewport.renderScale
+      const t = packTint(rim.color, rimAlpha(alpha))
+      for (const [dx, dy] of RIM_DIRS) {
+        const ox = dx * d
+        const oy = dy * d
+        node.batch(drawingContext, tex, x0 + ox, y0 + oy, x1 + ox, y1 + oy, x2 + ox, y2 + oy, x3 + ox, y3 + oy, u0, v0, u1 - u0, v1 - v0, TINT_FILL, t, t, t, t, this.renderOptions)
+      }
+    }
     if (!light) {
       const tint = packTint(color, alpha)
       node.batch(drawingContext, tex, x0, y0, x1, y1, x2, y2, x3, y3, u0, v0, u1 - u0, v1 - v0, effect, tint, tint, tint, tint, this.renderOptions)

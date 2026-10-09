@@ -8,9 +8,9 @@ export interface Decor extends PaintSprite {
   rot: number
 }
 
-/** 图集里 id 的那张图，描边与单位一样 */
+/** 图集里 id 的那张图，不描边 */
 export function decorSprite(atlas: EcsAtlas, id: string, x: number, y: number, size: number, rot: number, alpha: number): Decor {
-  return { z: 1, frame: atlas.index(id, 'player'), x, y, w: size, h: size, rot, color: 0xffffff, alpha }
+  return { z: 1, frame: atlas.index(id), x, y, w: size, h: size, rot, color: 0xffffff, alpha }
 }
 
 /** 只留下 keep 的布景 */

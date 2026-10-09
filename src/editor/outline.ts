@@ -1,7 +1,7 @@
 import { ENEMIES } from '../data/enemies'
 import { MAPS } from '../data/maps'
 import type { Path } from '../data/runCheck'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { endText, stepText } from '../scene/runLines'
 import type { EnemyKind } from '../types/enemies'
 import type { Draft, End, Fight, Phase, Spawn, Step, WaveSquad } from './draft'

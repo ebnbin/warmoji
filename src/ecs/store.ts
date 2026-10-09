@@ -155,4 +155,3 @@ export const traces = slots<import('./systems/shared/trace').TraceRec>()
 export const zoneSrc = slots<Source>()
 
 export const animId = slots<string>()
-export const animOutline = slots<import('../emoji/svg').OutlineKind>()

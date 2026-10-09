@@ -68,7 +68,7 @@ import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls, PET_TRAIL_MS, rewindMs } from '../../data/abilities'
 import { reactionEffects } from '../../data/reactions'
 import { UNIT } from '../../util/units'
-import { holderOutline, spawnWeaponBody } from './weapon'
+import { holderRim, spawnWeaponBody } from './weapon'
 import { keepTrace } from '../systems/shared/trace'
 import { attachDrawable } from './drawable'
 import type { Sim } from '../sim'
@@ -84,9 +84,9 @@ interface ShapeSpec<K extends keyof ShapeOf> {
 const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
   bolt: {
     comps: [Bolt, Shots],
-    attach: (sim, e, s, faction) => {
+    attach: (sim, e, s) => {
       const p = s.projectile
-      Bolt.frame[e] = sim.frames.index(p.look.emoji, faction === FACTION.enemy ? 'enemyProjectile' : 'player')
+      Bolt.frame[e] = sim.frames.index(p.look.emoji)
       Bolt.size[e] = p.look.size
       Bolt.radius[e] = p.radius
       Bolt.speed[e] = p.speed
@@ -342,7 +342,7 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
 /** 施法锚点物件：画在宿主身边，能力从它身上出手，由 tickPets 摆放 */
 function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['anchor']>, faction: number): number {
   const p = newEntity(sim.world)
-  attachDrawable(sim.world, p, sim.frames, { id: a.look.emoji, outline: holderOutline(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.look.size, z: 13 })
+  attachDrawable(sim.world, p, sim.frames, { id: a.look.emoji, rim: holderRim(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.look.size, z: 13 })
   addComponents(sim.world, p, Pet, Mounted)
   Pet.of[p] = e
   Mounted.host[p] = host

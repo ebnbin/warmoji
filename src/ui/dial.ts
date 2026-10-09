@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { drawDisc } from './draw'
 import { CooldownPie, RingGauge } from './gauge'
 import { pressable } from './gesture'

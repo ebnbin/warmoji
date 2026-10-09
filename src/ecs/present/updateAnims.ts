@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { clipFrameIndex } from '../../emoji/anim'
 import { Anim, ANIM_SET, Sprite } from '../components'
-import { animId, animOutline } from '../store'
+import { animId } from '../store'
 import type { Sim } from '../sim'
 
 export function updateAnims(sim: Sim): void {
@@ -10,8 +10,7 @@ export function updateAnims(sim: Sim): void {
   for (const eid of query(sim.world, ANIM_SET)) {
     if (Anim.frames[eid]! < 0) continue
     const id = animId[eid]
-    const outline = animOutline[eid]
-    if (id === undefined || outline === undefined) continue
+    if (id === undefined) continue
     if (Anim.onceFrames[eid]! > 0) {
       const t = now - Anim.onceAt[eid]!
       if (t < Anim.onceDur[eid]!) {
@@ -21,7 +20,7 @@ export function updateAnims(sim: Sim): void {
       Anim.onceFrames[eid] = 0
     }
     if (Anim.frames[eid]! === 0) {
-      const c = atlas.clip(id, outline, 'idle')
+      const c = atlas.clip(id, 'idle')
       if (c.frames === 0) {
         Sprite.frame[eid] = Anim.still[eid]!
         continue
