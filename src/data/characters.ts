@@ -46,12 +46,10 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
 
 const CHARACTER_TABLE = fromJson<Record<CharacterId, CharacterAuthoring>>(charactersJson)
 export const CHARACTERS: Record<CharacterId, CharacterDef> = mapValues(CHARACTER_TABLE, hydrateCharacter)
-const ROSTER = fromJson<{ readonly characters: readonly CharacterId[]; readonly legacyCharacters: readonly CharacterId[]; readonly maps: Readonly<Record<MapId, readonly CharacterId[]>> }>(rosterJson)
-/** 新角色：选角、招募与沙盒只列它们，按地图的先后 */
+const ROSTER = fromJson<{ readonly characters: readonly CharacterId[]; readonly maps: Readonly<Record<MapId, readonly CharacterId[]>> }>(rosterJson)
+/** 全部角色：选角、招募与沙盒列的就是它们，按地图的先后 */
 export const ROSTER_IDS: readonly CharacterId[] = ROSTER.characters
-/** 旧角色：只给旧关卡的预设队伍与图鉴的旧角色页用 */
-export const LEGACY_ROSTER_IDS: readonly CharacterId[] = ROSTER.legacyCharacters
-/** 各张图对应的新角色：沙盒进哪张图就从这里抽队伍 */
+/** 各张图对应的角色：沙盒进哪张图就从这里抽队伍 */
 export const MAP_ROSTER: Readonly<Record<MapId, readonly CharacterId[]>> = ROSTER.maps
 
 /** 角色在这一级时各载体用的能力 */

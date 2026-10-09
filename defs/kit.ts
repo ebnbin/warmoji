@@ -1,6 +1,6 @@
 import type { Effect } from '../src/types/abilityDefs'
 
-/** 新单位共用的小写法：弹体、炸开的一圈、场与地上的一片的样子 */
+/** 单位共用的小写法：弹体、炸开的一圈、场与地上的一片的样子 */
 
 /** 一发弹体：emoji、弹速（格/秒）、大小（格），rot 是图里尖头的朝向与出手方向差几度 */
 export const shot = (emoji: string, speed: number, size = 0.45, rot = 0) => ({ look: { emoji, size, rotationOffsetDeg: rot }, radius: +(size * 0.34).toFixed(2), speed })

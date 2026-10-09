@@ -1,5 +1,5 @@
-import { CHARACTERS, LEGACY_ROSTER_IDS, ROSTER_IDS, baseLoadout } from '../data/characters'
-import { ELITE, ENEMIES, LEGACY_ENEMIES, NEW_ENEMIES, TENACITY } from '../data/enemies'
+import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
+import { ELITE, ENEMIES, ENEMY_LIST, TENACITY } from '../data/enemies'
 import { AURA_MS, ELEMENT_IDS, ELEMENT_MUL, ELEMENTS, REACTIONS } from '../data/elements'
 import type { ElementId } from '../types/elements'
 import type { CharacterId } from '../types/characters'
@@ -325,8 +325,8 @@ export function wikiGroups(): WikiGroup[] {
         lines: mapStatLines(id),
       })),
     },
-    { icon: '1f939', title: '新角色', entries: ROSTER_IDS.map(characterEntry) },
-    { icon: '1f9df', title: '新敌人', entries: NEW_ENEMIES.map(enemyEntry) },
+    { icon: '1f939', title: '角色', entries: ROSTER_IDS.map(characterEntry) },
+    { icon: '1f9df', title: '敌人', entries: ENEMY_LIST.map(enemyEntry) },
     { icon: '1f308', title: '元素', entries: [elementRulesEntry(), ...ELEMENT_IDS.map(elementEntry)] },
     {
       icon: '2b50',
@@ -351,8 +351,6 @@ export function wikiGroups(): WikiGroup[] {
         ],
       })),
     },
-    { icon: '1f474', title: '旧角色', entries: LEGACY_ROSTER_IDS.map(characterEntry) },
-    { icon: '1f480', title: '旧敌人', entries: LEGACY_ENEMIES.map(enemyEntry) },
   ]
 }
 
