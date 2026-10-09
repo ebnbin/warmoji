@@ -1,10 +1,16 @@
 import Phaser from 'phaser'
 import emojiOrderingUrl from '../assets/emoji/ordering.txt?url'
-import emojiBundleUrl from '../assets/emoji/twemoji.txt?url'
+import twemojiUrl from '../assets/emoji/twemoji.txt?url'
+import notoUrl from '../assets/emoji/noto.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
+import { EMOJI_VENDOR_ID } from '../emoji/vendor'
+import type { EmojiVendorId } from '../emoji/vendors'
 import { Label } from '../ui'
 import { PRELOAD_EMOJIS } from '../manifest'
 import { SceneKey } from './keys'
+
+/** 各画风的资源，只下载这次启动用的那一份 */
+const BUNDLE_URLS: Readonly<Record<EmojiVendorId, string>> = { twemoji: twemojiUrl, noto: notoUrl }
 
 enum TextAsset {
   EmojiOrdering = 'emoji-ordering',
@@ -18,7 +24,7 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.load.text(TextAsset.EmojiOrdering, emojiOrderingUrl)
-    this.load.text(TextAsset.EmojiBundle, emojiBundleUrl)
+    this.load.text(TextAsset.EmojiBundle, BUNDLE_URLS[EMOJI_VENDOR_ID])
   }
 
   create(): void {

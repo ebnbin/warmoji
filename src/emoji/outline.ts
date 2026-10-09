@@ -1,9 +1,6 @@
-import { EMOJI_BOX } from './pack'
-import { EMOJI_PAD } from './svg'
-
-/** 界面图标的描边：width 是往外描多宽，SVG 单位 */
+/** 界面图标的描边：share 是往外描的宽占贴图边长的份额，画风的留白须放得下它 */
 export const OUTLINE = {
-  width: 2,
+  share: 1 / 24,
   colors: {
     player: '#000000',
     enemy: '#8e24aa',
@@ -14,14 +11,12 @@ export const OUTLINE = {
 
 export type OutlineKind = keyof typeof OUTLINE.colors
 
-if (OUTLINE.width > EMOJI_PAD) throw new Error(`描边 ${OUTLINE.width} 宽过了 emoji 四周留的 ${EMOJI_PAD}`)
-
 /** 剪影往外扩时取的方向数：越多边越圆 */
 const DIRS = 16
 
 /** 边长 size 像素的图标描边的像素宽 */
 export function outlinePx(size: number): number {
-  return (OUTLINE.width * size) / (EMOJI_BOX + EMOJI_PAD * 2)
+  return OUTLINE.share * size
 }
 
 /** 按光栅后的剪影往外描 px 宽的一圈 color，再把原图盖回去：只看像素，与图是怎么画出来的无关 */

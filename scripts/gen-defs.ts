@@ -54,6 +54,9 @@ import { withAffixes } from '../src/data/reactions.ts'
 import { SIGNALS } from '../src/data/signals.ts'
 import type { MapSignals } from '../src/data/signals.ts'
 import { parseEmojiPack } from '../src/emoji/pack.ts'
+import { OUTLINE } from '../src/emoji/outline.ts'
+import { EMOJI_VENDORS, vendorBox } from '../src/emoji/vendors.ts'
+import type { EmojiVendor } from '../src/emoji/vendors.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { AbilityDef, Cond, CondWho, Effect } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
@@ -897,7 +900,17 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }
 
-const PACK = new Set(parseEmojiPack(readFileSync('scripts/emoji/ordering.txt', 'utf8'), readFileSync('scripts/emoji/twemoji.txt', 'utf8')).ids)
+const ORDERING = readFileSync('scripts/emoji/ordering.txt', 'utf8')
+const VENDOR_PACKS = Object.entries<EmojiVendor>(EMOJI_VENDORS).map(([id, v]) => parseEmojiPack(ORDERING, readFileSync(`scripts/emoji/${id}.txt`, 'utf8'), v.header))
+/** 每种画风都有图的 emoji */
+const PACK = new Set(VENDOR_PACKS[0]!.ids.filter((e) => VENDOR_PACKS.every((p) => p.bodyById.has(e))))
+
+/** 画风的留白放得下界面图标的描边 */
+for (const [id, v] of Object.entries<EmojiVendor>(EMOJI_VENDORS)) {
+  const box = vendorBox(v)
+  const rim = (Math.max(box.w, box.h) + 2 * v.padding) * OUTLINE.share
+  need(v.padding >= rim, `emoji 画风 ${id} 的 padding ${v.padding} 放不下 ${+rim.toFixed(2)} 宽的描边`)
+}
 
 /** 地图信号：同一个名字在哪种地图上说法都一样，关卡的说明按名字找说法 */
 {
@@ -1347,5 +1360,5 @@ const OUT = 'src/assets'
 mkdirSync(`${OUT}/emoji`, { recursive: true })
 for (const [name, data] of Object.entries(TABLES)) writeFileSync(`${OUT}/${name}.json`, JSON.stringify(data, null, 1) + '\n')
 
-// ordering.txt 与 twemoji.txt 逐行对应，只拷贝不改写
-for (const name of ['ordering.txt', 'twemoji.txt']) copyFileSync(`scripts/emoji/${name}`, `${OUT}/emoji/${name}`)
+// 各画风的资源与 ordering.txt 逐行对应，只拷贝不改写
+for (const name of ['ordering', ...Object.keys(EMOJI_VENDORS)]) copyFileSync(`scripts/emoji/${name}.txt`, `${OUT}/emoji/${name}.txt`)

@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { Casting, Depth, ENEMY_SET, EnemyPhase, Motion, MOTION, Phys, Sprite, TELEGRAPH, Transform } from '../components'
 import { enemyZ } from '../entities/enemy'
-import { footY } from '../utils/ground'
+import { footY } from '../render/foot'
 import { isHalted } from '../utils/marks'
 import { leaderX, leaderY } from '../utils/team'
 import { UNIT } from '../../util/units'
