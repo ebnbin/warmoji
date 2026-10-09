@@ -23,7 +23,7 @@ export const EMOJI_VENDORS = {
 
 export type EmojiVendorId = keyof typeof EMOJI_VENDORS
 
-export const DEFAULT_VENDOR: EmojiVendorId = 'twemoji'
+export const DEFAULT_VENDOR: EmojiVendorId = 'noto'
 
 export function isVendorId(v: unknown): v is EmojiVendorId {
   return typeof v === 'string' && Object.hasOwn(EMOJI_VENDORS, v)

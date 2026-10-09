@@ -14,8 +14,8 @@ export interface Settings {
 const DEFAULT_SETTINGS: Settings = {
   damageNumbers: true,
   hitShake: true,
-  sound: true,
-  bgm: true,
+  sound: false,
+  bgm: false,
   emojiVendor: DEFAULT_VENDOR,
 }
 
