@@ -1,44 +1,53 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
+import { patch, shot } from '../../../kit.ts'
 
-// 🐢 寺龟：甩一圈水泼慢身边的敌人；玄武护体时硬得像石头，把四周的敌人招到身上，身周的水幕把飞来的弹体弹回去
-const templeTurtleJar = {
+// 🐢 寺龟：抛出睡莲叶让敌人睡着，落处起一团催眠的池雾；玄武时全队爬上龟背，自己霸体硬扛
+const SLEEP = { kind: 'sleep', durationMs: 3000, wakeMul: 2 } as const
+
+const templeTurtleLotus = {
   trigger: 'auto',
-  cooldownMs: 1250,
+  cooldownMs: 1200,
   aim: 'nearest',
-  range: 2.2,
-  damage: 18,
-  fireSfx: 'splash',
-  color: 0x42a5f5,
-  shape: { kind: 'disc', radius: 2, at: 'self' },
-  onHit: [{ kind: 'slow', factor: 0.75, durationMs: 1000 }],
+  range: 7,
+  damage: 14,
+  fireSfx: 'shoot',
+  shape: { kind: 'bolt', projectile: shot('1fab7', 9), lifeMs: 1000 },
+  onHit: [SLEEP],
 } satisfies AbilityDef
 
-const templeTurtleJar2 = { ...templeTurtleJar, reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'shield', amount: 0, ratio: 0.04, ms: 2000 }] }] } satisfies AbilityDef
+const templeTurtleLotus2 = {
+  ...templeTurtleLotus,
+  onHit: [SLEEP, { kind: 'ground', def: patch(1.5, 2500, 0xa5d6a7, [{ kind: 'sleep', durationMs: 1200, wakeMul: 1.5 }], 0, 600) }],
+} satisfies AbilityDef
 
-const templeTurtleJar3 = { ...templeTurtleJar2, onHit: [...templeTurtleJar.onHit, { kind: 'attune', element: 'water', ms: 4000 }] } satisfies AbilityDef
+const templeTurtleLotus3 = {
+  ...templeTurtleLotus,
+  onHit: [
+    SLEEP,
+    {
+      kind: 'ground',
+      def: {
+        ...patch(1.5, 3000, 0xa5d6a7, undefined, 0, 0),
+        dwell: { ms: 1000, effects: [{ kind: 'sleep', durationMs: 2500, wakeMul: 2 }] },
+        onExpire: [{ kind: 'slow', factor: 0.5, durationMs: 1500 }],
+      },
+    },
+  ],
+} satisfies AbilityDef
 
 const templeTurtleXuanwu = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'wash',
   color: 0x4fc3f7,
-  shape: { kind: 'disc', radius: 4, at: 'self' },
-  onHit: [{ kind: 'taunt', durationMs: 3000 }],
-  reactions: [
-    {
-      on: 'fire',
-      to: 'self',
-      effects: [
-        { kind: 'guard', mul: 0.4, durationMs: 4000 },
-        { kind: 'barrier', shape: 'ring', length: 2.2, durationMs: 3000, bodies: 'none', shots: true, reflect: true, follow: true, color: 0x4fc3f7 },
-      ],
-    },
-  ],
+  shape: { kind: 'all', of: 'allies' },
+  onHit: [{ kind: 'attach', ms: 4000 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 4000 }, { kind: 'guard', mul: 0.5, durationMs: 4000 }] }],
 } satisfies AbilityDef
 
-export const abilities = { templeTurtleJar, templeTurtleJar2, templeTurtleJar3, templeTurtleXuanwu } satisfies Record<string, AbilityDef>
+export const abilities = { templeTurtleLotus, templeTurtleLotus2, templeTurtleLotus3, templeTurtleXuanwu } satisfies Record<string, AbilityDef>
 
 export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.15 } }, { add: { maxHp: 70, armor: 4 }, mul: { damage: 1.35 } }] as const satisfies readonly StatMods[]
 
@@ -46,27 +55,27 @@ export default {
   emoji: '1f422',
   name: '寺龟',
   element: 'water',
-  desc: '寺院池子里的老龟，走得慢、背壳硬：甩一圈水泼慢身边的敌人；玄武护体时受到的伤害大减，把四周的敌人都招到自己身上，身周的水幕把飞来的弹体弹回去',
+  desc: '寺院池子里的老龟，走得慢、背壳硬：抛出睡莲叶，打中的敌人睡 3 秒，叫醒的那一下伤害 ×2；技能玄武让全队爬上龟背 4 秒，队友谁也选不中却照常出手，自己霸体、受到的伤害 ×0.5',
   role: 'tank',
-  tags: ['defense', 'melee'],
+  tags: ['defense', 'control', 'ranged'],
   body: { drag: 5.5, mass: 1.8 },
   stats: { moveSpeed: 3.9, maxStamina: 150, staminaRegen: 42, exertion: 1.25 },
   skill: {
     name: '玄武',
     icon: '1f6e1',
-    desc: '4 秒内受到的伤害 ×0.4，4 格内的敌人嘲讽 3 秒，身周立起一圈 2.2 格的水幕跟着自己 3 秒，把敌方的弹体反弹回去',
-    cdMs: 14_000,
+    desc: '4 秒内全体队友贴在龟背上，谁也选不中，照常出手；自己霸体 4 秒，受到的伤害 ×0.5',
+    cdMs: 16_000,
     ability: 'templeTurtleXuanwu',
   },
   weapons: [],
   innate: [
     {
-      name: '水缸',
-      icon: '1f3fa',
-      base: 'templeTurtleJar',
+      name: '睡莲',
+      icon: '1fab7',
+      base: 'templeTurtleLotus',
       upgrades: [
-        { ability: 'templeTurtleJar2', card: { icon: '26f2', name: '清泉', desc: '每甩一次水，给自己挂一层生命 4% 的护盾 2 秒' } },
-        { ability: 'templeTurtleJar3', card: { icon: '1f4a7', name: '龟息', desc: '泼中的敌人 4 秒内变成水元素，挨雷、冰打更疼' } },
+        { ability: 'templeTurtleLotus2', card: { icon: '1f32b', name: '池雾', desc: '睡莲叶落处起一团 1.5 格的雾，留 2.5 秒，雾里的敌人每 0.6 秒睡 1.2 秒' } },
+        { ability: 'templeTurtleLotus3', card: { icon: '1f6cc', name: '龟眠', desc: '雾改成留 3 秒：在雾里连续待满 1 秒的敌人睡 2.5 秒，叫醒的那一下伤害 ×2；雾散时还在雾里的减速 50%，持续 1.5 秒' } },
       ],
     },
   ],

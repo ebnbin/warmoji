@@ -27,11 +27,11 @@ export default {
     boss: 'edge',
     lean: { mul: 3, full: 13 },
     kinds: {
-      edge: { name: '冰缘', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'splash', snapU: 8, weight: 3, perSec: 1.5, only: ['zombie', 'turtle', 'crab', 'snake', 'blob', 'curlingStone', 'iceBlock', 'orca', 'yeti'] },
-      seam: { name: '新冰缝', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['turtle', 'crab', 'snake', 'iceBlock', 'crackGrin'] },
-      drift: { name: '雪堆', at: { kind: 'mark' }, enter: 'rise', look: 'snow', weight: 2, perSec: 1.5, only: ['zombie', 'boar', 'blob', 'creeper', 'knight', 'badSnowman', 'frostSwan', 'mistSpirit', 'curlingStone'] },
-      squall: { name: '风雪', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1.5, only: ['ghost', 'snowCloud', 'mistSpirit', 'gustSpirit'] },
-      sky: { name: '天上', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1, only: ['swan', 'frostSwan', 'snowCloud'] },
+      edge: { name: '冰缘', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'splash', snapU: 8, weight: 3, perSec: 1.5, only: ['frostSwan', 'badSnowman', 'curlingStone', 'iceBlock', 'orca', 'yeti'] },
+      seam: { name: '新冰缝', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['badSnowman', 'iceBlock', 'crackGrin'] },
+      drift: { name: '雪堆', at: { kind: 'mark' }, enter: 'rise', look: 'snow', weight: 2, perSec: 1.5, only: ['tusker', 'wallRhino', 'badSnowman', 'frostSwan', 'mistSpirit', 'curlingStone'] },
+      squall: { name: '风雪', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1.5, only: ['snowCloud', 'mistSpirit', 'gustSpirit'] },
+      sky: { name: '天上', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1, only: ['frostSwan', 'snowCloud'] },
     },
   },
   floe: {
