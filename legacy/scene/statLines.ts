@@ -443,7 +443,7 @@ export function elementLine(el: ElementId | undefined): string {
 export function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
   const how = DELIVERY_NAME[deliveryOf(w)]
-  if (w.element) base.push(`${ELEMENTS[w.element].name}元素`)
+  if (w.element) base.push(w.element === 'physical' ? '物理' : `${ELEMENTS[w.element].name}元素`)
   if (w.damage) base.push(`伤害 ${w.damage}${how ? `（${how}）` : ''}`)
   if (w.trigger === 'auto' && w.cooldownMs > 0) base.push(`冷却 ${sec(w.cooldownMs)}`)
   if (w.knockback) base.push(`击退 ${kbGrid(w.knockback)}`)

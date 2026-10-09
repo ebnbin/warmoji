@@ -761,8 +761,8 @@ interface AbilityBase {
   readonly shape: Shape
   /** 出手方式，决定吃近战伤害还是远程伤害；不写按形状定 */
   readonly delivery?: Delivery
-  /** 这一下的元素，不写按出手的身体的；附了魔的按附的 */
-  readonly element?: ElementId
+  /** 这一下的元素，不写按出手的身体的，physical 是身体带着元素也打物理；附了魔的按附的 */
+  readonly element?: ElementId | 'physical'
   readonly damage?: number
   readonly knockback?: number
   readonly onHit?: readonly Effect[]

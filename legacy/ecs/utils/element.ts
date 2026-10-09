@@ -16,6 +16,7 @@ export function elementNow(sim: Sim, eid: number): number {
 export function strikeElement(sim: Sim, def: AbilityDef | undefined, body: number): number {
   const imbue = hasComponent(sim.world, body, Mark) ? markSlot(sim, body, MARK.imbue) : -1
   if (imbue >= 0) return Mark.a[imbue]!
+  if (def?.element === 'physical') return 0
   return def?.element !== undefined ? elementIndex(def.element) : elementNow(sim, body)
 }
 
