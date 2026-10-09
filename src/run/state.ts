@@ -1,7 +1,8 @@
 import { CHARACTERS, ROSTER_IDS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { fightsOf, RUNS } from '../data/runs'
-import type { GrowthProgress, ItemId } from '../types/items'
+import { SHELF } from '../data/items'
+import type { ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
 import type { MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
@@ -17,12 +18,8 @@ export const INVINCIBLE_HP = 10_000_000
 export interface Kept {
   /** 靠全队升级的一局里升到了几级 */
   level: number
-  items: ItemId[]
   /** 永久形态（局内进化），-1 是本体 */
   form: number
-  growth: GrowthProgress
-  /** 已计入成长的击杀数 */
-  growthKills: number
 }
 
 export interface RunState {
@@ -56,6 +53,10 @@ export interface RunState {
   memberRes: number[]
   /** 这一局里上过场的角色各自记住的 */
   kept: Partial<Record<CharacterId, Kept>>
+  /** 队伍道具：买下的按先后排，重复的就是叠了几件 */
+  items: ItemId[]
+  /** 商店的货架有几格 */
+  shelf: number
   /** 队员的等级下限：买道具攒的等级比它低时按它算 */
   minLevel: number
   /** 队伍无敌：生命上限锁在极大值 */
@@ -151,6 +152,8 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mutators?
     skillCd: [],
     memberRes: [],
     kept: {},
+    items: [],
+    shelf: SHELF,
     minLevel: 1,
     invincible: false,
     lives: def.rules?.lives ?? Infinity,
@@ -249,7 +252,7 @@ export function recruitDueCount(run: RunState): number {
 
 /** 这名角色这一局记住的，第一次上场时记下 */
 export function keptOf(run: RunState, id: CharacterId): Kept {
-  return (run.kept[id] ??= { level: 1, items: [], form: -1, growth: {}, growthKills: 0 })
+  return (run.kept[id] ??= { level: 1, form: -1 })
 }
 
 /** 场上这一格的人记住的 */

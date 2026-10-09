@@ -1,4 +1,4 @@
-import { Boss, FACTION, Faction, Gear, Hp, MARK, Phys, Radius, Transform, Uid } from '../components'
+import { Alive, Boss, FACTION, Faction, Gear, Hp, MARK, Phys, Radius, Transform, Uid } from '../components'
 import { elementIndex } from '../../data/elements'
 import { isAirborne, markSlot, statusDef } from './marks'
 import { elementNow } from './element'
@@ -55,12 +55,22 @@ function atom(sim: Sim, src: Source, self: number, t: number, c: Atom): boolean 
     }
     case 'afterSkill':
       return sim.elapsedMs - Gear.skillAt[t]! < c.ms
+    case 'nearLeader': {
+      const l = sim.leader
+      if (l < 0) return false
+      const d = sim.hooks.worldDelta(sim, Transform.x[t]!, Transform.y[t]!, Transform.x[l]!, Transform.y[l]!)
+      return Math.hypot(d.x, d.y) <= c.radius
+    }
+    case 'newLeader':
+      return t === sim.leader && sim.elapsedMs - sim.leaderSince < c.ms
+    case 'alone':
+      return sim.characters.every((m) => m === t || !Alive.v[m])
     case 'element':
       return elementNow(sim, t) === elementIndex(c.element)
   }
 }
 
-/** 条件：self 是带着这条规则的身体，target 是这一下作用到的身体，没有的记 -1，看的那个没有就不成立；按来源分开记的状态只认 src 施加的 */
+/** 条件：self 是带着这条规则的身体，target 是这一下作用到的身体，没有的记 -1，leader 看此刻的队长，看的那个没有就不成立；按来源分开记的状态只认 src 施加的 */
 export function test(sim: Sim, src: Source, self: number, target: number, c: Cond): boolean {
   switch (c.kind) {
     case 'all':
@@ -70,7 +80,7 @@ export function test(sim: Sim, src: Source, self: number, target: number, c: Con
     case 'not':
       return !test(sim, src, self, target, c.cond)
     default: {
-      const t = c.who === 'self' ? self : target
+      const t = c.who === 'self' ? self : c.who === 'leader' ? sim.leader : target
       return t >= 0 && atom(sim, src, self, t, c)
     }
   }

@@ -2,9 +2,9 @@ import itemsJson from '../assets/items.json'
 import economyJson from '../assets/economy.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
-import { stackMods } from './stats'
-import type { Economy, GrowthProgress, ItemRarity, ItemDef, ItemId } from '../types/items'
-import type { StatMods, StatValues } from '../types/stats'
+import { foldStats, STATS } from './stats'
+import type { Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
+import type { StatBase, StatKey, StatMods, StatValues } from '../types/stats'
 import type { AbilityDef, Shape } from '../types/abilityDefs'
 import type { Tone } from '../ui/theme'
 
@@ -22,17 +22,6 @@ export const ITEMS = fromJson<Record<ItemId, ItemDef>>(itemsJson)
 
 export const ITEM_IDS: readonly ItemId[] = keysOf(ITEMS)
 
-/** 买下这件道具给角色的经验 */
-export function itemXp(def: ItemDef): number {
-  return Math.round(def.price * ECON.xpPerCoin)
-}
-
-export function characterXp(owned: readonly ItemId[]): number {
-  let xp = 0
-  for (const id of owned) xp += itemXp(ITEMS[id])
-  return xp
-}
-
 const PRICE = ECON.price
 
 export function itemPrice(id: ItemId, wave: number): number {
@@ -41,20 +30,26 @@ export function itemPrice(id: ItemId, wave: number): number {
   return Math.max(1, Math.round(ITEMS[id].price * inflate * disc))
 }
 
-/** 成长道具攒下的进度折成几份 */
-export function growthSteps(id: ItemId, progress: number): number {
-  const g = ITEMS[id].grow
-  return g ? Math.floor(progress / (g.each === 'kills' ? g.count : 1)) : 0
+/** 全队只算一次的属性：经济与全场类，不进各人的属性表 */
+export function teamOnce(k: StatKey): boolean {
+  const c = STATS[k].category
+  return c === 'economy' || c === 'field'
 }
 
-/** 角色身上的常驻修正：买到的道具、本局攒下的成长与当前等级的成长 */
-export function gearMods(owned: readonly ItemId[], level: readonly StatMods[], growth: GrowthProgress = {}): StatMods[] {
-  const grown = keysOf(growth).flatMap((id) => {
-    const g = ITEMS[id].grow
-    const n = growthSteps(id, growth[id] ?? 0)
-    return g && n > 0 ? [stackMods(g.stats, n)] : []
-  })
-  return [...owned.flatMap((id) => ITEMS[id].stats ?? []), ...grown, ...level]
+/** 修正里只留 keep 认的属性 */
+function only(m: StatMods, keep: (k: StatKey) => boolean): StatMods {
+  const pick = (r: StatBase | undefined): StatBase => Object.fromEntries(Object.entries(r ?? {}).filter(([k]) => keep(k as StatKey)))
+  return { add: pick(m.add), pct: pick(m.pct), mul: pick(m.mul) }
+}
+
+/** 一名队员身上的常驻修正：队伍道具里各人各算的属性，加上他这一级的 */
+export function gearMods(owned: readonly ItemId[], level: readonly StatMods[]): StatMods[] {
+  return [...owned.flatMap((id) => (ITEMS[id].stats ? [only(ITEMS[id].stats, (k) => !teamOnce(k))] : [])), ...level]
+}
+
+/** 队伍道具里全队只算一次的属性：经济与全场类，其余取默认值 */
+export function teamStats(owned: readonly ItemId[]): StatValues {
+  return foldStats(undefined, owned.flatMap((id) => (ITEMS[id].stats ? [only(ITEMS[id].stats, teamOnce)] : [])))
 }
 
 /** 只缩放形状的空间参数、索敌距离与弹速；伤害/冷却在结算时按属性表乘，此处不得再乘 */
@@ -92,6 +87,9 @@ export function resolveAbilityDef(w: AbilityDef, fx: Pick<StatValues, 'range' | 
   }
   return { ...w, shape, ...(w.range === undefined ? {} : { range: w.range * r }) }
 }
+
+/** 开局时货架有几格 */
+export const SHELF = ECON.shop.shelf
 
 /** 打完第 wave 波的商店里已经花钱刷新过 paid 次，下一次刷新的价格 */
 export function rerollPrice(wave: number, paid: number): number {

@@ -2,24 +2,24 @@ import Phaser from 'phaser'
 import { CHARACTERS, TEAM } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { FIELD, POOLS } from '../data/battlefield'
-import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
+import { ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
 import { HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
 import { STAT_CATEGORIES, STAT_KEYS, STATS, statValue } from '../data/stats'
 import { fightCount } from '../data/runs'
 import { heatOf, MUTATORS } from '../data/mutators'
-import { levelProgress, stackCount } from '../run/draft'
+import { characterTraits, stackCount, useful } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { levelCap, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
 import { pendingLevelUps } from '../run/levelUp'
 import { xpToNext } from '../run/xp'
-import { endRun, getRun, leaderSlot, runDef, slotKept, stepsOf, waveStartHp } from '../run/state'
+import { endRun, getRun, leaderSlot, runDef, stepsOf, waveStartHp } from '../run/state'
 import { fightAfterRecruit, fightsDone, lastFight, nextFight, plannedFights } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
-import type { GrowthProgress, ItemId } from '../types/items'
+import type { ItemId } from '../types/items'
 import type { FightDef, GroupTraits, Squad } from '../types/runs'
 import { fightGoalText, mutatorText, runRuleLines } from './runLines'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
@@ -94,7 +94,6 @@ interface Member extends MemberSheet {
   readonly slot: number
   readonly id: CharacterId
   readonly items: readonly ItemId[]
-  readonly growth: GrowthProgress
 }
 
 interface Foe {
@@ -265,15 +264,14 @@ export class PauseScene extends Phaser.Scene {
     const sheets = this.opened.from === SceneKey.Battle ? (activeHudHost()?.teamSheets() ?? []) : []
     this.live = sheets.length > 0
     return run.roster.map((id, slot): Member => {
-      const { items, growth } = slotKept(run, slot)
+      const items = run.items
       const sheet = sheets[slot]
-      if (sheet) return { ...sheet, slot, id, items, growth }
+      if (sheet) return { ...sheet, slot, id, items }
       const stats = memberOutStats(run, slot)
       return {
         slot,
         id,
         items,
-        growth,
         emoji: memberLook(run, slot),
         level: memberLevel(run, slot),
         leader: slot === leaderSlot(run),
@@ -333,7 +331,7 @@ export class PauseScene extends Phaser.Scene {
     this.renderHead(m)
     const flow = new Flow(this, view, { x: 24, y: 12, width: view.viewport.w - 48 })
     if (this.tab === 'stats') this.flowStats(flow, m)
-    else if (this.tab === 'skills') flowStatGroups(flow, characterStatGroups(m.id, m.items, m.level, { growth: m.growth, base: false }))
+    else if (this.tab === 'skills') flowStatGroups(flow, characterStatGroups(m.id, m.items, m.level, { base: false }))
     else this.flowItems(flow, m)
     flow.finish()
   }
@@ -369,18 +367,10 @@ export class PauseScene extends Phaser.Scene {
     if (m.alive) keep(new ProgressBar(this, x0, D.y + 102, half, 6, { tone: staminaTone(m.stamina), value: m.stamina }))
 
     const top = levelCap(this.run, m.slot)
-    const prog = levelProgress(characterXp(m.items), this.run.minLevel, top)
-    // 沙盒的等级是调出来的，靠全队升级的一局按升级时的选择，都不来自买道具攒的经验
+    // 沙盒的等级是调出来的，不算满没满
     const tuned = runDef(this.run).team === 'knobs'
-    const picked = teamLeveled(this.run)
-    const lvText = tuned
-      ? `Lv ${m.level}`
-      : picked
-        ? `Lv ${m.level}${m.level >= top ? ' · 满级' : ''}`
-        : prog.maxed
-          ? `Lv ${m.level} · 满级`
-          : `Lv ${m.level} · 经验 ${prog.cur}/${prog.need}`
-    const lvRatio = tuned ? 1 : picked ? (top > 1 ? (m.level - 1) / (top - 1) : 1) : prog.ratio
+    const lvText = tuned ? `Lv ${m.level}` : `Lv ${m.level}${m.level >= top ? ' · 满级' : ''}`
+    const lvRatio = tuned ? 1 : top > 1 ? (m.level - 1) / (top - 1) : 1
     keep(new Label(this, right, D.y + 68, lvText, { kind: 'label', bold: true, color: 'accent' }).setOrigin(1, 0.5))
     keep(new ProgressBar(this, right - half, D.y + 86, half, 14, { tone: lvRatio >= 1 ? 'accent' : 'info', value: lvRatio }))
   }
@@ -405,16 +395,17 @@ export class PauseScene extends Phaser.Scene {
     flow.text(note, { kind: 'caption', color: 'faint', indent: false })
   }
 
-  /** 已有道具：稀有的在前，逐条写明效果，成长道具附上已成长的次数 */
+  /** 队伍道具：全队共用一份，稀有的在前，逐条写明效果；只对某种打法有用、这名队员又吃不到的注明 */
   private flowItems(flow: Flow, m: Member): void {
     const owned = m.items
     if (owned.length === 0) {
       const def = runDef(this.run)
-      flow.text(stepsOf(this.run).some((s) => s.kind === 'shop') ? '还没有道具：在商店给这名队员购买' : `${def.name}不带道具`, { color: 'muted', indent: false })
+      flow.text(stepsOf(this.run).some((s) => s.kind === 'shop') ? '还没有道具：在商店买下的道具挂在队伍上，场上每个人都吃得到' : `${def.name}不带道具`, { color: 'muted', indent: false })
       return
     }
-    flow.text(teamLeveled(this.run) ? `共 ${owned.length} 件` : `共 ${owned.length} 件 · 角色经验 ${characterXp(owned)}`, { color: 'muted', indent: false })
+    flow.text(`队伍道具共 ${owned.length} 件，全队共用，换人也不受影响`, { color: 'muted', indent: false })
     flow.gap(6)
+    const traits = characterTraits(CHARACTERS[m.id], m.level)
     const rank = (id: ItemId): number => RARITY_ORDER.indexOf(ITEMS[id].rarity)
     for (const id of [...new Set(owned)].sort((a, b) => rank(b) - rank(a))) {
       const def = ITEMS[id]
@@ -427,7 +418,7 @@ export class PauseScene extends Phaser.Scene {
       flow.put(head).put(new Chip(this, 24 + head.spanWidth + 14, flow.y + 18, rarity.label, { tone: rarity.tone, originX: 0 }))
       flow.y += 44
       for (const line of itemLines(def)) flow.text(line)
-      if (def.grow) flow.text(`已成长 ${growthSteps(id, m.growth[id] ?? 0)} 次`, { color: 'good' })
+      if (!useful(def, traits)) flow.text(`${CHARACTERS[m.id].name}吃不到这件的加成`, { color: 'faint' })
       flow.gap(10)
     }
   }

@@ -121,7 +121,6 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'recall':
     case 'steal':
     case 'coins':
-    case 'interest':
     case 'vanish':
     case 'status':
     case 'imbue':

@@ -7,7 +7,7 @@ import type { Sim } from './sim'
 import type { RunState } from '../run/state'
 import type { Claim } from '../run/levelUp'
 
-const TAPE_VERSION = 2
+const TAPE_VERSION = 3
 
 /** 每走这么多步记一次校验值 */
 const CHECK_EVERY = 60

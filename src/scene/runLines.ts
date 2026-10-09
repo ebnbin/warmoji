@@ -110,7 +110,7 @@ export function runRuleLines(def: RunDef): string[] {
   if (fightCount(def) > 1) out.push('场与场之间不休整：活着的带着残血进下一场，倒下的还倒着')
   if (def.teamLevel) {
     out.push('击杀攒全队经验，越往后升得越慢，不封顶；每升一级掉一个升级道具，队长走过去捡起来选一项：给场上一人升一级，或让一人满生命上场（招募、替换、恢复）')
-    out.push('升级道具不替你捡，没捡的留到下一场，散落在地图各处；买道具不再涨角色经验')
+    out.push('升级道具不替你捡，没捡的留到下一场，散落在地图各处')
   }
   return out
 }

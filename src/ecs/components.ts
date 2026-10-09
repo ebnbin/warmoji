@@ -452,7 +452,7 @@ export const Res = { v: f32(), max: f32(), lock: f32(), lastGain: f32() }
 export const Lethal = { used: u8(), low: u8() }
 
 /** 带道具的身体：最近一次受伤与放主动技能的时刻，本条命里用过的残血触发（按位）与致命触发 */
-export const Gear = { hurtAt: f32(), skillAt: f32(), low: u32(), lethal: u8() }
+export const Gear = { hurtAt: f32(), skillAt: f32() }
 
 /** 吸血的每秒上限：at 是这一秒从何时算起，hp 是这一秒已经吸回的量 */
 export const Leech = { at: f32(), hp: f32() }

@@ -157,12 +157,6 @@ interface CoinsEffect {
   readonly kind: 'coins'
   readonly count: number
 }
-/** 结息：队伍按手上金币的 ratio 倍得金币，最多 max */
-interface InterestEffect {
-  readonly kind: 'interest'
-  readonly ratio: number
-  readonly max: number
-}
 /** 消散：目标身体不算击杀地移除，自爆者对自己用 */
 interface VanishEffect {
   readonly kind: 'vanish'
@@ -329,8 +323,8 @@ interface MendEffect {
   readonly tickMs: number
   readonly durationMs: number
 }
-/** 条件看谁：self 是带着这条规则的身体（出手者、持有者），target 是这一下作用到的身体 */
-export type CondWho = 'self' | 'target'
+/** 条件看谁：self 是带着这条规则的身体（出手者、持有者），target 是这一下作用到的身体，leader 是此刻的队长 */
+export type CondWho = 'self' | 'target' | 'leader'
 /** 条件：对 who 判断，能用 all（并且）、any（或者）、not（不是）组合 */
 export type Cond =
   | { readonly kind: 'all'; readonly of: readonly Cond[] }
@@ -354,6 +348,12 @@ export type Cond =
   | { readonly kind: 'within'; readonly who: 'target'; readonly radius: number }
   /** 放完主动技能还不到 ms */
   | { readonly kind: 'afterSkill'; readonly who: CondWho; readonly ms: number }
+  /** 离队长不超过 radius，队长自己也算 */
+  | { readonly kind: 'nearLeader'; readonly who: CondWho; readonly radius: number }
+  /** 当上队长还不到 ms */
+  | { readonly kind: 'newLeader'; readonly who: CondWho; readonly ms: number }
+  /** 场上的队员只剩自己站着 */
+  | { readonly kind: 'alone'; readonly who: CondWho }
   /** 身体此刻是这种元素 */
   | { readonly kind: 'element'; readonly who: CondWho; readonly element: ElementId }
 /** 几率：过了 p 的几率才施加 then */
@@ -598,7 +598,6 @@ export type Effect =
   | InvulnEffect
   | TimeStopEffect
   | CoinsEffect
-  | InterestEffect
   | VanishEffect
   | RootEffect
   | SilenceEffect

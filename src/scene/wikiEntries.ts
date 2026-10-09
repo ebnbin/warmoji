@@ -14,7 +14,7 @@ import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
 import { MAP_IDS, MAPS, bossesOf } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
-import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
+import { ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
 import { modTexts, STATS, statText } from '../data/stats'
 import { maxLevelOf } from '../data/levels'
 import { keysOf } from '../util/record'
@@ -347,8 +347,8 @@ export function wikiGroups(): WikiGroup[] {
         name: i.name,
         desc: itemLines(i).join(' · '),
         lines: [
-          `道具 · ${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : i.maxStacks === 1 ? '唯一' : `上限 ${i.maxStacks} 件`}`,
-          `${i.for ? `只刷给${i.for.map((t) => TRAIT_LABEL[t]).join('、')}角色` : '所有角色都能刷到'} · 角色经验 +${itemXp(i)}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
+          `队伍道具 · ${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '全队不限件数' : i.maxStacks === 1 ? '全队唯一' : `全队最多 ${i.maxStacks} 件`}`,
+          i.for ? `只对${i.for.map((t) => TRAIT_LABEL[t]).join('、')}角色有用` : '对场上每个人都有用',
         ],
       })),
     },

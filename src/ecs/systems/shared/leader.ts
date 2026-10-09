@@ -69,6 +69,7 @@ export function switchLeader(sim: Sim, eid: number): void {
   const from = sim.leader
   const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, Transform.x[from]!, Transform.y[from]!)
   sim.leader = eid
+  sim.leaderSince = sim.elapsedMs
   const fx = Facing.x[eid]!
   const fy = Facing.y[eid]!
   if (fx !== 0 || fy !== 0) sim.heading = { x: fx, y: fy }

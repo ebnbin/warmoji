@@ -967,6 +967,7 @@ function condWhos(c: Cond): CondWho[] {
   return c.kind === 'all' || c.kind === 'any' ? c.of.flatMap(condWhos) : c.kind === 'not' ? condWhos(c.cond) : [c.who]
 }
 
+need(Number.isInteger(ECONOMY.shop.shelf) && ECONOMY.shop.shelf >= 1, 'economy.shop.shelf 须是正整数')
 const itemEmojis = new Map<string, string>()
 for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(PACK.has(i.emoji), `items.${id} 的 emoji 不在表情包里：${i.emoji}`)
@@ -974,7 +975,12 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(dup === undefined, `items.${id} 与 items.${dup} 用了同一个 emoji`)
   itemEmojis.set(i.emoji, id)
   need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
-  for (const w of i.when ?? []) if ('if' in w) need(!condWhos(w.if).includes('target'), `items.${id}.when 的条件没有目标可看，只能看 self`)
+  for (const w of i.when ?? []) if ('if' in w) need(!condWhos(w.if).includes('target'), `items.${id}.when 的条件没有目标可看，只能看 self 或 leader`)
+  // 条件属性各人各算，经济与全场类的属性全队只算一次，不能写进条件里
+  for (const w of i.when ?? []) {
+    const keys = [w.stats.add, w.stats.pct, w.stats.mul].flatMap((r) => Object.keys(r ?? {})) as (keyof typeof STATS)[]
+    need(keys.every((k) => STATS[k].category !== 'economy' && STATS[k].category !== 'field'), `items.${id}.when 不能写经济与全场类的属性`)
+  }
 }
 
 /** 障碍：标准身体至少两层、跨得过贴地的一层，跨不过平射飞的那一层；贯穿次数是非负整数，强度为正 */
