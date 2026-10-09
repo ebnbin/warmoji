@@ -1,43 +1,44 @@
 import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
-import { shot } from '../../../kit.ts'
+import { ring, shot } from '../../../kit.ts'
 
-// 🧜 人鱼：一段歌给最伤的队友回血，一颗珍珠打敌人，两样轮着来；技能把倒下的队友都唱醒
+// 🧜 人鱼：本身是水；一段歌给最伤的队友回血，一颗水珠泼湿一小片敌人，两样轮着来；技能把倒下的队友都唱醒
 const HURT = { kind: 'hpBelow', who: 'target', ratio: 1 } as const
+const WEAKEST = { side: 'allies', radius: 4.5, filter: HURT, sort: 'weakest', count: 1 } as const
 
-// 轮换只在这一式放出去后才往下走，所以歌声与珍珠都写成总能放出去的 world，各自落空也照样轮着来
+// 轮换只在这一式放出去后才往下走，所以歌声与水珠都写成总能放出去的 world，各自落空也照样轮着来
 const song = {
   trigger: 'auto',
   cooldownMs: 1000,
   aim: 'self',
   fireSfx: 'chirp',
   shape: { kind: 'world' },
-  onHit: [{ kind: 'to', who: { side: 'allies', radius: 4.5, filter: HURT, sort: 'weakest', count: 1 }, then: [{ kind: 'heal', amount: 10 }] }],
+  onHit: [{ kind: 'to', who: WEAKEST, then: [{ kind: 'heal', amount: 10 }] }],
 } satisfies AbilityDef
 
-const pearlShot = {
+const dropShot = {
   trigger: 'manual',
   class: 'attack',
   aim: 'nearest',
   range: 6,
-  damage: 12,
+  damage: 9,
   fireSfx: 'plip',
-  shape: { kind: 'bolt', projectile: shot('26aa', 9, 0.4), lifeMs: 900 },
+  shape: { kind: 'bolt', projectile: shot('1f4a7', 9, 0.4), lifeMs: 900 },
+  onHit: [{ kind: 'blast', radius: 1.2, ratio: 0.5, knockback: 0, ring: ring(0x42a5f5) }],
 } satisfies AbilityDef
 
-const pearl = { trigger: 'auto', cooldownMs: 1000, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability: pearlShot }] } satisfies AbilityDef
+const drop = { trigger: 'auto', cooldownMs: 1000, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability: dropShot }] } satisfies AbilityDef
 
-const mermaidSong = { ...song, cycle: [pearl] } satisfies AbilityDef
+const mermaidSong = { ...song, cycle: [drop] } satisfies AbilityDef
 
-const song2 = {
-  ...song,
-  onHit: [...song.onHit, { kind: 'to', who: { side: 'allies', radius: 4.5, filter: HURT }, then: [{ kind: 'mend', amount: 3, tickMs: 500, durationMs: 3000 }] }],
-} satisfies AbilityDef
-const mermaidSong2 = { ...song2, cycle: [pearl] } satisfies AbilityDef
+const tide = { kind: 'to', who: { side: 'allies', radius: 4.5, filter: HURT }, then: [{ kind: 'mend', amount: 3, tickMs: 500, durationMs: 3000 }] } as const
 
-const pearl3 = { ...pearl, onHit: [{ kind: 'cast', ability: { ...pearlShot, onHit: [{ kind: 'disarm', durationMs: 800 }] } }] } satisfies AbilityDef
-const mermaidSong3 = { ...song2, cycle: [pearl3] } satisfies AbilityDef
+const song2 = { ...song, onHit: [...song.onHit, tide] } satisfies AbilityDef
+const mermaidSong2 = { ...song2, cycle: [drop] } satisfies AbilityDef
+
+const song3 = { ...song2, onHit: [{ kind: 'to', who: WEAKEST, then: [{ kind: 'heal', amount: 10 }, { kind: 'cleanse' }] }, tide] } satisfies AbilityDef
+const mermaidSong3 = { ...song3, cycle: [drop] } satisfies AbilityDef
 
 const mermaidRevive = {
   trigger: 'manual',
@@ -56,7 +57,8 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9dc',
   name: '人鱼',
-  desc: '人鱼轮着来：唱一段歌给 4.5 格内最伤的队友回 10 点血，再朝 6 格内最近的敌人弹一颗珍珠；没人受伤时歌声落空，没有敌人时珍珠落空，两样照样轮着来；技能把倒下的队友都唱醒，全队回血',
+  element: 'water',
+  desc: '人鱼本身是水、一直是湿的，轮着来：唱一段歌给 4.5 格内最伤的队友回 10 点血，再朝 6 格内最近的敌人弹一颗水珠，打中 9 点，炸开把 1.2 格内别的敌人各打一半，一片都泼湿，给队友的雷与冰铺路；没人受伤时歌声落空，没有敌人时水珠落空，两样照样轮着来；技能把倒下的队友都唱醒，全队回血',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.6 },
@@ -70,7 +72,7 @@ export default {
       base: 'mermaidSong',
       upgrades: [
         { ability: 'mermaidSong2', card: { icon: '1f319', name: '潮汐', desc: '歌声还让 4.5 格内受伤的队友 3 秒里每半秒回 3 点血' } },
-        { ability: 'mermaidSong3', card: { icon: '1f48e', name: '珠光', desc: '珍珠打中的敌人致盲 0.8 秒' } },
+        { ability: 'mermaidSong3', card: { icon: '1f30a', name: '清流', desc: '歌声治的那名队友，身上的控制、减速和燃烧、寒冷、中毒、湿一并冲掉' } },
       ],
     },
   ],

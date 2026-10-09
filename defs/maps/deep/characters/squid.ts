@@ -3,7 +3,9 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { patch } from '../../../kit.ts'
 
-// 🦑 乌贼：触腕猛地一刺，专挑残血的下手；技能喷出一团墨云，墨云外的敌人打不进来
+// 🦑 乌贼：触腕猛地一刺，刺完不到四成血的再补一下，冻住的一刺敲碎；技能喷出一团墨云，墨云外的敌人打不进来
+const FINISH = { kind: 'if', when: { kind: 'hpBelow', who: 'target', ratio: 0.4 }, then: [{ kind: 'damage', amount: 14 }] } as const
+
 const squidStab = {
   trigger: 'auto',
   cooldownMs: 1400,
@@ -12,9 +14,10 @@ const squidStab = {
   damage: 26,
   fireSfx: 'whoosh',
   shape: { kind: 'segment', reach: 0, radius: 0.45, ms: 160, lungeDist: 2.5 },
+  onHit: [FINISH],
 } satisfies AbilityDef
 
-const squidStab2 = { ...squidStab, onHit: [{ kind: 'disarm', durationMs: 1000 }] } satisfies AbilityDef
+const squidStab2 = { ...squidStab, onHit: [FINISH, { kind: 'disarm', durationMs: 1000 }] } satisfies AbilityDef
 
 const squidStab3 = {
   ...squidStab2,
@@ -37,7 +40,7 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f991',
   name: '乌贼',
-  desc: '神出鬼没的乌贼：触腕猛地扑刺 2.5 格，专挑残血的下手；技能喷出一大团墨云，墨云里的队员只会被同在墨云里的敌人打到，自己趁机潜行',
+  desc: '神出鬼没的乌贼：触腕猛地扑刺 2.5 格，一刺 26 点，刺完还剩不到四成血的再补 14 点，冻住的一刺就碎冰；技能喷出一大团墨云，墨云里的队员只会被同在墨云里的敌人打到，自己趁机潜行',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4.2, mass: 0.6 },

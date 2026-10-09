@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { ring } from '../../../kit.ts'
 
-// 🦐 螳螂虾：一出手就是两拳，同一个敌人挨满几拳就被打晕；技能朝一个方向打出六连重拳
+// 🦐 螳螂虾：拳拳是物理，一出手就是两拳，同一个敌人挨满几拳就被打晕，冻住的一拳敲碎；技能朝一个方向打出六连重拳，墙也打得碎
 const KO = [{ kind: 'stun', durationMs: 800 }, { kind: 'damage', amount: 18 }] as const
 
 const mantisShrimpPunch = {
@@ -26,14 +26,15 @@ const mantisShrimpPunch2 = {
 
 const mantisShrimpPunch3 = {
   ...mantisShrimpPunch2,
-  onHit: [{ kind: 'stack', max: 3, durationMs: 3000, then: [...KO, { kind: 'blast', radius: 1.5, ratio: 0.8, knockback: 2, ring: ring(0x4fc3f7) }] }],
+  onHit: [{ kind: 'stack', max: 3, durationMs: 3000, then: [...KO, { kind: 'blast', radius: 1.5, ratio: 0.8, knockback: 2, breach: 0.3, ring: ring(0xffcc80) }] }],
 } satisfies AbilityDef
 
 const mantisShrimpBarrage = {
   trigger: 'manual',
   aim: 'stick',
   damage: 15,
-  knockback: 1,
+  knockback: 1.2,
+  breach: 0.4,
   fireSfx: 'thud',
   shape: { kind: 'segment', reach: 2.4, radius: 0.6, ms: 90 },
   repeat: { count: 6, delayMs: 100 },
@@ -46,13 +47,12 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f990',
   name: '螳螂虾',
-  element: 'water',
-  desc: '出拳比子弹还快的螳螂虾：一出手就是两拳，同一个敌人 3 秒内挨满四拳就晕 0.8 秒，再多挨 18 点；技能朝一个方向打出六连重拳',
+  desc: '出拳比子弹还快的螳螂虾，拳拳是实打实的物理：一出手就是两拳，同一个敌人 3 秒内挨满四拳就晕 0.8 秒，再多挨 18 点；冻住的挨一拳就碎冰，这一拳伤害翻倍；技能朝一个方向打出六连重拳，挡路的墙也打得碎',
   role: 'bruiser',
   tags: ['damage', 'melee'],
   body: { drag: 4.8, mass: 1 },
   stats: { moveSpeed: 5.8, maxStamina: 110, staminaRegen: 65, exertion: 1 },
-  skill: { name: '连环重拳', icon: '1f94a', desc: '朝摇杆方向连打六拳，每拳 15 点，把敌人往前推', cdMs: 9_000, ability: 'mantisShrimpBarrage', aim: true },
+  skill: { name: '连环重拳', icon: '1f94a', desc: '朝摇杆方向连打六拳，每拳 15 点，把敌人往前推，墙也打得碎', cdMs: 9_000, ability: 'mantisShrimpBarrage', aim: true },
   weapons: [],
   innate: [
     {
@@ -61,7 +61,7 @@ export default {
       base: 'mantisShrimpPunch',
       upgrades: [
         { ability: 'mantisShrimpPunch2', card: { icon: '1f4a8', name: '空泡', desc: '拳拳把敌人震退，挨满三拳就晕' } },
-        { ability: 'mantisShrimpPunch3', card: { icon: '1f4a5', name: '音爆', desc: '打晕时在敌人身上炸开，1.5 格内的敌人各吃这一拳八成的伤害' } },
+        { ability: 'mantisShrimpPunch3', card: { icon: '1f4a5', name: '音爆', desc: '打晕时在敌人身上炸开，1.5 格内的敌人各吃这一拳八成的伤害并被震退，墙也炸得碎' } },
       ],
     },
   ],
