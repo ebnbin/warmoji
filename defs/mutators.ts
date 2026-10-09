@@ -1,4 +1,4 @@
-import type { MutatorDef } from '../src/types/runs'
+import type { MutatorDef } from '../legacy/types/runs'
 
 /** 冒险与实验开局前可以自选叠加的词缀，按热度从低到高 */
 export const MUTATORS = {

@@ -1,4 +1,4 @@
-import type { FeelTuning } from '../src/types/feel'
+import type { FeelTuning } from '../legacy/types/feel'
 
 export const FEEL = {
   squad: { fanDistance: 1.5, fanSpreadDeg: 120, seatRadius: 0.125, claimRadius: 0.5, seatHysteresis: 0.25, reverseGain: 2, turnRateDeg: 240, recallDist: 14, handoverMs: 500, facingTauMs: 250 },

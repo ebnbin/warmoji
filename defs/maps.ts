@@ -1,4 +1,4 @@
-import type { MapDef } from '../src/types/maps'
+import type { MapDef } from '../legacy/types/maps'
 import meadow from './maps/meadow/map.ts'
 import sakura from './maps/sakura/map.ts'
 import desert from './maps/desert/map.ts'

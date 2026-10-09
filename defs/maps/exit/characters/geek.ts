@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { ring } from '../../../kit.ts'
 
 // 🤓 极客：遥控无人机往敌人头上扔电池，落地炸开一小圈；技能放出电磁脉冲，让身边的敌人哑火

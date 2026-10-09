@@ -1,6 +1,6 @@
-import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🥳 派对王：礼炮给身边最伤的队友回血，彩带甩到敌人身上烫一阵，两样轮着来；技能让全队开起狂欢

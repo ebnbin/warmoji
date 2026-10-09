@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🧑‍🚒 消防员：喷淋给最伤的队友回血、水柱冲开敌人，两样轮着来；技能放下水幕，全队回血减伤，敌方的弹体被弹回去
 const hurt = { kind: 'hpBelow', who: 'target', ratio: 1 } as const

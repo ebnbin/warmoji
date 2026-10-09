@@ -1,4 +1,4 @@
-import type { TeamBaseline } from '../src/types/characters'
+import type { TeamBaseline } from '../legacy/types/characters'
 
 export const TEAM_BASELINE = {
   team: {

@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧜 人鱼：一段歌给最伤的队友回血，一颗珍珠打敌人，两样轮着来；技能把倒下的队友都唱醒

@@ -1,4 +1,4 @@
-import type { RunDef } from '../src/types/runs'
+import type { RunDef } from '../legacy/types/runs'
 
 /** 关卡编辑器打开时的草稿：最简单的可玩一局，三人预设队伍在草甸撑过一分钟 */
 export const EDITOR_DRAFT = {

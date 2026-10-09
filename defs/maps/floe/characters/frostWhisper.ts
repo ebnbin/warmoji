@@ -1,7 +1,7 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
-import type { WeaponSource } from '../../../../src/types/weapons'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
+import type { WeaponSource } from '../../../../legacy/types/weapons'
 import { shot, zoneLook } from '../../../kit.ts'
 
 // 🥶 霜语者：身周一直冒寒气拖慢敌人，寒语打过去挨满三下就冻成冰块；绝对零度冻住时间，站着不动时全场近乎凝固

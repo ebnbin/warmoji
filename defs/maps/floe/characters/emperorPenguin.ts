@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { ring, shot } from '../../../kit.ts'
 
 // 🐣 企鹅宝宝：远远扔出冻得梆硬的鱼，打倒 25 个敌人就长成帝企鹅，这一局不再变回去；技能缩回蛋壳回血，破壳时震开周围

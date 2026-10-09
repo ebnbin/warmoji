@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch } from '../../../kit.ts'
 
 // 🦑 乌贼：触腕猛地一刺，专挑残血的下手；技能喷出一团墨云，墨云外的敌人打不进来

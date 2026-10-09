@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { ring } from '../../../kit.ts'
 
 // 🧑‍🔬 火山学家：往敌人身上抛带定时器的采样弹，到点炸开一圈；技能沿原路撤回 3 秒前的位置

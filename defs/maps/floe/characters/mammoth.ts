@@ -1,6 +1,6 @@
-import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🦣 猛犸：长鼻卷雪给最伤的队友敷伤、象牙挑开身前的敌人，两样轮着来；技能把全队护进长毛里
 const tusk = {

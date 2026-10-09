@@ -1,4 +1,4 @@
-import type { Effect } from '../src/types/abilityDefs'
+import type { Effect } from '../legacy/types/abilityDefs'
 
 /** 单位共用的小写法：弹体、炸开的一圈、场与地上的一片的样子 */
 

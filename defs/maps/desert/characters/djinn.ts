@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🧞 灯神：放出绕身打转的沙灵，见到敌人就扑上去撞散；技能一连许下三个愿望
 const sandSpirit = { look: { emoji: '1f300', size: 0.55 }, speed: 7, orbit: { radius: 0.8, spinRadPerSec: 3 } } as const

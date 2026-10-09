@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🐁 迷宫鼠：抄近路闪到敌人身后咬一口，专咬残血的，咬死了立刻再扑，咬过的流血；技能在迷宫里开一条捷径
 const mazeRatBite = {

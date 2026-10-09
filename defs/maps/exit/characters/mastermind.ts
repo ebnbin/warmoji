@@ -1,6 +1,6 @@
-import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, shot } from '../../../kit.ts'
 
 // 🦹 幕后主使：冷冷一瞥让敌人迈不开腿，盯满三下就冻住，和在脚边丢惊喜盒轮着来；技能在敌群里挑起内讧

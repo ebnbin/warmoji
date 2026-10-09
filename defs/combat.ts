@@ -1,4 +1,4 @@
-import type { CombatTuning } from '../src/types/abilities'
+import type { CombatTuning } from '../legacy/types/abilities'
 
 export const COMBAT = {
   // 速度趋近驱动的时间常数是 mass/(drag·grip)，也是击退的衰减时间；拾取物几乎立刻跟上磁吸，碎片没有驱动、靠地面阻力刹住

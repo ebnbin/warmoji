@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🐕‍🦺 搜救犬：药包叼给伤得最重的队友，吠叫吼向身前的敌人，两样轮着来；技能把倒下的队友全都救起来
 // 药包与吠叫都从总能放出去的 world 出手，免得没人受伤或身边没敌人时轮换卡住

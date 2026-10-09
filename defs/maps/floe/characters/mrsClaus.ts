@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🤶 圣诞奶奶：烤一炉姜饼绕着自己转，见了敌人就扑上去撞一下；种下一棵会扔彩球、会给队友回血的圣诞树

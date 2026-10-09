@@ -1,4 +1,4 @@
-import type { PickupTable } from '../src/types/pickups'
+import type { PickupTable } from '../legacy/types/pickups'
 
 export const PICKUPS = {
   defs: {

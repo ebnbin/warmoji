@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import BONE_MAN from './boneMan.ts'
 
 const TOMBSTONE = {

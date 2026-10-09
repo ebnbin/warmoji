@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧘 僧人：诵经让身边受伤的队友慢慢回血，念珠打敌人，两样轮着来；技能敲响金钟，全队先无敌再减伤

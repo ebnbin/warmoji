@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, shot } from '../../../kit.ts'
 
 // 🤠 牛仔：一口气打空左轮，每匣最后一发点着敌人；技能甩出套索，把一条线上的敌人拴在身后拖着走

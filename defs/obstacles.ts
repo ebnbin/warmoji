@@ -1,4 +1,4 @@
-import type { ObstacleTuning } from '../src/types/obstacles'
+import type { ObstacleTuning } from '../legacy/types/obstacles'
 
 export const OBSTACLES = {
   body: { refRadiusU: 0.45, heightM: 1.7, layers: 3, step: 0.35 },

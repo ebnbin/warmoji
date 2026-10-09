@@ -1,7 +1,7 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
-import type { WeaponSource } from '../../../../src/types/weapons'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
+import type { WeaponSource } from '../../../../legacy/types/weapons'
 
 // 🦉 猫头鹰：掷出月牙镖，飞出去再飞回来，去程回程都打，打中的敌人显形；技能打出一颗月光照明弹
 const owlCrescent = {

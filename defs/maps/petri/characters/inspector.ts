@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🧐 鉴定师：举着放大镜聚出一道光，照到的一排敌人都更怕疼，照 6 下就得换电池；技能侧身翻滚，滚前先把身边的敌人看个透，可以攒着用
 const inspectorLens = {

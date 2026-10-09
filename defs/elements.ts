@@ -1,4 +1,4 @@
-import type { ElementRules } from '../src/types/elements'
+import type { ElementRules } from '../legacy/types/elements'
 
 /**
  * 元素与克制：六种基础元素两两相克，每种克两种、被两种克、和剩下的一种两不相干；光与暗互相克制。

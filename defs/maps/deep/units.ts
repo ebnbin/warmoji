@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../src/types/enemies'
+import type { EnemyDef } from '../../../legacy/types/enemies'
 import type { CharacterFile } from '../../characters.ts'
 import fishSchool from './enemies/fishSchool.ts'
 import pearlClam from './enemies/pearlClam.ts'

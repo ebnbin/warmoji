@@ -1,4 +1,4 @@
-import type { EnemyDef, EnemyKind } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind } from '../legacy/types/enemies'
 import { ENEMIES as meadow } from './maps/meadow/units.ts'
 import { ENEMIES as sakura } from './maps/sakura/units.ts'
 import { ENEMIES as desert } from './maps/desert/units.ts'

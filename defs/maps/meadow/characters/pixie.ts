@@ -1,6 +1,6 @@
-import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧚 花仙子：花粉治最伤的队友，花瓣打敌人，两样轮着来；技能给全队挂上护盾并解掉控制

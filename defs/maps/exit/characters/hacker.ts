@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🧑‍💻 程序员：放出绕身转的爬虫程序，看见敌人就扑上去咬一口，带木马的让敌人更脆；技能入侵最近的几个敌人，让它们倒戈
 const crawlers = (count: number) =>

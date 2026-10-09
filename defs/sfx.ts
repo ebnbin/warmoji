@@ -1,4 +1,4 @@
-import type { SfxDef } from '../src/types/sfx'
+import type { SfxDef } from '../legacy/types/sfx'
 
 export const SFX = {
   shoot: { wave: 'square', freq: 900, freqEnd: 430, duration: 0.07, volume: 0.16, decayPow: 1.4, throttleMs: 45, jitter: 0.12 },

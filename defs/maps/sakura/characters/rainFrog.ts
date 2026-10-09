@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, ring } from '../../../kit.ts'
 
 // 🐸 雨蛙：吐出的水泡落到敌人身上炸开一圈；技能在敌人头上落一片梅雨，雨里的敌人一直挨淋、走不快

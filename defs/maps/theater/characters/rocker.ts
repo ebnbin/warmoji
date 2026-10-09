@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { zoneLook } from '../../../kit.ts'
 
 // 🧑‍🎤 摇滚歌手：电吉他一扫震开身前一片；技能在脚下来一段终极 solo，圈里的敌人被声浪从他身边推开

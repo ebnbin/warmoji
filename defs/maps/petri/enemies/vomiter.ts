@@ -1,5 +1,5 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { patch } from '../../../kit.ts'
 
 // 扇形的命中效果落在吐的人脚下，黏液得吐完再接这一下以目标为心的才落到人脚下

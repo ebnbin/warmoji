@@ -1,5 +1,5 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { patch, shot } from '../../../kit.ts'
 import SPIDERLING from './spiderling.ts'
 import SPIDER_EGG from './spiderEgg.ts'

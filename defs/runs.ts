@@ -1,5 +1,5 @@
-import type { RunDef } from '../src/types/runs'
-import { mapValues } from '../src/util/record.ts'
+import type { RunDef } from '../legacy/types/runs'
+import { mapValues } from '../legacy/util/record.ts'
 import { EXPERIMENTS } from './experiments.ts'
 import { CHAPTER as meadowChapter } from './maps/meadow/chapter.ts'
 

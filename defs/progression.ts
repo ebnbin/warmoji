@@ -1,4 +1,4 @@
-import type { Progression } from '../src/types/waves'
+import type { Progression } from '../legacy/types/waves'
 
 export const PROGRESSION = {
   summaryMs: 1600,

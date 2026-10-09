@@ -1,4 +1,4 @@
-import type { AiTuning } from '../src/types/enemies'
+import type { AiTuning } from '../legacy/types/enemies'
 
 export const AI = {
   wander: { turnMinMs: 800, turnJitterMs: 1200, spawnTurnMinMs: 600, spawnTurnJitterMs: 900 },

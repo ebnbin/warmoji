@@ -1,4 +1,4 @@
-import type { TimeStopTuning } from '../src/types/timeStop'
+import type { TimeStopTuning } from '../legacy/types/timeStop'
 
 export const TIMESTOP = {
   floor: 0.05,

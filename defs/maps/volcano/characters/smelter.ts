@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, zoneLook } from '../../../kit.ts'
 
 // 🧑‍🏭 炉工：抡锤扫开身前一片，第三锤在脚下砸出一滩熔铁；技能烧旺炉心，把身边的敌人都引到自己身上

@@ -1,4 +1,4 @@
-import type { ExperimentDef } from '../src/types/runs'
+import type { ExperimentDef } from '../legacy/types/runs'
 import { FIGHTS as meadow } from './maps/meadow/fights.ts'
 import { FIGHTS as sakura } from './maps/sakura/fights.ts'
 import { FIGHTS as desert } from './maps/desert/fights.ts'

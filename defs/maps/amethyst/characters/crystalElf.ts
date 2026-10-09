@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { ring } from '../../../kit.ts'
 
 // 🧝 晶灵：从洞顶召下晶刺砸在几个敌人头上，落点再炸开一圈碎晶；技能立起一圈反弹弹体的晶环，走过圈线的敌人挨一下

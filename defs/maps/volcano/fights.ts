@@ -1,4 +1,4 @@
-import type { ExperimentDef } from '../../../src/types/runs'
+import type { ExperimentDef } from '../../../legacy/types/runs'
 
 /** 这张图的关卡：每个只试一种新玩法，靠这张图自己的机制成立 */
 export const FIGHTS = {

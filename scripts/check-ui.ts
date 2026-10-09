@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 
-// 界面一律用 src/ui 组件库搭：库外不许直接建显示对象、接管指针、写颜色和字体样式，也不许用 React。
+// 界面一律用 legacy/ui 组件库搭：库外不许直接建显示对象、接管指针、写颜色和字体样式，也不许用 React。
 // 战斗的 ECS 与地图、可独立成库的开发者工具与 emoji 纹理管线不属于界面。
-const root = resolve('src')
+const root = resolve('legacy')
 const exempt = ['ui', 'ecs', 'maps', 'devtools', 'emoji'].map((d) => join(root, d) + sep)
 
 const RULES: readonly { readonly re: RegExp; readonly what: string }[] = [
@@ -34,7 +34,7 @@ for (const file of files) {
     .split('\n')
     .forEach((line, i) => {
       for (const rule of RULES) {
-        if (rule.re.test(line)) errors.push(`${relative('.', file)}:${i + 1} ${rule.what}，改用 src/ui 组件库：${line.trim()}`)
+        if (rule.re.test(line)) errors.push(`${relative('.', file)}:${i + 1} ${rule.what}，改用 legacy/ui 组件库：${line.trim()}`)
       }
     })
 }
