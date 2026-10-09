@@ -10,7 +10,7 @@ import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, Boss, Depth, Elite, ENEMY_SET, Facing, Faction, Hp, MARK_SLOTS, Mark, Res, RIM, Slot, Sprite, Tint, Transform, VisOff } from './components'
+import { Alive, Boss, Depth, Elite, Emplacement, ENEMY_SET, Facing, Faction, Hp, MARK_SLOTS, Mark, Radius, Res, Slot, Sprite, Tint, TINT_SIDE, Transform, VisOff } from './components'
 import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -46,7 +46,8 @@ const ICON_MAX = 3
 
 const BAR_W = 0.8 * UNIT
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
-const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x4dd0e1, slow: 0xffa726, low: 0xef5350 }
+const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x66bb6a, slow: 0xffa726, low: 0xef5350 }
+const HP_COLOR = 0xef5350
 
 const ECHO_COLOR = 0x80deea
 const ECHO_ALPHA = 0.5
@@ -62,12 +63,15 @@ const FEET_FLAT = 0.38
 const TEAM_RING = { line: 3, fill: 0.16 }
 const LEAD_RING = { line: 4.5, fill: 0.22 }
 const ELITE_RING = { line: 3, fill: 0.12 }
+/** 头目：两圈同心的粗圈，里面那圈缩到 BOSS_INNER */
+const BOSS_RING = { line: 4.5, fill: 0.12 }
+const BOSS_INNER = 0.8
 /** 队长圈外指着朝向的箭头：离圈多远、多长、半宽 */
 const HEAD_GAP = 3
 const HEAD_LEN = 9
 const HEAD_W = 6
 
-/** 队长被后画的身体盖住时，在最上面透出它的金色剪影，只压在敌方弹体下面 */
+/** 队长被后画的身体盖住时，在最上面透出它的黄色剪影，只压在敌方弹体下面 */
 const XRAY_Z = FOE_SHOT_Z - 1
 const XRAY_ALPHA = 0.5
 /** 盖住队长的身体：队长的中心落在它画面的中间这一成里 */
@@ -144,7 +148,7 @@ function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
     h: SWEAT_SIZE,
     color: 0xffffff,
     alpha: hostShown(body),
-    rim: RIM.item,
+    outlined: true,
   })
 }
 
@@ -163,7 +167,7 @@ function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly str
   const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((emojis.length - 1) * ICON_SIZE) / 2
   const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * (0.55 + row)
   const alpha = hostShown(eid)
-  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, rim: RIM.item }))
+  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, outlined: true }))
 }
 
 /** 精英与头目头顶第一排打头的元素图标：小怪太多不标，靠图鉴认 */
@@ -208,7 +212,7 @@ function bars(sim: Sim, o: Scratch): void {
     const x = Transform.x[m]! + VisOff.x[m]! - BAR_W / 2
     let y = Transform.y[m]! + VisOff.y[m]! + charSize(m) * 0.62
     rect(o, x, y, BAR_W, 6, back)
-    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? SIDE.team : ratio > 0.25 ? 0xffdc5d : 0xef5350, a))
+    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(HP_COLOR, a))
     y += 7
     if (res >= 0) {
       rect(o, x, y, BAR_W, 5, back)
@@ -231,27 +235,40 @@ function footRing(sim: Sim, o: Scratch, eid: number, size: number, color: number
   return { x, y, rx, ry }
 }
 
-/** 脚下的圈：队员蓝圈，队长金圈、圈外一个箭头指着朝向，精英与头目琥珀圈；倒下的不画 */
+/** 脚下有圈的：身体与装置 */
+const FOOTED: QueryTerm[] = [Alive, Radius, Transform, Tint]
+const EMPLACED: QueryTerm[] = [Emplacement, Transform, Tint]
+
+/** 脚下的圈：队伍的身体与装置一圈黄，队长的粗一些、圈外一个箭头指着朝向；精英一圈细红，头目两圈同心的粗红；倒下的不画 */
 function feet(sim: Sim, o: Scratch): void {
-  for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
-    const lead = m === sim.leader
-    const a = hostShown(m)
-    const r = footRing(sim, o, m, charSize(m), lead ? SIDE.lead : SIDE.team, lead ? LEAD_RING : TEAM_RING, a)
-    if (!lead) continue
-    const f = norm(Facing.x[m]!, Facing.y[m]!)
+  for (const eid of query(sim.world, FOOTED)) {
+    if (!Alive.v[eid]) continue
+    const a = Tint.alpha[eid]!
+    const size = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.w[eid]!
+    if (Tint.side[eid] !== TINT_SIDE.team) {
+      if (Boss.v[eid]) {
+        const r = footRing(sim, o, eid, size, SIDE.strong, BOSS_RING, a)
+        ellipse(o, WORLD, r.x, r.y, r.rx * BOSS_INNER, r.ry * BOSS_INNER, BOSS_RING.line, 0, packTint(SIDE.strong, 0.95 * a))
+      } else if (Elite.v[eid]) footRing(sim, o, eid, size, SIDE.strong, ELITE_RING, a)
+      continue
+    }
+    if (eid !== sim.leader) {
+      footRing(sim, o, eid, size, SIDE.team, TEAM_RING, a)
+      continue
+    }
+    const r = footRing(sim, o, eid, size, SIDE.team, LEAD_RING, a)
+    const f = norm(Facing.x[eid]!, Facing.y[eid]!)
     const bx = r.x + f.x * (r.rx + HEAD_GAP)
     const by = r.y + f.y * (r.ry + HEAD_GAP * FEET_FLAT)
-    const s = norm(f.x, f.y * FEET_FLAT)
-    tri(o, WORLD, bx + s.x * HEAD_LEN, by + s.y * HEAD_LEN, bx - s.y * HEAD_W, by + s.x * HEAD_W, bx + s.y * HEAD_W, by - s.x * HEAD_W, packTint(SIDE.lead, 0.95 * a))
+    const d = norm(f.x, f.y * FEET_FLAT)
+    tri(o, WORLD, bx + d.x * HEAD_LEN, by + d.y * HEAD_LEN, bx - d.y * HEAD_W, by + d.x * HEAD_W, bx + d.y * HEAD_W, by - d.x * HEAD_W, packTint(SIDE.team, 0.95 * a))
   }
-  for (const eid of query(sim.world, ENEMY_SET)) {
-    if (!Alive.v[eid] || !(Elite.v[eid] || Boss.v[eid])) continue
-    footRing(sim, o, eid, Transform.w[eid]!, SIDE.elite, ELITE_RING, Tint.alpha[eid]!)
+  for (const eid of query(sim.world, EMPLACED)) {
+    if (Tint.side[eid] === TINT_SIDE.team) footRing(sim, o, eid, Transform.w[eid]!, SIDE.team, TEAM_RING, Tint.alpha[eid]!)
   }
 }
 
-/** 队长被后画的身体盖住时（按 z 排在它后面、画面中间压着它的中心），在最上面透出它的金色剪影 */
+/** 队长被后画的身体盖住时（按 z 排在它后面、画面中间压着它的中心），在最上面透出它的黄色剪影 */
 function xray(sim: Sim, out: PaintSprite[]): void {
   const lead = sim.leader
   if (!Alive.v[lead]) return
@@ -276,7 +293,7 @@ function xray(sim: Sim, out: PaintSprite[]): void {
     h: Transform.h[lead]!,
     rot: Transform.rot[lead]!,
     flipX: Sprite.flipX[lead]!,
-    color: SIDE.lead,
+    color: SIDE.team,
     alpha: XRAY_ALPHA * hostShown(lead),
     effect: TINT_FILL,
   })

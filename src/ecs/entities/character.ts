@@ -13,7 +13,7 @@ import { armGear } from '../systems/shared/gear'
 
 import type { RunState } from '../../run/state'
 import type { StatMods } from '../../types/stats'
-import { Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, RIM, Seat, Slot, Sprite, Tint, Transform } from '../components'
+import { Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Tint, TINT_SIDE, Transform } from '../components'
 import { bodyRules } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { STANDARD } from '../utils/pass'
@@ -79,7 +79,7 @@ export function spawnCharacter(
   Transform.w[eid] = size
   Transform.h[eid] = size
   Sprite.frame[eid] = atlas.index(def.emoji)
-  Tint.rim[eid] = RIM.team
+  Tint.side[eid] = TINT_SIDE.team
   Depth.z[eid] = 10 + place.depthOffsetY
   return eid
 }

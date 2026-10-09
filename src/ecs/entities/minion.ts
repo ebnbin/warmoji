@@ -4,7 +4,7 @@ import { UNIT } from '../../util/units'
 import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS, SWARM_SPAN } from '../../data/abilities'
 import { EMPLACE } from '../../data/feel'
 import { attachDrawable } from './drawable'
-import { holderRim } from './weapon'
+import { holderSide } from './weapon'
 import {
   Alive,
   AROUND,
@@ -54,7 +54,7 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   const m = newEntity(sim.world)
   attachDrawable(sim.world, m, sim.frames, {
     id: spec.emoji,
-    rim: holderRim(Faction.v[weaponEid]!, Owner.eid[weaponEid]!),
+    side: holderSide(Faction.v[weaponEid]!),
     x: spec.x,
     y: spec.y,
     size: spec.size * spec.bornScale,
