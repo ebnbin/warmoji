@@ -1,8 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { FACTION, Faction, Portal, Projectile, RIM, Tint, Zone, ZONE_WHO } from '../components'
+import { FACTION, Faction, Projectile, RIM, Tint } from '../components'
 import type { Rim } from '../components'
-import { zoneSrc } from '../store'
 import type { EcsWorld } from '../world'
 
 /** 敌我的颜色：我方冷、敌方暖，红绿色弱也分得开；队长另用金色 */
@@ -53,11 +52,4 @@ export function shotOf(world: EcsWorld, eid: number): ShotLook | null {
 export function rimOf(eid: number, leader: number): RimStyle | null {
   const rim = Tint.rim[eid] as Rim
   return rim === RIM.team && eid === leader ? LEAD_RIM : RIMS[rim]
-}
-
-/** 场按对队伍有没有坏处分：foe 是不是队伍放的、又施于队伍的（伤害、减益、拉扯），team 是队伍自己放的；其余（敌方给自己人的、传送门）不归哪边 */
-export function zoneSide(world: EcsWorld, eid: number): 'foe' | 'team' | null {
-  if (!hasComponent(world, eid, Zone) || hasComponent(world, eid, Portal)) return null
-  if (zoneSrc[eid]?.faction === FACTION.team) return 'team'
-  return Zone.who[eid] === ZONE_WHO.allies ? null : 'foe'
 }
