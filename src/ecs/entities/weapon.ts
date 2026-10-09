@@ -13,20 +13,20 @@ import {
   Held,
   Mounted,
   Quad,
-  RIM,
   Sprite,
   Thrown,
   Tint,
+  TINT_SIDE,
   Transform,
   VisOff,
 } from '../components'
-import type { Rim } from '../components'
+import type { TintSide } from '../components'
 import type { Sim } from '../sim'
 import { flyerHits } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
 
-export function holderRim(faction: number, holderEid: number): Rim {
-  return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? RIM.elite : RIM.none) : RIM.team
+export function holderSide(faction: number, holderEid: number): TintSide {
+  return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? TINT_SIDE.elite : TINT_SIDE.none) : TINT_SIDE.team
 }
 
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
@@ -34,7 +34,7 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
   const e = newEntity(world)
   attachDrawable(world, e, sim.frames, {
     id: held.look.emoji,
-    rim: holderRim(faction, holderEid),
+    side: holderSide(faction, holderEid),
     x: Transform.x[holderEid]!,
     y: Transform.y[holderEid]!,
     size: held.look.size,
@@ -65,7 +65,7 @@ function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   Tint.color[t] = 0xffffff
   Tint.effect[t] = 0
   Tint.alpha[t] = 1
-  Tint.rim[t] = Tint.rim[weaponEid]!
+  Tint.side[t] = Tint.side[weaponEid]!
   Depth.z[t] = 13
   Quad.v[t] = 0
   return t

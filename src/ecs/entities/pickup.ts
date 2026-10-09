@@ -20,7 +20,6 @@ import {
   Pop,
   Pull,
   Radius,
-  RIM,
   Ring,
   Span,
   Transform,
@@ -68,7 +67,6 @@ function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   const p = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   attachDrawable(sim.world, eid, sim.frames, {
     id: spec.emoji,
-    rim: RIM.item,
     x: p.x,
     y: p.y,
     size: spec.size,

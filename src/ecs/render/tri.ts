@@ -91,7 +91,8 @@ export function ellipse(
   o: Scratch, m: Matrix,
   cx: number, cy: number, rx: number, ry: number, width: number, fill: number, line: number,
 ): void {
-  const n = segsFor(rx)
+  // 段数按周长取：小圈压扁后，段少了两头看得出折角
+  const n = Math.max(32, Math.min(128, Math.ceil((Math.PI * 2 * Math.sqrt((rx * rx + ry * ry) / 2)) / 4)))
   const d = (Math.PI * 2) / n
   const h = width / 2
   for (let k = 0; k < n; k++) {

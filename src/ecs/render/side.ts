@@ -1,7 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { FACTION, Faction, Projectile, RIM, Tint } from '../components'
-import type { Rim } from '../components'
+import { FACTION, Faction, Projectile, Tint, TINT_SIDE } from '../components'
 import type { EcsWorld } from '../world'
 
 /** 敌我的颜色：我方冷、敌方暖，红绿色弱也分得开；队长另用金色 */
@@ -19,14 +18,9 @@ export interface RimStyle {
   readonly px: number
 }
 
-export const RIMS: Readonly<Record<Rim, RimStyle | null>> = {
-  [RIM.none]: null,
-  [RIM.team]: { color: SIDE.team, px: 2.5 },
-  [RIM.elite]: { color: SIDE.elite, px: 2.5 },
-  [RIM.item]: { color: SIDE.ink, px: 1.5 },
-}
-
-const LEAD_RIM: RimStyle = { color: 0xffffff, px: 3 }
+/** 默认的黑边：画出来的东西都描，布景除外 */
+export const INK_RIM: RimStyle = { color: SIDE.ink, px: 2 }
+const ELITE_RIM: RimStyle = { color: SIDE.elite, px: 2.5 }
 
 /** 弹体画成什么样：大小与透明度的倍率、至少画多大（像素）、描边、垫在下面的光晕（size 是相对弹体的倍率） */
 export interface ShotLook {
@@ -39,8 +33,8 @@ export interface ShotLook {
 
 /** 打得到队伍的要躲：放大一点、不小于这么大、描红边、垫一团橙红的光晕 */
 const FOE_SHOT: ShotLook = { size: 1.1, min: 0.45 * UNIT, alpha: 1, rim: { color: SIDE.foe, px: 2 }, glow: { color: 0xff6e40, size: 2, alpha: 0.7 } }
-/** 队伍自己的不用看：缩小、变淡、不描边 */
-const TEAM_SHOT: ShotLook = { size: 0.85, min: 0, alpha: 0.55, rim: null, glow: null }
+/** 队伍自己的不用看：缩小、变淡、描黑边 */
+const TEAM_SHOT: ShotLook = { size: 0.85, min: 0, alpha: 0.55, rim: INK_RIM, glow: null }
 
 /** 弹体按此刻的阵营画（反弹会换边）；不是弹体的是 null */
 export function shotOf(world: EcsWorld, eid: number): ShotLook | null {
@@ -48,8 +42,7 @@ export function shotOf(world: EcsWorld, eid: number): ShotLook | null {
   return Faction.v[eid] === FACTION.team ? TEAM_SHOT : FOE_SHOT
 }
 
-/** 不是弹体的实体此刻的描边：队伍里的队长换成白边 */
-export function rimOf(eid: number, leader: number): RimStyle | null {
-  const rim = Tint.rim[eid] as Rim
-  return rim === RIM.team && eid === leader ? LEAD_RIM : RIMS[rim]
+/** 不是弹体的实体的描边：精英头目和它们手上的琥珀边，其余黑边 */
+export function rimOf(eid: number): RimStyle {
+  return Tint.side[eid] === TINT_SIDE.elite ? ELITE_RIM : INK_RIM
 }

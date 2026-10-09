@@ -1,12 +1,12 @@
 import { addComponents } from 'bitecs'
-import { Depth, Quad, RENDERABLE, RIM, Sprite, Tint, Transform } from '../components'
-import type { Rim } from '../components'
+import { Depth, Quad, RENDERABLE, Sprite, Tint, TINT_SIDE, Transform } from '../components'
+import type { TintSide } from '../components'
 import type { EcsWorld } from '../world'
 import type { FrameIndex } from '../frames'
 
 export interface DrawableInit {
   id: string
-  rim?: Rim
+  side?: TintSide
   x: number
   y: number
   size: number
@@ -30,7 +30,7 @@ export function attachDrawable(world: EcsWorld, eid: number, atlas: FrameIndex, 
   Tint.color[eid] = init.color ?? 0xffffff
   Tint.effect[eid] = init.effect ?? 0
   Tint.alpha[eid] = init.alpha ?? 1
-  Tint.rim[eid] = init.rim ?? RIM.none
+  Tint.side[eid] = init.side ?? TINT_SIDE.none
   Depth.z[eid] = init.z ?? 0
   Quad.v[eid] = 0
 }

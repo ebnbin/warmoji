@@ -3,10 +3,9 @@ import type { EcsAtlas } from '../atlas'
 import type { UnitLight } from '../../types/maps'
 import { AWAY } from '../../data/light'
 import { viewport } from '../../util/apply'
-import type { Rim } from '../components'
 import { EcsLayer } from './layer'
 import type { LayerType } from './layer'
-import { RIMS } from './side'
+import { INK_RIM } from './side'
 import type { RimStyle } from './side'
 import { packTint, TINT_FILL } from './tint'
 
@@ -58,7 +57,8 @@ export interface PaintSprite {
   readonly color: number
   readonly alpha: number
   readonly effect?: number
-  readonly rim?: Rim
+  /** 描黑边；布景不描 */
+  readonly outlined?: boolean
 }
 
 type QuadNode = Phaser.Renderer.WebGL.RenderNodes.BatchHandlerQuad
@@ -116,7 +116,7 @@ export class SpriteBatch extends EcsLayer {
 
   protected drawPaint(node: QuadNode, drawingContext: Phaser.Renderer.WebGL.DrawingContext, s: PaintSprite): void {
     if (s.frame < 0) return
-    this.draw(node, drawingContext, s.x, s.y, s.rot ?? 0, s.w, s.h, s.flipX ?? 0, s.frame, 0, s.color, s.alpha, s.effect ?? 0, s.rim === undefined ? null : RIMS[s.rim])
+    this.draw(node, drawingContext, s.x, s.y, s.rot ?? 0, s.w, s.h, s.flipX ?? 0, s.frame, 0, s.color, s.alpha, s.effect ?? 0, s.outlined ? INK_RIM : null)
   }
 
   /** 画一张图：(x, y) 为中心转 rot，宽高 w×h，flipX 水平翻转，quad 非零时只取四分之一格；rim 是垫在下面的描边 */

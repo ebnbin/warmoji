@@ -17,16 +17,13 @@ export class EcsSpriteBatch extends SpriteBatch {
   private order: number[] = []
   private readonly zMin: number
   private readonly zMax: number
-  /** 此刻的队长，还没开打是 -1 */
-  private readonly leader: () => number
 
   /** paint 须按 z 从小到大排好 */
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight, lightAt: LightAt | undefined, leader: () => number) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number, paint: readonly PaintSprite[], light: UnitLight, lightAt: LightAt | undefined) {
     super(scene, LayerType.Sprite, depth, atlas, paint, light, lightAt)
     this.world = world
     this.zMin = zMin
     this.zMax = zMax
-    this.leader = leader
   }
 
   renderWebGL(
@@ -53,7 +50,6 @@ export class EcsSpriteBatch extends SpriteBatch {
     order.sort((a, b) => Depth.z[a]! - Depth.z[b]! || a - b)
 
     self.aim(camera, drawingContext)
-    const leader = self.leader()
 
     for (let i = 0; i < order.length; i++) {
       const eid = order[i]!
@@ -78,7 +74,7 @@ export class EcsSpriteBatch extends SpriteBatch {
         node, drawingContext,
         x, y, Transform.rot[eid]!,
         w, h, Sprite.flipX[eid]!, frame, Quad.v[eid]!,
-        Tint.color[eid]!, alpha, Tint.effect[eid]!, shot ? shot.rim : rimOf(eid, leader),
+        Tint.color[eid]!, alpha, Tint.effect[eid]!, shot ? shot.rim : rimOf(eid),
       )
     }
     for (; p < paint.length && paint[p]!.z < self.zMax; p++) self.drawPaint(node, drawingContext, paint[p]!)

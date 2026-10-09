@@ -10,7 +10,7 @@ import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, Boss, Depth, Elite, ENEMY_SET, Facing, Faction, Hp, MARK_SLOTS, Mark, Res, RIM, Slot, Sprite, Tint, Transform, VisOff } from './components'
+import { Alive, Boss, Depth, Elite, Emplacement, ENEMY_SET, Facing, Faction, Hp, MARK_SLOTS, Mark, Radius, Res, Slot, Sprite, Tint, TINT_SIDE, Transform, VisOff } from './components'
 import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -144,7 +144,7 @@ function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
     h: SWEAT_SIZE,
     color: 0xffffff,
     alpha: hostShown(body),
-    rim: RIM.item,
+    outlined: true,
   })
 }
 
@@ -163,7 +163,7 @@ function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly str
   const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((emojis.length - 1) * ICON_SIZE) / 2
   const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * (0.55 + row)
   const alpha = hostShown(eid)
-  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, rim: RIM.item }))
+  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, outlined: true }))
 }
 
 /** 精英与头目头顶第一排打头的元素图标：小怪太多不标，靠图鉴认 */
@@ -231,23 +231,31 @@ function footRing(sim: Sim, o: Scratch, eid: number, size: number, color: number
   return { x, y, rx, ry }
 }
 
-/** 脚下的圈：队员蓝圈，队长金圈、圈外一个箭头指着朝向，精英与头目琥珀圈；倒下的不画 */
+/** 脚下有圈的：身体与装置 */
+const FOOTED: QueryTerm[] = [Alive, Radius, Transform, Tint]
+const EMPLACED: QueryTerm[] = [Emplacement, Transform, Tint]
+
+/** 脚下的圈：队伍的身体与装置一圈蓝，队长换成金圈、圈外一个箭头指着朝向，精英与头目一圈琥珀；倒下的不画 */
 function feet(sim: Sim, o: Scratch): void {
-  for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
-    const lead = m === sim.leader
-    const a = hostShown(m)
-    const r = footRing(sim, o, m, charSize(m), lead ? SIDE.lead : SIDE.team, lead ? LEAD_RING : TEAM_RING, a)
-    if (!lead) continue
-    const f = norm(Facing.x[m]!, Facing.y[m]!)
+  for (const eid of query(sim.world, FOOTED)) {
+    if (!Alive.v[eid]) continue
+    const a = Tint.alpha[eid]!
+    const size = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.w[eid]!
+    if (Tint.side[eid] === TINT_SIDE.elite && (Elite.v[eid] || Boss.v[eid])) footRing(sim, o, eid, size, SIDE.elite, ELITE_RING, a)
+    if (Tint.side[eid] !== TINT_SIDE.team) continue
+    if (eid !== sim.leader) {
+      footRing(sim, o, eid, size, SIDE.team, TEAM_RING, a)
+      continue
+    }
+    const r = footRing(sim, o, eid, size, SIDE.lead, LEAD_RING, a)
+    const f = norm(Facing.x[eid]!, Facing.y[eid]!)
     const bx = r.x + f.x * (r.rx + HEAD_GAP)
     const by = r.y + f.y * (r.ry + HEAD_GAP * FEET_FLAT)
-    const s = norm(f.x, f.y * FEET_FLAT)
-    tri(o, WORLD, bx + s.x * HEAD_LEN, by + s.y * HEAD_LEN, bx - s.y * HEAD_W, by + s.x * HEAD_W, bx + s.y * HEAD_W, by - s.x * HEAD_W, packTint(SIDE.lead, 0.95 * a))
+    const d = norm(f.x, f.y * FEET_FLAT)
+    tri(o, WORLD, bx + d.x * HEAD_LEN, by + d.y * HEAD_LEN, bx - d.y * HEAD_W, by + d.x * HEAD_W, bx + d.y * HEAD_W, by - d.x * HEAD_W, packTint(SIDE.lead, 0.95 * a))
   }
-  for (const eid of query(sim.world, ENEMY_SET)) {
-    if (!Alive.v[eid] || !(Elite.v[eid] || Boss.v[eid])) continue
-    footRing(sim, o, eid, Transform.w[eid]!, SIDE.elite, ELITE_RING, Tint.alpha[eid]!)
+  for (const eid of query(sim.world, EMPLACED)) {
+    if (Tint.side[eid] === TINT_SIDE.team) footRing(sim, o, eid, Transform.w[eid]!, SIDE.team, TEAM_RING, Tint.alpha[eid]!)
   }
 }
 
