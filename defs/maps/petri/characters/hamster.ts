@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🐹 仓鼠：鼓着腮帮子贴身一次挥两拳，越打跑得越快；技能钻进仓鼠球朝一个方向滚出去
+// 🐹 仓鼠：鼓着腮帮子贴身一次挥两拳，冻住的一拳就碎；技能钻进仓鼠球朝一个方向滚出去，撞开敌人、撞塌墙
 const hamsterJab = {
   trigger: 'auto',
   cooldownMs: 750,
@@ -28,7 +28,8 @@ const hamsterBall = {
   trigger: 'manual',
   aim: 'stick',
   damage: 36,
-  knockback: 4,
+  knockback: 5,
+  breach: 1,
   fireSfx: 'charge',
   shape: { kind: 'sprint', distance: 6, ms: 450, radius: 1 },
   reactions: [{ on: 'cast', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 500 }] }],
@@ -41,12 +42,12 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.02 }, mul: { damage: 1.2
 export default {
   emoji: '1f439',
   name: '仓鼠',
-  desc: '鼓着腮帮子贴身连挥两拳；技能钻进仓鼠球朝摇杆方向滚出一大段，撞开沿路的敌人，滚的时候什么控制都不吃',
+  desc: '鼓着腮帮子贴身连挥两拳，冻住的敌人挨第一拳就碎冰、吃双倍；靠吸血续航，中了毒就吸不回来；技能钻进仓鼠球朝摇杆方向滚出一大段，把沿路的敌人撞飞、撞塌挡路的墙，滚的时候什么控制都不吃',
   role: 'bruiser',
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4.5, mass: 0.8 },
   stats: { moveSpeed: 6.4, maxStamina: 120, staminaRegen: 80, exertion: 1 },
-  skill: { name: '仓鼠球', icon: '1f6de', desc: '钻进球里朝摇杆方向滚出 6 格，沿路的敌人挨一下、被撞开；滚的时候霸体', cdMs: 10_000, ability: 'hamsterBall', aim: true },
+  skill: { name: '仓鼠球', icon: '1f6de', desc: '钻进球里朝摇杆方向滚出 6 格，沿路的敌人挨一下、被重重撞开，挡路的墙撞塌一截；滚的时候霸体', cdMs: 10_000, ability: 'hamsterBall', aim: true },
   weapons: [],
   innate: [
     {
