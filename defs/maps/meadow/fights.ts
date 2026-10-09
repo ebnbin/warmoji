@@ -33,10 +33,10 @@ export const FIGHTS = {
   gateGuard: {
     emoji: '1f411',
     name: '守栅门',
-    desc: '闩着的栅栏门外就是羊圈：怪物从林子里钻出来，不理队伍，直奔栅栏门去拱羊；放过去 6 只就输，撑过 90 秒',
+    desc: '闩着的栅栏门外就是羊圈：怪物从林子里钻出来，不理队伍，直奔栅栏门去拱羊；放过去 6 只就输，撑过 30 秒',
     note: '敌人朝一处行进、不追队伍：从「别被打倒」变成「拦住它们」，站位要卡在林子和栅栏门之间',
     team: { slots: [{ tags: ['control'] }, { tags: ['area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
-    stars: [{ kind: 'downs', count: 0 }, { kind: 'kills', count: 70 }],
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'kills', count: 23 }],
     fight: {
       name: '守栅门',
       map: 'meadow',
@@ -58,7 +58,7 @@ export const FIGHTS = {
             },
           ],
           ends: [
-            { kind: 'time', ms: 90_000 },
+            { kind: 'time', ms: 30_000 },
             { kind: 'leak', mark: 'gate', radius: 1.5, count: 6 },
           ],
         },
