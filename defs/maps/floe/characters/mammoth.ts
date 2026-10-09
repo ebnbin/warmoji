@@ -2,14 +2,14 @@ import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🦣 猛犸：长鼻卷雪给最伤的队友敷伤、象牙挑开身前的敌人，两样轮着来；技能把全队护进长毛里
+// 🦣 猛犸：长鼻卷雪给最伤的队友敷伤、象牙把身前的敌人远远挑开，两样轮着来；技能先解掉全队身上的毒与冰再回血，把全队护进长毛里
 const tusk = {
   trigger: 'manual',
   class: 'attack',
   aim: 'nearest',
   range: 2.1,
   damage: 12,
-  knockback: 2,
+  knockback: 4,
   fireSfx: 'thud',
   shape: { kind: 'sector', radius: 2, arcDeg: 120, ms: 200 },
 } satisfies AbilityDef
@@ -56,7 +56,7 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 30 }, mul: { h
 export default {
   emoji: '1f9a3',
   name: '猛犸',
-  desc: '披着长毛的猛犸：长鼻卷雪给 4.5 格内最伤的队友回 11 点血，再用象牙把身前 2 格内的敌人挑开，两样轮着来，没人受伤时敷伤落空、身前没敌人时象牙挑空；技能把全队护进长毛里',
+  desc: '披着长毛的猛犸，身子沉、不容易被撞开：长鼻卷雪给 4.5 格内最伤的队友回 11 点血，再用象牙把身前 2 格内的敌人远远挑开（物理，冻住的挑碎、伤害翻倍），两样轮着来，没人受伤时敷伤落空、身前没敌人时象牙挑空；中了毒的队友敷了伤也回不了血。技能先解掉全队身上的毒、寒冷与冻结再回血，把全队护进长毛里',
   role: 'support',
   tags: ['support', 'melee'],
   body: { drag: 5.5, mass: 1.7 },
@@ -64,7 +64,7 @@ export default {
   skill: {
     name: '冰河庇护',
     icon: '1f3d4',
-    desc: '全队解除控制与减速、回复 20% 生命，5 秒内受到的伤害 ×0.6；身周立起一圈 3 格的长毛屏障跟着自己 5 秒，敌人进不来也出不去',
+    desc: '全队解除控制、减速与身上的燃烧、中毒、寒冷、湿，再回复 20% 生命，5 秒内受到的伤害 ×0.6；身周立起一圈 3 格的长毛屏障跟着自己 5 秒，敌人进不来也出不去',
     cdMs: 17_000,
     ability: 'mammothShelter',
   },
@@ -75,7 +75,7 @@ export default {
       icon: '1f9a3',
       base: 'mammothTrunk',
       upgrades: [
-        { ability: 'mammothTrunk2', card: { icon: '1f9f6', name: '长毛', desc: '敷伤时再给那名队友挂上生命 6% 的护盾 3 秒' } },
+        { ability: 'mammothTrunk2', card: { icon: '1f9f6', name: '长毛', desc: '敷伤时再给那名队友挂上生命 6% 的护盾 3 秒；护盾不算回血，中了毒照样挂得上' } },
         { ability: 'mammothTrunk3', card: { icon: '1f9e3', name: '暖意', desc: '敷伤时再给那名队友回春：3 秒里每半秒回 3 点' } },
       ],
     },
