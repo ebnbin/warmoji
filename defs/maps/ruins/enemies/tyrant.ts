@@ -34,11 +34,26 @@ const charge = {
   aim: 'nearest',
   range: 9,
   damage: 30,
-  knockback: 6,
   breach: 12,
   fireSfx: 'charge',
   windup: { ms: 800, lockAt: 'start', telegraph: 'shake' },
   shape: { kind: 'sprint', distance: 8, ms: 900, radius: 1.5 },
+  onHit: [{ kind: 'shove', distance: 3, ms: 280, onWall: [{ kind: 'stun', durationMs: 1500 }, { kind: 'damage', amount: 12 }] }],
+} satisfies AbilityDef
+
+const stomp = {
+  trigger: 'auto',
+  class: 'skill',
+  cooldownMs: 9000,
+  firstDelayMs: 5000,
+  aim: 'nearest',
+  range: 3.2,
+  damage: 16,
+  fireSfx: 'boom',
+  color: 0x8d6e63,
+  windup: { ms: 800, lockAt: 'start', telegraph: 'blink' },
+  shape: { kind: 'disc', radius: 3.4, at: 'self' },
+  onHit: [{ kind: 'grounded', durationMs: 2500 }, { kind: 'slow', factor: 0.5, durationMs: 1500 }],
 } satisfies AbilityDef
 
 const roar = {
@@ -61,7 +76,7 @@ const TYRANT = {
   emoji: '1f996',
   name: '暴龙',
   element: 'earth',
-  desc: '残垣的霸主：一口咬下去疼得要命，尾巴一甩扫开身前一大片，低头冲撞时连墙带人一起撞穿，一声咆哮吓得 5 格内的人四散逃开；血少了彻底狂暴，跑得更快、出手更勤',
+  desc: '残垣的霸主：一口咬下去疼得要命，尾巴一甩扫开身前一大片；低头冲撞时连墙带人一起撞穿，撞上的人被顶出 3 格，顶到墙上的晕 1.5 秒；一跺脚，3.4 格内的人 2.5 秒里冲不动、跳不起、闪不走，1.5 秒里走得慢一半；一声咆哮吓得 5 格内的人四散逃开；血掉到四成彻底狂暴，跑得更快、出手更勤',
   size: 3.5,
   radius: 1.12,
   span: [0, 6],
@@ -73,7 +88,7 @@ const TYRANT = {
   coins: 60,
   traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
-  abilities: [bite, tailSwipe, charge, roar],
+  abilities: [bite, tailSwipe, charge, stomp, roar],
   phases: [{ below: 0.4, name: '狂暴', stats: { mul: { moveSpeed: 1.3, cooldown: 0.75 } }, effects: [{ kind: 'unstoppable', durationMs: 3000 }] }],
 } satisfies EnemyDef
 

@@ -2,13 +2,14 @@ import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 
-// 🐼 熊猫：竹棍一戳一扫轮着来；技能抱成一团朝一个方向滚出去，把沿路的敌人撞上半空
+// 🐼 熊猫：竹棍一戳一扫轮着来，每一下都耗能量；技能太极挡下所有来招，晕住出手的并还手，还回能量
 const poke = {
   trigger: 'auto',
   cooldownMs: 800,
   aim: 'nearest',
   range: 2.4,
   damage: 22,
+  cost: 15,
   fireSfx: 'thud',
   shape: { kind: 'segment', reach: 2.2, radius: 0.45, ms: 150 },
 } satisfies AbilityDef
@@ -20,6 +21,7 @@ const sweep = {
   range: 2.4,
   damage: 17,
   knockback: 2.5,
+  cost: 15,
   fireSfx: 'whoosh',
   shape: { kind: 'sector', radius: 2, arcDeg: 160, ms: 200 },
 } satisfies AbilityDef
@@ -34,17 +36,25 @@ const bambooPandaStaff2 = { ...poke, cycle: [sweep2] } satisfies AbilityDef
 
 const bambooPandaStaff3 = { ...poke3, cycle: [sweep2] } satisfies AbilityDef
 
-const bambooPandaRoll = {
+const bambooPandaTaiji = {
   trigger: 'manual',
-  aim: 'stick',
-  damage: 35,
-  fireSfx: 'charge',
+  aim: 'self',
+  fireSfx: 'upgrade',
   color: 0x81c784,
-  shape: { kind: 'sprint', distance: 5, ms: 500, radius: 0.9 },
-  onHit: [{ kind: 'knockup', durationMs: 800, height: 1.5 }],
+  shape: { kind: 'world' },
+  reactions: [
+    {
+      on: 'fire',
+      to: 'self',
+      effects: [
+        { kind: 'parry', durationMs: 1600, then: [{ kind: 'stun', durationMs: 1200 }, { kind: 'damage', amount: 30 }] },
+        { kind: 'gain', amount: 50 },
+      ],
+    },
+  ],
 } satisfies AbilityDef
 
-export const abilities = { bambooPandaStaff, bambooPandaStaff2, bambooPandaStaff3, bambooPandaRoll } satisfies Record<string, AbilityDef>
+export const abilities = { bambooPandaStaff, bambooPandaStaff2, bambooPandaStaff3, bambooPandaTaiji } satisfies Record<string, AbilityDef>
 
 export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2 } }, { add: { maxHp: 45, lifesteal: 0.05 }, mul: { damage: 1.45 } }] as const satisfies readonly StatMods[]
 
@@ -52,12 +62,12 @@ export default {
   emoji: '1f43c',
   name: '熊猫',
   element: 'wood',
-  desc: '抡着竹棍的熊猫：一戳一扫轮着来，戳得远、扫得开；技能抱成一团朝一个方向滚出去，把沿路的敌人撞上半空',
+  desc: '抡着竹棍、练过太极的熊猫：一戳一扫轮着来，戳得远、扫得开，每一下耗 15 点能量，能量每秒回 12 点，不够就停手；技能太极 1.6 秒内挡下所有来招，晕住出手的并还手，还回 50 点能量',
   role: 'bruiser',
-  tags: ['damage', 'melee'],
+  tags: ['damage', 'defense', 'melee'],
   body: { drag: 5, mass: 1.5 },
   stats: { moveSpeed: 5.2, maxStamina: 130, staminaRegen: 60, exertion: 1 },
-  skill: { name: '竹林卷', icon: '1f38d', desc: '朝摇杆方向滚出 5 格，沿路的敌人挨一下并被撞上半空 0.8 秒', cdMs: 10_000, ability: 'bambooPandaRoll', aim: true },
+  skill: { name: '太极', icon: '262f', desc: '1.6 秒内挡下所有命中，每挡一下就让出手的晕 1.2 秒并还它 30 点伤害；放出时回 50 点能量', cdMs: 11_000, ability: 'bambooPandaTaiji' },
   weapons: [],
   innate: [
     {
@@ -70,4 +80,5 @@ export default {
       ],
     },
   ],
+  resource: { kind: 'energy', max: 100, start: 100, regen: 12 },
 } as const satisfies CharacterAuthoring

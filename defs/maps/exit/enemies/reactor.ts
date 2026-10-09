@@ -1,6 +1,7 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { EnemyDef } from '../../../../src/types/enemies'
 import { patch } from '../../../kit.ts'
+import REACTOR_PYLON from './reactorPylon.ts'
 
 const radiation = {
   trigger: 'auto',
@@ -38,6 +39,31 @@ const overload = {
   shape: { kind: 'disc', radius: 5, at: 'self' },
 } satisfies AbilityDef
 
+const shielding = {
+  trigger: 'auto',
+  class: 'skill',
+  cooldownMs: 20000,
+  firstDelayMs: 800,
+  aim: 'self',
+  fireSfx: 'recruit',
+  shape: { kind: 'world' },
+  onHit: [{ kind: 'summon', of: { unit: REACTOR_PYLON, spread: 5 }, count: 3 }],
+} satisfies AbilityDef
+
+const sweep = {
+  trigger: 'auto',
+  class: 'skill',
+  cooldownMs: 4000,
+  firstDelayMs: 1000,
+  aim: 'nearest',
+  range: 8,
+  damage: 14,
+  fireSfx: 'zap',
+  color: 0xff5252,
+  shape: { kind: 'segment', reach: 8, radius: 0.3, ms: 0, beam: true },
+  repeat: { count: 8, spreadDeg: 360, delayMs: 70 },
+} satisfies AbilityDef
+
 const meltdown = {
   trigger: 'auto',
   class: 'skill',
@@ -57,20 +83,30 @@ const REACTOR = {
   emoji: '2622',
   name: '失控核心',
   element: 'thunder',
-  desc: '失控的反应堆核心，挪得很慢：身周 4 格一直冒着辐射，每半秒烫一下；电弧在队伍里连跳 4 次；隔一阵蓄力 1.2 秒，把 5 格内的人炸开；血掉到一半就熔毁，变成火元素、出手更快，还往队员头上落下熔渣，落地处烧 4 秒',
+  desc: '失控的反应堆核心，挪得很慢：一登场就在身边立起 3 根屏蔽柱，只要还有一根立着就打不动它，每 20 秒再立 3 根；身周 4 格一直冒着辐射，每半秒烫一下；电弧在队伍里连跳 4 次；隔一阵蓄力 1.2 秒，把 5 格内的人炸开；血掉到一半就熔毁，变成火元素、出手更快，当场再立 2 根屏蔽柱，电弧换成绕身扫一圈的 8 道 8 格长的激光，还往队员头上落下熔渣，落地处烧 4 秒',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
-  hp: 8000,
+  hp: 7200,
   stats: { armor: 6, exertion: 0 },
   speed: 0.9,
   damage: 20,
   xp: 60,
   coins: 60,
   traits: ['anchored', 'wary'],
+  guardedBy: 'reactorPylon',
   drive: { kind: 'chase' },
-  abilities: [radiation, arc, overload],
-  phases: [{ below: 0.5, name: '熔毁', element: 'fire', abilities: [radiation, arc, overload, meltdown], stats: { mul: { cooldown: 0.8 } } }],
+  abilities: [radiation, arc, overload, shielding],
+  phases: [
+    {
+      below: 0.5,
+      name: '熔毁',
+      element: 'fire',
+      abilities: [radiation, sweep, overload, meltdown, shielding],
+      stats: { mul: { cooldown: 0.8 } },
+      effects: [{ kind: 'summon', of: { unit: REACTOR_PYLON, spread: 5 }, count: 2 }],
+    },
+  ],
 } satisfies EnemyDef
 
 export default REACTOR

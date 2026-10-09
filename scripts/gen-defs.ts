@@ -2,16 +2,14 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFi
 import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
-import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, MAP_CHARACTERS, NEW_CHARACTER_FILES, WEAPONS } from '../defs/characters.ts'
+import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, MAP_CHARACTERS, WEAPONS } from '../defs/characters.ts'
 import type { CharacterFile } from '../defs/characters.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
 import { ECONOMY } from '../defs/economy.ts'
 import { EDITOR_DRAFT } from '../defs/editor.ts'
 import { ELEMENTS } from '../defs/elements.ts'
-import { ENEMIES, NEW_ENEMIES } from '../defs/enemies.ts'
-import { LEGACY_CHARACTER_FILES } from '../defs/legacy/characters.ts'
-import { LEGACY_ENEMIES } from '../defs/legacy/enemies.ts'
+import { ENEMIES } from '../defs/enemies.ts'
 import { EXPERIMENTS } from '../defs/experiments.ts'
 import { FEEL } from '../defs/feel.ts'
 import { ITEMS } from '../defs/items.ts'
@@ -76,16 +74,16 @@ const need = (ok: boolean, msg: string): void => {
   if (!ok) errors.push(msg)
 }
 
-/** 地图的小怪与头目只从新敌人里挑，旧敌人只留给旧关卡 */
+/** 地图的小怪不是头目，头目是头目 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  const fresh = NEW_ENEMIES as Readonly<Record<string, EnemyDef>>
-  for (const kind of m.foes) need(fresh[kind] !== undefined && fresh[kind].role !== 'boss', `maps.${id}.foes 须引用非头目的新敌人：${kind}`)
+  const all = ENEMIES as Readonly<Record<string, EnemyDef>>
+  for (const kind of m.foes) need(all[kind] !== undefined && all[kind].role !== 'boss', `maps.${id}.foes 须引用非头目的敌人：${kind}`)
   need(new Set(m.foes).size === m.foes.length, `maps.${id}.foes 不能重复`)
   need(m.bosses.length > 0 && new Set(m.bosses).size === m.bosses.length, `maps.${id}.bosses 至少一个、不能重复`)
-  for (const kind of m.bosses) need(fresh[kind]?.role === 'boss', `maps.${id}.bosses 须引用新头目：${kind}`)
+  for (const kind of m.bosses) need(all[kind]?.role === 'boss', `maps.${id}.bosses 须引用头目：${kind}`)
 }
 
-/** 新敌人都绑在至少一张图上：写进某张图的小怪或头目，或由绑了的敌人召出、分裂出、生出、长成 */
+/** 敌人都绑在至少一张图上：写进某张图的小怪或头目，或由绑了的敌人召出、分裂出、生出、长成 */
 {
   const seen = new Set<object>()
   const under = (v: unknown, out: Set<string>): void => {
@@ -97,7 +95,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   }
   const bound = new Set<string>()
   for (const m of Object.values<MapDef>(MAPS)) for (const k of [...m.foes, ...m.bosses]) under(ENEMIES[k], bound)
-  for (const k of Object.keys(NEW_ENEMIES)) need(bound.has(k), `新敌人 ${k} 没绑到任何一张图上：写进某张图的 foes 或 bosses，或由绑了的敌人召出`)
+  for (const k of Object.keys(ENEMIES)) need(bound.has(k), `敌人 ${k} 没绑到任何一张图上：写进某张图的 foes 或 bosses，或由绑了的敌人召出`)
 }
 
 /** 地面费力、场内费力和身体的赶路耗体力，出现在哪都不能为负；属性修正的加值可以为负，由属性表的下限兜住 */
@@ -743,7 +741,7 @@ for (const [at, u] of units) {
   need((u.reactions ?? []).filter((r) => r.on === 'lowHp').length <= 8, `${at} 的残血线最多八条`)
 }
 
-/** 角色与敌人新旧放在一起，id 各不相同、名字也各不相同 */
+/** 角色与敌人放在一起，id 各不相同、名字也各不相同 */
 {
   const dup = (list: readonly string[]): string[] => [...new Set(list.filter((k, i) => list.indexOf(k) !== i))]
   const ids = dup([...Object.keys(CHARACTERS), ...Object.keys(ENEMIES)])
@@ -1113,12 +1111,10 @@ need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restR
 need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
 need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
 
-/** 新旧名单与各张图对应的角色：选角、沙盒、地图与图鉴按它分开新旧，沙盒按图抽队伍 */
+/** 角色与敌人按地图先后的名单，和各张图对应的角色：选角、图鉴按它排，沙盒按图抽队伍 */
 const ROSTER = {
-  characters: Object.keys(NEW_CHARACTER_FILES),
-  legacyCharacters: Object.keys(LEGACY_CHARACTER_FILES),
-  enemies: Object.keys(NEW_ENEMIES),
-  legacyEnemies: Object.keys(LEGACY_ENEMIES),
+  characters: Object.keys(CHARACTER_FILES),
+  enemies: Object.keys(ENEMIES),
   maps: MAP_CHARACTERS,
 }
 need(Object.keys(MAP_CHARACTERS).sort().join() === Object.keys(MAPS).sort().join(), 'defs/characters.ts 的 MAP_CHARACTERS 须每张图各一份')
@@ -1283,8 +1279,8 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
 }
 
 /**
- * 内容一个单位一个文件：旧的敌人与角色在 legacy，新的在各自那张图的目录里，地图与关卡在各自的目录里；文件名就是 id，每个文件都在所在目录的登记表里登记、只登记一次；
- * 新旧的 id 不重；关卡在哪张图的目录里写的就是那张图；角色文件里的能力与武器 id 全局不重，角色用到的能力与武器都在它自己的文件里、文件里的也都用得上
+ * 内容一个单位一个文件：敌人与角色在各自那张图的目录里，地图与关卡在各自的目录里；文件名就是 id，每个文件都在所在目录的登记表里登记、只登记一次；
+ * 各图之间的 id 不重；关卡在哪张图的目录里写的就是那张图；角色文件里的能力与武器 id 全局不重，角色用到的能力与武器都在它自己的文件里、文件里的也都用得上
  */
 {
   const defs = new URL('../defs/', import.meta.url)
@@ -1302,10 +1298,8 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
     }
     need(n === Object.keys(table).length, `${at} 登记了 ${Object.keys(table).length} 个，${where(dir, '')} 里有 ${n} 个文件：每个一个文件、只登记一次`)
   }
-  await registered(new URL('legacy/enemies/', defs), 'defs/legacy/enemies.ts', LEGACY_ENEMIES, (mod) => mod.default)
-  await registered(new URL('legacy/characters/', defs), 'defs/legacy/characters.ts', LEGACY_CHARACTER_FILES, (mod) => mod)
-  let newEnemies = 0
-  let newCharacters = 0
+  let enemies = 0
+  let characters = 0
   for (const m of mapDirs) {
     const units = new URL(`maps/${m}/units.ts`, defs)
     need(existsSync(units), `defs/maps/${m}/ 缺 units.ts`)
@@ -1313,13 +1307,13 @@ for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
     const own = (await import(units.href)) as { ENEMIES: Record<string, EnemyDef>; CHARACTERS: Record<string, CharacterFile> }
     await registered(new URL(`maps/${m}/enemies/`, defs), `defs/maps/${m}/units.ts`, own.ENEMIES, (mod) => mod.default)
     await registered(new URL(`maps/${m}/characters/`, defs), `defs/maps/${m}/units.ts`, own.CHARACTERS, (mod) => mod)
-    for (const [k, e] of Object.entries(own.ENEMIES)) need((NEW_ENEMIES as Record<string, unknown>)[k] === e, `defs/maps/${m}/units.ts 的敌人 ${k} 没在 defs/enemies.ts 里接上，或和别的敌人重名`)
-    for (const [k, c] of Object.entries(own.CHARACTERS)) need((NEW_CHARACTER_FILES as Record<string, unknown>)[k] === c, `defs/maps/${m}/units.ts 的角色 ${k} 没在 defs/characters.ts 里接上，或和别的角色重名`)
-    newEnemies += Object.keys(own.ENEMIES).length
-    newCharacters += Object.keys(own.CHARACTERS).length
+    for (const [k, e] of Object.entries(own.ENEMIES)) need((ENEMIES as Record<string, unknown>)[k] === e, `defs/maps/${m}/units.ts 的敌人 ${k} 没在 defs/enemies.ts 里接上，或和别的敌人重名`)
+    for (const [k, c] of Object.entries(own.CHARACTERS)) need((CHARACTER_FILES as Record<string, unknown>)[k] === c, `defs/maps/${m}/units.ts 的角色 ${k} 没在 defs/characters.ts 里接上，或和别的角色重名`)
+    enemies += Object.keys(own.ENEMIES).length
+    characters += Object.keys(own.CHARACTERS).length
   }
-  need(newEnemies === Object.keys(NEW_ENEMIES).length && newEnemies + Object.keys(LEGACY_ENEMIES).length === Object.keys(ENEMIES).length, '新敌人之间或新旧敌人之间有重名的种类')
-  need(newCharacters === Object.keys(NEW_CHARACTER_FILES).length && newCharacters + Object.keys(LEGACY_CHARACTER_FILES).length === Object.keys(CHARACTER_FILES).length, '新角色之间或新旧角色之间有重名的 id')
+  need(enemies === Object.keys(ENEMIES).length, '各图的敌人之间有重名的种类')
+  need(characters === Object.keys(CHARACTER_FILES).length, '各图的角色之间有重名的 id')
   for (const [k, e] of Object.entries<EnemyDef>(ENEMIES)) need(e.kind === k, `enemies.${k} 的 kind 须是 ${k}`)
 
   let fights = 0

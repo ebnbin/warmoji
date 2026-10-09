@@ -49,8 +49,11 @@ const dispatcherEvacuate = {
   aim: 'stick',
   fireSfx: 'warp',
   color: 0xfff59d,
-  shape: { kind: 'all', of: 'allies' },
-  onHit: [{ kind: 'warp', distance: 6 }, { kind: 'shield', amount: 0, ratio: 0.2, ms: COMBAT.transitMs.teleport + 4000 }],
+  shape: { kind: 'world' },
+  onHit: [
+    { kind: 'to', who: { side: 'allies', radius: 20 }, then: [{ kind: 'shield', amount: 0, ratio: 0.2, ms: COMBAT.transitMs.teleport + 4000 }] },
+    { kind: 'warp', distance: 6, allies: true },
+  ],
 } satisfies AbilityDef
 
 export const abilities = { dispatcherBroadcast, dispatcherBroadcast2, dispatcherBroadcast3, dispatcherEvacuate } satisfies Record<string, AbilityDef>
@@ -66,7 +69,7 @@ export default {
   tags: ['support', 'mobile'],
   body: { drag: 5, mass: 1 },
   stats: { moveSpeed: 5.6, maxStamina: 85, staminaRegen: 80, exertion: 0.7 },
-  skill: { name: '全员转移', icon: '1f68c', desc: '全队朝摇杆方向隐身穿行 6 格，落地各挂一层生命 20% 的护盾 4 秒', cdMs: 15_000, ability: 'dispatcherEvacuate', aim: true },
+  skill: { name: '全员转移', icon: '1f68c', desc: '全队跟着调度员朝摇杆方向隐身穿行 6 格，落地各挂一层生命 20% 的护盾 4 秒', cdMs: 15_000, ability: 'dispatcherEvacuate', aim: true },
   weapons: [],
   innate: [
     {

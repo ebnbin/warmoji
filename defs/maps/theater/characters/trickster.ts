@@ -4,7 +4,7 @@ import type { ElementId } from '../../../../src/types/elements'
 import type { StatMods } from '../../../../src/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🤹 杂耍艺人：火、冰、雷三把飞刀轮着掷，一个人就打得出元素反应；技能一口气甩出三圈飞刀
+// 🤹 杂耍艺人：火、冰、雷三把飞刀轮着掷，一个人就打得出元素反应；技能让全场敌人跟着蹦迪，同时甩出三圈飞刀
 const knife = (element: ElementId) =>
   ({
     trigger: 'auto',
@@ -38,11 +38,20 @@ const ring = (element: ElementId, speed: number) =>
     repeat: { count: 8, spreadDeg: 360 },
   }) satisfies AbilityDef
 
+const dance = {
+  trigger: 'manual',
+  aim: 'self',
+  fireSfx: 'chirp',
+  shape: { kind: 'all', of: 'foes' },
+  onHit: [{ kind: 'if', when: { kind: 'boss', who: 'target' }, then: [{ kind: 'stun', durationMs: 500 }], else: [{ kind: 'stun', durationMs: 2000 }] }],
+} satisfies AbilityDef
+
 const tricksterStorm = {
   trigger: 'manual',
   aim: 'self',
   shape: { kind: 'world' },
   onHit: [
+    { kind: 'cast', ability: dance },
     { kind: 'cast', ability: ring('fire', 9) },
     { kind: 'cast', ability: ring('ice', 11) },
     { kind: 'cast', ability: ring('thunder', 13) },
@@ -56,12 +65,12 @@ export const levels = [{ mul: { damage: 1.2, projSpeed: 1.1 } }, { add: { crit: 
 export default {
   emoji: '1f939',
   name: '杂耍艺人',
-  desc: '手上总抛着三把飞刀的杂耍艺人：火刀、冰刀、雷刀轮着掷，一个人就打得出元素反应；技能一口气向四面八方甩出三圈飞刀',
+  desc: '手上总抛着三把飞刀的杂耍艺人：火刀、冰刀、雷刀轮着掷，一个人就打得出元素反应；技能让全场的敌人跟着蹦迪 2 秒、动弹不得（头目只蹦 0.5 秒），同时向四面八方甩出三圈飞刀',
   role: 'ranged',
   tags: ['damage', 'ranged'],
   body: { drag: 4.5, mass: 0.8 },
   stats: { moveSpeed: 6, maxStamina: 100, staminaRegen: 75, exertion: 0.8 },
-  skill: { name: '漫天飞刀', icon: '1f3aa', desc: '向四面八方一口气甩出火、冰、雷三圈飞刀，每圈 8 把', cdMs: 12_000, ability: 'tricksterStorm' },
+  skill: { name: '满堂彩', icon: '1f57a', desc: '全场的敌人跟着蹦迪 2 秒，失去行动，头目只蹦 0.5 秒；同时向四面八方甩出火、冰、雷三圈飞刀，每圈 8 把', cdMs: 15_000, ability: 'tricksterStorm' },
   weapons: [],
   innate: [
     {

@@ -17,10 +17,10 @@ export const FIGHTS = {
         {
           intro: { title: '跟艇', sub: '跟着潜艇，它落稳三次就赢' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 2 },
-            { kind: 'crab', weight: 1 },
-            { kind: 'snake', weight: 1 },
+            { kind: 'conch', weight: 3 },
+            { kind: 'shark', weight: 2 },
+            { kind: 'doorCoral', weight: 1 },
+            { kind: 'fishSchool', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1100 },
@@ -31,8 +31,8 @@ export const FIGHTS = {
               squad: {
                 count: 6,
                 mix: [
-                  { kind: 'zombie', weight: 2 },
-                  { kind: 'snake', weight: 1 },
+                  { kind: 'conch', weight: 2 },
+                  { kind: 'fishSchool', weight: 1 },
                 ],
                 at: { kind: 'gate', gate: 'abyss' },
               },
@@ -61,14 +61,14 @@ export const FIGHTS = {
         {
           intro: { title: '憋气寻宝', sub: '击倒守在远处的三名悬赏目标' },
           mix: [
-            { kind: 'zombie', weight: 2 },
-            { kind: 'skeleton', weight: 1 },
+            { kind: 'conch', weight: 2 },
+            { kind: 'shark', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1600 },
-            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'snake', elites: 1, stats: { mul: { maxHp: 1.6 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'bones' }, bounty: true, escort: { enemy: 'slime', count: 3 } }, banner: { title: '悬赏发布', sub: '三名目标守在远处，一步也不挪' } },
-            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blob', elites: 1, stats: { mul: { maxHp: 1.2 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'seep' }, bounty: true, escort: { enemy: 'puffer', count: 2 } } },
-            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'skeleton', elites: 1, stats: { mul: { maxHp: 1.2 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'rubble' }, bounty: true, escort: { enemy: 'zombie', count: 3 } } },
+            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'pearlClam', elites: 1, stats: { mul: { maxHp: 1.6 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'bones' }, bounty: true, escort: { enemy: 'seepBubble', count: 3 } }, banner: { title: '悬赏发布', sub: '三名目标守在远处，一步也不挪' } },
+            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'porcupineFish', elites: 1, stats: { mul: { maxHp: 1.2 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'seep' }, bounty: true, escort: { enemy: 'seepBubble', count: 2 } } },
+            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'shark', elites: 1, stats: { mul: { maxHp: 1.2 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'rubble' }, bounty: true, escort: { enemy: 'conch', count: 3 } } },
           ],
           ends: [
             { kind: 'bounty' },
@@ -94,10 +94,10 @@ export const FIGHTS = {
         {
           intro: { title: '守门', sub: '队长在潜艇门口站满 40 秒' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 2 },
-            { kind: 'crab', weight: 2 },
-            { kind: 'slime', weight: 1 },
+            { kind: 'conch', weight: 3 },
+            { kind: 'shark', weight: 2 },
+            { kind: 'doorCoral', weight: 2 },
+            { kind: 'seepBubble', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 700 }],
           cues: [{ cue: 'depart', atMs: 25_000 }],
@@ -110,9 +110,9 @@ export const FIGHTS = {
     },
   },
   slowSwap: {
-    emoji: '1f40a',
+    emoji: '1f40b',
     name: '换人要等',
-    desc: '深海自己的头目巨鳄从陡坎下翻上来，打倒它；换队长要冷却 8 秒，离开潜艇门口就得憋气，谁在前面顶着、什么时候换下来喘口气都得算好',
+    desc: '深海自己的头目深渊巨鲸从陡坎下浮上来，打倒它；换队长要冷却 8 秒，离开潜艇门口就得憋气，谁在前面顶着、什么时候换下来喘口气都得算好',
     note: '换人冷却让「轮着换人放技能」变成要算计的事；头目战加上换气点，站位和换人一起被地图卡住',
     team: { slots: [{ tags: ['defense'] }, { tags: ['damage', 'ranged'] }, { tags: ['support'] }, { tags: ['damage'] }], level: 3 },
     stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 90_000 }],
@@ -124,13 +124,13 @@ export const FIGHTS = {
       phases: [
         {
           mix: [
-            { kind: 'zombie', weight: 2 },
-            { kind: 'puffer', weight: 1 },
-            { kind: 'snake', weight: 1 },
+            { kind: 'conch', weight: 2 },
+            { kind: 'seepBubble', weight: 1 },
+            { kind: 'fishSchool', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 2500 },
-            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'croc', at: { kind: 'gate', gate: 'abyss' } }, banner: { title: '巨鳄', sub: '深海的头目翻上来了' } },
+            { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'abyssWhale', at: { kind: 'gate', gate: 'abyss' } }, banner: { title: '深渊巨鲸', sub: '深海的头目浮上来了' } },
           ],
           ends: [{ kind: 'boss' }],
         },

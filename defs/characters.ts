@@ -4,7 +4,6 @@ import type { CharacterAuthoring } from '../src/types/characters'
 import type { StatMods } from '../src/types/stats'
 import type { WeaponId, WeaponSource } from '../src/types/weapons'
 import { mapValues } from '../src/util/record.ts'
-import { LEGACY_CHARACTER_FILES } from './legacy/characters.ts'
 import { CHARACTERS as meadow } from './maps/meadow/units.ts'
 import { CHARACTERS as sakura } from './maps/sakura/units.ts'
 import { CHARACTERS as desert } from './maps/desert/units.ts'
@@ -26,8 +25,8 @@ export interface CharacterFile {
   readonly levels: readonly StatMods[]
 }
 
-/** 新角色：各张图目录里的按地图的先后接起来；和旧角色的 id 不重由构建期检查 */
-export const NEW_CHARACTER_FILES = {
+/** 角色登记表：各张图目录里的按地图的先后接起来；每名角色一个文件，文件名就是 id，id 不重由构建期检查 */
+export const CHARACTER_FILES = {
   ...meadow,
   ...sakura,
   ...desert,
@@ -42,11 +41,8 @@ export const NEW_CHARACTER_FILES = {
   ...nebula,
 } satisfies Record<string, CharacterFile>
 
-/** 各张图对应的新角色，按登记的先后：沙盒进哪张图就从哪张图的里面抽队伍 */
+/** 各张图对应的角色，按登记的先后：沙盒进哪张图就从哪张图的里面抽队伍 */
 export const MAP_CHARACTERS = mapValues({ meadow, sakura, desert, deep, ruins, amethyst, volcano, floe, theater, petri, exit, nebula }, (own) => Object.keys(own))
-
-/** 角色登记表：旧角色在前、新角色在后；每名角色一个文件，文件名就是 id */
-export const CHARACTER_FILES = { ...LEGACY_CHARACTER_FILES, ...NEW_CHARACTER_FILES } satisfies Record<string, CharacterFile>
 
 export const CHARACTERS = mapValues(CHARACTER_FILES, (f) => f.default)
 

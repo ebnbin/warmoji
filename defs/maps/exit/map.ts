@@ -29,11 +29,11 @@ export default {
     look: 'glow',
     boss: 'warden',
     kinds: {
-      ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['ghost', 'chameleon', 'siren', 'stander', 'zipper', 'upsideDown', 'mouthless'] },
-      tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['crab', 'gargoyle', 'turtle', 'poster', 'floatingSuit'] },
-      swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['alien', 'locust', 'blob', 'hive', 'smiley', 'commuter'] },
+      ghosts: { name: '幽灵舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['stander', 'zipper', 'upsideDown', 'mouthless'] },
+      tanks: { name: '重甲舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['upsideDown', 'geodeling', 'lavaGiant', 'poster', 'floatingSuit'] },
+      swarm: { name: '虫群舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 3, perSec: 1.5, only: ['poster', 'smiley', 'commuter'] },
       mixed: { name: '混编舱', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 1 },
-      warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['mecha', 'watcher', 'reactor'] },
+      warden: { name: '看守', at: { kind: 'mark' }, enter: 'drop', look: 'glow', weight: 1, only: ['watcher', 'reactor'] },
     },
   },
   exit: {

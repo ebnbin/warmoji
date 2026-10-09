@@ -5,7 +5,7 @@ export const EDITOR_DRAFT = {
   emoji: '1f6e0',
   name: '自定义关卡',
   desc: '在关卡编辑器里调出来的一局',
-  team: { slots: ['guard', 'mage', 'medic'] },
+  team: { slots: ['royalGuard', 'rocker', 'nurse'] },
   steps: [
     {
       kind: 'fight',
@@ -15,8 +15,8 @@ export const EDITOR_DRAFT = {
         phases: [
           {
             mix: [
-              { kind: 'zombie', weight: 3 },
-              { kind: 'locust', weight: 1 },
+              { kind: 'wolf', weight: 3 },
+              { kind: 'goat', weight: 1 },
             ],
             spawns: [{ kind: 'stream' }],
             ends: [{ kind: 'time', ms: 60_000 }],

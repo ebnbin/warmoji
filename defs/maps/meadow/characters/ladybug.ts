@@ -1,26 +1,25 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
+import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🐞 瓢虫：吐黏糊糊的蚜弹，同一个敌人挨满三发就被粘在原地；技能撒下七颗星把一片敌人钉住
+// 🐞 瓢虫：星粉蚜弹把敌人变成一只什么都做不了的绵羊；技能撒下七颗星，把一片敌人变羊钉住
+const sheep = (durationMs: number) => ({ kind: 'morph', durationMs, morphEmoji: '1f411' }) as const satisfies Effect
+
 const ladybugSpit = {
   trigger: 'auto',
-  cooldownMs: 900,
+  cooldownMs: 1000,
   aim: 'nearest',
   range: 6.5,
-  damage: 11,
+  damage: 10,
   fireSfx: 'plip',
-  shape: { kind: 'bolt', projectile: shot('1f7e2', 10, 0.32), lifeMs: 1500 },
-  onHit: [{ kind: 'stack', max: 3, durationMs: 3000, then: [{ kind: 'root', durationMs: 1000 }] }],
+  shape: { kind: 'bolt', projectile: shot('2728', 10, 0.4), lifeMs: 1500 },
+  onHit: [sheep(2500)],
 } satisfies AbilityDef
 
-const ladybugSpit2 = { ...ladybugSpit, onHit: [{ kind: 'slow', factor: 0.75, durationMs: 1000 }, ...ladybugSpit.onHit] } satisfies AbilityDef
+const ladybugSpit2 = { ...ladybugSpit, shape: { ...ladybugSpit.shape, pierce: 1 }, onHit: [sheep(4000)] } satisfies AbilityDef
 
-const ladybugSpit3 = {
-  ...ladybugSpit,
-  onHit: [{ kind: 'slow', factor: 0.75, durationMs: 1000 }, { kind: 'stack', max: 3, durationMs: 3000, then: [{ kind: 'root', durationMs: 1500 }, { kind: 'damage', amount: 0, ratio: 1 }] }],
-} satisfies AbilityDef
+const ladybugSpit3 = { ...ladybugSpit2, onHit: [{ ...sheep(4000), vulnMul: 1.4 }] } satisfies AbilityDef
 
 const ladybugStars = {
   trigger: 'manual',
@@ -29,7 +28,7 @@ const ladybugStars = {
   damage: 20,
   fireSfx: 'chirp',
   shape: { kind: 'drop', targets: 7, look: { emoji: '2b50', size: 0.8 }, fromAbove: 3, dropMs: 500, staggerMs: 90 },
-  onHit: [{ kind: 'root', durationMs: 1500 }],
+  onHit: [sheep(3000), { kind: 'root', durationMs: 1500 }],
 } satisfies AbilityDef
 
 export const abilities = { ladybugSpit, ladybugSpit2, ladybugSpit3, ladybugStars } satisfies Record<string, AbilityDef>
@@ -40,21 +39,21 @@ export default {
   emoji: '1f41e',
   name: '瓢虫',
   element: 'wood',
-  desc: '吐黏糊糊的蚜弹，同一个敌人挨满三发就被粘在原地；技能撒下七颗星，把一片敌人钉住',
+  desc: '背上驮着七颗星的瓢虫：星粉蚜弹把打中的敌人变成一只什么都做不了的绵羊 2.5 秒，变回来后 5 秒内不会再变，头目不会变；技能往最近的 7 个敌人头上各落一颗星，砸中的变羊 3 秒、定身 1.5 秒',
   role: 'controller',
   tags: ['control', 'ranged'],
   body: { drag: 5, mass: 0.7 },
   stats: { moveSpeed: 5.8, maxStamina: 90, staminaRegen: 75, exertion: 0.9 },
-  skill: { name: '七星阵', icon: '2b50', desc: '在最近的七个敌人头上各落一颗星，砸中的定身 1.5 秒', cdMs: 13_000, ability: 'ladybugStars' },
+  skill: { name: '七星阵', icon: '2b50', desc: '在最近的 7 个敌人头上各落一颗星：砸中的挨 20 点，变成绵羊 3 秒、定身 1.5 秒；头目不会变羊，只被定身', cdMs: 14_000, ability: 'ladybugStars' },
   weapons: [],
   innate: [
     {
-      name: '蚜弹',
+      name: '星粉蚜弹',
       icon: '1f41e',
       base: 'ladybugSpit',
       upgrades: [
-        { ability: 'ladybugSpit2', card: { icon: '1f4a7', name: '黏液', desc: '打中的敌人减速 25% 1 秒' } },
-        { ability: 'ladybugSpit3', card: { icon: '2b50', name: '七星', desc: '挨满三发时定身改成 1.5 秒，再补一下等于这一发的伤害' } },
+        { ability: 'ladybugSpit2', card: { icon: '1f411', name: '长效', desc: '变羊改成 4 秒，蚜弹还能穿过 1 个敌人打中后面的' } },
+        { ability: 'ladybugSpit3', card: { icon: '1f494', name: '待宰羔羊', desc: '变成绵羊的敌人受到的伤害 ×1.4' } },
       ],
     },
   ],

@@ -4,7 +4,7 @@ import type { MapDef } from '../../../src/types/maps'
 export default {
   emoji: '1f338',
   name: '樱花',
-  desc: '寺院外溪边的一片樱林空地，花开得正好，地上铺满了落花。一面是寺院的瓦顶土墙，另外三面是樱树林，林缘的樱树一棵挨一棵，走不进去。一条溪斜斜地穿过空地：上游从林子里一排大石头的缝里涌进来，下游漫过一道低石槛、穿过竹栅流进林子。溪水深：站不住的地方就顺水漂，只能划水往两边挣，逆流基本划不动；漂到下游就被水压在竹栅前，贴着竹栅挪到岸边才上得来——敌我都一样，落进水里的金币也堆在栅前。溪上有一座木桥，走桥上不沾水，桥下照样漂。巨鳄个子大，蹚得过去',
+  desc: '寺院外溪边的一片樱林空地，花开得正好，地上铺满了落花。一面是寺院的瓦顶土墙，另外三面是樱树林，林缘的樱树一棵挨一棵，走不进去。一条溪斜斜地穿过空地：上游从林子里一排大石头的缝里涌进来，下游漫过一道低石槛、穿过竹栅流进林子。溪水深：站不住的地方就顺水漂，只能划水往两边挣，逆流基本划不动；漂到下游就被水压在竹栅前，贴着竹栅挪到岸边才上得来——敌我都一样，落进水里的金币也堆在栅前。溪上有一座木桥，走桥上不沾水，桥下照样漂。赤鬼个子大，蹚得过去',
   kind: 'sakura',
   stamina: { exertion: 0.5, regen: 1 },
   palette: {
@@ -26,11 +26,11 @@ export default {
     look: 'petals',
     boss: 'rocks',
     kinds: {
-      grove: { name: '樱林', at: { kind: 'nooks', spacingU: 7, away: { mark: 'ports', minU: 2.5 } }, enter: 'walk', look: 'petals', weight: 3, perSec: 1.5, only: ['zombie', 'ghost', 'blob', 'slime', 'snake', 'wisp', 'templeMonkey', 'templeGoose', 'umbrella', 'tengu'] },
-      thicket: { name: '林缘', at: { kind: 'rim', segU: 3, away: { mark: 'ports', minU: 2.5 } }, enter: 'climb', look: 'petals', weight: 1.5, perSec: 1, only: ['zombie', 'blob', 'slime', 'snake', 'templeMonkey', 'umbrella', 'tengu'] },
-      wall: { name: '寺墙', at: { kind: 'mark' }, enter: 'climb', weight: 2, perSec: 1, only: ['ghost', 'zombie', 'wisp', 'templeGoose', 'lantern', 'cursedDoll'] },
-      bank: { name: '溪岸', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 3, perSec: 1.5, only: ['snake', 'puffer', 'turtle', 'siren', 'crab', 'crayfish'] },
-      rocks: { name: '石组', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 1, only: ['croc', 'oni', 'riverDragon'] },
+      grove: { name: '樱林', at: { kind: 'nooks', spacingU: 7, away: { mark: 'ports', minU: 2.5 } }, enter: 'walk', look: 'petals', weight: 3, perSec: 1.5, only: ['wisp', 'templeMonkey', 'templeGoose', 'umbrella', 'cursedDoll', 'tengu'] },
+      thicket: { name: '林缘', at: { kind: 'rim', segU: 3, away: { mark: 'ports', minU: 2.5 } }, enter: 'climb', look: 'petals', weight: 1.5, perSec: 1, only: ['templeGoose', 'templeMonkey', 'umbrella', 'cursedDoll', 'tengu'] },
+      wall: { name: '寺墙', at: { kind: 'mark' }, enter: 'climb', weight: 2, perSec: 1, only: ['wisp', 'templeGoose', 'lantern', 'cursedDoll'] },
+      bank: { name: '溪岸', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 3, perSec: 1.5, only: ['templeMonkey', 'lantern', 'crayfish'] },
+      rocks: { name: '石组', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 1, only: ['oni', 'riverDragon'] },
       lawn: { name: '落花', at: { kind: 'ground' }, enter: 'rise', look: 'petals', weight: 1 },
     },
   },

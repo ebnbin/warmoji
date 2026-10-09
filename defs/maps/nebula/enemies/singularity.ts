@@ -57,6 +57,29 @@ const spaghettify = {
   ],
 } satisfies AbilityDef
 
+const eventHorizon = {
+  trigger: 'auto',
+  class: 'skill',
+  cooldownMs: 14000,
+  firstDelayMs: 2000,
+  aim: 'self',
+  fireSfx: 'zap',
+  shape: { kind: 'world' },
+  onHit: [
+    {
+      kind: 'barrier',
+      shape: 'ring',
+      length: 4.5,
+      durationMs: 6000,
+      bodies: 'none',
+      shots: false,
+      follow: true,
+      onCross: [{ kind: 'stun', durationMs: 1000 }, { kind: 'damage', amount: 24 }],
+      color: 0x7e57c2,
+    },
+  ],
+} satisfies AbilityDef
+
 const repulse = {
   trigger: 'auto',
   class: 'skill',
@@ -90,7 +113,7 @@ const SINGULARITY = {
   emoji: '1f573',
   name: '奇点',
   element: 'dark',
-  desc: '黑洞凝成的奇点：张开 6 格的引力井把人往身边吸，蓄力 1.2 秒后重创 4 格内的人，暗物质弹朝八方射，还会用引力拴住最近的人，3 秒内没挣到 7 格外就被拉成面条，眩晕 1 秒并挨一大下；血掉到一半翻成白洞，元素转为光，改用斥力爆发把人炸开、朝八方射光弹，蓄力重创照旧，出手也更快',
+  desc: '黑洞凝成的奇点：隔一阵在身周撑开一圈 4.5 格的事件视界跟着自己 6 秒，越过那圈线的人（进出都算）当场定住 1 秒并挨一下；张开 6 格的引力井把人往身边吸，蓄力 1.2 秒后重创 4 格内的人，暗物质弹朝八方射，还会用引力拴住最近的人，3 秒内没挣到 7 格外就被拉成面条，眩晕 1 秒并挨一大下；血掉到一半翻成白洞，元素转为光，改用斥力爆发把人炸开、朝八方射光弹，蓄力重创照旧，出手也更快',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -102,7 +125,7 @@ const SINGULARITY = {
   coins: 60,
   traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
-  abilities: [well, horizon, darkShot, spaghettify],
+  abilities: [eventHorizon, well, horizon, darkShot, spaghettify],
   phases: [{ below: 0.5, name: '白洞', element: 'light', abilities: [repulse, lightShot, horizon], stats: { mul: { cooldown: 0.8 } } }],
 } satisfies EnemyDef
 

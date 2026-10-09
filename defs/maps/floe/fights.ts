@@ -5,9 +5,9 @@ export const FIGHTS = {
   iceShove: {
     emoji: '1f9ca',
     name: '推下海',
-    desc: '我方伤不了敌人，击退却格外有劲：把敌人推下冰缘，冰点上下的海水会把它们冻死；当心狼骑也会把队员撞下海。让 20 只敌人被寒水冻死',
+    desc: '我方伤不了敌人，击退却格外有劲：把敌人推下冰缘，冰点上下的海水会把它们冻死；当心破墙犀也会把队员撞下海。让 20 只敌人被寒水冻死',
     note: '只能借地形杀敌：输出换成了击退，冰面打滑让一下推得更远，也让自己更容易掉下去',
-    team: { slots: ['unicorn', 'mage', 'kangaroo'], level: 2 },
+    team: { slots: ['otter', 'rocker', 'owl'], level: 2 },
     stars: [{ kind: 'time', ms: 90_000 }, { kind: 'hazard', by: 'coldWater', damage: 0 }],
     fight: {
       name: '推下海',
@@ -18,14 +18,14 @@ export const FIGHTS = {
         {
           intro: { title: '推下海', sub: '让 20 只敌人被寒水冻死' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'crab', weight: 1 },
-            { kind: 'snake', weight: 1 },
-            { kind: 'blob', weight: 1 },
+            { kind: 'frostSwan', weight: 3 },
+            { kind: 'iceBlock', weight: 1 },
+            { kind: 'badSnowman', weight: 1 },
+            { kind: 'curlingStone', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1200, cap: 30 },
-            { kind: 'batch', atMs: 30_000, squad: { count: 3, enemy: 'knight', at: { kind: 'gate', gate: 'drift' } }, banner: { title: '狼骑', sub: '它们会把人撞下海' } },
+            { kind: 'batch', atMs: 30_000, squad: { count: 3, enemy: 'wallRhino', at: { kind: 'gate', gate: 'drift' } }, banner: { title: '破墙犀', sub: '它们会把人撞下海' } },
           ],
           ends: [
             { kind: 'kills', count: 20, by: 'coldWater' },
@@ -50,10 +50,10 @@ export const FIGHTS = {
         {
           intro: { title: '风暴', sub: '阵风一来就躲到雪地上' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'blob', weight: 2 },
-            { kind: 'crab', weight: 1 },
-            { kind: 'snake', weight: 1 },
+            { kind: 'frostSwan', weight: 3 },
+            { kind: 'curlingStone', weight: 2 },
+            { kind: 'iceBlock', weight: 1 },
+            { kind: 'badSnowman', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 800 }],
           cues: [{ cue: 'gust', atMs: 3000, every: 10_000 }],
@@ -77,10 +77,10 @@ export const FIGHTS = {
         {
           intro: { title: '冰心打捞', sub: '死在水里的金币会沉' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'crab', weight: 1 },
-            { kind: 'snake', weight: 1 },
-            { kind: 'blob', weight: 1 },
+            { kind: 'frostSwan', weight: 3 },
+            { kind: 'iceBlock', weight: 1 },
+            { kind: 'badSnowman', weight: 1 },
+            { kind: 'curlingStone', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 900, loot: { coins: 2 }, at: { kind: 'gate', gate: 'edge' } }],
           ends: [
@@ -107,10 +107,10 @@ export const FIGHTS = {
         {
           intro: { title: '冰上铁人', sub: '撑过 60 秒，谁都不许倒下' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'boar', weight: 1 },
-            { kind: 'snake', weight: 1 },
-            { kind: 'blob', weight: 1 },
+            { kind: 'frostSwan', weight: 3 },
+            { kind: 'tusker', weight: 1 },
+            { kind: 'badSnowman', weight: 1 },
+            { kind: 'curlingStone', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1300 },

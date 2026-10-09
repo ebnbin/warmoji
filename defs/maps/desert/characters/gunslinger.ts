@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 import { patch, shot } from '../../../kit.ts'
 
-// 🤠 牛仔：一口气打空左轮，每匣最后一发点着敌人；技能扇着击锤朝一个方向连开六枪
+// 🤠 牛仔：一口气打空左轮，每匣最后一发点着敌人；技能甩出套索，把一条线上的敌人拴在身后拖着走
 const bullet = shot('1f538', 14, 0.32)
 
 const ignite = { kind: 'poison', damage: 0, ratio: 0.12, tickMs: 500, durationMs: 3000 } as const
@@ -15,27 +15,30 @@ const gunslingerRevolver = {
   range: 7,
   damage: 14,
   fireSfx: 'shoot',
+  held: { look: { emoji: '1f52b', size: 0.75, rotationOffsetDeg: 180 }, restOffset: 0.45, mountSide: 1, mountGap: 0.32 },
   shape: { kind: 'bolt', projectile: bullet, lifeMs: 600 },
   ammo: { count: 6, reloadMs: 1500, last: [ignite] },
 } satisfies AbilityDef
 
-const gunslingerRevolver2 = { ...gunslingerRevolver, ammo: { count: 8, reloadMs: 1200, last: [ignite] } } satisfies AbilityDef
-
-const gunslingerRevolver3 = {
-  ...gunslingerRevolver2,
-  ammo: { ...gunslingerRevolver2.ammo, last: [ignite, { kind: 'ground', def: patch(1.2, 3000, 0xff7043, undefined, 4, 500) }] },
+const gunslingerRevolver2 = {
+  ...gunslingerRevolver,
+  ammo: { ...gunslingerRevolver.ammo, last: [ignite, { kind: 'ground', def: patch(1.2, 3000, 0xff7043, undefined, 4, 500) }] },
 } satisfies AbilityDef
 
-const gunslingerFan = {
+const gunslingerRevolver3 = { ...gunslingerRevolver2, repeat: { everyN: 3, count: 5, spreadDeg: 32, ratio: 0.6 } } satisfies AbilityDef
+
+const gunslingerLasso = {
   trigger: 'manual',
-  aim: 'stick',
-  damage: 18,
-  fireSfx: 'shoot',
-  shape: { kind: 'bolt', projectile: bullet, lifeMs: 600 },
-  repeat: { count: 6, spreadDeg: 60 },
+  aim: 'nearest',
+  range: 6.5,
+  damage: 20,
+  fireSfx: 'whoosh',
+  color: 0xa1887f,
+  shape: { kind: 'segment', reach: 6.5, radius: 0.45, ms: 220, beam: true },
+  onHit: [{ kind: 'drag', ms: 2500 }],
 } satisfies AbilityDef
 
-export const abilities = { gunslingerRevolver, gunslingerRevolver2, gunslingerRevolver3, gunslingerFan } satisfies Record<string, AbilityDef>
+export const abilities = { gunslingerRevolver, gunslingerRevolver2, gunslingerRevolver3, gunslingerLasso } satisfies Record<string, AbilityDef>
 
 export const levels = [{ mul: { damage: 1.2 } }, { add: { crit: 0.08 }, mul: { damage: 1.45 } }] as const satisfies readonly StatMods[]
 
@@ -43,12 +46,12 @@ export default {
   emoji: '1f920',
   name: '牛仔',
   element: 'fire',
-  desc: '腰里别着左轮的牛仔：一匣 6 发一口气打完，最后一发点着敌人，3 秒里每半秒烧掉这一发一成二的血；打空了得停 1.5 秒换弹；技能扇着击锤朝一个方向连开六枪',
+  desc: '腰里别着左轮的牛仔：一匣 6 发一口气打完，最后一发点着敌人，3 秒里每半秒烧掉这一发一成二的血；打空了得停 1.5 秒换弹；技能甩出套索，把一条线上的敌人拴在身后拖着走',
   role: 'ranged',
-  tags: ['damage', 'ranged'],
+  tags: ['damage', 'control', 'ranged'],
   body: { drag: 4.5, mass: 1 },
   stats: { moveSpeed: 5.8, maxStamina: 100, staminaRegen: 70, exertion: 1 },
-  skill: { name: '扇射', icon: '1faad', desc: '朝摇杆方向一口气打出散开 60 度的 6 发子弹', cdMs: 9_000, ability: 'gunslingerFan', aim: true },
+  skill: { name: '套索', icon: '1faa2', desc: '朝最近的敌人甩出 6.5 格长的套索，套中的敌人挨 20 点，被拴在身后拖行 2.5 秒，期间动弹不得', cdMs: 12_000, ability: 'gunslingerLasso' },
   weapons: [],
   innate: [
     {
@@ -56,8 +59,8 @@ export default {
       icon: '1f52b',
       base: 'gunslingerRevolver',
       upgrades: [
-        { ability: 'gunslingerRevolver2', card: { icon: '23f1', name: '快拔', desc: '一匣装 8 发，换弹只要 1.2 秒' } },
-        { ability: 'gunslingerRevolver3', card: { icon: '1f9e8', name: '燃烧弹', desc: '每匣最后一发打中的地方再烧起 1.2 格的火 3 秒，每半秒烫一下' } },
+        { ability: 'gunslingerRevolver2', card: { icon: '1f9e8', name: '燃烧弹', desc: '每匣最后一发打中的地方再烧起 1.2 格的火 3 秒，每半秒烫一下' } },
+        { ability: 'gunslingerRevolver3', card: { icon: '1f32a', name: '左轮风暴', desc: '每第 3 发改成散开 32 度的 5 发，旁边 4 发六成伤害' } },
       ],
     },
   ],

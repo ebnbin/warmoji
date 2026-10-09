@@ -4,8 +4,8 @@ import type { StatMods } from '../../../../src/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧑‍⚕️ 医护：给伤得最重的队友打一针，再朝敌人甩一支飞针，两样轮着来；技能给全队急救，倒下的当场站起来
-const heal = { kind: 'heal', amount: 13 } as const
-const vaccine = [heal, { kind: 'cleanse' }, { kind: 'shield', amount: 0, ratio: 0.05, ms: 3000 }] as const
+const heal = { kind: 'heal', amount: 13, scope: 'lowest' } as const
+const prescription = { kind: 'heal', amount: 13, scope: 'all', ratio: 0.6 } as const
 
 const needle = {
   trigger: 'manual',
@@ -17,25 +17,23 @@ const needle = {
   shape: { kind: 'bolt', projectile: shot('1f489', 11, 0.48, 135), lifeMs: 1400 },
 } satisfies AbilityDef
 
-const sleepNeedle = { ...needle, onHit: [{ kind: 'sleep', durationMs: 1500, wakeMul: 1.3 }] } satisfies AbilityDef
+const jab = (onHit: readonly Effect[]) =>
+  ({
+    trigger: 'manual',
+    class: 'attack',
+    aim: 'self',
+    fireSfx: 'chirp',
+    shape: { kind: 'disc', radius: 5, at: 'self', of: 'hurt' },
+    onHit,
+  }) satisfies AbilityDef
 
-// 轮流的两式都得总放得出去、没有对象就空过，否则会卡在其中一式：打针挑人，飞针套一层 cast
+// 轮流的两式都得总放得出去、没有对象就空过，否则会卡在其中一式：打针与飞针各套一层 cast
 const toss = (ability: Extract<AbilityDef, { readonly trigger: 'manual' }>) =>
   ({ trigger: 'auto', cooldownMs: 1150, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability }] }) satisfies AbilityDef
 
-const jab = (then: readonly Effect[]) =>
-  ({
-    trigger: 'auto',
-    cooldownMs: 1150,
-    aim: 'self',
-    fireSfx: 'chirp',
-    shape: { kind: 'world' },
-    onHit: [{ kind: 'to', who: { side: 'allies', radius: 5, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 }, then }],
-  }) satisfies AbilityDef
-
-const nurseKit = { ...jab([heal]), cycle: [toss(needle)] } satisfies AbilityDef
-const nurseKit2 = { ...jab(vaccine), cycle: [toss(needle)] } satisfies AbilityDef
-const nurseKit3 = { ...jab(vaccine), cycle: [toss(sleepNeedle)] } satisfies AbilityDef
+const nurseKit = { ...toss(jab([heal])), cycle: [toss(needle)] } satisfies AbilityDef
+const nurseKit2 = { ...toss(jab([prescription])), cycle: [toss(needle)] } satisfies AbilityDef
+const nurseKit3 = { ...toss(jab([{ kind: 'reviveCut', ms: 2000 }, prescription])), cycle: [toss(needle)] } satisfies AbilityDef
 
 const nurseFirstAid = {
   trigger: 'manual',
@@ -55,7 +53,7 @@ export default {
   emoji: '1f9d1_200d_2695_fe0f',
   name: '医护',
   element: 'light',
-  desc: '打针和飞针轮着来：一针扎给 5 格内伤得最重的队友，一针甩向最近的敌人，没人受伤或没有敌人时那一下就空过；技能给全队急救，倒下的当场站起来',
+  desc: '打针和飞针轮着来：一针扎给 5 格内伤得最重的队友，回 13 点血，一针甩向最近的敌人，没人受伤或没有敌人时那一下就空过；技能给全队急救，倒下的当场站起来',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.7 },
@@ -68,8 +66,8 @@ export default {
       icon: '1f489',
       base: 'nurseKit',
       upgrades: [
-        { ability: 'nurseKit2', card: { icon: '1fa79', name: '疫苗', desc: '打针时顺带解掉控制与减速，再挂上生命 5% 的护盾 3 秒' } },
-        { ability: 'nurseKit3', card: { icon: '1f4a4', name: '麻醉针', desc: '飞针打中的敌人睡 1.5 秒，挨打才醒，醒的那一下伤害 ×1.3' } },
+        { ability: 'nurseKit2', card: { icon: '1f97c', name: '群体处方', desc: '打针改成给 5 格内每个受伤的队友都扎一针，各回 8 点血（一针的 60%）' } },
+        { ability: 'nurseKit3', card: { icon: '26a1', name: '电击起搏', desc: '每打一针，倒下的队友里还要等得最久的那个少等 2 秒，不论远近' } },
       ],
     },
   ],

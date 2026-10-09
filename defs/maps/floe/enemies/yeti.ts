@@ -31,18 +31,19 @@ const slam = {
   reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'ground', def: { ...patch(3, 5000, 0xb3e5fc), traction: 0.25 } }] }],
 } satisfies AbilityDef
 
-const roar = {
+// 冻进冰里的人打不了也挨不了打
+const encase = {
   trigger: 'auto',
   class: 'skill',
   cooldownMs: 12000,
-  firstDelayMs: 6000,
+  firstDelayMs: 5000,
   aim: 'nearest',
-  range: 6,
-  fireSfx: 'rumble',
-  color: 0x90a4ae,
-  windup: { ms: 500, lockAt: 'start', telegraph: 'blink' },
-  shape: { kind: 'disc', radius: 6, at: 'self' },
-  onHit: [{ kind: 'fear', durationMs: 1200 }],
+  range: 9,
+  fireSfx: 'zap',
+  color: 0xb3e5fc,
+  windup: { ms: 700, lockAt: 'end', telegraph: 'blink' },
+  shape: { kind: 'disc', radius: 2.6, at: 'target' },
+  onHit: [{ kind: 'stasis', durationMs: 2000 }],
 } satisfies AbilityDef
 
 const toss = {
@@ -66,7 +67,8 @@ const blizzard = {
   aim: 'self',
   damage: 6,
   fireSfx: 'gust',
-  when: { kind: 'foesNear', who: 'self', radius: 5, atLeast: 1 },
+  // 冰茧形态换了招式，阶段就不能再换招式，暴雪改看血线
+  when: { kind: 'all', of: [{ kind: 'hpBelow', who: 'self', ratio: 0.6 }, { kind: 'foesNear', who: 'self', radius: 5, atLeast: 1 }] },
   shape: { kind: 'zone', radius: 5, durationMs: 550, tickMs: 450, visual: { ...zoneLook(0xe3f2fd), enterMs: 0 } },
   repeat: { count: 8, delayMs: 500 },
   onHit: [{ kind: 'slow', factor: 0.6, durationMs: 600 }],
@@ -78,7 +80,7 @@ const YETI = {
   emoji: '1fac8',
   name: '大脚雪怪',
   element: 'ice',
-  desc: '浮冰上横行的大脚雪怪，不怕冰水：一口气扔出三个大雪球，砸中人就炸开一片；抓起贴身的人往身后摔；跺碎冰面冻住身边一圈人，留下一片光冰；一声咆哮吓跑身边的人；血少于六成卷起跟着自己走的暴雪，少于四分之一霸体 3 秒、越跑越快',
+  desc: '浮冰上横行的大脚雪怪，不怕冰水：一口气扔出三个大雪球，砸中人就炸开一片；抓起贴身的人往身后摔；跺碎冰面冻住身边一圈人，留下一片光冰；把 9 格内最近那人身边 2.6 格的人冻进冰里 2 秒，冻住的打不了也挨不了打；血少于六成卷起跟着自己走的暴雪，少于四分之一霸体 3 秒、越跑越快；第一次倒下时缩成冰茧，回两成生命，6 秒内打不碎就满血复生',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -90,9 +92,11 @@ const YETI = {
   coins: 60,
   traits: ['anchored', 'wary', 'coldproof'],
   drive: { kind: 'chase' },
-  abilities: [snowballs, slam, roar, toss],
+  abilities: [snowballs, slam, encase, toss, blizzard],
+  reactions: [{ on: 'lethal', to: 'self', effects: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'form', to: 0, ms: 6000, onEnd: [{ kind: 'healRatio', ratio: 1 }] }] }],
+  forms: [{ emoji: '1f9ca', name: '冰茧', span: [0, 3], stats: { mul: { scale: 0.7, moveSpeed: 0 } }, drive: { kind: 'stay' }, abilities: [], damage: 0 }],
   phases: [
-    { below: 0.6, name: '暴雪', abilities: [snowballs, slam, roar, toss, blizzard] },
+    { below: 0.6, name: '暴雪' },
     { below: 0.25, name: '冰河', stats: { mul: { moveSpeed: 1.3 } }, effects: [{ kind: 'unstoppable', durationMs: 3000 }] },
   ],
 } satisfies EnemyDef

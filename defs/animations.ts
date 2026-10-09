@@ -468,42 +468,6 @@ export const ANIMATIONS: AnimResource = {
         },
       },
     },
-    '1f40a': {
-      emoji: '1f40a',
-      name: '巨鳄',
-      desc: '庞躯浮沉微微起伏，独眼骤缩冷冷一瞪，背脊鳞甲一阵耸动——潜伏河底的杀机。',
-      anatomy: '躯干 path 呼吸缩放（浮水起伏）；眼睛 path 绕自身收放（冷瞪）；背脊鳞甲 g 缩放耸动。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [1],
-              cx: 18,
-              cy: 20,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.02 }, { t: 1, scale: 1 }],
-            },
-            {
-              indices: [2],
-              cx: 11.5,
-              cy: 18,
-              keyframes: [
-                { t: 0, scale: 1 },
-                { t: 0.35, scale: 0.6 },
-                { t: 0.55, scale: 1.15 },
-                { t: 0.75, scale: 1 },
-                { t: 1, scale: 1 },
-              ],
-            },
-            {
-              indices: [3],
-              cx: 25,
-              cy: 24,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.05 }, { t: 1, scale: 1 }],
-            },
-          ],
-        },
-      },
-    },
     '1f939': {
       emoji: '1f939',
       name: '杂耍演员',
@@ -1089,42 +1053,6 @@ export const ANIMATIONS: AnimResource = {
                 ],
               },
             },
-          ],
-        },
-      },
-    },
-    '1f607': {
-      emoji: '1f607',
-      name: '天使',
-      desc: '光环悬浮飘荡微微倾侧，双翼轻扇，整张笑脸安详浮动。',
-      anatomy: '光环 = FFAC33 椭环；翼 = 顶部 5DADEC/3B94D9 蓝色双翼层；脸 = FFCC4D 大圆。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [2],
-              keyframes: [
-                { t: 0, ty: 0, rotate: 0 },
-                { t: 0.3, ty: -1.2, rotate: 2 },
-                { t: 0.6, ty: 0.3, rotate: -1 },
-                { t: 1, ty: 0, rotate: 0 },
-              ],
-              cx: 18,
-              cy: 10,
-            },
-            {
-              indices: [3, 4],
-              keyframes: [
-                { t: 0, scaleY: 1 },
-                { t: 0.25, scaleY: 0.85 },
-                { t: 0.5, scaleY: 1 },
-                { t: 0.75, scaleY: 0.9 },
-                { t: 1, scaleY: 1 },
-              ],
-              cx: 18,
-              cy: 11,
-            },
-            { indices: [0, 1, 5], keyframes: [{ t: 0, ty: 0 }, { t: 0.5, ty: -0.8 }, { t: 1, ty: 0 }], cx: 18, cy: 18 },
           ],
         },
       },
@@ -2015,31 +1943,6 @@ export const ANIMATIONS: AnimResource = {
                 { t: 0.3, scaleX: 1.05, scaleY: 0.94 },
                 { t: 0.6, scaleX: 0.97, scaleY: 1.02 },
                 { t: 1, scaleX: 1, scaleY: 1 },
-              ],
-            },
-          ],
-        },
-      },
-    },
-    '1f5d1': {
-      emoji: '1f5d1',
-      name: '垃圾桶',
-      desc: '桶身时不时一阵乱晃，像里面有东西在翻腾，晃完又静下来。',
-      anatomy: '桶身 [0] 与桶沿、桶底 [1] 作为一个部件绕底部中点晃动（单部件，图层顺序不变）。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [0, 1],
-              cx: 18,
-              cy: 34,
-              keyframes: [
-                { t: 0, rotate: 0 },
-                { t: 0.1, rotate: 3 },
-                { t: 0.2, rotate: -3 },
-                { t: 0.3, rotate: 2 },
-                { t: 0.4, rotate: 0 },
-                { t: 1, rotate: 0 },
               ],
             },
           ],
