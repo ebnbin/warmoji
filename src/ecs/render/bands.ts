@@ -13,6 +13,9 @@ export const UNDER_Z = -1000
 /** 躺在地上的精灵与地上的布景画在这一层 */
 export const LYING_DEPTH = 1
 
+/** 压暗地面的一层：盖住地面、布景与地上的小东西，压不到地上的圈、影子与立着的身体 */
+export const GROUND_DIM_DEPTH = 1.9
+
 /** 脚下的圈：压在影子上面、立着的身体下面 */
 export const FEET_DEPTH = 2.7
 

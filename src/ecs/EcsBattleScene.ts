@@ -35,7 +35,7 @@ import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, 
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { FEET_DEPTH, LYING_DEPTH } from './render/bands'
+import { FEET_DEPTH, GROUND_DIM_DEPTH, LYING_DEPTH } from './render/bands'
 import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
@@ -137,6 +137,9 @@ function unknownCommand(cmd: never): never {
 
 /** 视野规则的黑幕有多黑 */
 const VISION_FOG_ALPHA = 0.92
+
+/** 地面整体压暗多少 */
+const GROUND_DIM = 0.14
 
 
 /** 瞄准线的长度：位移走多远，或效果把东西放出去多远 */
@@ -597,6 +600,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.paint = paint
     const light = MAPS[run.mapId].light
     const lightAt = this.map.lightAt?.bind(this.map)
+    // 地面整体退后一档，单位、弹体与地上的圈在明度上和它脱开
+    this.lens.screen.cover(this.add.rectangle(0, 0, 1, 1, 0x000000, GROUND_DIM).setDepth(GROUND_DIM_DEPTH))
     // 布景躺在地上，和躺着的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
     const leader = (): number => this.sim?.leader ?? -1

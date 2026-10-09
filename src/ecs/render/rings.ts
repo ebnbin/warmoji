@@ -1,11 +1,40 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
 import { Ring, RING_SET, Tint, Transform } from '../components'
-import { fan, place, ringStrip } from './tri'
+import { fan, place, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
 import { LayerType, TriBatch } from './layer'
+import { SIDE, zoneSide } from './side'
 import { packTint } from './tint'
+
+type Matrix = Phaser.GameObjects.Components.TransformMatrix
+
+/** 伤得到队伍的场：边是一圈慢慢转的红色虚线，里面铺红色斜纹；底色仍是能力自己的颜色 */
+const HAZARD = { line: 4, lineAlpha: 0.95, dash: 22, dashFill: 0.62, spinPerMs: 0.0006, stripeGap: 16, stripeWidth: 5, stripeAlpha: 0.22 }
+/** 队伍自己放的场：底色淡一些，边是一圈细细的淡蓝 */
+const OWN = { fillMul: 0.6, line: 2, lineAlpha: 0.5 }
+
+/** 圆里铺一层 45° 的斜纹 */
+function stripes(o: Scratch, m: Matrix, x: number, y: number, r: number, color: number): void {
+  const k = Math.SQRT1_2
+  for (let c = -r + HAZARD.stripeGap / 2; c < r; c += HAZARD.stripeGap) {
+    const half = Math.sqrt(r * r - c * c)
+    const cx = x + c * k
+    const cy = y + c * k
+    segment(o, m, cx - half * k, cy + half * k, cx + half * k, cy - half * k, HAZARD.stripeWidth, color)
+  }
+}
+
+/** 一圈虚线，每段占一格的 dashFill，整圈按 spin 转着 */
+function dashes(o: Scratch, m: Matrix, x: number, y: number, r: number, spin: number, color: number): void {
+  const n = Math.max(8, Math.round((Math.PI * 2 * r) / HAZARD.dash))
+  const step = (Math.PI * 2) / n
+  for (let i = 0; i < n; i++) {
+    const a = spin + i * step
+    ringStrip(o, m, x, y, r, HAZARD.line, color, a, a + step * HAZARD.dashFill)
+  }
+}
 
 interface Breath {
   ms: number
@@ -68,8 +97,18 @@ export class RingLayer {
       const x = Transform.x[eid]!
       const y = Transform.y[eid]! + Ring.dy[eid]!
       const color = Ring.color[eid]!
-      fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * a))
-      ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, packTint(color, Ring.lineAlpha[eid]! * a))
+      const side = zoneSide(this.world, eid)
+      if (side === 'foe') {
+        fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * a))
+        stripes(o, m, x, y, r, packTint(SIDE.foe, HAZARD.stripeAlpha * a))
+        dashes(o, m, x, y, r, this.now * HAZARD.spinPerMs, packTint(SIDE.foe, HAZARD.lineAlpha * a))
+      } else if (side === 'team') {
+        fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * OWN.fillMul * a))
+        ringStrip(o, m, x, y, r, OWN.line, packTint(SIDE.team, OWN.lineAlpha * a))
+      } else {
+        fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * a))
+        ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, packTint(color, Ring.lineAlpha[eid]! * a))
+      }
     }
     if (zMin === -Infinity) place(o, m, this.ground.above)
   }
