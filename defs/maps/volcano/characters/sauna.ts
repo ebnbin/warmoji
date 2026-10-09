@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { zoneLook } from '../../../kit.ts'
 
-// 🧖 温泉客：身周冒蒸汽，熏得敌人出手发慢，熏满三下就睡过去；技能就地泡出一池温泉，泡久了的敌人睡着
+// 🧖 温泉客：身周冒蒸汽，熏得敌人出手发慢，熏满三下就睡过去；技能就地泡出一池温泉，池里的敌人浑身湿透，泡久了睡着
 const saunaSteam = {
   trigger: 'auto',
   cooldownMs: 1100,
@@ -26,6 +26,7 @@ const saunaSteam3 = { ...saunaSteam2, range: 2.8, shape: { ...saunaSteam2.shape,
 const saunaSpring = {
   trigger: 'manual',
   aim: 'self',
+  element: 'water',
   fireSfx: 'bubble',
   shape: {
     kind: 'zone',
@@ -46,8 +47,7 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f9d6',
   name: '温泉客',
-  element: 'water',
-  desc: '裹着浴巾的温泉客：身周冒着蒸汽，熏得贴身的敌人出手发慢，熏满三下就睡过去；技能就地泡出一池温泉，在里面泡久了的敌人睡着',
+  desc: '裹着浴巾的温泉客，靠蒸汽护身：贴身的敌人被熏得出手发慢，熏满三下就睡过去；技能就地泡出一池温泉，池里的敌人浑身湿透、走不快，给队友的冰与雷铺路，泡久了还会睡着，叫醒那一下格外疼',
   role: 'controller',
   tags: ['control', 'area'],
   body: { drag: 5, mass: 0.8 },
@@ -55,7 +55,7 @@ export default {
   skill: {
     name: '温泉',
     icon: '2668',
-    desc: '在脚下泡出 3.5 格的温泉 6 秒：池里的敌人移速 ×0.6，连续泡满 1.2 秒就睡 2.5 秒，叫醒那一下伤害 ×1.5',
+    desc: '在脚下泡出 3.5 格的温泉 6 秒：池里的敌人一直是湿的（一冰就冻、一电一片），移速 ×0.6，连续泡满 1.2 秒就睡 2.5 秒，叫醒那一下伤害 ×1.5',
     cdMs: 14_000,
     ability: 'saunaSpring',
   },
