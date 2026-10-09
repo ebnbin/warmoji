@@ -342,7 +342,7 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
 /** 施法锚点物件：画在宿主身边，能力从它身上出手，由 tickPets 摆放 */
 function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['anchor']>, faction: number): number {
   const p = newEntity(sim.world)
-  attachDrawable(sim.world, p, sim.frames, { id: a.look.emoji, side: holderSide(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.look.size, z: 13 })
+  attachDrawable(sim.world, p, sim.frames, { id: a.look.emoji, side: holderSide(faction), x: Transform.x[host]!, y: Transform.y[host]!, size: a.look.size, z: 13 })
   addComponents(sim.world, p, Pet, Mounted)
   Pet.of[p] = e
   Mounted.host[p] = host

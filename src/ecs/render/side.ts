@@ -1,13 +1,12 @@
 import { hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { FACTION, Faction, Projectile, Tint, TINT_SIDE } from '../components'
+import { FACTION, Faction, Projectile } from '../components'
 import type { EcsWorld } from '../world'
 
-/** 画面上各方的颜色：我方黄、精英琥珀、头目紫、打得到队伍的弹体红，其余描黑 */
+/** 画面上各方的颜色：我方的圈黄、精英与头目的圈红、打得到队伍的弹体描红橙边，其余描黑 */
 export const SIDE = {
   team: 0xffd54f,
-  elite: 0xffab00,
-  boss: 0xb05cff,
+  strong: 0xe53935,
   foe: 0xff3d00,
   ink: 0x14171a,
 } as const
@@ -18,10 +17,8 @@ export interface RimStyle {
   readonly px: number
 }
 
-/** 默认的黑边：画出来的东西都描，布景除外 */
+/** 黑边：画出来的东西除了布景和打得到队伍的弹体，都描它 */
 export const INK_RIM: RimStyle = { color: SIDE.ink, px: 2 }
-const ELITE_RIM: RimStyle = { color: SIDE.elite, px: 2.5 }
-const BOSS_RIM: RimStyle = { color: SIDE.boss, px: 2.5 }
 
 /** 弹体画成什么样：大小与透明度的倍率、至少画多大（像素）、描边、垫在下面的光晕（size 是相对弹体的倍率） */
 export interface ShotLook {
@@ -41,10 +38,4 @@ const TEAM_SHOT: ShotLook = { size: 0.85, min: 0, alpha: 0.55, rim: INK_RIM, glo
 export function shotOf(world: EcsWorld, eid: number): ShotLook | null {
   if (!hasComponent(world, eid, Projectile)) return null
   return Faction.v[eid] === FACTION.team ? TEAM_SHOT : FOE_SHOT
-}
-
-/** 不是弹体的实体的描边：精英和它手上的琥珀边，头目和它手上的紫边，其余黑边 */
-export function rimOf(eid: number): RimStyle {
-  const side = Tint.side[eid]
-  return side === TINT_SIDE.boss ? BOSS_RIM : side === TINT_SIDE.elite ? ELITE_RIM : INK_RIM
 }

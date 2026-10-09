@@ -7,7 +7,7 @@ import type { UnitLight } from '../../types/maps'
 import { LayerType } from './layer'
 import { quadNode, SpriteBatch } from './sprites'
 import type { LightAt, PaintSprite } from './sprites'
-import { rimOf, shotOf } from './side'
+import { INK_RIM, shotOf } from './side'
 import { TINT_FILL } from './tint'
 export { SPRITE_BANDS } from './bands'
 
@@ -74,7 +74,7 @@ export class EcsSpriteBatch extends SpriteBatch {
         node, drawingContext,
         x, y, Transform.rot[eid]!,
         w, h, Sprite.flipX[eid]!, frame, Quad.v[eid]!,
-        Tint.color[eid]!, alpha, Tint.effect[eid]!, shot ? shot.rim : rimOf(eid),
+        Tint.color[eid]!, alpha, Tint.effect[eid]!, shot ? shot.rim : INK_RIM,
       )
     }
     for (; p < paint.length && paint[p]!.z < self.zMax; p++) self.drawPaint(node, drawingContext, paint[p]!)

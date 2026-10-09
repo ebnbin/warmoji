@@ -63,6 +63,9 @@ const FEET_FLAT = 0.38
 const TEAM_RING = { line: 3, fill: 0.16 }
 const LEAD_RING = { line: 4.5, fill: 0.22 }
 const ELITE_RING = { line: 3, fill: 0.12 }
+/** 头目：两圈同心的粗圈，里面那圈缩到 BOSS_INNER */
+const BOSS_RING = { line: 4.5, fill: 0.12 }
+const BOSS_INNER = 0.8
 /** 队长圈外指着朝向的箭头：离圈多远、多长、半宽 */
 const HEAD_GAP = 3
 const HEAD_LEN = 9
@@ -236,15 +239,19 @@ function footRing(sim: Sim, o: Scratch, eid: number, size: number, color: number
 const FOOTED: QueryTerm[] = [Alive, Radius, Transform, Tint]
 const EMPLACED: QueryTerm[] = [Emplacement, Transform, Tint]
 
-/** 脚下的圈：队伍的身体与装置一圈黄，队长的粗一些、圈外一个箭头指着朝向，精英一圈琥珀、头目一圈紫；倒下的不画 */
+/** 脚下的圈：队伍的身体与装置一圈黄，队长的粗一些、圈外一个箭头指着朝向；精英一圈细红，头目两圈同心的粗红；倒下的不画 */
 function feet(sim: Sim, o: Scratch): void {
   for (const eid of query(sim.world, FOOTED)) {
     if (!Alive.v[eid]) continue
     const a = Tint.alpha[eid]!
     const size = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.w[eid]!
-    if (Tint.side[eid] === TINT_SIDE.boss && Boss.v[eid]) footRing(sim, o, eid, size, SIDE.boss, ELITE_RING, a)
-    if (Tint.side[eid] === TINT_SIDE.elite && Elite.v[eid]) footRing(sim, o, eid, size, SIDE.elite, ELITE_RING, a)
-    if (Tint.side[eid] !== TINT_SIDE.team) continue
+    if (Tint.side[eid] !== TINT_SIDE.team) {
+      if (Boss.v[eid]) {
+        const r = footRing(sim, o, eid, size, SIDE.strong, BOSS_RING, a)
+        ellipse(o, WORLD, r.x, r.y, r.rx * BOSS_INNER, r.ry * BOSS_INNER, BOSS_RING.line, 0, packTint(SIDE.strong, 0.95 * a))
+      } else if (Elite.v[eid]) footRing(sim, o, eid, size, SIDE.strong, ELITE_RING, a)
+      continue
+    }
     if (eid !== sim.leader) {
       footRing(sim, o, eid, size, SIDE.team, TEAM_RING, a)
       continue

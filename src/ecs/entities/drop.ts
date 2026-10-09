@@ -23,7 +23,7 @@ export function spawnDrop(sim: Sim, weaponEid: number, spec: DropSpec): number {
   const d = newEntity(sim.world)
   attachDrawable(sim.world, d, sim.frames, {
     id: spec.emoji,
-    side: holderSide(Faction.v[weaponEid]!, Owner.eid[weaponEid]!),
+    side: holderSide(Faction.v[weaponEid]!),
     x: spec.x,
     y: spec.y - spec.fromAbove,
     size: spec.size,

@@ -54,7 +54,7 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   const m = newEntity(sim.world)
   attachDrawable(sim.world, m, sim.frames, {
     id: spec.emoji,
-    side: holderSide(Faction.v[weaponEid]!, Owner.eid[weaponEid]!),
+    side: holderSide(Faction.v[weaponEid]!),
     x: spec.x,
     y: spec.y,
     size: spec.size * spec.bornScale,

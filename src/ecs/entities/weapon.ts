@@ -4,9 +4,7 @@ import { DEG2RAD } from '../../util/units'
 import type { HeldVisual } from '../../types/abilityDefs'
 import { attachDrawable } from './drawable'
 import {
-  Boss,
   Depth,
-  Elite,
   FACTION,
   Flyer,
   FlyerShape,
@@ -25,9 +23,8 @@ import type { Sim } from '../sim'
 import { flyerHits } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
 
-export function holderSide(faction: number, holderEid: number): TintSide {
-  if (faction !== FACTION.enemy) return TINT_SIDE.team
-  return Boss.v[holderEid] ? TINT_SIDE.boss : Elite.v[holderEid] ? TINT_SIDE.elite : TINT_SIDE.none
+export function holderSide(faction: number): TintSide {
+  return faction === FACTION.enemy ? TINT_SIDE.none : TINT_SIDE.team
 }
 
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
@@ -35,7 +32,7 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
   const e = newEntity(world)
   attachDrawable(world, e, sim.frames, {
     id: held.look.emoji,
-    side: holderSide(faction, holderEid),
+    side: holderSide(faction),
     x: Transform.x[holderEid]!,
     y: Transform.y[holderEid]!,
     size: held.look.size,

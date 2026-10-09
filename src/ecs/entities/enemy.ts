@@ -247,7 +247,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   EnemyArm.fireDelayMs[eid] = AI.firstShot.minMs + sim.rng.next() * AI.firstShot.jitterMs
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
   Sprite.frame[eid] = atlas.index(def.emoji)
-  Tint.side[eid] = faction === FACTION.team ? TINT_SIDE.team : boss ? TINT_SIDE.boss : elite ? TINT_SIDE.elite : TINT_SIDE.none
+  Tint.side[eid] = faction === FACTION.team ? TINT_SIDE.team : TINT_SIDE.none
   Tint.alpha[eid] = boss ? 0.2 : 0.3
   startPop(sim, eid, boss ? POP.bossMs : POP.enemyMs)
   Pop.size[eid] = size
