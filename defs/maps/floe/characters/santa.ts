@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { ring, shot } from '../../../kit.ts'
 
 // 🎅 圣诞老人：朝敌人抛礼物，砸中就炸开一片，大礼包还会裂成三个；平安夜从天上砸下一堆礼物

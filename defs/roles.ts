@@ -1,4 +1,4 @@
-import type { RoleDef } from '../src/types/roles'
+import type { RoleDef } from '../legacy/types/roles'
 
 /** 远程一类的本能：和敌人保持三格，被贴近就后撤 */
 const KEEP_AWAY = [{ do: { kind: 'kite', distance: 3 } }] as const

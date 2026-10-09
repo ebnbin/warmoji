@@ -1,4 +1,4 @@
-import type { ExperimentDef, FightDef, FightReward, PhaseDef } from '../src/types/runs'
+import type { ExperimentDef, FightDef, FightReward, PhaseDef } from '../legacy/types/runs'
 
 /** 冒险的全队升级曲线 */
 export const TEAM_LEVEL = { first: 26, ratio: 6, k: 4 } as const

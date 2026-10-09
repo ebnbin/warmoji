@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 👮 警卫：两下警棍接一记重砸，砸中的定在原地，同一个敌人挨满四下警棍就被铐住；技能朝一个方向冲锋，撞晕一路的敌人
 const officerJab = {

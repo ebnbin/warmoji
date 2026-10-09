@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 💂 近卫：长戟一刺穿透一排，刺中的冲不动也闪不走，顶到墙上就围起来关住；技能立起盾墙，把周围的敌人引到自己身上
 const royalGuardStab = {

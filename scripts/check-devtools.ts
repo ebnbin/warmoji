@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 
-// src/devtools 是可抽成独立库的中立层：只许依赖 phaser、react 与目录内模块
-const root = resolve('src/devtools')
+// legacy/devtools 是可抽成独立库的中立层：只许依赖 phaser、react 与目录内模块
+const root = resolve('legacy/devtools')
 const PACKAGES = new Set(['phaser', 'react', 'react-dom/client'])
 const files: string[] = []
 const walk = (dir: string): void => {

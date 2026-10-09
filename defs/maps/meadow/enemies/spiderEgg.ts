@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import SPIDER_WEB from './spiderWeb.ts'
 
 const SPIDER_EGG = {

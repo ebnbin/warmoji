@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, shot } from '../../../kit.ts'
 
 // 😷 口罩人：喷出一团团冷雾让敌人走不快，同一个敌人挨满三团就冻住；技能在敌人那儿拉一圈隔离带把它们关起来

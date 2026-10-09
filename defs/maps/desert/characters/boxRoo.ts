@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { ring } from '../../../kit.ts'
 
 // 🦘 拳击袋鼠：左右勾拳连着打，两轮之后一记上勾拳把人打飞；技能硬吃一阵记下挨的打加倍还回去，再按一次提前炸开并飞踢出去

@@ -1,6 +1,6 @@
-import type { AbilityDef, Effect } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🧑‍⚕️ 医护：给伤得最重的队友打一针，再朝敌人甩一支飞针，两样轮着来；技能给全队急救，倒下的当场站起来

@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🐭 小白鼠：扑上去咬两口，再转着尾巴卷起一道旋风把一排敌人挑上天；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高
 const labMouseBite = {

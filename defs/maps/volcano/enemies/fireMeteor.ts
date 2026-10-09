@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { patch } from '../../../kit.ts'
 
 const FIRE_METEOR = {

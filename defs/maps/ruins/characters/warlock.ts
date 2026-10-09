@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🧙 巫师：以血施法，召鬼火灯要割自己的血，鬼火烧中敌人再补回来；技能以血为祭和身边的敌人结下亡灵契约，死了的替我方站起来
 const drink = { kind: 'to', who: { side: 'self' }, then: [{ kind: 'heal', amount: 4 }] } as const

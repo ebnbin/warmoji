@@ -1,6 +1,6 @@
-import type { AbilityDef, AbilityReaction, Cond } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef, AbilityReaction, Cond } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🤴 王子：佩剑刺开挡路的，出手时护住身边最伤的队友；每第三下横扫一圈，把敌人都招到自己身上
 

@@ -1,7 +1,7 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { ElementId } from '../../../../src/types/elements'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { ElementId } from '../../../../legacy/types/elements'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
 // 🤹 杂耍艺人：火、冰、雷三把飞刀轮着掷，一个人就打得出元素反应；技能让全场敌人跟着蹦迪，同时甩出三圈飞刀

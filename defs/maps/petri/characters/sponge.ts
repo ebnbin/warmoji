@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🧽 海绵：隔一会儿把身边一圈敌人吸一口，每吸一口给自己挂层薄盾，第三口把水挤出来；技能鼓成一团把敌人都招过来硬扛
 const spongeSoak = {

@@ -1,4 +1,4 @@
-import type { BattlefieldTuning } from '../src/types/battlefield'
+import type { BattlefieldTuning } from '../legacy/types/battlefield'
 
 const DESERT_EVENTS = [
   { id: 'desert_gale', emoji: '1f32c', name: '疾风助战', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { cooldown: 0.75 } } } },

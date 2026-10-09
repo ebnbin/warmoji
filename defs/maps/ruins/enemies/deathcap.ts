@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { patch } from '../../../kit.ts'
 
 const SPORES = [{ kind: 'poison', damage: 2, tickMs: 600, durationMs: 2400 }] as const

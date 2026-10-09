@@ -1,4 +1,4 @@
-import type { StaminaTuning } from '../src/types/stamina'
+import type { StaminaTuning } from '../legacy/types/stamina'
 
 export const STAMINA = {
   // 剩下的体力占上限的比例低于 slowFrom 开始减速，见底时速度只剩 floor

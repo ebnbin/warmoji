@@ -1,5 +1,5 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { patch } from '../../../kit.ts'
 import SPORE from './spore.ts'
 

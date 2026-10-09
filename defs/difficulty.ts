@@ -1,4 +1,4 @@
-import type { Difficulty } from '../src/types/enemies'
+import type { Difficulty } from '../legacy/types/enemies'
 
 export const DIFFICULTY = {
   curve: {

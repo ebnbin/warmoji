@@ -1,4 +1,4 @@
-import type { StatDef } from '../src/types/stats'
+import type { StatDef } from '../legacy/types/stats'
 
 export const STATS = {
   maxHp: { name: '生命上限', base: 0, min: 10, unit: 'count', category: 'survival', better: 'higher' },

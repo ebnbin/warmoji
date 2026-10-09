@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch } from '../../../kit.ts'
 
 // 🦎 火蜥蜴：闪到敌人身后舔一口火舌，伤口烧上一阵，专挑残血的下狠手；技能钻进熔岩里潜行，一路燃起火圈

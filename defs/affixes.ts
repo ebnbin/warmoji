@@ -1,4 +1,4 @@
-import type { AffixDef } from '../src/types/affixes'
+import type { AffixDef } from '../legacy/types/affixes'
 
 /** 精英词缀表 */
 export const AFFIXES = {

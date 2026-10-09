@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { shot } from '../../../kit.ts'
 
 const LEECH = [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'healRatio', ratio: 0.02 }] }] as const

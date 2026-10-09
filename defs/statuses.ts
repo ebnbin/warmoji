@@ -1,4 +1,4 @@
-import type { StatusDef } from '../src/types/statuses'
+import type { StatusDef } from '../legacy/types/statuses'
 
 const ALL = ['move', 'act', 'cast', 'dash'] as const
 

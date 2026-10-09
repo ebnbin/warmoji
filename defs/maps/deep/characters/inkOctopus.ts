@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch } from '../../../kit.ts'
 
 // 🐙 章鱼：伸出长长的触手把敌人拽到跟前，拽不动的就把自己拽过去；技能落下一团墨，墨阵里的敌人走不动也打不出手

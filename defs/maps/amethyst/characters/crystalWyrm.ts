@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch } from '../../../kit.ts'
 
 // 🐲 晶龙崽：一口口吐晶息攒热量，热过七成更猛并留下碎晶，热满了得歇；技能化成晶龙，换上晶石吐息与甩尾

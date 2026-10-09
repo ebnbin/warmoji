@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🤖 保安机器人：电警棍敲一下麻一下，随打随补装甲，每第三下放电麻一圈；技能立起电闸拦住敌人，再把身边的敌人都招到自己身上
 const securityBotBaton = {

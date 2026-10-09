@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 import { patch, shot } from '../../../kit.ts'
 
 // 🐢 寺龟：抛出睡莲叶让敌人睡着，落处起一团催眠的池雾；玄武时全队爬上龟背，自己霸体硬扛

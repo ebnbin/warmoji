@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../../../src/types/enemies'
+import type { EnemyDef } from '../../../../legacy/types/enemies'
 
 const MATRYOSHKA_MINI = {
   kind: 'matryoshkaMini',

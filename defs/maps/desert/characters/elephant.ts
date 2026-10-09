@@ -1,6 +1,6 @@
-import type { AbilityDef } from '../../../../src/types/abilityDefs'
-import type { CharacterAuthoring } from '../../../../src/types/characters'
-import type { StatMods } from '../../../../src/types/stats'
+import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
+import type { CharacterAuthoring } from '../../../../legacy/types/characters'
+import type { StatMods } from '../../../../legacy/types/stats'
 
 // 🐘 大象：绕身转的水罐给附近最伤的队友浇水，长鼻子喷出水柱冲开敌人，两样轮着来；技能给全队裹上一层挡三下的泥
 const jar = { emoji: '1f3fa', size: 0.7 } as const

@@ -1,4 +1,4 @@
-import type { ItemDef } from '../src/types/items'
+import type { ItemDef } from '../legacy/types/items'
 
 export const ITEMS = {
   gemHeart: {

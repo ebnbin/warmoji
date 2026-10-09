@@ -1,5 +1,5 @@
-import { hslToInt } from '../../../src/util/palette.ts'
-import type { MapDef } from '../../../src/types/maps'
+import { hslToInt } from '../../../legacy/util/palette.ts'
+import type { MapDef } from '../../../legacy/types/maps'
 
 export default {
   emoji: '1f3ad',

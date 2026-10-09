@@ -1,13 +1,13 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 
-// 模拟层是 src/ecs 里表现层之外的部分：不碰引擎、渲染、界面、音频、存档与开发面板，运行期（含间接）只依赖 bitecs；声音与画面经 outbox 交给表现层，开发面板的开关经注入
-// 战斗要能照录像重打：它运行期用到的 src/ecs 与 src/maps 代码不读钟，随机只走 sim 上的随机流
-const ecs = resolve('src/ecs')
+// 模拟层是 legacy/ecs 里表现层之外的部分：不碰引擎、渲染、界面、音频、存档与开发面板，运行期（含间接）只依赖 bitecs；声音与画面经 outbox 交给表现层，开发面板的开关经注入
+// 战斗要能照录像重打：它运行期用到的 legacy/ecs 与 legacy/maps 代码不读钟，随机只走 sim 上的随机流
+const ecs = resolve('legacy/ecs')
 const VIEW = ['EcsBattleScene.ts', 'atlas.ts', 'decor.ts', 'devTabs.ts', 'lens.ts', 'present', 'presentation.ts', 'render', 'viewRegistry.ts', 'views.ts'].map((p) => join(ecs, p))
-const BANNED = [...VIEW, ...['src/audio', 'src/dev', 'src/devtools', 'src/editor', 'src/save', 'src/scene', 'src/ui'].map((p) => resolve(p))]
+const BANNED = [...VIEW, ...['legacy/audio', 'legacy/dev', 'legacy/devtools', 'legacy/editor', 'legacy/save', 'legacy/scene', 'legacy/ui'].map((p) => resolve(p))]
 const PACKAGES = new Set(['bitecs'])
-const BATTLE = ['src/ecs', 'src/maps'].map((p) => resolve(p))
+const BATTLE = ['legacy/ecs', 'legacy/maps'].map((p) => resolve(p))
 // 表现层每帧照战局算外观：只写画面用的这些字段，不建、不删实体，也不加减组件，回放才与画面无关
 const present = join(ecs, 'present')
 const LOOKS: Readonly<Record<string, readonly string[]>> = {

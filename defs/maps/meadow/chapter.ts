@@ -1,4 +1,4 @@
-import type { FightDef, PhaseDef, RunDef } from '../../../src/types/runs'
+import type { FightDef, PhaseDef, RunDef } from '../../../legacy/types/runs'
 import { stage, TEAM_LEVEL } from '../../chapter.ts'
 import { FIGHTS } from './fights.ts'
 

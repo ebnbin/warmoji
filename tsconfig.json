@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "jsx": "react-jsx",
-    "rootDir": "src",
+    "rootDir": "legacy",
     "lib": [
       "ES2022",
       "DOM",
@@ -28,6 +28,6 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "src"
+    "legacy"
   ]
 }
