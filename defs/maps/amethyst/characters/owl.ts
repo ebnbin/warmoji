@@ -1,25 +1,29 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
-import { shot } from '../../../kit.ts'
+import type { WeaponSource } from '../../../../src/types/weapons'
 
-// 🦉 猫头鹰：远远射出羽箭，射中的敌人显形，暗处的藏不住；技能打出一颗月光照明弹
-const owlFeather = {
+// 🦉 猫头鹰：掷出月牙镖，飞出去再飞回来，去程回程都打，打中的敌人显形；技能打出一颗月光照明弹
+const owlCrescent = {
   trigger: 'auto',
-  cooldownMs: 550,
+  cooldownMs: 1200,
   aim: 'nearest',
-  range: 8,
-  damage: 14,
-  fireSfx: 'shoot',
-  shape: { kind: 'bolt', projectile: shot('1fab6', 12, 0.45, 45), lifeMs: 1000 },
+  range: 5,
+  damage: 18,
+  knockback: 4.5,
+  fireSfx: 'whoosh',
+  held: { look: { emoji: '1f319', size: 0.75 }, restOffset: 0.5 },
+  shape: { kind: 'flyer', range: 5, outMs: 550, returnSpeed: 10, radius: 0.5, spinDegPerSec: 800 },
   onHit: [{ kind: 'reveal', durationMs: 2000 }],
 } satisfies AbilityDef
 
-const owlFeather2 = { ...owlFeather, shape: { ...owlFeather.shape, pierce: 2 } } satisfies AbilityDef
+const owlCrescent2 = { ...owlCrescent, repeat: { count: 2, spreadDeg: 360 } } satisfies AbilityDef
 
-const owlVolley = { ...owlFeather2, repeat: { count: 3, spreadDeg: 20 } } satisfies AbilityDef
-
-const owlFeather3 = { ...owlFeather2, cycle: [owlFeather2, owlVolley] } satisfies AbilityDef
+const owlCrescent3 = {
+  ...owlCrescent2,
+  shape: { ...owlCrescent.shape, radius: 0.7, coinMagnetRadius: 1.6 },
+  held: { ...owlCrescent.held, look: { ...owlCrescent.held.look, size: 1.05 } },
+} satisfies AbilityDef
 
 const owlFlare = {
   trigger: 'manual',
@@ -34,15 +38,27 @@ const owlFlare = {
   ],
 } satisfies AbilityDef
 
-export const abilities = { owlFeather, owlFeather2, owlFeather3, owlFlare } satisfies Record<string, AbilityDef>
+export const abilities = { owlCrescent, owlCrescent2, owlCrescent3, owlFlare } satisfies Record<string, AbilityDef>
 
-export const levels = [{ mul: { damage: 1.2, projSpeed: 1.1 } }, { add: { crit: 0.08 }, mul: { damage: 1.45, projSpeed: 1.2 } }] as const satisfies readonly StatMods[]
+export const weapons = {
+  owlCrescent: {
+    name: '月牙镖',
+    emoji: '1f319',
+    base: 'owlCrescent',
+    upgrades: [
+      { ability: 'owlCrescent2', card: { icon: '1f317', name: '双月', desc: '同时朝相反方向再掷出一枚月牙镖' } },
+      { ability: 'owlCrescent3', card: { icon: '1f9f2', name: '磁月', desc: '月牙镖大 40%，沿途把 1.6 格内的金币吸过来' } },
+    ],
+  },
+} as const satisfies Record<string, WeaponSource>
+
+export const levels = [{ mul: { damage: 1.2 } }, { add: { crit: 0.08 }, mul: { damage: 1.45, range: 1.15 } }] as const satisfies readonly StatMods[]
 
 export default {
   emoji: '1f989',
   name: '猫头鹰',
   element: 'light',
-  desc: '黑夜里也看得清的猫头鹰：远远射出羽箭，射中的敌人显形 2 秒，躲在暗处的也藏不住；技能打出一颗月光照明弹，照亮一大片敌人',
+  desc: '黑夜里也看得清的猫头鹰：爪里攥着一枚月牙镖，掷出 5 格再飞回来，去程回程都打得中，打中的敌人显形 2 秒，躲在暗处的也藏不住；技能打出一颗月光照明弹，照亮一大片敌人',
   role: 'ranged',
   tags: ['damage', 'ranged'],
   body: { drag: 4.5, mass: 0.7 },
@@ -54,16 +70,6 @@ export default {
     cdMs: 13_000,
     ability: 'owlFlare',
   },
-  weapons: [],
-  innate: [
-    {
-      name: '羽箭',
-      icon: '1fab6',
-      base: 'owlFeather',
-      upgrades: [
-        { ability: 'owlFeather2', card: { icon: '1f453', name: '夜视', desc: '羽箭能穿过两个敌人继续飞' } },
-        { ability: 'owlFeather3', card: { icon: '1f985', name: '鹰眼', desc: '每第三发改成一次射出三根，散开 20 度' } },
-      ],
-    },
-  ],
+  weapons: ['owlCrescent'],
+  innate: [],
 } as const satisfies CharacterAuthoring

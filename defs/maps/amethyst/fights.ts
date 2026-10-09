@@ -17,10 +17,10 @@ export const FIGHTS = {
         {
           intro: { title: '日落前寻晶', sub: '天黑之前走遍每一颗小晶洞' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 2 },
-            { kind: 'rat', weight: 1 },
-            { kind: 'crab', weight: 1 },
+            { kind: 'caveBat', weight: 3 },
+            { kind: 'hollow', weight: 2 },
+            { kind: 'cheshire', weight: 1 },
+            { kind: 'geodeling', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 1100 }],
           ends: [
@@ -46,15 +46,15 @@ export const FIGHTS = {
         {
           intro: { title: '守夜', sub: '撑到日出' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 2 },
-            { kind: 'chameleon', weight: 1 },
-            { kind: 'rat', weight: 1 },
+            { kind: 'caveBat', weight: 3 },
+            { kind: 'hollow', weight: 2 },
+            { kind: 'lurker', weight: 1 },
+            { kind: 'cheshire', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 800 },
-            { kind: 'batch', atMs: 30_000, squad: { count: 8, mix: [{ kind: 'gargoyle', weight: 1 }, { kind: 'skeleton', weight: 2 }], at: { kind: 'gate', gate: 'rift' } }, banner: { title: '顶缝', sub: '有东西从顶缝里落下来了' } },
-            { kind: 'batch', atMs: 45_000, squad: { count: 6, enemy: 'crab', elites: 1, at: { kind: 'gate', gate: 'geode' } }, banner: { title: '晶洞', sub: '地上的晶洞里爬出来了' } },
+            { kind: 'batch', atMs: 30_000, squad: { count: 8, mix: [{ kind: 'geodeling', weight: 1 }, { kind: 'hollow', weight: 2 }], at: { kind: 'gate', gate: 'rift' } }, banner: { title: '顶缝', sub: '有东西从顶缝里落下来了' } },
+            { kind: 'batch', atMs: 45_000, squad: { count: 6, enemy: 'geodeling', elites: 1, at: { kind: 'gate', gate: 'geode' } }, banner: { title: '晶洞', sub: '地上的晶洞里爬出来了' } },
           ],
           ends: [{ kind: 'event', event: 'dawn', count: 1 }],
         },
@@ -76,17 +76,17 @@ export const FIGHTS = {
         {
           intro: { title: '晶洞深处', sub: '击倒躲在小晶洞里的悬赏目标' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 2 },
-            { kind: 'rat', weight: 1 },
+            { kind: 'caveBat', weight: 3 },
+            { kind: 'hollow', weight: 2 },
+            { kind: 'cheshire', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1000, at: { kind: 'gate', gate: 'tunnel' } },
             {
               kind: 'batch',
               atMs: 1500,
-              squad: { count: 3, enemy: 'gargoyle', elites: 3, stats: { mul: { maxHp: 2 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'tunnel' }, bounty: true },
-              banner: { title: '悬赏发布', sub: '三只石像鬼守在小晶洞里' },
+              squad: { count: 3, enemy: 'geodeling', elites: 3, stats: { mul: { maxHp: 2 } }, drive: { kind: 'stay' }, at: { kind: 'gate', gate: 'tunnel' }, bounty: true },
+              banner: { title: '悬赏发布', sub: '三只晶簇怪守在小晶洞里' },
             },
           ],
           ends: [
@@ -113,10 +113,10 @@ export const FIGHTS = {
         {
           intro: { title: '暗处伏击', sub: '当心四周和身后' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 2 },
-            { kind: 'chameleon', weight: 1 },
-            { kind: 'rat', weight: 1 },
+            { kind: 'caveBat', weight: 3 },
+            { kind: 'hollow', weight: 2 },
+            { kind: 'lurker', weight: 1 },
+            { kind: 'cheshire', weight: 1 },
           ],
           spawns: [
             { kind: 'batch', atMs: 3000, squad: { count: 8, at: { kind: 'ring', dist: 4 } }, banner: { title: '包围', sub: '敌人从暗处冒出来' } },

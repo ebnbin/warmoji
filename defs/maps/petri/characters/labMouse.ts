@@ -2,43 +2,55 @@ import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 
-// 🐭 小白鼠：闪到敌人身后咬一口、留下药毒再溜回来，咬死了立刻再扑；技能抄迷宫近路隐身穿出一段
+// 🐭 小白鼠：扑上去咬两口，再转着尾巴卷起一道旋风把一排敌人挑上天；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高
 const labMouseBite = {
   trigger: 'auto',
-  cooldownMs: 1400,
+  cooldownMs: 650,
   aim: 'nearest',
-  range: 5,
-  damage: 22,
+  range: 2.6,
+  damage: 16,
+  knockback: 2,
   fireSfx: 'whoosh',
-  shape: { kind: 'blink', behindDist: 0.5, strikeMs: 250 },
+  shape: { kind: 'segment', reach: 1.6, radius: 0.45, ms: 160, lungeDist: 0.5 },
   onHit: [{ kind: 'poison', damage: 0, ratio: 0.1, tickMs: 500, durationMs: 3000 }],
 } satisfies AbilityDef
 
-const labMouseBite2 = {
+const knockup = { kind: 'knockup', durationMs: 750, height: 1.3 } as const
+
+const gale = {
   ...labMouseBite,
-  reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'healRatio', ratio: 0.06 }, { kind: 'refresh', what: 'this' }] }],
+  range: 5,
+  knockback: 0,
+  fireSfx: 'gust',
+  color: 0xb3e5fc,
+  shape: { kind: 'segment', reach: 5, radius: 0.6, ms: 220, beam: true },
+  onHit: [knockup],
 } satisfies AbilityDef
 
-const labMouseBite3 = { ...labMouseBite2, shape: { ...labMouseBite2.shape, execute: { hpRatio: 0.35, mul: 1.7 } } } satisfies AbilityDef
+const galeWall = { kind: 'barrier', shape: 'wall', length: 3, offset: 1.5, durationMs: 2000, bodies: 'none', shots: true, color: 0xb3e5fc } as const
 
-const labMouseShortcut = {
+const gale2 = { ...gale, reactions: [{ on: 'fire', to: 'self', effects: [galeWall] }] } satisfies AbilityDef
+
+const gale3 = { ...gale2, onHit: [{ ...knockup, onLand: [{ kind: 'stun', durationMs: 700 }] }] } satisfies AbilityDef
+
+const labMouseCombo = { ...labMouseBite, cycle: [labMouseBite, gale] } satisfies AbilityDef
+
+const labMouseCombo2 = { ...labMouseBite, cycle: [labMouseBite, gale2] } satisfies AbilityDef
+
+const labMouseCombo3 = { ...labMouseBite, cycle: [labMouseBite, gale3] } satisfies AbilityDef
+
+const labMouseLunge = {
   trigger: 'manual',
-  aim: 'stick',
-  fireSfx: 'warp',
-  shape: { kind: 'world' },
-  reactions: [
-    {
-      on: 'fire',
-      to: 'self',
-      effects: [
-        { kind: 'warp', distance: 6 },
-        { kind: 'empower', hits: 1, then: [{ kind: 'damage', amount: 40 }, { kind: 'stun', durationMs: 600 }] },
-      ],
-    },
-  ],
+  aim: 'nearest',
+  range: 8,
+  requires: { kind: 'airborne', who: 'target' },
+  damage: 50,
+  fireSfx: 'whoosh',
+  shape: { kind: 'blink', behindDist: 0.5, strikeMs: 450 },
+  onHit: [{ kind: 'knockup', durationMs: 700, height: 1.6 }],
 } satisfies AbilityDef
 
-export const abilities = { labMouseBite, labMouseBite2, labMouseBite3, labMouseShortcut } satisfies Record<string, AbilityDef>
+export const abilities = { labMouseCombo, labMouseCombo2, labMouseCombo3, labMouseLunge } satisfies Record<string, AbilityDef>
 
 export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { crit: 0.12, dodge: 0.05 }, mul: { damage: 1.45 } }] as const satisfies readonly StatMods[]
 
@@ -46,21 +58,27 @@ export default {
   emoji: '1f42d',
   name: '小白鼠',
   element: 'dark',
-  desc: '从实验室里逃出来的小白鼠：闪到敌人身后咬一口就溜回来，咬过的慢慢中毒；技能抄迷宫的近路隐身穿出一段，下一口咬得格外狠',
+  desc: '从实验室里逃出来的小白鼠：扑上去咬两口，咬过的 3 秒里慢慢中毒，第三下转着尾巴卷起一道 5 格长的旋风，把一排敌人挑上天 0.75 秒；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高',
   role: 'assassin',
-  tags: ['damage', 'melee', 'mobile'],
+  tags: ['damage', 'control', 'melee', 'mobile'],
   body: { drag: 4, mass: 0.5 },
   stats: { moveSpeed: 7.4, maxStamina: 85, staminaRegen: 95, exertion: 0.7 },
-  skill: { name: '迷宫捷径', icon: '1f9c0', desc: '朝摇杆方向隐身穿行 6 格；下一口多造成 40 点伤害并眩晕 0.6 秒', cdMs: 10_000, ability: 'labMouseShortcut', aim: true },
+  skill: {
+    name: '腾空追咬',
+    icon: '1f32a',
+    desc: '只对空中的敌人出手：钻到 8 格内一个被挑上天的敌人身后狠咬一口，打 50 点，再把它挑高 0.7 秒',
+    cdMs: 9_000,
+    ability: 'labMouseLunge',
+  },
   weapons: [],
   innate: [
     {
       name: '实验品',
       icon: '1f42d',
-      base: 'labMouseBite',
+      base: 'labMouseCombo',
       upgrades: [
-        { ability: 'labMouseBite2', card: { icon: '1f48a', name: '抗药性', desc: '咬死敌人回 6% 生命，并立刻可以再扑' } },
-        { ability: 'labMouseBite3', card: { icon: '1f52c', name: '变异', desc: '对生命不高于 35% 的敌人伤害 ×1.7' } },
+        { ability: 'labMouseCombo2', card: { icon: '1f32c', name: '断风', desc: '旋风过处立起一道 3 格长的风墙 2 秒，吞掉敌方的弹体' } },
+        { ability: 'labMouseCombo3', card: { icon: '26a1', name: '落地惊雷', desc: '被旋风挑上天的敌人落地时眩晕 0.7 秒' } },
       ],
     },
   ],

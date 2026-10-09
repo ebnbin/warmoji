@@ -17,10 +17,10 @@ export const FIGHTS = {
         {
           intro: { title: '无菌操作', sub: '别让菌落盖满八成' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'blob', weight: 2 },
-            { kind: 'slime', weight: 1 },
-            { kind: 'mushroom', weight: 1 },
+            { kind: 'sneezer', weight: 3 },
+            { kind: 'mutant', weight: 2 },
+            { kind: 'vomiter', weight: 1 },
+            { kind: 'acidVial', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 600 }],
           ends: [
@@ -47,9 +47,9 @@ export const FIGHTS = {
         {
           intro: { title: '溶菌开路', sub: '依次在每一区的中心各站满 8 秒' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'blob', weight: 2 },
-            { kind: 'slime', weight: 2 },
+            { kind: 'sneezer', weight: 3 },
+            { kind: 'mutant', weight: 2 },
+            { kind: 'vomiter', weight: 2 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 800 }],
           ends: [
@@ -73,8 +73,8 @@ export const FIGHTS = {
   buriedGold: {
     emoji: '1f400',
     name: '菌下藏金',
-    desc: '菌落长过的金币被盖住，捡不到也吸不走，把那块清干净才露出来；偷币鼠却能把埋着的币挖走，打死它才吐出来：90 秒内捡到 80 金币',
-    note: '掉落物会被地图藏起来：捡钱的时机由溶菌决定，偷币鼠既是对手也是挖掘机',
+    desc: '菌落长过的金币被盖住，捡不到也吸不走，把那块清干净才露出来；柴郡猫却能把埋着的币挖走，打死它才吐出来：90 秒内捡到 80 金币',
+    note: '掉落物会被地图藏起来：捡钱的时机由溶菌决定，柴郡猫既是对手也是挖掘机',
     team: { slots: [{ tags: ['damage', 'area'] }, { tags: ['mobile'] }, { tags: ['ranged'] }], level: 2 },
     stars: [{ kind: 'time', ms: 70_000 }, { kind: 'downs', count: 0 }],
     fight: {
@@ -85,9 +85,9 @@ export const FIGHTS = {
         {
           intro: { title: '菌下藏金', sub: '捡到 80 金币' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'blob', weight: 2 },
-            { kind: 'rat', weight: 2 },
+            { kind: 'sneezer', weight: 3 },
+            { kind: 'mutant', weight: 2 },
+            { kind: 'cheshire', weight: 2 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 800, loot: { coins: 2 } }],
           ends: [
