@@ -1,9 +1,9 @@
 import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
-import { shot } from '../../../kit.ts'
+import { ring, shot } from '../../../kit.ts'
 
-// 🧚 花仙子：花粉治最伤的队友，花瓣打敌人，两样轮着来；技能给全队挂上护盾并解掉控制
+// 🧚 花仙子：花粉治最伤的队友，沾着露水的花瓣打敌人、溅湿一小片，两样轮着来；技能给全队挂上护盾，解掉控制和身上的毒与火
 // 花粉与花瓣都用 world 出手，没人受伤或没有敌人时也照样轮下去
 const pollen = (then: readonly Effect[]) =>
   ({
@@ -28,9 +28,10 @@ const pixiePetal = {
         class: 'attack',
         aim: 'nearest',
         range: 6,
-        damage: 13,
-        fireSfx: 'shoot',
+        damage: 9,
+        fireSfx: 'splash',
         shape: { kind: 'bolt', projectile: shot('1f338', 9, 0.42), lifeMs: 1400 },
+        onHit: [{ kind: 'blast', radius: 1.2, ratio: 0.5, knockback: 0, ring: ring(0x42a5f5) }],
       },
     },
   ],
@@ -61,12 +62,13 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9da',
   name: '花仙子',
-  desc: '花粉治最伤的那个队友，花瓣打敌人，两样轮着来；技能给全队挂上护盾并解掉控制',
+  element: 'water',
+  desc: '本身是水、浑身湿漉漉的花仙子，点不着火，却一冰就冻、一电一片：花粉治最伤的那个队友，沾着露水的花瓣打敌人，打中就溅开，把 1.2 格内的敌人都浇湿 5 秒，给队友的雷与冰铺路，两样轮着来；技能给全队挂上护盾，解掉控制和身上的毒与火',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.5 },
   stats: { moveSpeed: 6, maxStamina: 80, staminaRegen: 85, exertion: 0.7 },
-  skill: { name: '花之护佑', icon: '1f490', desc: '全队解除控制与减速，挂上生命 25% 的护盾 6 秒', cdMs: 16_000, ability: 'pixieBlessing' },
+  skill: { name: '花之护佑', icon: '1f490', desc: '全队解除控制与减速，清掉身上的中毒、燃烧、寒冷与湿，挂上生命 25% 的护盾 6 秒', cdMs: 16_000, ability: 'pixieBlessing' },
   weapons: [],
   innate: [
     {
@@ -75,7 +77,7 @@ export default {
       base: 'pixieDance',
       upgrades: [
         { ability: 'pixieDance2', card: { icon: '1f49a', name: '回春', desc: '花粉改成先回 8 点血，再 3 秒里每半秒回 4 点' } },
-        { ability: 'pixieDance3', card: { icon: '1f33a', name: '花环', desc: '花粉治的队友还挂上生命 8% 的护盾 3 秒' } },
+        { ability: 'pixieDance3', card: { icon: '1f33a', name: '花环', desc: '花粉治的队友还挂上生命 8% 的护盾 3 秒；中了毒回不了血，护盾照样挂得上' } },
       ],
     },
   ],

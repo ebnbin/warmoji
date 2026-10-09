@@ -4,7 +4,8 @@ const GRASS_SNAKE = {
   kind: 'grassSnake',
   emoji: '1f40d',
   name: '草蛇',
-  desc: '贴着草皮游过来，窜起来咬一口带毒；个子矮，平射的子弹容易从它头上飞过去',
+  element: 'poison',
+  desc: '贴着草皮游过来，窜起来咬一口叠一层中毒，几条一起咬叠得飞快，中了毒什么回复都不管用；本身是毒、不会中毒；个子矮，平射的子弹容易从它头上飞过去',
   size: 1.15,
   radius: 0.42,
   span: [0, 0],
@@ -17,15 +18,14 @@ const GRASS_SNAKE = {
   abilities: [
     {
       trigger: 'auto',
-      cooldownMs: 2200,
+      cooldownMs: 1800,
       firstDelayMs: 400,
       aim: 'nearest',
       range: 1.8,
-      damage: 6,
+      damage: 7,
       fireSfx: 'whoosh',
       windup: { ms: 260, lockAt: 'end', telegraph: 'shake' },
       shape: { kind: 'segment', reach: 0.8, radius: 0.4, ms: 120, lungeDist: 0.8 },
-      onHit: [{ kind: 'poison', damage: 3, tickMs: 600, durationMs: 3600 }],
     },
   ],
 } satisfies EnemyDef

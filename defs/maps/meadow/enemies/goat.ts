@@ -4,7 +4,7 @@ const GOAT = {
   kind: 'goat',
   emoji: '1f410',
   name: '山羊',
-  desc: '从坡顶一路蹦下来，落地就低头冲顶，被顶中的人飞出去老远',
+  desc: '从坡顶一路蹦下来，落地就低头冲顶，被顶中的人飞出去老远，撞上林缘、栅栏或坡脚的晕 0.8 秒',
   size: 1.25,
   radius: 0.46,
   span: [0, 1],
@@ -25,7 +25,7 @@ const GOAT = {
       fireSfx: 'bleat',
       windup: { ms: 420, lockAt: 'start', telegraph: 'shake' },
       shape: { kind: 'sprint', distance: 2.6, ms: 280, radius: 0.85 },
-      onHit: [{ kind: 'shove', distance: 3.2, ms: 320 }],
+      onHit: [{ kind: 'shove', distance: 3.2, ms: 320, onWall: [{ kind: 'stun', durationMs: 800 }] }],
     },
   ],
 } satisfies EnemyDef
