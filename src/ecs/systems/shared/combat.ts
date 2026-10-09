@@ -7,7 +7,7 @@ import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Gear, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Seat, Slot, Sprite, Stamina, Stats, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Seat, Slot, Sprite, Stamina, Stats, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
 import { addMark, hasMark } from '../../utils/marks'
 import { offenseOf } from '../../utils/stats'
@@ -25,7 +25,6 @@ import { followersOf, seatPoints } from '../layoutTeam'
 import { charSize } from './scale'
 import { release } from './gut'
 import { returnBorrowed } from './steal'
-import { gearKill } from './gear'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import { clockSec, runCurve } from '../../fight/clock'
@@ -42,10 +41,7 @@ export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy
     return
   }
   const anchored = hasComponent(sim.world, eid, Anchored)
-  const at = { x: Transform.x[eid]!, y: Transform.y[eid]! }
-  const hostile = Faction.v[eid] === FACTION.enemy
   killBody(sim, eid, src, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
-  if (hostile) gearKill(sim, src, at)
 }
 
 /** 击杀反应施于出手的身体，敌我同一条：属性表的击杀回复、身体的击杀规则、出手那条能力的击杀效果、资源的击杀增长 */
@@ -257,8 +253,6 @@ export function raise(sim: Sim, eid: number): void {
   Alive.v[eid] = 1
   Lethal.used[eid] = 0
   Lethal.low[eid] = 0
-  Gear.low[eid] = 0
-  Gear.lethal[eid] = 0
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
   Stamina.used[eid] = 0

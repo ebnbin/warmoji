@@ -18,7 +18,7 @@ import { feedGut } from './gut'
 import { applyForm, bodyElement, npcAbilities, npcDrive, phaseStats, rearmNpcKeep } from '../../entities/form'
 import { attachDrive, detachDrive } from '../../entities/enemy'
 import { foldBody, setStatLayer } from '../../utils/stats'
-import { gearDodged, gearHurt, gearLethal, gearLowHp, gearStruck } from './gear'
+import { gearHurt } from './gear'
 import { spawnFxCircle } from '../../entities/fx'
 import { counterMul } from '../../../data/elements'
 import { toPx } from '../../../data/px'
@@ -283,7 +283,7 @@ function spikesOf(sim: Sim, src: Source, target: number, tags: number, o: HitOpt
   return () => void hit(sim, own, by, n)
 }
 
-/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
+/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量；持续伤害不暴击、不吃护甲；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (!lands(sim, src, target, o, true)) return false
   if (harmless(sim, src, target)) {
@@ -293,7 +293,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   const tags = hitTags(src.tags ?? 0, o.tags ?? 0, o.tick === true)
   if (dodged(sim, target, tags)) {
     sim.out.events.push({ kind: 'dodge', x: Transform.x[target]!, y: Transform.y[target]!, fxAt: sim.fxMs })
-    gearDodged(sim, src, target)
     return false
   }
   const now = sim.elapsedMs
@@ -334,17 +333,15 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     const back = bodyRules[target]?.onHurt
     if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })
   }
-  gearHurt(sim, src, target, dmg, o.tick === true)
+  gearHurt(sim, target)
   const { x: jx, y: jy } = knockOf(sim, atk, target, o)
   const at = { x: Transform.x[target]!, y: Transform.y[target]! }
   const uid = Uid.v[target]!
   let hp = mounted(sim, target, dmg) ? Hp.v[target]! : Hp.v[target]! - dmg
   if (hp <= 0 && hasMark(sim, target, MARK.undying)) hp = 1
   if (hp <= 0 && lethal(sim, target)) hp = Hp.v[target]!
-  if (hp <= 0 && gearLethal(sim, target)) hp = Hp.v[target]!
   if (hp <= 0) {
     die(sim, target, src, jx, jy)
-    gearStruck(sim, src, target, uid, at, damage, tags, crit)
     if (react) reacted(sim, src, target, uid, react, at, dmg)
     spikes?.()
     return true
@@ -352,10 +349,8 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   Hp.v[target] = hp
   lowHp(sim, target)
   advancePhase(sim, target)
-  gearLowHp(sim, target)
   sim.out.events.push({ kind: 'flinch', eid: target, uid: Uid.v[target]!, team, tint: src.tint, at: now, fxAt: sim.fxMs })
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
-  gearStruck(sim, src, target, uid, at, damage, tags, crit)
   if (react) reacted(sim, src, target, uid, react, at, dmg)
   spikes?.()
   return true

@@ -98,6 +98,10 @@ function countOf(sim: Sim, eid: number, c: GearCount): number {
       return Math.floor(now / c.everyMs)
     case 'unhurt':
       return Math.floor((now - Gear.hurtAt[eid]!) / c.everyMs)
+    case 'alliesDown':
+      return sim.characters.filter((m) => !Alive.v[m]).length
+    case 'alliesUp':
+      return sim.characters.filter((m) => m !== eid && Alive.v[m]).length
   }
 }
 

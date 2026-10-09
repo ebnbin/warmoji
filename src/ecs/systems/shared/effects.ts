@@ -390,10 +390,6 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (src.faction === FACTION.team) spawnCoins(sim, at.x, at.y, fx.count)
   },
 
-  interest: (sim, src, fx) => {
-    if (src.faction === FACTION.team) sim.run.coins += Math.min(fx.max, Math.floor(sim.run.coins * fx.ratio))
-  },
-
   vanish: (sim, _src, _fx, at) => {
     eachCapable(sim, at, Enemy, (t) => despawnEnemy(sim, t))
   },

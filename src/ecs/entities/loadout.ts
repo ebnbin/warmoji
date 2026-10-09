@@ -1,5 +1,5 @@
 import { CHARACTERS, loadoutFor } from '../../data/characters'
-import { gearMods, ITEMS, resolveAbilityDef } from '../../data/items'
+import { gearMods, resolveAbilityDef } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { toPx } from '../../data/px'
 import { memberLevel } from '../../run/members'
@@ -8,30 +8,27 @@ import { FACTION, Stats } from '../components'
 import { equipAbility, equipSkill } from './ability'
 import { applyForm } from './form'
 import type { AbilityDef } from '../../types/abilityDefs'
-import type { GrowthProgress, ItemId } from '../../types/items'
+import type { ItemId } from '../../types/items'
 import type { StatMods } from '../../types/stats'
 import type { RunState } from '../../run/state'
 import type { Sim } from '../sim'
 
-/** 队员带进这一场的道具、本局成长与等级 */
-export function memberGear(run: RunState, slot: number): { owned: readonly ItemId[]; growth: GrowthProgress; level: number } {
-  const k = slotKept(run, slot)
-  return { owned: k.items, growth: k.growth, level: memberLevel(run, slot) }
+/** 队员带进这一场的队伍道具与他的等级 */
+export function memberGear(run: RunState, slot: number): { owned: readonly ItemId[]; level: number } {
+  return { owned: run.items, level: memberLevel(run, slot) }
 }
 
-/** 队员身上的常驻修正：道具、本局成长与等级给的 */
+/** 队员身上的常驻修正：队伍道具与他的等级给的 */
 export function memberGearMods(run: RunState, slot: number): StatMods[] {
-  const { owned, growth, level } = memberGear(run, slot)
-  return gearMods(owned, levelStatsFor(run.roster[slot]!, level), growth)
+  const { owned, level } = memberGear(run, slot)
+  return gearMods(owned, levelStatsFor(run.roster[slot]!, level))
 }
 
-/** 装上队员的自动能力：不给就按等级取载体当前档，再加上道具附带的装置；形状按属性表的攻击范围与弹速缩放 */
+/** 装上队员的自动能力：不给就按等级取载体当前档；形状按属性表的攻击范围与弹速缩放 */
 export function armCarriers(sim: Sim, slot: number, defs?: readonly AbilityDef[]): void {
   const m = sim.characters[slot]!
-  const { owned, level } = memberGear(sim.run, slot)
   const fx = { range: Stats.range[m]!, projSpeed: Stats.projSpeed[m]! }
-  const own = defs ?? loadoutFor(CHARACTERS[sim.run.roster[slot]!], level)
-  const list = [...own, ...owned.flatMap((id) => ITEMS[id].ability ?? [])]
+  const list = defs ?? loadoutFor(CHARACTERS[sim.run.roster[slot]!], memberLevel(sim.run, slot))
   list.forEach((w, i) => {
     equipAbility(sim, m, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230)
   })

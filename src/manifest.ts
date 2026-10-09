@@ -6,13 +6,11 @@ import type { BodyRules, EnemyDef, EnemyKind, NpcDef } from './types/enemies'
 import { ENEMIES, SPAWN } from './data/enemies'
 import { PICKUPS } from './data/pickups'
 import { FIELD_PICKUPS } from './data/battlefield'
-import { ITEMS } from './data/items'
 import { abilityEffects, childAbilities, childEffects } from './data/abilities'
 import { MAPS, mapEnemyRoster } from './data/maps'
 import type { FightDef } from './types/runs'
 import { plannedFights } from './run/flow'
 import type { RunState } from './run/state'
-import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 import { TAGS } from './data/tags'
 import { rulesOf, withAffixes } from './data/reactions'
@@ -139,15 +137,11 @@ export interface BattleSprites {
   readonly plain: readonly string[]
 }
 
-/** 这一局在这张图上可能画出来的：队伍连同还能招来的角色、这张图与这一局在这张图上的各场里的敌人（精英带上词缀）、道具、拾取物、状态与词缀的图标、这张图的布景 */
+/** 这一局在这张图上可能画出来的：队伍连同还能招来的角色、这张图与这一局在这张图上的各场里的敌人（精英带上词缀）、拾取物、状态与词缀的图标、这张图的布景 */
 export function battleSprites(run: RunState): BattleSprites {
   const seen: Sides = {
     team: { body: new Set(), shot: new Set(), abilities: new Set(), npcs: new Set(), steals: false, raises: false },
     enemy: { body: new Set(), shot: new Set(), abilities: new Set(), npcs: new Set(), steals: false, raises: false },
-  }
-  for (const i of Object.values<ItemDef>(ITEMS)) {
-    for (const t of i.reactions ?? []) walkEffects(seen, t.effects, 'team')
-    if (i.ability) walkAbility(seen, i.ability, 'team')
   }
   const team = new Set<CharacterId>([...run.roster, ...(run.roster.length < TEAM.maxSize ? ROSTER_IDS : [])])
   for (const id of team) walkCharacter(seen, CHARACTERS[id])
