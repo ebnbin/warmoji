@@ -4,7 +4,6 @@ const MOUTHLESS = {
   kind: 'mouthless',
   emoji: '1f636',
   name: '无嘴影',
-  element: 'dark',
   desc: '没有嘴的影子：出现 1.2 秒就潜进暗处，队伍瞄不到它；闪到人身后打一下又闪回原处，打中的 1 秒放不了技能，出手就现形，1.2 秒没再出手又潜回去',
   size: 1.25,
   radius: 0.46,

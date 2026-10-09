@@ -10,7 +10,7 @@ import type { InstinctDef, InstinctRule } from '../types/roles'
 import { gearMods, resolveAbilityDef } from '../data/items'
 import { ROLES } from '../data/roles'
 import { STATUSES } from '../data/statuses'
-import { ELEMENT_IDS, ELEMENTS } from '../data/elements'
+import { ELEMENTS } from '../data/elements'
 import type { ElementId } from '../types/elements'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
@@ -259,7 +259,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'imbue':
       return `附${ELEMENTS[e.element].name}魔 ${sec(e.ms)}（出手都带${ELEMENTS[e.element].name}元素）`
     case 'attune':
-      return `转为${ELEMENTS[e.element].name}元素 ${sec(e.ms)}`
+      return `转为${ELEMENTS[e.element].name}元素 ${sec(e.ms)}（${ELEMENTS[e.element].body}）`
     case 'shield':
       return `护盾 ${[e.amount ? `${e.amount}` : '', e.ratio ? `${pct(e.ratio)} 生命上限` : ''].filter(Boolean).join(' + ')}，持续 ${sec(e.ms)}`
     case 'mend':
@@ -435,16 +435,9 @@ function selfAndHit(w: AbilityDef): string[] {
 /** 伤害按出手方式吃近战或远程伤害 */
 const DELIVERY_NAME: Partial<Record<number, string>> = { [HIT.melee]: '近战', [HIT.ranged]: '远程' }
 
-/** 一种元素克制谁、被谁克制 */
-export function counterText(el: ElementId): string {
-  const beats = ELEMENTS[el].beats.map((b) => ELEMENTS[b].name).join('、')
-  const by = ELEMENT_IDS.filter((o) => ELEMENTS[o].beats.includes(el)).map((o) => ELEMENTS[o].name).join('、')
-  return `克制${beats}，被${by}克制`
-}
-
-/** 单位的元素：挨打按它算克制，出手默认带它 */
+/** 单位的元素：本身是它免疫什么、天生怎样，出手默认带它；没有元素的出手是物理 */
 export function elementLine(el: ElementId | undefined): string {
-  return el ? `元素 ${ELEMENTS[el].name}：${counterText(el)}；出手默认带${ELEMENTS[el].name}元素` : '元素 无：挨打不吃克制，出手不带元素'
+  return el ? `元素 ${ELEMENTS[el].name}：${ELEMENTS[el].body}；出手默认带${ELEMENTS[el].name}元素` : '元素 无：出手是物理，打得碎冻住的冰'
 }
 
 export function abilityStatLines(w: AbilityDef): string[] {

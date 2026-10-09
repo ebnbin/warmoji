@@ -58,7 +58,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f47c',
   name: '星之使者',
-  element: 'light',
   desc: '从星空飞下来的小天使：星辉治 5 格内最伤的那个队友，星弹打 6.5 格内最近的敌人，两样轮着来；没人受伤或射程里没敌人时，轮到的那一下空过，轮换照走；技能让倒下的队友全部站起来，全队回血并短暂无敌',
   role: 'support',
   tags: ['support', 'ranged'],

@@ -4,7 +4,6 @@ const TRASH_FLY = {
   kind: 'trashFly',
   emoji: '1fab0',
   name: '绿头蝇',
-  element: 'wood',
   desc: '微笑海报后头飞出来的绿头蝇，绕着海报 2.5 格嗡嗡打转，有人走进海报 6 格内就扑上去；海报被撕掉后永久暴走，移速 ×1.7、伤害 ×2.5',
   size: 0.7,
   radius: 0.26,

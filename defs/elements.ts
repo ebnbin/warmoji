@@ -1,58 +1,28 @@
 import type { ElementRules } from '../legacy/types/elements'
 
 /**
- * 元素与克制：六种基础元素两两相克，每种克两种、被两种克、和剩下的一种两不相干；光与暗互相克制。
- * 带元素的一下打在身上附着那种元素，附着着一种时被另一种打中可能起反应
+ * 元素：每种只做一件别的元素做不了的事，不带元素的一下就是物理；没有克制倍率。
+ * 身体本身是哪种元素就免疫哪种：火点不着、冰冻不住、雷不受传导、水一直是湿的、毒不会中毒
  */
 export const ELEMENTS = {
-  mul: { strong: 1.5, weak: 0.7, same: 0.6 },
-  auraMs: 4000,
   list: {
-    fire: { name: '火', icon: '1f525', color: 0xff7043, beats: ['wood', 'ice'], aura: 'auraFire', fall: { burst: 'sparks', tint: 0x5d4037 } },
-    water: { name: '水', icon: '1f4a7', color: 0x42a5f5, beats: ['fire', 'earth'], aura: 'auraWater', fall: { burst: 'splash', tint: 0x90caf9 } },
-    ice: { name: '冰', icon: '2744', color: 0x80deea, beats: ['water', 'wood'], aura: 'auraIce', fall: { burst: 'snow', tint: 0xb3e5fc } },
-    thunder: { name: '雷', icon: '1f329', color: 0xffd54f, beats: ['water', 'ice'], aura: 'auraThunder', fall: { burst: 'glow', tint: 0xfff59d } },
-    earth: { name: '土', icon: '1faa8', color: 0xa1887f, beats: ['thunder', 'fire'], aura: 'auraEarth', fall: { burst: 'sand', tint: 0xbcaaa4 } },
-    wood: { name: '木', icon: '1f33f', color: 0x81c784, beats: ['earth', 'thunder'], aura: 'auraWood', fall: { burst: 'leaves', tint: 0xa5d6a7 } },
-    light: { name: '光', icon: '2728', color: 0xfff59d, beats: ['dark'], aura: 'auraLight', fall: { burst: 'bubbles', tint: 0xfff9c4 } },
-    dark: { name: '暗', icon: '1f311', color: 0x7e57c2, beats: ['light'], aura: 'auraDark', fall: { burst: 'shards', tint: 0x5e35b1 } },
+    fire: { name: '火', icon: '1f525', color: 0xff7043, desc: '点燃：烧着的每隔一阵掉血，还会烧到贴着的同伴；水与冰浇得灭', body: '本身点不着，不怕岩浆', fall: { burst: 'sparks', tint: 0x5d4037 } },
+    ice: { name: '冰', icon: '2744', color: 0x80deea, desc: '寒冷：越打越慢，叠满就冻住；冻住的挨一下物理就碎', body: '本身冻不住，不怕冰水', fall: { burst: 'snow', tint: 0xb3e5fc } },
+    thunder: { name: '雷', icon: '1f329', color: 0xffd54f, desc: '打断挨打的出手，电流再跳到身边的另一个；湿的连成一片一起挨', body: '本身不受传导', fall: { burst: 'glow', tint: 0xfff59d } },
+    water: { name: '水', icon: '1f4a7', color: 0x42a5f5, desc: '浇湿：灭火、点不着；湿的一冰就冻、一电一片', body: '本身一直是湿的，会游泳', fall: { burst: 'splash', tint: 0x90caf9 } },
+    poison: { name: '毒', icon: '1f9ea', color: 0x9ccc65, desc: '中毒：一层层叠上去掉血，中了毒什么回复都不管用', body: '本身不会中毒', fall: { burst: 'bubbles', tint: 0x7cb342 } },
   },
+  burn: { ratio: 0.15, tickMs: 500, durationMs: 3000, spread: 0.4 },
+  chill: { stacks: 3, ms: 3000, slow: 0.75, frozenMs: 1500 },
+  shock: { radius: 2.5, ratio: 0.5 },
+  wet: { ms: 5000 },
+  poison: { ratio: 0.1, tickMs: 1000, durationMs: 5000, stacks: 5 },
   reactions: {
-    vaporize: { name: '蒸发', desc: '这一下伤害 ×1.75', of: ['fire', 'water'], mul: 1.75, color: 0xe0f7fa, burst: 'steam' },
-    melt: { name: '融化', desc: '这一下伤害 ×1.5', of: ['fire', 'ice'], mul: 1.5, color: 0xffccbc, burst: 'splash' },
-    overload: {
-      name: '超载',
-      desc: '在被打中处炸开，周围 1.6 格内的敌人吃这一下八成的伤害并被炸开',
-      of: ['fire', 'thunder'],
-      effects: [{ kind: 'blast', radius: 1.6, ratio: 0.8, knockback: 3, ring: { color: 0xff8a65, fillAlpha: 0.3, lineWidth: 4, lineAlpha: 0.9, durMs: 260 } }],
-      color: 0xff8a65,
-      burst: 'sparks',
-    },
-    burn: { name: '燃烧', desc: '烧 4 秒，每半秒掉这一下一成二的血', of: ['fire', 'wood'], effects: [{ kind: 'poison', damage: 0, ratio: 0.12, tickMs: 500, durationMs: 4000 }], color: 0xff7043, burst: 'maple' },
-    freeze: { name: '冻结', desc: '冻住 1.5 秒', of: ['water', 'ice'], effects: [{ kind: 'status', status: 'frozen', ms: 1500 }], color: 0x81d4fa, burst: 'snow' },
-    electrocharge: {
-      name: '感电',
-      desc: '电流窜到身边：被打中的连同 2.5 格内最近的两个敌人各吃这一下一半的伤害',
-      of: ['water', 'thunder'],
-      effects: [{ kind: 'to', who: { side: 'foes', radius: 2.5, sort: 'nearest', count: 3 }, then: [{ kind: 'damage', amount: 0, ratio: 0.5 }] }],
-      color: 0xfff176,
-      burst: 'glow',
-    },
-    mire: {
-      name: '泥沼',
-      desc: '陷进泥里 3 秒：移速减半，冲刺、跳跃、闪现都用不了',
-      of: ['water', 'earth'],
-      effects: [
-        { kind: 'slow', factor: 0.5, durationMs: 3000 },
-        { kind: 'grounded', durationMs: 3000 },
-      ],
-      color: 0x8d6e63,
-      burst: 'silt',
-    },
-    bloom: { name: '滋生', desc: '出手的一方回复上限 4% 的生命', of: ['water', 'wood'], effects: [{ kind: 'to', who: { side: 'self' }, then: [{ kind: 'healRatio', ratio: 0.04 }] }], color: 0xa5d6a7, burst: 'leaves' },
-    superconduct: { name: '超导', desc: '5 秒内受到的伤害 ×1.3', of: ['ice', 'thunder'], effects: [{ kind: 'status', status: 'exposed', ms: 5000, value: 1.3 }], color: 0xb39ddb, burst: 'shards' },
-    permafrost: { name: '冻土', desc: '冻在地上 2 秒，走不了但还能出手', of: ['ice', 'earth'], effects: [{ kind: 'root', durationMs: 2000 }], color: 0xb0bec5, burst: 'sand' },
-    magnetize: { name: '磁暴', desc: '麻痹 0.8 秒', of: ['thunder', 'earth'], effects: [{ kind: 'stun', durationMs: 800 }], color: 0xffe082, burst: 'sparks' },
-    annihilate: { name: '湮灭', desc: '这一下伤害 ×2', of: ['light', 'dark'], mul: 2, color: 0xede7f6, burst: 'glow' },
+    shatter: { name: '碎冰', desc: '冻住的挨一下物理：这一下伤害翻倍，冰也碎了', color: 0xb3e5fc, burst: 'shards', ratio: 1 },
+    thaw: { name: '解冻', desc: '火打在冻住或身上发冷的：冰化了、寒冷散了，这一下不点燃', color: 0xffccbc, burst: 'steam' },
+    quench: { name: '熄灭', desc: '水或冰打在烧着的、火打在湿的：火灭了，湿气也蒸干了', color: 0xe0f7fa, burst: 'steam' },
+    flashFreeze: { name: '急冻', desc: '冰打在湿的：当场冻住，不用叠满', color: 0x81d4fa, burst: 'snow' },
+    conduct: { name: '导电', desc: '雷打在湿的：周围 3 格内湿的敌人连成一片，各吃这一下六成的伤害', color: 0xfff176, burst: 'glow', radius: 3, ratio: 0.6 },
+    ignite: { name: '爆燃', desc: '火打在毒云里的：毒云炸开，云里的敌人各吃这一下一倍半的伤害', color: 0xff8a65, burst: 'sparks', ratio: 1.5 },
   },
 } as const satisfies ElementRules

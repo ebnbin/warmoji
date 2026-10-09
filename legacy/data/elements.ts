@@ -1,17 +1,17 @@
 import elementsJson from '../assets/elements.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
-import type { ElementDef, ElementId, ElementReaction, ElementRules } from '../types/elements'
+import { UNIT } from '../util/units'
+import type { ElementDef, ElementId, ElementReaction, ElementRules, ReactionId } from '../types/elements'
 
 const RULES = fromJson<Omit<ElementRules, 'list'> & { readonly list: Readonly<Record<ElementId, ElementDef>> }>(elementsJson)
 
+/** 整套规则，长度按格：图鉴照着它写 */
+export const ELEMENT_RULES = RULES
 export const ELEMENTS = RULES.list
 export const ELEMENT_IDS: readonly ElementId[] = keysOf(RULES.list)
-export const ELEMENT_MUL = RULES.mul
-export const AURA_MS = RULES.auraMs
-export const REACTIONS: readonly ElementReaction[] = Object.values(RULES.reactions)
 
-/** 元素的编号：0 是无元素，其余按元素表的次序 */
+/** 元素的编号：0 是无元素（物理），其余按元素表的次序 */
 export function elementIndex(id: ElementId | undefined): number {
   return id === undefined ? 0 : ELEMENT_IDS.indexOf(id) + 1
 }
@@ -20,37 +20,22 @@ export function elementAt(i: number): ElementId | undefined {
   return i > 0 ? ELEMENT_IDS[i - 1] : undefined
 }
 
-const N = ELEMENT_IDS.length + 1
+/** 各元素的编号，按名字取 */
+export const EL: Readonly<Record<ElementId, number>> = Object.fromEntries(ELEMENT_IDS.map((id) => [id, elementIndex(id)])) as Record<ElementId, number>
 
-/** 克制倍率：按出手的与挨打的元素编号查 */
-const COUNTER = new Float32Array(N * N).fill(1)
-for (const a of ELEMENT_IDS) {
-  for (const b of ELEMENT_IDS) {
-    const k = elementIndex(a) * N + elementIndex(b)
-    if (a === b) COUNTER[k] = RULES.mul.same
-    else if (ELEMENTS[a].beats.includes(b)) COUNTER[k] = RULES.mul.strong
-    else if (ELEMENTS[b].beats.includes(a)) COUNTER[k] = RULES.mul.weak
-  }
-}
+export const BURN = { ...RULES.burn, spread: RULES.burn.spread * UNIT }
+export const CHILL = RULES.chill
+export const SHOCK = { ...RULES.shock, radius: RULES.shock.radius * UNIT }
+export const WET_MS = RULES.wet.ms
+export const POISON = RULES.poison
 
-export function counterMul(atk: number, def: number): number {
-  return COUNTER[atk * N + def]!
-}
+export const REACTION_IDS: readonly ReactionId[] = keysOf(RULES.reactions)
+export const REACTIONS: readonly ElementReaction[] = REACTION_IDS.map((id) => RULES.reactions[id])
+export const SHATTER = RULES.reactions.shatter
+export const CONDUCT = { ...RULES.reactions.conduct, radius: RULES.reactions.conduct.radius * UNIT }
+export const IGNITE = RULES.reactions.ignite
 
-/** 克制倍率按元素名查：图鉴用 */
-export function counterOf(atk: ElementId, def: ElementId): number {
-  return counterMul(elementIndex(atk), elementIndex(def))
-}
-
-/** 元素反应：按附着的与打中的元素编号查，两个顺序都算 */
-const REACT: (ElementReaction | undefined)[] = Array.from({ length: N * N }, () => undefined)
-for (const r of REACTIONS) {
-  const a = elementIndex(r.of[0])
-  const b = elementIndex(r.of[1])
-  REACT[a * N + b] = r
-  REACT[b * N + a] = r
-}
-
-export function reactionOf(aura: number, by: number): ElementReaction | undefined {
-  return REACT[aura * N + by]
+/** 反应的编号：事件与飘字按它查 */
+export function reactionIndex(id: ReactionId): number {
+  return REACTION_IDS.indexOf(id)
 }

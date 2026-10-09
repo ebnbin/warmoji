@@ -44,6 +44,7 @@ import type { ByKind } from '../../../util/record'
 import { spawnFxCircle, spawnFxRing } from '../../entities/fx'
 import { withDeath } from '../../../data/reactions'
 import { elementIndex } from '../../../data/elements'
+import { addPoison } from './elements'
 
 interface HitCtx {
   readonly x: number
@@ -200,12 +201,8 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   poison: (sim, src, fx, at) => {
-    const now = sim.elapsedMs
     const tick = fx.damage + (fx.ratio ?? 0) * at.baseDamage
-    eachCapable(sim, at, Mark, (t) => {
-      const s = addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, tick, fx.tickMs, now + fx.tickMs)
-      if (s >= 0) (markSrcs[t] ??= [])[s - t * MARK_SLOTS] = src
-    })
+    eachCapable(sim, at, Mark, (t) => addPoison(sim, src, t, tick, fx.tickMs, fx.durationMs, false))
   },
 
   morph: (sim, _src, fx, at) => {
@@ -281,10 +278,10 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (fx.scope === 'lowest') {
       let best = hurt[0]!
       for (const t of hurt) if (Hp.v[t]! / Hp.max[t]! < Hp.v[best]! / Hp.max[best]!) best = t
-      mend(best, each)
+      mend(sim, best, each)
       return
     }
-    for (const t of hurt) mend(t, each)
+    for (const t of hurt) mend(sim, t, each)
   },
 
   spawnProjectile: (sim, src, fx, at) => {
@@ -374,7 +371,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   healRatio: (sim, _src, fx, at) => {
     eachCapable(sim, at, Hp, (t) => {
-      if (Alive.v[t]) mend(t, Hp.max[t]! * fx.ratio)
+      if (Alive.v[t]) mend(sim, t, Hp.max[t]! * fx.ratio)
     })
   },
 

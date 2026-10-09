@@ -4,7 +4,6 @@ const SHARD = {
   kind: 'shard',
   emoji: '1f539',
   name: '碎晶',
-  element: 'earth',
   desc: '晶簇怪碎开的小晶块，贴着地面蹦过来扎人；个子矮，平射的子弹容易从它头上飞过去',
   size: 0.7,
   radius: 0.26,

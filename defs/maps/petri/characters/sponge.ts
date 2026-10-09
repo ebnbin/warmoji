@@ -24,7 +24,7 @@ const spongeSqueeze = {
   knockback: 3,
   fireSfx: 'splash',
   shape: { kind: 'disc', radius: 2.4, at: 'self' },
-  onHit: [...spongeSoak2.onHit, { kind: 'attune', element: 'water', ms: 4000 }],
+  onHit: [...spongeSoak2.onHit, { kind: 'status', status: 'wet', ms: 4000 }],
 } satisfies AbilityDef
 
 const spongeSoak3 = { ...spongeSoak2, cycle: [spongeSoak2, spongeSqueeze] } satisfies AbilityDef
@@ -70,7 +70,7 @@ export default {
       base: 'spongeSoak',
       upgrades: [
         { ability: 'spongeSoak2', card: { icon: '1f4a7', name: '吸饱', desc: '被吸的敌人减速 30% 1 秒' } },
-        { ability: 'spongeSoak3', card: { icon: '1f4a6', name: '挤水', desc: '每第三口把吸的水挤出来：2.4 格内的敌人挨一下、被冲开，4 秒内变成水元素' } },
+        { ability: 'spongeSoak3', card: { icon: '1f4a6', name: '挤水', desc: '每第三口把吸的水挤出来：2.4 格内的敌人挨一下、被冲开，浑身湿透 4 秒' } },
       ],
     },
   ],

@@ -83,15 +83,15 @@ export interface BodyRules {
 }
 /**
  * 单位天生的特质，地图规则按它区别对待：swims 在水里照常游（不被水流冲走、追人时能下水），breathes 要换气（深海里离开气口会缺氧），
- * phases 穿得过能穿的墙与岩石，fireproof 不怕岩浆，coldproof 不怕冰水，anchored 推不动、也不被地图机关搬走，wary 会绕开致命的地方；
- * 会不会飞不写在这里，看身段：脚下那层离了地就是飞着的
+ * phases 穿得过能穿的墙与岩石，fireproof 不怕岩浆、点不着，coldproof 不怕冰水、冻不住，anchored 推不动、也不被地图机关搬走，wary 会绕开致命的地方；
+ * 会不会飞不写在这里，看身段：脚下那层离了地就是飞着的；本身是火的天生耐火、冰的天生耐寒、水的天生会游泳，不用再写
  */
 export type UnitTrait = 'swims' | 'breathes' | 'phases' | 'fireproof' | 'coldproof' | 'anchored' | 'wary'
 /** 角色与敌人共用的写法：外观、名字、特质、反应、资源与形态 */
 export interface UnitBase {
   readonly emoji: string
   readonly name: string
-  /** 元素：决定挨打时的克制，也是出手默认带的元素；不写是无元素 */
+  /** 元素：本身是什么，决定免疫什么，也是出手默认带的元素；不写是无元素，出手是物理 */
   readonly element?: ElementId
   readonly traits?: readonly UnitTrait[]
   readonly reactions?: readonly BodyReaction[]

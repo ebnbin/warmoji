@@ -56,7 +56,6 @@ export const levels = [{ add: { maxHp: 20, armor: 1 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f46e',
   name: '警卫',
-  element: 'earth',
   desc: '训练有素的警卫：两下警棍接一记重砸，把闹事的按住铐走；技能朝一个方向冲锋，撞晕一路的敌人',
   role: 'bruiser',
   tags: ['damage', 'control', 'melee'],

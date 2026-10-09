@@ -4,7 +4,6 @@ const HOLLOW = {
   kind: 'hollow',
   emoji: '1fae5',
   name: '虚影',
-  element: 'dark',
   desc: '人形的一团虚影，时隐时现：每 4 秒就有 1.5 秒淡得只剩个轮廓，谁也打不到它；被它碰到的人眼前一黑，0.6 秒出不了手',
   size: 1.2,
   radius: 0.45,

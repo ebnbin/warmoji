@@ -4,7 +4,6 @@ const STANDER = {
   kind: 'stander',
   emoji: '1f9cd',
   name: '站立者',
-  element: 'dark',
   desc: '直挺挺地站着：有人走近到 4 格内它就一动不动，一离远就飞快地挪近；贴到 1.6 格内时顿一下，猛地朝身边一圈出手',
   size: 1.4,
   radius: 0.5,

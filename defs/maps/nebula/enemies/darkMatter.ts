@@ -4,7 +4,6 @@ const DARK_MATTER = {
   kind: 'darkMatter',
   emoji: '26ab',
   name: '暗物质',
-  element: 'dark',
   desc: '看不见的一团暗物质：一出现就潜行，身周 3 格的引力场一直把人往它身上拖；贴到 1.6 格内顿一下，震伤身周 1.4 格，出手的那一下现形，停下一秒不动又隐没',
   size: 1.2,
   radius: 0.45,

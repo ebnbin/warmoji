@@ -44,7 +44,6 @@ export const levels = [{ add: { crit: 0.04 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f43f',
   name: '松鼠',
-  element: 'wood',
   desc: '爱囤粮的松鼠：扔出的橡果能穿过 1 个敌人，飞完落在地上囤 5 秒；每扔 4 颗就把满地的橡果一齐收回来，沿途再砸一遍；技能竖起蓬松的大尾巴，吞掉敌人射来的弹',
   role: 'ranged',
   tags: ['damage', 'ranged'],

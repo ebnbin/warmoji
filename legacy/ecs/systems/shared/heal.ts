@@ -1,9 +1,12 @@
-import { Hp } from '../../components'
+import { hasComponent } from 'bitecs'
+import { Hp, Mark, MARK } from '../../components'
+import { hasMark } from '../../utils/marks'
 import { eachAlly } from '../../utils/targets'
 import type { Sim } from '../../sim'
 
-/** 回血都走这里：加上 amount，不超过生命上限；回给谁、回多少由调用方定 */
-export function mend(eid: number, amount: number): void {
+/** 回血都走这里：加上 amount，不超过生命上限；中了毒的什么都回不了；回给谁、回多少由调用方定 */
+export function mend(sim: Sim, eid: number, amount: number): void {
+  if (hasComponent(sim.world, eid, Mark) && hasMark(sim, eid, MARK.poison)) return
   Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + amount)
 }
 
@@ -36,6 +39,6 @@ export function healAllies(
     for (const eid of hurt) if (Hp.v[eid]! / Hp.max[eid]! < Hp.v[best]! / Hp.max[best]!) best = eid
     targets = [best]
   }
-  for (const eid of targets) mend(eid, amount)
+  for (const eid of targets) mend(sim, eid, amount)
   return targets.length
 }

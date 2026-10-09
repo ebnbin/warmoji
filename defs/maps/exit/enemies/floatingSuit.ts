@@ -5,7 +5,6 @@ const FLOATING_SUIT = {
   kind: 'floatingSuit',
   emoji: '1f574',
   name: '悬浮西装男',
-  element: 'dark',
   desc: '西装笔挺地飘在半空，和人隔着 3.5 格；每 3.5 秒朝最近的人隐身穿行 4 格，冷不丁出现在跟前，再甩出公文包砸人',
   size: 1.4,
   radius: 0.5,

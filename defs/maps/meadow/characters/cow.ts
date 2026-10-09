@@ -48,7 +48,6 @@ export const levels = [{ add: { maxHp: 30, armor: 2 } }, { add: { maxHp: 70, arm
 export default {
   emoji: '1f404',
   name: '奶牛',
-  element: 'earth',
   desc: '身板厚实，顶开挡路的家伙；跺地震晕一圈，一声长哞把敌人都招到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],

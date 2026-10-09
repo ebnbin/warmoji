@@ -64,7 +64,6 @@ export const levels = [{ add: { maxHp: 20 }, mul: { damage: 1.2 } }, { add: { ma
 export default {
   emoji: '1f432',
   name: '晶龙崽',
-  element: 'earth',
   desc: '刚从晶蛋里破壳的小龙：一口口吐出 2.8 格长的晶息，每口攒 11 点热量，停嘴 0.9 秒后才慢慢凉下来，攒满 100 就得歇 2.5 秒；技能化成晶龙 6 秒，体型变大、热量清空，换上晶石吐息与甩尾',
   role: 'bruiser',
   tags: ['damage', 'melee', 'area'],

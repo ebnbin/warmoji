@@ -44,7 +44,6 @@ export const levels = [{ mul: { summonDamage: 1.2, damage: 1.1, healing: 1.2 } }
 export default {
   emoji: '1f9d9',
   name: '巫师',
-  element: 'dark',
   desc: '以血施法的巫师：每召一次绕身飞的鬼火灯就割掉自己 6 点生命，鬼火穿墙扑向敌人烧一下就灭，烧中了补回 4 点；技能付 20 点生命和身边的敌人结下亡灵契约，契约里死去的会替我方站起来',
   role: 'summoner',
   tags: ['damage', 'summon'],

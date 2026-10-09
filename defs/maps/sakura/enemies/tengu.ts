@@ -4,7 +4,6 @@ const TENGU = {
   kind: 'tengu',
   emoji: '1f47a',
   name: '天狗',
-  element: 'wood',
   desc: '从樱林飞出来的天狗，在半空里扇羽扇，把面前的人吹开 3 格，一不小心就被吹进溪里；隔一阵闪到人背后俯冲啄一口',
   size: 1.35,
   radius: 0.5,

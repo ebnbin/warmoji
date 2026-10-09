@@ -4,7 +4,6 @@ const SPORE = {
   kind: 'spore',
   emoji: '1f7e2',
   name: '孢子',
-  element: 'wood',
   desc: '霉菌和超级细菌放出来的孢子，又小又矮，贴着琼脂滚过来，碰到人就让人中毒',
   size: 0.6,
   radius: 0.22,

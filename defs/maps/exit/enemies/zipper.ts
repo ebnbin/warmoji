@@ -5,7 +5,6 @@ const ZIPPER = {
   kind: 'zipper',
   emoji: '1f910',
   name: '拉链嘴',
-  element: 'dark',
   desc: '嘴上拉着拉链，隔着 4 格远远站着，射出一枚拉链，被打中的人 1.5 秒放不了技能',
   size: 1.25,
   radius: 0.46,

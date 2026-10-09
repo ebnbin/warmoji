@@ -65,7 +65,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9d8',
   name: '僧人',
-  element: 'light',
   desc: '寺里的僧人：诵经让 4 格内受伤的队友 3 秒里每半秒回 3 点血，弹出两颗念珠打 6.5 格内最近的敌人，两样轮着来，附近没敌人时这一轮念珠落空、诵经照常；技能敲响金钟罩住全队，先无敌一阵再减伤',
   role: 'support',
   tags: ['support', 'ranged'],

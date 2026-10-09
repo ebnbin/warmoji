@@ -46,7 +46,6 @@ export const levels = [{ add: { maxHp: 10 }, mul: { damage: 1.2, areaDamage: 1.1
 export default {
   emoji: '1f9dd',
   name: '晶灵',
-  element: 'earth',
   desc: '晶洞里长出来的精灵：从洞顶召下晶刺砸在最近的两个敌人头上，落点再炸开一圈碎晶；危险时立起一圈晶环，敌方弹体撞上就被反弹回去，走过圈线的敌人挨一下并眩晕',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],

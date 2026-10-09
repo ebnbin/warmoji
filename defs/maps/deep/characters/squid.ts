@@ -37,7 +37,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f991',
   name: '乌贼',
-  element: 'dark',
   desc: '神出鬼没的乌贼：触腕猛地扑刺 2.5 格，专挑残血的下手；技能喷出一大团墨云，墨云里的队员只会被同在墨云里的敌人打到，自己趁机潜行',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

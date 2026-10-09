@@ -4,7 +4,6 @@ const GRASS_SNAKE = {
   kind: 'grassSnake',
   emoji: '1f40d',
   name: '草蛇',
-  element: 'wood',
   desc: '贴着草皮游过来，窜起来咬一口带毒；个子矮，平射的子弹容易从它头上飞过去',
   size: 1.15,
   radius: 0.42,

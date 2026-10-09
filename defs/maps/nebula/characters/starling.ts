@@ -36,7 +36,6 @@ export const levels = [{ add: { maxHp: 10 }, mul: { damage: 1.2 } }, { add: { ma
 export default {
   emoji: '1f31f',
   name: '小星星',
-  element: 'light',
   desc: '一闪一闪的小星星：在最近的敌人身上炸开一团星光，一炸一片，升级后还能炸瞎敌人、炸得更大；技能召来一场流星雨',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],

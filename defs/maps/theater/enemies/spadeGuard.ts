@@ -4,7 +4,6 @@ const SPADE_GUARD = {
   kind: 'spadeGuard',
   emoji: '2660',
   name: '黑桃卫兵',
-  element: 'earth',
   desc: '扑克牌里的卫兵：盯上人就把盾举到身前 3 秒，正面 120 度打来的全挡下，隔 4 秒举一次；凑近了一枪刺过来，绕到侧面打它',
   size: 1.35,
   radius: 0.5,

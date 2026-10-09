@@ -4,7 +4,6 @@ const MOAI = {
   kind: 'moai',
   emoji: '1f5ff',
   name: '石像',
-  element: 'earth',
   desc: '立在院子里一动不动的石像，推不动，远远盯着人瞪出一道目光；有人走进 5 格它就醒过来慢慢追，人走远了又立住不动；跺一脚震晕身边的人',
   size: 1.7,
   radius: 0.6,

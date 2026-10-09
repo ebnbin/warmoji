@@ -36,7 +36,6 @@ export const levels = [{ mul: { summonDamage: 1.2, damage: 1.1 } }, { add: { max
 export default {
   emoji: '1f9d1_200d_1f4bb',
   name: '程序员',
-  element: 'dark',
   desc: '敲几行代码就放出绕身转的爬虫程序，看见敌人就扑上去咬一口；技能入侵最近的几个敌人，让它们调转矛头打同伴',
   role: 'summoner',
   tags: ['damage', 'control', 'summon'],

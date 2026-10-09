@@ -4,7 +4,6 @@ const MOSQUITO = {
   kind: 'mosquito',
   emoji: '1f99f',
   name: '蚊子',
-  element: 'wood',
   desc: '飞在半空，跟人隔着 3 格左右，隔一阵俯冲 3 格扎人一口：扎中的中毒，自己还回 5% 生命',
   size: 1,
   radius: 0.36,

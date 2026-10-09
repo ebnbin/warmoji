@@ -37,7 +37,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f47d',
   name: '外星人',
-  element: 'dark',
   desc: '灰皮肤的外星来客：闪到敌人身后扎一针探针再闪回来，对残血的下手更狠，扎死了就隐身再扑；技能把最近的敌人绑进只有彼此的异界单挑',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

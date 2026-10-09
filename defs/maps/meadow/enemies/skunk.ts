@@ -7,7 +7,6 @@ const SKUNK = {
   kind: 'skunk',
   emoji: '1f9a8',
   name: '臭鼬',
-  element: 'wood',
   desc: '挨打时尾巴一翘放一团臭气，臭气里的人出手变慢；倒下时放一大团',
   size: 1.2,
   radius: 0.45,

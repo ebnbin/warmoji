@@ -1,6 +1,6 @@
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
 import { ELITE, ENEMIES, ENEMY_LIST, TENACITY } from '../data/enemies'
-import { AURA_MS, ELEMENT_IDS, ELEMENT_MUL, ELEMENTS, REACTIONS } from '../data/elements'
+import { ELEMENT_IDS, ELEMENT_RULES, ELEMENTS, REACTIONS } from '../data/elements'
 import type { ElementId } from '../types/elements'
 import type { CharacterId } from '../types/characters'
 import { AFFIX_IDS, AFFIXES } from '../data/affixes'
@@ -19,7 +19,7 @@ import { modTexts, STATS, statText } from '../data/stats'
 import { maxLevelOf } from '../data/levels'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
-import { abilityLabel, abilityStatLines, characterStatGroups, condLine, counterText, effectLine, elementLine, sec, traitLine } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, condLine, effectLine, elementLine, pct, sec, traitLine } from './statLines'
 import { itemLines, TRAIT_LABEL } from './itemLines'
 import { mapStaminaLine } from './mapLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -279,39 +279,29 @@ function enemyEntry(e: EnemyDef): WikiEntry {
   return { emoji: e.emoji, name: e.role === 'boss' ? `${e.name}（Boss）` : e.name, desc: e.desc, lines: enemyStatLines(e) }
 }
 
-/** 元素页的第一条：克制、附着与反应的规则 */
+/** 元素页的第一条：各元素留在身上的状态与反应的规则 */
 function elementRulesEntry(): WikiEntry {
-  const { strong, weak, same } = ELEMENT_MUL
+  const { burn, chill, shock, wet, poison } = ELEMENT_RULES
   return {
     emoji: '1f308',
-    name: '元素与克制',
-    desc: '带元素的一下打在身上，按出手的元素与挨打的元素算克制，还会让它附着上这种元素；附着着一种时被另一种打中，可能起元素反应',
+    name: '元素与反应',
+    desc: '带元素的一下打在身上，留下这种元素的状态，或者和身上已有的起反应；不带元素的一下是物理。元素之间没有克制倍率，身体本身是哪种元素就免疫哪种',
     lines: [
-      `伤害倍率：克制 ×${strong} · 被克 ×${weak} · 同元素 ×${same} · 其余 ×1；没有元素的不吃克制`,
-      '六种基础元素两两相克：每种克两种、被两种克，和剩下的一种两不相干；光与暗互相克制',
-      `附着 ${sec(AURA_MS)}：同一种再打只延长时间；另一种打中时能起反应就消耗附着、起反应，否则换成新的这一种；持续伤害不附着`,
-      '反应的效果由出手的一方施加，不再带元素',
-      ...REACTIONS.map((r) => `${r.name}（${ELEMENTS[r.of[0]].name}+${ELEMENTS[r.of[1]].name}）：${r.desc}`),
+      `燃烧：每 ${sec(burn.tickMs)} 掉点燃那一下 ${pct(burn.ratio)} 的血，烧 ${sec(burn.durationMs)}，再点只换跳伤、延长时间；每跳一次烧到身体相距 ${grid(burn.spread)} 内、没在烧的同伴`,
+      `寒冷：每挨一下冰加一层，移速 ×${chill.slow}，${sec(chill.ms)} 不再挨冰就散；叠到 ${chill.stacks} 层冻住 ${sec(chill.frozenMs)}`,
+      `电：打断挨打的出手（记进韧性），再跳到 ${grid(shock.radius)} 内最近的另一个敌人，吃这一下 ${pct(shock.ratio)}`,
+      `湿：浇湿 ${sec(wet.ms)}；本身是水的、泡在水里的一直是湿的`,
+      `中毒：每挨一下毒加一层，每层每 ${sec(poison.tickMs)} 掉那一下 ${pct(poison.ratio)} 的血，最多 ${poison.stacks} 层，${sec(poison.durationMs)} 不再中毒就解；中了毒什么回复都不管用`,
+      '持续伤害的一跳不沾元素，也不起反应',
+      ...REACTIONS.map((r) => `${r.name}：${r.desc}`),
     ],
   }
 }
 
-/** 一种元素：克制谁、附着状态与能起的反应 */
+/** 一种元素：打中会怎样、本身是它免疫什么 */
 function elementEntry(id: ElementId): WikiEntry {
   const el = ELEMENTS[id]
-  const names = (ids: readonly ElementId[]): string => ids.map((o) => ELEMENTS[o].name).join('、') || '无'
-  const by = ELEMENT_IDS.filter((o) => ELEMENTS[o].beats.includes(id))
-  const { strong, weak, same } = ELEMENT_MUL
-  return {
-    emoji: el.icon,
-    name: `${el.name}元素`,
-    desc: counterText(id),
-    lines: [
-      `打${names(el.beats)} ×${strong} · 打${names(by)} ×${weak} · 打${el.name} ×${same}`,
-      `被打中的身上附着「${STATUSES[el.aura].name}」${sec(AURA_MS)}`,
-      ...REACTIONS.filter((r) => r.of.includes(id)).map((r) => `遇上${ELEMENTS[r.of[0] === id ? r.of[1] : r.of[0]].name}：${r.name}——${r.desc}`),
-    ],
-  }
+  return { emoji: el.icon, name: `${el.name}元素`, desc: el.desc, lines: [`身体本身是${el.name}：${el.body}`] }
 }
 
 export function wikiGroups(): WikiGroup[] {

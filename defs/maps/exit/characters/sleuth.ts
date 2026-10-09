@@ -46,7 +46,6 @@ export const levels = [{ mul: { damage: 1.2 } }, { add: { crit: 0.08 }, mul: { d
 export default {
   emoji: '1f575',
   name: '侦探',
-  element: 'light',
   desc: '眼尖的侦探：放大镜照到哪里，藏着的敌人就现形 2 秒，线索攒够了当场结案；技能给 9 格内血最厚的敌人下悬赏，揭穿它身边 5 格的一片，悬赏期间它倒下，全队主动技能立刻转好',
   role: 'ranged',
   tags: ['damage', 'support', 'ranged'],

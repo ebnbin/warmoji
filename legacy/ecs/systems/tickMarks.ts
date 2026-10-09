@@ -6,7 +6,8 @@ import { WORLD_SOURCE } from '../utils/source'
 import { postponeAbilities } from './shared/ability'
 import { hit } from './shared/damage'
 import { applyAbilityEffects, FUSE_DEF, markSource, STORE_DEF } from './shared/effects'
-import { strongestSlot } from '../utils/marks'
+import { markSlot, strongestSlot } from '../utils/marks'
+import { spreadBurn } from './shared/elements'
 import { die } from './shared/combat'
 import { mend } from './shared/heal'
 import type { Sim } from '../sim'
@@ -34,14 +35,15 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
   }
 }
 
-/** 标记的时钟：中毒只有最强的一条按节拍跳伤、回春只有最强的一条按节拍回血，落后一拍以上的从现在重新数；亡后残留的按秒流失、流失殆尽即死；到期的清掉并执行到期反应 */
+/** 标记的时钟：中毒与燃烧各只有一条按节拍跳伤，燃烧每跳一次烧到贴着的同伴；回春只有最强的一条按节拍回血，落后一拍以上的从现在重新数；亡后残留的按秒流失、流失殆尽即死；到期的清掉并执行到期反应 */
 export function tickMarks(sim: Sim): void {
   const now = sim.elapsedMs
   const dt = sim.wdtMs / 1000
   for (const eid of [...query(sim.world, [Mark])]) {
     if (!hasComponent(sim.world, eid, Mark)) continue
     const base = eid * MARK_SLOTS
-    const poison = strongestSlot(sim, eid, MARK.poison)
+    const poison = markSlot(sim, eid, MARK.poison)
+    const burn = markSlot(sim, eid, MARK.burn)
     const mending = strongestSlot(sim, eid, MARK.mending)
     for (let i = 0; i < MARK_SLOTS; i++) {
       const s = base + i
@@ -54,10 +56,17 @@ export function tickMarks(sim: Sim): void {
         hit(sim, markSource(eid, s) ?? WORLD_SOURCE, eid, Mark.a[s]!, { tick: true })
         if (!hasComponent(sim.world, eid, Mark)) break
       }
+      if (s === burn && now >= Mark.c[s]! && Mark.c[s]! <= until) {
+        const next = Mark.c[s]! + Mark.b[s]!
+        Mark.c[s] = next <= now ? now + Mark.b[s]! : next
+        hit(sim, markSource(eid, s) ?? WORLD_SOURCE, eid, Mark.a[s]!, { tick: true })
+        if (!hasComponent(sim.world, eid, Mark)) break
+        if (Alive.v[eid] && Mark.kind[s] === MARK.burn) spreadBurn(sim, eid, s)
+      }
       if (s === mending && now >= Mark.c[s]! && Mark.c[s]! <= until) {
         const next = Mark.c[s]! + Mark.b[s]!
         Mark.c[s] = next <= now ? now + Mark.b[s]! : next
-        if (Alive.v[eid]) mend(eid, Mark.a[s]!)
+        if (Alive.v[eid]) mend(sim, eid, Mark.a[s]!)
       }
       if (kind === MARK.undead && Alive.v[eid]) {
         Hp.v[eid] = Hp.v[eid]! - Mark.a[s]! * dt

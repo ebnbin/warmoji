@@ -63,7 +63,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9d1_200d_1f9bc',
   name: '调度员',
-  element: 'light',
   desc: '坐着电动轮椅守在调度台前，广播里调度与信号弹轮着喊：调度给 4.5 格内伤得最重的队友回血，信号弹打 6.5 格内最近的敌人，没人可治或没敌人可打时那一句就空过；技能把全队一起转移出去',
   role: 'support',
   tags: ['support', 'mobile'],

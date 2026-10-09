@@ -45,7 +45,6 @@ export const levels = [{ mul: { damage: 1.2 } }, { add: { crit: 0.08 }, mul: { d
 export default {
   emoji: '1f9d0',
   name: '鉴定师',
-  element: 'light',
   desc: '举着放大镜把手电的光聚成一道射出去，穿过 6 格内的一排敌人，照到的 2 秒内挨打更疼；连照 6 下就得花 1.5 秒换电池；技能侧身翻滚，滚前先把身边的敌人看个透，最多攒 3 次',
   role: 'ranged',
   tags: ['damage', 'ranged', 'mobile'],

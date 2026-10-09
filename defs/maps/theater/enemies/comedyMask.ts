@@ -4,7 +4,6 @@ const COMEDY_MASK = {
   kind: 'comedyMask',
   emoji: '1f602',
   name: '喜剧面具',
-  element: 'light',
   desc: '飘在半空的喜剧面具，咯咯笑着贴上来；有同伴受了伤就笑一阵，身边 4 格内受了伤的（连它自己，头目除外）各回 6% 的生命，笑完要歇 4 秒',
   size: 1.2,
   radius: 0.45,

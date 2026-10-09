@@ -41,7 +41,6 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.02 }, mul: { damage: 1.2
 export default {
   emoji: '1f439',
   name: '仓鼠',
-  element: 'earth',
   desc: '鼓着腮帮子贴身连挥两拳；技能钻进仓鼠球朝摇杆方向滚出一大段，撞开沿路的敌人，滚的时候什么控制都不吃',
   role: 'bruiser',
   tags: ['damage', 'melee', 'mobile'],

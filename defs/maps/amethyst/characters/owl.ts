@@ -57,7 +57,6 @@ export const levels = [{ mul: { damage: 1.2 } }, { add: { crit: 0.08 }, mul: { d
 export default {
   emoji: '1f989',
   name: '猫头鹰',
-  element: 'light',
   desc: '黑夜里也看得清的猫头鹰：爪里攥着一枚月牙镖，掷出 5 格再飞回来，去程回程都打得中，打中的敌人显形 2 秒，躲在暗处的也藏不住；技能打出一颗月光照明弹，照亮一大片敌人',
   role: 'ranged',
   tags: ['damage', 'ranged'],

@@ -287,6 +287,11 @@ export const sakura: WorldHooks = {
   basin(sim) {
     return sakuraOf(sim).plan.basin
   },
+  /** 站在溪水里、水深够沾湿的是湿的：桥上的、飞着的不沾水 */
+  soaks(sim, eid) {
+    const s = sakuraOf(sim)
+    return s.aboard.get(eid) !== Uid.v[eid] && Span.lo[eid] === 0 && wetAt(sim, s, Transform.x[eid]!, Transform.y[eid]!)
+  },
   /** 队员过溪走桥（见 viaBridge），敌人直奔目标，追进水里就随水漂 */
   chaseDir(sim, eid, tx, ty) {
     const s = sakuraOf(sim)

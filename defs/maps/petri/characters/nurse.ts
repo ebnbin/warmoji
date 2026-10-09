@@ -52,7 +52,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9d1_200d_2695_fe0f',
   name: '医护',
-  element: 'light',
   desc: '打针和飞针轮着来：一针扎给 5 格内伤得最重的队友，回 13 点血，一针甩向最近的敌人，没人受伤或没有敌人时那一下就空过；技能给全队急救，倒下的当场站起来',
   role: 'support',
   tags: ['support', 'ranged'],

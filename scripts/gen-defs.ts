@@ -1182,28 +1182,15 @@ const TABLES = {
   for (const [id, d] of list) need(d.merge !== 'bySource' || d.forces !== undefined, `statuses.${id} 按施加者分格的只能是牵着走的状态`)
 }
 
-/** 元素：克制的元素都存在、不克自己，每种克别人的与被克的一样多；附着的状态各不相同；反应是两种不同元素，同一对只有一种反应 */
+/** 元素：各状态的时长、节拍、层数与倍率都为正，减速在 (0, 1) 内，层数是整数；反应的倍率与范围为正 */
 {
-  const list = ELEMENTS.list as Readonly<Record<string, { readonly beats: readonly string[]; readonly aura: string }>>
-  const ids = Object.keys(list)
-  for (const [id, e] of Object.entries(list)) {
-    need(e.beats.every((b) => b !== id && ids.includes(b)), `elements.list.${id}.beats 须是别的元素`)
-    const beaten = ids.filter((o) => list[o]!.beats.includes(id)).length
-    need(beaten === e.beats.length, `elements.list.${id} 克 ${e.beats.length} 种、被 ${beaten} 种克，须一样多`)
-    need(e.aura in STATUSES, `elements.list.${id}.aura 须是状态表里的状态：${e.aura}`)
-  }
-  need(new Set(Object.values(list).map((e) => e.aura)).size === ids.length, 'elements.list 各元素附着的状态须各不相同')
-  const pairs = new Set<string>()
-  for (const [id, r] of Object.entries(ELEMENTS.reactions)) {
-    const [a, b] = r.of
-    need(a !== b && ids.includes(a) && ids.includes(b), `elements.reactions.${id} 须是两种不同的元素`)
-    const key = [a, b].sort().join('+')
-    need(!pairs.has(key), `elements.reactions.${id}：${key} 已经有别的反应`)
-    pairs.add(key)
-    need(!('mul' in r) || r.mul > 0, `elements.reactions.${id}.mul 须为正`)
-  }
-  const { strong, weak, same } = ELEMENTS.mul
-  need(strong > 1 && weak > 0 && weak < 1 && same > 0 && same <= 1 && ELEMENTS.auraMs > 0, 'elements.mul 须克制大于 1、被克与同元素在 (0, 1] 内，附着时长为正')
+  const { burn, chill, shock, wet, poison, reactions } = ELEMENTS
+  const pos = (v: number): boolean => v > 0
+  need([burn.ratio, burn.tickMs, burn.durationMs, burn.spread].every(pos), 'elements.burn 须都为正')
+  need([chill.ms, chill.frozenMs].every(pos) && chill.slow > 0 && chill.slow < 1 && Number.isInteger(chill.stacks) && chill.stacks >= 1, 'elements.chill 须时长为正、减速在 (0, 1) 内、层数是正整数')
+  need([shock.radius, shock.ratio, wet.ms].every(pos), 'elements.shock 与 elements.wet 须为正')
+  need([poison.ratio, poison.tickMs, poison.durationMs].every(pos) && Number.isInteger(poison.stacks) && poison.stacks >= 1, 'elements.poison 须为正、层数是正整数')
+  need([reactions.shatter.ratio, reactions.conduct.radius, reactions.conduct.ratio, reactions.ignite.ratio].every(pos), 'elements.reactions 的倍率与范围须为正')
 }
 
 /** 本能：生命比例在 (0, 1] 内、距离为正；队员离队长的绳长为正，躲危险的余量不为负 */

@@ -4,7 +4,6 @@ const SAND_SCORPION = {
   kind: 'sandScorpion',
   emoji: '1f982',
   name: '沙蝎',
-  element: 'earth',
   desc: '从沙下钻出来；7 格内没人时伏着不动，停满 1.5 秒就钻回沙里潜行，出手才现形；钳子一夹让人迈不开腿，尾刺够得远还带毒，连着扎中同一个人 3 下（每下隔不到 5 秒），那人的体力一下子见底',
   size: 1.3,
   radius: 0.48,

@@ -5,7 +5,6 @@ const SPIDER_EGG = {
   kind: 'spiderEgg',
   emoji: '1faba',
   name: '蜘蛛卵',
-  element: 'dark',
   desc: '蛛后产在草里的一窝卵，原地不动，6 秒内不打破就结成一张会缠人的蜘蛛网',
   size: 1,
   radius: 0.4,

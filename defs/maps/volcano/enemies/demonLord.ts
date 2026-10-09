@@ -65,7 +65,7 @@ const DEMON_LORD = {
   emoji: '1f47f',
   name: '炎魔',
   element: 'fire',
-  desc: '火山深处爬出来的炎魔，不怕岩浆：炎剑一扫大半圈，砍中的身上烧起来；往最近的四名队员头上各砸一团地狱火，落处烧三秒；隔一阵挺剑冲锋。血掉到一半就魔化成暗元素、出手更快：横扫改成让人致盲，地狱火换成魂链——拴住最近的一人，两秒半内没跑到它六格外就晕倒，再挨一记重击',
+  desc: '火山深处爬出来的炎魔，不怕岩浆：炎剑一扫大半圈，砍中的身上烧起来；往最近的四名队员头上各砸一团地狱火，落处烧三秒；隔一阵挺剑冲锋。血掉到一半就魔化、出手更快：横扫改成让人致盲，地狱火换成魂链——拴住最近的一人，两秒半内没跑到它六格外就晕倒，再挨一记重击',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -78,7 +78,7 @@ const DEMON_LORD = {
   traits: ['fireproof', 'anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [flameSweep, hellfire, flameCharge],
-  phases: [{ below: 0.5, name: '魔化', element: 'dark', abilities: [darkSweep, soulChain, flameCharge], stats: { mul: { cooldown: 0.85 } } }],
+  phases: [{ below: 0.5, name: '魔化', abilities: [darkSweep, soulChain, flameCharge], stats: { mul: { cooldown: 0.85 } } }],
 } satisfies EnemyDef
 
 export default DEMON_LORD

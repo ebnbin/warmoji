@@ -42,7 +42,6 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f57a',
   name: '舞王',
-  element: 'dark',
   desc: '一进敌群就停不下来的舞王：原地一转两圈，扫开身边的敌人，同一个挨满三下就被迷得朝他走来；技能在脚下铺开一片舞池，池里的敌人一边挨打一边被迷住',
   role: 'bruiser',
   tags: ['damage', 'melee', 'area'],

@@ -5,6 +5,7 @@ import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { displace } from './shared/displace'
 import { mend } from './shared/heal'
+import { zoneSoaks } from './shared/elements'
 import { backEaseOut } from '../utils/ease'
 import { addMark } from '../utils/marks'
 import { isSameEntity } from '../utils/identity'
@@ -109,7 +110,7 @@ function port(sim: Sim, z: number, x: number, y: number, r: number): void {
   }
 }
 
-/** 场每帧：跟随、到期结算、回复、牵引、迷雾、停留、陷阱、传送门；每到节拍对场内对象扣血（只打敌方）再施加效果；一个身体一个节拍内只吃一个场的血；敌我同一条 */
+/** 场每帧：跟随、到期结算、回复、牵引、迷雾、停留、陷阱、传送门；每到节拍对场内对象扣血（只打敌方）、让场内敌方沾上场的元素，再施加效果；一个身体一个节拍内只吃一个场的血；敌我同一条 */
 export function updateZones(sim: Sim): void {
   const world = sim.world
   const zones = [...query(world, ZONE_SET)]
@@ -151,7 +152,7 @@ export function updateZones(sim: Sim): void {
     const rate = Zone.mend[z]! * attackOf(sim, src).healing
     if (rate > 0) {
       eachAlly(sim, src.faction, x, y, r, false, (eid, tx, ty) => {
-        if (inside(x, y, r, tx, ty)) mend(eid, rate * dt)
+        if (inside(x, y, r, tx, ty)) mend(sim, eid, rate * dt)
       }, src.realm)
     }
     const pull = Zone.pull[z]!
@@ -184,14 +185,19 @@ export function updateZones(sim: Sim): void {
     const effects = zoneEffects[z]
     const found = whoIn(sim, z, src, x, y, r)
     const uids = found.map((t) => Uid.v[t]!)
+    const foes = Zone.who[z] === ZONE_WHO.allies ? [] : foesIn(sim, src, x, y, r)
+    const foeUids = foes.map((t) => Uid.v[t]!)
     if (damage > 0) {
-      for (const t of Zone.who[z] === ZONE_WHO.allies ? [] : foesIn(sim, src, x, y, r)) {
+      for (const t of foes) {
         const last = ZoneHit.last[t]!
         if (last !== 0 && now - last < tickMs) continue
         ZoneHit.last[t] = now
         hit(sim, src, t, damage, { tick: true, tags: HIT.area })
       }
     }
+    foes.forEach((t, i) => {
+      if (Alive.v[t] && Uid.v[t] === foeUids[i]) zoneSoaks(sim, src, t, damage)
+    })
     if (effects && effects.length > 0 && found.length > 0) {
       applyAbilityEffects(sim, src, effects, { x, y, baseDamage: damage, targets: unchanged(sim, found, uids).filter((t) => Alive.v[t]) })
     }

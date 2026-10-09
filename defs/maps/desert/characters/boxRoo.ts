@@ -69,7 +69,6 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f998',
   name: '拳击袋鼠',
-  element: 'earth',
   desc: '戴着拳套的袋鼠：左右勾拳一下接一下，打完两轮再补一记上勾拳把人打飞；技能先硬吃 2.5 秒，把挨的打记下来加倍震回去，再按一次就当场震开、朝一个方向飞踢出去',
   role: 'bruiser',
   tags: ['damage', 'defense', 'melee', 'mobile'],

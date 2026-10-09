@@ -56,7 +56,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9dc',
   name: '人鱼',
-  element: 'light',
   desc: '人鱼轮着来：唱一段歌给 4.5 格内最伤的队友回 10 点血，再朝 6 格内最近的敌人弹一颗珍珠；没人受伤时歌声落空，没有敌人时珍珠落空，两样照样轮着来；技能把倒下的队友都唱醒，全队回血',
   role: 'support',
   tags: ['support', 'ranged'],

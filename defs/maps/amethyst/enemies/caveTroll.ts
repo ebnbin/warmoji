@@ -4,7 +4,6 @@ const CAVE_TROLL = {
   kind: 'caveTroll',
   emoji: '1f9cc',
   name: '洞穴巨怪',
-  element: 'earth',
   desc: '从暗道深处挤出来的巨怪，又大又慢：一把揪住面前的人往身后一扔，摔在地上晕 0.6 秒；隔一阵抡起木棒横扫面前一大片',
   size: 1.8,
   radius: 0.65,

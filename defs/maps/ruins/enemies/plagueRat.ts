@@ -4,7 +4,6 @@ const PLAGUE_RAT = {
   kind: 'plagueRat',
   emoji: '1f400',
   name: '瘟鼠',
-  element: 'wood',
   desc: '成群窜过来的老鼠，又小又快，被它碰到就染上瘟病，3 秒里一阵阵掉血；个子矮，平射的子弹容易从它头上飞过去',
   size: 0.95,
   radius: 0.36,

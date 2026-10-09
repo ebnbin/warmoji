@@ -46,7 +46,6 @@ export const levels = [{ mul: { summonDamage: 1.2 } }, { add: { maxHp: 20 }, mul
 export default {
   emoji: '1f9d1_200d_1f393',
   name: '研究生',
-  element: 'wood',
   desc: '走到哪儿接种到哪儿：边走边放下会朝敌人射孢子的培养皿；技能拉着全队熬夜赶论文，一阵子里大家出手都快了',
   role: 'summoner',
   tags: ['damage', 'summon'],

@@ -5,7 +5,6 @@ const MOLD = {
   kind: 'mold',
   emoji: '1f344',
   name: '霉菌',
-  element: 'wood',
   desc: '长在原地不动，也不碰人；每 5 秒长大一圈，一直长到原来的 1.8 倍；每 5 秒放出两个孢子，最多同时 6 个，不除掉就一直放',
   size: 1.3,
   radius: 0.5,

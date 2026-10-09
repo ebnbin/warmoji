@@ -37,7 +37,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f407',
   name: '野兔',
-  element: 'wood',
   desc: '一蹬就跃到敌人身上，专挑残血的补刀，踢死了立刻再跳；危险了就钻进草里不见',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

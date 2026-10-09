@@ -4,7 +4,6 @@ const GOAT = {
   kind: 'goat',
   emoji: '1f410',
   name: '山羊',
-  element: 'earth',
   desc: '从坡顶一路蹦下来，落地就低头冲顶，被顶中的人飞出去老远',
   size: 1.25,
   radius: 0.46,

@@ -4,7 +4,6 @@ const QUAKER = {
   kind: 'quaker',
   emoji: '1fae8',
   name: '地动怪',
-  element: 'earth',
   desc: '浑身打哆嗦的地动怪，皮也厚：凑近了就抖得更凶，抖上一阵一跺脚，震出三格的地震，震中的人晕上一会儿',
   size: 1.35,
   radius: 0.5,
