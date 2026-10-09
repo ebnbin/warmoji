@@ -351,7 +351,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     byUid: by >= 0 ? Uid.v[by]! : 0,
     element: el,
     share: dmg / Math.max(1, Hp.max[target]!),
-    skill: src.ability !== undefined && hasComponent(sim.world, src.ability, Manual),
+    skill: !o.tick && src.ability !== undefined && hasComponent(sim.world, src.ability, Manual),
     at: now,
     fxAt: sim.fxMs,
   })

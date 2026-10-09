@@ -652,6 +652,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       stop: (ms) => this.hitStop(ms),
       skill: (color) => this.hud.emit(HudEvent.SkillFired, color),
       cues: hitCues,
+      pace: { skillUntil: -Infinity },
       shake: () => {
         if (this.hitShakeOn) this.lens.screen.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
       },

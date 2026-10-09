@@ -21,6 +21,8 @@ export interface Show {
   readonly stop: (ms: number) => void
   readonly numbers: DamageNumbers | null
   readonly cues: HitCues
+  /** 主动技能放出后多久之内打中才顿帧（画面时钟）：只顿一次，召唤物、留下的场后来打中的不顿 */
+  readonly pace: { skillUntil: number }
 }
 
 /** 敌人挨打闪白的时长，世界时钟 */
@@ -44,8 +46,8 @@ const SKILL_COLOR = 0xffe082
 /** 元素反应的名字飘在挨打处上方这么高 */
 const REACT_RISE = 44
 
-/** 顿帧的毫秒数：精英与头目倒下、队员一下掉 heavyShare 以上的血、主动技能打中 */
-const STOP = { strongKill: 90, heavyHurt: 60, heavyShare: 0.12, skill: 45 } as const
+/** 顿帧的毫秒数：精英与头目倒下、队员一下掉 heavyShare 以上的血、主动技能放出后 skillWindow 毫秒内打中 */
+const STOP = { strongKill: 90, heavyHurt: 60, heavyShare: 0.12, skill: 45, skillWindow: 400 } as const
 
 function unhandled(e: never): never {
   throw new Error(`模拟发出的事没有演法：${JSON.stringify(e)}`)
@@ -92,7 +94,11 @@ function damage(e: Extract<SimEvent, { kind: 'damage' }>, show: Show): number {
   const from = e.trace ?? e.from
   if (from) pushHitCue(show.cues, HIT_CUE.spark, e.x, e.y, from.x, from.y, color, e.fxAt)
   if (e.trace) pushHitCue(show.cues, HIT_CUE.trace, e.x, e.y, e.trace.x, e.trace.y, e.team ? FOE_TRACE : color, e.fxAt)
-  if (!e.team) return e.skill ? STOP.skill : 0
+  if (!e.team) {
+    if (!e.skill || e.fxAt > show.pace.skillUntil) return 0
+    show.pace.skillUntil = -Infinity
+    return STOP.skill
+  }
   show.shake()
   if (e.from) pushHitCue(show.cues, HIT_CUE.hurt, e.x, e.y, e.from.x, e.from.y, HURT_COLOR, e.fxAt, e.eid, e.uid)
   blame(show.world, e.by, e.byUid, e.at)
@@ -102,6 +108,8 @@ function damage(e: Extract<SimEvent, { kind: 'damage' }>, show: Show): number {
 /** 把模拟发出的事演出来：声音、伤害数字与打中的指示、震屏与顿帧、挨打与增益的闪色、落地回弹；身体已经换了人的只出声不闪 */
 export function feedback(events: readonly SimEvent[], show: Show): void {
   let stop = 0
+  // 技能当场打中的几下排在放出这件事前面
+  for (const e of events) if (e.kind === 'skill') show.pace.skillUntil = e.fxAt + STOP.skillWindow
   for (const e of events) {
     switch (e.kind) {
       case 'damage':
