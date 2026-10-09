@@ -2,7 +2,7 @@ import { hasComponent, query } from 'bitecs'
 import { Alive, Faction, Lifetime, MARK, MARK_SLOTS, Mark, Radius, TAG, Transform, Uid, Zone } from '../../components'
 import { BURN, CHILL, CONDUCT, EL, IGNITE, POISON, REACTIONS, reactionIndex, SHOCK, WET_MS } from '../../../data/elements'
 import { TENACITY } from '../../../data/enemies'
-import { addCc, addMark, clearMarks, isSteadfast, markSlot, realmOf } from '../../utils/marks'
+import { addCc, addMark, clearMarks, hasMark, isSteadfast, markSlot, realmOf } from '../../utils/marks'
 import { burnProof, coldProof, isBurning, isChilled, isFrozen, isWet, poisonProof, shockProof } from '../../utils/element'
 import { eachAlly, targetsWithin } from '../../utils/targets'
 import { HIT } from '../../utils/hitTags'
@@ -109,8 +109,10 @@ export function elementLands(sim: Sim, src: Source, t: number, el: number, dealt
         return 'thaw'
       }
       if (isWet(sim, t)) {
+        // 本身是水、泡在水里的蒸不干，火照样点不着，只是不再起反应
+        const dried = hasMark(sim, t, MARK.wet)
         clearMarks(t, [MARK.wet])
-        return 'quench'
+        return dried ? 'quench' : undefined
       }
       if (dealt > 0 && !burnProof(sim, t)) setBurn(sim, src, t, dealt * BURN.ratio, now + BURN.durationMs)
       return undefined
