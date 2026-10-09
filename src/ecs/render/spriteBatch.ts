@@ -7,7 +7,8 @@ import type { UnitLight } from '../../types/maps'
 import { LayerType } from './layer'
 import { quadNode, SpriteBatch } from './sprites'
 import type { LightAt, PaintSprite } from './sprites'
-import { rimOf } from './side'
+import { rimOf, shotOf } from './side'
+import { TINT_FILL } from './tint'
 export { SPRITE_BANDS } from './bands'
 
 /** z 在 [zMin, zMax) 里的实体精灵，与 paint 里同一段 z 的图按 z 排在一起画 */
@@ -59,15 +60,25 @@ export class EcsSpriteBatch extends SpriteBatch {
       for (; p < paint.length && paint[p]!.z < Depth.z[eid]!; p++) self.drawPaint(node, drawingContext, paint[p]!)
       const frame = Sprite.frame[eid]!
       if (frame < 0) continue
-      const gx = Transform.x[eid]!
-      const gy = Transform.y[eid]!
-      const w = Transform.w[eid]!
-      const h = Transform.h[eid]!
+      const x = Transform.x[eid]! + VisOff.x[eid]!
+      const y = Transform.y[eid]! + VisOff.y[eid]!
+      let w = Transform.w[eid]!
+      let h = Transform.h[eid]!
+      let alpha = Tint.alpha[eid]!
+      const shot = shotOf(self.world, eid)
+      if (shot) {
+        const k = Math.max(shot.size, shot.min / (w || 1))
+        w *= k
+        h *= k
+        alpha *= shot.alpha
+        const g = shot.glow
+        if (g) self.draw(node, drawingContext, x, y, 0, w * g.size, h * g.size, 0, self.atlas.glow, 0, g.color, alpha * g.alpha, TINT_FILL, null)
+      }
       self.draw(
         node, drawingContext,
-        gx + VisOff.x[eid]!, gy + VisOff.y[eid]!, Transform.rot[eid]!,
+        x, y, Transform.rot[eid]!,
         w, h, Sprite.flipX[eid]!, frame, Quad.v[eid]!,
-        Tint.color[eid]!, Tint.alpha[eid]!, Tint.effect[eid]!, rimOf(self.world, eid, leader),
+        Tint.color[eid]!, alpha, Tint.effect[eid]!, shot ? shot.rim : rimOf(eid, leader),
       )
     }
     for (; p < paint.length && paint[p]!.z < self.zMax; p++) self.drawPaint(node, drawingContext, paint[p]!)

@@ -16,6 +16,23 @@ function rasterize(raw: string): Promise<HTMLImageElement> {
   return svgToImage(setSvgSize(raw, CELL))
 }
 
+/** 一团中间实、往外渐渐淡没的白：染成什么颜色就是什么颜色的光晕 */
+function glowCell(): HTMLCanvasElement {
+  const cv = document.createElement('canvas')
+  cv.width = CELL
+  cv.height = CELL
+  const g = cv.getContext('2d')
+  if (!g) throw new Error('光晕拿不到 2D 画布')
+  const r = CELL / 2
+  const grad = g.createRadialGradient(r, r, 0, r, r, r)
+  grad.addColorStop(0, 'rgba(255,255,255,1)')
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.75)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, CELL, CELL)
+  return cv
+}
+
 const NO_CLIP = { base: -1, frames: 0 }
 
 let atlasSerial = 0
@@ -27,6 +44,8 @@ export class EcsAtlas {
   private readonly pageOf: Int32Array
   private readonly keyToFrame = new Map<string, number>()
   private readonly reportedMissing = new Set<string>()
+  /** 光晕那一格 */
+  readonly glow: number
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
@@ -63,6 +82,8 @@ export class EcsAtlas {
   private constructor() {
     this.uv = new Float32Array(MAX_FRAMES * 4)
     this.pageOf = new Int32Array(MAX_FRAMES)
+    this.glow = this.alloc()
+    this.place(this.glow, glowCell())
   }
 
   private alloc(): number {
@@ -206,7 +227,7 @@ export class EcsAtlas {
   }
 
   private static async create(scene: Phaser.Scene, ids: readonly string[]): Promise<EcsAtlas> {
-    if (ids.length > MAX_FRAMES) console.error(`图集放不下这一局要画的 ${ids.length} 个 emoji，上限 ${MAX_FRAMES}`)
+    if (ids.length + 1 > MAX_FRAMES) console.error(`图集放不下这一局要画的 ${ids.length} 个 emoji，上限 ${MAX_FRAMES - 1}`)
     const atlas = new EcsAtlas()
     const imgs = await Promise.all(
       ids.map(async (id) => {

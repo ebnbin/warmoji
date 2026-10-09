@@ -30,6 +30,7 @@ import type { Scratch } from './render/tri'
 import { packTint, TINT_FILL } from './render/tint'
 import { SIDE } from './render/side'
 import { footY } from './utils/ground'
+import { FOE_SHOT_Z } from './present/layerShots'
 import type { PaintSprite } from './render/sprites'
 import type { Sim } from './sim'
 
@@ -66,8 +67,8 @@ const HEAD_GAP = 3
 const HEAD_LEN = 9
 const HEAD_W = 6
 
-/** 队长被后画的身体盖住时，在最上面透出它的金色剪影 */
-const XRAY_Z = 60
+/** 队长被后画的身体盖住时，在最上面透出它的金色剪影，只压在敌方弹体下面 */
+const XRAY_Z = FOE_SHOT_Z - 1
 const XRAY_ALPHA = 0.5
 /** 盖住队长的身体：队长的中心落在它画面的中间这一成里 */
 const XRAY_COVER = 0.35

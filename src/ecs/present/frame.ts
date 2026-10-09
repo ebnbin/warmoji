@@ -6,6 +6,7 @@ import { animateShards } from './animateShards'
 import { blinkTelegraphs, hideTelegraphs } from './blinkTelegraphs'
 import { characterVisual } from './characterVisual'
 import { fadeEnemyFlash } from './fadeEnemyFlash'
+import { layerShots } from './layerShots'
 import { finishEnemyPops, popInEnemies } from './popInEnemies'
 import { showMounted } from './showMounted'
 import { stepPickupVisuals } from './stepPickupVisuals'
@@ -23,6 +24,7 @@ export function presentFrame(sim: Sim, dtMs: number): void {
   animateCharacters(sim, dtMs)
   animateEnemies(sim)
   animateBees(sim)
+  layerShots(sim)
   characterVisual(sim)
   blinkTelegraphs(sim)
   animateShards(sim)

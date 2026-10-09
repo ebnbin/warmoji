@@ -71,7 +71,7 @@ export function quadNode(renderer: Phaser.Renderer.WebGL.WebGLRenderer): QuadNod
 
 /** 一层图集里的图，按地图给的光画，按 paint 的次序画；不碰实体 */
 export class SpriteBatch extends EcsLayer {
-  private readonly atlas: EcsAtlas
+  protected readonly atlas: EcsAtlas
   private readonly uv = new Float32Array(4)
   private readonly spriteMatrix = new Phaser.GameObjects.Components.TransformMatrix()
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
