@@ -17,13 +17,13 @@ export const FIGHTS = {
         {
           intro: { title: '坡顶来敌', sub: '敌人只从坡顶被抛下来' },
           mix: [
-            { kind: 'zombie', weight: 4 },
-            { kind: 'boar', weight: 2 },
-            { kind: 'locust', weight: 2 },
+            { kind: 'wolf', weight: 4 },
+            { kind: 'tusker', weight: 2 },
+            { kind: 'goat', weight: 2 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 700, ramp: { toMs: 380, overMs: 60_000 }, at: { kind: 'gate', gate: 'bank' } },
-            { kind: 'batch', atMs: 40_000, squad: { count: 6, enemy: 'boar', elites: 1, at: { kind: 'gate', gate: 'bank' } }, banner: { title: '山猪群', sub: '一群山猪从坡顶冲下来' } },
+            { kind: 'batch', atMs: 40_000, squad: { count: 6, enemy: 'tusker', elites: 1, at: { kind: 'gate', gate: 'bank' } }, banner: { title: '野猪群', sub: '一群野猪从坡顶冲下来' } },
           ],
           ends: [{ kind: 'time', ms: 75_000 }],
         },
@@ -45,14 +45,14 @@ export const FIGHTS = {
         {
           intro: { title: '守栅门', sub: '别让怪物摸到栅栏门' },
           spawns: [
-            { kind: 'stream', intervalMs: 1300, ramp: { toMs: 750, overMs: 80_000 }, enemy: 'zombie', drive: { kind: 'march', mark: 'gate' }, at: { kind: 'gate', gate: 'woods' } },
-            { kind: 'stream', fromMs: 20_000, intervalMs: 5000, enemy: 'boar', drive: { kind: 'march', mark: 'gate' }, at: { kind: 'gate', gate: 'woods' } },
+            { kind: 'stream', intervalMs: 1300, ramp: { toMs: 750, overMs: 80_000 }, enemy: 'wolf', drive: { kind: 'march', mark: 'gate' }, at: { kind: 'gate', gate: 'woods' } },
+            { kind: 'stream', fromMs: 20_000, intervalMs: 5000, enemy: 'tusker', drive: { kind: 'march', mark: 'gate' }, at: { kind: 'gate', gate: 'woods' } },
             {
               kind: 'stream',
               intervalMs: 3200,
               mix: [
-                { kind: 'snake', weight: 2 },
-                { kind: 'rat', weight: 1 },
+                { kind: 'grassSnake', weight: 2 },
+                { kind: 'cheshire', weight: 1 },
               ],
               at: { kind: 'gate', gate: 'brush' },
             },
@@ -81,10 +81,10 @@ export const FIGHTS = {
         {
           intro: { title: '接力', sub: '每 10 秒换下一名队员当队长' },
           mix: [
-            { kind: 'zombie', weight: 4 },
-            { kind: 'locust', weight: 2 },
-            { kind: 'boar', weight: 1 },
-            { kind: 'snake', weight: 1 },
+            { kind: 'wolf', weight: 4 },
+            { kind: 'goat', weight: 2 },
+            { kind: 'tusker', weight: 1 },
+            { kind: 'grassSnake', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 600 }],
           ends: [

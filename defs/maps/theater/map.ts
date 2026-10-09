@@ -29,8 +29,8 @@ export default {
     boss: 'trap',
     kinds: {
       trap: { name: '活门', at: { kind: 'mark' }, enter: 'rise', look: 'paper', snapU: 1, weight: 3, perSec: 1.5 },
-      edge: { name: '台边', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'paper', weight: 3, perSec: 1.5, only: ['zombie', 'rat', 'skeleton', 'knight', 'mushroom', 'raccoon', 'elf', 'comedyMask', 'tragedyMask', 'madClown', 'spadeGuard'] },
-      wings: { name: '布景后', at: { kind: 'mark' }, enter: 'walk', look: 'paper', snapU: 5, weight: 3, perSec: 1, only: ['zombie', 'skeleton', 'knight', 'rat', 'raccoon', 'elf', 'gargoyle', 'mushroom', 'comedyMask', 'tragedyMask', 'spadeGuard', 'usher', 'flirt', 'cheshire'] },
+      edge: { name: '台边', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'paper', weight: 3, perSec: 1.5, only: ['comedyMask', 'tragedyMask', 'madClown', 'spadeGuard', 'cheshire', 'roach', 'wallRhino', 'deathcap', 'usher'] },
+      wings: { name: '布景后', at: { kind: 'mark' }, enter: 'walk', look: 'paper', snapU: 5, weight: 3, perSec: 1, only: ['comedyMask', 'tragedyMask', 'spadeGuard', 'usher', 'flirt', 'cheshire', 'madClown', 'roach', 'wallRhino', 'geodeling', 'deathcap'] },
       print: { name: '地布下', at: { kind: 'ground' }, enter: 'rise', look: 'paper', weight: 1 },
     },
   },

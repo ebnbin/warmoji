@@ -5,7 +5,7 @@ const TUSKER = {
   emoji: '1f417',
   name: '野猪',
   element: 'earth',
-  desc: '低头刨地蓄力，朝人直直冲出一大段，撞上就被顶开；冲完要喘口气，侧面躲得开',
+  desc: '低头刨地蓄力，朝人直直冲出一大段，撞上就被顶开；冲完要喘口气，侧面躲得开；倒下后留下一具半透明的尸壳，杵在原地 3 秒骗走队伍的火力',
   size: 1.4,
   radius: 0.52,
   span: [0, 1],
@@ -30,6 +30,7 @@ const TUSKER = {
       shape: { kind: 'sprint', distance: 5, ms: 520, radius: 0.9 },
     },
   ],
+  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }] }],
 } satisfies EnemyDef
 
 export default TUSKER
