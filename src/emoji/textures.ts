@@ -37,6 +37,20 @@ export function emojiPackStats(): { ids: number } | undefined {
   return loadedPack ? { ids: loadedPack.ids.length } : undefined
 }
 
+/** 一段文字恰好是一个有图的 emoji 时它的 ID：码位按十六进制用下划线连起来，资源里不带 fe0f 的去掉它再找 */
+export function emojiIdOf(text: string): string | undefined {
+  const cps = [...text.trim()].map((ch) => ch.codePointAt(0)!.toString(16))
+  const has = (id: string): boolean => loadedPack?.bodyById.has(id) ?? false
+  const full = cps.join('_')
+  const bare = cps.filter((cp) => cp !== 'fe0f').join('_')
+  return [full, bare].find((id) => id !== '' && has(id))
+}
+
+/** emoji 的 ID 写回文字 */
+export function emojiTextOf(id: string): string {
+  return String.fromCodePoint(...id.split('_').map((cp) => parseInt(cp, 16)))
+}
+
 export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }

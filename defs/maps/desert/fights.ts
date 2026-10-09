@@ -137,7 +137,7 @@ export const FIGHTS = {
           ],
           spawns: [
             { kind: 'stream', intervalMul: 1.3 },
-            { kind: 'stream', fromMs: 30_000, untilMs: 50_000, intervalMul: 1 },
+            { kind: 'stream', fromMs: 30_000, untilMs: 50_000 },
             { kind: 'batch', atMs: 40_000, squad: { count: 8, eliteChance: 0.2, at: { kind: 'gate', gate: 'crest' } }, banner: { title: '丘顶', sub: '一群从沙丘顶上翻下来' } },
           ],
           ends: [{ kind: 'time', ms: 75_000 }],

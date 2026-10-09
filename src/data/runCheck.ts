@@ -45,6 +45,7 @@ const PLACES: Readonly<Record<string, (n: number | undefined) => string>> = {
   phases: (n) => `第 ${n} 阶段`,
   spawns: (n) => `第 ${n} 条刷怪`,
   ends: (n) => `第 ${n} 条结束规则`,
+  cues: (n) => `第 ${n} 条地图指令`,
   squad: () => '这一队',
   squads: (n) => `第 ${n} 组`,
   escort: () => '护卫',
