@@ -91,7 +91,7 @@ export const Alive = { v: u8() }
 
 export const CharScale = { v: f32() }
 /** 倒地与归队：at 是复活的时刻；fell、rose 是倒下、归队时的画面时钟；drop 为 1 是正从空中落回坑位 */
-export const Revive = { at: f32(), fell: f32(), rose: f32(), drop: u8() }
+export const Revive = { fell: f32(), rose: f32(), drop: u8() }
 
 export const MARK_SLOTS = 16
 

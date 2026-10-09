@@ -47,14 +47,6 @@ export const ITEMS = {
     maxStacks: 3,
     stats: { add: { iframes: 150 } },
   },
-  reviveWatch: {
-    emoji: '23f1',
-    name: '复活怀表',
-    rarity: 'common',
-    price: 22,
-    maxStacks: 3,
-    stats: { add: { revive: -2000 } },
-  },
   helmet: {
     emoji: '1fa96',
     name: '钢盔',

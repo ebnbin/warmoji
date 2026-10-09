@@ -7,7 +7,6 @@ export const STATS = {
   armor: { name: '护甲', base: 0, unit: 'count', category: 'survival', better: 'higher' },
   dodge: { name: '闪避', base: 0, min: 0, max: 0.6, unit: 'chance', category: 'survival', better: 'higher' },
   iframes: { name: '受击无敌', base: 0, min: 0, unit: 'ms', category: 'survival', better: 'higher' },
-  revive: { name: '复活时间', base: 0, min: 1000, unit: 'ms', category: 'survival', better: 'lower' },
   taken: { name: '受到伤害', base: 1, min: 0, unit: 'ratio', category: 'survival', better: 'lower' },
   blocks: { name: '每波护盾', base: 0, min: 0, unit: 'count', category: 'survival', better: 'higher' },
   thorns: { name: '近战反伤', base: 0, min: 0, unit: 'count', category: 'survival', better: 'higher' },

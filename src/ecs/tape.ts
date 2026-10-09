@@ -5,9 +5,9 @@ import type { SandboxState } from './sandbox/knobs'
 import { numChoiceValues, pinNumChoices } from './systems/shared/devNumbers'
 import type { Sim } from './sim'
 import type { RunState } from '../run/state'
-import type { CharacterId } from '../types/characters'
+import type { Claim } from '../run/levelUp'
 
-const TAPE_VERSION = 1
+const TAPE_VERSION = 2
 
 /** 每走这么多步记一次校验值 */
 const CHECK_EVERY = 60
@@ -17,6 +17,8 @@ export type DevCommand =
   /** n 是放这张图的第几个头目 */
   | { readonly kind: 'spawn'; readonly what: 'one' | 'elite' | 'surge' | 'boss'; readonly n?: number }
   | { readonly kind: 'killAll' }
+  /** 打倒一名队员：队长以外站着的先倒 */
+  | { readonly kind: 'down' }
   | { readonly kind: 'grant'; readonly what: 'coins' | 'level' }
   | { readonly kind: 'endWave' }
   | { readonly kind: 'nextPhase' }
@@ -29,7 +31,7 @@ export type TapeEvent =
   | { readonly t: number; readonly k: 'move'; readonly x: number; readonly y: number; readonly raw: number }
   | { readonly t: number; readonly k: 'cast'; readonly dir: { readonly x: number; readonly y: number } | null; readonly hold: number }
   | { readonly t: number; readonly k: 'switch'; readonly slot: number }
-  | { readonly t: number; readonly k: 'claims'; readonly recruits: readonly CharacterId[]; readonly upgrades: readonly number[] }
+  | { readonly t: number; readonly k: 'claim'; readonly claim: Claim }
   | { readonly t: number; readonly k: 'dev'; readonly cmd: DevCommand }
   | { readonly t: number; readonly k: 'settings'; readonly sandbox: SandboxState; readonly tuning: Readonly<Record<string, number>> }
 

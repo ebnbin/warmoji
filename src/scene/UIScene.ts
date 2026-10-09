@@ -19,6 +19,8 @@ type IconState = 'ready' | 'cooling' | 'dead'
 interface SquadIcon {
   readonly dial: DialButton
   shownState: IconState
+  /** 这一格上是谁：半路换了人就整排重建 */
+  readonly shownName: string
 }
 
 /** 阵亡优先于冷却：倒地的人不显示技能冷却 */
@@ -295,7 +297,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
       })
         .setScale(isLeader ? RING.leaderScale : 1)
         .setDepth(isLeader ? DEPTH.leader : DEPTH.squad)
-      return { dial, shownState: 'ready' as IconState }
+      return { dial, shownState: 'ready' as IconState, shownName: member.name }
     })
     this.squadShown = { leader: s.leaderSlot, switching: false }
     this.squad.forEach((b, slot) => this.styleSquadIcon(b, s.members[slot]!, slot === s.leaderSlot, false))
@@ -397,7 +399,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
     b.dial
       .setDim(switching)
       .setIcon(skill ? m.skillIcon : m.emoji, 'player')
-      .setDead(dead, m.reviveSec)
+      .setDead(dead)
       .setHp(dead ? null : Math.max(0, Math.min(1, m.max > 0 ? m.hp / m.max : 0)))
       .setStamina(dead ? null : m.stamina, staminaTone(m.stamina))
     // 徽章：队长显示头像，不能放技能时显示禁止，阵亡显示骷髅，冷却中的队员显示技能图标
@@ -410,7 +412,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
   private updateSquad(): void {
     const s = this.arena.squadSnapshot()
     if (!s) return
-    if (s.members.length !== this.squad.length) this.createSquad(s)
+    if (s.members.length !== this.squad.length || s.members.some((m, i) => m.name !== this.squad[i]!.shownName)) this.createSquad(s)
     const leaderChanged = s.leaderSlot !== this.squadShown.leader
     if (leaderChanged) this.swapLeader(this.squadShown.leader, s.leaderSlot)
     const switchChanged = s.switching !== this.squadShown.switching
@@ -426,7 +428,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
       }
       const dial = b.dial.setTired(m.tired)
       if (state === 'dead') {
-        dial.setDead(true, m.reviveSec)
+        dial.setDead(true)
         return
       }
       if (state === 'cooling') dial.setCooldown(m.cdMs > 0 ? m.cdRemainMs / m.cdMs : 0, Math.ceil(m.cdRemainMs / 1000))

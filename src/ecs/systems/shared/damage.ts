@@ -43,15 +43,14 @@ interface HitOpts {
 function record(sim: Sim, src: Source, target: number, dmg: number): void {
   const st = sim.run.stats
   if (Faction.v[target] === FACTION.team) {
-    const slot = hasComponent(sim.world, target, Slot) ? Slot.v[target]! : -1
-    if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + dmg
+    const id = hasComponent(sim.world, target, Slot) ? sim.run.roster[Slot.v[target]!] : undefined
+    if (id !== undefined) st.damageTaken[id] = (st.damageTaken[id] ?? 0) + dmg
     if (src.enemy) st.enemyDamage[src.enemy] = (st.enemyDamage[src.enemy] ?? 0) + dmg
     if (src.hazard) st.hazardDamage[src.hazard] = (st.hazardDamage[src.hazard] ?? 0) + dmg
     return
   }
-  if (src.slot >= 0 && src.slot < st.damage.length) {
-    st.damage[src.slot] = (st.damage[src.slot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[target]!))
-  }
+  const by = src.slot >= 0 ? sim.run.roster[src.slot] : undefined
+  if (by !== undefined) st.damage[by] = (st.damage[by] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[target]!))
 }
 
 function blockFx(sim: Sim, target: number, color: number): void {

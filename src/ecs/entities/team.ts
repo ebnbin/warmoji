@@ -1,16 +1,20 @@
+import { query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { fanSlots } from '../../data/formation'
 import { REJOIN, SQUAD } from '../../data/feel'
 import { TEAM } from '../../data/characters'
-import { leaderSlot } from '../../run/state'
+import { leaderSlot, seatLeader } from '../../run/state'
 import type { RunState } from '../../run/state'
 import type { StatMods } from '../../types/stats'
 import type { FrameIndex } from '../frames'
-import { Alive, FACTION, Hp, Transform, Uid } from '../components'
+import { Alive, FACTION, Hp, Nest, Transform, Uid } from '../components'
 import { fightMods } from '../fight/state'
 import { startPop } from '../utils/pop'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { mend } from '../systems/shared/heal'
+import { raise, rejoin } from '../systems/shared/combat'
+import { finishHandover, firstUp, switchLeader } from '../systems/shared/leader'
+import { unequipAbilities } from './ability'
 import { leaderX, leaderY } from '../utils/team'
 import { spawnCharacter } from './character'
 import { rearmCharacter } from './form'
@@ -25,9 +29,10 @@ export interface TeamLayout {
   leader: number
 }
 
-/** 队长站在出生点，其余按入队顺序排在身后的扇形上；mods 是这一场给队伍的常驻修正 */
+/** 队长站在出生点，其余按入队顺序排在身后的扇形上；隐藏顺序的队首倒着就交给后面第一个站着的；mods 是这一场给队伍的常驻修正 */
 export function formTeam(world: EcsWorld, atlas: FrameIndex, run: RunState, x: number, y: number, mods: readonly StatMods[]): TeamLayout {
   const count = run.roster.length
+  seatLeader(run)
   const lead = leaderSlot(run)
   const fan = fanSlots(Math.max(0, count - 1), SQUAD.fanDistance, SQUAD.fanSpreadDeg, 0, -1)
   const characters: number[] = []
@@ -90,5 +95,37 @@ export function relevel(sim: Sim, slot: number): void {
   foldBody(sim.world, sim, m)
   if (Alive.v[m]) mend(m, Math.max(0, Hp.max[m]! - before))
   rearmCharacter(sim, m)
+  glow(sim, m)
+}
+
+/** 换下场：带走他的能力与召唤物，跟着他的不再认他，从世界里拿掉 */
+function bench(sim: Sim, eid: number): void {
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
+  unequipAbilities(sim, eid)
+  for (const e of query(sim.world, [Transform])) if (Nest.of[e] === eid) Nest.of[e] = -1
+  removeEntity(sim.world, eid)
+}
+
+/** 半路换人：名单上这一格已经换好；换上来的满生命从空中落进队伍，换下的是队长就先交给隐藏顺序里下一个站着的 */
+export function swapTeam(sim: Sim, slot: number): void {
+  const old = sim.characters[slot]!
+  const eid = spawnCharacter(sim.world, sim.frames, sim.run, { slot, x: Transform.x[old]!, y: Transform.y[old]!, depthOffsetY: 0, sizeMul: TEAM.followerSizeMul }, fightMods(sim.fight, FACTION.team))
+  sim.characters[slot] = eid
+  if (old === sim.leader) {
+    switchLeader(sim, firstUp(sim, old))
+    finishHandover(sim)
+  }
+  bench(sim, old)
+  sim.fight.rescueMs[slot] = 0
+  armMember(sim, slot)
+  rejoin(sim, eid)
+  glow(sim, eid)
+}
+
+/** 恢复：生命回满，倒下的复活，从空中落回队伍 */
+export function restoreMember(sim: Sim, slot: number): void {
+  const m = sim.characters[slot]!
+  if (Alive.v[m]) mend(m, Hp.max[m]!)
+  else raise(sim, m)
   glow(sim, m)
 }

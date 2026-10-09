@@ -103,7 +103,7 @@ export const FIGHTS = {
       name: '废墟救援',
       map: 'ruins',
       clockSec: 90,
-      rules: { revive: false, rescue: { ms: 2500, radius: 1.2 } },
+      rules: { rescue: { ms: 2500, radius: 1.2 } },
       phases: [
         {
           intro: { title: '废墟救援', sub: '倒下要队长去扶，累计倒下 4 次就输' },

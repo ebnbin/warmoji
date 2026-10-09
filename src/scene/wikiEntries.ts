@@ -16,6 +16,7 @@ import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
 import { modTexts, STATS, statText } from '../data/stats'
+import { maxLevelOf } from '../data/levels'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
 import { abilityLabel, abilityStatLines, characterStatGroups, condLine, counterText, effectLine, elementLine, sec, traitLine } from './statLines'
@@ -260,14 +261,14 @@ function flatten(groups: readonly { title: string; lines: readonly string[] }[])
   return groups.flatMap((g) => [`◆ ${g.title}`, ...g.lines])
 }
 
-/** 一名角色的图鉴条目：1 到 3 级各一页 */
+/** 一名角色的图鉴条目：1 级到他的等级上限各一页 */
 function characterEntry(id: CharacterId): WikiEntry {
   return {
     emoji: CHARACTERS[id].emoji,
     name: CHARACTERS[id].name,
     desc: CHARACTERS[id].desc,
     lines: flatten(characterStatGroups(id, [], 1, { path: false })),
-    levels: [1, 2, 3].map((lv) => ({
+    levels: Array.from({ length: maxLevelOf(id) }, (_, i) => i + 1).map((lv) => ({
       label: `${lv} 级`,
       lines: flatten(characterStatGroups(id, [], lv, { path: false })),
     })),

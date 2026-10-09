@@ -90,8 +90,8 @@ function swallowNebula(sim: Sim, s: NebulaState, cfg: NebulaConfig): void {
   const inside = (eid: number): boolean => inNebulaHorizon(s, Transform.x[eid]!, Transform.y[eid]!)
   for (const m of sim.characters) {
     if (!Alive.v[m] || offPlane(m) || !inside(m)) continue
-    const slot = Slot.v[m]!
-    if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + Hp.v[m]!
+    const id = sim.run.roster[Slot.v[m]!]
+    if (id !== undefined) st.damageTaken[id] = (st.damageTaken[id] ?? 0) + Hp.v[m]!
     st.hazardDamage.blackhole = (st.hazardDamage.blackhole ?? 0) + Hp.v[m]!
     const x = Transform.x[m]!
     const y = Transform.y[m]!

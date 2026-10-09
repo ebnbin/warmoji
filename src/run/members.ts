@@ -1,15 +1,16 @@
 import { CHARACTERS, memberStats } from '../data/characters'
-import { characterLevel, MAX_CHAR_LEVEL } from '../data/charLevel'
+import { characterLevel } from '../data/charLevel'
 import { characterXp, gearMods } from '../data/items'
-import { levelStatsFor } from '../data/levels'
+import { levelStatsFor, maxLevelOf } from '../data/levels'
+import type { CharacterId } from '../types/characters'
 import type { StatValues } from '../types/stats'
 import { runTeamMods } from './rules'
-import { runDef } from './state'
+import { runDef, slotKept } from './state'
 import type { RunState } from './state'
 
-/** 这一局队员能到的最高等级 */
-export function levelCap(run: RunState): number {
-  return runDef(run).rules?.maxLevel ?? MAX_CHAR_LEVEL
+/** 场上这一格的人能到的最高等级 */
+export function levelCap(run: RunState, slot: number): number {
+  return maxLevelOf(run.roster[slot]!)
 }
 
 /** 这一局靠全队升级：队员的等级来自升级时的选择，买道具不给角色经验 */
@@ -17,26 +18,33 @@ export function teamLeveled(run: RunState): boolean {
   return runDef(run).teamLevel !== undefined
 }
 
-/** 攒了 xp 经验的队员是几级：不低于这一局的等级下限，不高于上限 */
-export function levelFor(run: RunState, xp: number): number {
-  return Math.min(levelCap(run), Math.max(run.minLevel, characterLevel(xp)))
+/** 攒了 xp 经验的这名角色是几级：不低于这一局的等级下限，不高于他自己的上限 */
+export function levelFor(run: RunState, id: CharacterId, xp: number): number {
+  return Math.min(maxLevelOf(id), Math.max(run.minLevel, characterLevel(xp)))
 }
 
-/** 队员的等级：靠全队升级的一局按升级时的选择，否则按买过的道具折成的角色经验 */
+/** 这名角色这一局的等级，换下去也记着：靠全队升级的一局按升级时的选择，否则按买过的道具折成的角色经验 */
+export function levelOf(run: RunState, id: CharacterId): number {
+  const k = run.kept[id]
+  if (teamLeveled(run)) return Math.min(maxLevelOf(id), Math.max(run.minLevel, k?.level ?? 1))
+  return levelFor(run, id, characterXp(k?.items ?? []))
+}
+
+/** 场上这一格的人的等级 */
 export function memberLevel(run: RunState, slot: number): number {
-  if (teamLeveled(run)) return Math.min(levelCap(run), Math.max(run.minLevel, run.memberLevels[slot] ?? 1))
-  return levelFor(run, characterXp(run.memberItems[slot] ?? []))
+  return levelOf(run, run.roster[slot]!)
 }
 
 /** 队员战斗外的属性：定位、道具、本局成长与等级，加上这一局规则与词缀给队伍的修正 */
 export function memberOutStats(run: RunState, slot: number): StatValues {
   const id = run.roster[slot]!
-  return memberStats(CHARACTERS[id], [...gearMods(run.memberItems[slot] ?? [], levelStatsFor(id, memberLevel(run, slot)), run.memberGrowth[slot]), ...runTeamMods(run)])
+  const k = slotKept(run, slot)
+  return memberStats(CHARACTERS[id], [...gearMods(k.items, levelStatsFor(id, memberLevel(run, slot)), k.growth), ...runTeamMods(run)])
 }
 
 /** 队员战斗外的样子：局内进化过就是进化后的形态 */
 export function memberLook(run: RunState, slot: number): string {
   const def = CHARACTERS[run.roster[slot]!]
-  const form = run.memberForm[slot] ?? -1
+  const form = slotKept(run, slot).form
   return (form >= 0 ? def.forms?.[form]?.emoji : undefined) ?? def.emoji
 }

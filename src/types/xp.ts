@@ -3,9 +3,9 @@ export interface XpState {
   xp: number
 }
 
-/** 经验曲线：从 n 级升到下一级要 base × growth^(n-1)，到 maxLevel 就满级 */
+/** 经验曲线：第 n 次升级要 first × (ratio − (ratio − 1) × e^(−(n − 1) / k))，前面升得快，往后贴近第一次的 ratio 倍，不封顶 */
 export interface XpCurve {
-  readonly base: number
-  readonly growth: number
-  readonly maxLevel: number
+  readonly first: number
+  readonly ratio: number
+  readonly k: number
 }

@@ -1,6 +1,5 @@
-import { CHARACTERS, ROSTER_IDS, memberStats } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
-import { WAVE } from '../data/waves'
 import { fightsOf, RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
@@ -13,6 +12,18 @@ import { rollSandbox, sandboxRun } from './sandbox'
 
 /** 无敌时的生命上限 */
 export const INVINCIBLE_HP = 10_000_000
+
+/** 这一局里一名上过场的角色记住的：换下去也留着，再上场接着用；生命、技能冷却与资源只记在场上那一格 */
+export interface Kept {
+  /** 靠全队升级的一局里升到了几级 */
+  level: number
+  items: ItemId[]
+  /** 永久形态（局内进化），-1 是本体 */
+  form: number
+  growth: GrowthProgress
+  /** 已计入成长的击杀数 */
+  growthKills: number
+}
 
 export interface RunState {
   /** 这一局的玩法 */
@@ -30,39 +41,35 @@ export interface RunState {
   kills: number
   /** 全队经验：满了升级 */
   xp: XpState
-  /** 全队升级已经领了几次：靠全队升级的一局里，每次招一名新队员或给一名队员升一级算一次 */
+  /** 全队升级已经领了几次：靠全队升级的一局里，每领一次算一次，跳过的也算 */
   claimed: number
   combatMs: number
+  /** 场上的人，按格 */
   roster: CharacterId[]
-  /** 每人带进下一场的生命；Infinity 是满血开局 */
+  /** 隐藏顺序：场上的人按入队先后排，队首就是队长；当上队长的排到队首，换上来的排到队尾 */
+  order: CharacterId[]
+  /** 场上每格带进下一场的生命；Infinity 是满血，0 是倒着 */
   memberHp: number[]
-  memberItems: ItemId[][]
+  /** 场上每格的主动技能还要冷却多久 */
   skillCd: number[]
-  /** 永久形态（局内进化），-1 是本体 */
-  memberForm: number[]
-  /** 跨波保留的资源值，-1 是没有 */
+  /** 场上每格跨波保留的资源值，-1 是没有 */
   memberRes: number[]
-  memberGrowth: GrowthProgress[]
-  /** 靠全队升级的一局里每人升到了几级 */
-  memberLevels: number[]
-  /** 每人已计入成长的击杀数 */
-  growthKills: number[]
-  leaderId: CharacterId
+  /** 这一局里上过场的角色各自记住的 */
+  kept: Partial<Record<CharacterId, Kept>>
   /** 队员的等级下限：买道具攒的等级比它低时按它算 */
   minLevel: number
   /** 队伍无敌：生命上限锁在极大值 */
   invincible: boolean
-  /** 全队还能起来几次；Infinity 是不限 */
+  /** 全队还能被扶起来、被技能救起来几次；Infinity 是不限 */
   lives: number
-  /** 这一局回不来的队员，按名单位置 */
-  fallen: boolean[]
   /** 开局前自选的词缀 */
   mutators: MutatorId[]
+  /** 按角色记的战绩，换下去也留着 */
   stats: {
-    damage: number[]
-    kills: number[]
-    deaths: number[]
-    damageTaken: number[]
+    damage: Partial<Record<CharacterId, number>>
+    kills: Partial<Record<CharacterId, number>>
+    deaths: Partial<Record<CharacterId, number>>
+    damageTaken: Partial<Record<CharacterId, number>>
     enemyKills: Partial<Record<EnemyKind, number>>
     enemyDamage: Partial<Record<EnemyKind, number>>
     hazardDamage: Partial<Record<Hazard, number>>
@@ -139,25 +146,20 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mutators?
     claimed: 0,
     combatMs: 0,
     roster: [],
+    order: [],
     memberHp: [],
-    memberItems: [],
     skillCd: [],
-    memberForm: [],
     memberRes: [],
-    memberGrowth: [],
-    memberLevels: [],
-    growthKills: [],
-    leaderId: ROSTER_IDS[0]!,
+    kept: {},
     minLevel: 1,
     invincible: false,
     lives: def.rules?.lives ?? Infinity,
-    fallen: [],
     mutators: [...(opts.mutators ?? [])],
     stats: {
-      damage: [],
-      kills: [],
-      deaths: [],
-      damageTaken: [],
+      damage: {},
+      kills: {},
+      deaths: {},
+      damageTaken: {},
       enemyKills: {},
       enemyDamage: {},
       hazardDamage: {},
@@ -172,11 +174,9 @@ function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mutators?
     for (const m of t.ids) addMember(run, m)
     run.minLevel = t.level
     run.invincible = t.invincible
-    run.memberHp.fill(Infinity)
   } else if (def.team) {
     for (const m of pickTeam(def.team.slots)) addMember(run, m)
     run.minLevel = def.team.level ?? 1
-    run.memberHp.fill(Infinity)
   }
   syncMap(run)
   current = run
@@ -235,7 +235,7 @@ function syncMap(run: RunState): void {
   if (next?.kind === 'fight') run.mapId = next.fight.map
 }
 
-/** 还没入队的角色 */
+/** 能上场的角色：角色池里不在场上的 */
 export function recruitCandidates(run: RunState): CharacterId[] {
   return ROSTER_IDS.filter((id) => !run.roster.includes(id))
 }
@@ -247,24 +247,36 @@ export function recruitDueCount(run: RunState): number {
   return Math.max(0, Math.min(step.upTo - run.roster.length, recruitCandidates(run).length))
 }
 
-/** 队员入队：第一个入队的就是队长 */
+/** 这名角色这一局记住的，第一次上场时记下 */
+export function keptOf(run: RunState, id: CharacterId): Kept {
+  return (run.kept[id] ??= { level: 1, items: [], form: -1, growth: {}, growthKills: 0 })
+}
+
+/** 场上这一格的人记住的 */
+export function slotKept(run: RunState, slot: number): Kept {
+  return keptOf(run, run.roster[slot]!)
+}
+
+/** 队员入队：满生命、技能就绪，排到隐藏顺序的队尾；第一个入队的就是队长 */
 export function addMember(run: RunState, id: CharacterId): number {
   run.roster.push(id)
-  run.memberHp.push(memberStats(CHARACTERS[id]).maxHp)
-  run.memberItems.push([])
+  run.order.push(id)
+  run.memberHp.push(Infinity)
   run.skillCd.push(0)
-  run.memberForm.push(-1)
   run.memberRes.push(-1)
-  run.memberGrowth.push({})
-  run.memberLevels.push(1)
-  run.growthKills.push(0)
-  run.fallen.push(false)
-  run.stats.damage.push(0)
-  run.stats.kills.push(0)
-  run.stats.deaths.push(0)
-  run.stats.damageTaken.push(0)
-  if (run.roster.length === 1) run.leaderId = id
+  keptOf(run, id)
   return run.roster.length - 1
+}
+
+/** 换人：这一格换成 id，满生命、技能就绪；换下的人从隐藏顺序里拿掉，记住的都留着；换上来的排到队尾 */
+export function swapMember(run: RunState, slot: number, id: CharacterId): void {
+  const out = run.roster[slot]!
+  run.roster[slot] = id
+  run.order = [...run.order.filter((c) => c !== out), id]
+  run.memberHp[slot] = Infinity
+  run.skillCd[slot] = 0
+  run.memberRes[slot] = -1
+  keptOf(run, id)
 }
 
 export function recruitMember(run: RunState, id: CharacterId): number {
@@ -272,13 +284,28 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   return addMember(run, id)
 }
 
-/** 队长所在的名单位置；名单里找不到或他回不来了，就交给第一个还在的 */
+/** 队长所在的格：隐藏顺序的队首 */
 export function leaderSlot(run: RunState): number {
-  const at = run.roster.indexOf(run.leaderId)
-  return at >= 0 && !run.fallen[at] ? at : Math.max(0, run.fallen.indexOf(false))
+  return Math.max(0, run.roster.indexOf(run.order[0]!))
 }
 
+/** 当上队长：排到隐藏顺序的队首 */
+export function toFront(run: RunState, id: CharacterId): void {
+  run.order = [id, ...run.order.filter((c) => c !== id)]
+}
+
+/** 轮换：队首排到队尾 */
+export function toBack(run: RunState, id: CharacterId): void {
+  run.order = [...run.order.filter((c) => c !== id), id]
+}
+
+/** 开打前定队长：队首倒着就交给隐藏顺序里第一个站着的 */
+export function seatLeader(run: RunState): void {
+  const up = run.order.find((id) => run.memberHp[run.roster.indexOf(id)] !== 0)
+  if (up !== undefined) toFront(run, up)
+}
+
+/** 开打时的生命：带进来的残血，0 是倒着 */
 export function waveStartHp(storedHp: number, maxHp: number): number {
-  if (storedHp > 0) return Math.min(storedHp, maxHp)
-  return Math.round(maxHp * WAVE.reviveHpRatio)
+  return Math.min(storedHp, maxHp)
 }

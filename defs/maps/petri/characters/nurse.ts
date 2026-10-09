@@ -33,7 +33,7 @@ const toss = (ability: Extract<AbilityDef, { readonly trigger: 'manual' }>) =>
 
 const nurseKit = { ...toss(jab([heal])), cycle: [toss(needle)] } satisfies AbilityDef
 const nurseKit2 = { ...toss(jab([prescription])), cycle: [toss(needle)] } satisfies AbilityDef
-const nurseKit3 = { ...toss(jab([{ kind: 'reviveCut', ms: 2000 }, prescription])), cycle: [toss(needle)] } satisfies AbilityDef
+const nurseKit3 = { ...toss(jab([prescription, { kind: 'invuln', ms: 1000 }])), cycle: [toss(needle)] } satisfies AbilityDef
 
 const nurseFirstAid = {
   trigger: 'manual',
@@ -67,7 +67,7 @@ export default {
       base: 'nurseKit',
       upgrades: [
         { ability: 'nurseKit2', card: { icon: '1f97c', name: '群体处方', desc: '打针改成给 5 格内每个受伤的队友都扎一针，各回 8 点血（一针的 60%）' } },
-        { ability: 'nurseKit3', card: { icon: '26a1', name: '电击起搏', desc: '每打一针，倒下的队友里还要等得最久的那个少等 2 秒，不论远近' } },
+        { ability: 'nurseKit3', card: { icon: '26a1', name: '电击起搏', desc: '每扎到一名队友，他 1 秒内无敌' } },
       ],
     },
   ],

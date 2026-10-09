@@ -9,7 +9,7 @@ function runText(): string {
   return [
     `${MAPS[run.mapId].name} · ${runDef(run).name} · 第 ${run.step + 1}/${stepsOf(run).length} 步`,
     `金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）`,
-    `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')} · 队长 ${CHARACTERS[run.leaderId].name}`,
+    `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')} · 队长 ${run.order[0] ? CHARACTERS[run.order[0]].name : '无'}`,
     `累计战斗 ${Math.round(run.combatMs / 1000)} s`,
   ].join('\n')
 }

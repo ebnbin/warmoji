@@ -3,6 +3,7 @@ import { gearMods, ITEMS, resolveAbilityDef } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { toPx } from '../../data/px'
 import { memberLevel } from '../../run/members'
+import { slotKept } from '../../run/state'
 import { FACTION, Stats } from '../components'
 import { equipAbility, equipSkill } from './ability'
 import { applyForm } from './form'
@@ -14,7 +15,8 @@ import type { Sim } from '../sim'
 
 /** 队员带进这一场的道具、本局成长与等级 */
 export function memberGear(run: RunState, slot: number): { owned: readonly ItemId[]; growth: GrowthProgress; level: number } {
-  return { owned: run.memberItems[slot] ?? [], growth: run.memberGrowth[slot] ?? {}, level: memberLevel(run, slot) }
+  const k = slotKept(run, slot)
+  return { owned: k.items, growth: k.growth, level: memberLevel(run, slot) }
 }
 
 /** 队员身上的常驻修正：道具、本局成长与等级给的 */
@@ -41,7 +43,7 @@ export function armMember(sim: Sim, slot: number): void {
   const def = CHARACTERS[run.roster[slot]!]
   armCarriers(sim, slot)
   sim.skills[slot] = equipSkill(sim, sim.characters[slot]!, toPx(def.skill.ability), def.skill.cdMs, run.skillCd[slot] ?? 0)
-  const form = run.memberForm[slot] ?? -1
+  const form = slotKept(run, slot).form
   if (form >= 0) applyForm(sim, sim.characters[slot]!, form)
 }
 

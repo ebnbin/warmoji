@@ -139,15 +139,14 @@ export type EndRule =
   | { readonly kind: 'leak'; readonly mark: string; readonly radius: number; readonly count: number }
 
 /**
- * 我方在一场里的规则，写在一局上对每一场生效，写在一场上只管这一场、盖过一局写的：
- * revive 为假时倒下的队员不会自己起来；rescue 让活着的队长在倒下的队员身边 radius 格内连续站满 ms 毫秒把他扶起来；
+ * 我方在一场里的规则，写在一局上对每一场生效，写在一场上只管这一场、盖过一局写的；倒下的队员不会自己起来：
+ * rescue 让活着的队长在倒下的队员身边 radius 格内连续站满 ms 毫秒把他扶起来；
  * leader 里 lock 不许手动换队长，critical 队长倒下就输，switchCdMs 是手动换队长的冷却；
  * surprise 为真时敌人现身不打预兆；skills 为假时不能放主动技能；vision 是队长看得见的半径（格），外面一片漆黑；
  * harmless 为真时我方伤不了敌人：出手照样命中，击退、控制与附带的效果照常，只是不掉血，敌人只能死于地图上的危害；relay 是每隔多少毫秒自动把队长交给名单上的下一名活着的队员；
  * mods 是给队伍的常驻修正，一局与一场写的叠加。
  */
 export interface FightRules {
-  readonly revive?: boolean
   readonly rescue?: { readonly ms: number; readonly radius: number }
   readonly leader?: { readonly lock?: boolean; readonly critical?: boolean; readonly switchCdMs?: number }
   readonly surprise?: boolean
@@ -158,14 +157,9 @@ export interface FightRules {
   readonly mods?: StatMods
 }
 
-/** 场与场之间：carry 活着的带着残血、倒下的回三成血；rest 每人回复一部分损失的生命，倒下的也起来；full 每场满血；permadeath 活着的带着残血，一场打完时还倒着的这一局都回不来 */
-export type Between = 'carry' | 'rest' | 'full' | 'permadeath'
-
-/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，maxLevel 是队员的等级上限；mods 在商店里也算 */
+/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（被扶起来、被技能救起来都算一次）；mods 在商店里也算。场与场之间不休整：活着的带着残血，倒下的进下一场还倒着 */
 export interface RunRules extends FightRules {
   readonly lives?: number
-  readonly between?: Between
-  readonly maxLevel?: number
 }
 
 /** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，hazard 全队受到 by 这种危害的伤害不超过 damage */
@@ -179,7 +173,6 @@ export type StarRule =
 
 /** 词缀对我方规则的改动，只能往难里改 */
 export interface MutatorRules {
-  readonly revive?: false
   readonly leader?: { readonly lock?: true; readonly critical?: true }
   readonly surprise?: true
   readonly skills?: false
@@ -196,10 +189,9 @@ export interface MutatorDef {
   readonly enemyMods?: StatMods
 }
 
-/** 过关奖励：coins 是额外的金币，heal 为真时全队回满血进下一场 */
+/** 过关奖励：coins 是额外的金币 */
 export interface FightReward {
   readonly coins?: number
-  readonly heal?: boolean
 }
 
 /** 对地图下的一条指令：这一阶段开始 atMs 后让地图做一次 cue，写了 every 就每隔 every 再做一次，一共 times 次，不写 times 就一直做到这一阶段结束 */
@@ -235,7 +227,7 @@ export interface FightDef {
 /** 一步：招募到 upTo 人；进商店，物价与稀有度按第 tier 波算；打一场 */
 export type StepDef = { readonly kind: 'recruit'; readonly upTo: number } | { readonly kind: 'shop'; readonly tier: number } | { readonly kind: 'fight'; readonly fight: FightDef }
 
-/** 全队升级：队员不靠买道具升级，而是击杀攒全队经验、按这条曲线升级，每升一级掉一个升级道具，队长捡起来选招一名新队员或给一名队员升一级 */
+/** 全队升级：队员不靠买道具升级，而是击杀攒全队经验、按这条曲线升级，每升一级掉一个升级道具，队长捡起来选一项：给场上一人升一级，或让一人满生命上场（招募、替换、恢复） */
 export type TeamLevelDef = XpCurve
 
 /** 预设队伍的一个位置：指定角色，或从同时带着这些标签的角色里随机一名 */

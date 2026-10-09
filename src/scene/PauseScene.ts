@@ -1,6 +1,5 @@
 import Phaser from 'phaser'
 import { CHARACTERS, TEAM } from '../data/characters'
-import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ENEMIES } from '../data/enemies'
 import { FIELD, POOLS } from '../data/battlefield'
 import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
@@ -14,8 +13,8 @@ import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { levelCap, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
 import { pendingLevelUps } from '../run/levelUp'
-import { xpMaxed, xpToNext } from '../run/xp'
-import { endRun, getRun, leaderSlot, runDef, stepsOf, waveStartHp } from '../run/state'
+import { xpToNext } from '../run/xp'
+import { endRun, getRun, leaderSlot, runDef, slotKept, stepsOf, waveStartHp } from '../run/state'
 import { fightAfterRecruit, fightsDone, lastFight, nextFight, plannedFights } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
@@ -266,8 +265,7 @@ export class PauseScene extends Phaser.Scene {
     const sheets = this.opened.from === SceneKey.Battle ? (activeHudHost()?.teamSheets() ?? []) : []
     this.live = sheets.length > 0
     return run.roster.map((id, slot): Member => {
-      const items = run.memberItems[slot] ?? []
-      const growth = run.memberGrowth[slot] ?? {}
+      const { items, growth } = slotKept(run, slot)
       const sheet = sheets[slot]
       if (sheet) return { ...sheet, slot, id, items, growth }
       const stats = memberOutStats(run, slot)
@@ -279,10 +277,9 @@ export class PauseScene extends Phaser.Scene {
         emoji: memberLook(run, slot),
         level: memberLevel(run, slot),
         leader: slot === leaderSlot(run),
-        alive: true,
+        alive: run.memberHp[slot] !== 0,
         hp: waveStartHp(run.memberHp[slot] ?? stats.maxHp, stats.maxHp),
         max: stats.maxHp,
-        reviveSec: 0,
         stamina: 1,
         tired: false,
         now: stats,
@@ -365,26 +362,23 @@ export class PauseScene extends Phaser.Scene {
     const half = (right - x0 - 28) / 2
     const ratio = m.max > 0 ? Math.min(1, m.hp / m.max) : 0
     const hpText = !m.alive
-      ? m.reviveSec === null
-        ? '倒下 · 这一场不会自己起来'
-        : `倒下 · ${m.reviveSec} 秒后复活`
+      ? '倒下 · 全队升级时复活他，或把他换下'
       : `生命 ${Math.ceil(m.hp)} / ${Math.round(m.max)} · 体力 ${Math.round(m.stamina * m.now.maxStamina)} / ${Math.round(m.now.maxStamina)}${this.opened.from === SceneKey.Battle ? '' : '（下一波开局）'}`
     keep(new Label(this, x0, D.y + 68, hpText, { kind: 'label', bold: true, color: !m.alive ? 'bad' : ratio > 0.5 ? 'good' : 'warn' }).setOrigin(0, 0.5))
     keep(new ProgressBar(this, x0, D.y + 86, half, 14, { tone: 'hp', value: m.alive ? ratio : 0 }))
     if (m.alive) keep(new ProgressBar(this, x0, D.y + 102, half, 6, { tone: staminaTone(m.stamina), value: m.stamina }))
 
-    const top = levelCap(this.run)
+    const top = levelCap(this.run, m.slot)
     const prog = levelProgress(characterXp(m.items), this.run.minLevel, top)
-    const capText = top < MAX_CHAR_LEVEL ? '等级上限' : '满级'
     // 沙盒的等级是调出来的，靠全队升级的一局按升级时的选择，都不来自买道具攒的经验
     const tuned = runDef(this.run).team === 'knobs'
     const picked = teamLeveled(this.run)
     const lvText = tuned
       ? `Lv ${m.level}`
       : picked
-        ? `Lv ${m.level}${m.level >= top ? ` · ${capText}` : ''}`
+        ? `Lv ${m.level}${m.level >= top ? ' · 满级' : ''}`
         : prog.maxed
-          ? `Lv ${m.level} · ${capText}`
+          ? `Lv ${m.level} · 满级`
           : `Lv ${m.level} · 经验 ${prog.cur}/${prog.need}`
     const lvRatio = tuned ? 1 : picked ? (top > 1 ? (m.level - 1) / (top - 1) : 1) : prog.ratio
     keep(new Label(this, right, D.y + 68, lvText, { kind: 'label', bold: true, color: 'accent' }).setOrigin(1, 0.5))
@@ -504,7 +498,7 @@ export class PauseScene extends Phaser.Scene {
     const picked = teamLeveled(run)
     flow.text(
       size >= TEAM.maxSize
-        ? `队伍 ${size} / ${TEAM.maxSize} 人，已满员`
+        ? `队伍 ${size} / ${TEAM.maxSize} 人，已满员${picked ? ' · 全队升级时可以替换队员' : ''}`
         : picked
           ? `队伍 ${size} / ${TEAM.maxSize} 人 · 全队升级时可以招募新队员`
           : joinAt
@@ -512,7 +506,7 @@ export class PauseScene extends Phaser.Scene {
             : `队伍 ${size} 人`,
     )
     if (picked) {
-      const xp = xpMaxed(run) ? '满级' : `经验 ${run.xp.xp}/${xpToNext(run)}`
+      const xp = `经验 ${run.xp.xp}/${xpToNext(run)}`
       const waiting = pendingLevelUps(run)
       flow.text(`全队 Lv ${run.xp.level} · ${xp}${waiting > 0 ? ` · 还有 ${waiting} 次升级没领` : ''}`, { color: 'info' })
     }
@@ -545,16 +539,16 @@ export class PauseScene extends Phaser.Scene {
         { label: '阵亡', at: 0.92 },
       ],
       rows: this.members.map((m) => {
-        const taken = st.damageTaken[m.slot] ?? 0
-        const deaths = st.deaths[m.slot] ?? 0
+        const taken = st.damageTaken[m.id] ?? 0
+        const deaths = st.deaths[m.id] ?? 0
         return {
           icon: m.emoji,
           outline: 'player' as const,
           name: CHARACTERS[m.id].name,
           cells: [
-            formatBig(st.damage[m.slot] ?? 0),
+            formatBig(st.damage[m.id] ?? 0),
             taken > 0 ? { text: formatBig(taken), color: 'warn' as const } : NONE,
-            `${st.kills[m.slot] ?? 0}`,
+            `${st.kills[m.id] ?? 0}`,
             deaths > 0 ? { text: `${deaths}`, color: 'bad' as const } : NONE,
           ],
         }

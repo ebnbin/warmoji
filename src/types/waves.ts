@@ -23,8 +23,6 @@ export interface DifficultyCurve {
 }
 
 export interface Progression {
-  readonly reviveHpRatio: number
-  readonly restRatio: number
   readonly summaryMs: number
   /** 不靠全队升级的一局的全队经验 */
   readonly xp: XpCurve

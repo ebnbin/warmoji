@@ -1,5 +1,6 @@
 import { TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Motion, MOTION, Seat, Transform } from '../../components'
+import { toFront } from '../../../run/state'
+import { Alive, CharScale, Facing, Motion, MOTION, Seat, Slot, Transform } from '../../components'
 import { charSize, rescale } from './scale'
 import { grantIframe } from './combat'
 import type { Sim } from '../../sim'
@@ -37,7 +38,7 @@ function setScale(sim: Sim, eid: number, s: number): void {
   Transform.h[eid] = charSize(eid)
 }
 
-function finishHandover(sim: Sim): void {
+export function finishHandover(sim: Sim): void {
   const h = sim.handover
   if (!h) return
   setScale(sim, h.from, TEAM.followerSizeMul)
@@ -61,9 +62,10 @@ export function canSwitchLeader(sim: Sim, eid: number): boolean {
   )
 }
 
-/** 立刻换队长：中心、朝向与目标位当帧切到新队长；尺寸、相机与免伤在交接期内过渡 */
+/** 立刻换队长：他排到隐藏顺序的队首；中心、朝向与目标位当帧切到新队长；尺寸、相机与免伤在交接期内过渡 */
 export function switchLeader(sim: Sim, eid: number): void {
   finishHandover(sim)
+  toFront(sim.run, sim.run.roster[Slot.v[eid]!]!)
   const from = sim.leader
   const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, Transform.x[from]!, Transform.y[from]!)
   sim.leader = eid
@@ -76,27 +78,21 @@ export function switchLeader(sim: Sim, eid: number): void {
   sim.handover = { msLeft: ms, ms, from, to: eid, fromScale: CharScale.v[from]!, toScale: CharScale.v[eid]!, camX: d.x, camY: d.y }
 }
 
-function nearestAlive(sim: Sim, x: number, y: number): number {
-  let best = -1
-  let bestD = Infinity
-  for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
-    const dist = Math.hypot(d.x, d.y)
-    if (dist < bestD) {
-      bestD = dist
-      best = m
-    }
+/** 隐藏顺序里第一个站着的队员，从队首往后找，except 不算；都倒着是 -1 */
+export function firstUp(sim: Sim, except = -1): number {
+  for (const id of sim.run.order) {
+    const m = sim.characters[sim.run.roster.indexOf(id)]
+    if (m !== undefined && m !== except && Alive.v[m]) return m
   }
-  return best
+  return -1
 }
 
-/** 队长阵亡则交给最近的存活队员；交接期内按真实时间推进尺寸插值 */
+/** 队长倒下就交给隐藏顺序里下一个站着的队员；交接期内按真实时间推进尺寸插值 */
 export function stepHandover(sim: Sim): void {
   const leader = sim.leader
   if (leader < 0 || sim.over) return
   if (!Alive.v[leader]) {
-    const next = nearestAlive(sim, Transform.x[leader]!, Transform.y[leader]!)
+    const next = firstUp(sim)
     if (next >= 0) switchLeader(sim, next)
   }
   const h = sim.handover

@@ -11,24 +11,17 @@ function curveOf(run: RunState): XpCurve {
 /** 全队从当前等级升到下一级要的经验 */
 export function xpToNext(run: RunState): number {
   const c = curveOf(run)
-  return Math.round(c.base * Math.pow(c.growth, run.xp.level - 1))
+  return Math.round(c.first * (c.ratio - (c.ratio - 1) * Math.exp(-(run.xp.level - 1) / c.k)))
 }
 
-/** 全队满级了 */
-export function xpMaxed(run: RunState): boolean {
-  return run.xp.level >= curveOf(run).maxLevel
-}
-
-/** 全队攒经验，够了就升级，返回升了几级；满级后不再攒 */
+/** 全队攒经验，够了就升级，返回升了几级 */
 export function gainXp(run: RunState, amount: number): number {
-  const top = curveOf(run).maxLevel
   let gained = 0
   run.xp.xp += amount
-  while (!xpMaxed(run) && run.xp.xp >= xpToNext(run)) {
+  while (run.xp.xp >= xpToNext(run)) {
     run.xp.xp -= xpToNext(run)
     run.xp.level++
     gained++
   }
-  if (run.xp.level >= top) run.xp.xp = 0
   return gained
 }

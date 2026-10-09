@@ -277,7 +277,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       const cy = atTarget ? target!.y : oy
       const r = Disc.radius[e]! * mods.reach
       if (Disc.of[e] === DISC_OF.hurt) {
-        const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
+        const revives = onHit?.some((fx) => fx.kind === 'revive') ?? false
         const hurt: number[] = []
         // 倒下的人留在倒下的地方、不跟队，复活类的效果够得着所有倒下的同伴
         eachAlly(sim, src.faction, cx, cy, revives ? Infinity : r, revives, (t, x, y) => {

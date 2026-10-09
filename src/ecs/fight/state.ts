@@ -168,7 +168,7 @@ interface PhaseBase {
 }
 
 function downsOf(run: RunState): number {
-  return run.stats.deaths.reduce((s, n) => s + n, 0)
+  return Object.values(run.stats.deaths).reduce((s, n) => s + n, 0)
 }
 
 function baseOf(run: RunState, events: Partial<Record<MapEvent, number>>): PhaseBase {
