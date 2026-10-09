@@ -42,6 +42,7 @@ export const FIGHTS = {
       name: '双生标志',
       map: 'desert',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.55 } },
       phases: [
         {
           intro: { title: '双生标志', sub: '在每一处标志物旁站满 1.5 秒' },

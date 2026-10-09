@@ -85,13 +85,13 @@ export const FIGHTS = {
     name: '冲走他们',
     desc: '溪深而急，站不住的会顺水漂走：把敌人打进溪里冲走，个子小的一下水就浮起来；让 25 只敌人被溪水冲走',
     note: '把水流当武器：目标不是打死，而是用击退和站位把敌人送进深水，打不打死都不算数',
-    team: { slots: ['otter', 'rocker', 'owl'], level: 2 },
+    team: { slots: ['otter', 'horse', 'owl'], level: 2 },
     stars: [{ kind: 'time', ms: 70_000 }, { kind: 'downs', count: 0 }],
     fight: {
       name: '冲走他们',
       map: 'sakura',
       clockSec: 60,
-      rules: { mods: { mul: { knockback: 1.6 } } },
+      rules: { mods: { mul: { knockback: 3 } } },
       phases: [
         {
           intro: { title: '冲走他们', sub: '把敌人打进溪里' },

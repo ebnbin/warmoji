@@ -9,7 +9,7 @@ import { smooth, wrapU } from './terrain'
 import type { DesertConfig, DesertGait } from '../../types/maps'
 import type { Sim } from '../../ecs/sim'
 
-/** 印子的样子：步态之外，钻在沙下走的蝎王顶出一道隆起 */
+/** 印子的样子：步态之外，钻在沙下走的巨沙虫顶出一道隆起 */
 export type PrintGait = DesertGait | 'burrow'
 
 /**
@@ -118,7 +118,7 @@ function emit(t: Tracks, p: Print): void {
 /**
  * 推进这一帧的印子：每个在地上走的身体按走过的路一步一步落印子。步幅按身体的大小与走得多快，累了步子变小；
  * 印子的深浅按压在脚下的分量（半径乘质量倍率）、沙的松实与累的程度，体力低于 dragFrom 就拖着脚；落下印子的地方沙被踩实一点。
- * 蛇和钻在沙下的蝎王留下连成一道的痕迹
+ * 蛇和钻在沙下的巨沙虫留下连成一道的痕迹
  */
 export function stepTracks(sim: Sim, t: Tracks, cfg: DesertConfig, sizeU: number, loose: (x: number, y: number) => number, dt: number): void {
   const tc = cfg.tracks

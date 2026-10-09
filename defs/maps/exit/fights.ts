@@ -13,6 +13,7 @@ export const FIGHTS = {
       name: '走遍迷宫',
       map: 'exit',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.45, damage: 0.7 } },
       phases: [
         {
           intro: { title: '走遍迷宫', sub: '在每一间舱室的入口站满 2.5 秒' },
@@ -42,6 +43,7 @@ export const FIGHTS = {
       name: '封站',
       map: 'exit',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.4, damage: 0.65 } },
       phases: [
         {
           intro: { title: '封站', sub: '25 秒后门全锁死' },
@@ -72,6 +74,7 @@ export const FIGHTS = {
       name: '逐间清剿',
       map: 'exit',
       clockSec: 100,
+      enemyMods: { mul: { maxHp: 0.4, damage: 0.65 } },
       phases: [
         {
           intro: { title: '逐间清剿', sub: '每穿过一道门冒出一队，清掉全部六队' },
@@ -104,6 +107,7 @@ export const FIGHTS = {
       name: '精英巡逻',
       map: 'exit',
       clockSec: 70,
+      enemyMods: { mul: { maxHp: 0.4, damage: 0.7 } },
       rules: { mods: { mul: { damage: 1.25 } } },
       phases: [
         {

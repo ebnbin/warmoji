@@ -13,6 +13,7 @@ export const FIGHTS = {
       name: '无菌操作',
       map: 'petri',
       clockSec: 60,
+      enemyMods: { mul: { maxHp: 0.55, damage: 0.6 } },
       phases: [
         {
           intro: { title: '无菌操作', sub: '别让菌落盖满八成' },
@@ -42,6 +43,7 @@ export const FIGHTS = {
       name: '溶菌开路',
       map: 'petri',
       clockSec: 70,
+      enemyMods: { mul: { maxHp: 0.5, damage: 0.6 } },
       chaseLeader: true,
       phases: [
         {
@@ -71,7 +73,7 @@ export const FIGHTS = {
     },
   },
   buriedGold: {
-    emoji: '1f400',
+    emoji: '1f63c',
     name: '菌下藏金',
     desc: '菌落长过的金币被盖住，捡不到也吸不走，把那块清干净才露出来；柴郡猫却能把埋着的币挖走，打死它才吐出来：90 秒内捡到 80 金币',
     note: '掉落物会被地图藏起来：捡钱的时机由溶菌决定，柴郡猫既是对手也是挖掘机',
@@ -81,6 +83,7 @@ export const FIGHTS = {
       name: '菌下藏金',
       map: 'petri',
       clockSec: 80,
+      enemyMods: { mul: { maxHp: 0.55, damage: 0.55 } },
       phases: [
         {
           intro: { title: '菌下藏金', sub: '捡到 80 金币' },

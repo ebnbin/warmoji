@@ -7,13 +7,14 @@ export const FIGHTS = {
     name: '推下海',
     desc: '我方伤不了敌人，击退却格外有劲：把敌人推下冰缘，冰点上下的海水会把它们冻死；当心破墙犀也会把队员撞下海。让 20 只敌人被寒水冻死',
     note: '只能借地形杀敌：输出换成了击退，冰面打滑让一下推得更远，也让自己更容易掉下去',
-    team: { slots: ['otter', 'rocker', 'owl'], level: 2 },
+    team: { slots: ['horse', 'owl', 'otter'], level: 2 },
     stars: [{ kind: 'time', ms: 90_000 }, { kind: 'hazard', by: 'coldWater', damage: 0 }],
     fight: {
       name: '推下海',
       map: 'floe',
       clockSec: 60,
-      rules: { harmless: true, mods: { mul: { knockback: 2.5 } } },
+      enemyMods: { mul: { maxHp: 0.55, damage: 0.8 } },
+      rules: { harmless: true, mods: { mul: { knockback: 5 } } },
       phases: [
         {
           intro: { title: '推下海', sub: '让 20 只敌人被寒水冻死' },
@@ -46,6 +47,7 @@ export const FIGHTS = {
       name: '风暴',
       map: 'floe',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.5, damage: 0.75 } },
       phases: [
         {
           intro: { title: '风暴', sub: '阵风一来就躲到雪地上' },
@@ -73,6 +75,7 @@ export const FIGHTS = {
       name: '冰心打捞',
       map: 'floe',
       clockSec: 80,
+      enemyMods: { mul: { maxHp: 0.55, damage: 0.8 } },
       phases: [
         {
           intro: { title: '冰心打捞', sub: '死在水里的金币会沉' },
@@ -102,7 +105,7 @@ export const FIGHTS = {
       name: '冰上铁人',
       map: 'floe',
       clockSec: 90,
-      enemyMods: { mul: { damage: 1.3 } },
+      enemyMods: { mul: { maxHp: 0.65, damage: 1.3 } },
       phases: [
         {
           intro: { title: '冰上铁人', sub: '撑过 60 秒，谁都不许倒下' },

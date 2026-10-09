@@ -13,6 +13,7 @@ export const FIGHTS = {
       name: '跟艇',
       map: 'deep',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.7 } },
       phases: [
         {
           intro: { title: '跟艇', sub: '跟着潜艇，它落稳三次就赢' },
@@ -89,6 +90,7 @@ export const FIGHTS = {
       name: '守门',
       map: 'deep',
       clockSec: 100,
+      enemyMods: { mul: { maxHp: 0.6 } },
       chaseLeader: true,
       phases: [
         {
