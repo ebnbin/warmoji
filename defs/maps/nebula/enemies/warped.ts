@@ -4,7 +4,6 @@ const WARPED = {
   kind: 'warped',
   emoji: '1faea',
   name: '扭曲脸',
-  element: 'dark',
   desc: '脸被引力扯歪了的怪人：一路追着人走，每 6 秒在身周撑开一圈 1.5 格、跟着它走的扭曲场，3 秒内打进圈里的子弹全被弹回去',
   size: 1.3,
   radius: 0.48,

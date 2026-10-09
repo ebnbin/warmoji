@@ -36,7 +36,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f401',
   name: '迷宫鼠',
-  element: 'dark',
   desc: '在迷宫里长大的老鼠，认得每一条近路：一眨眼闪到敌人身后咬一口再闪回来，专挑残血的下嘴；技能开一条捷径，自己先溜进暗处',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

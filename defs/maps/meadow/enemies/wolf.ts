@@ -4,7 +4,6 @@ const WOLF = {
   kind: 'wolf',
   emoji: '1f43a',
   name: '狼',
-  element: 'earth',
   desc: '在林间成群游荡，盯上人就小跑追来，进到三格内伏低身子猛扑过去',
   size: 1.3,
   radius: 0.48,

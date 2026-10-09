@@ -4,7 +4,6 @@ const WEIGHTLESS = {
   kind: 'weightless',
   emoji: '1f635_200d_1f4ab',
   name: '失重者',
-  element: 'light',
   desc: '晕头转向飘在半空的人：贴近了晃 0.5 秒，让身边 2.2 格的人一起失重飘起 1 秒，飘着的时候照样被引力拖着走',
   size: 1.25,
   radius: 0.46,

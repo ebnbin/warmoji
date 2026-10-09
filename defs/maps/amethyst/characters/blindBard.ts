@@ -35,7 +35,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f9d1_200d_1f9af',
   name: '盲琴师',
-  element: 'dark',
   desc: '看不见路的琴师，琴声却认得每一个敌人：音符打中同一个敌人三次就让它睡过去 2 秒，叫醒它的那一下伤害 ×1.5；技能一曲长眠，哄睡身边一圈',
   role: 'controller',
   tags: ['control', 'ranged'],

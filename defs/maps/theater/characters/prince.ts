@@ -53,7 +53,6 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.1 } }, {
 export default {
   emoji: '1f934',
   name: '王子',
-  element: 'light',
   desc: '持剑的王子：佩剑刺开挡路的家伙，出手时顺手护住身边最伤的队友；横扫一圈把敌人都招到自己身上，喊一声“为了公主”什么都挡得住',
   role: 'tank',
   tags: ['defense', 'melee'],

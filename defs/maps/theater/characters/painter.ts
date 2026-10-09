@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧑‍🎨 布景画师：立起会泼颜料的画，颜料把敌人染成水元素；技能画出两个以假乱真的自己
+// 🧑‍🎨 布景画师：立起会泼颜料的画，颜料把敌人浇得浑身湿透；技能画出两个以假乱真的自己
 const paintShot = {
   trigger: 'auto',
   cooldownMs: 800,
@@ -12,7 +12,7 @@ const paintShot = {
   damage: 8,
   fireSfx: 'plip',
   shape: { kind: 'bolt', projectile: shot('1f3a8', 9, 0.4), lifeMs: 1100 },
-  onHit: [{ kind: 'attune', element: 'water', ms: 3000 }],
+  onHit: [{ kind: 'status', status: 'wet', ms: 3000 }],
 } satisfies AbilityDef
 
 const easel = (ability: AbilityDef, maxAlive: number) =>
@@ -44,7 +44,7 @@ export default {
   emoji: '1f9d1_200d_1f3a8',
   name: '布景画师',
   element: 'water',
-  desc: '给舞台画布景的画师：走到哪就立起会泼颜料的画，颜料把敌人染成水元素，好让队友的冰与雷打得更狠；技能画出两个以假乱真的自己',
+  desc: '给舞台画布景的画师：走到哪就立起会泼颜料的画，颜料把敌人浇得浑身湿透，好让队友的冰一打就冻、雷一打一片；技能画出两个以假乱真的自己',
   role: 'summoner',
   tags: ['damage', 'summon'],
   body: { drag: 5, mass: 1 },

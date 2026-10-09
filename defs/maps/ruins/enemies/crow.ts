@@ -4,7 +4,6 @@ const CROW = {
   kind: 'crow',
   emoji: '1f426_200d_2b1b',
   name: '乌鸦',
-  element: 'dark',
   desc: '悬在半空，和人隔着三四格，隔一阵俯冲下来啄人的眼睛，啄中的致盲 1 秒，打不出普通攻击',
   size: 1.1,
   radius: 0.42,

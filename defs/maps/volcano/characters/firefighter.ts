@@ -39,7 +39,7 @@ const firefighterSpray2 = {
 } satisfies AbilityDef
 const firefighterHose2 = { ...firefighterSpray2, cycle: [firefighterJet] } satisfies AbilityDef
 
-const firefighterJet3 = { ...firefighterJet, onHit: [{ kind: 'cast', ability: { ...jet, onHit: [{ kind: 'attune', element: 'water', ms: 4000 }] } }] } satisfies AbilityDef
+const firefighterJet3 = { ...firefighterJet, onHit: [{ kind: 'cast', ability: { ...jet, onHit: [{ kind: 'status', status: 'wet', ms: 4000 }] } }] } satisfies AbilityDef
 const firefighterHose3 = { ...firefighterSpray2, cycle: [firefighterJet3] } satisfies AbilityDef
 
 const firefighterCurtain = {
@@ -90,7 +90,7 @@ export default {
       base: 'firefighterHose',
       upgrades: [
         { ability: 'firefighterHose2', card: { icon: '1f9ef', name: '灭火', desc: '喷淋还给身周 4 格内受伤的队友各挂一层生命 6% 的护盾 3 秒，并解除控制与减速' } },
-        { ability: 'firefighterHose3', card: { icon: '1f4a6', name: '高压', desc: '水柱冲中的敌人 4 秒内变成水元素，雷与冰打它更疼' } },
+        { ability: 'firefighterHose3', card: { icon: '1f4a6', name: '高压', desc: '水柱冲中的敌人浑身湿透 4 秒，一冰就冻、一电一片' } },
       ],
     },
   ],

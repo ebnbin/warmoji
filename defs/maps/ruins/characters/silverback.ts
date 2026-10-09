@@ -56,7 +56,6 @@ export const levels = [{ add: { maxHp: 25, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f98d',
   name: '银背猩猩',
-  element: 'earth',
   desc: '力大无穷的银背：双拳捶开身前一片，捶胸一声怒吼吓退身边的敌人；技能朝一个方向猛冲，连墙带人一起撞开',
   role: 'bruiser',
   tags: ['damage', 'melee'],

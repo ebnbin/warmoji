@@ -4,7 +4,6 @@ const HEDGEHOG = {
   kind: 'hedgehog',
   emoji: '1f994',
   name: '刺猬',
-  element: 'earth',
   desc: '缩成刺球朝人滚过来，撞上就把人弹开；浑身是刺，近身打它的会被反扎；挨打时常缩成一团，1.5 秒内受到的伤害减半',
   size: 1.1,
   radius: 0.42,

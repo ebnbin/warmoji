@@ -35,7 +35,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f60e',
   name: '墨镜客',
-  element: 'light',
   desc: '戴着墨镜不怕晃眼：闪到 5 格内最近的敌人身后挥出一道日光刃再闪回来，被照到的眼前一白，0.8 秒打不出手；技能亮出一片强光，趁乱隐去身形',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

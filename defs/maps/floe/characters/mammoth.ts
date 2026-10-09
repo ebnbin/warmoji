@@ -56,7 +56,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 30 }, mul: { h
 export default {
   emoji: '1f9a3',
   name: '猛犸',
-  element: 'earth',
   desc: '披着长毛的猛犸：长鼻卷雪给 4.5 格内最伤的队友回 11 点血，再用象牙把身前 2 格内的敌人挑开，两样轮着来，没人受伤时敷伤落空、身前没敌人时象牙挑空；技能把全队护进长毛里',
   role: 'support',
   tags: ['support', 'melee'],

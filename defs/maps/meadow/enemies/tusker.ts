@@ -4,7 +4,6 @@ const TUSKER = {
   kind: 'tusker',
   emoji: '1f417',
   name: '野猪',
-  element: 'earth',
   desc: '低头刨地蓄力，朝人直直冲出一大段，撞上就被顶开；冲完要喘口气，侧面躲得开；倒下后留下一具半透明的尸壳，杵在原地 3 秒骗走队伍的火力',
   size: 1.4,
   radius: 0.52,

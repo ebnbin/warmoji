@@ -5,7 +5,6 @@ const DOOR_CORAL = {
   kind: 'doorCoral',
   emoji: '1fab8',
   name: '附门珊瑚',
-  element: 'earth',
   desc: '不理队伍，慢慢爬向潜艇门口；身周 1.6 格罩着一团浑水，在里面每走一格多耗 3 点气；身边 1.4 格的人每 2 秒被蜇一下；停着 2 秒没动就长大一圈，最多长到两倍',
   size: 1.4,
   radius: 0.52,

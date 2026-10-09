@@ -51,7 +51,6 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f482',
   name: '近卫',
-  element: 'light',
   desc: '持戟的近卫：长戟一刺穿透一排敌人，把贴上来的顶开；升级后刺中的冲不动也闪不走，顶到墙上的被一圈墙关住；技能在身前立起盾墙，把周围的敌人都引到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],

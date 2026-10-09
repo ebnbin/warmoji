@@ -42,7 +42,6 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f42b',
   name: '双峰驼',
-  element: 'earth',
   desc: '在沙海里走得最稳的双峰驼：驼峰撞开挡路的敌人，边打边从驼峰里匀出水来回血，每第三下在身前立起一道沙墙；技能扬起一片沙尘，沙尘里的敌人打不出手，自己也少挨打',
   role: 'tank',
   tags: ['defense', 'melee'],

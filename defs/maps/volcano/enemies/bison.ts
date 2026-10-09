@@ -4,7 +4,6 @@ const BISON = {
   kind: 'bison',
   emoji: '1f9ac',
   name: '野牛',
-  element: 'earth',
   desc: '一身厚毛的野牛，皮糙肉厚：追上来刨蹄蓄力半秒，低头直冲六格，撞上的被顶飞老远；冲的方向起步时就定了，侧身躲得开',
   size: 1.6,
   radius: 0.6,

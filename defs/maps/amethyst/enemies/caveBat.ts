@@ -4,7 +4,6 @@ const CAVE_BAT = {
   kind: 'caveBat',
   emoji: '1f987',
   name: '洞蝠',
-  element: 'dark',
   desc: '成群倒挂在洞顶，一受惊就扑下来追着人飞；碰到人就吸一口血，回自己 5% 的生命',
   size: 1.1,
   radius: 0.4,

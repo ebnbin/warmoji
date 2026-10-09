@@ -44,7 +44,6 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f980',
   name: '帝王蟹',
-  element: 'earth',
   desc: '披着厚甲的帝王蟹，走得慢、推不太动：大钳一夹把敌人钉在原地 0.8 秒；技能竖起甲壳挂上护盾，把身边的敌人都招到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],

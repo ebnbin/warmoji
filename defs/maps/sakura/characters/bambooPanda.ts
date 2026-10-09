@@ -61,7 +61,6 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f43c',
   name: '熊猫',
-  element: 'wood',
   desc: '抡着竹棍、练过太极的熊猫：一戳一扫轮着来，戳得远、扫得开，每一下耗 15 点能量，能量每秒回 12 点，不够就停手；技能太极 1.6 秒内挡下所有来招，晕住出手的并还手，还回 50 点能量',
   role: 'bruiser',
   tags: ['damage', 'defense', 'melee'],

@@ -67,7 +67,6 @@ export const levels = [{ mul: { healing: 1.2, damage: 1.1 } }, { add: { maxHp: 2
 export default {
   emoji: '1f430',
   name: '玉兔',
-  element: 'light',
   desc: '从月亮上下来过中秋的玉兔：捣药给 4.5 格内最伤的队友回 11 点血，再朝 6.5 格内最近的敌人扔月饼，两样轮着来，轮到的那样没有对象就空过一次；技能给全队挂上护盾，并在脚下铺开一片回血的广寒宫',
   role: 'support',
   tags: ['support', 'ranged'],

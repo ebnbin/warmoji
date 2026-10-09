@@ -34,7 +34,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f925',
   name: '匹诺曹',
-  element: 'wood',
   desc: '一撒谎鼻子就变长的木偶：伸长鼻子戳穿一排敌人，同一个挨满三下就被定在原地；技能一通谎话，让身边的敌人掉头去打自己人',
   role: 'controller',
   tags: ['control', 'melee'],

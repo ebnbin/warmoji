@@ -7,7 +7,6 @@ const DEATHCAP = {
   kind: 'deathcap',
   emoji: '1f344_200d_1f7eb',
   name: '枯木菇',
-  element: 'wood',
   desc: '慢吞吞挪过来的毒菇，每隔几秒在身边喷出一圈孢子，站在孢子里的人一下下掉血并中毒；倒下时喷出一大团',
   size: 1.15,
   radius: 0.44,

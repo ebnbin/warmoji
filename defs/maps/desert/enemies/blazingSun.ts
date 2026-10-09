@@ -43,7 +43,7 @@ const heatWave = {
   onHit: [{ kind: 'exhaust' }],
 } satisfies AbilityDef
 
-const darkBeam = { ...sunBeam, cooldownMs: 4000, firstDelayMs: 1200, element: 'dark', color: 0x7e57c2 } satisfies AbilityDef
+const darkBeam = { ...sunBeam, cooldownMs: 4000, firstDelayMs: 1200, color: 0x7e57c2 } satisfies AbilityDef
 
 const eclipse = {
   trigger: 'auto',
@@ -79,7 +79,7 @@ const BLAZING_SUN = {
   emoji: '1f31e',
   name: '烈日',
   element: 'fire',
-  desc: '悬在沙海上空的烈日：远远射出三道散开的日光，往人头上落下耀斑、落处烧起一片火，隔一阵蓄力放出热浪抽干全队的体力；血掉到一半转入日蚀：变成暗元素，不再落耀斑、放热浪，改射暗光束，还会让全场眼前一黑 1.5 秒；血不到两成坍成超新星：贴上来，隔一阵蓄力 1.5 秒炸开身周 6 格',
+  desc: '悬在沙海上空的烈日：远远射出三道散开的日光，往人头上落下耀斑、落处烧起一片火，隔一阵蓄力放出热浪抽干全队的体力；血掉到一半转入日蚀：不再落耀斑、放热浪，改射暗光束，还会让全场眼前一黑 1.5 秒；血不到两成坍成超新星：贴上来，隔一阵蓄力 1.5 秒炸开身周 6 格',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -93,7 +93,7 @@ const BLAZING_SUN = {
   drive: { kind: 'standoff', standoffDist: 4.5 },
   abilities: [sunBeam, flare, heatWave],
   phases: [
-    { below: 0.5, name: '日蚀', element: 'dark', abilities: [darkBeam, eclipse] },
+    { below: 0.5, name: '日蚀', abilities: [darkBeam, eclipse] },
     { below: 0.2, name: '超新星', drive: { kind: 'chase' }, abilities: [darkBeam, eclipse, supernova] },
   ],
 } satisfies EnemyDef

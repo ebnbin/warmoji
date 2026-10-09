@@ -4,7 +4,6 @@ const ABYSS_EYE = {
   kind: 'abyssEye',
   emoji: '1f441',
   name: '深渊之眼',
-  element: 'dark',
   desc: '从头顶的黑暗里沉下来，悬在高处和队伍隔开五格；盯住最近的队员牵上一道暗光，2.5 秒内没挣出 6 格，那人的气就被抽空，3 秒内受到的伤害 ×1.2',
   size: 1.3,
   radius: 0.48,

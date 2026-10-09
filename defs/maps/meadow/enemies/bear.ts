@@ -5,7 +5,6 @@ const BEAR = {
   role: 'boss',
   emoji: '1f43b',
   name: '林中熊',
-  element: 'earth',
   desc: '林子里的大熊：熊掌一扇扫开一片，一声咆哮吓跑身边的人，隔一阵低头冲撞；血掉到一半就暴怒，越打越快',
   size: 3.2,
   radius: 1.05,

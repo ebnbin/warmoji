@@ -4,7 +4,6 @@ const CURSED_DOLL = {
   kind: 'cursedDoll',
   emoji: '1f38e',
   name: '诅咒人偶',
-  element: 'dark',
   desc: '从寺墙后面挪出来的诅咒人偶，走得很慢：隔一阵对 6 格内最近的人下咒，中咒的 4 秒内挨打更疼、2 秒内走不快；它每挨一下，2.5 格内离它最近的人也跟着疼一下；被打碎时把身边 3 格内的人都咒一遍',
   size: 1.2,
   radius: 0.44,

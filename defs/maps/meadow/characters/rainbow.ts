@@ -35,7 +35,6 @@ export const levels = [{ add: { maxHp: 10 }, mul: { damage: 1.2, areaDamage: 1.1
 export default {
   emoji: '1f984',
   name: '独角兽',
-  element: 'light',
   desc: '角上射出一道穿过一排敌人的虹光，照到的敌人身上留着灼人的余晖；技能在脚下架一座彩虹桥，桥下的敌人走不快，桥上的队友回血',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],

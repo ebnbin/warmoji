@@ -23,7 +23,7 @@ const tailSlap = {
   fireSfx: 'splash',
   windup: { ms: 450, lockAt: 'end', telegraph: 'shake' },
   shape: { kind: 'sector', radius: 3.2, arcDeg: 160, ms: 250 },
-  onHit: [{ kind: 'attune', element: 'water', ms: 4000 }],
+  onHit: [{ kind: 'status', status: 'wet', ms: 4000 }],
 } satisfies AbilityDef
 
 const surge = {
@@ -74,7 +74,7 @@ const ORCA = {
   emoji: '1facd',
   name: '虎鲸',
   element: 'water',
-  desc: '从冰缘外的海里爬上来的虎鲸，不怕冰水、在海里游得飞快：张口撕咬，甩尾拍中的人 4 秒内变成水元素，掀起一道浪把一排人推开 4 格；隔一阵身子一沉谁也打不着，0.8 秒后一跃扑出 6 格砸进人堆；血掉到一半开始猎杀，跑得更快、出手更勤',
+  desc: '从冰缘外的海里爬上来的虎鲸，不怕冰水、在海里游得飞快：张口撕咬，甩尾拍中的人浑身湿透 4 秒，掀起一道浪把一排人推开 4 格；隔一阵身子一沉谁也打不着，0.8 秒后一跃扑出 6 格砸进人堆；血掉到一半开始猎杀，跑得更快、出手更勤',
   size: 3.2,
   radius: 1.05,
   span: [0, 6],

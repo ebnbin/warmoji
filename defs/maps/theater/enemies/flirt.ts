@@ -5,7 +5,6 @@ const FLIRT = {
   kind: 'flirt',
   emoji: '1f618',
   name: '飞吻演员',
-  element: 'light',
   desc: '离人四格远远站着抛飞吻，飞吻会拐着弯追人，挨上的人 1.2 秒里被迷得朝飞吻演员走过去',
   size: 1.25,
   radius: 0.46,

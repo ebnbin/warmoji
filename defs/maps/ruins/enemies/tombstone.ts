@@ -5,7 +5,6 @@ const TOMBSTONE = {
   kind: 'tombstone',
   emoji: '1faa6',
   name: '墓碑',
-  element: 'dark',
   desc: '院子里冒出来的墓碑，自己一动不动也推不动，每 6 秒从坟里爬出两个骷髅兵，场上最多四个；不推倒它就一直往外爬',
   size: 1.4,
   radius: 0.55,

@@ -15,7 +15,6 @@ const VOMITER = {
   kind: 'vomiter',
   emoji: '1f92e',
   name: '呕吐菌',
-  element: 'dark',
   desc: '慢吞吞地挪，憋一下朝身前吐一大口，吐中的挨一下；吐完最近那人的脚下摊开一滩 1.5 格的黏液，4 秒内踩上去的人走得慢一半',
   size: 1.45,
   radius: 0.54,

@@ -52,7 +52,6 @@ export const levels = [{ mul: { summonDamage: 1.2, damage: 1.1 } }, { add: { max
 export default {
   emoji: '1f9d1_200d_1f33e',
   name: '农夫',
-  element: 'wood',
   desc: '边走边种会吐豆子的向日葵，丰收时向日葵还给身边的队友回血；技能一口气种下三门玉米炮',
   role: 'summoner',
   tags: ['damage', 'summon'],

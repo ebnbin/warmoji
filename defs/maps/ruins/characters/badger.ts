@@ -35,7 +35,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f9a1',
   name: '獾',
-  element: 'dark',
   desc: '凶悍的獾：钻地扑到 4.5 格内的敌人背后狠咬一口再钻回来，对生命不到三成的下嘴重一半；技能一横心，什么控制都不吃',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

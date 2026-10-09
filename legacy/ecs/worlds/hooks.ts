@@ -128,6 +128,8 @@ export interface WorldHooks {
   seat?(sim: Sim, from: Point, at: Point): Point
   /** 从 (x, y) 走到队长要走多远，像素，按地图的寻路算、穿门的路也算，走不到为 Infinity；不写就按直线 */
   toLeader?(sim: Sim, x: number, y: number): number
+  /** 这个身体此刻泡在水里：算湿的；不写就哪里都没有水 */
+  soaks?(sim: Sim, eid: number): boolean
   /** 这个身体此刻每秒换多少口气，按体力点数：正的是喘得上气，走着也按它补；负的是憋着气，按它往下掉，歇着也回不来；不写就照常 */
   breath?(sim: Sim, eid: number): number
   /** 这张图要队伍盯住的一处：在屏幕外时队长身边画一个指过去的箭头；不写就没有 */

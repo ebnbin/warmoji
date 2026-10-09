@@ -4,7 +4,6 @@ const TEMPLE_GOOSE = {
   kind: 'templeGoose',
   emoji: '1fabf',
   name: '护院大鹅',
-  element: 'earth',
   desc: '看门的大鹅：伸长脖子冲过来啄人；隔一阵扯着嗓子大叫一声，身边 2 格内的人吓得掉头就跑',
   size: 1.3,
   radius: 0.48,

@@ -4,7 +4,6 @@ const BONE_MAN = {
   kind: 'boneMan',
   emoji: '1f480',
   name: '骷髅兵',
-  element: 'dark',
   desc: '从墓碑底下爬出来的骷髅兵，骨头一碰就散，摇摇晃晃地追着人打',
   size: 1.1,
   radius: 0.42,

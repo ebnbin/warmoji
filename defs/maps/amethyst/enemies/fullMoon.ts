@@ -6,8 +6,7 @@ const FULL_MOON = {
   role: 'boss',
   emoji: '1f31d',
   name: '满月',
-  element: 'light',
-  desc: '中秋夜悬在塌顶下的一轮满月，总和人隔着四五格：朝人打出一道 8 格长的月光柱，往最近的四个人头上落下月石；隔一阵掀起潮汐，把 6 格内的人往身边拽；血掉到六成迎来月食，变成暗元素；只剩两成五时中秋团圆，变回光元素、回一成生命，出手间隔缩到 0.75 倍',
+  desc: '中秋夜悬在塌顶下的一轮满月，总和人隔着四五格：朝人打出一道 8 格长的月光柱，往最近的四个人头上落下月石；隔一阵掀起潮汐，把 6 格内的人往身边拽；血掉到六成迎来月食；只剩两成五时中秋团圆，回一成生命，出手间隔缩到 0.75 倍',
   size: 3.5,
   radius: 1.15,
   span: [0, 6],
@@ -54,8 +53,8 @@ const FULL_MOON = {
     },
   ],
   phases: [
-    { below: 0.6, name: '月食', element: 'dark' },
-    { below: 0.25, name: '中秋', element: 'light', stats: { mul: { cooldown: 0.75 } }, effects: [{ kind: 'healRatio', ratio: 0.1 }] },
+    { below: 0.6, name: '月食' },
+    { below: 0.25, name: '中秋', stats: { mul: { cooldown: 0.75 } }, effects: [{ kind: 'healRatio', ratio: 0.1 }] },
   ],
 } satisfies EnemyDef
 

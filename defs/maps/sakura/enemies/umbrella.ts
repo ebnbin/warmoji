@@ -4,7 +4,6 @@ const UMBRELLA = {
   kind: 'umbrella',
   emoji: '2602',
   name: '唐伞妖',
-  element: 'dark',
   desc: '单脚蹦的唐伞妖：一蹦就是两格半地追过来，落地砸中身边的人还把人震开',
   size: 1.3,
   radius: 0.46,

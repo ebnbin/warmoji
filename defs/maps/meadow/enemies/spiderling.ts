@@ -4,7 +4,6 @@ const SPIDERLING = {
   kind: 'spiderling',
   emoji: '1f577',
   name: '小蜘蛛',
-  element: 'dark',
   desc: '蛛后的卵囊里孵出来的小蜘蛛，又小又快，咬一口让人腿发软',
   size: 0.75,
   radius: 0.28,

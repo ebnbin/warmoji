@@ -61,7 +61,6 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9da',
   name: '花仙子',
-  element: 'light',
   desc: '花粉治最伤的那个队友，花瓣打敌人，两样轮着来；技能给全队挂上护盾并解掉控制',
   role: 'support',
   tags: ['support', 'ranged'],

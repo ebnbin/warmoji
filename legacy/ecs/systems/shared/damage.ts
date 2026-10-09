@@ -20,10 +20,9 @@ import { attachDrive, detachDrive } from '../../entities/enemy'
 import { foldBody, setStatLayer } from '../../utils/stats'
 import { gearHurt } from './gear'
 import { spawnFxCircle } from '../../entities/fx'
-import { counterMul, REACTIONS } from '../../../data/elements'
-import { toPx } from '../../../data/px'
-import { elementNow, touchElement } from '../../utils/element'
-import type { ElementReaction } from '../../../types/elements'
+import { EL, SHATTER } from '../../../data/elements'
+import { isFrozen, isWet } from '../../utils/element'
+import { elementLands, igniteClouds, reacted, shatter, shock } from './elements'
 import type { Point } from '../../../util/vec'
 import type { Offense } from '../../utils/stats'
 import type { Source } from '../../utils/source'
@@ -36,6 +35,8 @@ interface TouchOpts {
   readonly tags?: number
   /** 近身打它的身体：反伤反给它，不写就是出手的身体 */
   readonly by?: number
+  /** 传过来的一下（电流跳过去、毒云炸开）：不再往下传、不引爆毒云 */
+  readonly relay?: true
 }
 
 /** 这一下的出手画面上看不看得见：shown 是弹体、刀光、电弧、相撞、场这类已经画出来的；看不见的给出 trace，表现层从那里补一道指示 */
@@ -243,7 +244,7 @@ function leech(sim: Sim, src: Source, atk: Offense, dmg: number, tags: number): 
   }
   const amount = Math.min(dmg * atk.lifesteal, Hp.max[b]! * LIFESTEAL_CAP_PER_SEC - Leech.hp[b]!)
   if (amount <= 0) return
-  if (Alive.v[b]) mend(b, amount)
+  if (Alive.v[b]) mend(sim, b, amount)
   Leech.hp[b] = Leech.hp[b]! + amount
 }
 
@@ -268,17 +269,6 @@ function shove(sim: Sim, src: Source, target: number, o: TouchOpts): void {
   if (j.x !== 0 || j.y !== 0) displace(sim, target, { kind: 'push', x: j.x, y: j.y }, FORCED)
 }
 
-/** 元素反应：在被打中处闪一圈、迸出这种反应的粒子、飘出它的名字，再由出手方施加反应的效果，效果不带元素；被打中的已经倒下就只施加不看目标的 */
-function reacted(sim: Sim, src: Source, target: number, uid: number, r: ElementReaction, at: Point, dmg: number): void {
-  spawnFxCircle(sim, at.x, at.y, 34, { fill: r.color, fillAlpha: 0.45, stroke: r.color, lineWidth: 5, lineAlpha: 0.95, fromScale: 0.4, toScale: 2.2, durationMs: 380, depth: 14 })
-  sim.out.bursts.push({ x: at.x, y: at.y, count: 14, kind: r.burst })
-  sim.out.events.push({ kind: 'react', x: at.x, y: at.y, reaction: REACTIONS.indexOf(r), fxAt: sim.fxMs })
-  const effects = toPx(r).effects
-  if (!effects) return
-  const alive = Alive.v[target] === 1 && Uid.v[target] === uid
-  applyAbilityEffects(sim, { ...src, element: 0 }, effects, { x: at.x, y: at.y, baseDamage: dmg, targets: alive ? [target] : [] })
-}
-
 /** 反伤：带刺的身体被近战打中，反给近身打它的身体一下；持续伤害不算 */
 function spikesOf(sim: Sim, src: Source, target: number, tags: number, o: HitOpts): (() => void) | null {
   if (o.tick || (tags & HIT.melee) === 0 || !hasComponent(sim.world, target, Stats)) return null
@@ -298,7 +288,7 @@ function comingFrom(sim: Sim, src: Source, o: HitOpts): Point | null {
   return o.from ?? src.from ?? null
 }
 
-/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量；持续伤害不暴击、不吃护甲；返回是否命中 */
+/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、物理打冻住的碎冰、暴击，只在最后取整；带元素的一下随后沾上元素或起反应，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后电流往下传、火引爆毒云；持续伤害不暴击、不吃护甲、不沾元素；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts): boolean {
   if (!lands(sim, src, target, o, true)) return false
   if (harmless(sim, src, target)) {
@@ -322,16 +312,23 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if ((tags & HIT.dot) === 0) raw *= armorTaken(Stats.armor[target]!)
   raw *= Stats.taken[target]!
   const el = src.element ?? 0
-  const react = el > 0 && !o.tick ? touchElement(sim, target, el) : undefined
-  if (el > 0) raw *= counterMul(el, elementNow(sim, target)) * (react?.mul ?? 1)
+  const at = { x: Transform.x[target]!, y: Transform.y[target]! }
+  const uid = Uid.v[target]!
+  const shattered = el === 0 && !o.tick && isFrozen(sim, target)
+  if (shattered) raw *= 1 + SHATTER.ratio
+  const wet = el === EL.thunder && isWet(sim, target)
   const crit = !o.tick && !src.noCrit && atk.crit > 0 && sim.rng.next() < atk.crit
   if (crit) raw *= atk.critDamage
   const dealt = Math.max(1, Math.round(raw))
+  if (shattered) shatter(sim, target, at)
+  const react = el > 0 && !o.tick ? elementLands(sim, src, target, el, dealt) : undefined
+  if (react) reacted(sim, at, react)
+  const onward = o.tick || o.relay ? null : el === EL.thunder ? () => shock(sim, src, target, uid, damage, at, wet) : el === EL.fire ? () => igniteClouds(sim, src, at, damage) : null
   const dmg = soak(sim, target, dealt)
   if (dmg <= 0) {
     blockFx(sim, target, SHIELD_COLOR)
-    if (react) reacted(sim, src, target, Uid.v[target]!, react, { x: Transform.x[target]!, y: Transform.y[target]! }, dealt)
     spikes?.()
+    onward?.()
     return true
   }
   const team = Faction.v[target] === FACTION.team
@@ -369,15 +366,13 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   }
   gearHurt(sim, target)
   const { x: jx, y: jy } = knockOf(sim, atk, target, o)
-  const at = { x: Transform.x[target]!, y: Transform.y[target]! }
-  const uid = Uid.v[target]!
   let hp = mounted(sim, target, dmg) ? Hp.v[target]! : Hp.v[target]! - dmg
   if (hp <= 0 && hasMark(sim, target, MARK.undying)) hp = 1
   if (hp <= 0 && lethal(sim, target)) hp = Hp.v[target]!
   if (hp <= 0) {
     die(sim, target, src, jx, jy)
-    if (react) reacted(sim, src, target, uid, react, at, dmg)
     spikes?.()
+    onward?.()
     return true
   }
   Hp.v[target] = hp
@@ -385,7 +380,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   advancePhase(sim, target)
   sim.out.events.push({ kind: 'flinch', eid: target, uid: Uid.v[target]!, team, tint: src.tint, at: now, fxAt: sim.fxMs })
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
-  if (react) reacted(sim, src, target, uid, react, at, dmg)
   spikes?.()
+  onward?.()
   return true
 }

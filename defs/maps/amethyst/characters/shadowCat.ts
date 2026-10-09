@@ -51,7 +51,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f408_200d_2b1b',
   name: '黑猫',
-  element: 'dark',
   desc: '黑夜里看不见的黑猫：闪到敌人身后挠一爪，对生命低于 30% 的多挠六成；猫有九命——每条命第一次生命归零时不倒下，回三成生命，1 秒内谁也打不到它',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

@@ -5,7 +5,6 @@ const NAUSEOUS = {
   kind: 'nauseous',
   emoji: '1f922',
   name: '恶心菌',
-  element: 'wood',
   desc: '慢吞吞地挪，身边始终罩着一团 1.8 格的恶心气：待在气里每半秒挨一下并中毒，出来了还要再难受 3 秒',
   size: 1.35,
   radius: 0.5,

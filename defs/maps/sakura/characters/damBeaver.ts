@@ -44,7 +44,6 @@ export const levels = [{ mul: { summonDamage: 1.2, damage: 1.1 } }, { add: { max
 export default {
   emoji: '1f9ab',
   name: '河狸',
-  element: 'wood',
   desc: '勤快的河狸：边走边打下会射木刺的木桩，每根立 12 秒；技能在前方筑起一道长坝，敌人过不来、敌方的弹体也打不过来',
   role: 'summoner',
   tags: ['damage', 'summon'],

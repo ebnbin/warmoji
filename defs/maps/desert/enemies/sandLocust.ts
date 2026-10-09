@@ -4,7 +4,6 @@ const SAND_LOCUST = {
   kind: 'sandLocust',
   emoji: '1f997',
   name: '沙蝗',
-  element: 'wood',
   desc: '一蹦一蹦地扑过来，每一跳 2 格，落下时砸中脚边的人；身子脆，一打就散',
   size: 0.95,
   radius: 0.34,

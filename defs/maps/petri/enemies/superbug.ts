@@ -45,8 +45,7 @@ const SUPERBUG = {
   role: 'boss',
   emoji: '1f9a0',
   name: '超级细菌',
-  element: 'wood',
-  desc: '培养皿里最毒的超级细菌：往离它最近的至多五个人头上落毒孢，砸中的挨一下，落点留一团 4 秒的孢子云，待在里面中毒；抽一鞭毛把人钉住 0.8 秒；隔一阵分裂出六个孢子；血掉到六成长出耐药性，变成火元素、霸体 2 秒、出手更勤，掉到三成再变异成暗元素，打得更狠',
+  desc: '培养皿里最毒的超级细菌：往离它最近的至多五个人头上落毒孢，砸中的挨一下，落点留一团 4 秒的孢子云，待在里面中毒；抽一鞭毛把人钉住 0.8 秒；隔一阵分裂出六个孢子；血掉到六成长出耐药性，变成火元素、霸体 2 秒、出手更勤，掉到三成再变异，打得更狠',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -61,7 +60,7 @@ const SUPERBUG = {
   abilities: [sporeRain, lash, fission],
   phases: [
     { below: 0.6, name: '耐药', element: 'fire', stats: { mul: { cooldown: 0.85 } }, effects: [{ kind: 'unstoppable', durationMs: 2000 }] },
-    { below: 0.3, name: '变异', element: 'dark', stats: { mul: { cooldown: 0.85, damage: 1.3 } } },
+    { below: 0.3, name: '变异', stats: { mul: { cooldown: 0.85, damage: 1.3 } } },
   ],
 } satisfies EnemyDef
 

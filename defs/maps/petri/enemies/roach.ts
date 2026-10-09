@@ -4,7 +4,6 @@ const ROACH = {
   kind: 'roach',
   emoji: '1fab3',
   name: '蟑螂',
-  element: 'dark',
   desc: '又矮又快，贴着琼脂乱窜；打不死的小强——生命见底时不倒，撑着回到一半，再爬 2.5 秒才流光倒下',
   size: 1,
   radius: 0.38,

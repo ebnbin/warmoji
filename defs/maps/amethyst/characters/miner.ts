@@ -60,7 +60,6 @@ export const levels = [{ add: { maxHp: 25, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f9d4',
   name: '矿工',
-  element: 'earth',
   desc: '在晶洞里挖了一辈子矿的老矿工：矿镐刨中的敌人更吃痛；撑起一圈坑道支架把队友护在里面，把敌人都招到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],

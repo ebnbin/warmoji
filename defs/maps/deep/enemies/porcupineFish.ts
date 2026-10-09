@@ -5,7 +5,6 @@ const PORCUPINE_FISH = {
   kind: 'porcupineFish',
   emoji: '1f421',
   name: '刺豚',
-  element: 'dark',
   desc: '飘在半空慢慢靠过来。挨打就鼓成刺球，常把贴在身边的人扎一下；3 秒内连挨三下鼓到 1.6 倍，3 秒没挨打才瘪回去；死后留下一团毒',
   size: 1.2,
   radius: 0.44,

@@ -5,7 +5,6 @@ const SNAIL = {
   kind: 'snail',
   emoji: '1f40c',
   name: '蜗牛',
-  element: 'wood',
   desc: '慢吞吞地爬，壳很硬；爬过的地方留下一道黏液，踩上去走不动',
   size: 1.2,
   radius: 0.46,

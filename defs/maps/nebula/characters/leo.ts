@@ -59,7 +59,6 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.15 } }, 
 export default {
   emoji: '1f981',
   name: '狮子座',
-  element: 'light',
   desc: '从星座里走下来的狮子：狮爪把贴上来的拍开，每第三下改成怒吼吓跑一圈；技能给自己挂上厚厚的护盾，把身边的敌人都招到自己身上，还替队友挡下两成伤害',
   role: 'tank',
   tags: ['defense', 'melee'],

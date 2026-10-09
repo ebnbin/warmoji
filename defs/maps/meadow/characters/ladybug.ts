@@ -38,7 +38,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f41e',
   name: '瓢虫',
-  element: 'wood',
   desc: '背上驮着七颗星的瓢虫：星粉蚜弹把打中的敌人变成一只什么都做不了的绵羊 2.5 秒，变回来后 5 秒内不会再变，头目不会变；技能往最近的 7 个敌人头上各落一颗星，砸中的变羊 3 秒、定身 1.5 秒',
   role: 'controller',
   tags: ['control', 'ranged'],

@@ -93,7 +93,7 @@ export function relevel(sim: Sim, slot: number): void {
   const before = Hp.max[m]!
   setStatLayer(m, 'gear', memberGearMods(sim.run, slot))
   foldBody(sim.world, sim, m)
-  if (Alive.v[m]) mend(m, Math.max(0, Hp.max[m]! - before))
+  if (Alive.v[m]) mend(sim, m, Math.max(0, Hp.max[m]! - before))
   rearmCharacter(sim, m)
   glow(sim, m)
 }
@@ -125,7 +125,7 @@ export function swapTeam(sim: Sim, slot: number): void {
 /** 恢复：生命回满，倒下的复活，从空中落回队伍 */
 export function restoreMember(sim: Sim, slot: number): void {
   const m = sim.characters[slot]!
-  if (Alive.v[m]) mend(m, Hp.max[m]!)
+  if (Alive.v[m]) mend(sim, m, Hp.max[m]!)
   else raise(sim, m)
   glow(sim, m)
 }

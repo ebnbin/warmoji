@@ -8,6 +8,6 @@ export function tickRegen(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   for (const eid of query(sim.world, [Stats, Hp, Alive])) {
     const r = Stats.regen[eid]!
-    if (r > 0 && Alive.v[eid] && Hp.v[eid]! < Hp.max[eid]!) mend(eid, r * dt)
+    if (r > 0 && Alive.v[eid] && Hp.v[eid]! < Hp.max[eid]!) mend(sim, eid, r * dt)
   }
 }

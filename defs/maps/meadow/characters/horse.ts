@@ -38,7 +38,6 @@ export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f40e',
   name: '骏马',
-  element: 'earth',
   desc: '一阵风似的骏马：后蹄把贴上来的踢飞，朝一个方向奔腾冲出一条路',
   role: 'bruiser',
   tags: ['damage', 'melee', 'mobile'],

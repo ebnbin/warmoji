@@ -41,7 +41,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f999',
   name: '羊驼',
-  element: 'earth',
   desc: '羊驼一口一口地吐口水，同一个敌人 3 秒内挨满三口就恶心得晕过去 1 秒；技能冲着前方一通发火，吓得一片敌人掉头就跑',
   role: 'controller',
   tags: ['control', 'ranged'],

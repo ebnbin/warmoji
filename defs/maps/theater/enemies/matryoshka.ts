@@ -5,7 +5,6 @@ const MATRYOSHKA = {
   kind: 'matryoshka',
   emoji: '1fa86',
   name: '套娃',
-  element: 'wood',
   desc: '又慢又结实的套娃，打碎了裂成两个中套娃，中套娃再裂成两个小套娃，越打越多',
   size: 1.4,
   radius: 0.6,

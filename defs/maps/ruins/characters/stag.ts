@@ -58,7 +58,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f98c',
   name: '鹿',
-  element: 'wood',
   desc: '林间的雄鹿：鹿角把贴上来的敌人挑上半空，隔几下甩到身后；技能一声长鸣，把身前一片敌人扔到别的敌人身上砸晕',
   role: 'controller',
   tags: ['control', 'melee'],

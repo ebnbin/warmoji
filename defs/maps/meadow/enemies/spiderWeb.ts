@@ -4,7 +4,6 @@ const SPIDER_WEB = {
   kind: 'spiderWeb',
   emoji: '1f578',
   name: '蜘蛛网',
-  element: 'dark',
   desc: '蛛后的卵在草里结成的网，原地不动：每 3.5 秒朝 6 格内最近的人甩出蛛丝，落点 1.1 格内的人定身 1.5 秒；蛛后能瞬移到它身边',
   size: 1.9,
   radius: 0.7,

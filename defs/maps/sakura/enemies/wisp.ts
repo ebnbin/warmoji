@@ -4,7 +4,6 @@ const WISP = {
   kind: 'wisp',
   emoji: '1f47b',
   name: '游魂',
-  element: 'dark',
   desc: '从樱林里慢慢飘出来的游魂，穿得过墙、飘得过溪：贴上谁就吸一口，回自己 8% 的生命；隔一阵就虚化 1.2 秒，这时什么都打不中它',
   size: 1.2,
   radius: 0.44,

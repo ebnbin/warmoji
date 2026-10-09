@@ -57,7 +57,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f42d',
   name: '小白鼠',
-  element: 'dark',
   desc: '从实验室里逃出来的小白鼠：扑上去咬两口，咬过的 3 秒里慢慢中毒，第三下转着尾巴卷起一道 5 格长的旋风，把一排敌人挑上天 0.75 秒；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高',
   role: 'assassin',
   tags: ['damage', 'control', 'melee', 'mobile'],

@@ -5,7 +5,6 @@ const MATRYOSHKA_MID = {
   kind: 'matryoshkaMid',
   emoji: '1fa86',
   name: '中套娃',
-  element: 'wood',
   desc: '套娃碎开后走出来的中套娃，再打碎又裂成两个小套娃',
   size: 1.1,
   radius: 0.45,

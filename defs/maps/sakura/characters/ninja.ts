@@ -50,7 +50,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f977',
   name: '忍者',
-  element: 'dark',
   desc: '来无影去无踪的忍者：闪到 6 格内最近的敌人身后斩一刀，对生命低于三成的斩得更狠；技能变出两个分身一起出手',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],

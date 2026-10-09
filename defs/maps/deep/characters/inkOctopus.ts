@@ -40,7 +40,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f419',
   name: '章鱼',
-  element: 'dark',
   desc: '八条腕足的章鱼：伸出 3 格长的触手，把打中的敌人拽到跟前，拽不动的重家伙就把自己拽过去；技能在敌人头上落一团墨，墨阵里的敌人走不动也打不出手',
   role: 'controller',
   tags: ['control', 'melee'],

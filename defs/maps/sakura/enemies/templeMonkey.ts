@@ -5,7 +5,6 @@ const TEMPLE_MONKEY = {
   kind: 'templeMonkey',
   emoji: '1f435',
   name: '寺猴',
-  element: 'wood',
   desc: '寺院里的猴子：绕着人保持三四格远，抛桃核砸人；挨打时有三成几率猛地提速 1.5 秒，蹿得飞快',
   size: 1.15,
   radius: 0.42,

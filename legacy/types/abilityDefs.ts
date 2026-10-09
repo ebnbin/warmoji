@@ -302,7 +302,7 @@ interface ImbueEffect {
   readonly element: ElementId
   readonly ms: number
 }
-/** 转属：目标 ms 内变成这种元素，挨打按它算克制，出手也默认带它 */
+/** 转属：目标 ms 内本身变成这种元素，免疫的、湿不湿跟着变，出手也默认带它 */
 interface AttuneEffect {
   readonly kind: 'attune'
   readonly element: ElementId

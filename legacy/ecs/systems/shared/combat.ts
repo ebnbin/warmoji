@@ -51,7 +51,7 @@ function killerReacts(sim: Sim, src: Source): void {
   const k = src.body
   if (k === undefined || !isSameEntity(sim.world, k, src.bodyUid ?? 0) || !Alive.v[k]) return
   const at = { x: Transform.x[k]!, y: Transform.y[k]!, baseDamage: 0, targets: [k] }
-  if (hasComponent(sim.world, k, Stats)) mend(k, Stats.killHeal[k]!)
+  if (hasComponent(sim.world, k, Stats)) mend(sim, k, Stats.killHeal[k]!)
   const onKill = bodyRules[k]?.onKill
   if (onKill) applyAbilityEffects(sim, selfSource(sim, k), onKill, at)
   const byAbility = src.ability === undefined ? undefined : abilityOnKill[src.ability]

@@ -41,7 +41,6 @@ export const levels = [{ add: { maxHp: 10 }, mul: { damage: 1.2, areaDamage: 1.1
 export default {
   emoji: '1f385',
   name: '圣诞老人',
-  element: 'light',
   desc: '扛着一大袋礼物：朝敌人抛礼物，砸中就在 1.6 格内炸开一片；技能平安夜从天上砸下一堆礼物',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],

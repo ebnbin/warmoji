@@ -46,7 +46,6 @@ const PUMPKIN_KING = {
   role: 'boss',
   emoji: '1f383',
   name: '南瓜王',
-  element: 'wood',
   desc: '盘踞残垣的南瓜王：藤鞭一抽把人钉在原地，远远抛来南瓜，落到人身上炸开一片，隔一阵召出三个会自爆的南瓜仔；血掉到一半点亮万圣夜，浑身着火变成火元素，出手更快',
   size: 3.2,
   radius: 1.05,

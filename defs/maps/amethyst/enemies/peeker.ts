@@ -5,7 +5,6 @@ const PEEKER = {
   kind: 'peeker',
   emoji: '1fae3',
   name: '偷看鬼',
-  element: 'dark',
   desc: '躲在暗处偷看的小鬼，总和人隔着四五格；被人逼近到 3 格就扭头跑开；远远瞪人一眼，被瞪中的 3 秒内受到的伤害 ×1.2',
   size: 1.2,
   radius: 0.45,

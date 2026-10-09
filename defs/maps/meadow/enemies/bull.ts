@@ -4,7 +4,6 @@ const BULL = {
   kind: 'bull',
   emoji: '1f402',
   name: '公牛',
-  element: 'earth',
   desc: '从牧场的栅栏翻进来，红着眼只盯队长；隔一阵蓄力狂冲一长段，冲撞时什么控制都不吃',
   size: 1.6,
   radius: 0.6,

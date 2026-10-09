@@ -4,7 +4,6 @@ const SCARAB = {
   kind: 'scarab',
   emoji: '1fab2',
   name: '圣甲虫',
-  element: 'earth',
   desc: '甲壳坚硬；隔一阵团起身子，像推粪球一样朝最近的人猛滚过去，半路会跟着人拐弯，撞上的被顶开',
   size: 1.2,
   radius: 0.45,

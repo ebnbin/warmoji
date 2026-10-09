@@ -39,7 +39,6 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1fa90',
   name: '环星',
-  element: 'dark',
   desc: '戴着光环的行星：在敌人身上套一圈引力环让它走不快，同一个敌人套满三圈就被锁在原地，升级后还被拽到身边；技能在脚下张开引力井，把一片敌人往里吸',
   role: 'controller',
   tags: ['control', 'ranged'],

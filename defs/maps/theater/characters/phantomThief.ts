@@ -41,7 +41,6 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f978',
   name: '怪盗',
-  element: 'dark',
   desc: '神出鬼没的怪盗：闪到敌人身后出刀再闪回来，每一刀有两成几率顺手摸走一枚金币；技能偷走最近的敌人的一招，随后混进人群不见',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],
