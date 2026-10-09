@@ -1,6 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { AI } from '../defs/ai.ts'
-import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
 import { ABILITIES, CHARACTER_FILES, CHARACTERS, LEVEL_STATS, MAP_CHARACTERS, WEAPONS } from '../defs/characters.ts'
 import type { CharacterFile } from '../defs/characters.ts'
@@ -54,9 +53,7 @@ import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { withAffixes } from '../src/data/reactions.ts'
 import { SIGNALS } from '../src/data/signals.ts'
 import type { MapSignals } from '../src/data/signals.ts'
-import { animIssues } from '../src/emoji/animCheck.ts'
-import { packSvg, parseEmojiPack } from '../src/emoji/pack.ts'
-import { splitSvg } from '../src/emoji/svgSplit.ts'
+import { parseEmojiPack } from '../src/emoji/pack.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { AbilityDef, Cond, CondWho, Effect } from '../src/types/abilityDefs'
 import type { StatusDef } from '../src/types/statuses'
@@ -900,8 +897,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }
 
-const EMOJI_PACK = parseEmojiPack(readFileSync('scripts/emoji/ordering.txt', 'utf8'), readFileSync('scripts/emoji/twemoji.txt', 'utf8'))
-const PACK = new Set(EMOJI_PACK.ids)
+const PACK = new Set(parseEmojiPack(readFileSync('scripts/emoji/ordering.txt', 'utf8'), readFileSync('scripts/emoji/twemoji.txt', 'utf8')).ids)
 
 /** 地图信号：同一个名字在哪种地图上说法都一样，关卡的说明按名字找说法 */
 {
@@ -1130,7 +1126,6 @@ need(Object.keys(MAP_CHARACTERS).sort().join() === Object.keys(MAPS).sort().join
 const TABLES = {
   abilities: ABILITIES,
   ai: AI,
-  animations: ANIMATIONS,
   battlefield: BATTLEFIELD,
   characters: CHARACTERS,
   combat: COMBAT,
@@ -1255,15 +1250,6 @@ const TABLES = {
     }
   }
   for (const [name, data] of Object.entries(TABLES)) scan(data, name, false)
-}
-
-/** 动画配方：部件的下标对得上这张 emoji 的顶层元素，首尾姿态闭环 */
-{
-  const elementCount = (emoji: string): number | undefined => {
-    const svg = packSvg(EMOJI_PACK, emoji)
-    return svg === null ? undefined : splitSvg(svg).els.length
-  }
-  for (const issue of animIssues(ANIMATIONS, elementCount)) need(false, issue)
 }
 
 /** 角色的能力：引用存在；主动技能（轮流出手的每一式）手动出手、要拖着瞄准的才用摇杆瞄准；武器与天生能力自动出手 */

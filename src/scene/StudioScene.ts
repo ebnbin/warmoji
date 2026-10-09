@@ -1,19 +1,8 @@
 import Phaser from 'phaser'
 import { setSvgSize } from '../emoji/svg'
-import {
-  ANIM_RECIPES,
-  ANIM_DEF,
-  ANIM_TEMPLATES,
-  animSetOf,
-  applyTemplate,
-  bakeAnimFrame,
-  composeSvg,
-  flattenTree,
-  parseSvgTree,
-} from '../emoji/anim'
-import type { AnimClip, AnimRecipe, AnimTemplate, SvgTree, TreeRow } from '../emoji/anim'
-import type { AnimClipId } from '../types/anim'
-import { emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
+import { composeSvg, flattenTree, parseSvgTree } from '../emoji/svgTree'
+import type { SvgTree, TreeRow } from '../emoji/svgTree'
+import { emojiSvgText, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import {
   beginPage,
@@ -28,7 +17,6 @@ import {
   Row,
   ScrollView,
   Swatch,
-  Tabs,
   VirtualEmojiGrid,
 } from '../ui'
 import type { PageFrame, Rect } from '../ui'
@@ -36,20 +24,9 @@ import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
 
 const RASTER = 256
-const SPEEDS = [1, 0.5, 0.25] as const
 const ANAT_ROW = 64
 const ANAT_INDENT = 28
 const anatIndentOf = (depth: number): number => 16 + depth * ANAT_INDENT
-
-type Tab = 'recipes' | 'templates' | 'anatomy'
-
-const TABS: readonly { readonly key: Tab; readonly label: string }[] = [
-  { key: 'recipes', label: '{1f3ac} 配方' },
-  { key: 'templates', label: '{1f9e9} 模板' },
-  { key: 'anatomy', label: '{1f52c} 解剖' },
-]
-
-const CLIP_LABELS: Record<AnimClipId, string> = { idle: '{1f9d8} 待机', attack: '{2694} 攻击' }
 
 interface AnatUi {
   tree: SvgTree
@@ -65,11 +42,6 @@ const DEFAULT_SUBJECT = '1f939'
 
 export class StudioScene extends Phaser.Scene {
   private preserveOnRestart = false
-  private tab: Tab = 'recipes'
-  private recipeSel = ANIM_RECIPES[0]!.emoji
-  private clipSel: AnimClipId = 'idle'
-  private tplEmoji = DEFAULT_SUBJECT
-  private tpl: AnimTemplate = ANIM_TEMPLATES[0]!
   private anatEmoji = DEFAULT_SUBJECT
   private allKeys: string[] = []
 
@@ -84,19 +56,9 @@ export class StudioScene extends Phaser.Scene {
 
   private frame!: PageFrame
   private grid?: VirtualEmojiGrid
-  private preview?: Picture
-  private paused = false
-  private speedIdx = 0
-  private frameKeys: string[] = []
-  private frameIdx = 0
-  private previewSize = 0
-  private animTimer?: Phaser.Time.TimerEvent
   private jobGen = 0
   private ownedKeys = new Set<string>()
   private detailObjs: { destroy(): void }[] = []
-  private detailScroll!: ScrollView
-  private toggleBtn?: Button
-  private speedBtn?: Button
 
   constructor() {
     super(SceneKey.Studio)
@@ -107,53 +69,32 @@ export class StudioScene extends Phaser.Scene {
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
     if (!preserved) {
-      this.tab = 'recipes'
-      this.recipeSel = ANIM_RECIPES[0]!.emoji
-      this.tplEmoji = DEFAULT_SUBJECT
-      this.tpl = ANIM_TEMPLATES[0]!
       this.anatEmoji = DEFAULT_SUBJECT
       this.resetAnatState()
-      this.paused = false
-      this.speedIdx = 0
     }
     prepareEmojiThumbs(this, emojiThumbSize(70, viewport.renderScale))
     this.detailObjs = []
     this.anat = undefined
 
-    const f = (this.frame = pageFrame({ sub: true, tallDetail: true }))
+    const f = (this.frame = pageFrame({ tallDetail: true }))
     new PageHeader(this, f, { title: '{1f9ea} Emoji Studio', back: () => this.scene.start(SceneKey.Menu) })
-    new Tabs(this, { x: f.left, y: f.subY, w: f.right - f.left }, {
-      items: TABS,
-      selected: this.tab,
-      tabWidth: 176,
-      onSelect: (key) => {
-        this.tab = key
-        this.paused = false
-        this.applyTab()
-      },
-    })
     new Panel(this, f.detail.x, f.detail.y, f.detail.w, f.detail.h)
-    this.detailScroll = new ScrollView(this, f.detail)
     const grid = (this.grid = new VirtualEmojiGrid(this, f.list))
     grid.onTap = (cp) => this.onGridTap(cp)
 
-    const need = new Set<string>(ANIM_TEMPLATES.map((t) => t.icon))
-    void Promise.all([
-      Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))),
-      loadEmojiPack()
-        .then((p) => {
-          this.allKeys = [...p.ids]
-        })
-        .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`)),
-    ]).then(() => {
-      if (!this.scene.isActive(SceneKey.Studio)) return
-      this.applyTab()
-    })
+    void loadEmojiPack()
+      .then((p) => {
+        this.allKeys = [...p.ids]
+      })
+      .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`))
+      .then(() => {
+        if (!this.scene.isActive(SceneKey.Studio)) return
+        this.showAll()
+      })
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-      this.animTimer?.remove()
       this.jobGen++
       for (const key of this.ownedKeys) this.textures.remove(key)
       this.ownedKeys.clear()
@@ -161,43 +102,22 @@ export class StudioScene extends Phaser.Scene {
     })
   }
 
-  private applyTab(): void {
+  private showAll(): void {
     const grid = this.grid
     if (grid) {
-      if (this.tab === 'recipes') {
-        grid.setItems(ANIM_RECIPES.map((r) => r.emoji))
-        grid.setSelected(this.recipeSel)
-      } else {
-        grid.setItems(this.allKeys)
-        grid.setSelected(this.tab === 'templates' ? this.tplEmoji : this.anatEmoji)
-      }
+      grid.setItems(this.allKeys)
+      grid.setSelected(this.anatEmoji)
       grid.ensureVisible()
     }
-    if (this.tab === 'recipes') this.buildRecipeDetail()
-    else if (this.tab === 'templates') this.buildTemplateDetail()
-    else this.buildAnatomyDetail()
+    this.buildAnatomyDetail()
   }
 
   private onGridTap(cp: string): void {
-    if (this.tab === 'recipes') {
-      const recipe = ANIM_RECIPES.find((r) => r.emoji === cp)
-      if (!recipe || recipe.emoji === this.recipeSel) return
-      this.recipeSel = recipe.emoji
-      this.clipSel = animSetOf(recipe.emoji)?.clips[0]?.id ?? 'idle'
-      this.grid?.setSelected(cp)
-      this.buildRecipeDetail()
-    } else if (this.tab === 'templates') {
-      if (cp === this.tplEmoji) return
-      this.tplEmoji = cp
-      this.grid?.setSelected(cp)
-      this.buildTemplateDetail()
-    } else {
-      if (cp === this.anatEmoji) return
-      this.anatEmoji = cp
-      this.resetAnatState()
-      this.grid?.setSelected(cp)
-      this.buildAnatomyDetail()
-    }
+    if (cp === this.anatEmoji) return
+    this.anatEmoji = cp
+    this.resetAnatState()
+    this.grid?.setSelected(cp)
+    this.buildAnatomyDetail()
   }
 
   private resetAnatState(): void {
@@ -207,108 +127,17 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private resetDetail(): Rect {
-    this.animTimer?.remove()
-    this.animTimer = undefined
     this.jobGen++
     this.anatSplitGen++
     for (const o of this.detailObjs) o.destroy()
     this.detailObjs = []
-    this.detailScroll.clear()
-    this.preview = undefined
-    this.frameKeys = []
     this.anat = undefined
-    this.toggleBtn = undefined
-    this.speedBtn = undefined
     return this.frame.detail
   }
 
   private keep<T extends { destroy(): void }>(obj: T): T {
     this.detailObjs.push(obj)
     return obj
-  }
-
-  private buildRecipeDetail(): void {
-    const d = this.resetDetail()
-    const set = animSetOf(this.recipeSel)
-    if (!set) return
-    const clip = set.clips.find((c) => c.id === this.clipSel) ?? set.clips[0]!
-    this.clipSel = clip.id
-    const previewSize = this.frame.portrait ? 280 : 300
-    const cx = d.x + d.w / 2
-    let y = d.y + 18
-    this.spawnPreview(cx, y + previewSize / 2, previewSize, set.emoji)
-    y += previewSize + 18
-    if (set.clips.length > 1) y = this.buildClipTabs(set, clip, d, y) + 12
-    y = this.buildControls(cx, y) + 16
-    const view = this.detailScroll
-    view.setViewport({ x: d.x, y, w: d.w, h: d.y + d.h - y - 8 })
-    const name = new Label(this, d.w / 2, 0, clip.name, { kind: 'lead' }).setOrigin(0.5, 0)
-    const desc = new Label(this, d.w / 2, 50, clip.desc, { kind: 'body', color: 'soft', align: 'center', wrap: d.w - 72, spacing: 8 }).setOrigin(0.5, 0)
-    const anatomy = new Label(this, d.w / 2, desc.y + desc.height + 14, clip.anatomy, { kind: 'label', color: 'muted', align: 'center', wrap: d.w - 72 }).setOrigin(0.5, 0)
-    view.add([name, desc, anatomy])
-    view.setContentSize(anatomy.y + anatomy.height + 8)
-    this.startBake(clip, previewSize, `studio-anim-${set.emoji}-${clip.id}`, clip.frames)
-  }
-
-  private buildClipTabs(set: { clips: readonly AnimClip[] }, current: AnimClip, d: Rect, y: number): number {
-    const tabs = new Tabs(this, { x: d.x + 24, y: y + 22, w: d.w - 48 }, {
-      items: set.clips.map((c) => ({ key: c.id, label: CLIP_LABELS[c.id] })),
-      selected: current.id,
-      size: 'sm',
-      tabWidth: 160,
-      onSelect: (id) => {
-        this.clipSel = id
-        this.buildRecipeDetail()
-      },
-    })
-    this.keep(tabs)
-    return y + tabs.height
-  }
-
-  private buildTemplateDetail(): void {
-    const d = this.resetDetail()
-    const tpl = this.tpl
-    const previewSize = this.frame.portrait ? 260 : 270
-    const cx = d.x + d.w / 2
-    let y = d.y + 16
-    this.spawnPreview(cx, y + previewSize / 2, previewSize, this.tplEmoji)
-    y += previewSize + 18
-    y = this.buildControls(cx, y) + 18
-
-    const view = this.detailScroll
-    view.setViewport({ x: d.x, y, w: d.w, h: d.y + d.h - y - 8 })
-    const tiles = new Tabs(this, { x: 20, y: 40, w: d.w - 40 }, {
-      items: ANIM_TEMPLATES.map((t) => ({ key: t.id, icon: t.icon, label: t.name })),
-      selected: tpl.id,
-      size: 'tile',
-      columns: 5,
-      parent: view.content,
-      onSelect: (id) => {
-        const next = ANIM_TEMPLATES.find((t) => t.id === id)
-        if (!next) return
-        this.tpl = next
-        this.buildTemplateDetail()
-      },
-    })
-    const desc = new Label(this, d.w / 2, 8 + tiles.height + 12, `${tpl.name}：${tpl.desc}`, {
-      kind: 'label',
-      color: 'soft',
-      align: 'center',
-      wrap: d.w - 72,
-    }).setOrigin(0.5, 0)
-    view.add(desc)
-    view.setContentSize(desc.y + desc.height + 8)
-
-    const emoji = this.tplEmoji
-    const gen = ++this.jobGen
-    void emojiSvgText(emoji)
-      .then((svg) => {
-        if (gen !== this.jobGen) return
-        this.startBake(applyTemplate(tpl, emoji, svg), previewSize, `studio-tpl-${emoji}-${tpl.id}`)
-      })
-      .catch((err) => {
-        console.error(`模板套用失败: ${String(err)}`)
-      })
   }
 
   private buildAnatomyDetail(): void {
@@ -484,123 +313,6 @@ export class StudioScene extends Phaser.Scene {
       this.ownedKeys.delete(this.anatLiveKey)
     }
     this.anatLiveKey = next
-  }
-
-  private spawnPreview(cx: number, cy: number, size: number, emoji: string): void {
-    const pic = this.keep(new Picture(this, cx, cy, size))
-    this.preview = pic
-    this.previewSize = size
-    void ensureEmoji(this, emoji)
-      .then((key) => {
-        if (this.preview !== pic || this.frameKeys.length > 0 || !this.scene.isActive(SceneKey.Studio)) return
-        pic.show(key, size)
-      })
-      .catch((err) => console.warn(`预览加载失败 ${emoji}: ${String(err)}`))
-  }
-
-  private buildControls(cx: number, y: number): number {
-    const defs: { label: string; onTap: () => void }[] = [
-      { label: '{23ee}', onTap: () => this.stepFrame(-1) },
-      {
-        label: this.toggleLabel(),
-        onTap: () => {
-          this.paused = !this.paused
-          this.restartTimer()
-          this.refreshControls()
-        },
-      },
-      { label: '{23ed}', onTap: () => this.stepFrame(1) },
-      {
-        label: this.speedLabel(),
-        onTap: () => {
-          this.speedIdx = (this.speedIdx + 1) % SPEEDS.length
-          this.restartTimer()
-          this.refreshControls()
-        },
-      },
-    ]
-    const btnW = 76
-    const gap = 12
-    const x0 = cx - (defs.length * btnW + (defs.length - 1) * gap) / 2 + btnW / 2
-    const h = 50
-    const buttons = defs.map((d, i) =>
-      this.keep(new Button(this, x0 + i * (btnW + gap), y + h / 2, { label: d.label, size: 'sm', variant: 'secondary', width: btnW, onTap: d.onTap })),
-    )
-    this.toggleBtn = buttons[1]
-    this.speedBtn = buttons[3]
-    return y + h + 5
-  }
-
-  private toggleLabel(): string {
-    return this.paused ? '{25b6}' : '{23f8}'
-  }
-
-  private speedLabel(): string {
-    return `${SPEEDS[this.speedIdx]}×`
-  }
-
-  private refreshControls(): void {
-    this.toggleBtn?.setLabel(this.toggleLabel())
-    this.speedBtn?.setLabel(this.speedLabel())
-  }
-
-  private stepFrame(dir: 1 | -1): void {
-    if (this.frameKeys.length === 0) return
-    if (!this.paused) {
-      this.paused = true
-      this.restartTimer()
-      this.refreshControls()
-    }
-    this.frameIdx = (this.frameIdx + dir + this.frameKeys.length) % this.frameKeys.length
-    this.preview?.show(this.frameKeys[this.frameIdx]!, this.previewSize)
-  }
-
-  private restartTimer(): void {
-    this.animTimer?.remove()
-    this.animTimer = undefined
-    if (this.paused || this.frameKeys.length === 0) return
-    this.animTimer = this.time.addEvent({
-      delay: Math.max(30, ANIM_DEF.durMs / this.frameKeys.length / SPEEDS[this.speedIdx]!),
-      loop: true,
-      callback: () => {
-        this.frameIdx = (this.frameIdx + 1) % this.frameKeys.length
-        this.preview?.show(this.frameKeys[this.frameIdx]!, this.previewSize)
-      },
-    })
-  }
-
-  private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number): void {
-    const gen = ++this.jobGen
-    void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_DEF.frames)
-      .then((keys) => {
-        if (gen !== this.jobGen || !this.preview) return
-        this.frameKeys = keys
-        this.frameIdx = 0
-        this.previewSize = size
-        this.preview.show(keys[0]!, size)
-        this.restartTimer()
-      })
-      .catch((err) => {
-        console.error(`动画烘焙失败: ${String(err)}`)
-      })
-  }
-
-  private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix: string | undefined, frames: number): Promise<string[]> {
-    const svg = await emojiSvgText(recipe.emoji)
-    const prefix = keyPrefix ?? `studio-anim-${recipe.emoji}`
-    const keys: string[] = []
-    for (let k = 0; k < frames; k++) {
-      const key = `${prefix}-${k}`
-      keys.push(key)
-      if (this.textures.exists(key)) continue
-      const frame = bakeAnimFrame(svg, recipe, k / frames)
-      const img = await svgToImage(setSvgSize(frame, RASTER))
-      if (!this.textures.exists(key)) {
-        this.textures.addImage(key, img)
-        this.ownedKeys.add(key)
-      }
-    }
-    return keys
   }
 
   private onViewportChanged(): void {

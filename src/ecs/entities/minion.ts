@@ -3,13 +3,11 @@ import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
 import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS, SWARM_SPAN } from '../../data/abilities'
 import { EMPLACE } from '../../data/feel'
-import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import { holderOutline } from './weapon'
 import {
   Alive,
   AROUND,
-  Anim,
   Built,
   Clock,
   Contact,
@@ -28,14 +26,12 @@ import {
   Radius,
   Retiring,
   Span,
-  Sprite,
   Ctl,
   SummonShape,
   Swarmer,
   VisOff,
 } from '../components'
 import type { Sim } from '../sim'
-import { ANIM_DEF } from '../../emoji/anim'
 import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
 import { abilityGroup, equipAbility } from '../entities/ability'
@@ -52,7 +48,6 @@ interface MinionSpec {
   y: number
   z: number
   lifeMs: number
-  animOffsetMs?: number
 }
 
 function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
@@ -73,10 +68,6 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   Minion.dieAt[m] = spec.lifeMs > 0 ? sim.elapsedMs + spec.lifeMs : 0
   Minion.size[m] = spec.size
   Minion.ability[m] = 0
-  if (spec.animOffsetMs !== undefined) {
-    addComponent(sim.world, m, Anim)
-    armIdle(m, spec.emoji, outline, Sprite.frame[m]!, spec.animOffsetMs)
-  }
   return m
 }
 
@@ -97,7 +88,6 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
     y: anchorY(e) + Math.sin(phase) * r,
     z: 12,
     lifeMs: SummonShape.lifeMs[e]!,
-    animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
   addComponents(world, m, Phys, Drive, Clock, Radius, Span, Faction, Alive, Ctl, Nest, Orbit, Contact, Phasing)
   Phys.vx[m] = 0
@@ -154,7 +144,6 @@ export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs
     y: at ? at.y : anchorY(e) + 6,
     z: 5,
     lifeMs,
-    animOffsetMs: live.length * 311,
   })
   addComponent(sim.world, m, Fired)
   Fired.v[m] = 0
