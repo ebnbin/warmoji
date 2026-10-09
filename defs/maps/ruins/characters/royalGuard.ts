@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 
-// 💂 近卫：长戟一刺穿透一排，出手时举盾减伤，第三下横扫致盲；技能立起盾墙，把周围的敌人引到自己身上
+// 💂 近卫：长戟一刺穿透一排，刺中的冲不动也闪不走，顶到墙上就围起来关住；技能立起盾墙，把周围的敌人引到自己身上
 const royalGuardStab = {
   trigger: 'auto',
   cooldownMs: 1150,
@@ -14,17 +14,15 @@ const royalGuardStab = {
   shape: { kind: 'segment', reach: 2.2, radius: 0.5, ms: 160 },
 } satisfies AbilityDef
 
-const royalGuardStab2 = { ...royalGuardStab, reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'guard', mul: 0.8, durationMs: 1000 }] }] } satisfies AbilityDef
+const royalGuardStab2 = { ...royalGuardStab, onHit: [{ kind: 'grounded', durationMs: 2500 }] } satisfies AbilityDef
 
-const royalGuardSweep = {
-  ...royalGuardStab2,
-  damage: 20,
-  color: 0xfff59d,
-  shape: { kind: 'sector', radius: 2.4, arcDeg: 160, ms: 220 },
-  onHit: [{ kind: 'disarm', durationMs: 800 }],
-} satisfies AbilityDef
+const besieged = [
+  { kind: 'stun', durationMs: 1200 },
+  { kind: 'damage', amount: 0, ratio: 0.8 },
+  { kind: 'barrier', shape: 'ring', length: 1.3, durationMs: 2000, bodies: 'all', shots: false, color: 0xffe082 },
+] as const
 
-const royalGuardStab3 = { ...royalGuardStab2, cycle: [royalGuardStab2, royalGuardSweep] } satisfies AbilityDef
+const royalGuardStab3 = { ...royalGuardStab2, knockback: 0, onHit: [{ kind: 'shove', distance: 2.4, ms: 260, onWall: besieged }, { kind: 'grounded', durationMs: 2500 }] } satisfies AbilityDef
 
 const royalGuardWard = {
   trigger: 'manual',
@@ -54,7 +52,7 @@ export default {
   emoji: '1f482',
   name: '近卫',
   element: 'light',
-  desc: '持戟的近卫：长戟一刺穿透一排敌人，把贴上来的顶开；技能在身前立起盾墙，把周围的敌人都引到自己身上',
+  desc: '持戟的近卫：长戟一刺穿透一排敌人，把贴上来的顶开；升级后刺中的冲不动也闪不走，顶到墙上的被一圈墙关住；技能在身前立起盾墙，把周围的敌人都引到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.7 },
@@ -73,8 +71,8 @@ export default {
       icon: '1f531',
       base: 'royalGuardStab',
       upgrades: [
-        { ability: 'royalGuardStab2', card: { icon: '1f6e1', name: '盾墙', desc: '每次出手后 1 秒内受到的伤害减两成' } },
-        { ability: 'royalGuardStab3', card: { icon: '2600', name: '光耀', desc: '每第三下改成 160° 的横扫，扫中的敌人致盲 0.8 秒，打不出普通攻击' } },
+        { ability: 'royalGuardStab2', card: { icon: '26d3', name: '禁锢', desc: '被戟刺中的敌人 2.5 秒内不能冲刺、跳跃、闪现' } },
+        { ability: 'royalGuardStab3', card: { icon: '1f3f0', name: '围城', desc: '戟刺改成把敌人顶出 2.4 格：撞上墙的眩晕 1.2 秒、再挨这一下八成的伤害，四周围起一圈 1.3 格的墙 2 秒，谁也进出不得' } },
       ],
     },
   ],

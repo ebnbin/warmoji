@@ -7,7 +7,7 @@ export const FIGHTS = {
     name: '引火烧身',
     desc: '我方伤不了敌人，击退却格外有劲：火山隔一阵就喷发，熔岩顺着地势漫下来，敌人追人时会直直穿过熔岩；让 15 只敌人被熔岩烧死',
     note: '只能借地形杀敌：熔岩敌我都烫，要算着喷发的节奏，把敌人引进去、自己站在岩石上',
-    team: { slots: ['boxerBear', 'mage', 'kangaroo'], level: 2 },
+    team: { slots: ['boxRoo', 'rocker', 'owl'], level: 2 },
     stars: [{ kind: 'hazard', by: 'lava', damage: 0 }, { kind: 'time', ms: 110_000 }],
     fight: {
       name: '引火烧身',
@@ -18,9 +18,9 @@ export const FIGHTS = {
         {
           intro: { title: '引火烧身', sub: '让 15 只敌人被熔岩烧死' },
           mix: [
-            { kind: 'zombie', weight: 4 },
-            { kind: 'boar', weight: 1 },
-            { kind: 'skeleton', weight: 1 },
+            { kind: 'bison', weight: 4 },
+            { kind: 'tusker', weight: 1 },
+            { kind: 'quaker', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 900, cap: 40 }],
           cues: [{ cue: 'erupt', atMs: 8000, every: 45_000 }],
@@ -35,7 +35,7 @@ export const FIGHTS = {
   eruptionCycle: {
     emoji: '1f30b',
     name: '喷发周期',
-    desc: '火山每 45 秒喷发一次，每次喷发都从火山口抛出火山怪与彗星，熔岩随后漫过盆地；撑到第三次喷发',
+    desc: '火山每 45 秒喷发一次，每次喷发都从火山口抛出熔岩巨人与火流星，熔岩随后漫过盆地；撑到第三次喷发',
     note: '让地图事件刷怪：每次喷发既是一波敌人也是一片熔岩，平静的那段是喘息也是准备',
     team: { slots: [{ tags: ['defense'] }, { tags: ['area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
     stars: [{ kind: 'downs', count: 0 }, { kind: 'hazard', by: 'lava', damage: 100 }],
@@ -47,9 +47,9 @@ export const FIGHTS = {
         {
           intro: { title: '喷发周期', sub: '撑到第三次喷发' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 1 },
-            { kind: 'creeper', weight: 1 },
+            { kind: 'bison', weight: 3 },
+            { kind: 'meltling', weight: 1 },
+            { kind: 'chili', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1100 },
@@ -60,8 +60,8 @@ export const FIGHTS = {
               squad: {
                 count: 7,
                 mix: [
-                  { kind: 'turtle', weight: 1 },
-                  { kind: 'comet', weight: 2 },
+                  { kind: 'lavaGiant', weight: 1 },
+                  { kind: 'fireMeteor', weight: 2 },
                 ],
                 at: { kind: 'gate', gate: 'crater' },
               },
@@ -77,7 +77,7 @@ export const FIGHTS = {
   ventWalk: {
     emoji: '2668',
     name: '喷气孔巡查',
-    desc: '在每一个喷气孔上站满 3 秒，火山怪会从喷气孔里钻出来；第 20 秒火山喷发，熔岩顺着地势漫下来，可能正好淹过还没去的那几个',
+    desc: '在每一个喷气孔上站满 3 秒，熔岩巨人会从喷气孔里钻出来；第 20 秒火山喷发，熔岩顺着地势漫下来，可能正好淹过还没去的那几个',
     note: '到访当目标、地图改写路线：熔岩会封住一些去处，又在凉透后重新放行，先去哪个得看熔岩往哪流',
     team: { slots: [{ tags: ['mobile'] }, { tags: ['defense'] }, { tags: ['area'] }], level: 2 },
     stars: [{ kind: 'time', ms: 60_000 }, { kind: 'skills', count: 0 }],
@@ -89,9 +89,9 @@ export const FIGHTS = {
         {
           intro: { title: '喷气孔巡查', sub: '站上每一个喷气孔' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'skeleton', weight: 1 },
-            { kind: 'boar', weight: 1 },
+            { kind: 'bison', weight: 3 },
+            { kind: 'meltling', weight: 1 },
+            { kind: 'tusker', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1000 },
@@ -99,8 +99,8 @@ export const FIGHTS = {
               kind: 'stream',
               intervalMs: 4000,
               mix: [
-                { kind: 'turtle', weight: 1 },
-                { kind: 'creeper', weight: 1 },
+                { kind: 'lavaGiant', weight: 1 },
+                { kind: 'chili', weight: 1 },
               ],
               at: { kind: 'gate', gate: 'vent' },
             },

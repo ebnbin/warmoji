@@ -27,8 +27,8 @@ export default {
     kinds: {
       door: { name: '院门', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
       slope: { name: '山坡', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'maple', weight: 2, perSec: 1 },
-      wall: { name: '断墙', at: { kind: 'mark' }, enter: 'climb', weight: 1.5, perSec: 1, only: ['zombie', 'skeleton', 'snake', 'knight', 'gargoyle', 'plagueRat', 'crow', 'deathcap', 'screamer', 'moai'] },
-      haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['ghost', 'screamer'] },
+      wall: { name: '断墙', at: { kind: 'mark' }, enter: 'climb', weight: 1.5, perSec: 1, only: ['plagueRat', 'boneMan', 'crow', 'wallRhino', 'geodeling', 'deathcap', 'screamer', 'moai'] },
+      haunt: { name: '墙里', at: { kind: 'mark' }, enter: 'walk', look: 'steam', weight: 3, perSec: 1, only: ['screamer'] },
     },
   },
   ruins: {

@@ -30,7 +30,7 @@ export default {
     kinds: {
       tunnel: { name: '暗道', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
       seam: { name: '晶缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'passage', minU: 2.5 } }, enter: 'walk', look: 'shards', weight: 2, perSec: 1, only: ['cheshire', 'geodeling', 'lurker', 'caveBat', 'hollow', 'peeker'] },
-      geode: { name: '晶洞', at: { kind: 'mark' }, enter: 'rise', look: 'shards', weight: 2, perSec: 1, only: ['geodeling', 'lurker', 'cheshire', 'pumpkinling', 'coffin'] },
+      geode: { name: '晶洞', at: { kind: 'mark' }, enter: 'rise', look: 'shards', weight: 2, perSec: 1, only: ['geodeling', 'lurker', 'cheshire', 'coffin'] },
       rift: { name: '顶缝', at: { kind: 'mark' }, enter: 'drop', weight: 1.5, perSec: 1, only: ['geodeling', 'caveBat', 'hollow', 'darkMoon'] },
       breach: { name: '塌顶', at: { kind: 'mark' }, enter: 'drop', weight: 1, only: ['vampireCount', 'fullMoon'] },
       dark: { name: '暗处', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
