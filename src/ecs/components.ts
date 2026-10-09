@@ -177,19 +177,6 @@ export const ETurn = { at: f32() }
 
 export const Despawn = { at: f32() }
 
-export const Anim = {
-  base: i32(),
-  frames: i32(),
-  durMs: f32(),
-  offset: f32(),
-  onceBase: i32(),
-  onceFrames: i32(),
-  onceDur: f32(),
-  onceAt: f32(),
-  still: i32(),
-}
-export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
-
 export const Quad = { v: u8() }
 
 export const Shard = { startMs: f32(), until: f32(), rot: f32(), size: f32() }
@@ -458,7 +445,7 @@ export const Res = { v: f32(), max: f32(), lock: f32(), lastGain: f32() }
 export const Lethal = { used: u8(), low: u8() }
 
 /** 带道具的身体：最近一次受伤与放主动技能的时刻，本条命里用过的残血触发（按位）与致命触发 */
-export const Gear = { hurtAt: f32(), skillAt: f32(), low: u32(), lethal: u8() }
+export const Gear = { hurtAt: f32(), skillAt: f32() }
 
 /** 吸血的每秒上限：at 是这一秒从何时算起，hp 是这一秒已经吸回的量 */
 export const Leech = { at: f32(), hp: f32() }

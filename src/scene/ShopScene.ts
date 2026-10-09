@@ -1,49 +1,52 @@
 import Phaser from 'phaser'
-import { CHARACTERS, upgradeCardsFor } from '../data/characters'
-import { characterXp, ITEMS, itemPrice, itemXp, RARITIES, rerollPrice } from '../data/items'
-import { LEVEL_STATS } from '../data/levels'
+import { CHARACTERS } from '../data/characters'
+import { ITEMS, itemPrice, RARITIES, rerollPrice, teamOnce, teamStats } from '../data/items'
 import { PICKUPS } from '../data/pickups'
-import { modTexts } from '../data/stats'
 import { playSfx } from '../audio/sfx'
-import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
-import { levelCap, levelFor, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
-import { getRun, slotKept, stepOf } from '../run/state'
+import { characterTraits, rollItem, stackCount, useful } from '../run/draft'
+import { memberLevel, memberLook, memberOutStats } from '../run/members'
+import { getRun, stepOf } from '../run/state'
 import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { ItemDef, ItemId } from '../types/items'
-import type { StatValues } from '../types/stats'
-import { beginPage, Button, Dialog, Icon, Label, OfferCard, PageHeader, pageFrame, Pill } from '../ui'
-import type { OfferGoods, OfferLine, OfferOwner, OfferState, PageFrame, Rect } from '../ui'
+import type { StatKey } from '../types/stats'
+import { beginPage, Button, Label, OfferCard, PageHeader, pageFrame, Pill } from '../ui'
+import type { OfferFaces, OfferGoods, OfferLine, OfferState, PageFrame, Rect } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { itemEffects } from './itemLines'
-import { openPause } from './pause'
 import { finishStep, runExit } from './teamPage'
 import { SceneKey } from './keys'
 import type { DevSceneTabs, DevTabsHost } from '../devtools'
 
-/** 这一轮摆给一名队员的货；id 为 null 是他能买的都买满了 */
+/** 货架上的一格；id 为 null 是能买的都买满了 */
 interface Offer {
   readonly id: ItemId | null
   sold: boolean
 }
 
 const COIN = `{${PICKUPS.coin.emoji}}`
-/** 卡片的间距与尺寸上限：竖卡最宽 colW、竖屏上最高 colH，横卡最高 rowH；竖屏 rowsFrom 人起一人一行 */
+/** 卡片的间距与尺寸上限：竖卡最宽 colW、竖屏上最高 colH，横卡最高 rowH；竖屏 rowsFrom 格起一格一行 */
 const CARDS = { gap: 18, colW: 360, colH: 560, rowH: 260, rowsFrom: 3 } as const
 /** 刷新后卡片逐张亮出的间隔 */
 const REVEAL_STEP = 60
 
-/** 商店：每名队员一格货，全队一起刷新 */
+/** 这一轮商店的加成：队伍道具的一份，加上进店这一刻场上站着的人各自的；倒下的不算 */
+interface ShopStats {
+  readonly luck: number
+  readonly shopPrice: number
+  readonly freeRerolls: number
+}
+
+/** 商店：货架有几格就摆几件，买下的都是队伍道具，一起刷新 */
 export class ShopScene extends Phaser.Scene implements DevTabsHost {
   private preserveOnRestart = false
   private run!: RunState
   private offers: Offer[] = []
+  private stats: ShopStats = { luck: 0, shopPrice: 1, freeRerolls: 0 }
   /** 这次进店全队还剩几次免费刷新 */
   private freeRerolls = 0
   /** 这次进店已花钱刷新的次数，刷新价随之上涨 */
   private paidRerolls = 0
-  /** 最近看过或买过的队员：打开暂停页先看他 */
-  private lastSlot: number | undefined
   /** 刚买下、要盖戳的那一格 */
   private freshSlot = -1
   private shownCoins = 0
@@ -63,10 +66,10 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     this.preserveOnRestart = false
     this.run = getRun()
     if (!preserved) {
+      this.stats = this.shopStats()
       this.offers = this.rollAll()
-      this.freeRerolls = this.run.roster.reduce((sum, _, slot) => sum + Math.floor(this.slotStats(slot).freeRerolls), 0)
+      this.freeRerolls = Math.floor(this.stats.freeRerolls)
       this.paidRerolls = 0
-      this.lastSlot = undefined
     }
     this.freshSlot = -1
     this.cards = []
@@ -74,7 +77,7 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, {
       title: `{1f6d2} 商店${this.doneLabel()}`,
-      ...runExit(this, this.run, () => ({ from: SceneKey.Shop, slot: this.lastSlot })),
+      ...runExit(this, this.run, () => ({ from: SceneKey.Shop })),
     })
     this.shownCoins = this.run.coins
     this.coins = new Pill(this, f.centerX, f.subY, { icon: PICKUPS.coin.emoji, outline: 'player', text: `${this.run.coins}`, color: 'accent' })
@@ -104,16 +107,16 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     return name ? ` · ${name}完成` : ''
   }
 
-  private levelOf(slot: number): number {
-    return memberLevel(this.run, slot)
-  }
-
-  private slotStats(slot: number): StatValues {
-    return memberOutStats(this.run, slot)
-  }
-
-  private ownedFor(slot: number): ItemId[] {
-    return slotKept(this.run, slot).items
+  /** 进店这一刻的商店加成：队伍道具的一份，加上场上站着的人各自的 */
+  private shopStats(): ShopStats {
+    const run = this.run
+    const team = teamStats(run.items)
+    const up = run.roster.flatMap((_, slot) => (run.memberHp[slot] === 0 ? [] : [memberOutStats(run, slot)]))
+    return {
+      luck: up.reduce((sum, st) => sum + st.luck, team.luck),
+      shopPrice: up.reduce((mul, st) => mul * st.shopPrice, team.shopPrice),
+      freeRerolls: up.reduce((sum, st) => sum + st.freeRerolls, team.freeRerolls),
+    }
   }
 
   /** 物价与稀有度按这家商店写的第几档算 */
@@ -123,20 +126,18 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     return step.tier
   }
 
-  /** 给这名队员刷一件：道具池看他的打法与等级，稀有度看物价档位、等级与他的幸运 */
-  private roll(slot: number): ItemId | null {
-    const level = this.levelOf(slot)
-    const pool = characterPoolFor(CHARACTERS[this.run.roster[slot]!], level)
-    return rollItem(pool, this.ownedFor(slot), Math.random, this.tier, level, this.slotStats(slot).luck)
-  }
-
+  /** 摆满货架：一格一件不重样，稀有度看物价档位与幸运 */
   private rollAll(): Offer[] {
-    return this.run.roster.map((_, slot) => ({ id: this.roll(slot), sold: false }))
+    const shown: ItemId[] = []
+    return Array.from({ length: this.run.shelf }, () => {
+      const id = rollItem(this.run.items, shown, Math.random, this.tier, this.stats.luck)
+      if (id) shown.push(id)
+      return { id, sold: false }
+    })
   }
 
-  /** 这名队员买它的价格：按他自己的商店价格 */
-  private price(slot: number, id: ItemId): number {
-    return Math.max(1, Math.round(itemPrice(id, this.tier) * this.slotStats(slot).shopPrice))
+  private price(id: ItemId): number {
+    return Math.max(1, Math.round(itemPrice(id, this.tier) * this.stats.shopPrice))
   }
 
   /** 这一轮的货都买下了：下一次刷新免费 */
@@ -151,18 +152,14 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
   private buy(slot: number): void {
     const offer = this.offers[slot]
     if (!offer?.id || offer.sold) return
-    const price = this.price(slot, offer.id)
+    const price = this.price(offer.id)
     if (this.run.coins < price) return
     this.run.coins -= price
     playSfx('buy')
-    const before = this.levelOf(slot)
-    this.ownedFor(slot).push(offer.id)
+    this.run.items.push(offer.id)
     offer.sold = true
-    this.lastSlot = slot
     this.freshSlot = slot
     this.render(false)
-    const after = this.levelOf(slot)
-    if (after > before) this.showLevelUp(slot, after)
   }
 
   /** 全队一起换下一轮：买空了这一轮就免费，其次用免费次数，再次花钱 */
@@ -181,12 +178,6 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     this.render(true)
   }
 
-  /** 点主人一栏：在暂停页看这名队员 */
-  private inspect(slot: number): void {
-    this.lastSlot = slot
-    openPause(this, { from: SceneKey.Shop, slot })
-  }
-
   private render(reveal: boolean): void {
     this.coins.setText(`${this.run.coins}`)
     if (this.run.coins !== this.shownCoins) {
@@ -199,7 +190,7 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     for (const c of this.cards) c.destroy()
     const rects = this.cardRects()
     this.cards = rects.map((rect, slot) => {
-      const card = new OfferCard(this, rect, { owner: this.ownerOf(slot), state: this.stateOf(slot) })
+      const card = new OfferCard(this, rect, { faces: this.facesOf(slot), state: this.stateOf(slot) })
       return reveal ? card.reveal(slot * REVEAL_STEP) : card
     })
     this.freshSlot = -1
@@ -222,10 +213,10 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     }
   }
 
-  /** 一人一张竖卡并排，竖屏人多时改成一人一行；整组居中 */
+  /** 一格一张竖卡并排，竖屏格多时改成一格一行；整组居中 */
   private cardRects(): Rect[] {
     const { body: B, portrait } = this.frame
-    const n = this.run.roster.length
+    const n = this.offers.length
     const { gap } = CARDS
     const spread = (along: number, max: number): { size: number; start: number } => {
       const size = Math.min(max, (along - gap * (n - 1)) / n)
@@ -240,35 +231,19 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     return Array.from({ length: n }, (_, i) => ({ x: B.x + start + i * (size + gap), y: B.y + (B.h - h) / 2, w: size, h }))
   }
 
-  /** 主人一栏：等级与经验，经验条预告买下这件后涨到哪；等级按这一局的上下限算；靠全队升级的一局买道具不涨经验，条上是等级 */
-  private ownerOf(slot: number): OfferOwner {
-    const xp = characterXp(this.ownedFor(slot))
-    const level = this.levelOf(slot)
-    const floor = this.run.minLevel
-    const top = levelCap(this.run, slot)
-    const prog = levelProgress(xp, floor, top)
-    const base = {
-      emoji: memberLook(this.run, slot),
-      outline: 'player' as const,
-      name: CHARACTERS[this.run.roster[slot]!].name,
-      level: `Lv ${level}`,
-      onTap: () => this.inspect(slot),
-    }
-    const maxed: OfferOwner = { ...base, xp: 1, xpTone: 'accent', note: '满级', noteColor: 'accent' }
-    if (teamLeveled(this.run)) return level >= top ? maxed : { ...base, xp: (level - 1) / (top - 1), xpTone: 'info' }
-    if (prog.maxed) return maxed
-    const offer = this.offers[slot]
-    if (!offer?.id || offer.sold) return { ...base, xp: prog.ratio, xpTone: 'info' }
-    const gain = itemXp(ITEMS[offer.id])
-    const up = levelFor(this.run, this.run.roster[slot]!, xp + gain) > level
-    return {
-      ...base,
-      xp: prog.ratio,
-      xpAfter: up ? 1 : levelProgress(xp + gain, floor, top).ratio,
-      xpTone: 'info',
-      note: up ? '升级！' : `+${gain}`,
-      noteColor: up ? 'accent' : 'info',
-    }
+  /** 场上谁吃得到这一格的货：只对某种打法有用的看各人的打法；只写经济与全场类属性的全队算一份 */
+  private facesOf(slot: number): OfferFaces {
+    const run = this.run
+    const id = this.offers[slot]?.id
+    const def = id ? ITEMS[id] : undefined
+    const on = run.roster.map((c, i) => !def || useful(def, characterTraits(CHARACTERS[c], memberLevel(run, i))))
+    const faces = run.roster.map((_, i) => ({ emoji: memberLook(run, i), outline: 'player' as const, on: on[i]! }))
+    if (!def) return { faces, note: '场上的队员' }
+    const st = def.stats
+    const keys = [st?.add, st?.pct, st?.mul].flatMap((r) => Object.keys(r ?? {})) as StatKey[]
+    if (keys.length > 0 && !def.when && keys.every(teamOnce)) return { faces, note: '全队算一份' }
+    const n = on.filter(Boolean).length
+    return { faces, note: n === faces.length ? '全队都吃得到' : n === 0 ? '场上没人吃得到' : `${n} 人吃得到` }
   }
 
   private stateOf(slot: number): OfferState {
@@ -284,44 +259,19 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
       tag: rarity.label,
       tagTone: rarity.tone,
       lines: itemEffects(def).map((l): OfferLine => ({ text: l.text, color: l.good === null ? undefined : l.good ? 'good' : 'bad' })),
-      aside: this.stackNote(def, stackCount(this.ownedFor(slot), id)),
+      aside: this.stackNote(def, stackCount(this.run.items, id)),
     }
     if (offer.sold) return { kind: 'sold', goods, stamp: '已买下', fresh: slot === this.freshSlot }
-    const price = this.price(slot, id)
+    const price = this.price(id)
     return { kind: 'open', goods, price: `购买 ${COIN} ${price}`, canBuy: this.run.coins >= price, onBuy: () => this.buy(slot) }
   }
 
-  /** 唯一的道具与已经有了的道具才注明 */
+  /** 全队唯一的道具与队伍已经有了的道具才注明 */
   private stackNote(def: ItemDef, held: number): string | undefined {
     const max = def.maxStacks
-    if (max === 1) return '唯一'
+    if (max === 1) return '全队唯一'
     if (held === 0) return undefined
-    return max === undefined ? `已持有 ×${held}` : `已持有 ${held}/${max}`
-  }
-
-  private showLevelUp(slot: number, level: number): void {
-    playSfx('levelup')
-    const id = this.run.roster[slot]!
-    const def = CHARACTERS[id]
-    const card = upgradeCardsFor(def)[level - 2]
-    const statLine = level >= 2 ? modTexts(LEVEL_STATS[id][level - 2]!).join(' · ') : ''
-    const w = Math.min(560, this.frame.content.w - 60)
-    const h = 320
-    const d = new Dialog(this, { width: w, height: h, title: '升级！', titleColor: 'accent', autoCloseMs: 3400 })
-    const left = -w / 2
-    d.add([
-      new Icon(this, left + 80, d.bodyTop + 38, memberLook(this.run, slot), 88, 'player'),
-      new Label(this, left + 140, d.bodyTop + 20, def.name, { kind: 'lead' }).setOrigin(0, 0.5),
-      new Label(this, left + 140, d.bodyTop + 58, `Lv ${level - 1} → Lv ${level}`, { kind: 'heading', color: 'info' }).setOrigin(0, 0.5),
-    ])
-    let y = d.bodyTop + 100
-    if (card) {
-      d.add(new Label(this, 0, y, `新能力 · ${card.name}`, { kind: 'heading', color: 'epic', align: 'center', wrap: w - 48 }).setOrigin(0.5, 0))
-      const desc = new Label(this, 0, y + 38, card.desc, { kind: 'body', color: 'soft', align: 'center', wrap: w - 48 }).setOrigin(0.5, 0)
-      d.add(desc)
-      y = desc.y + desc.height + 10
-    }
-    if (statLine) d.add(new Label(this, 0, Math.max(y, h / 2 - 44), statLine, { kind: 'body', color: 'good', align: 'center', wrap: w - 48 }).setOrigin(0.5, 0))
+    return max === undefined ? `队伍已有 ×${held}` : `队伍已有 ${held}/${max}`
   }
 
   private onViewportChanged(): void {

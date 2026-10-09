@@ -7,7 +7,6 @@ import { PICKUPS } from '../data/pickups'
 import { fightCount } from '../data/runs'
 import { heatOf } from '../data/mutators'
 import { reachLab, submitLab } from '../save/labs'
-import { ITEMS } from '../data/items'
 import { endRun, getRun, restartRun, runDef, skipFilled } from '../run/state'
 import { starMet } from '../run/stars'
 import { teamLeveled } from '../run/members'
@@ -21,7 +20,6 @@ import { playSfx } from '../audio/sfx'
 import { beginPage, Button, Label, pageFrame, RichLabel, Table, TONE } from '../ui'
 import type { PageFrame, Rect, TableCell, TableRow } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
-import { stackCount } from '../run/draft'
 import { formatBig } from '../util/format'
 import { SceneKey } from './keys'
 
@@ -108,7 +106,7 @@ export class ResultScene extends Phaser.Scene {
       this,
       cx,
       titleY + 62,
-      `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText}${teamLeveled(this.run) ? ` · 全队 Lv ${this.run.xp.level}` : ''} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
+      `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText}${teamLeveled(this.run) ? ` · 全队 Lv ${this.run.xp.level}` : ''} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins}${this.run.items.length > 0 ? ` · 队伍道具 ${this.run.items.length} 件` : ''} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
       { kind: 'heading', bold: false, color: 'soft', originX: 0.5, maxWidth: content.w - 48 },
     )
     const statusY = titleY + (f.portrait ? 102 : 100)
@@ -181,12 +179,6 @@ export class ResultScene extends Phaser.Scene {
     const rows: TableRow[] = keysOf(this.run.kept).map((id) => {
       const taken = st.damageTaken[id] ?? 0
       const deaths = st.deaths[id] ?? 0
-      const owned = this.run.kept[id]?.items ?? []
-      const unique = [...new Set(owned)]
-      const items: TableCell =
-        unique.length === 0
-          ? NONE
-          : { icons: unique.slice(0, 2).map((item) => ({ id: ITEMS[item].emoji, count: stackCount(owned, item) })), more: Math.max(0, unique.length - 2) }
       return {
         icon: CHARACTERS[id].emoji,
         outline: 'player',
@@ -196,17 +188,15 @@ export class ResultScene extends Phaser.Scene {
           taken > 0 ? { text: formatBig(taken), color: 'warn' } : NONE,
           `${st.kills[id] ?? 0}`,
           deaths > 0 ? { text: `${deaths}`, color: 'bad' } : NONE,
-          items,
         ],
       }
     })
     new Table(this, rect, {
       columns: [
-        { label: '伤害', at: 0.42 },
-        { label: '承伤', at: 0.54 },
-        { label: '击杀', at: 0.64 },
-        { label: '阵亡', at: 0.74 },
-        { label: '道具', at: 0.88 },
+        { label: '伤害', at: 0.5 },
+        { label: '承伤', at: 0.65 },
+        { label: '击杀', at: 0.79 },
+        { label: '阵亡', at: 0.92 },
       ],
       rows,
       rowH: 62,

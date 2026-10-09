@@ -1,8 +1,8 @@
 import { modLines, modTexts } from '../data/stats'
 import type { ModLine } from '../data/stats'
-import { abilityStatLines, condLine, effectLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
-import type { Cond, Effect } from '../types/abilityDefs'
-import type { GearCount, GearGrow, GearWhen, ItemDef, ItemReaction, Trait } from '../types/items'
+import { condLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
+import type { Cond } from '../types/abilityDefs'
+import type { GearCount, GearWhen, ItemDef, Trait } from '../types/items'
 
 export const TRAIT_LABEL: Record<Trait, string> = {
   ...SHAPE_LABEL,
@@ -14,8 +14,9 @@ export const TRAIT_LABEL: Record<Trait, string> = {
   heal: '治疗',
 }
 
-/** 持有者的条件：常见的几种按道具的口吻说，其余照能力的说法 */
+/** 条件：常见的几种按道具的口吻说，其余照能力的说法 */
 function condText(c: Cond): string {
+  if (c.kind === 'afterSkill' && c.who === 'leader') return `队长放主动技能后 ${sec(c.ms)} 内`
   if (c.kind === 'all' || c.kind === 'any' || c.kind === 'not' || c.who !== 'self') return `${condLine(c)}时`
   switch (c.kind) {
     case 'still':
@@ -30,6 +31,12 @@ function condText(c: Cond): string {
       return `身边 ${grid(c.radius)} 内没有敌人时`
     case 'afterSkill':
       return `放主动技能后 ${sec(c.ms)} 内`
+    case 'nearLeader':
+      return `离队长 ${grid(c.radius)} 以内时`
+    case 'newLeader':
+      return `刚当上队长的 ${sec(c.ms)} 内`
+    case 'alone':
+      return '场上只剩自己站着时'
     default:
       return `${condLine(c)}时`
   }
@@ -43,6 +50,10 @@ function countText(c: GearCount): string {
       return `本波每过 ${sec(c.everyMs)}`
     case 'unhurt':
       return `每 ${sec(c.everyMs)} 没受伤`
+    case 'alliesDown':
+      return '场上每有一名队员倒下'
+    case 'alliesUp':
+      return '场上每多一名站着的队友'
   }
 }
 
@@ -51,63 +62,12 @@ function whenLine(w: GearWhen): string {
   return `${condText(w.if)}：${modTexts(w.stats).join('，')}`
 }
 
-function onText(t: ItemReaction): string {
-  switch (t.on) {
-    case 'hit':
-      return '命中时'
-    case 'crit':
-      return '暴击时'
-    case 'kill':
-      return '击杀时'
-    case 'hurt':
-      return '受伤时'
-    case 'dodge':
-      return '闪避时'
-    case 'skill':
-      return '放主动技能时'
-    case 'wave':
-      return '每波开始时'
-    case 'lowHp':
-      return `每条命第一次生命低于 ${pct(t.ratio)} 时`
-    case 'lethal':
-      return '每条命第一次受到致命伤害时不倒下，留 1 生命'
-  }
-}
-
-/** 爆开写明在哪、打多少；落在尸体处的写明从哪来，改受伤倍率的写明改谁；其余效果照常 */
-function triggerEffect(t: ItemReaction, e: Effect): string {
-  if (e.kind === 'blast') {
-    const where = t.to === 'self' ? '在身边' : t.to === 'spot' ? '在尸体处' : '在目标处'
-    const amount = e.amount ?? 0
-    const ratio = e.ratio ?? 0
-    const hurt = t.damage !== undefined ? `造成 ${Math.round(amount + t.damage * ratio)} 伤害` : amount ? `造成 ${amount}${ratio ? ` + 这一下 ${pct(ratio)}` : ''} 伤害` : `波及这一下 ${pct(ratio)} 的伤害`
-    return `${where}爆开 ${grid(e.radius)}，${hurt}`
-  }
-  const line = effectLine(e, t.to === 'self')
-  if (t.to === 'spot') return `从尸体处${line}`
-  return e.kind === 'guard' ? `让${t.to === 'self' ? '自己' : '目标'}${line}` : line
-}
-
-function triggerLine(t: ItemReaction): string {
-  const chance = 'chance' in t && t.chance !== undefined ? ` ${pct(t.chance)} 几率` : ''
-  const cond = t.if ? `、${condText(t.if)}` : ''
-  const who = t.to === 'other' && (t.on === 'dodge' || t.on === 'hurt') ? '对出手者' : ''
-  return `${onText(t)}${cond}${chance}${t.on === 'lethal' ? '，' : '：'}${who}${t.effects.map((e) => triggerEffect(t, e)).join('，')}`
-}
-
-function growLine(g: GearGrow): string {
-  return `${g.each === 'wave' ? '每波结束' : `这名角色每击杀 ${g.count} 个敌人`}：${modTexts(g.stats).join('，')}，本局永久`
-}
-
-/** 道具效果逐条：直接的属性涨跌带好坏，条件、触发、装置与成长只是说明 */
+/** 道具效果逐条：直接的属性涨跌带好坏，条件属性只是说明 */
 export function itemEffects(def: ItemDef): ModLine[] {
   const note = (text: string): ModLine => ({ text, good: null })
   return [
     ...(def.stats ? modLines(def.stats) : []),
     ...(def.when ?? []).map((w) => note(whenLine(w))),
-    ...(def.reactions ?? []).map((t) => note(triggerLine(t))),
-    ...(def.ability ? [note(`自动出手：${abilityStatLines(def.ability).join('，').replaceAll(' · ', '，')}`)] : []),
-    ...(def.grow ? [note(growLine(def.grow))] : []),
   ]
 }
 

@@ -1,12 +1,11 @@
 import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
 import { slotKept } from '../../run/state'
-import { Ability, Act, Anchored, Anim, Borrowed, Cd, Charges, Contact, Elem, EnemyArm, Faction, Form, Granted, Manual, MARK, Motion, MOTION, Owner, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
+import { Ability, Act, Anchored, Borrowed, Cd, Charges, Contact, Elem, EnemyArm, Faction, Form, Granted, Manual, MARK, Motion, MOTION, Owner, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
 import { setTraits } from '../utils/traits'
 import { abilityDef, bodyLook, enemyDef, formEnd } from '../store'
 import { hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
-import { armIdle } from '../systems/shared/anim'
 import { interrupt } from '../systems/shared/ability'
 import { attachDrive, detachDrive } from './enemy'
 import { STANDARD } from '../utils/pass'
@@ -40,7 +39,6 @@ function relook(sim: Sim, eid: number, emoji: string): void {
   bodyLook[eid] = emoji
   if (hasMark(sim, eid, MARK.morph)) return
   Sprite.frame[eid] = sim.frames.index(emoji)
-  armIdle(eid, emoji, Sprite.frame[eid]!, Anim.offset[eid]!)
 }
 
 /** 换能力：主动技能与借来的不换；非玩家身体还没装过能力就留给 armEnemies */

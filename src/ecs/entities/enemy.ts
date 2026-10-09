@@ -14,7 +14,6 @@ import type { StatMods } from '../../types/stats'
 import {
   Act,
   Anchored,
-  Anim,
   Boss,
   AROUND,
   Bounty,
@@ -67,10 +66,8 @@ import { spawnTelegraph } from './telegraph'
 import { gateEntry } from '../worlds/gates'
 import type { Entry } from '../worlds/gates'
 import type { SpawnTraits } from './telegraph'
-import { armIdle } from '../systems/shared/anim'
 import { STANDARD } from '../utils/pass'
 import { hoverPx } from '../utils/ground'
-import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
 import { toPx } from '../../data/px'
@@ -214,7 +211,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     ownClock: false,
     element: elementIndex(def.element),
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim, Act)
+  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Act)
   Act.gcdUntil[eid] = 0
   Act.phase[eid] = -1
   Act.rule[eid] = -1
@@ -251,7 +248,6 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
   Sprite.frame[eid] = atlas.index(def.emoji)
   Tint.rim[eid] = faction === FACTION.team ? RIM.team : elite || boss ? RIM.elite : RIM.none
-  armIdle(eid, def.emoji, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.alpha[eid] = boss ? 0.2 : 0.3
   startPop(sim, eid, boss ? POP.bossMs : POP.enemyMs)
   Pop.size[eid] = size
@@ -424,7 +420,6 @@ export function applyMorph(
   addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
   if (spec.vulnMul !== undefined) addMark(eid, MARK.exposed, TAG.morph, until, spec.vulnMul)
   Sprite.frame[eid] = atlas.index(spec.morphEmoji)
-  armIdle(eid, spec.morphEmoji, Sprite.frame[eid]!, Anim.offset[eid]!)
   interrupt(sim, eid)
   Transform.rot[eid] = 0
   if (anchored) removeComponent(sim.world, eid, Anchored)
@@ -438,5 +433,4 @@ export function restoreMorph(sim: Sim, atlas: FrameIndex, eid: number, anchored:
   if (anchored) addComponent(sim.world, eid, Anchored)
   const emoji = bodyLook[eid] ?? def.emoji
   Sprite.frame[eid] = atlas.index(emoji)
-  armIdle(eid, emoji, Sprite.frame[eid]!, Anim.offset[eid]!)
 }

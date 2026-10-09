@@ -3,35 +3,25 @@ import type { OutlineKind } from '../emoji/outline'
 import { Button } from './button'
 import { Chip } from './chip'
 import { drawBlock, drawDisc } from './draw'
-import { ProgressBar } from './gauge'
-import type { GaugeTone } from './gauge'
-import { pressable } from './gesture'
 import type { Rect } from './gesture'
 import { Icon } from './icon'
-import { Label, RichLabel } from './label'
-import type { Segment } from './label'
+import { Label } from './label'
 import { ScrollView } from './scrollView'
 import { MOTION, SHAPE, SURFACE, TONE } from './theme'
 import type { TextColor, TextKind, Tone } from './theme'
 import { Widget } from './widget'
 
-/** 这一格货归谁：头像、名字、等级与经验 */
-export interface OfferOwner {
+/** 场上的一个人：吃不吃得到这一格货 */
+export interface OfferFace {
   readonly emoji: string
   readonly outline?: OutlineKind
-  readonly name: string
-  /** 等级字样，例如 Lv 2 */
-  readonly level: string
-  /** 经验进度，0 到 1 */
-  readonly xp: number
-  /** 买下后会到的经验进度 */
-  readonly xpAfter?: number
-  readonly xpTone: GaugeTone
-  /** 经验条旁的短字，例如 +8 */
-  readonly note?: string
-  readonly noteColor?: TextColor
-  /** 点主人一栏 */
-  readonly onTap?: () => void
+  readonly on: boolean
+}
+
+/** 这一格货场上谁吃得到：每人一个头像，吃不到的压暗；note 是一句总括 */
+export interface OfferFaces {
+  readonly faces: readonly OfferFace[]
+  readonly note: string
 }
 
 export interface OfferLine {
@@ -59,18 +49,22 @@ export type OfferState =
   | { readonly kind: 'empty'; readonly note: string }
 
 export interface OfferCardOptions {
-  readonly owner: OfferOwner
+  readonly faces: OfferFaces
   readonly state: OfferState
 }
 
 const RADIUS = SHAPE.radius.md + 2
-/** 主人栏压在描边以内 */
+/** 谁吃得到那一栏压在描边以内 */
 const INSET = 2
 const PAD = 14
-/** 竖卡顶上主人栏的高度 */
+/** 竖卡顶上那一栏的高度 */
 const BAND_H = 80
-/** 横卡左侧主人栏的宽度 */
+/** 横卡左侧那一栏的宽度 */
 const SIDE_W = 140
+/** 那一栏里的头像与间距；吃不到的头像压暗 */
+const FACE = 30
+const FACE_GAP = 6
+const FACE_OFF = 0.25
 /** 横卡右上角购买键的宽度 */
 const BUY_W = 176
 const LINE_GAP = 5
@@ -89,64 +83,53 @@ interface Lines {
 /** 能整体调透明度的对象 */
 type Fadable = Phaser.GameObjects.GameObject & { readonly alpha: number; setAlpha(value?: number): unknown }
 
-/** 主人一栏：竖卡在顶上横排，横卡在左侧竖排 */
-class OwnerBand extends Widget {
-  private readonly bg: Phaser.GameObjects.Graphics
+/** 谁吃得到那一栏：竖卡在顶上，总括一行、头像一排；横卡在左侧，总括在上、头像按行排开 */
+class FacesBand extends Widget {
   private readonly bandW: number
   private readonly bandH: number
   private readonly side: Side
 
-  constructor(scene: Phaser.Scene, w: number, h: number, side: Side, owner: OfferOwner) {
+  constructor(scene: Phaser.Scene, w: number, h: number, side: Side, faces: OfferFaces) {
     super(scene)
     this.bandW = w
     this.bandH = h
     this.side = side
-    this.bg = scene.add.graphics()
-    this.add(this.bg)
-    this.paint(false)
-    if (side === 'top') this.layTop(owner)
-    else this.layLeft(owner)
-    const onTap = owner.onTap
-    if (onTap) pressable(this, { shape: new Phaser.Geom.Rectangle(0, 0, w, h), onTap, onPress: (down) => this.paint(down) })
+    const bg = scene.add.graphics()
+    this.add(bg)
+    this.paint(bg)
+    if (side === 'top') this.layTop(faces)
+    else this.layLeft(faces)
   }
 
-  private layTop(o: OfferOwner): void {
+  private face(f: OfferFace, x: number, y: number): Icon {
+    return new Icon(this.scene, x, y, f.emoji, FACE, f.outline).setAlpha(f.on ? 1 : FACE_OFF)
+  }
+
+  private layTop(o: OfferFaces): void {
     const { bandW: w, bandH: h } = this
-    const avatar = 52
-    const x = PAD + avatar + 12
-    const nameY = h / 2 - 13
-    const barY = h / 2 + 15
-    this.add(new Icon(this.scene, PAD + avatar / 2, h / 2, o.emoji, avatar, o.outline))
-    const level = new Label(this.scene, w - PAD, nameY, o.level, { kind: 'caption', bold: true, color: 'accent' }).setOrigin(1, 0.5)
-    const name = new Label(this.scene, x, nameY, o.name, { kind: 'label', bold: true }).setOrigin(0, 0.5)
-    name.fit(level.x - level.width - 8 - x)
-    this.add([name, level])
-    let right = w - PAD
-    if (o.note) {
-      const note = new Label(this.scene, right, barY, o.note, { kind: 'caption', bold: true, color: o.noteColor ?? 'info' }).setOrigin(1, 0.5)
-      this.add(note)
-      right -= note.width + 8
-    }
-    this.add(new ProgressBar(this.scene, x, barY - 5, Math.max(12, right - x), 10, { tone: o.xpTone, value: o.xp, preview: o.xpAfter }))
+    this.add(new Label(this.scene, w / 2, h / 2 - 16, o.note, { kind: 'caption', bold: true, color: 'soft' }).setOrigin(0.5).fit(w - PAD * 2))
+    const span = o.faces.length * FACE + (o.faces.length - 1) * FACE_GAP
+    o.faces.forEach((f, i) => this.add(this.face(f, (w - span) / 2 + FACE / 2 + i * (FACE + FACE_GAP), h / 2 + 16)))
   }
 
-  private layLeft(o: OfferOwner): void {
-    const { bandW: w, bandH: h } = this
-    const avatar = 56
-    const top = Math.max(PAD, (h - 132) / 2)
-    const nameY = top + avatar + 20
-    const rowY = nameY + 28
-    this.add(new Icon(this.scene, w / 2, top + avatar / 2, o.emoji, avatar, o.outline))
-    this.add(new Label(this.scene, w / 2, nameY, o.name, { kind: 'label', bold: true }).setOrigin(0.5).fit(w - 20))
-    const row: Segment[] = [{ text: o.level, color: 'accent' }, ...(o.note ? [{ text: o.note, color: o.noteColor ?? 'info' }] : [])]
-    this.add(new RichLabel(this.scene, w / 2, rowY, row, { kind: 'caption', bold: true, gap: 8, originX: 0.5, maxWidth: w - 16 }))
-    this.add(new ProgressBar(this.scene, 16, rowY + 16, w - 32, 10, { tone: o.xpTone, value: o.xp, preview: o.xpAfter }))
+  private layLeft(o: OfferFaces): void {
+    const { bandW: w } = this
+    const note = new Label(this.scene, w / 2, PAD, o.note, { kind: 'caption', bold: true, color: 'soft', align: 'center', wrap: w - 16 }).setOrigin(0.5, 0)
+    this.add(note)
+    const cols = Math.max(1, Math.floor((w - 16 + FACE_GAP) / (FACE + FACE_GAP)))
+    const top = note.y + note.height + 10 + FACE / 2
+    o.faces.forEach((f, i) => {
+      const row = Math.floor(i / cols)
+      const inRow = Math.min(cols, o.faces.length - row * cols)
+      const span = inRow * FACE + (inRow - 1) * FACE_GAP
+      this.add(this.face(f, (w - span) / 2 + FACE / 2 + (i % cols) * (FACE + FACE_GAP), top + row * (FACE + FACE_GAP)))
+    })
   }
 
-  private paint(down: boolean): void {
+  private paint(g: Phaser.GameObjects.Graphics): void {
     const { bandW: w, bandH: h } = this
     const r = RADIUS - INSET
-    const g = this.bg.clear().fillStyle(down ? SURFACE.bg : SURFACE.sunken, 1)
+    g.clear().fillStyle(SURFACE.sunken, 1)
     g.lineStyle(2, SURFACE.outline, 1)
     if (this.side === 'top') {
       g.fillRoundedRect(INSET, INSET, w - INSET * 2, h - INSET, { tl: r, tr: r, bl: 0, br: 0 })
@@ -158,7 +141,7 @@ class OwnerBand extends Widget {
   }
 }
 
-/** 商店里的一格：一侧是主人，其余是给他的货；高比宽大时主人在上，否则主人在左。rect 是卡片外沿 */
+/** 商店里的一格：一侧是场上谁吃得到，其余是货；高比宽大时那一栏在上，否则在左。rect 是卡片外沿 */
 export class OfferCard extends Widget {
   private readonly cardW: number
   private readonly cardH: number
@@ -175,7 +158,7 @@ export class OfferCard extends Widget {
     drawBlock(bg, 0, 0, rect.w, rect.h, { face: SURFACE.raised, radius: RADIUS, drop: SHAPE.drop, line: tone ? TONE[tone].face : undefined, lineW: tone ? 4 : SHAPE.line })
     this.add(bg)
     const column = rect.h >= rect.w
-    this.add(column ? new OwnerBand(scene, rect.w, BAND_H, 'top', opts.owner) : new OwnerBand(scene, SIDE_W, rect.h, 'left', opts.owner))
+    this.add(column ? new FacesBand(scene, rect.w, BAND_H, 'top', opts.faces) : new FacesBand(scene, SIDE_W, rect.h, 'left', opts.faces))
     if (column) this.layColumn(state)
     else this.layRow(state)
     this.once(Phaser.GameObjects.Events.DESTROY, () => {
@@ -227,7 +210,7 @@ export class OfferCard extends Widget {
     this.goodsEnd(state, head, { x: w / 2, y: btnY, w: w - PAD * 2 })
   }
 
-  /** 横卡：图标、名字与购买键一行，效果在下，整块在主人栏右侧居中 */
+  /** 横卡：图标、名字与购买键一行，效果在下，整块在左侧那一栏的右边居中 */
   private layRow(state: OfferState): void {
     const { cardW: w, cardH: h } = this
     const x0 = SIDE_W + 18

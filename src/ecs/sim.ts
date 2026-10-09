@@ -21,6 +21,7 @@ import { newWorldState } from './worlds/hooks'
 import { worldFor } from './worlds/registry'
 import { newOutbox } from './outbox'
 import { FACTION, Stats } from './components'
+import { teamStats } from '../data/items'
 import type { FightDef } from '../types/runs'
 import { fightMods, newFight } from './fight/state'
 import { layDown } from './systems/shared/combat'
@@ -31,6 +32,8 @@ export interface Sim {
   teamDir: { x: number; y: number }
   moveInputRaw: number
   leader: number
+  /** 此刻的队长是什么时候当上的；开打时的队长不算刚当上 */
+  leaderSince: number
   heading: { x: number; y: number }
   handover: Handover | null
   aim: { x: number; y: number }
@@ -53,7 +56,7 @@ export interface Sim {
   timeStopMsLeft: number
   chrono: number
   battleFx: BattleEffects
-  /** 队伍道具定下的全场规则：敌人的移速与出怪速度的倍率 */
+  /** 全场规则：敌人的移速与出怪速度的倍率，队伍道具的一份乘上各队员自己的 */
   foes: { readonly speed: number; readonly count: number }
   frameAttractors: { x: number; y: number; r2: number }[]
   /** 按阵营的可被打身体快照，每帧开头与身体走完后各刷新一次 */
@@ -142,6 +145,7 @@ export function makeSim(
   const seed = (run.decorSeed ^ 0x9e37 ^ Math.imul(run.step, 0x9e3779b1)) >>> 0
   const team = formTeam(world, frames, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
+  const foes = teamStats(run.items)
   const sim: Sim = {
     world,
     teamDir: { x: 0, y: 0 },
@@ -164,8 +168,8 @@ export function makeSim(
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
     foes: {
-      speed: characters.reduce((v, m) => v * Stats.enemySpeed[m]!, 1),
-      count: characters.reduce((v, m) => v * Stats.enemyCount[m]!, 1),
+      speed: characters.reduce((v, m) => v * Stats.enemySpeed[m]!, foes.enemySpeed),
+      count: characters.reduce((v, m) => v * Stats.enemyCount[m]!, foes.enemyCount),
     },
     frameAttractors: [],
     targets: [[], []],
@@ -178,6 +182,7 @@ export function makeSim(
     fight: state,
     run,
     leader,
+    leaderSince: -Infinity,
     heading: { x: 0, y: -1 },
     handover: null,
     aim: { x: 0, y: -1 },

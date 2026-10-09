@@ -1,8 +1,7 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { EMPLACE } from '../../data/feel'
 import { retireEmplacement } from '../entities/minion'
-import { Aim, Cd, Emplacement, Fired, Frozen, Minion, Retiring, Tint, Transform } from '../components'
-import { playClip } from './shared/anim'
+import { Aim, Emplacement, Fired, Frozen, Minion, Retiring, Tint, Transform } from '../components'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
@@ -43,7 +42,6 @@ export function updateEmplacements(sim: Sim): void {
     if (Fired.v[t] && a !== 0) {
       Fired.v[t] = 0
       Transform.rot[t] = Aim.rad[a]! - Math.PI / 4
-      playClip(sim, sim.frames, t, 'attack', Cd.left[a]!)
     }
   }
 }

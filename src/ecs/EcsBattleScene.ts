@@ -72,7 +72,7 @@ import { bodyAt, describeBody } from './inspector'
 
 import { initialLayout, stepFrozen } from './sim'
 import { presentFrame, presentFrozen } from './present/frame'
-import { openWave, settleWave } from './systems/shared/wave'
+import { settleWave } from './systems/shared/wave'
 import { waveAt, WAVE } from '../data/waves'
 import { SURGE } from '../data/enemies'
 import { curveOf, timeLimitMs } from '../data/runs'
@@ -580,7 +580,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.events.off(Phaser.Scenes.Events.RESUME, this.onResume, this)
       this.scene.stop(SceneKey.Ui)
-      this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
       this.damageText?.destroy()
@@ -654,7 +653,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     startPhase(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
-    openWave(this.sim)
     scatterLevelUps(this.sim, pendingLevelUps(run))
     markFightBase(this.sim)
     this.ready = true

@@ -1,11 +1,10 @@
 import { addComponents, hasComponent, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { attachDrawable } from './drawable'
-import { Alive, Anim, MARK, Radius, Shadow, Slot, Sprite, Transform, Uid } from '../components'
+import { Alive, MARK, Radius, Shadow, Slot, Transform, Uid } from '../components'
 import { addCc } from '../utils/marks'
 import { isSameEntity } from '../utils/identity'
 import { targetsWithin } from '../utils/targets'
-import { armIdle } from '../systems/shared/anim'
 import { displace } from '../systems/shared/displace'
 import { blinkFlash } from '../systems/shared/fire'
 import { bodyLook, enemyDef } from '../store'
@@ -39,8 +38,7 @@ export function spawnShadow(sim: Sim, src: Source, by: number, angle: number, li
   const s = newEntity(sim.world)
   const emoji = lookOf(sim, by)
   attachDrawable(sim.world, s, sim.frames, { id: emoji, x: at.x, y: at.y, size: Transform.w[by]!, z: 4, color: 0x4a148c, effect: 0, alpha: 0.55 })
-  addComponents(sim.world, s, Shadow, Alive, Radius, Anim)
-  armIdle(s, emoji, Sprite.frame[s]!, 0)
+  addComponents(sim.world, s, Shadow, Alive, Radius)
   Shadow.of[s] = by
   Shadow.ofUid[s] = Uid.v[by]!
   Shadow.until[s] = sim.elapsedMs + lifeMs

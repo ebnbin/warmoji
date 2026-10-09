@@ -153,5 +153,3 @@ export const blinkStrike = slots<{ readonly src: Source; readonly target: number
 export const traces = slots<import('./systems/shared/trace').TraceRec>()
 
 export const zoneSrc = slots<Source>()
-
-export const animId = slots<string>()

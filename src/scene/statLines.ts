@@ -14,7 +14,7 @@ import { ELEMENT_IDS, ELEMENTS } from '../data/elements'
 import type { ElementId } from '../types/elements'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
-import type { GrowthProgress, ItemId } from '../types/items'
+import type { ItemId } from '../types/items'
 import type { AbilityDef, Cond, Effect, Selector, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
@@ -137,8 +137,6 @@ export function effectLine(e: Effect, self = false): string {
       return '自身消散'
     case 'coins':
       return `每次命中掉 ${e.count} 枚金币`
-    case 'interest':
-      return `按手上金币的 ${pct(e.ratio)} 结息，最多 ${e.max}`
     case 'root':
       return `定身 ${sec(e.durationMs)}（不能走，能出手）`
     case 'silence':
@@ -294,7 +292,7 @@ export function condLine(c: Cond): string {
     case 'not':
       return `不${condLine(c.cond)}`
   }
-  const who = c.who === 'self' ? '自己' : ''
+  const who = c.who === 'self' ? '自己' : c.who === 'leader' ? '队长' : ''
   switch (c.kind) {
     case 'airborne':
       return `${who}在空中`
@@ -318,6 +316,12 @@ export function condLine(c: Cond): string {
       return `离自己 ${grid(c.radius)} 以内`
     case 'afterSkill':
       return `${who}放主动技能后 ${sec(c.ms)} 内`
+    case 'nearLeader':
+      return `${who}离队长 ${grid(c.radius)} 以内`
+    case 'newLeader':
+      return `${who}当上队长后 ${sec(c.ms)} 内`
+    case 'alone':
+      return `场上只剩${who}站着`
     case 'element':
       return `${who}是${ELEMENTS[c.element].name}元素`
   }
@@ -502,10 +506,10 @@ export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
   level = 1,
-  opts: { path?: boolean; growth?: GrowthProgress; base?: boolean } = {},
+  opts: { path?: boolean; base?: boolean } = {},
 ): StatGroup[] {
   const def = CHARACTERS[id]
-  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level), opts.growth))
+  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level)))
   const loadout = loadoutFor(def, level)
   const groups: StatGroup[] = []
   if (opts.base !== false) {
@@ -540,7 +544,7 @@ export function characterStatGroups(
   if (opts.path !== false) {
     groups.push({
       icon: '2b50',
-      title: `升级路径（当前 ${level} 级 · 角色经验自动解锁）`,
+      title: `升级路径（当前 ${level} 级 · 全队升级时选他升级）`,
       lines: upgradeCardsFor(def).map((card, i) => {
         const atLevel = i + 2
         const reached = level >= atLevel

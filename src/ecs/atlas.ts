@@ -1,16 +1,12 @@
 import type Phaser from 'phaser'
 import { setSvgSize } from '../emoji/svg'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
-import { animClipOf, bakeAnimFrame } from '../emoji/anim'
-import type { AnimClipId } from '../types/anim'
 
 const CELL = 256
 const PAGE = 2048
 const COLS = PAGE / CELL
 const PER_PAGE = COLS * COLS
 const MAX_FRAMES = 2048
-
-type ClipKey = `${string}|${AnimClipId}`
 
 function rasterize(raw: string): Promise<HTMLImageElement> {
   return svgToImage(setSvgSize(raw, CELL))
@@ -33,8 +29,6 @@ function glowCell(): HTMLCanvasElement {
   return cv
 }
 
-const NO_CLIP = { base: -1, frames: 0 }
-
 let atlasSerial = 0
 let shared: EcsAtlas | undefined
 let building: Promise<EcsAtlas> | undefined
@@ -50,17 +44,10 @@ export class EcsAtlas {
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
   private cursor = 0
-  private scene?: Phaser.Scene
   private readonly serial = atlasSerial++
-  private disposed = false
-
-  dispose(): void {
-    this.disposed = true
-  }
 
   /** 换成别的图集时放掉图集页的纹理 */
   private release(scene: Phaser.Scene): void {
-    this.disposed = true
     for (const p of this.pages) if (scene.textures.exists(p.key)) scene.textures.remove(p.key)
     this.pages.length = 0
     this.canvases.length = 0
@@ -71,13 +58,6 @@ export class EcsAtlas {
   private covers(ids: readonly string[]): boolean {
     return ids.every((id) => this.keyToFrame.has(id))
   }
-
-  private rebind(scene: Phaser.Scene): void {
-    this.scene = scene
-    this.disposed = false
-  }
-  private readonly clips = new Map<ClipKey, { base: number; frames: number }>()
-  private readonly baking = new Set<ClipKey>()
 
   private constructor() {
     this.uv = new Float32Array(MAX_FRAMES * 4)
@@ -99,11 +79,6 @@ export class EcsAtlas {
     cv.height = PAGE
     this.canvases.push(cv)
     this.ctxs.push(cv.getContext('2d')!)
-    const scene = this.scene
-    if (!scene) return
-    const key = `ecs-atlas-${this.serial}-${this.pages.length}`
-    if (scene.textures.exists(key)) scene.textures.remove(key)
-    this.pages.push(scene.textures.addCanvas(key, cv)!)
   }
 
   private place(frame: number, img: HTMLImageElement | HTMLCanvasElement): void {
@@ -118,54 +93,6 @@ export class EcsAtlas {
     this.uv[b + 2] = (px + CELL) / PAGE
     this.uv[b + 3] = 1 - (py + CELL) / PAGE
     this.pageOf[frame] = page
-  }
-
-  clip(id: string, clipId: AnimClipId): { base: number; frames: number } {
-    const key: ClipKey = `${id}|${clipId}`
-    const hit = this.clips.get(key)
-    if (hit) return hit
-    if (!this.baking.has(key)) {
-      this.baking.add(key)
-      void this.bakeClip(id, clipId, key)
-        .catch(() => {
-          this.clips.set(key, NO_CLIP)
-        })
-        .finally(() => this.baking.delete(key))
-    }
-    return NO_CLIP
-  }
-
-  private hasRoom(n: number): boolean {
-    return this.cursor + n <= MAX_FRAMES
-  }
-
-  private async bakeClip(id: string, clipId: AnimClipId, key: ClipKey): Promise<void> {
-    const clip = animClipOf(id, clipId)
-    const scene = this.scene
-    if (!scene || this.disposed) return
-    if (!clip || !this.hasRoom(clip.frames)) {
-      this.clips.set(key, NO_CLIP)
-      return
-    }
-    const raw = await emojiSvgText(id)
-    const recipe = { ...clip, viewBox: undefined }
-    const imgs = await Promise.all(
-      Array.from({ length: clip.frames }, (_, i) => rasterize(bakeAnimFrame(raw, recipe, i / clip.frames))),
-    )
-    if (this.disposed || !scene.textures) return
-    if (!this.hasRoom(imgs.length)) {
-      this.clips.set(key, NO_CLIP)
-      return
-    }
-    const base = this.cursor
-    const touched = new Set<number>()
-    for (const img of imgs) {
-      const frame = this.alloc()
-      this.place(frame, img)
-      touched.add(Math.floor(frame / PER_PAGE))
-    }
-    for (const p of touched) this.pages[p]?.refresh()
-    this.clips.set(key, { base, frames: clip.frames })
   }
 
   index(id: string): number {
@@ -221,9 +148,7 @@ export class EcsAtlas {
         })
       await building
     }
-    const atlas = shared!
-    atlas.rebind(scene)
-    return atlas
+    return shared!
   }
 
   private static async create(scene: Phaser.Scene, ids: readonly string[]): Promise<EcsAtlas> {
@@ -239,14 +164,13 @@ export class EcsAtlas {
         }
       }),
     )
-    for (let i = 0; i < ids.length && atlas.hasRoom(1); i++) {
+    for (let i = 0; i < ids.length && atlas.cursor < MAX_FRAMES; i++) {
       const img = imgs[i]
       if (!img) continue
       const frame = atlas.alloc()
       atlas.place(frame, img)
       atlas.keyToFrame.set(ids[i]!, frame)
     }
-    atlas.scene = scene
     for (let p = 0; p < atlas.canvases.length; p++) {
       const key = `ecs-atlas-${atlas.serial}-${p}`
       if (scene.textures.exists(key)) scene.textures.remove(key)
