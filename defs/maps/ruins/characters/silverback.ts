@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🦍 银背猩猩：双拳捶开身前一片，每第四下捶胸怒吼吓退敌人；技能朝一个方向猛冲，连墙带人撞开
+// 🦍 银背猩猩：双拳捶开身前一片、把人捶飞，边打边吸血，每第四下捶胸怒吼吓退敌人；技能朝一个方向猛冲，连墙带人撞开
 const silverbackSmash = {
   trigger: 'auto',
   cooldownMs: 900,
@@ -56,7 +56,7 @@ export const levels = [{ add: { maxHp: 25, lifesteal: 0.03 }, mul: { damage: 1.2
 export default {
   emoji: '1f98d',
   name: '银背猩猩',
-  desc: '力大无穷的银背：双拳捶开身前一片，捶胸一声怒吼吓退身边的敌人；技能朝一个方向猛冲，连墙带人一起撞开',
+  desc: '力大无穷的银背：双拳捶开身前一片，把人捶飞，残墙也捶得掉皮，冻住的一拳就碎、伤害翻倍；边打边吸血，中了毒就吸不回来；捶胸一声怒吼吓退身边的敌人；技能朝一个方向猛冲，连墙带人一起撞开',
   role: 'bruiser',
   tags: ['damage', 'melee'],
   body: { drag: 5, mass: 1.6 },

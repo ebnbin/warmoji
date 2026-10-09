@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🐕‍🦺 搜救犬：药包叼给伤得最重的队友，吠叫吼向身前的敌人，两样轮着来；技能把倒下的队友全都救起来
+// 🐕‍🦺 搜救犬：浑身湿透，药包叼给伤得最重的队友，吠叫时甩出一身水把身前的敌人浇湿，两样轮着来；技能把倒下的队友全都救起来
 // 药包与吠叫都从总能放出去的 world 出手，免得没人受伤或身边没敌人时轮换卡住
 const hurtAlly = { side: 'allies', radius: 5, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 } as const
 
@@ -19,10 +19,11 @@ const bark = {
   trigger: 'manual',
   class: 'attack',
   aim: 'nearest',
-  range: 2.2,
-  damage: 12,
+  range: 2.4,
+  damage: 8,
   fireSfx: 'bleat',
-  shape: { kind: 'sector', radius: 2, arcDeg: 90, ms: 160 },
+  color: 0x42a5f5,
+  shape: { kind: 'sector', radius: 2.2, arcDeg: 110, ms: 160 },
 } satisfies AbilityDef
 
 const rescueDogBark = { trigger: 'auto', cooldownMs: 1200, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability: bark }] } satisfies AbilityDef
@@ -31,7 +32,7 @@ const rescueDogGrowl = { ...rescueDogBark, onHit: [{ kind: 'cast', ability: { ..
 
 const rescueDogCare = { ...rescueDogKit, cycle: [rescueDogBark] } satisfies AbilityDef
 
-const rescueDogKit2 = { ...rescueDogKit, onHit: [{ kind: 'to', who: hurtAlly, then: [{ kind: 'heal', amount: 12 }, { kind: 'cleanse' }] }] } satisfies AbilityDef
+const rescueDogKit2 = { ...rescueDogKit, onHit: [{ kind: 'to', who: hurtAlly, then: [{ kind: 'cleanse' }, { kind: 'heal', amount: 12 }] }] } satisfies AbilityDef
 
 const rescueDogCare2 = { ...rescueDogKit2, cycle: [rescueDogBark] } satisfies AbilityDef
 
@@ -55,7 +56,7 @@ export default {
   emoji: '1f415_200d_1f9ba',
   name: '搜救犬',
   element: 'water',
-  desc: '训练有素的搜救犬：药包和吠叫轮着来，药包叼给 5 格内伤得最重的队友，吠叫吼向身前 2 格的敌人；没人受伤或身边没敌人时那一下落空，照样轮到下一样；技能把倒下的队友全都救起来',
+  desc: '训练有素的搜救犬，本身是水，浑身湿透：点不着火，却一冰就冻、挨电连上身边湿的。药包和吠叫轮着来，药包叼给 5 格内伤得最重的队友，吠叫时甩出一身水，身前 2.2 格的敌人挨一下、浇湿 5 秒，湿了的一冰就冻、一电一片；没人受伤或身边没敌人时那一下落空，照样轮到下一样；技能把倒下的队友全都救起来',
   role: 'support',
   tags: ['support', 'melee'],
   body: { drag: 4.5, mass: 0.9 },
@@ -68,7 +69,7 @@ export default {
       icon: '1fa79',
       base: 'rescueDogCare',
       upgrades: [
-        { ability: 'rescueDogCare2', card: { icon: '26d1', name: '急救', desc: '接住药包的队友顺带解除控制与减速' } },
+        { ability: 'rescueDogCare2', card: { icon: '26d1', name: '急救', desc: '接药包的队友先解除控制、减速与燃烧、中毒、寒冷、湿，再上药，中了毒的也补得上' } },
         { ability: 'rescueDogCare3', card: { icon: '1f6a8', name: '警犬', desc: '吠叫让身前的敌人恐惧 0.8 秒' } },
       ],
     },

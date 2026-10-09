@@ -3,32 +3,34 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { ring, shot } from '../../../kit.ts'
 
-// 👷 爆破工：把雷管抛到敌人身上炸开一片；技能朝一个方向扔出一大捆炸药，能把墙炸出缺口
+// 👷 爆破工：把雷管抛进敌群炸开一片火，烧着的挨着谁就烧到谁；技能朝一个方向扔出一大捆不点火的炸药，把人炸飞、把墙炸出缺口
+// 雷管只轻轻掀一下：人挤着火才烧得开
 const demolisherStick = {
   trigger: 'auto',
   cooldownMs: 1400,
   aim: 'nearest',
   range: 6.5,
-  damage: 20,
-  knockback: 2,
+  damage: 16,
+  knockback: 0.5,
   fireSfx: 'shoot',
   shape: { kind: 'drop', targets: 1, look: { emoji: '1f9e8', size: 0.5 }, fromAbove: 2.5, dropMs: 450, staggerMs: 0 },
-  onHit: [{ kind: 'blast', radius: 1.5, ratio: 1, knockback: 2, breach: 0.5, ring: ring(0xff7043) }],
+  onHit: [{ kind: 'blast', radius: 1.5, ratio: 1, knockback: 0.5, breach: 0.5, ring: ring(0xff7043) }],
 } satisfies AbilityDef
 
-const demolisherStick2 = { ...demolisherStick, onHit: [{ kind: 'blast', radius: 2, ratio: 1, knockback: 2, breach: 0.5, ring: ring(0xff7043) }] } satisfies AbilityDef
+const demolisherStick2 = { ...demolisherStick, onHit: [{ kind: 'blast', radius: 2, ratio: 1, knockback: 0.5, breach: 0.5, ring: ring(0xff7043) }] } satisfies AbilityDef
 
 const demolisherStick3 = {
   ...demolisherStick2,
   onHit: [
     ...demolisherStick2.onHit,
-    { kind: 'to', who: { side: 'foes', radius: 2 }, then: [{ kind: 'fuse', ms: 1500, then: [{ kind: 'blast', radius: 1.4, ratio: 0.8, knockback: 1, ring: ring(0xffb74d) }] }] },
+    { kind: 'to', who: { side: 'foes', radius: 2 }, then: [{ kind: 'fuse', ms: 1500, then: [{ kind: 'blast', radius: 1.4, ratio: 1, knockback: 0.5, ring: ring(0xffb74d) }] }] },
   ],
 } satisfies AbilityDef
 
 const demolisherCharge = {
   trigger: 'manual',
   aim: 'stick',
+  element: 'physical',
   damage: 60,
   knockback: 4,
   breach: 4,
@@ -45,7 +47,7 @@ export default {
   emoji: '1f477',
   name: '爆破工',
   element: 'fire',
-  desc: '扛着一箱雷管的爆破工：把雷管抛到最近的敌人身上炸开一片，连墙皮也崩掉一点；技能朝一个方向扔出一大捆炸药，碰上敌人炸开一大片，撞上墙把墙炸出缺口',
+  desc: '扛着一箱雷管的爆破工，本身是火，点不着、不怕岩浆：把雷管抛到最近的敌人身上炸开一片火，炸到的都点着，烧着的挨着同伴就烧过去；雷管只轻轻掀一下，不把人炸散，连墙皮也崩掉一点；扔进毒云里连云一起炸开。技能扔出一大捆不点火的炸药，碰上敌人炸开一大片把人炸飞，撞上墙把墙炸出缺口',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],
   body: { drag: 5, mass: 1.2 },
@@ -53,7 +55,7 @@ export default {
   skill: {
     name: '爆破',
     icon: '1f4a5',
-    desc: '朝摇杆方向扔出一大捆炸药，飞出 6 格：碰上敌人就炸开 3 格，把人炸飞；撞上高墙就把墙炸出一个大洞',
+    desc: '朝摇杆方向扔出一大捆炸药，飞出 6 格：碰上敌人就炸开 3 格，把人炸飞；撞上高墙就把墙炸出一个大洞；这一炸是物理，不点火，冻住的炸碎、伤害翻倍',
     cdMs: 12_000,
     ability: 'demolisherCharge',
     aim: true,
@@ -65,8 +67,8 @@ export default {
       icon: '1f9e8',
       base: 'demolisherStick',
       upgrades: [
-        { ability: 'demolisherStick2', card: { icon: '1f9ed', name: '定向爆破', desc: '炸开的范围从 1.5 格扩到 2 格' } },
-        { ability: 'demolisherStick3', card: { icon: '23f2', name: '延时引信', desc: '被炸到的敌人再挂 1.5 秒引信，到点在它身上再炸开 1.4 格，八成伤害' } },
+        { ability: 'demolisherStick2', card: { icon: '1f9ed', name: '定向爆破', desc: '炸开的范围从 1.5 格扩到 2 格，一次点着更多' } },
+        { ability: 'demolisherStick3', card: { icon: '23f2', name: '延时引信', desc: '被炸到的敌人再挂 1.5 秒引信，到点在它身上再炸开 1.4 格火：没着的点着，烧着的从这一下起再烧 3 秒' } },
       ],
     },
   ],

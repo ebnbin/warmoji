@@ -49,11 +49,12 @@ const stomp = {
   aim: 'nearest',
   range: 3.2,
   damage: 16,
+  breach: 3,
   fireSfx: 'boom',
   color: 0x8d6e63,
   windup: { ms: 800, lockAt: 'start', telegraph: 'blink' },
   shape: { kind: 'disc', radius: 3.4, at: 'self' },
-  onHit: [{ kind: 'grounded', durationMs: 2500 }, { kind: 'slow', factor: 0.5, durationMs: 1500 }],
+  onHit: [{ kind: 'grounded', durationMs: 2500 }],
 } satisfies AbilityDef
 
 const roar = {
@@ -75,7 +76,7 @@ const TYRANT = {
   role: 'boss',
   emoji: '1f996',
   name: '暴龙',
-  desc: '残垣的霸主：一口咬下去疼得要命，尾巴一甩扫开身前一大片；低头冲撞时连墙带人一起撞穿，撞上的人被顶出 3 格，顶到墙上的晕 1.5 秒；一跺脚，3.4 格内的人 2.5 秒里冲不动、跳不起、闪不走，1.5 秒里走得慢一半；一声咆哮吓得 5 格内的人四散逃开；血掉到四成彻底狂暴，跑得更快、出手更勤',
+  desc: '残垣的霸主，一招一式都是物理：一口咬下去疼得要命，尾巴一甩扫开身前一大片；低头冲撞时连墙带人一起撞穿，撞上的人被顶出 3 格，顶到墙上的晕 1.5 秒；一跺脚震塌 3.4 格内的残墙，落石砸人，圈里的人 2.5 秒里冲不动、跳不起、闪不走；一声咆哮吓得 5 格内的人四散逃开；血掉到四成彻底狂暴，跑得更快、出手更勤。皮糙肉厚、护甲高，燃烧和中毒却不吃护甲；冻住了挨一下物理伤害翻倍；冲撞前要蓄力 0.8 秒，雷打得断',
   size: 3.5,
   radius: 1.12,
   span: [0, 6],
