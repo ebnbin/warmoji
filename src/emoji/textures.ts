@@ -3,7 +3,8 @@ import { OUTLINE, outlinePx, outlineRaster } from './outline'
 import type { OutlineKind } from './outline'
 import { packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
-import { EMOJI_PAD, padSvg, setSvgSize } from './svg'
+import { padSvg, setSvgSize } from './svg'
+import { EMOJI_VENDOR } from './vendor'
 
 const RASTER = 256
 const LRU_LIMIT = 256
@@ -26,8 +27,8 @@ function packDeferred(): Promise<EmojiPack> {
   return packPromise
 }
 
-export function primeEmojiPack(orderingText: string, twemojiText: string): void {
-  const pack = parseEmojiPack(orderingText, twemojiText)
+export function primeEmojiPack(orderingText: string, bodiesText: string): void {
+  const pack = parseEmojiPack(orderingText, bodiesText, EMOJI_VENDOR.header)
   loadedPack = pack
   void packDeferred()
   resolvePack?.(pack)
@@ -59,7 +60,7 @@ export async function emojiSvgText(id: string): Promise<string> {
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, id)
   if (!svg) throw new Error(`emoji 不在打包资源中: ${id}`)
-  return padSvg(svg, EMOJI_PAD)
+  return padSvg(svg, EMOJI_VENDOR.padding)
 }
 
 interface EmojiTextureStats {

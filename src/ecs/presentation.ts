@@ -29,7 +29,7 @@ import { ellipse, fan, newScratch, quad, resetScratch, ringStrip, segment, tri }
 import type { Scratch } from './render/tri'
 import { packTint, TINT_FILL } from './render/tint'
 import { SIDE } from './render/side'
-import { footY } from './utils/ground'
+import { footY } from './render/foot'
 import { FOE_SHOT_Z } from './present/layerShots'
 import type { PaintSprite } from './render/sprites'
 import type { Sim } from './sim'

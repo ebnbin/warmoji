@@ -1,11 +1,14 @@
 import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
+import { DEFAULT_VENDOR, isVendorId } from '../emoji/vendors'
+import type { EmojiVendorId } from '../emoji/vendors'
 
 export interface Settings {
   damageNumbers: boolean
   hitShake: boolean
   sound: boolean
   bgm: boolean
+  emojiVendor: EmojiVendorId
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -13,9 +16,10 @@ const DEFAULT_SETTINGS: Settings = {
   hitShake: true,
   sound: true,
   bgm: true,
+  emojiVendor: DEFAULT_VENDOR,
 }
 
-type SettingKey = keyof Settings
+type SettingKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings]
 
 interface SettingDef {
   readonly key: SettingKey
@@ -42,6 +46,7 @@ function sanitizeSettings(raw: unknown): Settings {
     hitShake: pick('hitShake'),
     sound: pick('sound'),
     bgm: pick('bgm'),
+    emojiVendor: isVendorId(obj.emojiVendor) ? obj.emojiVendor : DEFAULT_SETTINGS.emojiVendor,
   }
 }
 

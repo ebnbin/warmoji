@@ -1,8 +1,6 @@
 const OPEN_TAG = /<svg\b[^>]*>/
 const VIEW_BOX = /viewBox\s*=\s*"([^"]+)"/
 
-export const EMOJI_PAD = 6
-
 export function padSvg(svg: string, pad: number): string {
   const open = OPEN_TAG.exec(svg)
   if (!open) throw new Error('不是有效的 SVG')
