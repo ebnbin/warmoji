@@ -56,7 +56,7 @@ export function hitProjectiles(sim: Sim): void {
     struck.add(Uid.v[f.eid]!)
     const damage = Proj.damage[eid]!
     const s = struckOf(f.eid)
-    if (strike(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy }, tags: HIT.ranged })) applyOnHit(sim, src, projOnHit[eid], f.x, f.y, damage, [s])
+    if (strike(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy }, tags: HIT.ranged, cue: 'shown' })) applyOnHit(sim, src, projOnHit[eid], f.x, f.y, damage, [s])
     if (Proj.pierce[eid]! <= 0) {
       splitBolt(sim, eid)
       cullProjectile(sim, eid)

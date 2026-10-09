@@ -171,7 +171,7 @@ export function updateZones(sim: Sim): void {
       if (found.length === 0) continue
       const uids = found.map((t) => Uid.v[t]!)
       const damage = Zone.damage[z]!
-      if (damage > 0) for (const t of found) hit(sim, src, t, damage, { tags: HIT.area })
+      if (damage > 0) for (const t of found) hit(sim, src, t, damage, { tags: HIT.area, cue: 'shown' })
       applyAbilityEffects(sim, src, zoneEffects[z], { x, y, baseDamage: damage, targets: unchanged(sim, found, uids) })
       spawnFxCircle(sim, x, y, r * 1.4, { fill: Ring.color[z]!, fillAlpha: 0.4, stroke: 0xffffff, lineWidth: 3, lineAlpha: 0.9, fromScale: 0.3, toScale: 1, durationMs: 320, depth: 8 })
       Lifetime.until[z] = now

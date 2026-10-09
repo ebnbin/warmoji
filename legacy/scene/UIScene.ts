@@ -160,6 +160,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
     arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
     arenaEvents.on(HudEvent.WaveWarning, this.onWaveWarning, this)
     arenaEvents.on(HudEvent.SkillCast, this.onSkillCast, this)
+    arenaEvents.on(HudEvent.SkillFired, this.onSkillFired, this)
     arenaEvents.on(HudEvent.FieldCollected, this.onFieldCollected, this)
     arenaEvents.on(HudEvent.LeaderChanged, this.onLeaderChanged, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -167,6 +168,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
       arenaEvents.off(HudEvent.WaveComplete, this.onWaveComplete, this)
       arenaEvents.off(HudEvent.WaveWarning, this.onWaveWarning, this)
       arenaEvents.off(HudEvent.SkillCast, this.onSkillCast, this)
+      arenaEvents.off(HudEvent.SkillFired, this.onSkillFired, this)
       arenaEvents.off(HudEvent.FieldCollected, this.onFieldCollected, this)
       arenaEvents.off(HudEvent.LeaderChanged, this.onLeaderChanged, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -502,6 +504,11 @@ export class UIScene extends Phaser.Scene implements HudInput, DevTabsHost {
 
   private onSkillCast(name: string): void {
     this.announcer.toast(`{26a1} ${name}`, { color: 'accent', holdMs: 900 })
+  }
+
+  /** 技能钮和放技能的队员用同一种颜色一起亮 */
+  private onSkillFired(color: number): void {
+    this.squad[this.squadShown.leader]?.dial.flare(color)
   }
 
   private onFieldCollected(fx: FieldCollected): void {

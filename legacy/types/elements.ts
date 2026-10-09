@@ -1,6 +1,7 @@
 import type elementsJson from '../assets/elements.json'
 import type { Effect } from './abilityDefs'
 import type { StatusId } from './statuses'
+import type { EntranceLook } from './maps'
 
 /** 元素：单位与能力身上的属性，决定克制与元素反应 */
 export type ElementId = keyof (typeof elementsJson)['list']
@@ -13,6 +14,8 @@ export interface ElementDef {
   readonly beats: readonly ElementId[]
   /** 被这种元素打中后身上附着的状态 */
   readonly aura: StatusId
+  /** 被这种元素打倒的样子：迸出的粒子与碎片染的颜色 */
+  readonly fall: { readonly burst: EntranceLook; readonly tint: number }
 }
 
 /** 元素反应：身上附着着一种元素时被另一种打中，消耗附着，这一下伤害 × mul，再由出手方对被打中的身体施加 effects（不带元素） */
@@ -22,8 +25,10 @@ export interface ElementReaction {
   readonly of: readonly [ElementId, ElementId]
   readonly mul?: number
   readonly effects?: readonly Effect[]
-  /** 反应时在被打中的身体上闪一圈的颜色 */
+  /** 反应时在被打中的身体上闪一圈、飘出名字的颜色 */
   readonly color: number
+  /** 反应时迸出的粒子 */
+  readonly burst: EntranceLook
 }
 
 /** 元素的整套规则：克制倍率（克制、被克、同元素）、附着多久、有哪些元素与反应 */

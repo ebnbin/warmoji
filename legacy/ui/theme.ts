@@ -84,4 +84,4 @@ export const SCRIM_ALPHA = 0.62
 
 export const LAYER = { hud: 100, toast: 250, overlay: 400, dialog: 600 } as const
 
-export const MOTION = { press: 70, slide: 140, pop: 240, fade: 420 } as const
+export const MOTION = { press: 70, slide: 140, pop: 240, fade: 420, flare: 480 } as const

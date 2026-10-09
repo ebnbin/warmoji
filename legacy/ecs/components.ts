@@ -604,8 +604,14 @@ export const Contact = { damage: f32(), knockback: f32(), vanish: u8() }
 
 export const TELEGRAPH = { shake: 0, blink: 1 } as const
 
-/** 蓄力中的身体：until 之前不走，telegraph 是身上的预兆 */
-export const Casting = { until: f32(), telegraph: u8() }
+/**
+ * 蓄力中的身体：until 之前不走，telegraph 是身上的预兆；以下只给画面：from 是蓄力开始的时刻，ability 与 abilityUid 是在蓄的那条能力，
+ * angle 与 (tx, ty) 是它此刻瞄着的方向与目标处，方向在出手时才定的随瞄准更新
+ */
+export const Casting = { until: f32(), telegraph: u8(), from: f32(), ability: i32Fill(-1), abilityUid: u32(), angle: f32(), tx: f32(), ty: f32() }
+
+/** 身体最近一次出手的时刻（画面时钟）与方向：只给画面做出手的姿势 */
+export const Strike = { at: f32(), angle: f32() }
 
 export const LOCK_AT = { start: 0, end: 1 } as const
 

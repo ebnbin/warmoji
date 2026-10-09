@@ -27,7 +27,7 @@ function dashHits(sim: Sim, m: number, e: number): void {
     if (MotionHit.stamp[t.eid] === stamp) continue
     MotionHit.stamp[t.eid] = stamp
     const s = struckOf(t.eid)
-    if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
+    if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y }, cue: 'shown' })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
   }
 }
 
@@ -39,7 +39,7 @@ function landHits(sim: Sim, m: number, e: number): void {
   const radius = LeapShape.radius[e]!
   const color = Payload.color[e]!
   const damage = Motion.dmg[m]!
-  applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
+  applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!, 'shown'))
   breachAt(sim, x, y, BLAST_M, radius, abilityDef[e]?.breach ?? 0)
   sim.out.events.push({ kind: 'slam' })
   spawnFxCircle(sim, x, y, radius, {

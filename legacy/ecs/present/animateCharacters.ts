@@ -1,8 +1,9 @@
 import { UNIT } from '../../util/units'
 import { charSize } from '../systems/shared/scale'
 import { REJOIN } from '../../data/feel'
-import { Alive, Breath, Depth, Phys, Pop, Sprite, Transform } from '../components'
+import { Alive, Breath, Depth, Motion, MOTION, Phys, Pop, Sprite, Strike, Transform } from '../components'
 import { leaderX, leaderY } from '../utils/team'
+import { leanToward, STRIKE_POSE, strikeDepth, striking } from './pose'
 import type { Sim } from '../sim'
 
 const STRIDE = 20
@@ -30,7 +31,7 @@ export function finishCharacterPops(sim: Sim): void {
   }
 }
 
-/** 按离队长的远近排前后，走动时呼吸快些，按速度转身；dtMs 是这一帧模拟走过的时长 */
+/** 按离队长的远近排前后，走动时呼吸快些，按速度转身；出手那一刻朝出手方向一探再弹回，自己位移时不探；dtMs 是这一帧模拟走过的时长 */
 export function animateCharacters(sim: Sim, dtMs: number): void {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
@@ -40,13 +41,16 @@ export function animateCharacters(sim: Sim, dtMs: number): void {
     const vx = Phys.vx[eid]!
     const moving = Math.hypot(vx, Phys.vy[eid]!) > STRIDE
     const size = charSize(eid)
+    const at = Strike.at[eid]!
+    const k = Motion.kind[eid] === MOTION.none ? strikeDepth(sim.fxMs, at) : 0
     if (!popping(sim, eid, size)) {
       const bp = Breath.phase[eid]! + dtMs / (moving ? 85 : 140)
       Breath.phase[eid] = bp
       const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
-      Transform.w[eid] = size * (1 - s * 0.6)
-      Transform.h[eid] = size * (1 + s)
+      Transform.w[eid] = size * (1 - s * 0.6) * (1 + STRIKE_POSE.stretch * k)
+      Transform.h[eid] = size * (1 + s) * (1 - STRIKE_POSE.squash * k)
     }
+    if (striking(sim.fxMs, at)) Transform.rot[eid] = leanToward(Strike.angle[eid]!, STRIKE_POSE.lean * k)
     if (Math.abs(vx) > STRIDE) Sprite.flipX[eid] = vx > 0 ? 1 : 0
   }
 }

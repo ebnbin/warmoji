@@ -1,5 +1,5 @@
 import { hasComponent, query, removeComponent } from 'bitecs'
-import { Ability, Act, Alive, BLINK, BlinkState, Casting, CastRequest, Cd, Manual, Motion, MOTION, Owner, RepeatState, Stage, WindupState } from '../components'
+import { Ability, Act, Alive, BLINK, BlinkState, Casting, CastRequest, Cd, Manual, Motion, MOTION, Owner, RepeatState, Stage, Uid, WindupState } from '../components'
 import { abilityCombo, abilityDef, enemyDef, npcCombo } from '../store'
 import { grantedAbility } from '../entities/ability'
 import { fireAbility } from './shared/fire'
@@ -10,7 +10,10 @@ import type { Sim } from '../sim'
 /** 出了手记账；手动能力的第一段算放了一次主动技能 */
 function fired(sim: Sim, e: number): void {
   spend(sim, e)
-  if (hasComponent(sim.world, e, Manual) && !(hasComponent(sim.world, e, Stage) && Stage.root[e] !== 0)) gearSkill(sim, Owner.eid[e]!)
+  if (!hasComponent(sim.world, e, Manual) || (hasComponent(sim.world, e, Stage) && Stage.root[e] !== 0)) return
+  const o = Owner.eid[e]!
+  gearSkill(sim, o)
+  sim.out.events.push({ kind: 'skill', eid: o, uid: Uid.v[o]!, fxAt: sim.fxMs })
 }
 
 /** 手上正有事没做完的身体：蓄力、延迟重复、瞬袭、自己的冲刺 */

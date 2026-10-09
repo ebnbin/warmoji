@@ -16,6 +16,9 @@ export const LYING_DEPTH = 1
 /** 脚下的圈：压在影子上面、立着的身体下面 */
 export const FEET_DEPTH = 2.7
 
+/** 敌方蓄力的预警：压在影子上面、脚下的圈下面 */
+export const WARN_DEPTH = 2.6
+
 export const SPRITE_BANDS: readonly Band[] = [
   { depth: 0.5, zMin: -Infinity, zMax: UNDER_Z },
   { depth: LYING_DEPTH, zMin: UNDER_Z, zMax: LYING_Z },

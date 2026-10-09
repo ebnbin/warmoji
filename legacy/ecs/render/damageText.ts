@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { FONT_FAMILY } from '../../ui/theme'
-import { DAMAGE_NUMBER_RISE_MS, MISS } from '../present/damageNumbers'
+import { REACTIONS } from '../../data/elements'
+import { DAMAGE_NUMBER_RISE_MS, MISS, REACTION_RISE_MS } from '../present/damageNumbers'
 import type { DamageNumbers } from '../present/damageNumbers'
 import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
@@ -10,9 +11,14 @@ const TEX_KEY = 'ecs-damage-digits'
 const CHARS = 10
 const CHAR_W = 24
 const CHAR_H = 36
-/** 数字后面接一块"闪避"的字形 */
-const MISS_W = 52
-const TEX_W = CHAR_W * CHARS + MISS_W
+/** 数字后面依次接几块字：先是"闪避"，再是各种元素反应的名字；每个字占这么宽 */
+const LABELS = ['闪避', ...REACTIONS.map((r) => r.name)]
+const GLYPH_W = 26
+const LABEL_W = LABELS.map((s) => s.length * GLYPH_W)
+const LABEL_X = LABEL_W.map((_, i) => CHAR_W * CHARS + LABEL_W.slice(0, i).reduce((a, b) => a + b, 0))
+const TEX_W = CHAR_W * CHARS + LABEL_W.reduce((a, b) => a + b, 0)
+/** 闪避的颜色；反应的名字按反应的颜色 */
+const MISS_COLOR = 0x9ad7ff
 
 
 
@@ -35,8 +41,10 @@ function bakeDigits(scene: Phaser.Scene): void {
     ctx.fillText(String(i), cx, CHAR_H / 2)
   }
   ctx.font = `bold 22px ${FONT_FAMILY}`
-  ctx.strokeText('闪避', CHAR_W * CHARS + MISS_W / 2, CHAR_H / 2)
-  ctx.fillText('闪避', CHAR_W * CHARS + MISS_W / 2, CHAR_H / 2)
+  LABELS.forEach((s, i) => {
+    ctx.strokeText(s, LABEL_X[i]! + LABEL_W[i]! / 2, CHAR_H / 2)
+    ctx.fillText(s, LABEL_X[i]! + LABEL_W[i]! / 2, CHAR_H / 2)
+  })
   scene.textures.addCanvas(TEX_KEY, canvas)
 }
 
@@ -77,17 +85,19 @@ export class DamageTextLayer {
     const cap = buf.born.length
     for (let j = 0; j < cap; j++) {
       const i = (buf.head + j) % cap
-      const t = (fx - buf.born[i]!) / DAMAGE_NUMBER_RISE_MS
+      const n = buf.value[i]!
+      const label = n <= MISS ? MISS - n : -1
+      const react = label > 0
+      const t = (fx - buf.born[i]!) / (react ? REACTION_RISE_MS : DAMAGE_NUMBER_RISE_MS)
       if (!(t >= 0 && t < 1)) continue
       const crit = buf.crit[i] === 1
-      const size = crit ? 34 : 24
+      const size = react ? 30 : crit ? 34 : 24
       const gh = size
       const gw = (CHAR_W * size) / CHAR_H
-      const cy = buf.y[i]! - 26 * t
-      const n = buf.value[i]!
-      if (n === MISS) {
-        const tint = packTint(0x9ad7ff, 1 - t)
-        const w = (MISS_W * size) / CHAR_H
+      const cy = buf.y[i]! - (react ? 40 : 26) * t
+      if (label >= 0) {
+        const tint = packTint(react ? buf.color[i]! : MISS_COLOR, react ? Math.min(1, 3 * (1 - t)) : 1 - t)
+        const w = (LABEL_W[label]! * size) / CHAR_H
         const x0 = buf.x[i]! - w / 2
         const x1 = x0 + w
         const y0 = cy - gh / 2
@@ -98,14 +108,14 @@ export class DamageTextLayer {
           m.getX(x0, y1), m.getY(x0, y1),
           m.getX(x1, y0), m.getY(x1, y0),
           m.getX(x1, y1), m.getY(x1, y1),
-          (CHAR_W * CHARS) / TEX_W, 1, MISS_W / TEX_W, -1,
+          LABEL_X[label]! / TEX_W, 1, LABEL_W[label]! / TEX_W, -1,
           0,
           tint, tint, tint, tint,
           opts,
         )
         continue
       }
-      const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
+      const tint = packTint(crit ? 0xffdc5d : buf.color[i]!, 1 - t)
       let digits = 1
       for (let v = n; v >= 10; v = Math.floor(v / 10)) digits++
       let left = buf.x[i]! - (digits * gw) / 2

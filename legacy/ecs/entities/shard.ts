@@ -15,6 +15,7 @@ export function spawnShards(
   flipX: number,
   flingVx: number,
   flingVy: number,
+  tint: number,
 ): void {
   const dw = w / 2
   const dh = h / 2
@@ -35,7 +36,7 @@ export function spawnShards(
     Sprite.frame[eid] = frame
     Sprite.flipX[eid] = flipX
     Quad.v[eid] = i + 1
-    Tint.color[eid] = 0xffffff
+    Tint.color[eid] = tint
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1
     Depth.z[eid] = 6

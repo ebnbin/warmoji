@@ -36,6 +36,7 @@ import {
   Segment,
   Shots,
   SprintShape,
+  Strike,
   SummonShape,
   Swing,
   Thrown,
@@ -69,6 +70,7 @@ import { strongestTarget } from '../../utils/assassinate'
 import { headingOf, muzzle } from '../../utils/projectile'
 import { leaderPoint } from '../../utils/team'
 import { hit, strike, touch } from './damage'
+import type { Cue } from './damage'
 import { applyAbilityEffects, applyOnHit, casterOf, EMPOWER_DEF, struckOf } from './effects'
 import { test } from '../../utils/cond'
 import { takeBoost } from './resource'
@@ -179,8 +181,16 @@ function breachOf(e: number): number {
 
 export const BLINK_COLOR = 0xb388ff
 
+const CAST_LINE_R = 5
+
 export function blinkFlash(sim: Sim, x: number, y: number): void {
   spawnFxCircle(sim, x, y, 26, { fill: BLINK_COLOR, fillAlpha: 0.4, fromScale: 1, toScale: 1.8, durationMs: 240, depth: 14 })
+}
+
+/** 落在目标处的一圈：从出手处牵一道细光过去，看得出是谁放的 */
+function castLine(sim: Sim, ox: number, oy: number, x: number, y: number, color: number): void {
+  const d = sim.hooks.worldDelta(sim, ox, oy, x, y)
+  spawnFxBeam(sim, ox, oy, Math.atan2(d.y, d.x), Math.hypot(d.x, d.y), CAST_LINE_R, color)
 }
 
 function burst(sim: Sim, x: number, y: number, radius: number, color: number, boom: boolean): void {
@@ -208,11 +218,11 @@ function auraUp(sim: Sim, e: number): boolean {
 }
 
 /** 打一遍：返回真正落到身上的身体；不带伤害的形状只碰不打 */
-function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point, tags = 0): Struck[] {
+function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point, cue: Cue, tags = 0): Struck[] {
   const struck: Struck[] = []
   for (const t of found) {
     const s = struckOf(t.eid)
-    if (strike(sim, src, t.eid, damage, { knockback: kb, from, tags })) struck.push(s)
+    if (strike(sim, src, t.eid, damage, { knockback: kb, from, tags, cue })) struck.push(s)
   }
   return struck
 }
@@ -246,7 +256,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       if (wall) reach *= wall.t
       const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, reach + radius))
       const origin = { x: ox, y: oy }
-      const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
+      const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin, 'shown')
       applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
       if (wall) {
         impactAt(sim, wall)
@@ -262,7 +272,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       const radius = Sector.radius[e]!
       const list = covered(sim, src, ox, oy, targetsWithin(sim, sweep(sim, e, src), ox, oy, radius))
       const origin = { x: ox, y: oy }
-      const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
+      const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin, 'shown')
       applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
       breachAt(sim, ox + Math.cos(angle) * radius * 0.5, oy + Math.sin(angle) * radius * 0.5, layerZ(muzzleLayer(sim, e)), radius * 0.5, breachOf(e))
       Swing.startMs[e] = sim.fxMs
@@ -293,10 +303,15 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       }
       const list = covered(sim, src, cx, cy, targetsWithin(sim, src, cx, cy, r))
       const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
-      const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy }, HIT.area)
+      const center = { x: cx, y: cy }
+      // 没有颜色的不炸开一圈：看不见，从圆心补指示
+      const struck = strikeAll(sim, src, found, damage, kb, center, color !== 0 ? 'shown' : { trace: center }, HIT.area)
       applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
       breachAt(sim, cx, cy, BLAST_M, r, breachOf(e))
-      if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
+      if (color !== 0) {
+        if (atTarget) castLine(sim, ox, oy, cx, cy, color)
+        burst(sim, cx, cy, r, color, damage > 0)
+      }
       return true
     }
 
@@ -313,7 +328,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         const from = points[points.length - 1]!
         points.push({ x: cur.x, y: cur.y })
         const s = struckOf(cur.eid)
-        if (hit(sim, src, cur.eid, dmg, { knockback: kb, from })) struck.push(s)
+        if (hit(sim, src, cur.eid, dmg, { knockback: kb, from, cue: 'shown' })) struck.push(s)
         last = cur
         dmg *= Chain.decay[e]!
         // 电弧从这一跳往下一跳传：够得着就行，不看施法者看不看得见
@@ -407,7 +422,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         if (damage > 0) {
           for (const t of list) {
             const s = struckOf(t.eid)
-            if (hit(sim, src, t.eid, damage, { tags: HIT.area })) struck.push(s)
+            if (hit(sim, src, t.eid, damage, { tags: HIT.area, cue: 'shown' })) struck.push(s)
           }
           sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
         } else {
@@ -521,7 +536,7 @@ function fireMirrored(sim: Sim, e: number, src: Source, angle: number, target: F
 }
 
 /** 一次几发里第 i 发的方向：一整圈的从瞄准方向起均分，扇面的从一侧排到另一侧，不散开的都朝瞄准方向 */
-function volleyAngle(base: number, spreadDeg: number, i: number, count: number): number {
+export function volleyAngle(base: number, spreadDeg: number, i: number, count: number): number {
   if (spreadDeg >= 360 - 1e-9) return base + (i * Math.PI * 2) / count
   if (spreadDeg <= 0 || count <= 1) return base
   return base + spreadDeg * DEG2RAD * (i / (count - 1) - 0.5)
@@ -535,6 +550,17 @@ function startWindup(sim: Sim, e: number, shot: Shot): void {
   const o = Owner.eid[e]!
   Casting.until[o] = until
   Casting.telegraph[o] = Windup.telegraph[e]!
+  Casting.from[o] = sim.elapsedMs
+  Casting.ability[o] = e
+  Casting.abilityUid[o] = Uid.v[e]!
+  aimCasting(o, e, shot)
+}
+
+/** 蓄力中的身体此刻瞄着哪里：没有目标的落在出手处 */
+export function aimCasting(o: number, e: number, shot: Shot): void {
+  Casting.angle[o] = shot.angle
+  Casting.tx[o] = shot.target ? shot.target.x : anchorX(e)
+  Casting.ty[o] = shot.target ? shot.target.y : anchorY(e)
 }
 
 /** 强化下一击：普通出手时取走宿主身上的一次强化 */
@@ -614,8 +640,10 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (sfx) sim.out.events.push({ kind: 'fire', sfx })
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
-  // 潜行出手即现形，闲着的计时重来
   const o = Owner.eid[e]!
+  Strike.at[o] = sim.fxMs
+  Strike.angle[o] = shot.angle
+  // 潜行出手即现形，闲着的计时重来
   clearMarks(o, STEALTH)
   if (hasComponent(w, o, Idle)) {
     Idle.since[o] = sim.elapsedMs
