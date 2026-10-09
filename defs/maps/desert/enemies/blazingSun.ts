@@ -9,7 +9,7 @@ const sunBeam = {
   firstDelayMs: 2000,
   aim: 'nearest',
   range: 8,
-  damage: 22,
+  damage: 18,
   fireSfx: 'zap',
   color: 0xffd54f,
   windup: { ms: 600, lockAt: 'start', telegraph: 'blink' },
@@ -23,7 +23,7 @@ const flare = {
   firstDelayMs: 1200,
   aim: 'nearest',
   range: 9,
-  damage: 18,
+  damage: 15,
   fireSfx: 'ignite',
   shape: { kind: 'drop', targets: 4, look: { emoji: '1f525', size: 1 }, fromAbove: 4, dropMs: 700, staggerMs: 150 },
   onHit: [{ kind: 'ground', def: patch(1.3, 3000, 0xff7043, undefined, 4, 500) }],
@@ -43,20 +43,21 @@ const heatWave = {
   onHit: [{ kind: 'exhaust' }],
 } satisfies AbilityDef
 
-const darkBeam = { ...sunBeam, cooldownMs: 4000, firstDelayMs: 1200, color: 0x7e57c2 } satisfies AbilityDef
+const stormBeam = { ...sunBeam, cooldownMs: 4000, firstDelayMs: 1200, element: 'thunder', damage: 15, color: 0xfff176 } satisfies AbilityDef
 
-const eclipse = {
+const magnetStorm = {
   trigger: 'auto',
   class: 'skill',
   cooldownMs: 10000,
   firstDelayMs: 2500,
   aim: 'self',
-  fireSfx: 'snuff',
-  color: 0x311b92,
+  element: 'thunder',
+  damage: 12,
+  fireSfx: 'zap',
+  color: 0xfff176,
   fxRadius: 2,
   windup: { ms: 800, lockAt: 'start', telegraph: 'blink' },
   shape: { kind: 'all', of: 'foes' },
-  onHit: [{ kind: 'disarm', durationMs: 1500 }],
 } satisfies AbilityDef
 
 const supernova = {
@@ -65,7 +66,8 @@ const supernova = {
   cooldownMs: 8000,
   firstDelayMs: 1500,
   aim: 'self',
-  damage: 40,
+  element: 'fire',
+  damage: 34,
   knockback: 6,
   fireSfx: 'boom',
   color: 0xffab40,
@@ -79,22 +81,22 @@ const BLAZING_SUN = {
   emoji: '1f31e',
   name: '烈日',
   element: 'fire',
-  desc: '悬在沙海上空的烈日：远远射出三道散开的日光，往人头上落下耀斑、落处烧起一片火，隔一阵蓄力放出热浪抽干全队的体力；血掉到一半转入日蚀：不再落耀斑、放热浪，改射暗光束，还会让全场眼前一黑 1.5 秒；血不到两成坍成超新星：贴上来，隔一阵蓄力 1.5 秒炸开身周 6 格',
+  desc: '悬在沙海上空的烈日，本身是火、点不着：远远射出三道散开的日光，打中就点着，挨着站的会一起烧起来；往人头上落下耀斑、落处烧起一片火；隔一阵蓄力放出热浪抽干全队的体力；血掉到一半转入磁暴：本身变成雷，点得着了，改射三道电光，打中的出手被打断、电流再跳给身边另一个人，隔一阵蓄力 0.8 秒让全场各挨一道雷；血不到两成坍成超新星：贴上来，隔一阵蓄力 1.5 秒炸开身周 6 格，炸中的都被点着、被掀开',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
   hp: 4800,
   stats: { armor: 3, exertion: 0 },
   speed: 1,
-  damage: 20,
+  damage: 17,
   xp: 60,
   coins: 60,
   traits: ['anchored', 'wary'],
   drive: { kind: 'standoff', standoffDist: 4.5 },
   abilities: [sunBeam, flare, heatWave],
   phases: [
-    { below: 0.5, name: '日蚀', abilities: [darkBeam, eclipse] },
-    { below: 0.2, name: '超新星', drive: { kind: 'chase' }, abilities: [darkBeam, eclipse, supernova] },
+    { below: 0.5, name: '磁暴', element: 'thunder', abilities: [stormBeam, magnetStorm] },
+    { below: 0.2, name: '超新星', drive: { kind: 'chase' }, abilities: [stormBeam, magnetStorm, supernova] },
   ],
 } satisfies EnemyDef
 

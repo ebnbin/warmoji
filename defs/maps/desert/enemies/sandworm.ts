@@ -10,11 +10,11 @@ const sandSpray = {
   aim: 'nearest',
   range: 3.2,
   damage: 18,
+  knockback: 4,
   fireSfx: 'wash',
   color: 0xd7b98e,
   windup: { ms: 450, lockAt: 'end', telegraph: 'shake' },
   shape: { kind: 'sector', radius: 3.2, arcDeg: 90, ms: 240 },
-  onHit: [{ kind: 'slow', factor: 0.6, durationMs: 1500 }],
 } satisfies AbilityDef
 
 const erupt = {
@@ -63,6 +63,12 @@ const quicksand = {
   onHit: [{ kind: 'ground', def: { ...patch(4.5, 5000, 0xd7ccc8, undefined, 4, 500), pull: 1.6, exertion: 5 } }],
 } satisfies AbilityDef
 
+const toxicSand = {
+  ...quicksand,
+  element: 'poison',
+  onHit: [{ kind: 'ground', def: { ...patch(4.5, 5000, 0x9ccc65, undefined, 4, 500), pull: 1.6, exertion: 5 } }],
+} satisfies AbilityDef
+
 const swallow = {
   trigger: 'auto',
   class: 'skill',
@@ -81,7 +87,7 @@ const SANDWORM = {
   role: 'boss',
   emoji: '1fab1',
   name: '巨沙虫',
-  desc: '盘在沙海底下的巨沙虫：张口喷沙让人走不快；钻进沙里谁也打不着，先在沙下飞快地游上 1.5 秒，再从最近的人脚下破土而出把人掀上天，然后钻回原处；往人脚下翻出 4.5 格的流沙漩涡，把人往中心卷，在里面每走一格多耗 5 点体力；还会一口把人吞进肚子慢慢消化，挨够了打才吐出来；血掉到一半翻起沙来，召出四只行军蚁，出招也更勤',
+  desc: '盘在沙海底下的巨沙虫，护甲厚，物理打它不太疼，燃烧和中毒照掉：张口喷沙把人冲开；钻进沙里谁也打不着，先在沙下飞快地游上 1.5 秒，再蓄力从最近的人脚下破土而出把人掀上天，然后钻回原处；往人脚下翻出 4.5 格的流沙漩涡，把人往中心卷，在里面每走一格多耗 5 点体力；还会蓄力一口把人吞进肚子慢慢消化，挨够了打才吐出来；破土和吞人的蓄力打得断；血掉到一半翻起沙来，召出四只行军蚁，翻出的流沙也带了毒，里面的人每半秒叠一层毒、回不了血，火打在流沙里的敌人身上会把它整团炸开；出招也更勤',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -94,7 +100,15 @@ const SANDWORM = {
   traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [sandSpray, burrow, quicksand, swallow],
-  phases: [{ below: 0.5, name: '翻沙', stats: { mul: { cooldown: 0.8 } }, effects: [{ kind: 'summon', of: { unit: ARMY_ANT, spread: 2 }, count: 4 }] }],
+  phases: [
+    {
+      below: 0.5,
+      name: '翻沙',
+      abilities: [sandSpray, burrow, toxicSand, swallow],
+      stats: { mul: { cooldown: 0.8 } },
+      effects: [{ kind: 'summon', of: { unit: ARMY_ANT, spread: 2 }, count: 4 }],
+    },
+  ],
 } satisfies EnemyDef
 
 export default SANDWORM

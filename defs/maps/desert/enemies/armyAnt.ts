@@ -4,17 +4,17 @@ const ARMY_ANT = {
   kind: 'armyAnt',
   emoji: '1f41c',
   name: '行军蚁',
-  desc: '贴着沙面爬得飞快，个子小，平射的子弹容易从它头上飞过去；被它咬一口沾上蚁酸，2 秒里每半秒疼一下',
+  element: 'poison',
+  desc: '贴着沙面爬得飞快，个子小，平射的子弹容易从它头上飞过去；咬一口叠一层蚁酸毒，中了毒什么回复都不管用；本身不会中毒，身子脆，成群挤在一起，点着一只能烧一片',
   size: 0.85,
   radius: 0.3,
   span: [0, 0],
   hp: 32,
   speed: 2.2,
-  damage: 6,
+  damage: 5,
   xp: 2,
   coins: 1,
   drive: { kind: 'chase' },
-  reactions: [{ on: 'touch', to: 'other', effects: [{ kind: 'poison', damage: 2, tickMs: 500, durationMs: 2000 }] }],
 } satisfies EnemyDef
 
 export default ARMY_ANT
