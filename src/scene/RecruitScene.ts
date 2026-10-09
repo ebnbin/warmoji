@@ -5,8 +5,8 @@ import { ROLES } from '../data/roles'
 import { modTexts } from '../data/stats'
 import { DUTY_TAGS, TAG_IDS, TAGS, tagsOf } from '../data/tags'
 import { playSfx } from '../audio/sfx'
-import { claimRecruit } from '../run/levelUp'
-import { memberLook } from '../run/members'
+import { fieldFull } from '../run/levelUp'
+import { levelOf, memberLook } from '../run/members'
 import { getRun, recruitCandidates, recruitDueCount, recruitMember } from '../run/state'
 import { fought } from '../run/flow'
 import type { RunState } from '../run/state'
@@ -36,7 +36,7 @@ function tagLabel(t: CharacterTag): string {
   return `{${TAGS[t].icon}} ${TAGS[t].name}`
 }
 
-/** 招募页：全部角色都能招；按标签筛选，点一名看详情，确认后招进队伍。升级时来招人的盖在停住的战斗上，招一人就回去 */
+/** 全角色页：角色池里的人都能上场，标着各人这一局的等级；按标签筛选，点一名看详情，确认后招进队伍。升级时来的盖在停住的战斗上，挑一人就回去：场上满了是替换，还要在队伍栏点选换下谁 */
 export class RecruitScene extends Phaser.Scene {
   /** 升级时来招人 */
   private readonly forLevelUp: boolean
@@ -46,6 +46,8 @@ export class RecruitScene extends Phaser.Scene {
   private frame!: PageFrame
   /** 正在看的角色；为空时详情区是队伍概况 */
   private focus: CharacterId | null = null
+  /** 替换时点选的要换下的那一格 */
+  private outgoing: number | null = null
   /** 选中的标签：只列出同时带着这些标签的角色 */
   private filters = new Set<CharacterTag>()
   private gridScroll = 0
@@ -75,6 +77,7 @@ export class RecruitScene extends Phaser.Scene {
     this.run = getRun()
     if (!preserved) {
       this.focus = null
+      this.outgoing = null
       this.filters = new Set()
       this.gridScroll = 0
     }
@@ -83,8 +86,8 @@ export class RecruitScene extends Phaser.Scene {
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, {
-      title: this.forLevelUp || fought(this.run) ? '招募新队员' : '组建队伍',
-      ...(this.forLevelUp ? { back: () => this.backToLevelUp(false) } : runExit(this, this.run, () => ({ from: SceneKey.Recruit }))),
+      title: this.swapping ? '替换队员' : this.forLevelUp || fought(this.run) ? '招募新队员' : '组建队伍',
+      ...(this.forLevelUp ? { back: () => this.backToLevelUp(null) } : runExit(this, this.run, () => ({ from: SceneKey.Recruit }))),
     })
     const { roster, panel } = this.bodyRects(this.createChips())
     this.grid = new TileGrid<CharacterId>(this, roster, { minWidth: 118, height: 140, initialScroll: this.gridScroll, onScroll: (pos) => (this.gridScroll = pos) })
@@ -203,7 +206,7 @@ export class RecruitScene extends Phaser.Scene {
       this.matching(tags).map((id): TileItem<CharacterId> => {
         const def = CHARACTERS[id]
         const joined = roster.includes(id)
-        return { key: id, emoji: def.emoji, outline: 'player', title: def.name, icons: [...(def.element ? [ELEMENTS[def.element].icon] : []), ...tagsOf(def).map((t) => TAGS[t].icon)], badge: joined ? '1f396' : undefined, dim: joined }
+        return { key: id, emoji: def.emoji, outline: 'player', title: `${def.name} Lv${levelOf(this.run, id)}`, icons: [...(def.element ? [ELEMENTS[def.element].icon] : []), ...tagsOf(def).map((t) => TAGS[t].icon)], badge: joined ? '1f396' : undefined, dim: joined }
       }),
     )
     this.grid.setSelected(this.focus)
@@ -227,13 +230,18 @@ export class RecruitScene extends Phaser.Scene {
     const roster = this.run.roster
     const due = this.due()
     const title = new Label(this, P.x + 20, cy, '队伍', { kind: 'label', bold: true, color: 'soft' }).setOrigin(0, 0.5)
-    const count = new Label(this, P.x + P.w - 20, cy, due > 0 ? `${roster.length} → ${roster.length + due} 人` : `${roster.length} 人`, { kind: 'label', color: 'info' }).setOrigin(1, 0.5)
+    const out = this.outgoing === null ? null : roster[this.outgoing]
+    const note = this.swapping ? (out ? `换下${CHARACTERS[out].name}` : '点选换下谁') : due > 0 ? `${roster.length} → ${roster.length + due} 人` : `${roster.length} 人`
+    const count = new Label(this, P.x + P.w - 20, cy, note, { kind: 'label', color: 'info' }).setOrigin(1, 0.5)
     this.strip.push(title, count)
     let x = title.x + title.width + 16 + STRIP_AVATAR / 2
     roster.forEach((id, slot) => {
-      this.strip.push(new AvatarSlot(this, x, cy, STRIP_AVATAR, { mode: 'member', emoji: memberLook(this.run, slot), outline: 'player', onTap: () => this.setFocus(id) }))
+      const mode = slot === this.outgoing ? 'picked' : 'member'
+      const onTap = this.swapping ? (): void => this.setOutgoing(slot) : (): void => this.setFocus(id)
+      this.strip.push(new AvatarSlot(this, x, cy, STRIP_AVATAR, { mode, emoji: memberLook(this.run, slot), outline: 'player', onTap }))
       x += STRIP_PITCH
     })
+    if (this.swapping) return
     const candidate = this.focus !== null && !roster.includes(this.focus) ? this.focus : null
     for (let i = 0; i < due; i++) {
       const id = i === 0 ? candidate : null
@@ -281,7 +289,7 @@ export class RecruitScene extends Phaser.Scene {
     const w = view.viewport.w
     const roster = this.run.roster
     const flow = new Flow(this, view, { x: 24, y: 16, width: w - 48 })
-    flow.put(new Label(this, 24, 16, roster.length === 0 ? '挑一名首发队员' : '给队伍补一名新队员', { kind: 'heading' }), 46)
+    flow.put(new Label(this, 24, 16, roster.length === 0 ? '挑一名首发队员' : this.swapping ? '挑一人换上场' : '给队伍补一名新队员', { kind: 'heading' }), 46)
     if (roster.length > 0) {
       const count = (t: CharacterTag): number => roster.filter((id) => CHARACTERS[id].tags.includes(t)).length
       const lack = DUTY_TAGS.filter((t) => count(t) === 0)
@@ -301,7 +309,12 @@ export class RecruitScene extends Phaser.Scene {
       }
       flow.gap(8)
     }
-    flow.text('点角色看详情，满意就按下方按钮招进队伍；上方的标签可以筛选，选了几个就只列出同时带着它们的角色', { kind: 'label', color: 'muted', indent: false })
+    flow.text(
+      this.swapping
+        ? '点角色看详情，再在上方队伍栏点选换下谁；换上来的满生命上场，等级按这一局记住的；上方的标签可以筛选'
+        : '点角色看详情，满意就按下方按钮招进队伍；上方的标签可以筛选，选了几个就只列出同时带着它们的角色',
+      { kind: 'label', color: 'muted', indent: false },
+    )
     flow.gap(10).heading('标签说明', '1f4d6')
     for (const t of TAG_IDS) {
       flow.put(new RichLabel(this, flow.indent, flow.y + 16, [{ icon: TAGS[t].icon, size: 26 }, { text: TAGS[t].name, color: TAGS[t].tone, bold: true }, { text: TAGS[t].desc, color: 'soft' }], { kind: 'label', originX: 0, gap: 10, maxWidth: w - 24 - flow.indent }), 38)
@@ -312,16 +325,31 @@ export class RecruitScene extends Phaser.Scene {
   private renderConfirm(): void {
     const btn = this.confirmBtn
     const id = this.focus
+    const out = this.outgoing === null ? null : this.run.roster[this.outgoing]
     if (this.due() === 0) btn.setLabel('继续').setEnabled(true)
     else if (id === null) btn.setLabel('先挑一名角色').setEnabled(false)
-    else if (this.run.roster.includes(id)) btn.setLabel(`${CHARACTERS[id].name} 已在队中`).setEnabled(false)
-    else btn.setLabel(`招募 ${CHARACTERS[id].name}`).setEnabled(true)
+    else if (this.run.roster.includes(id)) btn.setLabel(`${CHARACTERS[id].name} 已在场上`).setEnabled(false)
+    else if (!this.swapping) btn.setLabel(`招募 ${CHARACTERS[id].name}`).setEnabled(true)
+    else if (!out) btn.setLabel('再在队伍栏点选换下谁').setEnabled(false)
+    else btn.setLabel(`换上${CHARACTERS[id].name}，换下${CHARACTERS[out].name}`).setEnabled(true)
   }
 
-  /** 还要招几人：升级时来招的就一人 */
+  /** 升级时来的、场上又满了：这一次是替换 */
+  private get swapping(): boolean {
+    return this.forLevelUp && fieldFull(this.run)
+  }
+
+  private setOutgoing(slot: number): void {
+    this.outgoing = slot
+    this.renderStrip()
+    this.renderConfirm()
+  }
+
+  /** 还要招几人：升级时来的就一人 */
   private due(): number {
     if (!this.forLevelUp) return recruitDueCount(this.run)
-    return Math.min(1, TEAM.maxSize - this.run.roster.length, recruitCandidates(this.run).length)
+    const pool = recruitCandidates(this.run).length
+    return this.swapping ? Math.min(1, pool) : Math.min(1, TEAM.maxSize - this.run.roster.length, pool)
   }
 
   /** 招进队伍；还有空位就留在这页接着挑，升级时来招的招到就回去 */
@@ -334,9 +362,11 @@ export class RecruitScene extends Phaser.Scene {
     const id = this.focus
     if (id === null) return
     if (this.forLevelUp) {
-      if (claimRecruit(this.run, id) < 0) return
+      if (this.run.roster.includes(id)) return
+      const slot = this.swapping ? this.outgoing : this.run.roster.length
+      if (slot === null) return
       playSfx('recruit')
-      this.backToLevelUp(true)
+      this.backToLevelUp({ kind: 'join', slot, id })
       return
     }
     if (recruitMember(this.run, id) < 0) return
@@ -350,17 +380,17 @@ export class RecruitScene extends Phaser.Scene {
     this.renderFocus()
   }
 
-  /** 招够了：走到下一步；升级时来招的回到升级弹窗 */
+  /** 招够了：走到下一步；升级时来的回到升级弹窗 */
   private proceed(): void {
-    if (this.forLevelUp) this.backToLevelUp(false)
+    if (this.forLevelUp) this.backToLevelUp(null)
     else finishStep(this, this.run)
   }
 
-  /** 回到升级弹窗，带上招到人没有 */
-  private backToLevelUp(recruited: boolean): void {
+  /** 回到升级弹窗，带上挑好的人和他站到哪一格；没挑是 null */
+  private backToLevelUp(join: LevelUpWake['join']): void {
     if (this.leaving) return
     this.leaving = true
-    const wake: LevelUpWake = { recruited }
+    const wake: LevelUpWake = { join }
     this.scene.wake(SceneKey.LevelUp, wake)
     this.scene.stop()
   }

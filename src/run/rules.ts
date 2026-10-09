@@ -7,7 +7,6 @@ import type { RunState } from './state'
 
 /** 一场生效的我方规则：一场写的盖过一局写的，词缀再往难里改，修正层层叠加；vision 为 Infinity 是看得见全场，relay 为 0 是不轮换 */
 export interface ActiveRules {
-  readonly revive: boolean
   readonly rescue: FightRules['rescue']
   readonly lock: boolean
   readonly critical: boolean
@@ -26,7 +25,6 @@ const present = <T>(xs: readonly (T | undefined)[]): T[] => xs.flatMap((x) => (x
 function harden(a: ActiveRules, m: MutatorRules): ActiveRules {
   return {
     ...a,
-    revive: m.revive ?? a.revive,
     lock: m.leader?.lock ?? a.lock,
     critical: m.leader?.critical ?? a.critical,
     surprise: m.surprise ?? a.surprise,
@@ -38,7 +36,6 @@ function harden(a: ActiveRules, m: MutatorRules): ActiveRules {
 
 export function activeRules(run: RunRules | undefined, fight: FightRules | undefined, mutators: readonly MutatorRules[] = []): ActiveRules {
   const base: ActiveRules = {
-    revive: fight?.revive ?? run?.revive ?? true,
     rescue: fight?.rescue ?? run?.rescue,
     lock: fight?.leader?.lock ?? run?.leader?.lock ?? false,
     critical: fight?.leader?.critical ?? run?.leader?.critical ?? false,
@@ -61,7 +58,7 @@ export function mutatorFits(def: RunDef, m: MutatorDef): boolean {
   return fightsOf(def).some((f) => {
     const before = activeRules(def.rules, f.rules)
     const after = harden(before, rules)
-    return (['revive', 'lock', 'critical', 'surprise', 'skills', 'vision'] as const).some((k) => after[k] !== before[k])
+    return (['lock', 'critical', 'surprise', 'skills', 'vision'] as const).some((k) => after[k] !== before[k])
   })
 }
 

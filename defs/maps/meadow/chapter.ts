@@ -82,10 +82,9 @@ const MEADOW_BOSS: FightDef = {
 export const CHAPTER = {
   emoji: '1f33c',
   name: '草甸',
-  desc: '林子边上的一片草甸：守住闩着的栅栏门，轮流当队长清怪，顶住从坡顶抛下来的敌人，最后打倒从林缘爬出来的蛛后。选一名首发出发，击杀攒全队经验，升级时招人或给队员升级；每逛完一次商店，回到战场就是一片新生成的草甸',
+  desc: '林子边上的一片草甸：守住闩着的栅栏门，轮流当队长清怪，顶住从坡顶抛下来的敌人，最后打倒从林缘爬出来的蛛后。选一名首发出发，击杀攒全队经验，升级时给场上一人升级，或让一人满生命上场：招募、替换、恢复；场与场之间不休整，倒下的要靠升级时复活或换下；每逛完一次商店，回到战场就是一片新生成的草甸',
   chapter: 'meadow',
   stars: [{ kind: 'downs', count: 5 }, { kind: 'time', ms: 380_000 }],
-  rules: { between: 'rest' },
   teamLevel: TEAM_LEVEL,
   steps: [
     { kind: 'recruit', upTo: 1 },
@@ -93,7 +92,7 @@ export const CHAPTER = {
     { kind: 'shop', tier: 4 },
     { kind: 'fight', fight: stage(FIGHTS.relay, '1-2 接力', 120, { after: [MEADOW_RELAY_END], reward: { coins: 50 } }) },
     { kind: 'shop', tier: 8 },
-    { kind: 'fight', fight: stage(FIGHTS.bankRaid, '1-3 坡顶来敌', 210, { reward: { coins: 60, heal: true } }) },
+    { kind: 'fight', fight: stage(FIGHTS.bankRaid, '1-3 坡顶来敌', 210, { reward: { coins: 60 } }) },
     { kind: 'shop', tier: 12 },
     { kind: 'fight', fight: MEADOW_BOSS },
   ],

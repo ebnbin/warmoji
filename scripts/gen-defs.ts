@@ -720,15 +720,17 @@ const checkStamina =(st: { readonly maxStamina?: number; readonly staminaRegen?:
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) checkStamina(c.stats, `characters.${id}`)
 for (const [id, e] of Object.entries<EnemyDef>(ENEMIES)) checkStamina(e.stats, `enemies.${id}`)
 
+// 角色写了几级属性就能升到几级，每一级都要有升级卡，载体的升级档不能多过它
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   need(new Set(c.tags).size === c.tags.length, `characters.${id}.tags 不能重复`)
-  for (let k = 0; k < MAX_CHAR_LEVEL - 1; k++) {
+  const ups = LEVEL_STATS[id as keyof typeof LEVEL_STATS].length
+  need(ups < MAX_CHAR_LEVEL, `levels.${id} 最多写到 ${MAX_CHAR_LEVEL} 级：${ups + 1} 级`)
+  for (let k = 0; k < ups; k++) {
     const tiers = [...c.weapons.map((w) => WEAPONS[w].upgrades[k]), ...c.innate.map((i) => i.upgrades[k])]
     const names = new Set(tiers.flatMap((t) => (t ? [t.card.name] : [])))
     need(names.size === 1, `characters.${id} 第 ${k + 1} 档升级卡须存在且各载体一致`)
   }
-  for (const u of [...c.weapons.map((w) => WEAPONS[w].upgrades), ...c.innate.map((i) => i.upgrades)]) need(u.length < MAX_CHAR_LEVEL, `characters.${id} 的载体升级档不能多过等级上限：${u.length} 档`)
-  need(LEVEL_STATS[id as keyof typeof LEVEL_STATS].length === MAX_CHAR_LEVEL - 1, `levels.${id} 须给 2 到 ${MAX_CHAR_LEVEL} 级每一级写属性`)
+  for (const u of [...c.weapons.map((w) => WEAPONS[w].upgrades), ...c.innate.map((i) => i.upgrades)]) need(u.length <= ups, `characters.${id} 的载体升级档不能多过它的等级：${u.length} 档`)
 }
 
 const units: [string, UnitBase][] = [
@@ -1107,9 +1109,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   }
 }
 
-need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restRatio 须在 (0, 1] 内')
-need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
-need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
+need(PROGRESSION.xp.first > 0 && PROGRESSION.xp.ratio >= 1 && PROGRESSION.xp.k > 0, 'progression.xp 第一次要的经验与过渡快慢须为正，后期倍数不小于 1：越往后升级越难')
 
 /** 角色与敌人按地图先后的名单，和各张图对应的角色：选角、图鉴按它排，沙盒按图抽队伍 */
 const ROSTER = {

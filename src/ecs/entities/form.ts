@@ -1,5 +1,6 @@
 import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
+import { slotKept } from '../../run/state'
 import { Ability, Act, Anchored, Anim, Borrowed, Cd, Charges, Contact, Elem, EnemyArm, Faction, Form, Granted, Manual, MARK, Motion, MOTION, Owner, Phys, Slot, Span, Sprite, Transform, VisOff } from '../components'
 import { setTraits } from '../utils/traits'
 import { abilityDef, bodyLook, enemyDef, formEnd } from '../store'
@@ -141,7 +142,7 @@ export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?
   Form.until[eid] = ms === undefined ? 0 : sim.elapsedMs + ms
   formEnd[eid] = ms === undefined ? undefined : onEnd
   const char = hasComponent(sim.world, eid, Slot)
-  if (char && ms === undefined) sim.run.memberForm[Slot.v[eid]!] = to
+  if (char && ms === undefined) slotKept(sim.run, Slot.v[eid]!).form = to
   if (Form.idx[eid] === to) return
   const was = Form.idx[eid]! >= 0 ? forms?.[Form.idx[eid]!] : undefined
   Form.idx[eid] = to

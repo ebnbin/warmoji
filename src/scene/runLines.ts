@@ -5,7 +5,7 @@ import { isLose } from '../data/ends'
 import { signalName } from '../data/signals'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
-import { WAVE } from '../data/waves'
+import { fightCount } from '../data/runs'
 import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, PhaseDef, RunDef, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
@@ -55,8 +55,7 @@ export function endText(e: EndRule): string {
 
 /** 过关奖励的说法；没有奖励是 null */
 export function rewardText(r: FightReward | undefined): string | null {
-  const parts = [r?.coins ? `金币 +${r.coins}` : '', r?.heal ? '全队回满血' : ''].filter(Boolean)
-  return parts.length > 0 ? `过关奖励 ${parts.join('、')}` : null
+  return r?.coins ? `过关奖励 金币 +${r.coins}` : null
 }
 
 /** 一个阶段怎么达成、怎么输 */
@@ -90,7 +89,6 @@ export function phaseLines(f: FightDef): string[] {
 function ruleLines(r: FightRules | undefined): string[] {
   if (!r) return []
   const out: string[] = []
-  if (r.revive === false) out.push('倒下的队员不会自己起来')
   if (r.rescue) out.push(`队长在倒下的队员身边 ${r.rescue.radius} 格内站满 ${sec(r.rescue.ms)}能把他扶起来`)
   if (r.leader?.lock) out.push('不能换队长')
   if (r.leader?.critical) out.push('队长倒下就输')
@@ -104,17 +102,16 @@ function ruleLines(r: FightRules | undefined): string[] {
   return out
 }
 
-/** 一局的我方规则：每一场都照这些，外加命数、场间恢复、等级上限与全队升级 */
+/** 一局的我方规则：每一场都照这些，外加命数、场间不休整与全队升级 */
 export function runRuleLines(def: RunDef): string[] {
   const r = def.rules ?? {}
   const out = ruleLines(r)
-  if (r.lives !== undefined) out.push(`全队一共只能起来 ${r.lives} 次，自己起来、被扶起来、被技能救起来都算`)
-  if (r.between === 'rest') out.push(`场与场之间，每人回复 ${Math.round(WAVE.restRatio * 100)}% 损失的生命，倒下的也起来`)
-  if (r.between === 'full') out.push('每一场满血开局')
-  if (r.between === 'permadeath') out.push('一场打完时还倒着的队员，这一局都回不来')
-  if (r.maxLevel !== undefined) out.push(r.maxLevel === 1 ? '队员不能升级' : `队员最高只能升到 ${r.maxLevel} 级`)
-  const t = def.teamLevel
-  if (t) out.push(`击杀攒全队经验，最高 ${t.maxLevel} 级；每升一级掉一个升级道具，队长走过去捡起来，招一名新队员或给一名队员升一级；进商店前没捡的替你捡起；买道具不再涨角色经验`)
+  if (r.lives !== undefined) out.push(`全队一共只能起来 ${r.lives} 次，被扶起来、被技能救起来都算`)
+  if (fightCount(def) > 1) out.push('场与场之间不休整：活着的带着残血进下一场，倒下的还倒着')
+  if (def.teamLevel) {
+    out.push('击杀攒全队经验，越往后升得越慢，不封顶；每升一级掉一个升级道具，队长走过去捡起来选一项：给场上一人升一级，或让一人满生命上场（招募、替换、恢复）')
+    out.push('升级道具不替你捡，没捡的留到下一场，散落在地图各处；买道具不再涨角色经验')
+  }
   return out
 }
 

@@ -366,18 +366,8 @@ export function runChecks(cat: RunCatalog): RunChecks {
     checkRules(r.rules, ['rules'])
     const lives = r.rules?.lives
     need(lives === undefined || (Number.isInteger(lives) && lives >= 1), ['rules'], '命数须是正整数')
-    const maxLevel = r.rules?.maxLevel
-    const floor = r.team && r.team !== 'knobs' ? (r.team.level ?? 1) : 1
-    need(maxLevel === undefined || (Number.isInteger(maxLevel) && maxLevel >= floor && maxLevel < cat.maxCharLevel), ['rules'], `等级上限须是整数，不低于队伍的等级下限、低于 ${cat.maxCharLevel}`)
     const t = r.teamLevel
-    if (t) {
-      need(t.base > 0 && t.growth >= 1, ['teamLevel'], '底数须为正，增长不小于 1：越往后升级越难')
-      need(Number.isInteger(t.maxLevel) && t.maxLevel >= 2, ['teamLevel'], '满级须是不小于 2 的整数')
-      // 每一次全队升级都得有得选：补满队伍的人数，加上每人还能升的级数，够用完升到满级的次数
-      const free = Math.max(r.team && r.team !== 'knobs' ? r.team.slots.length : 0, ...steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
-      const room = teamSize - free + teamSize * ((maxLevel ?? cat.maxCharLevel) - floor)
-      need(room >= t.maxLevel - 1, ['teamLevel'], `靠全队升级，能选的只用得掉 ${room} 次，不够升到 ${t.maxLevel} 级的 ${t.maxLevel - 1} 次`)
-    }
+    if (t) need(t.first > 0 && t.ratio >= 1 && t.k > 0, ['teamLevel'], '第一次要的经验与过渡快慢须为正，后期倍数不小于 1：越往后升级越难')
     r.stars?.forEach((s, i) => checkStar(s, ['stars', i]))
     steps.forEach((s, i) => checkStep(s, ['steps', i]))
   }

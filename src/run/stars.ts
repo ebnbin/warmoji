@@ -5,7 +5,7 @@ import type { RunState } from './state'
 export function starMet(run: RunState, s: StarRule): boolean {
   switch (s.kind) {
     case 'downs':
-      return run.stats.deaths.reduce((sum, n) => sum + n, 0) <= s.count
+      return Object.values(run.stats.deaths).reduce((sum, n) => sum + n, 0) <= s.count
     case 'time':
       return run.combatMs <= s.ms
     case 'switches':

@@ -4,11 +4,10 @@ import { BOSSES, CURVE, ENEMIES, ENEMY_DEFS } from '../data/enemies'
 import { MAP_IDS, MAPS } from '../data/maps'
 import type { Path } from '../data/runCheck'
 import { TAGS } from '../data/tags'
-import { WAVE } from '../data/waves'
 import type { OutlineKind } from '../emoji/svg'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { MapDef } from '../types/maps'
-import type { BatchRule, Between, GroupTraits, RunRules, SpawnAt, Squad, StreamRule } from '../types/runs'
+import type { BatchRule, GroupTraits, RunRules, SpawnAt, Squad, StreamRule } from '../types/runs'
 import { keysOf } from '../util/record'
 import { endText } from '../scene/runLines'
 import { defaultTeam } from './draft'
@@ -262,29 +261,14 @@ function teamRows(d: Draft): Row[] {
   return rows
 }
 
-const BETWEEN: Readonly<Record<Between, { readonly label: string; readonly hint: string }>> = {
-  carry: { label: '带伤', hint: `活着的带着残血，倒下的回 ${pct(WAVE.reviveHpRatio)} 血` },
-  rest: { label: '休整', hint: `每人回复 ${pct(WAVE.restRatio)} 损失的生命，倒下的也起来` },
-  full: { label: '满血', hint: '每一场都满血开打' },
-  permadeath: { label: '阵亡', hint: '一场打完时还倒着的，这一局都回不来' },
-}
-
 function rulesRows(d: Draft): Row[] {
   const r: Mutable<RunRules> = d.rules ?? {}
   const w = (): Mutable<RunRules> => (d.rules ??= {})
   const leader = (): NonNullable<Mutable<RunRules>['leader']> => (w().leader ??= {})
-  const between = r.between ?? 'carry'
   const rescue = r.rescue
   return [
-    field({
-      kind: 'choice',
-      label: '场与场之间',
-      hint: BETWEEN[between].hint,
-      options: keysOf(BETWEEN).map((k) => ({ label: BETWEEN[k].label, chosen: k === between, run: () => put(w(), 'between', k === 'carry' ? undefined : k) })),
-    }),
-    flag('限定命数', r.lives !== undefined, (on) => put(w(), 'lives', on ? 3 : undefined), { hint: '全队一共能起来几次：自己起来、被扶起来、被技能救起来都算' }),
+    flag('限定命数', r.lives !== undefined, (on) => put(w(), 'lives', on ? 3 : undefined), { hint: '全队一共能起来几次：被扶起来、被技能救起来都算' }),
     ...(r.lives !== undefined ? [num('命数', r.lives, { min: 1, max: 9, step: 1, format: unit('次') }, (v) => (w().lives = v), { sub: true })] : []),
-    flag('倒下自己起来', r.revive !== false, (on) => put(w(), 'revive', on ? undefined : false)),
     flag('队长扶起倒下的队员', rescue !== undefined, (on) => put(w(), 'rescue', on ? { ms: 2_000, radius: 1.2 } : undefined), { hint: '队长在倒下的队员身边站满一段时间' }),
     ...(rescue
       ? [
@@ -298,8 +282,6 @@ function rulesRows(d: Draft): Row[] {
     flag('队长倒下就输', r.leader?.critical === true, (on) => put(leader(), 'critical', on || undefined)),
     flag('限定视野', r.vision !== undefined, (on) => put(w(), 'vision', on ? 6 : undefined), { hint: '只看得见队长身边这么远，外面一片漆黑' }),
     ...(r.vision !== undefined ? [num('视野', r.vision, { min: 1, max: 20, step: 0.5, format: unit('格') }, (v) => (w().vision = v), { sub: true })] : []),
-    flag('限定等级上限', r.maxLevel !== undefined, (on) => put(w(), 'maxLevel', on ? 1 : undefined)),
-    ...(r.maxLevel !== undefined ? [num('等级上限', r.maxLevel, { min: 1, max: MAX_CHAR_LEVEL - 1, step: 1, format: unit('级') }, (v) => (w().maxLevel = v), { sub: true })] : []),
   ]
 }
 
@@ -337,7 +319,6 @@ function fightRows(f: Fight, node: Node): Row[] {
     ...(f.clockSec !== undefined ? [num('难度时钟', f.clockSec, { min: 0, max: 1_800, step: 10, format: moment }, (v) => (f.clockSec = v), { sub: true })] : []),
     flag('敌人都盯着队长', f.chaseLeader === true, (on) => put(f, 'chaseLeader', on || undefined)),
     num('过关金币', f.reward?.coins ?? 0, { min: 0, max: 300, step: 5, format: unit('金币') }, (v) => put(reward(), 'coins', v > 0 ? v : undefined)),
-    flag('过关回满血', f.reward?.heal === true, (on) => put(reward(), 'heal', on || undefined)),
     heading('阶段'),
     actions([{ kind: 'do', label: '+ 阶段', role: 'add', run: () => f.phases.push(newPhase(f.phases.at(-1))), select: [...node.at, 'fight', 'phases', f.phases.length] }]),
   ]

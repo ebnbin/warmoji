@@ -16,8 +16,6 @@ export function waveAt(curve: DifficultyCurve, elapsedSec: number): WaveState {
 export const XP = P.xp
 
 export const WAVE = {
-  reviveHpRatio: P.reviveHpRatio,
-  restRatio: P.restRatio,
   summaryMs: P.summaryMs,
 } as const
 

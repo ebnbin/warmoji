@@ -35,7 +35,6 @@ export class DialButton extends Widget {
   private readonly stamina: RingGauge
   private readonly pie: CooldownPie
   private readonly cdText: Label
-  private readonly deadText: Label
   private readonly badge: Icon
   private readonly tired: Icon
   private readonly charges: Label
@@ -60,13 +59,12 @@ export class DialButton extends Widget {
     this.stamina = new RingGauge(scene, 0, 0, r - 4, { tone: 'info', thickness: 3 }).setVisible(false)
     const small = { kind: 'label', bold: true, outline: true } as const
     this.cdText = new Label(scene, 0, 0, '', { ...small, color: 'accent' }).setOrigin(0.5).setVisible(false)
-    this.deadText = new Label(scene, 0, 0, '', { ...small, color: 'bad' }).setOrigin(0.5).setVisible(false)
     const corner = r * 0.68
     this.badge = new Icon(scene, -corner, -corner, opts.icon, 20, opts.outline).setVisible(false)
     this.tired = new Icon(scene, corner, -corner, '1f4a6', 20, 'player').setVisible(false)
     this.charges = new Label(scene, corner, corner, '', { ...small, kind: 'caption', color: 'accent' }).setOrigin(0.5).setVisible(false)
     this.content = new Widget(scene)
-    this.content.add([this.base, this.face, this.ring, this.pie, this.stamina, this.cdText, this.deadText, this.badge, this.tired, this.charges])
+    this.content.add([this.base, this.face, this.ring, this.pie, this.stamina, this.cdText, this.badge, this.tired, this.charges])
     this.add(this.content)
     this.paintBase()
     pressable(this, {
@@ -124,9 +122,7 @@ export class DialButton extends Widget {
   }
 
   /** 阵亡时 dead 为真并给出复活倒计时，不会自己复活时倒计时为 null */
-  setDead(dead: boolean, seconds: number | null): this {
-    this.deadText.setVisible(dead && seconds !== null)
-    if (dead && seconds !== null && this.deadText.text !== String(seconds)) this.deadText.setText(String(seconds))
+  setDead(dead: boolean): this {
     if (dead === this.dead) return this
     this.dead = dead
     this.face.setAlpha(dead ? 0.25 : this.dimmed ? 0.55 : 1)

@@ -8,7 +8,6 @@ import type { Span } from '../types/obstacles'
 import type { CharacterId } from '../types/characters'
 import type { InstinctDef, InstinctRule } from '../types/roles'
 import { gearMods, resolveAbilityDef } from '../data/items'
-import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ROLES } from '../data/roles'
 import { STATUSES } from '../data/statuses'
 import { ELEMENT_IDS, ELEMENTS } from '../data/elements'
@@ -132,8 +131,6 @@ export function effectLine(e: Effect, self = false): string {
       return `回复 ${pct(e.ratio)} 生命上限`
     case 'invuln':
       return `无敌 ${sec(e.ms)}`
-    case 'reviveCut':
-      return `阵亡同伴的复活倒计时减 ${sec(e.ms)}`
     case 'timeStop':
       return `时停 ${sec(e.durationMs)}（按世界时长计，静止时同步放慢）`
     case 'vanish':
@@ -498,7 +495,7 @@ export function instinctLine(r: InstinctRule): string {
 }
 
 /** 属性面板开头三行固定显示的属性：生命、行动与体力，其余与默认值不同的排在后面 */
-const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'revive', 'maxStamina', 'staminaRegen', 'exertion']
+const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'maxStamina', 'staminaRegen', 'exertion']
 
 /** base 为假时不列基础属性（另有属性表的地方），资源单独成组 */
 export function characterStatGroups(
@@ -514,7 +511,7 @@ export function characterStatGroups(
   if (opts.base !== false) {
     const baseLines = [
       `${statText('maxHp', stats.maxHp)} · ${statText('iframes', stats.iframes)}`,
-      `${statText('moveSpeed', stats.moveSpeed)} · 质量 ${def.body.mass} · ${statText('revive', stats.revive)}`,
+      `${statText('moveSpeed', stats.moveSpeed)} · 质量 ${def.body.mass}`,
       `${statText('maxStamina', stats.maxStamina)} · ${statText('staminaRegen', stats.staminaRegen)} · ${statText('exertion', stats.exertion)}`,
     ]
     const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
@@ -562,7 +559,7 @@ export function characterStatGroups(
       ],
     })
   }
-  const tier = Math.min(level, MAX_CHAR_LEVEL) - 1
+  const tier = level - 1
   for (const [i, carrier] of def.carriers.entries()) {
     const w = resolveAbilityDef(loadout[i]!, stats)
     const how = deliveryOf(w)

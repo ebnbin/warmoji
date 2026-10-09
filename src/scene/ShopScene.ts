@@ -1,6 +1,5 @@
 import Phaser from 'phaser'
 import { CHARACTERS, upgradeCardsFor } from '../data/characters'
-import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { characterXp, ITEMS, itemPrice, itemXp, RARITIES, rerollPrice } from '../data/items'
 import { LEVEL_STATS } from '../data/levels'
 import { PICKUPS } from '../data/pickups'
@@ -8,7 +7,7 @@ import { modTexts } from '../data/stats'
 import { playSfx } from '../audio/sfx'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 import { levelCap, levelFor, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
-import { getRun, stepOf } from '../run/state'
+import { getRun, slotKept, stepOf } from '../run/state'
 import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { ItemDef, ItemId } from '../types/items'
@@ -114,7 +113,7 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
   }
 
   private ownedFor(slot: number): ItemId[] {
-    return (this.run.memberItems[slot] ??= [])
+    return slotKept(this.run, slot).items
   }
 
   /** 物价与稀有度按这家商店写的第几档算 */
@@ -246,7 +245,7 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
     const xp = characterXp(this.ownedFor(slot))
     const level = this.levelOf(slot)
     const floor = this.run.minLevel
-    const top = levelCap(this.run)
+    const top = levelCap(this.run, slot)
     const prog = levelProgress(xp, floor, top)
     const base = {
       emoji: memberLook(this.run, slot),
@@ -255,13 +254,13 @@ export class ShopScene extends Phaser.Scene implements DevTabsHost {
       level: `Lv ${level}`,
       onTap: () => this.inspect(slot),
     }
-    const maxed: OfferOwner = { ...base, xp: 1, xpTone: 'accent', note: top < MAX_CHAR_LEVEL ? '等级上限' : '满级', noteColor: 'accent' }
+    const maxed: OfferOwner = { ...base, xp: 1, xpTone: 'accent', note: '满级', noteColor: 'accent' }
     if (teamLeveled(this.run)) return level >= top ? maxed : { ...base, xp: (level - 1) / (top - 1), xpTone: 'info' }
     if (prog.maxed) return maxed
     const offer = this.offers[slot]
     if (!offer?.id || offer.sold) return { ...base, xp: prog.ratio, xpTone: 'info' }
     const gain = itemXp(ITEMS[offer.id])
-    const up = levelFor(this.run, xp + gain) > level
+    const up = levelFor(this.run, this.run.roster[slot]!, xp + gain) > level
     return {
       ...base,
       xp: prog.ratio,

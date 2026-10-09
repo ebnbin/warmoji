@@ -18,18 +18,20 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { battleSprites } from '../manifest'
-import { adoptRun, getRun, INVINCIBLE_HP, nextStep, runDef, stepOf } from '../run/state'
-import { claimNothing, claimRecruit, claimUpgrade, levelUpOptions, pendingLevelUps } from '../run/levelUp'
-import { memberLevel, teamLeveled } from '../run/members'
+import { adoptRun, getRun, INVINCIBLE_HP, nextStep, runDef } from '../run/state'
+import { anyChoice, claim, pendingLevelUps } from '../run/levelUp'
+import type { Claim, FieldMember } from '../run/levelUp'
+import { teamLeveled } from '../run/members'
 import { goStep } from '../scene/teamPage'
 import { openLevelUp } from '../scene/levelUp'
+import type { LevelUpResult } from '../scene/levelUp'
 import { rewardText } from '../scene/runLines'
 import type { RunState } from '../run/state'
 import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Stats, Transform } from './components'
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
@@ -54,8 +56,8 @@ import { sourceOf } from './utils/source'
 import { resetEntities } from './entities/entity'
 import { abilityGroup } from './entities/ability'
 import { armTeam, memberGear } from './entities/loadout'
-import { levelUpsOnField, sweepLevelUps } from './entities/pickup'
-import { joinTeam, relevel } from './entities/team'
+import { levelUpsOnField, scatterLevelUps } from './entities/pickup'
+import { joinTeam, relevel, restoreMember, swapTeam } from './entities/team'
 import { requestCast } from './systems/shared/ability'
 import { openStage, ready, turnOf } from './systems/shared/avail'
 import { skillRemainMs } from './systems/tickSkillCooldowns'
@@ -78,7 +80,7 @@ import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, streamInterval } from './fight/spawns'
 import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseMs, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
-import { xpMaxed, xpToNext } from '../run/xp'
+import { xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { subCountdown } from '../maps/deep/sub'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -93,7 +95,6 @@ import { tenacityRatio } from './systems/shared/tenacity'
 import { drain } from './outbox'
 import { keepTape, TapePlayer, TapeRecorder } from './tape'
 import type { DevCommand, Tape, TapeEvent } from './tape'
-import type { CharacterId } from '../types/characters'
 import type { Burst } from './outbox'
 import { feedback } from './present/feedback'
 import type { Show } from './present/feedback'
@@ -102,7 +103,7 @@ import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevTabs, lensMode, showGates, showGrid, showHeights, showTargets, showWalls, watchSandboxSteady } from './devTabs'
 import type { DevSceneTabs, DevTabsHost } from '../devtools'
-import { gainTeamXp } from './systems/shared/combat'
+import { die, gainTeamXp } from './systems/shared/combat'
 import { hit } from './systems/shared/damage'
 import { bodySource, WORLD_SOURCE } from './utils/source'
 import { nearestTarget } from './utils/targets'
@@ -137,11 +138,6 @@ function unknownCommand(cmd: never): never {
 /** 视野规则的黑幕有多黑 */
 const VISION_FOG_ALPHA = 0.92
 
-/** 倒下的队员几秒后起来；这一场不会自己起来是 null */
-function reviveSec(sim: Sim, m: number): number | null {
-  const at = Revive.at[m]!
-  return Number.isFinite(at) ? Math.max(0, Math.ceil((at - sim.elapsedMs) / 1000)) : null
-}
 
 /** 瞄准线的长度：位移走多远，或效果把东西放出去多远 */
 function aimReach(a: AbilityDef): number {
@@ -216,10 +212,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   private fog?: Fog
   /** 升级弹窗开着，战斗停着 */
   private choosing = false
-  /** 这一场赢了、小结放完，正在领剩下的升级 */
-  private settling = false
-  /** 每名队员装上能力时的等级，按名单位置 */
-  private armedLevels: number[] = []
   /** 攒着还没走的时间，毫秒 */
   private pendingMs = 0
   /** 模拟的快慢：0 是停住，停住时只走排着的那几步 */
@@ -232,8 +224,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   private recorder: TapeRecorder | null = null
   /** 照录像重打时的回放 */
   private player: TapePlayer | null = null
-  /** 弹出升级弹窗时的名单与各人等级：回来时比一比，就知道领了什么 */
-  private claimBase: { readonly roster: readonly CharacterId[]; readonly levels: readonly number[] } | null = null
 
   constructor() {
     super(SceneKey.Battle)
@@ -267,8 +257,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.heights = undefined
     this.fog = undefined
     this.choosing = false
-    this.settling = false
-    this.armedLevels = []
     this.pendingMs = 0
     this.rate = 1
     this.queuedSteps = 0
@@ -276,7 +264,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.inspectGfx = undefined
     this.recorder = null
     this.player = null
-    this.claimBase = null
   }
 
   devTabs(): DevSceneTabs {
@@ -301,6 +288,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
         if (sim.over) return
         for (const eid of [...query(this.world, [Enemy])]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
         return
+      case 'down': {
+        if (sim.over) return
+        const up = sim.characters.filter((m) => Alive.v[m])
+        const m = up.find((x) => x !== sim.leader) ?? up[0]
+        if (m !== undefined) die(sim, m, WORLD_SOURCE, 0, 0)
+        return
+      }
       case 'grant':
         if (cmd.what === 'coins') this.run.coins += 1000
         else gainTeamXp(sim, Math.max(1, xpToNext(this.run) - this.run.xp.xp))
@@ -654,12 +648,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run)
-    this.armedLevels = run.roster.map((_, slot) => memberLevel(run, slot))
     if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this, this.lens.screen)
     startPhase(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
     openWave(this.sim)
+    scatterLevelUps(this.sim, pendingLevelUps(run))
     markFightBase(this.sim)
     this.ready = true
     hint.destroy()
@@ -692,10 +686,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     const left = sim ? timeLeftMs(sim) : (timeLimitMs(this.fightDef.phases[0]!) ?? Infinity)
     const phases = this.fightDef.phases.length
     const name = this.fightDef.name
-    const xpNext = xpToNext(this.run)
     return {
-      xp: xpMaxed(this.run) ? xpNext : this.run.xp.xp,
-      xpNext,
+      xp: this.run.xp.xp,
+      xpNext: xpToNext(this.run),
       level: teamLeveled(this.run) ? this.run.xp.level : null,
       levelUps: pendingLevelUps(this.run),
       kills: this.run.kills,
@@ -756,7 +749,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
           alive: Alive.v[m] === 1,
           hp: Hp.v[m]!,
           max: Hp.max[m]!,
-          reviveSec: reviveSec(sim, m),
           stamina: staminaLeft(m),
           tired: dragging(sim, m),
         }
@@ -776,7 +768,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
         alive: Alive.v[m] === 1,
         hp: Hp.v[m]!,
         max: Hp.max[m]!,
-        reviveSec: reviveSec(sim, m),
         stamina: staminaLeft(m),
         tired: dragging(sim, m),
         now: statsOf(m),
@@ -917,13 +908,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
 
 
 
-  /** 这一场赢了：记下队长、打出小结，稍后走到下一步；回放就停在这一刻 */
+  /** 这一场赢了：打出小结，稍后走到下一步；回放就停在这一刻 */
   private scheduleWaveEnd(): void {
     this.ending = true
     if (this.finishTape()) return
     const sim = this.sim!
     const run = sim.run
-    run.leaderId = run.roster[sim.characters.indexOf(sim.leader)]!
     playSfx('wave')
     this.hud.emit(HudEvent.WaveComplete, {
       title: `${this.fightDef.name}完成！`,
@@ -935,81 +925,54 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.time.delayedCall(WAVE.summaryMs, () => this.settle())
   }
 
-  /** 小结之后：地上没捡的升级替玩家捡起来，逐个选完再走到下一步 */
+  /** 小结之后走到下一步：地上没捡的升级道具留到下一场 */
   private settle(): void {
-    this.settling = true
-    if (this.sim) {
-      sweepLevelUps(this.sim)
-      this.drainOutbox()
-    }
-    this.proceed()
-  }
-
-  /** 后面还有步骤才领：最后一场打完直接去结算 */
-  private proceed(): void {
-    while (stepOf(this.run) && pendingLevelUps(this.run) > 0) if (this.chooseLevelUp()) return
     goStep(this, this.run)
   }
 
-  /** 领下一次升级：已经没有能选的就作废，否则战斗停住、弹出升级弹窗；返回弹没弹出来 */
-  private chooseLevelUp(): boolean {
-    if (levelUpOptions(this.run).length === 0) {
-      claimNothing(this.run)
-      return false
-    }
-    // 回放不弹窗：录下的领法在下一步之前放进来
-    if (this.player) return false
-    this.choosing = true
-    this.claimBase = { roster: [...this.run.roster], levels: this.run.roster.map((_, slot) => memberLevel(this.run, slot)) }
-    const onField = this.sim ? levelUpsOnField(this.sim).length : 0
-    openLevelUp(this, { settling: this.settling, queued: pendingLevelUps(this.run) - onField })
-    return true
+  /** 场上每一格此刻站着没有、还剩几成生命 */
+  private fieldOf(sim: Sim): FieldMember[] {
+    return sim.characters.map((m) => ({ alive: Alive.v[m] === 1, hp: Alive.v[m] === 1 ? Hp.v[m]! / Hp.max[m]! : 0 }))
   }
 
-  /** 队长捡起了升级道具：捡起来还没选的就先选 */
+  /** 队长捡起了升级道具：已经没有能选的就作废，否则战斗停住、弹出升级弹窗；回放不弹窗，录下的领法在下一步之前放进来 */
   private takeLevelUps(sim: Sim): void {
     if (this.choosing || pendingLevelUps(this.run) <= levelUpsOnField(sim).length) return
-    this.chooseLevelUp()
-  }
-
-  /** 从升级弹窗回来：领到的升级当场生效；小结之后接着领下一次 */
-  private onResume(): void {
-    if (!this.choosing) return
-    this.choosing = false
-    if (this.settling) {
-      this.proceed()
+    const field = this.fieldOf(sim)
+    if (!anyChoice(this.run, field)) {
+      claim(this.run, { kind: 'skip' })
       return
     }
-    this.recordClaims()
-    this.syncTeam()
+    if (this.player) return
+    this.choosing = true
+    openLevelUp(this, { queued: pendingLevelUps(this.run) - levelUpsOnField(sim).length, field })
   }
 
-  /** 升级弹窗里领了什么：名单上添的人与各人涨的级，录进录像 */
-  private recordClaims(): void {
-    const base = this.claimBase
-    this.claimBase = null
+  /** 从升级弹窗回来：领到的当场生效，录进录像 */
+  private onResume(_sys: Phaser.Scenes.Systems, data?: LevelUpResult): void {
+    if (!this.choosing) return
+    this.choosing = false
     const sim = this.sim
-    if (!base || !sim) return
-    const run = this.run
-    const recruits = run.roster.slice(base.roster.length)
-    const upgrades = base.levels.flatMap((lv, slot) => Array.from({ length: memberLevel(run, slot) - lv }, () => slot))
-    this.recorder?.push({ t: sim.tick, k: 'claims', recruits, upgrades })
+    if (sim && data?.claim) this.issue({ t: sim.tick, k: 'claim', claim: data.claim })
   }
 
-  /** 按本局的名单与等级补上新招的队员，给升了级的队员换上新能力 */
-  private syncTeam(): void {
-    const sim = this.sim
-    if (!sim) return
-    for (let slot = sim.characters.length; slot < this.run.roster.length; slot++) {
-      joinTeam(sim, slot)
-      this.armedLevels[slot] = memberLevel(this.run, slot)
+  /** 领一次升级：名单与等级记下，场上的人跟着换、升级、回满 */
+  private applyClaim(sim: Sim, c: Claim): void {
+    claim(this.run, c)
+    switch (c.kind) {
+      case 'upgrade':
+        relevel(sim, c.slot)
+        return
+      case 'restore':
+        restoreMember(sim, c.slot)
+        return
+      case 'join':
+        if (c.slot === sim.characters.length) joinTeam(sim, c.slot)
+        else swapTeam(sim, c.slot)
+        return
+      case 'skip':
+        return
     }
-    this.run.roster.forEach((_, slot) => {
-      const level = memberLevel(this.run, slot)
-      if (this.armedLevels[slot] === level) return
-      relevel(sim, slot)
-      this.armedLevels[slot] = level
-    })
   }
 
 
@@ -1149,7 +1112,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   }
 
   /** 实时的一条输入：放成了就录进录像；回放时只认录像里的 */
-  private issue(e: Exclude<TapeEvent, { k: 'move' | 'settings' | 'claims' }>): boolean {
+  private issue(e: Exclude<TapeEvent, { k: 'move' | 'settings' }>): boolean {
     const sim = this.sim
     if (!sim || this.player) return false
     this.recorder?.poll(sim.tick)
@@ -1168,10 +1131,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       case 'dev':
         this.devApply(sim, e.cmd)
         return true
-      case 'claims':
-        for (const id of e.recruits) claimRecruit(this.run, id)
-        for (const slot of e.upgrades) claimUpgrade(this.run, slot)
-        this.syncTeam()
+      case 'claim':
+        this.applyClaim(sim, e.claim)
         return true
     }
   }

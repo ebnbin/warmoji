@@ -177,10 +177,11 @@ export class ResultScene extends Phaser.Scene {
 
   private renderTeam(rect: Rect): void {
     const st = this.run.stats
-    const rows: TableRow[] = this.run.roster.map((id, slot) => {
-      const taken = st.damageTaken[slot] ?? 0
-      const deaths = st.deaths[slot] ?? 0
-      const owned = this.run.memberItems[slot] ?? []
+    // 这一局上过场的都列出来，换下去的也算
+    const rows: TableRow[] = keysOf(this.run.kept).map((id) => {
+      const taken = st.damageTaken[id] ?? 0
+      const deaths = st.deaths[id] ?? 0
+      const owned = this.run.kept[id]?.items ?? []
       const unique = [...new Set(owned)]
       const items: TableCell =
         unique.length === 0
@@ -191,9 +192,9 @@ export class ResultScene extends Phaser.Scene {
         outline: 'player',
         name: CHARACTERS[id].name,
         cells: [
-          formatBig(st.damage[slot] ?? 0),
+          formatBig(st.damage[id] ?? 0),
           taken > 0 ? { text: formatBig(taken), color: 'warn' } : NONE,
-          `${st.kills[slot] ?? 0}`,
+          `${st.kills[id] ?? 0}`,
           deaths > 0 ? { text: `${deaths}`, color: 'bad' } : NONE,
           items,
         ],

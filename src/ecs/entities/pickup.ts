@@ -1,4 +1,4 @@
-import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
+import { addComponent, addComponents, hasComponent, query } from 'bitecs'
 import { PICKUP_BODY } from '../../data/abilities'
 import { startPop } from '../utils/pop'
 import { newEntity } from './entity'
@@ -222,13 +222,27 @@ export function levelUpsOnField(sim: Sim): number[] {
   return [...query(sim.world, [Pickup, LevelUp])].filter((eid) => !hasComponent(sim.world, eid, Collected))
 }
 
-/** 收走地上所有的升级道具：一场结束时替玩家捡起 */
-export function sweepLevelUps(sim: Sim): void {
-  for (const eid of levelUpsOnField(sim)) {
-    sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'coin' })
-    pickupDef[eid] = undefined
-    pickupSfx[eid] = undefined
-    removeEntity(sim.world, eid)
+/** 带进这一场的升级道具离队长至少这么远（格）：不会一上场就捡到 */
+const SCATTER_AWAY = 8
+/** 每个道具最多试这么多个落点，都不够远就取最远的 */
+const SCATTER_TRIES = 12
+
+/** 上一场没捡的升级道具：随机散落在地图上能走到的地方，离队长远远的 */
+export function scatterLevelUps(sim: Sim, count: number): void {
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
+  for (let i = 0; i < count; i++) {
+    let best = { x: lx, y: ly }
+    let far = -1
+    for (let k = 0; k < SCATTER_TRIES && far < SCATTER_AWAY * UNIT; k++) {
+      const p = sim.hooks.settle(sim, { x: sim.rng.next() * sim.mapW, y: sim.rng.next() * sim.mapH })
+      const d = sim.hooks.worldDelta(sim, lx, ly, p.x, p.y)
+      const dist = Math.hypot(d.x, d.y)
+      if (dist <= far) continue
+      best = p
+      far = dist
+    }
+    spawnPickup(sim, best.x, best.y, levelUpSpec())
   }
 }
 

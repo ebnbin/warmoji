@@ -9,7 +9,6 @@ import type { AbilityDef } from '../types/abilityDefs'
 import { WEAPONS } from './weapons'
 import type { UpgradeCard, WeaponId } from '../types/weapons'
 import type { Carrier, CharacterAuthoring, CharacterDef, CharacterId, InnateSource, TeamBaseline } from '../types/characters'
-import { MAX_CHAR_LEVEL } from './charLevel'
 import { foldStats } from './stats'
 import { ROLES } from './roles'
 import type { StatBase, StatMods, StatValues } from '../types/stats'
@@ -54,16 +53,16 @@ export const MAP_ROSTER: Readonly<Record<MapId, readonly CharacterId[]>> = ROSTE
 
 /** 角色在这一级时各载体用的能力 */
 export function loadoutFor(def: CharacterDef, level: number): readonly AbilityDef[] {
-  return def.carriers.map((c) => c.tiers[Math.min(Math.min(level, MAX_CHAR_LEVEL), c.tiers.length) - 1]!)
+  return def.carriers.map((c) => c.tiers[Math.min(level, c.tiers.length) - 1]!)
 }
 
 export function baseLoadout(def: CharacterDef): readonly AbilityDef[] {
   return def.carriers.map((c) => c.tiers[0]!)
 }
 
-/** 2 级起每一级亮出的升级卡：取第一件在这一级有卡的载体 */
+/** 2 级起每一级亮出的升级卡：取第一件在这一级有卡的载体；能升几级就有几张 */
 export function upgradeCardsFor(def: CharacterDef): readonly UpgradeCard[] {
-  return Array.from({ length: MAX_CHAR_LEVEL - 1 }, (_, k) => {
+  return Array.from({ length: Math.max(0, ...def.carriers.map((c) => c.cards.length)) }, (_, k) => {
     for (const c of def.carriers) {
       const card = c.cards[k]
       if (card) return card

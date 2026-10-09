@@ -89,17 +89,16 @@ function settleDeathMarks(sim: Sim, eid: number): void {
   }
 }
 
-/** 倒下的队员还能不能起来：这一局没回不来、全队还有命 */
-export function revivable(sim: Sim, eid: number): boolean {
-  return !sim.run.fallen[Slot.v[eid]!] && sim.run.lives > 0
+/** 倒下的队员还能不能被扶起来、被技能救起来：全队还有命 */
+export function revivable(sim: Sim, _eid: number): boolean {
+  return sim.run.lives > 0
 }
 
-/** 倒地：留在原地歪倒、淡出，不再跟队，扇形也不再给他留坑；这一场许自己起来又还能起来的开始复活计时，否则一直倒着 */
+/** 倒地：留在原地歪倒、淡出，不再跟队，扇形也不再给他留坑；不会自己起来，一直倒着 */
 export function layDown(sim: Sim, eid: number): void {
   endMotion(eid)
   Hp.v[eid] = 0
   Alive.v[eid] = 0
-  Revive.at[eid] = sim.fight.rules.revive && revivable(sim, eid) ? sim.elapsedMs + Stats.revive[eid]! : Infinity
   Revive.fell[eid] = sim.fxMs
   Revive.drop[eid] = 0
   Seat.v[eid] = -1
@@ -113,8 +112,8 @@ export function layDown(sim: Sim, eid: number): void {
 function down(sim: Sim, eid: number): void {
   layDown(sim, eid)
   const st = sim.run.stats
-  const slot = Slot.v[eid]!
-  if (slot >= 0 && slot < st.deaths.length) st.deaths[slot] = (st.deaths[slot] ?? 0) + 1
+  const id = sim.run.roster[Slot.v[eid]!]
+  if (id !== undefined) st.deaths[id] = (st.deaths[id] ?? 0) + 1
   if (eid === sim.leader) sim.fight.leaderFell = true
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
   if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
@@ -127,7 +126,8 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
   const st = sim.run.stats
   if (hostile) {
     sim.run.kills++
-    if (src.slot >= 0 && src.slot < st.kills.length) st.kills[src.slot] = (st.kills[src.slot] ?? 0) + 1
+    const by = src.slot >= 0 ? sim.run.roster[src.slot] : undefined
+    if (by !== undefined) st.kills[by] = (st.kills[by] ?? 0) + 1
     if (src.hazard) st.hazardKills[src.hazard] = (st.hazardKills[src.hazard] ?? 0) + 1
   }
   sim.out.events.push({ kind: 'kill' })
@@ -231,7 +231,7 @@ export function grantIframe(sim: Sim, eid: number, ms: number): void {
 const REJOINING: Mover = { self: false, free: true }
 
 /** 归队：扇形多出一个坑位，随机分给他，他从空中落进去；队长原地落下。倒下的人早已淡出、不在场上，在坑位重新登场不算位移 */
-function rejoin(sim: Sim, eid: number): void {
+export function rejoin(sim: Sim, eid: number): void {
   if (eid !== sim.leader) {
     const n = followersOf(sim).length
     const seat = Math.floor(sim.rng.next() * n)
@@ -245,12 +245,15 @@ function rejoin(sim: Sim, eid: number): void {
   displace(sim, eid, { kind: 'drop', ms: REJOIN.dropMs, height: REJOIN.height * UNIT }, REJOINING)
 }
 
-/** 复活：回不来的不行；用掉全队一条命，命用完了其余倒着的也不会再自己起来；生命与体力回满，回到队伍里 */
+/** 被扶起来、被技能救起来：全队没命了就不行，起来一次用掉一条命 */
 export function reviveCharacter(sim: Sim, eid: number): void {
   if (!revivable(sim, eid)) return
-  const run = sim.run
-  run.lives -= 1
-  if (run.lives <= 0) for (const m of sim.characters) if (!Alive.v[m]) Revive.at[m] = Infinity
+  sim.run.lives -= 1
+  raise(sim, eid)
+}
+
+/** 站起来：生命与体力回满，从空中落回队伍里 */
+export function raise(sim: Sim, eid: number): void {
   Alive.v[eid] = 1
   Lethal.used[eid] = 0
   Lethal.low[eid] = 0

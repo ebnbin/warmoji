@@ -11,7 +11,6 @@ import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { settleMotions } from '../settleMotions'
 import { refoldBattleFx } from '../refoldBattleFx'
-import { reviveCharacters } from '../reviveCharacters'
 import { steerBodies } from '../steerBodies'
 import { updateBees } from '../updateBees'
 import { updateControl } from '../updateControl'
@@ -44,7 +43,6 @@ export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   tickSkillCooldowns,
   stepHandover,
-  { run: reviveCharacters, after: [stepHandover] },
   tickMarks,
   { run: tickResources, after: [tickMarks] },
   { run: tickForms, after: [tickMarks] },
@@ -58,7 +56,7 @@ export const SIM_PIPELINE = pipeline([
   { run: tickStats, after: [refoldBattleFx, tickMarks, tickForms] },
   { run: tickRegen, after: [tickStats] },
   { run: updateControl, after: [tickStats, tickMarks, tickTenacity] },
-  { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
+  { run: driveTeam, after: [stepHandover, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
   despawnExpired,
   updateBees,

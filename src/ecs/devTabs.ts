@@ -155,6 +155,7 @@ function commandsTab(battle: EcsBattleScene): DevTab {
           { label: '金币 +1000', run: () => battle.dev({ kind: 'grant', what: 'coins' }) },
           { label: '升一级', run: () => battle.dev({ kind: 'grant', what: 'level' }) },
           { label: '技能冷却清零', run: () => battle.dev({ kind: 'resetSkill' }) },
+          { label: '打倒一名队员', run: () => battle.dev({ kind: 'down' }) },
           ...(battle.endless ? [] : [{ label: '结束本波', run: (): void => battle.dev({ kind: 'endWave' }) }]),
           { label: '下一阶段', run: () => battle.dev({ kind: 'nextPhase' }) },
         ],

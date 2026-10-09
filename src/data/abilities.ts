@@ -72,7 +72,6 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'heal':
     case 'healRatio':
     case 'revive':
-    case 'reviveCut':
     case 'undead':
     case 'stun':
     case 'root':

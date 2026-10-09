@@ -382,15 +382,6 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     })
   },
 
-  reviveCut: (sim, _src, fx, at) => {
-    let best = -1
-    eachCapable(sim, at, Revive, (t) => {
-      if (Alive.v[t]) return
-      if (best < 0 || Revive.at[t]! > Revive.at[best]!) best = t
-    })
-    if (best >= 0) Revive.at[best] = Revive.at[best]! - fx.ms
-  },
-
   timeStop: (sim, _src, fx) => {
     sim.timeStopMsLeft = fx.durationMs
   },

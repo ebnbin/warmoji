@@ -149,10 +149,6 @@ interface InvulnEffect {
   readonly kind: 'invuln'
   readonly ms: number
 }
-interface ReviveCutEffect {
-  readonly kind: 'reviveCut'
-  readonly ms: number
-}
 interface TimeStopEffect {
   readonly kind: 'timeStop'
   readonly durationMs: number
@@ -600,7 +596,6 @@ export type Effect =
   | ReviveEffect
   | HealRatioEffect
   | InvulnEffect
-  | ReviveCutEffect
   | TimeStopEffect
   | CoinsEffect
   | InterestEffect

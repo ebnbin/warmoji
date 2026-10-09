@@ -153,7 +153,8 @@ export function levelProgress(xp: number, floor = 1, top = MAX_CHAR_LEVEL): Leve
   const level = Math.min(top, Math.max(floor, characterLevel(xp)))
   if (level >= top) return { maxed: true, cur: 0, need: 0, ratio: 1 }
   const prev = level > floor ? CHAR_XP_THRESHOLDS[level - 2]! : 0
-  const next = CHAR_XP_THRESHOLDS[level - 1]!
+  const next = CHAR_XP_THRESHOLDS[level - 1]
+  if (next === undefined) return { maxed: true, cur: 0, need: 0, ratio: 1 }
   const cur = xp - prev
   const need = next - prev
   return { maxed: false, cur, need, ratio: Math.max(0, Math.min(1, cur / need)) }

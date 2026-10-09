@@ -10,6 +10,5 @@ export const MUTATORS = {
   fragile: { emoji: '1f494', name: '脆弱', heat: 2, rules: { mods: { mul: { maxHp: 0.6 } } } },
   silence: { emoji: '1f507', name: '封印', heat: 2, rules: { skills: false } },
   night: { emoji: '1f311', name: '永夜', heat: 2, rules: { vision: 4 } },
-  lasting: { emoji: '1faa6', name: '长眠', heat: 2, rules: { revive: false } },
   king: { emoji: '1f451', name: '孤王', heat: 2, rules: { leader: { critical: true } } },
 } as const satisfies Record<string, MutatorDef>

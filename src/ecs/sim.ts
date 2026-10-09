@@ -164,8 +164,8 @@ export function makeSim(
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
     foes: {
-      speed: characters.reduce((v, m, slot) => (run.fallen[slot] ? v : v * Stats.enemySpeed[m]!), 1),
-      count: characters.reduce((v, m, slot) => (run.fallen[slot] ? v : v * Stats.enemyCount[m]!), 1),
+      speed: characters.reduce((v, m) => v * Stats.enemySpeed[m]!, 1),
+      count: characters.reduce((v, m) => v * Stats.enemyCount[m]!, 1),
     },
     frameAttractors: [],
     targets: [[], []],
@@ -182,9 +182,9 @@ export function makeSim(
     handover: null,
     aim: { x: 0, y: -1 },
   }
-  // 这一局回不来的队员倒着上场
+  // 上一场倒下的人倒着上场
   characters.forEach((m, slot) => {
-    if (run.fallen[slot]) layDown(sim, m)
+    if (run.memberHp[slot] === 0) layDown(sim, m)
   })
   return sim
 }
