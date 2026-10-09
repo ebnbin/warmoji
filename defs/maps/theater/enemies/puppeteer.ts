@@ -26,7 +26,8 @@ const press = {
   aim: 'nearest',
   range: 8,
   damage: 26,
-  knockback: 2,
+  knockback: 2.5,
+  element: 'physical',
   fireSfx: 'thud',
   color: 0x7e57c2,
   windup: { ms: 800, lockAt: 'end', telegraph: 'shake' },
@@ -40,10 +41,9 @@ const silk = {
   firstDelayMs: 2500,
   aim: 'nearest',
   range: 9,
-  damage: 18,
+  damage: 15,
   fireSfx: 'flutter',
   shape: { kind: 'drop', targets: 4, look: { emoji: '1f9f5', size: 1 }, fromAbove: 4, dropMs: 700, staggerMs: 150 },
-  onHit: [{ kind: 'root', durationMs: 1000 }],
 } satisfies AbilityDef
 
 const PUPPETEER = {
@@ -51,7 +51,8 @@ const PUPPETEER = {
   role: 'boss',
   emoji: '1faf3',
   name: '提线之手',
-  desc: '从顶上垂下来的提线大手：牵住最近的两名队员，3 秒内没跑出 6 格就被牵着倒戈 2.5 秒；蓄一口力重重按下一片，按中的晕一下；丝线从天上落下把人钉在原地；血掉到四成谢幕，出手更快、走得更快',
+  element: 'thunder',
+  desc: '从顶上垂下来的提线大手，丝线通着电，本身带电、电流跳不到它身上：牵住最近的两名队员，3 秒内没跑出 6 格就被牵着倒戈 2.5 秒；蓄 0.8 秒重重按下一片，这一下是物理，按中的被震开、晕 0.6 秒，蓄力时挨雷就被打断；四根带电的丝线从天上落下，挨中的电流再跳到 2.5 格内另一名队员，湿的连成一片一起挨；血掉到四成谢幕，出手更快、走得更快',
   size: 3.2,
   radius: 1.1,
   span: [0, 6],

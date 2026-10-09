@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🥳 派对王：礼炮给身边最伤的队友回血，彩带甩到敌人身上烫一阵，两样轮着来；技能让全队开起狂欢
+// 🥳 派对王：本身是火；礼炮给身边最伤的队友回血，彩带甩到敌人身上点着火、火再烧到贴着的敌人，两样轮着来；技能让全队开起狂欢、出手都点火
 
 // 礼炮与彩带用不用得上都算放过，免得轮换卡在其中一式
 const salute = (then: readonly Effect[]) =>
@@ -21,10 +21,9 @@ const streamerThrow = {
   class: 'attack',
   aim: 'nearest',
   range: 6,
-  damage: 10,
+  damage: 9,
   fireSfx: 'shoot',
   shape: { kind: 'bolt', projectile: shot('1f38a', 9, 0.42), lifeMs: 1200 },
-  onHit: [{ kind: 'poison', damage: 2, tickMs: 500, durationMs: 2000 }],
 } satisfies AbilityDef
 
 const streamer = {
@@ -61,12 +60,12 @@ export default {
   emoji: '1f973',
   name: '派对王',
   element: 'fire',
-  desc: '走到哪热闹到哪的派对王：礼炮与彩带每 1.3 秒轮着放，礼炮给 4.5 格内最伤的队友回血，彩带甩向 6 格内最近的敌人、烫它一阵，轮到的那样用不上就空过；技能让全队回血、加伤、出手带火',
+  desc: '走到哪热闹到哪的派对王，本身是火、点不着：礼炮与彩带每 1.3 秒轮着放，礼炮给 4.5 格内最伤的队友回血，中了毒的回不了；彩带甩向 6 格内最近的敌人、把它点着，火会烧到贴着它的敌人；轮到的那样用不上就空过；技能让全队回血、加伤、出手都点火，打进毒云就炸开',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.8 },
   stats: { moveSpeed: 6, maxStamina: 90, staminaRegen: 80, exertion: 0.8 },
-  skill: { name: '狂欢', icon: '1f389', desc: '全队回复 20% 生命，6 秒内伤害 ×1.25、出手都带上火元素', cdMs: 16_000, ability: 'partyHostFiesta' },
+  skill: { name: '狂欢', icon: '1f389', desc: '全队回复 20% 生命，6 秒内伤害 ×1.25、出手都带上火：打中的敌人都点着，打在毒云里的把毒云引爆', cdMs: 16_000, ability: 'partyHostFiesta' },
   weapons: [],
   innate: [
     {

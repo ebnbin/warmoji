@@ -1,18 +1,17 @@
 import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
-import { shot } from '../../../kit.ts'
+import { ring, shot } from '../../../kit.ts'
 
-// 🧑‍🎨 布景画师：立起会泼颜料的画，颜料把敌人浇得浑身湿透；技能画出两个以假乱真的自己
+// 🧑‍🎨 布景画师：本身是水；立起会泼颜料的画，颜料把敌人浇得湿透，给队友的冰与雷铺路；技能画出两个以假乱真的自己
 const paintShot = {
   trigger: 'auto',
   cooldownMs: 800,
   aim: 'nearest',
   range: 6,
-  damage: 8,
+  damage: 7,
   fireSfx: 'plip',
   shape: { kind: 'bolt', projectile: shot('1f3a8', 9, 0.4), lifeMs: 1100 },
-  onHit: [{ kind: 'status', status: 'wet', ms: 3000 }],
 } satisfies AbilityDef
 
 const easel = (ability: AbilityDef, maxAlive: number) =>
@@ -26,7 +25,7 @@ const easel = (ability: AbilityDef, maxAlive: number) =>
 
 const painterEasel = easel(paintShot, 2)
 const painterEasel2 = easel(paintShot, 3)
-const painterEasel3 = easel({ ...paintShot, onHit: [...paintShot.onHit, { kind: 'slow', factor: 0.8, durationMs: 1000 }] }, 3)
+const painterEasel3 = easel({ ...paintShot, onHit: [{ kind: 'blast', radius: 1.2, ratio: 0.5, knockback: 0, ring: ring(0x42a5f5) }] }, 3)
 
 const painterDouble = {
   trigger: 'manual',
@@ -44,7 +43,7 @@ export default {
   emoji: '1f9d1_200d_1f3a8',
   name: '布景画师',
   element: 'water',
-  desc: '给舞台画布景的画师：走到哪就立起会泼颜料的画，颜料把敌人浇得浑身湿透，好让队友的冰一打就冻、雷一打一片；技能画出两个以假乱真的自己',
+  desc: '给舞台画布景的画师，本身是水：走到哪就立起会泼颜料的画，颜料把敌人浇湿 5 秒，湿的点不着火，队友的冰一打就冻、雷一打一片；技能画出两个以假乱真的自己；身上总是湿的，自己点不着，可挨了冰当场就冻、挨了雷就连上',
   role: 'summoner',
   tags: ['damage', 'summon'],
   body: { drag: 5, mass: 1 },
@@ -58,7 +57,7 @@ export default {
       base: 'painterEasel',
       upgrades: [
         { ability: 'painterEasel2', card: { icon: '1f58c', name: '多画几幅', desc: '最多同时立三幅画' } },
-        { ability: 'painterEasel3', card: { icon: '1f30a', name: '水彩', desc: '颜料打中的敌人 1 秒内走得慢两成' } },
+        { ability: 'painterEasel3', card: { icon: '1f4a6', name: '泼墨', desc: '颜料溅开：打中的敌人 1.2 格内的别的敌人也挨半下，一起湿透' } },
       ],
     },
   ],

@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🥸 怪盗：闪到敌人身后出刀，顺手摸走金币；技能偷走最近的敌人的一招
+// 🥸 怪盗：闪到敌人身后出刀，刀是物理，冻住的一刀就碎，顺手摸走金币；技能偷走最近的敌人的一招
 const phantomThiefBlade = {
   trigger: 'auto',
   cooldownMs: 1400,
@@ -41,7 +41,7 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f978',
   name: '怪盗',
-  desc: '神出鬼没的怪盗：闪到敌人身后出刀再闪回来，每一刀有两成几率顺手摸走一枚金币；技能偷走最近的敌人的一招，随后混进人群不见',
+  desc: '神出鬼没的怪盗：闪到敌人身后出刀再闪回来，这一刀是物理，打在冻住的身上敲碎冰、伤害翻倍；每一刀有两成几率顺手摸走一枚金币；技能偷走最近的敌人的一招，随后混进人群不见；身法灵，躲得开一些单打的，躲不开范围与持续伤害',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4, mass: 0.6 },
