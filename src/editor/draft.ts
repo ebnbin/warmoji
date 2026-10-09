@@ -8,7 +8,7 @@ import { fromJson } from '../data/json'
 import { MAPS } from '../data/maps'
 import { runChecks } from '../data/runCheck'
 import type { Issue } from '../data/runCheck'
-import type { EndRule, FightDef, PhaseDef, RunDef, SpawnRule, WavesRule } from '../types/runs'
+import type { CueRule, EndRule, FightDef, PhaseDef, RunDef, SpawnRule, WavesRule } from '../types/runs'
 
 /** 每一层都去掉只读：编辑器就地改草稿 */
 export type Mutable<T> = T extends object ? { -readonly [K in keyof T]: Mutable<T[K]> } : T
@@ -22,6 +22,7 @@ export type Spawn = Mutable<SpawnRule>
 export type Waves = Mutable<WavesRule>
 export type WaveSquad = Waves['squads'][number]
 export type End = Mutable<EndRule>
+export type Cue = Mutable<CueRule>
 
 const CHECKS = runChecks({
   enemies: ENEMIES,

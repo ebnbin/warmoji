@@ -33,7 +33,7 @@ export class ResultScene extends Phaser.Scene {
   private reason: string | null = null
   private submitted = false
   /** 赢下带星级的一关：每条条件做到没有、几颗星、热度、破没破纪录 */
-  private lab: { met: boolean[]; stars: number; heat: number; newBest: boolean } | null = null
+  private lab: { met: boolean[]; stars: number; heat: number; newBest: boolean; trial: boolean } | null = null
 
   constructor() {
     super(SceneKey.Result)
@@ -62,16 +62,14 @@ export class ResultScene extends Phaser.Scene {
     if (!this.submitted) {
       this.submitted = true
       const id = this.run.runId
-      if (id !== undefined && def.stars) {
-        if (this.win) {
-          const met = def.stars.map((s) => starMet(this.run, s))
-          const stars = 1 + met.filter(Boolean).length
-          const heat = heatOf(this.run.mutators)
-          const r = submitLab(browserStorage(), id, stars, heat, fights)
-          this.lab = { met, stars, heat, newBest: r.newStars || r.newHeat }
-        } else {
-          reachLab(browserStorage(), id, reached - 1)
-        }
+      if (def.stars && this.win) {
+        const met = def.stars.map((s) => starMet(this.run, s))
+        const stars = 1 + met.filter(Boolean).length
+        const heat = heatOf(this.run.mutators)
+        const r = id === undefined ? undefined : submitLab(browserStorage(), id, stars, heat, fights)
+        this.lab = { met, stars, heat, newBest: r !== undefined && (r.newStars || r.newHeat), trial: id === undefined }
+      } else if (def.stars && id !== undefined) {
+        reachLab(browserStorage(), id, reached - 1)
       }
       playSfx(this.win ? 'levelup' : 'over')
     }
@@ -117,7 +115,7 @@ export class ResultScene extends Phaser.Scene {
         this,
         cx,
         statusY,
-        `${'{2b50}'.repeat(lab.stars)} ${lab.stars}/${1 + def.stars.length} 星${missed.length > 0 ? `（没做到：${missed.join('、')}）` : ''}${lab.heat > 0 ? ` · 热度 ${lab.heat}` : ''}${lab.newBest ? ' · 新纪录！' : ''}`,
+        `${'{2b50}'.repeat(lab.stars)} ${lab.stars}/${1 + def.stars.length} 星${missed.length > 0 ? `（没做到：${missed.join('、')}）` : ''}${lab.heat > 0 ? ` · 热度 ${lab.heat}` : ''}${lab.newBest ? ' · 新纪录！' : ''}${lab.trial ? ' · 试玩不记录' : ''}`,
         { kind: 'heading', bold: false, color: 'accent', originX: 0.5, maxWidth: content.w - 48 },
       )
     } else if (this.reason !== null) {

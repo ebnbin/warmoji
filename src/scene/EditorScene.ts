@@ -1,21 +1,22 @@
 import Phaser from 'phaser'
 import { CHARACTERS, ROSTER_IDS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
-import { EXPERIMENT_IDS } from '../data/experiments'
 import { MAP_IDS, MAPS } from '../data/maps'
 import { pathText } from '../data/runCheck'
 import type { Issue, Path } from '../data/runCheck'
-import { RUNS } from '../data/runs'
+import { RUN_IDS, RUNS } from '../data/runs'
+import { STAT_CATEGORIES } from '../data/stats'
+import { TAG_IDS, TAGS } from '../data/tags'
 import { currentDraft, defaultEmoji, draftIssues, draftSnapshot, loadDraft, resetDraft } from '../editor/draft'
 import { inspect } from '../editor/fields'
 import type { Action, Field, Option, Row as FormRow } from '../editor/fields'
-import { END_KINDS, ICON, SPAWN_KINDS } from '../editor/kinds'
+import { END_KINDS, ICON, SPAWN_KINDS, STAR_KINDS } from '../editor/kinds'
 import { outline, ownerOf, samePath } from '../editor/outline'
 import type { Node } from '../editor/outline'
 import { preloadEmojis } from '../emoji/hold'
 import type { EmojiRef } from '../emoji/hold'
 import { beginCustomRun, skipFilled } from '../run/state'
-import type { ExperimentId } from '../types/runs'
+import type { RunId } from '../types/runs'
 import {
   beginPage,
   Button,
@@ -28,6 +29,7 @@ import {
   Label,
   Notice,
   openPicker,
+  openTextPrompt,
   PageHeader,
   pageFrame,
   Panel,
@@ -82,10 +84,11 @@ const inset = (r: Rect, d: number): Rect => ({ x: r.x + d, y: r.y + d, w: r.w - 
 
 const headerTitle = (): string => `{${currentDraft().emoji}} 关卡编辑器`
 
-/** 页面上会出现的图标：导航与操作的、能换上的每一局，外加所有敌人、地图与角色 */
+/** 页面上会出现的图标：导航与操作的、能换上的每一局，外加所有敌人、地图、角色、标签与属性分类 */
 function editorEmojis(): EmojiRef[] {
+  const kinds = [SPAWN_KINDS, END_KINDS, STAR_KINDS].flatMap((table) => Object.values<{ readonly icon: string }>(table).map((k) => k.icon))
   return [
-    ...[WARN, OK, PLAY, currentDraft().emoji, defaultEmoji(), ...EXPERIMENT_IDS.map((id) => RUNS[id].emoji), ...Object.values(ICON), ...Object.values(SPAWN_KINDS).map((k) => k.icon), ...Object.values(END_KINDS).map((k) => k.icon)].map((id) => ({ id })),
+    ...[WARN, OK, PLAY, currentDraft().emoji, defaultEmoji(), ...RUN_IDS.map((id) => RUNS[id].emoji), ...Object.values(ICON), ...kinds, ...TAG_IDS.map((t) => TAGS[t].icon), ...Object.values(STAT_CATEGORIES).map((c) => c.icon)].map((id) => ({ id })),
     ...Object.values(ENEMIES).map((e) => ({ id: e.emoji, outline: 'enemy' as const })),
     ...MAP_IDS.map((id) => ({ id: MAPS[id].emoji })),
     ...ROSTER_IDS.map((id) => ({ id: CHARACTERS[id].emoji, outline: 'player' as const })),
@@ -116,6 +119,8 @@ export class EditorScene extends Phaser.Scene {
   private status!: Button
   /** 参数区眼下画的是什么样子 */
   private look = ''
+  /** 页头眼下的标题：图标跟着草稿换 */
+  private title = ''
 
   constructor() {
     super(SceneKey.Editor)
@@ -128,8 +133,9 @@ export class EditorScene extends Phaser.Scene {
   create(): void {
     beginPage(this)
     this.look = ''
+    this.title = headerTitle()
     const f = (this.frame = pageFrame({ footer: true }))
-    this.header = new PageHeader(this, f, { title: headerTitle(), back: () => this.scene.start(SceneKey.Menu) })
+    this.header = new PageHeader(this, f, { title: this.title, back: () => this.scene.start(SceneKey.Menu) })
     new Button(this, f.right - 66, f.headerY, { label: '换一局', size: 'sm', variant: 'secondary', width: 132, onTap: () => this.swap() })
 
     const { nav, form } = split(f)
@@ -170,6 +176,8 @@ export class EditorScene extends Phaser.Scene {
       this.drawForm(node, own, rows, keepForm)
     }
     this.status.setLabel(issues.length > 0 ? `{${WARN}} ${issues.length} 个问题` : `{${OK}} 没有问题`).setVariant(issues.length > 0 ? 'danger' : 'secondary')
+    const title = headerTitle()
+    if (title !== this.title) this.header.title.setContent((this.title = title))
   }
 
   private drawNav(nodes: readonly Node[], chosen: Node, flagged: ReadonlySet<Node>, reveal: boolean): void {
@@ -245,12 +253,15 @@ export class EditorScene extends Phaser.Scene {
   private drawField(f: Field, y: number, w: number): number {
     let row: FieldRow | undefined
     const main = this.control(f, (text) => row?.setValue(text))
-    const tools = (f.tools ?? []).map((t): Part => ({ obj: new IconButton(this, 0, 0, { icon: t.icon, size: TOOL, variant: 'dark', onTap: () => this.edit(t.run) }), width: TOOL }))
+    const type = f.kind === 'number' ? [{ icon: ICON.type, run: () => this.typeNumber(f) }] : []
+    const tools = [...type, ...(f.tools ?? []).map((t) => ({ icon: t.icon, run: () => this.edit(t.run) }))].map(
+      (t): Part => ({ obj: new IconButton(this, 0, 0, { icon: t.icon, size: TOOL, variant: 'dark', onTap: t.run }), width: TOOL }),
+    )
     const box = this.pack([...(main ? [main] : []), ...tools])
     row = new FieldRow(this, PAD, y, w, {
       label: f.label,
       value: this.shownValue(f),
-      hint: f.hint,
+      hint: f.kind === 'text' && f.lines > 1 ? f.value || '（空着）' : f.hint,
       icon: f.icon,
       outline: f.outline,
       control: box?.obj,
@@ -261,11 +272,34 @@ export class EditorScene extends Phaser.Scene {
     return y + row.rowHeight
   }
 
-  /** 名字后面的当前值：控件自己显示数值的就不再写 */
+  /** 名字后面的当前值：控件自己显示数值的就不再写，长文字整段写在名字下面 */
   private shownValue(f: Field): string | undefined {
     if (f.kind === 'number') return this.stepper(f) ? undefined : f.format(f.value)
     if (f.kind === 'pick' || f.kind === 'info') return f.value
+    if (f.kind === 'text') return f.lines > 1 ? undefined : (f.shown ?? f.value)
     return undefined
+  }
+
+  /** 直接填一个数：滑杆步长落不到的值也写得进去 */
+  private typeNumber(f: Extract<Field, { kind: 'number' }>): void {
+    const range = `${f.format(f.min)} 到 ${f.format(f.max)}`
+    openTextPrompt(this, {
+      title: f.label,
+      value: String(f.value),
+      numeric: true,
+      hint: `${range}${f.whole ? '，整数' : ''}`,
+      check: (t) => {
+        const v = Number(t)
+        if (t === '' || !Number.isFinite(v)) return '要填一个数'
+        if (f.whole && !Number.isInteger(v)) return '要填整数'
+        return v < f.min || v > f.max ? `要在 ${range} 之间` : undefined
+      },
+      onDone: (t) => {
+        // 控件自己显示的数值不算在样子里，填进去的数得整个重画才看得见
+        this.look = ''
+        this.edit(() => f.set(Number(t)))
+      },
+    })
   }
 
   private stepper(f: Extract<Field, { kind: 'number' }>): boolean {
@@ -294,6 +328,17 @@ export class EditorScene extends Phaser.Scene {
       }
       case 'pick':
         return { obj: new Button(this, 0, 0, { label: '更换', size: 'sm', variant: 'secondary', width: 112, onTap: () => this.pick(f.title, f.options) }), width: 112 }
+      case 'text':
+        return {
+          obj: new Button(this, 0, 0, {
+            label: '修改',
+            size: 'sm',
+            variant: 'secondary',
+            width: 112,
+            onTap: () => openTextPrompt(this, { title: f.label, value: f.value, lines: f.lines, hint: f.hint, check: f.check, onDone: (t) => this.edit(() => f.set(t)) }),
+          }),
+          width: 112,
+        }
       case 'info':
         return undefined
     }
@@ -353,16 +398,15 @@ export class EditorScene extends Phaser.Scene {
     })
   }
 
-  /** 丢掉改动，换上默认的一局或一个实验从头改起 */
+  /** 丢掉改动，换上默认的一局、冒险的一章或一个实验从头改起 */
   private swap(): void {
-    openPicker<ExperimentId | null>(this, {
+    openPicker<RunId | null>(this, {
       title: '丢掉改动，从哪一局改起？',
-      items: [{ key: null, emoji: defaultEmoji(), label: '默认的一局' }, ...EXPERIMENT_IDS.map((id) => ({ key: id, emoji: RUNS[id].emoji, label: RUNS[id].name }))],
+      items: [{ key: null, emoji: defaultEmoji(), label: '默认的一局' }, ...RUN_IDS.map((id) => ({ key: id, emoji: RUNS[id].emoji, label: RUNS[id].name }))],
       onPick: (id) => {
         if (id === null) resetDraft()
         else loadDraft(RUNS[id])
         this.selected = []
-        this.header.title.setContent(headerTitle())
         this.render(false, true)
       },
     })
