@@ -4,6 +4,11 @@ set -euo pipefail
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then exit 0; fi
 cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
 
+# 只在新 session 时清：恢复的旧磁盘会残留未跟踪和被忽略的文件，resume / compact / clear 时清会删掉进行中的工作
+if grep -q '"source" *: *"startup"' <<<"$(cat)"; then
+  git clean -fdxq
+fi
+
 if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
   git fetch --unshallow origin || echo "session-start: unshallow 失败，稍后手动 git fetch --unshallow origin" >&2
 fi
