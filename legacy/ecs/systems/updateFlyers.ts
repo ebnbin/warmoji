@@ -71,7 +71,7 @@ export function updateFlyers(sim: Sim): void {
       const fy = Transform.y[f]!
       const damage = Flyer.damage[f]!
       const s = struckOf(t.eid)
-      if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x: fx, y: fy } })) applyOnHit(sim, src, abilityOnHit[e], fx, fy, damage, [s])
+      if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x: fx, y: fy }, cue: 'shown' })) applyOnHit(sim, src, abilityOnHit[e], fx, fy, damage, [s])
     }
   }
 }

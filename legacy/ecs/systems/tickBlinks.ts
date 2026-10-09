@@ -29,7 +29,7 @@ function strike(sim: Sim, e: number, m: number): void {
   const execHp = BlinkShape.execHp[e]!
   if (execHp > 0 && Hp.max[t]! > 0 && Hp.v[t]! / Hp.max[t]! <= execHp) dmg *= BlinkShape.execMul[e]!
   const struck = struckOf(t)
-  if (hit(sim, s.src, t, dmg, { knockback: s.knockback, from: { x, y } })) applyOnHit(sim, s.src, s.onHit, tx, ty, dmg, [struck], Aim.rad[e])
+  if (hit(sim, s.src, t, dmg, { knockback: s.knockback, from: { x, y }, cue: 'shown' })) applyOnHit(sim, s.src, s.onHit, tx, ty, dmg, [struck], Aim.rad[e])
   spawnFxSlash(sim, tx, ty, Aim.rad[e]!, 34)
 }
 

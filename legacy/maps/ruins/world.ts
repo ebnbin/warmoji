@@ -570,7 +570,7 @@ function landFalls(sim: Sim, s: RuinsState): void {
     let e = 0
     for (const p of due) for (const b of p.bins) if ((b.x - x) ** 2 + (b.y - y) ** 2 < r * r) e += b.energy
     const dmg = (e / 1000) * cfg.fall.damagePerKJ
-    if (dmg >= 1) hit(sim, src, eid, Math.round(dmg))
+    if (dmg >= 1) hit(sim, src, eid, Math.round(dmg), { cue: 'shown' })
   }
 }
 

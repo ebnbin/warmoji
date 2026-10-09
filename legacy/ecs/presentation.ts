@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { hasComponent, query } from 'bitecs'
+import { entityExists, hasComponent, query } from 'bitecs'
 import type { QueryTerm } from 'bitecs'
 import { UNIT } from '../util/units'
 import { norm } from '../util/vec'
@@ -10,7 +10,43 @@ import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, Boss, Depth, Elite, Emplacement, ENEMY_SET, Facing, Faction, Hp, MARK_SLOTS, Mark, Radius, Res, Slot, Sprite, Tint, TINT_SIDE, Transform, VisOff } from './components'
+import {
+  Aim,
+  Alive,
+  Bolt,
+  Boss,
+  Casting,
+  Depth,
+  Disc,
+  DISC_AT,
+  Elite,
+  Emplacement,
+  ENEMY_SET,
+  FACTION,
+  Facing,
+  Faction,
+  Hp,
+  LeapShape,
+  MARK_SLOTS,
+  Mark,
+  Owner,
+  Radius,
+  Repeat,
+  Res,
+  Sector,
+  Segment,
+  Slot,
+  SprintShape,
+  Sprite,
+  Tint,
+  TINT_SIDE,
+  Transform,
+  Uid,
+  VisOff,
+} from './components'
+import { DEG2RAD } from '../util/units'
+import { volleyAngle } from './systems/shared/fire'
+import { anchorX, anchorY } from './utils/ability'
 import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -109,12 +145,14 @@ export class Presentation {
   readonly feet: Scratch = newScratch()
   /** 队长身边指向目标的箭头 */
   readonly pointer: Scratch = newScratch()
+  /** 敌方蓄力时地上的预警：压在身体与脚下的圈下面 */
+  readonly warn: Scratch = newScratch()
   /** 救援圈：全队倒下那一帧起不再更新 */
   private rescue: Mark[] = []
 
   step(sim: Sim): void {
     this.sprites.length = 0
-    for (const s of [this.marks, this.trail, this.bars, this.feet, this.pointer]) resetScratch(s)
+    for (const s of [this.marks, this.trail, this.bars, this.feet, this.pointer, this.warn]) resetScratch(s)
     sweats(sim, this.sprites)
     statusIcons(sim, this.sprites)
     echo(sim, this.sprites, this.trail)
@@ -122,6 +160,7 @@ export class Presentation {
     this.sprites.sort((a, b) => a.z - b.z)
     bars(sim, this.bars)
     feet(sim, this.feet)
+    warnings(sim, this.warn)
     pointer(sim, this.pointer, goalSpot(sim), GOAL_COLOR)
     pointer(sim, this.pointer, nearestTo(sim, levelUpsOnField(sim)), LEVEL_UP_COLOR)
     pointer(sim, this.pointer, sim.hooks.beacon?.(sim) ?? null, BEACON_COLOR)
@@ -363,4 +402,137 @@ function rescueMarks(sim: Sim, reach: number): Mark[] {
 function mark(o: Scratch, m: Mark): void {
   fan(o, WORLD, m.x, m.y, m.r, packTint(m.color, MARK_FILL))
   ringStrip(o, WORLD, m.x, m.y, m.r, MARK_WIDTH, packTint(m.color, MARK_LINE))
+}
+
+/** 预警：底下一层淡红标出要打到的范围，再一层随蓄力从里往外填满，填满的那一刻出手；快出手时描边亮起来 */
+const WARN = { color: SIDE.foe, base: 0.1, fill: 0.3, line: 0.75, width: 3, hotMs: 120 } as const
+/** 弹体的预警只画一段，免得一条线横穿整个屏幕 */
+const WARN_SHOT_MAX = 6 * UNIT
+/** 瞬袭的预警：目标脚下一个准星 */
+const WARN_MARK_R = 0.45 * UNIT
+
+interface Warn {
+  readonly o: Scratch
+  readonly p: number
+  readonly alpha: number
+  readonly hot: boolean
+}
+
+function warnLine(w: Warn): number {
+  return packTint(WARN.color, (w.hot ? 1 : WARN.line) * w.alpha)
+}
+
+function warnCircle(w: Warn, x: number, y: number, r: number): void {
+  fan(w.o, WORLD, x, y, r, packTint(WARN.color, WARN.base * w.alpha))
+  if (w.p > 0) fan(w.o, WORLD, x, y, r * w.p, packTint(WARN.color, WARN.fill * w.alpha))
+  ringStrip(w.o, WORLD, x, y, r, WARN.width, warnLine(w))
+}
+
+function wedgeFan(o: Scratch, x: number, y: number, r: number, a0: number, a1: number, color: number): void {
+  const n = Math.max(4, Math.ceil(((a1 - a0) / (Math.PI * 2)) * 40))
+  const d = (a1 - a0) / n
+  for (let k = 0; k < n; k++) {
+    const a = a0 + k * d
+    const b = a + d
+    tri(o, WORLD, x, y, x + Math.cos(a) * r, y + Math.sin(a) * r, x + Math.cos(b) * r, y + Math.sin(b) * r, color)
+  }
+}
+
+function warnWedge(w: Warn, x: number, y: number, r: number, angle: number, half: number): void {
+  const a0 = angle - half
+  const a1 = angle + half
+  wedgeFan(w.o, x, y, r, a0, a1, packTint(WARN.color, WARN.base * w.alpha))
+  if (w.p > 0) wedgeFan(w.o, x, y, r * w.p, a0, a1, packTint(WARN.color, WARN.fill * w.alpha))
+  const line = warnLine(w)
+  ringStrip(w.o, WORLD, x, y, r, WARN.width, line, a0, a1)
+  segment(w.o, WORLD, x, y, x + Math.cos(a0) * r, y + Math.sin(a0) * r, WARN.width, line)
+  segment(w.o, WORLD, x, y, x + Math.cos(a1) * r, y + Math.sin(a1) * r, WARN.width, line)
+}
+
+/** 从 (x, y) 朝 angle 伸出 len、半宽 half 的一条 */
+function warnLane(w: Warn, x: number, y: number, angle: number, len: number, half: number): void {
+  const ca = Math.cos(angle)
+  const sa = Math.sin(angle)
+  const rect = (l: number, color: number): void =>
+    quad(w.o, WORLD, x - sa * half, y + ca * half, x + sa * half, y - ca * half, x + ca * l + sa * half, y + sa * l - ca * half, x + ca * l - sa * half, y + sa * l + ca * half, color)
+  rect(len, packTint(WARN.color, WARN.base * w.alpha))
+  if (w.p > 0) rect(len * w.p, packTint(WARN.color, WARN.fill * w.alpha))
+  const line = warnLine(w)
+  const ex = x + ca * len
+  const ey = y + sa * len
+  segment(w.o, WORLD, x - sa * half, y + ca * half, ex - sa * half, ey + ca * half, WARN.width, line)
+  segment(w.o, WORLD, x + sa * half, y - ca * half, ex + sa * half, ey - ca * half, WARN.width, line)
+  segment(w.o, WORLD, ex - sa * half, ey + ca * half, ex + sa * half, ey - ca * half, WARN.width, line)
+}
+
+/** 同时打出去的几发各朝哪：散开的按扇面分，其余就是瞄着的方向 */
+function volley(e: number, angle: number): number[] {
+  const n = Repeat.count[e]!
+  if (n <= 1 || Repeat.delayMs[e]! > 0 || Repeat.everyN[e]! > 0) return [angle]
+  return Array.from({ length: n }, (_, i) => volleyAngle(angle, Repeat.spreadDeg[e]!, i, n))
+}
+
+/**
+ * 敌方身体蓄力时，按在蓄的那条能力的形状在地上画出要打到的地方：一圈、一扇、一条、落点或准星，随蓄力填满；
+ * 每种形状都要说清画不画，同一种形状在哪张图都是同一种预警；只画打得到队伍的，随身体显隐
+ */
+function warnings(sim: Sim, o: Scratch): void {
+  const now = sim.elapsedMs
+  for (const b of query(sim.world, ENEMY_SET)) {
+    const until = Casting.until[b]!
+    const e = Casting.ability[b]!
+    if (!Alive.v[b] || now >= until || e < 0 || !entityExists(sim.world, e) || Uid.v[e] !== Casting.abilityUid[b] || Owner.eid[e] !== b) continue
+    if (Faction.v[e] !== FACTION.enemy) continue
+    const def = abilityDef[e]
+    if (!def) continue
+    const from = Casting.from[b]!
+    const w: Warn = { o, p: until > from ? Math.min(1, Math.max(0, (now - from) / (until - from))) : 1, alpha: Tint.alpha[b]!, hot: until - now <= WARN.hotMs }
+    const x = anchorX(e)
+    const y = anchorY(e)
+    const angle = Casting.angle[b]!
+    const shape = def.shape
+    switch (shape.kind) {
+      case 'disc':
+        if (Disc.at[e] === DISC_AT.self) warnCircle(w, x, y, Disc.radius[e]!)
+        else warnCircle(w, Casting.tx[b]!, Casting.ty[b]!, Disc.radius[e]!)
+        break
+      case 'segment':
+        for (const a of volley(e, angle)) warnLane(w, x, y, a, Segment.reach[e]!, Math.max(Segment.radius[e]!, 0.15 * UNIT))
+        break
+      case 'sector':
+        for (const a of volley(e, angle)) warnWedge(w, x, y, Sector.radius[e]!, a, (Sector.arcDeg[e]! * DEG2RAD) / 2)
+        break
+      case 'sprint':
+        warnLane(w, x, y, angle, SprintShape.distance[e]!, SprintShape.radius[e]! || Radius.v[b]!)
+        break
+      case 'leap':
+        segment(o, WORLD, x, y, x + Math.cos(angle) * LeapShape.distance[e]!, y + Math.sin(angle) * LeapShape.distance[e]!, WARN.width, packTint(WARN.color, WARN.line * 0.5 * w.alpha))
+        warnCircle(w, x + Math.cos(angle) * LeapShape.distance[e]!, y + Math.sin(angle) * LeapShape.distance[e]!, LeapShape.radius[e]!)
+        break
+      case 'bolt': {
+        const reach = Math.min(WARN_SHOT_MAX, Aim.range[e]! || WARN_SHOT_MAX, (Bolt.speed[e]! * Bolt.lifeMs[e]!) / 1000)
+        for (const a of volley(e, angle)) warnLane(w, x, y, a, reach, Math.max(Bolt.radius[e]!, 0.1 * UNIT))
+        break
+      }
+      case 'blink':
+      case 'chain':
+        warnCircle(w, Casting.tx[b]!, Casting.ty[b]!, WARN_MARK_R)
+        break
+      // 打全场的靠全屏的闪光交代；场、召唤、装置与世界效果各有自己的样子，飞返体、坠物出手后看得见
+      case 'all':
+      case 'zone':
+      case 'summon':
+      case 'emplace':
+      case 'world':
+      case 'flyer':
+      case 'drop':
+        break
+      default:
+        unwarned(shape)
+    }
+  }
+}
+
+function unwarned(shape: never): never {
+  throw new Error(`能力的形状没有说清画不画预警：${JSON.stringify(shape)}`)
 }

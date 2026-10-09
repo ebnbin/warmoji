@@ -17,5 +17,5 @@ export function land(sim: Sim, d: number): void {
   const x = Transform.x[d]!
   const y = Drop.toY[d]!
   const s = struckOf(target)
-  if (hit(sim, src, target, damage, { knockback: Payload.knockback[e]!, from: { x: anchorX(e), y: anchorY(e) } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
+  if (hit(sim, src, target, damage, { knockback: Payload.knockback[e]!, from: { x: anchorX(e), y: anchorY(e) }, cue: 'shown' })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
 }

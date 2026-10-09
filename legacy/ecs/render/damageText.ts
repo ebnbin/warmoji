@@ -105,7 +105,7 @@ export class DamageTextLayer {
         )
         continue
       }
-      const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
+      const tint = packTint(crit ? 0xffdc5d : buf.color[i]!, 1 - t)
       let digits = 1
       for (let v = n; v >= 10; v = Math.floor(v / 10)) digits++
       let left = buf.x[i]! - (digits * gw) / 2

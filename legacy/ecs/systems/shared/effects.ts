@@ -24,6 +24,7 @@ import { spawnBolt } from '../../entities/projectile'
 import { openPortals, spawnZone } from '../../entities/zone'
 import { spawnCoins } from '../../entities/pickup'
 import { hit } from './damage'
+import type { Cue } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { bumpTenacity } from './tenacity'
@@ -65,6 +66,7 @@ export function applyBlast(
   damage: number,
   radius: number,
   knockback: number,
+  cue: Cue,
   exclude?: ReadonlySet<number>,
 ): Struck[] {
   const list = covered(sim, src, x, y, targetsWithin(sim, src, x, y, radius))
@@ -73,7 +75,7 @@ export function applyBlast(
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
     const s = struckOf(t.eid)
-    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y }, tags: HIT.area })) struck.push(s)
+    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y }, tags: HIT.area, cue })) struck.push(s)
   }
   return struck
 }
@@ -187,7 +189,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   blast: (sim, src, fx, at) => {
-    applyBlast(sim, src, at.x, at.y, (fx.amount ?? 0) + at.baseDamage * (fx.ratio ?? 0), fx.radius, fx.knockback, at.exclude)
+    applyBlast(sim, src, at.x, at.y, (fx.amount ?? 0) + at.baseDamage * (fx.ratio ?? 0), fx.radius, fx.knockback, fx.ring ? 'shown' : { trace: { x: at.x, y: at.y } }, at.exclude)
     breachAt(sim, at.x, at.y, BLAST_M, fx.radius, fx.breach ?? 0)
     if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
@@ -322,14 +324,14 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   damage: (sim, src, fx, at) => {
     const dmg = fx.amount + at.baseDamage * (fx.ratio ?? 0)
-    for (const t of at.targets ?? []) hit(sim, src, t, dmg)
+    for (const t of at.targets ?? []) hit(sim, src, t, dmg, { cue: { trace: { x: at.x, y: at.y } } })
   },
 
   hpDamage: (sim, src, fx, at) => {
     for (const t of at.targets ?? []) {
       if (!hasComponent(sim.world, t, Hp) || !Alive.v[t]) continue
       const dmg = Hp.v[t]! * (Boss.v[t] || Elite.v[t] ? fx.bossRatio : fx.ratio)
-      if (dmg >= 1) hit(sim, src, t, dmg)
+      if (dmg >= 1) hit(sim, src, t, dmg, { cue: { trace: { x: at.x, y: at.y } } })
     }
   },
 

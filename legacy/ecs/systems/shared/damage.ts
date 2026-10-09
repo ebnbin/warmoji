@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
-import { Act, Alive, Boss, Elem, Elite, EnemyArm, FACTION, Faction, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
+import { Act, Alive, Boss, Elem, Elite, EnemyArm, FACTION, Faction, Hp, Leech, Lethal, Manual, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
 import { clearMarks, hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot, strongestSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
@@ -29,16 +29,20 @@ import type { Offense } from '../../utils/stats'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-interface HitOpts {
+interface TouchOpts {
   readonly knockback?: number
   readonly from?: Point
-  /** 持续伤害与场地危害：不看也不消耗无敌帧 */
-  readonly tick?: boolean
   /** 出手处补上的伤害标签（见 hitTags）：范围，或替换来源的出手方式 */
   readonly tags?: number
   /** 近身打它的身体：反伤反给它，不写就是出手的身体 */
   readonly by?: number
 }
+
+/** 这一下的出手画面上看不看得见：shown 是弹体、刀光、电弧、相撞、场这类已经画出来的；看不见的给出 trace，表现层从那里补一道指示 */
+export type Cue = 'shown' | { readonly trace: Point }
+
+/** 持续伤害与场地危害（tick）不看也不消耗无敌帧，靠身上的状态与场地自己的样子交代；其余每一下都要说清出手看不看得见 */
+type HitOpts = TouchOpts & ({ readonly tick: true; readonly cue?: never } | { readonly tick?: false; readonly cue: Cue })
 
 function record(sim: Sim, src: Source, target: number, dmg: number): void {
   const st = sim.run.stats
@@ -61,7 +65,7 @@ function blockFx(sim: Sim, target: number, color: number): void {
 let countering = false
 
 /** 挡下这一下：法术护盾扣一次，招架反制出手的身体，正面格挡挡住从前方来的 */
-function blocked(sim: Sim, src: Source, target: number, o: HitOpts): boolean {
+function blocked(sim: Sim, src: Source, target: number, o: TouchOpts): boolean {
   const shield = markSlot(sim, target, MARK.spellShield)
   if (shield >= 0) {
     Mark.a[shield] = Mark.a[shield]! - 1
@@ -186,7 +190,7 @@ function guarded(sim: Sim, target: number): boolean {
 }
 
 /** 这一下能不能落到目标身上：静止、穿行与碰不到、依存无敌、挡格；带伤害的还看无敌；持续伤害不看也不消耗无敌与挡格 */
-function lands(sim: Sim, src: Source, target: number, o: HitOpts, harmful: boolean): boolean {
+function lands(sim: Sim, src: Source, target: number, o: TouchOpts & { readonly tick?: boolean }, harmful: boolean): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Alive.v[target] === 0) return false
   if (isUntouchable(sim, target) || inTransit(target) || (!o.tick && isUntargetable(sim, target))) return false
   if (guarded(sim, target)) {
@@ -197,12 +201,12 @@ function lands(sim: Sim, src: Source, target: number, o: HitOpts, harmful: boole
 }
 
 /** 不带伤害的一下：挡格与依存无敌照挡，无敌只挡伤害；返回是否碰到 */
-export function touch(sim: Sim, src: Source, target: number, o: HitOpts = {}): boolean {
+export function touch(sim: Sim, src: Source, target: number, o: TouchOpts = {}): boolean {
   return lands(sim, src, target, o, false)
 }
 
 /** 一下：带伤害的走 hit，不带的只碰 */
-export function strike(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
+export function strike(sim: Sim, src: Source, target: number, damage: number, o: HitOpts): boolean {
   return damage > 0 ? hit(sim, src, target, damage, o) : touch(sim, src, target, o)
 }
 
@@ -244,7 +248,7 @@ function leech(sim: Sim, src: Source, atk: Offense, dmg: number, tags: number): 
 }
 
 /** 击退的冲量：出手处给的击退乘出手方的击退倍率，从出手处推向目标 */
-function knockOf(sim: Sim, atk: Offense, target: number, o: HitOpts): Point {
+function knockOf(sim: Sim, atk: Offense, target: number, o: TouchOpts): Point {
   const kb = (o.knockback ?? 0) * atk.knockback
   if (kb <= 0 || !o.from) return { x: 0, y: 0 }
   const d = sim.hooks.worldDelta(sim, o.from.x, o.from.y, Transform.x[target]!, Transform.y[target]!)
@@ -258,7 +262,7 @@ function harmless(sim: Sim, src: Source, target: number): boolean {
 }
 
 /** 伤不了的一下：只闪一下、照样击退 */
-function shove(sim: Sim, src: Source, target: number, o: HitOpts): void {
+function shove(sim: Sim, src: Source, target: number, o: TouchOpts): void {
   sim.out.events.push({ kind: 'shrug', eid: target, uid: Uid.v[target]!, at: sim.elapsedMs })
   const j = knockOf(sim, attackOf(sim, src), target, o)
   if (j.x !== 0 || j.y !== 0) displace(sim, target, { kind: 'push', x: j.x, y: j.y }, FORCED)
@@ -280,11 +284,20 @@ function spikesOf(sim: Sim, src: Source, target: number, tags: number, o: HitOpt
   const by = o.by ?? casterOf(sim, src)
   if (n <= 0 || by < 0 || by === target) return null
   const own = selfSource(sim, target)
-  return () => void hit(sim, own, by, n)
+  const from = { x: Transform.x[target]!, y: Transform.y[target]! }
+  return () => void hit(sim, own, by, n, { cue: { trace: from } })
+}
+
+/** 这一下从哪个方向来：出手的身体还在就是它此刻的位置，否则是出手处；持续伤害与场地危害没有方向 */
+function comingFrom(sim: Sim, src: Source, o: HitOpts): Point | null {
+  if (o.tick) return null
+  const by = casterOf(sim, src)
+  if (by >= 0) return { x: Transform.x[by]!, y: Transform.y[by]! }
+  return o.from ?? src.from ?? null
 }
 
 /** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands（我方伤不了敌人的一场到此只击退）与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、元素克制与反应、暴击，只在最后取整，护盾先挡；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量；持续伤害不暴击、不吃护甲；返回是否命中 */
-export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
+export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts): boolean {
   if (!lands(sim, src, target, o, true)) return false
   if (harmless(sim, src, target)) {
     shove(sim, src, target, o)
@@ -320,7 +333,26 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     return true
   }
   const team = Faction.v[target] === FACTION.team
-  sim.out.events.push({ kind: 'damage', x: Transform.x[target]!, y: Transform.y[target]!, amount: dmg, crit, team, fxAt: sim.fxMs })
+  const by = casterOf(sim, src)
+  sim.out.events.push({
+    kind: 'damage',
+    eid: target,
+    uid: Uid.v[target]!,
+    x: Transform.x[target]!,
+    y: Transform.y[target]!,
+    amount: dmg,
+    crit,
+    team,
+    from: comingFrom(sim, src, o),
+    trace: o.tick || o.cue === 'shown' ? null : o.cue.trace,
+    by,
+    byUid: by >= 0 ? Uid.v[by]! : 0,
+    element: el,
+    share: dmg / Math.max(1, Hp.max[target]!),
+    skill: src.ability !== undefined && hasComponent(sim.world, src.ability, Manual),
+    at: now,
+    fxAt: sim.fxMs,
+  })
   record(sim, src, target, dmg)
   leech(sim, src, atk, dmg, tags)
   store(target, dmg)

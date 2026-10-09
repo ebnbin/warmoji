@@ -32,7 +32,7 @@ export function touchBodies(sim: Sim): void {
     let landed = false
     eachFoeBody(sim, { ...src, band: bandOf(sim, eid) }, x, y, Radius.v[eid]!, (t, tx, ty) => {
       const s = struckOf(t)
-      if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y }, tags: HIT.melee, by: eid })) return
+      if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y }, tags: HIT.melee, by: eid, cue: 'shown' })) return
       landed = true
       const back = bodyRules[t]?.onTouched
       if (back) applyAbilityEffects(sim, selfSource(sim, t), back, { x: tx, y: ty, baseDamage: dmg, targets: [eid] })

@@ -8,6 +8,7 @@ import { burstEmitter } from '../ui/fx'
 import { CueLayer } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
+import { HitCueLayer } from './render/hitCues'
 import { HeightOverlay } from './render/heights'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
@@ -35,7 +36,7 @@ import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, 
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { FEET_DEPTH, LYING_DEPTH } from './render/bands'
+import { FEET_DEPTH, LYING_DEPTH, WARN_DEPTH } from './render/bands'
 import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
@@ -99,6 +100,7 @@ import type { Burst } from './outbox'
 import { feedback } from './present/feedback'
 import type { Show } from './present/feedback'
 import { newDamageNumbers } from './present/damageNumbers'
+import { newHitCues } from './present/hitCues'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevTabs, lensMode, showGates, showGrid, showHeights, showTargets, showWalls, watchSandboxSteady } from './devTabs'
@@ -130,6 +132,8 @@ function liveCoins(world: EcsWorld): number {
 
 /** 一帧最多补走几步：卡得更久就丢掉落下的时间 */
 const MAX_STEPS_PER_FRAME = 4
+/** 一次顿帧停完后，隔这么久才接受下一次：连着打中不至于一卡一卡 */
+const STOP_GAP_MS = 220
 
 function unknownCommand(cmd: never): never {
   throw new Error(`开发指令没有处理：${JSON.stringify(cmd)}`)
@@ -191,6 +195,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   private skillAim: Point | null = null
   private aimGfx?: Phaser.GameObjects.Graphics
   private damageText?: DamageTextLayer
+  private hitCues?: HitCueLayer
+  /** 顿帧还要停多久、停完以后还要隔多久才接受下一次，毫秒 */
+  private stopMs = 0
+  private stopGapMs = 0
   private bursts!: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter>
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
@@ -248,6 +256,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.skillAim = null
     this.aimGfx = undefined
     this.damageText = undefined
+    this.hitCues = undefined
+    this.stopMs = 0
+    this.stopGapMs = 0
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
@@ -583,6 +594,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       this.cues?.destroy()
       this.rings?.destroy()
       this.damageText?.destroy()
+      this.hitCues?.destroy()
       this.map.destroy(this.ctx)
     })
   }
@@ -602,6 +614,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     if (light.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
+    new TriBatch(this, LayerType.Paint, WARN_DEPTH, (o, m) => place(o, m, paint.warn))
     new TriBatch(this, LayerType.Paint, FEET_DEPTH, (o, m) => place(o, m, paint.feet))
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
     new TriBatch(this, LayerType.Paint, 40, (o, m) => place(o, m, paint.pointer))
@@ -631,8 +644,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.fightDef)
     const numbers = settings.damageNumbers ? newDamageNumbers() : null
     if (numbers) this.damageText = new DamageTextLayer(this, numbers)
+    const hitCues = newHitCues()
+    this.hitCues = new HitCueLayer(this, hitCues)
     this.show = {
+      world: this.world,
       sfx: playSfx,
+      stop: (ms) => this.hitStop(ms),
+      cues: hitCues,
       shake: () => {
         if (this.hitShakeOn) this.lens.screen.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
       },
@@ -996,6 +1014,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)
+      this.hitCues?.step(sim.fxMs)
       this.aimLens(delta)
       return
     }
@@ -1018,6 +1037,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
+    this.hitCues?.step(sim.fxMs)
     this.paint?.step(sim)
     this.drawDevTargets(sim)
     this.drawInspected()
@@ -1036,13 +1056,25 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
   }
 
-  /** 这一帧走几步：攒下的时间按步长四舍五入；落下太多就丢掉，免得越补越卡 */
+  /** 顿帧：上一次停完隔够了才停；停着的这段时间不攒进模拟，战局与画面一起顿住 */
+  private hitStop(ms: number): void {
+    if (this.stopMs > 0 || this.stopGapMs > 0) return
+    this.stopMs = ms
+    this.stopGapMs = ms + STOP_GAP_MS
+  }
+
+  /** 这一帧走几步：顿帧中不走；攒下的时间按步长四舍五入；落下太多就丢掉，免得越补越卡 */
   private stepsFor(delta: number): number {
     if (this.rate === 0) {
       this.pendingMs = 0
       const n = Math.min(this.queuedSteps, MAX_STEPS_PER_FRAME)
       this.queuedSteps -= n
       return n
+    }
+    this.stopGapMs = Math.max(0, this.stopGapMs - delta)
+    if (this.stopMs > 0) {
+      this.stopMs -= delta
+      return 0
     }
     this.pendingMs += delta * this.rate
     const n = Math.round(this.pendingMs / TICK_MS)

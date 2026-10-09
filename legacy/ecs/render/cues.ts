@@ -1,10 +1,12 @@
 import Phaser from 'phaser'
 import { entityExists, query } from 'bitecs'
 import { cubicEaseIn, cubicEaseOut, sineEaseInOut } from '../utils/ease'
-import { Barrier, Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Motion, MOTION, Radius, Tether, Transform, TRANSIT, Uid } from '../components'
+import { Ability, Aim, Barrier, Depth, FACTION, Faction, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Motion, MOTION, Payload, Radius, Sector, Segment, Swing, Tether, Transform, TRANSIT, Uid } from '../components'
+import { anchorX, anchorY } from '../utils/ability'
+import { DEG2RAD } from '../../util/units'
 import { boltPts } from '../store'
 import type { EcsWorld } from '../world'
-import { fan, quad, ringStrip, segment } from './tri'
+import { fan, quad, ringStrip, segment, tri } from './tri'
 import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
 import { LayerType, TriBatch } from './layer'
@@ -12,6 +14,9 @@ import { packTint } from './tint'
 
 
 const FREE = -1
+
+/** 挥砍与突刺的刀光：挥完以后再淡出 FADE 毫秒，太快的按 MIN 毫秒挥；敌方的用打得到队伍的颜色画得醒目，我方的淡一些 */
+const STROKE = { fadeMs: 160, minMs: 90, foeAlpha: 0.9, teamAlpha: 0.5, foe: 0xff6e40, team: 0xffffff } as const
 
 
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
@@ -143,6 +148,7 @@ export class CueLayer {
         if (!entityExists(this.world, a) || !entityExists(this.world, b)) continue
         segment(o, m, Transform.x[a]!, Transform.y[a]!, Transform.x[b]!, Transform.y[b]!, 4, packTint(Tether.color[k]!, pulse))
       }
+      this.strokes(o, m)
       for (const k of query(this.world, [Fx, FxSlash, Transform])) {
         const a = Transform.rot[k]!
         ringStrip(
@@ -154,6 +160,46 @@ export class CueLayer {
     }
   }
 
+
+  /** 挥砍沿弧扫出一道月牙，突刺顺着方向刺出一道尖光；光束有自己的样子，不另画 */
+  private strokes(o: Scratch, m: Matrix): void {
+    for (const k of query(this.world, [Ability, Swing])) {
+      const start = Swing.startMs[k]!
+      if (start === 0) continue
+      const sector = Sector.radius[k]! > 0
+      if (!sector && (Segment.reach[k]! <= 0 || Segment.beam[k])) continue
+      const swing = Math.max(STROKE.minMs, sector ? Sector.ms[k]! : Segment.ms[k]!)
+      const age = this.now - start
+      if (age < 0 || age >= swing + STROKE.fadeMs) continue
+      const p = Math.min(1, age / swing)
+      const fade = age <= swing ? 1 : 1 - (age - swing) / STROKE.fadeMs
+      const foe = Faction.v[k] !== FACTION.team
+      const own = Payload.color[k]!
+      const color = foe ? STROKE.foe : own !== 0 ? own : STROKE.team
+      const alpha = (foe ? STROKE.foeAlpha : STROKE.teamAlpha) * fade
+      const x = anchorX(k)
+      const y = anchorY(k)
+      const aim = Aim.rad[k]!
+      if (sector) {
+        const r = Sector.radius[k]!
+        const half = (Sector.arcDeg[k]! * DEG2RAD) / 2
+        const a0 = aim - half
+        const a1 = a0 + 2 * half * sineEaseInOut(p)
+        if (a1 - a0 < 0.02) continue
+        ringStrip(o, m, x, y, r * 0.72, r * 0.42, packTint(color, alpha * 0.35), a0, a1)
+        ringStrip(o, m, x, y, r * 0.94, 4, packTint(color, alpha), a0, a1)
+        continue
+      }
+      const reach = Segment.reach[k]! * sineEaseInOut(Math.min(1, p * 1.6))
+      const w = Math.max(6, Segment.radius[k]!)
+      const ca = Math.cos(aim)
+      const sa = Math.sin(aim)
+      const tipX = x + ca * reach
+      const tipY = y + sa * reach
+      tri(o, m, x - sa * w, y + ca * w, x + sa * w, y - ca * w, tipX, tipY, packTint(color, alpha * 0.45))
+      segment(o, m, x, y, tipX, tipY, 3, packTint(color, alpha))
+    }
+  }
 
   screenFlash(color: number, alpha: number, durationMs: number): void {
     this.flash.setFillStyle(color, 1).setAlpha(alpha).setVisible(true)

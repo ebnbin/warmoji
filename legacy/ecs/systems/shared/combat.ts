@@ -124,11 +124,11 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
     if (by !== undefined) st.kills[by] = (st.kills[by] ?? 0) + 1
     if (src.hazard) st.hazardKills[src.hazard] = (st.hazardKills[src.hazard] ?? 0) + 1
   }
-  sim.out.events.push({ kind: 'kill' })
   const def = enemyDef[eid]
   const who = hostile ? enemyOf[eid] : undefined
   const elite = Elite.v[eid] === 1
   const boss = Boss.v[eid] === 1
+  sim.out.events.push({ kind: 'kill', strong: elite || boss })
   if (who) st.enemyKills[who.kind] = (st.enemyKills[who.kind] ?? 0) + 1
   if (hostile && elite) st.eliteKills += 1
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
