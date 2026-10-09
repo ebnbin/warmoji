@@ -27,7 +27,7 @@ export interface ElementReaction {
 /** 元素的整套规则：有哪些元素、各自留在身上的状态怎么算、几种反应；长度以格为单位 */
 export interface ElementRules {
   readonly list: Readonly<Record<string, ElementDef>>
-  /** 燃烧：每 tickMs 掉点燃那一下 ratio 倍的血，烧 durationMs；每跳一次烧到身体边缘相距 spread 格以内、没在烧的同伴，烧过去的只烧剩下的时间 */
+  /** 燃烧：每 tickMs 掉点燃那一下 ratio 倍的血，烧 durationMs，再点跳伤取大的；每跳一次烧到身体边缘相距 spread 格以内、没在烧的同伴，烧过去的只烧剩下的时间 */
   readonly burn: { readonly ratio: number; readonly tickMs: number; readonly durationMs: number; readonly spread: number }
   /** 寒冷：每挨一下冰加一层，移速 × slow，ms 内不再挨冰就散；叠到 stacks 层冻住 frozenMs */
   readonly chill: { readonly stacks: number; readonly ms: number; readonly slow: number; readonly frozenMs: number }
@@ -35,7 +35,7 @@ export interface ElementRules {
   readonly shock: { readonly radius: number; readonly ratio: number }
   /** 湿：浇湿 ms */
   readonly wet: { readonly ms: number }
-  /** 中毒：每挨一下毒加一层，每层每 tickMs 掉那一下 ratio 倍的血，最多 stacks 层，durationMs 内不再中毒就解 */
+  /** 中毒：每挨一下毒加一层，每层每 tickMs 掉那一下 ratio 倍的血，最多 stacks 层（满了以后比平均一层强的顶掉平均的一层），durationMs 内不再中毒就解 */
   readonly poison: { readonly ratio: number; readonly tickMs: number; readonly durationMs: number; readonly stacks: number }
   readonly reactions: {
     /** 物理打冻住的：这一下伤害 × (1 + ratio)，解冻 */
