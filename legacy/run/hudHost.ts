@@ -144,6 +144,8 @@ export enum HudEvent {
   WaveWarning = 'wave-warning',
   WaveComplete = 'wave-complete',
   SkillCast = 'skill-cast',
+  /** 主动技能真放出去的那一刻，带着放技能的队员亮的颜色 */
+  SkillFired = 'skill-fired',
   FieldCollected = 'field-collected',
   LeaderChanged = 'leader-changed',
 }
@@ -152,6 +154,7 @@ interface HudPayload {
   [HudEvent.WaveWarning]: WaveWarning
   [HudEvent.WaveComplete]: WaveSummary
   [HudEvent.SkillCast]: string
+  [HudEvent.SkillFired]: number
   [HudEvent.FieldCollected]: FieldCollected
   [HudEvent.LeaderChanged]: LeaderChanged
 }

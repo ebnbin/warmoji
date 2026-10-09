@@ -186,6 +186,22 @@ export class DialButton extends Widget {
     })
   }
 
+  /** 技能放出去了：底盘染上 color 闪一下，钮边扩出一圈同色的粗环 */
+  flare(color: number): void {
+    const glow = this.scene.add.circle(0, 0, this.radius, color, 0.45)
+    const ring = this.scene.add.circle(0, 0, this.radius).setStrokeStyle(6, color, 0.95)
+    this.add([glow, ring])
+    this.scene.tweens.add({ targets: glow, alpha: 0, duration: MOTION.flare, ease: 'Quad.easeOut', onComplete: () => glow.destroy() })
+    this.scene.tweens.add({
+      targets: ring,
+      scale: (this.radius + 22) / this.radius,
+      alpha: 0,
+      duration: MOTION.flare,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    })
+  }
+
   /** 点按生效：从钮边扩出一圈淡出的细环 */
   private ripple(): void {
     const ring = this.scene.add.circle(0, 0, this.radius).setStrokeStyle(3, INK.ink, 0.7)

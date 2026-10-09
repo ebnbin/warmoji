@@ -5,6 +5,7 @@ import { gainXp } from '../../../run/xp'
 import { teamLeveled } from '../../../run/members'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
+import { ELEMENTS, elementAt } from '../../../data/elements'
 import type { EnemyDef } from '../../../types/enemies'
 import { spawnShards } from '../../entities/shard'
 import { Alive, Anchored, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Seat, Slot, Sprite, Stamina, Stats, TAG, Thief, Tint, Transform } from '../../components'
@@ -26,6 +27,7 @@ import { charSize } from './scale'
 import { release } from './gut'
 import { returnBorrowed } from './steal'
 import type { Source } from '../../utils/source'
+import type { Burst } from '../../outbox'
 import type { Sim } from '../../sim'
 import { clockSec, runCurve } from '../../fight/clock'
 import { rulesOf } from '../../../data/reactions'
@@ -113,6 +115,12 @@ function down(sim: Sim, eid: number): void {
   if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
 }
 
+/** 被打倒的样子：死于带元素的一下按元素迸粒子、给碎片染色，否则是默认的 */
+function fallLook(src: Source): { readonly burst: Burst['kind']; readonly tint: number } {
+  const el = elementAt(src.element ?? 0)
+  return el ? ELEMENTS[el].fall : { burst: 'death', tint: 0xffffff }
+}
+
 /** 死亡移除：战利品、击杀计数（连同死于哪种危害）与 Boss 倒下只算敌方阵营的身体；亡语、巢穴、携带物、碎片敌我同一条 */
 function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
   sim.hooks.died?.(sim, eid)
@@ -131,8 +139,9 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
   sim.out.events.push({ kind: 'kill', strong: elite || boss })
   if (who) st.enemyKills[who.kind] = (st.enemyKills[who.kind] ?? 0) + 1
   if (hostile && elite) st.eliteKills += 1
-  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
-  if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
+  const fall = fallLook(src)
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: fall.burst })
+  if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: fall.burst })
   if (hostile && boss) sim.bossDown = true
   if (who) grantKillRewards(sim, eid, who, elite)
   const hexed = hasMark(sim, eid, MARK.morph)
@@ -157,6 +166,7 @@ function killBody(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: 
     Sprite.flipX[eid]!,
     flingVx,
     flingVy,
+    fall.tint,
   )
   unequipAbilities(sim, eid)
   enemyDef[eid] = undefined

@@ -20,7 +20,7 @@ import { attachDrive, detachDrive } from '../../entities/enemy'
 import { foldBody, setStatLayer } from '../../utils/stats'
 import { gearHurt } from './gear'
 import { spawnFxCircle } from '../../entities/fx'
-import { counterMul } from '../../../data/elements'
+import { counterMul, REACTIONS } from '../../../data/elements'
 import { toPx } from '../../../data/px'
 import { elementNow, touchElement } from '../../utils/element'
 import type { ElementReaction } from '../../../types/elements'
@@ -268,9 +268,11 @@ function shove(sim: Sim, src: Source, target: number, o: TouchOpts): void {
   if (j.x !== 0 || j.y !== 0) displace(sim, target, { kind: 'push', x: j.x, y: j.y }, FORCED)
 }
 
-/** 元素反应：在被打中处闪一圈，再由出手方施加反应的效果，效果不带元素；被打中的已经倒下就只施加不看目标的 */
+/** 元素反应：在被打中处闪一圈、迸出这种反应的粒子、飘出它的名字，再由出手方施加反应的效果，效果不带元素；被打中的已经倒下就只施加不看目标的 */
 function reacted(sim: Sim, src: Source, target: number, uid: number, r: ElementReaction, at: Point, dmg: number): void {
-  spawnFxCircle(sim, at.x, at.y, 24, { fill: r.color, fillAlpha: 0.4, stroke: r.color, lineWidth: 4, lineAlpha: 0.9, fromScale: 0.5, toScale: 1.8, durationMs: 320, depth: 14 })
+  spawnFxCircle(sim, at.x, at.y, 34, { fill: r.color, fillAlpha: 0.45, stroke: r.color, lineWidth: 5, lineAlpha: 0.95, fromScale: 0.4, toScale: 2.2, durationMs: 380, depth: 14 })
+  sim.out.bursts.push({ x: at.x, y: at.y, count: 14, kind: r.burst })
+  sim.out.events.push({ kind: 'react', x: at.x, y: at.y, reaction: REACTIONS.indexOf(r), fxAt: sim.fxMs })
   const effects = toPx(r).effects
   if (!effects) return
   const alive = Alive.v[target] === 1 && Uid.v[target] === uid

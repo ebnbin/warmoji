@@ -1,7 +1,16 @@
 const INITIAL_CAP = 256
 export const DAMAGE_NUMBER_RISE_MS = 350
+/** 元素反应的名字飘得慢些、久些 */
+export const REACTION_RISE_MS = 700
 /** value 为它时画"闪避"而不是数字 */
 export const MISS = -1
+
+/** 第 i 种元素反应的名字：value 比 MISS 还小 */
+export function reactionLabel(i: number): number {
+  return MISS - 1 - i
+}
+
+const LIFE_MS = Math.max(DAMAGE_NUMBER_RISE_MS, REACTION_RISE_MS)
 
 /** color 是数字的颜色：暴击另画金色 */
 export interface DamageNumbers {
@@ -45,7 +54,7 @@ function grow(d: DamageNumbers): void {
 export function pushDamageNumber(
   d: DamageNumbers, x: number, y: number, value: number, crit: boolean, color: number, fxMs: number,
 ): void {
-  if (fxMs - d.born[d.head]! < DAMAGE_NUMBER_RISE_MS) grow(d)
+  if (fxMs - d.born[d.head]! < LIFE_MS) grow(d)
   const i = d.head
   d.x[i] = x
   d.y[i] = y

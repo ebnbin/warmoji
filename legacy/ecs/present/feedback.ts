@@ -1,8 +1,8 @@
 import { hasComponent } from 'bitecs'
 import { REJOIN } from '../../data/feel'
-import { ELEMENTS, elementAt } from '../../data/elements'
-import { CharFlash, Enemy, Flash, Pop, Tint, Uid } from '../components'
-import { MISS, pushDamageNumber } from './damageNumbers'
+import { ELEMENTS, elementAt, REACTIONS } from '../../data/elements'
+import { CharFlash, Elem, Enemy, Flash, Pop, Tint, Uid } from '../components'
+import { MISS, pushDamageNumber, reactionLabel } from './damageNumbers'
 import type { DamageNumbers } from './damageNumbers'
 import { HIT_CUE, pushHitCue } from './hitCues'
 import type { HitCues } from './hitCues'
@@ -10,11 +10,13 @@ import type { SimEvent } from '../events'
 import type { EcsWorld } from '../world'
 import type { SfxId } from '../../types/sfx'
 
-/** 演出要用到的：播音效、震屏、顿帧、伤害数字（关掉时没有）、打中时的指示 */
+/** 演出要用到的：播音效、震屏、顿帧、伤害数字（关掉时没有）、打中时的指示、让技能钮跟着亮 */
 export interface Show {
   readonly world: EcsWorld
   readonly sfx: (id: SfxId) => void
   readonly shake: () => void
+  /** 主动技能放出的那一刻，技能钮用这个颜色亮一下 */
+  readonly skill: (color: number) => void
   /** 战局停 ms 毫秒，画面跟着停 */
   readonly stop: (ms: number) => void
   readonly numbers: DamageNumbers | null
@@ -36,6 +38,11 @@ const FOE_TRACE = 0xff6e40
 const PLAIN = 0xffffff
 /** 元素色往白里调这么多：深色的数字在暗地面上也看得清 */
 const NUMBER_LIGHTEN = 0.4
+/** 放主动技能的队员按自己的元素亮这么久，没有元素的亮金色；画面时钟 */
+const SKILL_GLOW_MS = 360
+const SKILL_COLOR = 0xffe082
+/** 元素反应的名字飘在挨打处上方这么高 */
+const REACT_RISE = 44
 
 /** 顿帧的毫秒数：精英与头目倒下、队员一下掉 heavyShare 以上的血、主动技能打中 */
 const STOP = { strongKill: 90, heavyHurt: 60, heavyShare: 0.12, skill: 45 } as const
@@ -103,6 +110,16 @@ export function feedback(events: readonly SimEvent[], show: Show): void {
       case 'dodge':
         if (show.numbers) pushDamageNumber(show.numbers, e.x, e.y - 14, MISS, false, PLAIN, e.fxAt)
         break
+      case 'react':
+        if (show.numbers) pushDamageNumber(show.numbers, e.x, e.y - REACT_RISE, reactionLabel(e.reaction), false, REACTIONS[e.reaction]!.color, e.fxAt)
+        break
+      case 'skill': {
+        const el = elementAt(Elem.v[e.eid]!)
+        const color = el ? ELEMENTS[el].color : SKILL_COLOR
+        show.skill(color)
+        if (Uid.v[e.eid] === e.uid) glow(e.eid, color, e.fxAt + SKILL_GLOW_MS)
+        break
+      }
       case 'flinch':
         show.sfx(e.team ? 'hurt' : 'hit')
         if (Uid.v[e.eid] !== e.uid) break
