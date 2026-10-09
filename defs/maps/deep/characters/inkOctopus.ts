@@ -3,8 +3,10 @@ import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 import { patch } from '../../../kit.ts'
 
-// 🐙 章鱼：伸出长长的触手把敌人拽到跟前；技能落下一团墨，墨阵里的敌人走不动也打不出手
-const PULL = { kind: 'pull', speed: 10, gap: 1 } as const
+// 🐙 章鱼：伸出长长的触手把敌人拽到跟前，拽不动的就把自己拽过去；技能落下一团墨，墨阵里的敌人走不动也打不出手
+const PULL = { kind: 'pull', speed: 10, gap: 1, heavy: 'self' } as const
+
+const suckers = { kind: 'if', when: { kind: 'marked', who: 'target', mark: 'disarm' }, then: [{ kind: 'root', durationMs: 2000 }], else: [{ kind: 'root', durationMs: 1000 }] } as const
 
 const inkOctopusArm = {
   trigger: 'auto',
@@ -17,7 +19,7 @@ const inkOctopusArm = {
   onHit: [PULL],
 } satisfies AbilityDef
 
-const inkOctopusArm2 = { ...inkOctopusArm, onHit: [PULL, { kind: 'root', durationMs: 1000 }] } satisfies AbilityDef
+const inkOctopusArm2 = { ...inkOctopusArm, onHit: [PULL, suckers] } satisfies AbilityDef
 
 const inkOctopusArm3 = { ...inkOctopusArm2, repeat: { count: 2, delayMs: 200, reaim: 'nearest' } } satisfies AbilityDef
 
@@ -39,7 +41,7 @@ export default {
   emoji: '1f419',
   name: '章鱼',
   element: 'dark',
-  desc: '八条腕足的章鱼：伸出 3 格长的触手，把打中的敌人拽到跟前；技能在敌人头上落一团墨，墨阵里的敌人走不动也打不出手',
+  desc: '八条腕足的章鱼：伸出 3 格长的触手，把打中的敌人拽到跟前，拽不动的重家伙就把自己拽过去；技能在敌人头上落一团墨，墨阵里的敌人走不动也打不出手',
   role: 'controller',
   tags: ['control', 'melee'],
   body: { drag: 5, mass: 0.8 },
@@ -52,7 +54,7 @@ export default {
       icon: '1f419',
       base: 'inkOctopusArm',
       upgrades: [
-        { ability: 'inkOctopusArm2', card: { icon: '1f9f2', name: '吸盘', desc: '拽过来的敌人定身 1 秒' } },
+        { ability: 'inkOctopusArm2', card: { icon: '1f9f2', name: '吸盘', desc: '拽过来的敌人定身 1 秒；已经被致盲的缠得更紧，定身 2 秒' } },
         { ability: 'inkOctopusArm3', card: { icon: '1f590', name: '多腕', desc: '一次甩出两条触手，第二条重新抓最近的敌人' } },
       ],
     },

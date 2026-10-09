@@ -27,7 +27,7 @@ export default {
     boss: 'burrow',
     kinds: {
       crest: { name: '丘顶', at: { kind: 'mark' }, enter: 'climb', look: 'sand', weight: 2, perSec: 1 },
-      marker: { name: '标志物', at: { kind: 'mark' }, enter: 'walk', look: 'sand', snapU: 4, weight: 3, perSec: 1, only: ['snake', 'rat', 'turtle', 'skeleton', 'cactus'] },
+      marker: { name: '标志物', at: { kind: 'mark' }, enter: 'walk', look: 'sand', snapU: 4, weight: 3, perSec: 1, only: ['cactus', 'cheshire', 'sandScorpion'] },
       burrow: { name: '沙下', at: { kind: 'ground' }, enter: 'rise', look: 'sand', weight: 1 },
     },
   },
@@ -53,7 +53,7 @@ export default {
       foot: 0.62,
       lifeS: 10,
       pack: 0.12,
-      gaits: { zombie: 'foot', skeleton: 'foot', boar: 'hoof', snake: 'slither', rat: 'paw', raccoon: 'paw', turtle: 'paw', creeper: 'paw', locust: 'hop', scorpion: 'legs', armyAnt: 'legs', scarab: 'legs', sandLocust: 'hop', cheetah: 'paw', dustDevil: 'slither', sandScorpion: 'legs', sandworm: 'slither', blazingSun: 'slither' },
+      gaits: { armyAnt: 'legs', scarab: 'legs', sandLocust: 'hop', cheetah: 'paw', dustDevil: 'slither', sandScorpion: 'legs', sandworm: 'slither', blazingSun: 'slither', cheshire: 'paw', usher: 'foot', wallRhino: 'hoof' },
     },
   },
   bosses: ['sandworm', 'blazingSun'],

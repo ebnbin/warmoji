@@ -17,10 +17,10 @@ export const FIGHTS = {
         {
           intro: { title: '环游沙海', sub: '沿一个方向走满四圈' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'locust', weight: 2 },
-            { kind: 'snake', weight: 1 },
-            { kind: 'skeleton', weight: 1 },
+            { kind: 'armyAnt', weight: 3 },
+            { kind: 'sandLocust', weight: 2 },
+            { kind: 'cactus', weight: 1 },
+            { kind: 'sandScorpion', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 900 }],
           ends: [
@@ -46,10 +46,10 @@ export const FIGHTS = {
         {
           intro: { title: '双生标志', sub: '在每一处标志物旁站满 1.5 秒' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'snake', weight: 2 },
-            { kind: 'skeleton', weight: 1 },
-            { kind: 'rat', weight: 1 },
+            { kind: 'armyAnt', weight: 3 },
+            { kind: 'cactus', weight: 2 },
+            { kind: 'sandScorpion', weight: 1 },
+            { kind: 'cheshire', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1100 },
@@ -57,8 +57,8 @@ export const FIGHTS = {
               kind: 'stream',
               intervalMs: 2400,
               mix: [
-                { kind: 'snake', weight: 2 },
-                { kind: 'skeleton', weight: 1 },
+                { kind: 'cactus', weight: 2 },
+                { kind: 'sandScorpion', weight: 1 },
               ],
               at: { kind: 'gate', gate: 'marker' },
             },
@@ -74,7 +74,7 @@ export const FIGHTS = {
   sandHunt: {
     emoji: '1f43e',
     name: '沙海追猎',
-    desc: '两名神偷在沙海里逃窜，第 30 秒又追加一名狼骑：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
+    desc: '两名领位员在沙海里逃窜，第 30 秒又追加一头破墙犀：沙海首尾相接，没有墙角能把它们逼进去，只能追上去打倒；只看得见队长身边 8 格',
     note: '环面上的追逐：逃跑的目标永远有路可走，追不上就只能抄近路截它',
     team: { slots: [{ tags: ['mobile', 'damage'] }, { tags: ['ranged'] }, { tags: ['control'] }], level: 2 },
     stars: [{ kind: 'time', ms: 80_000 }, { kind: 'downs', count: 0 }],
@@ -87,22 +87,22 @@ export const FIGHTS = {
         {
           intro: { title: '沙海追猎', sub: '击倒全部悬赏目标，它们会逃' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'locust', weight: 2 },
+            { kind: 'armyAnt', weight: 3 },
+            { kind: 'sandLocust', weight: 2 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 1400 },
             {
               kind: 'batch',
               atMs: 2000,
-              squad: { count: 2, enemy: 'raccoon', elites: 2, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
-              banner: { title: '悬赏发布', sub: '两名神偷在沙海里逃窜' },
+              squad: { count: 2, enemy: 'usher', elites: 2, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '悬赏发布', sub: '两名领位员在沙海里逃窜' },
             },
             {
               kind: 'batch',
               atMs: 30_000,
-              squad: { count: 1, enemy: 'knight', elites: 1, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
-              banner: { title: '追加悬赏', sub: '一名狼骑也上了榜' },
+              squad: { count: 1, enemy: 'wallRhino', elites: 1, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '追加悬赏', sub: '一头破墙犀也上了榜' },
             },
           ],
           ends: [
@@ -129,10 +129,10 @@ export const FIGHTS = {
         {
           intro: { title: '赤手空拳', sub: '不能放主动技能，撑过 75 秒' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'locust', weight: 2 },
-            { kind: 'snake', weight: 1 },
-            { kind: 'skeleton', weight: 1 },
+            { kind: 'armyAnt', weight: 3 },
+            { kind: 'sandLocust', weight: 2 },
+            { kind: 'cactus', weight: 1 },
+            { kind: 'sandScorpion', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMul: 1.3 },

@@ -1,8 +1,9 @@
 import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
+import { ring } from '../../../kit.ts'
 
-// 🦘 拳击袋鼠：左右勾拳连着打，两轮之后一记上勾拳把人打飞；技能朝一个方向飞踢
+// 🦘 拳击袋鼠：左右勾拳连着打，两轮之后一记上勾拳把人打飞；技能硬吃一阵记下挨的打加倍还回去，再按一次提前炸开并飞踢出去
 const boxRooHook = {
   trigger: 'auto',
   cooldownMs: 850,
@@ -32,6 +33,7 @@ const boxRooHook3 = {
   cycle: [boxRooHook, { ...boxRooUppercut, onHit: [{ kind: 'knockup', durationMs: 500, height: 1.2, onLand: [{ kind: 'shove', distance: 2, ms: 240 }] }] }],
 } satisfies AbilityDef
 
+// 飞踢起跳时把还没到期的记伤当场引爆，炸在起跳处
 const boxRooKick = {
   trigger: 'manual',
   aim: 'stick',
@@ -39,9 +41,28 @@ const boxRooKick = {
   knockback: 5,
   fireSfx: 'jump',
   shape: { kind: 'leap', distance: 5, ms: 450, height: 1.4, radius: 1.4 },
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'detonate', mark: 'store' }] }],
 } satisfies AbilityDef
 
-export const abilities = { boxRooHook, boxRooHook2, boxRooHook3, boxRooKick } satisfies Record<string, AbilityDef>
+const boxRooGrit = {
+  trigger: 'manual',
+  aim: 'stick',
+  fireSfx: 'thud',
+  shape: { kind: 'world' },
+  reactions: [
+    {
+      on: 'fire',
+      to: 'self',
+      effects: [
+        { kind: 'store', ms: 2500, ratio: 1.6, then: [{ kind: 'blast', radius: 3, ratio: 1, knockback: 10, ring: ring(0xff7043) }] },
+        { kind: 'guard', mul: 0.5, durationMs: 2500 },
+      ],
+    },
+  ],
+  recast: { windowMs: 2500, ability: boxRooKick },
+} satisfies AbilityDef
+
+export const abilities = { boxRooHook, boxRooHook2, boxRooHook3, boxRooGrit } satisfies Record<string, AbilityDef>
 
 export const levels = [{ add: { maxHp: 20, lifesteal: 0.03 }, mul: { damage: 1.2 } }, { add: { maxHp: 45, lifesteal: 0.05 }, mul: { damage: 1.45 } }] as const satisfies readonly StatMods[]
 
@@ -49,12 +70,19 @@ export default {
   emoji: '1f998',
   name: '拳击袋鼠',
   element: 'earth',
-  desc: '戴着拳套的袋鼠：左右勾拳一下接一下，打完两轮再补一记上勾拳把人打飞；技能朝一个方向飞踢过去，落地踹开一圈',
+  desc: '戴着拳套的袋鼠：左右勾拳一下接一下，打完两轮再补一记上勾拳把人打飞；技能先硬吃 2.5 秒，把挨的打记下来加倍震回去，再按一次就当场震开、朝一个方向飞踢出去',
   role: 'bruiser',
-  tags: ['damage', 'melee', 'mobile'],
+  tags: ['damage', 'defense', 'melee', 'mobile'],
   body: { drag: 4.5, mass: 1.2 },
   stats: { moveSpeed: 6.2, maxStamina: 120, staminaRegen: 70, exertion: 1 },
-  skill: { name: '飞踢', icon: '1f9b6', desc: '朝摇杆方向跃出 5 格，落地时 1.4 格内的敌人挨一记重踢并被踹开', cdMs: 10_000, ability: 'boxRooKick', aim: true },
+  skill: {
+    name: '以牙还牙',
+    icon: '1f4a2',
+    desc: '2.5 秒内受到的伤害减半并记下，到时以记下的 1.6 倍为伤害震开身周 3 格；2.5 秒内再按一次，立刻在原地震开，并朝摇杆方向跃出 5 格，落地时 1.4 格内的敌人挨一记重踢并被踹开',
+    cdMs: 13_000,
+    ability: 'boxRooGrit',
+    aim: true,
+  },
   weapons: [],
   innate: [
     {

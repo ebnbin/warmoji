@@ -2,23 +2,19 @@ import type { AbilityDef } from '../../../../src/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 
-// 🐘 大象：淋水给最伤的队友冲一冲，水柱把敌人冲开，两样轮着来；技能撑起一圈反弹弹体的水幕
+// 🐘 大象：绕身转的水罐给附近最伤的队友浇水，长鼻子喷出水柱冲开敌人，两样轮着来；技能给全队裹上一层挡三下的泥
+const jar = { emoji: '1f3fa', size: 0.7 } as const
+
 const mostHurt = { side: 'allies', radius: 4, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 } as const
 
-const showerHeal = { kind: 'heal', amount: 12 } as const
-
-const elephantShower = {
+const elephantPour = {
   trigger: 'auto',
   cooldownMs: 1200,
   aim: 'self',
   fireSfx: 'splash',
   shape: { kind: 'world' },
-  onHit: [{ kind: 'to', who: mostHurt, then: [showerHeal] }],
-} satisfies AbilityDef
-
-const elephantShower2 = {
-  ...elephantShower,
-  onHit: [{ kind: 'to', who: mostHurt, then: [showerHeal, { kind: 'mend', amount: 3, tickMs: 500, durationMs: 2000 }] }],
+  anchor: { look: jar, mode: 'orbit', distance: 1.6 },
+  onHit: [{ kind: 'to', who: mostHurt, then: [{ kind: 'heal', amount: 12 }] }],
 } satisfies AbilityDef
 
 const jet = {
@@ -33,33 +29,29 @@ const jet = {
   onHit: [{ kind: 'shove', distance: 1.5, ms: 220 }],
 } satisfies AbilityDef
 
-const mudJet = { ...jet, onHit: [...jet.onHit, { kind: 'attune', element: 'water', ms: 4000 }] } satisfies AbilityDef
-
 // 轮换只在这一式真放出去后才往下走，所以水柱套在总能出手的 world 里，身边没敌人就喷空
 const elephantJet = { trigger: 'auto', cooldownMs: 1200, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability: jet }] } satisfies AbilityDef
 
-const elephantMudJet = { ...elephantJet, onHit: [{ kind: 'cast', ability: mudJet }] } satisfies AbilityDef
+const elephantSpray = { ...elephantPour, cycle: [elephantJet] } satisfies AbilityDef
 
-const elephantSpray = { ...elephantShower, cycle: [elephantJet] } satisfies AbilityDef
+const elephantSpray2 = { ...elephantPour, anchor: { look: jar, mode: 'trail', distance: 0 }, cycle: [elephantJet] } satisfies AbilityDef
 
-const elephantSpray2 = { ...elephantShower2, cycle: [elephantJet] } satisfies AbilityDef
+const elephantSpray3 = { ...elephantPour, anchor: { look: jar, mode: 'ally', distance: 1 }, cycle: [elephantJet] } satisfies AbilityDef
 
-const elephantSpray3 = { ...elephantShower2, cycle: [elephantMudJet] } satisfies AbilityDef
-
-const elephantCurtain = {
+const elephantMud = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'splash',
-  color: 0x4fc3f7,
+  color: 0x8d6e63,
   fxRadius: 1.25,
   shape: { kind: 'all', of: 'allies' },
   onHit: [
+    { kind: 'spellShield', count: 3, durationMs: 6000 },
     { kind: 'mend', amount: 4, tickMs: 500, durationMs: 4000 },
-    { kind: 'barrier', shape: 'ring', length: 2.5, durationMs: 5000, bodies: 'none', shots: true, reflect: true, follow: true, color: 0x4fc3f7 },
   ],
 } satisfies AbilityDef
 
-export const abilities = { elephantSpray, elephantSpray2, elephantSpray3, elephantCurtain } satisfies Record<string, AbilityDef>
+export const abilities = { elephantSpray, elephantSpray2, elephantSpray3, elephantMud } satisfies Record<string, AbilityDef>
 
 export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { healing: 1.45, damage: 1.2 } }] as const satisfies readonly StatMods[]
 
@@ -67,21 +59,21 @@ export default {
   emoji: '1f418',
   name: '大象',
   element: 'water',
-  desc: '大象甩着长鼻子，两样轮着来：一下淋水，给 4 格内最伤的队友冲一冲；一下喷出水柱，把 3 格内的敌人冲开。没人受伤时那一下淋空，身边没敌人时那一下喷空，照样轮着来；技能撑起一圈跟着自己的水幕，弹回射来的东西，全队慢慢回血',
+  desc: '带着一只水罐的大象，两样轮着来：绕着身子转的水罐给 4 格内最伤的队友浇 12 点水，长鼻子喷出水柱把 3 格内的敌人冲开；没人受伤时那一下浇空，身边没敌人时那一下喷空，照样轮着来；技能给全队裹上一层泥，挡下接下来 3 次命中，再慢慢回血',
   role: 'support',
   tags: ['support', 'area'],
   body: { drag: 5.5, mass: 1.8 },
   stats: { moveSpeed: 4.4, maxStamina: 130, staminaRegen: 50, exertion: 1.1 },
-  skill: { name: '水幕', icon: '1f30a', desc: '身周撑起一圈 2.5 格的水幕 5 秒，跟着自己走、把敌人射来的弹反弹回去；全队 4 秒里每半秒回 4 点血', cdMs: 15_000, ability: 'elephantCurtain' },
+  skill: { name: '泥浴', icon: '1f6c1', desc: '全队裹上一层泥 6 秒，每人挡下接下来 3 次命中；4 秒里每半秒回 4 点血', cdMs: 16_000, ability: 'elephantMud' },
   weapons: [],
   innate: [
     {
-      name: '喷水',
-      icon: '1f418',
+      name: '水罐',
+      icon: '1f3fa',
       base: 'elephantSpray',
       upgrades: [
-        { ability: 'elephantSpray2', card: { icon: '1f6bf', name: '淋浴', desc: '淋水冲过的队友 2 秒里每半秒再回 3 点血' } },
-        { ability: 'elephantSpray3', card: { icon: '1f6c1', name: '泥浴', desc: '被水柱冲到的敌人 4 秒内变成水元素' } },
+        { ability: 'elephantSpray2', card: { icon: '1f463', name: '落罐', desc: '水罐改为落在 1.5 秒前走过的地方，给那一带 4 格内最伤的队友浇水' } },
+        { ability: 'elephantSpray3', card: { icon: '1f91d', name: '贴身照料', desc: '水罐改为贴着血量最低的队友，给它身边 4 格内最伤的队友浇水，离自己多远都浇得到' } },
       ],
     },
   ],
