@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import type { Rect } from './gesture'
 import { Icon } from './icon'
 import { Label, RichLabel } from './label'

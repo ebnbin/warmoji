@@ -1,7 +1,7 @@
 import { addComponents, hasComponent, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { attachDrawable } from './drawable'
-import { Alive, FACTION, Faction, MARK, Radius, Shadow, Slot, Transform, Uid } from '../components'
+import { Alive, MARK, Radius, Shadow, Slot, Transform, Uid } from '../components'
 import { addCc } from '../utils/marks'
 import { isSameEntity } from '../utils/identity'
 import { targetsWithin } from '../utils/targets'
@@ -37,8 +37,7 @@ export function spawnShadow(sim: Sim, src: Source, by: number, angle: number, li
   const at = sim.hooks.constrainBody(sim, by, { x: x0, y: y0 }, { x: x0 + Math.cos(angle) * dash, y: y0 + Math.sin(angle) * dash })
   const s = newEntity(sim.world)
   const emoji = lookOf(sim, by)
-  const outline = Faction.v[by] === FACTION.team ? 'player' : 'enemy'
-  attachDrawable(sim.world, s, sim.frames, { id: emoji, outline, x: at.x, y: at.y, size: Transform.w[by]!, z: 4, color: 0x4a148c, effect: 0, alpha: 0.55 })
+  attachDrawable(sim.world, s, sim.frames, { id: emoji, x: at.x, y: at.y, size: Transform.w[by]!, z: 4, color: 0x4a148c, effect: 0, alpha: 0.55 })
   addComponents(sim.world, s, Shadow, Alive, Radius)
   Shadow.of[s] = by
   Shadow.ofUid[s] = Uid.v[by]!

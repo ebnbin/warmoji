@@ -27,28 +27,3 @@ export function setSvgSize(svg: string, size: number): string {
   tag = tag.replace('<svg', `<svg width="${size}" height="${size}"`)
   return svg.slice(0, open.index) + tag + svg.slice(open.index + open[0].length)
 }
-
-export function outlineSvg(svg: string, radius: number, color: string): string {
-  const open = OPEN_TAG.exec(svg)
-  if (!open) throw new Error('不是有效的 SVG')
-  const style =
-    `<style>.__ol,.__ol *{fill:${color} !important;stroke:${color} !important;` +
-    `stroke-width:${radius * 2} !important;stroke-linejoin:round !important;stroke-linecap:round !important;}</style>`
-
-  const closeIdx = svg.lastIndexOf('</svg>')
-  if (closeIdx < 0) throw new Error('SVG 缺少闭合标签')
-  const body = svg.slice(open.index + open[0].length, closeIdx)
-  return svg.slice(0, open.index) + open[0] + style + `<g class="__ol">${body}</g>` + body + '</svg>'
-}
-
-export const OUTLINE = {
-  radius: 2,
-  colors: {
-    player: '#000000',
-    enemy: '#8e24aa',
-    enemyProjectile: '#d32f2f',
-    elite: '#ffb300',
-  },
-} as const
-
-export type OutlineKind = keyof typeof OUTLINE.colors

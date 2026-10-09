@@ -35,7 +35,7 @@ import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, 
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { LYING_DEPTH } from './render/bands'
+import { FEET_DEPTH, LYING_DEPTH } from './render/bands'
 import { SpriteBatch } from './render/sprites'
 import { EcsShadowBatch } from './render/shadow'
 import { LayerType, TriBatch } from './render/layer'
@@ -598,10 +598,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     const lightAt = this.map.lightAt?.bind(this.map)
     // 布景躺在地上，和躺着的精灵画在同一层
     new SpriteBatch(this, LayerType.Decor, LYING_DEPTH, atlas, this.ctx.decor, light, lightAt)
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt)
+    const leader = (): number => this.sim?.leader ?? -1
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites, light, lightAt, leader)
     if (light.shadow) new EcsShadowBatch(this, this.world, atlas, light.shadow)
     this.cues = new CueLayer(this, this.world, (r) => this.lens.screen.cover(r))
     this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
+    new TriBatch(this, LayerType.Paint, FEET_DEPTH, (o, m) => place(o, m, paint.feet))
     new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
     new TriBatch(this, LayerType.Paint, 40, (o, m) => place(o, m, paint.pointer))
     this.ctx.atlas = atlas

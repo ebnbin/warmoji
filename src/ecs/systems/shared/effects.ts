@@ -291,7 +291,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const p = fx.projectile
     spawnBolt(sim, at.x, at.y, Math.atan2(t.y - at.y, t.x - at.x), {
       faction: src.faction,
-      frame: sim.frames.index(p.look.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
+      frame: sim.frames.index(p.look.emoji),
       size: p.look.size,
       radius: p.radius,
       speed: p.speed,

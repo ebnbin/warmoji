@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { OutlineKind } from './svg'
+import type { OutlineKind } from './outline'
 import { emojiKey, emojiRaster } from './textures'
 import { HoldTable } from './holdTable'
 import type { HoldStats, TextureSpec } from './holdTable'

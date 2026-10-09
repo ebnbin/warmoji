@@ -57,7 +57,6 @@ export function spawnTelegraph(
   telegraphEntry[eid] = entry
   attachDrawable(sim.world, eid, sim.frames, {
     id: SPAWN.markEmoji,
-    outline: undefined,
     x,
     y,
     size: SPAWN.markSize * UNIT * (boss ? 2 : 1),

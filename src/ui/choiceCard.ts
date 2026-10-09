@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import { drawBlock, drawDisc } from './draw'
 import { pressable } from './gesture'
 import type { Rect } from './gesture'

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
+import type { QueryTerm } from 'bitecs'
 import { UNIT } from '../util/units'
 import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
@@ -9,7 +10,7 @@ import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, Boss, Elite, ENEMY_SET, Hp, MARK_SLOTS, Mark, Res, Slot, Transform, VisOff } from './components'
+import { Alive, Boss, Depth, Elite, ENEMY_SET, Facing, Faction, Hp, MARK_SLOTS, Mark, Res, RIM, Slot, Sprite, Tint, Transform, VisOff } from './components'
 import { abilityDef, eliteAffixes, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
@@ -24,9 +25,12 @@ import { hostShown } from './utils/statusTint'
 import { statusDef } from './utils/marks'
 import { elementNow } from './utils/element'
 import { leaderX, leaderY } from './utils/team'
-import { fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
+import { ellipse, fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
-import { packTint } from './render/tint'
+import { packTint, TINT_FILL } from './render/tint'
+import { SIDE } from './render/side'
+import { footY } from './utils/ground'
+import { FOE_SHOT_Z } from './present/layerShots'
 import type { PaintSprite } from './render/sprites'
 import type { Sim } from './sim'
 
@@ -51,6 +55,24 @@ const COOLING_DIM = 0.4
 const TRAIL_WIDTH = 5
 const TRAIL_ALPHA_OLD = 0.16
 const TRAIL_ALPHA_NEW = 0.34
+
+/** 脚下的圈：横半径是身体画面尺寸的 FEET_R，压扁成 FEET_FLAT 那么扁；线宽与填充的浓度按谁分 */
+const FEET_R = 0.42
+const FEET_FLAT = 0.38
+const TEAM_RING = { line: 3, fill: 0.16 }
+const LEAD_RING = { line: 4.5, fill: 0.22 }
+const ELITE_RING = { line: 3, fill: 0.12 }
+/** 队长圈外指着朝向的箭头：离圈多远、多长、半宽 */
+const HEAD_GAP = 3
+const HEAD_LEN = 9
+const HEAD_W = 6
+
+/** 队长被后画的身体盖住时，在最上面透出它的金色剪影，只压在敌方弹体下面 */
+const XRAY_Z = FOE_SHOT_Z - 1
+const XRAY_ALPHA = 0.5
+/** 盖住队长的身体：队长的中心落在它画面的中间这一成里 */
+const XRAY_COVER = 0.35
+const BODIES: QueryTerm[] = [Faction, Alive, Transform, Depth, Tint]
 
 const MARK_FILL = 0.16
 const MARK_LINE = 0.9
@@ -79,6 +101,8 @@ export class Presentation {
   readonly trail: Scratch = newScratch()
   /** 队员的血条、资源条与体力条 */
   readonly bars: Scratch = newScratch()
+  /** 脚下的圈：队员、队长与精英头目 */
+  readonly feet: Scratch = newScratch()
   /** 队长身边指向目标的箭头 */
   readonly pointer: Scratch = newScratch()
   /** 救援圈：全队倒下那一帧起不再更新 */
@@ -86,12 +110,14 @@ export class Presentation {
 
   step(sim: Sim): void {
     this.sprites.length = 0
-    for (const s of [this.marks, this.trail, this.bars, this.pointer]) resetScratch(s)
+    for (const s of [this.marks, this.trail, this.bars, this.feet, this.pointer]) resetScratch(s)
     sweats(sim, this.sprites)
     statusIcons(sim, this.sprites)
     echo(sim, this.sprites, this.trail)
+    xray(sim, this.sprites)
     this.sprites.sort((a, b) => a.z - b.z)
     bars(sim, this.bars)
+    feet(sim, this.feet)
     pointer(sim, this.pointer, goalSpot(sim), GOAL_COLOR)
     pointer(sim, this.pointer, nearestTo(sim, levelUpsOnField(sim)), LEVEL_UP_COLOR)
     pointer(sim, this.pointer, sim.hooks.beacon?.(sim) ?? null, BEACON_COLOR)
@@ -111,13 +137,14 @@ export class Presentation {
 function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
   out.push({
     z: SWEAT_Z,
-    frame: sim.frames.index(SWEAT, 'player'),
+    frame: sim.frames.index(SWEAT),
     x: Transform.x[body]! + VisOff.x[body]! + size * 0.34,
     y: Transform.y[body]! + VisOff.y[body]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4,
     w: SWEAT_SIZE,
     h: SWEAT_SIZE,
     color: 0xffffff,
     alpha: hostShown(body),
+    rim: RIM.item,
   })
 }
 
@@ -136,7 +163,7 @@ function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly str
   const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((emojis.length - 1) * ICON_SIZE) / 2
   const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * (0.55 + row)
   const alpha = hostShown(eid)
-  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji, 'player'), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha }))
+  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, rim: RIM.item }))
 }
 
 /** 精英与头目头顶第一排打头的元素图标：小怪太多不标，靠图鉴认 */
@@ -181,7 +208,7 @@ function bars(sim: Sim, o: Scratch): void {
     const x = Transform.x[m]! + VisOff.x[m]! - BAR_W / 2
     let y = Transform.y[m]! + VisOff.y[m]! + charSize(m) * 0.62
     rect(o, x, y, BAR_W, 6, back)
-    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, a))
+    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? SIDE.team : ratio > 0.25 ? 0xffdc5d : 0xef5350, a))
     y += 7
     if (res >= 0) {
       rect(o, x, y, BAR_W, 5, back)
@@ -192,6 +219,67 @@ function bars(sim: Sim, o: Scratch): void {
     rect(o, x, y, BAR_W, 6, back)
     rect(o, x + 1, y + 1, (BAR_W - 2) * sta, 4, packTint(STAMINA_COLOR[staminaTier(sta)], a))
   }
+}
+
+/** 身体脚下平躺的一圈，返回它的中心与半径 */
+function footRing(sim: Sim, o: Scratch, eid: number, size: number, color: number, ring: { readonly line: number; readonly fill: number }, alpha: number): { x: number; y: number; rx: number; ry: number } {
+  const x = Transform.x[eid]! + VisOff.x[eid]!
+  const y = footY(sim.world, eid)
+  const rx = size * FEET_R
+  const ry = rx * FEET_FLAT
+  ellipse(o, WORLD, x, y, rx, ry, ring.line, packTint(color, ring.fill * alpha), packTint(color, 0.95 * alpha))
+  return { x, y, rx, ry }
+}
+
+/** 脚下的圈：队员蓝圈，队长金圈、圈外一个箭头指着朝向，精英与头目琥珀圈；倒下的不画 */
+function feet(sim: Sim, o: Scratch): void {
+  for (const m of sim.characters) {
+    if (!Alive.v[m]) continue
+    const lead = m === sim.leader
+    const a = hostShown(m)
+    const r = footRing(sim, o, m, charSize(m), lead ? SIDE.lead : SIDE.team, lead ? LEAD_RING : TEAM_RING, a)
+    if (!lead) continue
+    const f = norm(Facing.x[m]!, Facing.y[m]!)
+    const bx = r.x + f.x * (r.rx + HEAD_GAP)
+    const by = r.y + f.y * (r.ry + HEAD_GAP * FEET_FLAT)
+    const s = norm(f.x, f.y * FEET_FLAT)
+    tri(o, WORLD, bx + s.x * HEAD_LEN, by + s.y * HEAD_LEN, bx - s.y * HEAD_W, by + s.x * HEAD_W, bx + s.y * HEAD_W, by - s.x * HEAD_W, packTint(SIDE.lead, 0.95 * a))
+  }
+  for (const eid of query(sim.world, ENEMY_SET)) {
+    if (!Alive.v[eid] || !(Elite.v[eid] || Boss.v[eid])) continue
+    footRing(sim, o, eid, Transform.w[eid]!, SIDE.elite, ELITE_RING, Tint.alpha[eid]!)
+  }
+}
+
+/** 队长被后画的身体盖住时（按 z 排在它后面、画面中间压着它的中心），在最上面透出它的金色剪影 */
+function xray(sim: Sim, out: PaintSprite[]): void {
+  const lead = sim.leader
+  if (!Alive.v[lead]) return
+  const x = Transform.x[lead]! + VisOff.x[lead]!
+  const y = Transform.y[lead]! + VisOff.y[lead]!
+  const z = Depth.z[lead]!
+  let covered = false
+  for (const eid of query(sim.world, BODIES)) {
+    if (eid === lead || !Alive.v[eid] || Depth.z[eid]! <= z || Tint.alpha[eid]! < 0.5) continue
+    if (Math.abs(Transform.x[eid]! + VisOff.x[eid]! - x) > Transform.w[eid]! * XRAY_COVER) continue
+    if (Math.abs(Transform.y[eid]! + VisOff.y[eid]! - y) > Transform.h[eid]! * XRAY_COVER) continue
+    covered = true
+    break
+  }
+  if (!covered) return
+  out.push({
+    z: XRAY_Z,
+    frame: Sprite.frame[lead]!,
+    x,
+    y,
+    w: Transform.w[lead]!,
+    h: Transform.h[lead]!,
+    rot: Transform.rot[lead]!,
+    flipX: Sprite.flipX[lead]!,
+    color: SIDE.lead,
+    alpha: XRAY_ALPHA * hostShown(lead),
+    effect: TINT_FILL,
+  })
 }
 
 /** 目标、最近的升级道具或地图要盯住的那一处在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
@@ -224,7 +312,7 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const dim = (cooled(sim, cur) ? 1 : COOLING_DIM) * hostShown(lead)
   sprites.push({
     z: ECHO_Z,
-    frame: sim.frames.index(lookOf(sim, lead), 'player'),
+    frame: sim.frames.index(lookOf(sim, lead)),
     x: at.x,
     y: at.y,
     w: Transform.w[lead]!,

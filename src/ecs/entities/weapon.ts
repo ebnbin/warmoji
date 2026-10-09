@@ -2,7 +2,6 @@ import { addComponent, addComponents, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import type { HeldVisual } from '../../types/abilityDefs'
-import type { OutlineKind } from '../../emoji/svg'
 import { attachDrawable } from './drawable'
 import {
   Boss,
@@ -14,27 +13,28 @@ import {
   Held,
   Mounted,
   Quad,
+  RIM,
   Sprite,
   Thrown,
   Tint,
   Transform,
   VisOff,
 } from '../components'
+import type { Rim } from '../components'
 import type { Sim } from '../sim'
 import { flyerHits } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
 
-export function holderOutline(faction: number, holderEid: number): OutlineKind {
-  return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
+export function holderRim(faction: number, holderEid: number): Rim {
+  return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? RIM.elite : RIM.none) : RIM.team
 }
 
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
   const e = newEntity(world)
-  const outline = holderOutline(faction, holderEid)
   attachDrawable(world, e, sim.frames, {
     id: held.look.emoji,
-    outline,
+    rim: holderRim(faction, holderEid),
     x: Transform.x[holderEid]!,
     y: Transform.y[holderEid]!,
     size: held.look.size,
@@ -65,6 +65,7 @@ function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   Tint.color[t] = 0xffffff
   Tint.effect[t] = 0
   Tint.alpha[t] = 1
+  Tint.rim[t] = Tint.rim[weaponEid]!
   Depth.z[t] = 13
   Quad.v[t] = 0
   return t

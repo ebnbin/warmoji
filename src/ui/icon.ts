@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { holdEmoji } from '../emoji/hold'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 
 /** emoji 图标：所在场景持有它的纹理到场景关掉；纹理还没载好时先空着，载好了自己换上 */
 export class Icon extends Phaser.GameObjects.Image {

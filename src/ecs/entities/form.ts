@@ -7,7 +7,7 @@ import { abilityDef, bodyLook, enemyDef, formEnd } from '../store'
 import { hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { interrupt } from '../systems/shared/ability'
-import { attachDrive, detachDrive, npcOutline } from './enemy'
+import { attachDrive, detachDrive } from './enemy'
 import { STANDARD } from '../utils/pass'
 import { hoverPx } from '../utils/ground'
 import { equipAbility, unequipAbilities } from './ability'
@@ -38,8 +38,7 @@ export function formOf(sim: Sim, eid: number): number {
 function relook(sim: Sim, eid: number, emoji: string): void {
   bodyLook[eid] = emoji
   if (hasMark(sim, eid, MARK.morph)) return
-  const outline = hasComponent(sim.world, eid, Slot) ? 'player' : npcOutline(eid)
-  Sprite.frame[eid] = sim.frames.index(emoji, outline)
+  Sprite.frame[eid] = sim.frames.index(emoji)
 }
 
 /** 换能力：主动技能与借来的不换；非玩家身体还没装过能力就留给 armEnemies */

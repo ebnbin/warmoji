@@ -13,6 +13,9 @@ export const UNDER_Z = -1000
 /** 躺在地上的精灵与地上的布景画在这一层 */
 export const LYING_DEPTH = 1
 
+/** 脚下的圈：压在影子上面、立着的身体下面 */
+export const FEET_DEPTH = 2.7
+
 export const SPRITE_BANDS: readonly Band[] = [
   { depth: 0.5, zMin: -Infinity, zMax: UNDER_Z },
   { depth: LYING_DEPTH, zMin: UNDER_Z, zMax: LYING_Z },

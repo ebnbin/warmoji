@@ -1,5 +1,5 @@
 import type { Path } from '../data/runCheck'
-import type { OutlineKind } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/outline'
 import type { Banner } from '../types/runs'
 import type { Mutable } from './draft'
 import type { Node } from './outline'
