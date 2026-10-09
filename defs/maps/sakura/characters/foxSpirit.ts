@@ -1,15 +1,15 @@
 import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
-import { shot } from '../../../kit.ts'
+import { ring, shot } from '../../../kit.ts'
 
-// 🦊 狐仙：放出追着敌人飞的狐火，同一个敌人挨满三团就被迷住；技能一回眸迷住身边，化出两只分身替她挨打，自己隐去
+// 🦊 狐仙：放出追着敌人飞的狐火，打中的都烧起来，同一个敌人挨满三团就被迷得朝她挤过来，挤成一堆的火烧连营；技能一回眸迷住身边，化出两只分身替她挨打，自己隐去
 const foxSpiritFire = {
   trigger: 'auto',
   cooldownMs: 900,
   aim: 'nearest',
   range: 7,
-  damage: 12,
+  damage: 10,
   fireSfx: 'ignite',
   shape: { kind: 'bolt', projectile: { ...shot('1f525', 7, 0.45, 270), flight: { kind: 'homing', degPerSec: 180 } }, lifeMs: 1800 },
   onHit: [{ kind: 'stack', max: 3, durationMs: 3000, then: [{ kind: 'charm', durationMs: 1500 }] }],
@@ -23,7 +23,7 @@ const foxSpiritFire2 = { ...foxSpiritFire, onHit: swoon } satisfies AbilityDef
 
 const foxSpiritFire3 = {
   ...foxSpiritFire,
-  onHit: [...swoon, { kind: 'deathMark', ms: 1500, then: [{ kind: 'to', who: { side: 'foes', radius: 2.2 }, then: [{ kind: 'charm', durationMs: 1000 }] }] }],
+  onHit: [...swoon, { kind: 'blast', radius: 1.5, ratio: 0.5, knockback: 0, ring: ring(0xff7043) }],
 } satisfies AbilityDef
 
 const foxSpiritCharm = {
@@ -60,7 +60,7 @@ export default {
   emoji: '1f98a',
   name: '狐仙',
   element: 'fire',
-  desc: '修行千年的狐仙：放出追着敌人飞的狐火，同一个敌人 3 秒内挨满三团就被迷得朝她走过来；技能一回眸迷住身边的敌人，再化出两只分身替她挨打，分身被打散时迷住周围的敌人，她自己隐去 1.5 秒',
+  desc: '修行千年的狐仙：放出追着敌人飞的狐火，打中的身上烧起来，烧着的还会烧到贴着的同伴；同一个敌人 3 秒内挨满三团就被迷得朝她走过来，被迷住的挤成一堆，火就在堆里连着烧；湿的敌人点不着，狐火打上去只把它蒸干；本身是火，点不着、不怕岩浆，身子轻，怕被打飞；技能一回眸迷住身边的敌人，再化出两只分身替她挨打，分身被打散时迷住周围的敌人，她自己隐去 1.5 秒',
   role: 'controller',
   tags: ['control', 'ranged', 'summon'],
   body: { drag: 4.5, mass: 0.6 },
@@ -80,7 +80,7 @@ export default {
       base: 'foxSpiritFire',
       upgrades: [
         { ability: 'foxSpiritFire2', card: { icon: '1f48b', name: '迷魂', desc: '狐火打中已被迷住的敌人，改为让它晕 1.2 秒，再补一下等于这一团的伤害' } },
-        { ability: 'foxSpiritFire3', card: { icon: '1f494', name: '摄魂', desc: '被狐火打中的敌人 1.5 秒内死去，迷住它身边 2.2 格内的敌人 1 秒' } },
+        { ability: 'foxSpiritFire3', card: { icon: '1f386', name: '燎原', desc: '狐火打中时炸开一圈火，1.5 格内别的敌人各挨这一团五成的伤害、一齐烧起来' } },
       ],
     },
   ],
