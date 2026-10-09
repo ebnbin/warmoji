@@ -1,7 +1,4 @@
 import Phaser from 'phaser'
-import { visibleEmojiIds } from '../emoji/pack'
-import { browserStorage } from '../util/storage'
-import { loadSettings } from '../save/settings'
 import { setSvgSize } from '../emoji/svg'
 import {
   ANIM_RECIPES,
@@ -145,7 +142,7 @@ export class StudioScene extends Phaser.Scene {
       Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))),
       loadEmojiPack()
         .then((p) => {
-          this.allKeys = [...visibleEmojiIds(p, loadSettings(browserStorage()).showSkinTone)]
+          this.allKeys = [...p.ids]
         })
         .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`)),
     ]).then(() => {

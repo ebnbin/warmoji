@@ -1,7 +1,4 @@
 import Phaser from 'phaser'
-import { visibleEmojiIds } from '../emoji/pack'
-import { browserStorage } from '../util/storage'
-import { loadSettings } from '../save/settings'
 import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from '../scene/wikiEntries'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 import { loadEmojiPack } from '../emoji/textures'
@@ -200,8 +197,7 @@ export class WikiScene extends Phaser.Scene {
   private async loadManifest(): Promise<void> {
     if (this.manifest.length > 0) return
     try {
-      const showSkinTone = loadSettings(browserStorage()).showSkinTone
-      this.manifest = [...visibleEmojiIds(await loadEmojiPack(), showSkinTone)]
+      this.manifest = [...(await loadEmojiPack()).ids]
     } catch (err) {
       console.error(`emoji 清单加载失败: ${String(err)}`)
     }

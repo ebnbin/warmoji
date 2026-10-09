@@ -900,7 +900,8 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }
 
-const PACK = new Set(readFileSync('scripts/emoji/ordering.txt', 'utf8').split(/\s+/))
+const EMOJI_PACK = parseEmojiPack(readFileSync('scripts/emoji/ordering.txt', 'utf8'), readFileSync('scripts/emoji/twemoji.txt', 'utf8'))
+const PACK = new Set(EMOJI_PACK.ids)
 
 /** 地图信号：同一个名字在哪种地图上说法都一样，关卡的说明按名字找说法 */
 {
@@ -1252,9 +1253,8 @@ const TABLES = {
 
 /** 动画配方：部件的下标对得上这张 emoji 的顶层元素，首尾姿态闭环 */
 {
-  const pack = parseEmojiPack(readFileSync('scripts/emoji/ordering.txt', 'utf8'), readFileSync('scripts/emoji/twemoji.txt', 'utf8'))
   const elementCount = (emoji: string): number | undefined => {
-    const svg = packSvg(pack, emoji)
+    const svg = packSvg(EMOJI_PACK, emoji)
     return svg === null ? undefined : splitSvg(svg).els.length
   }
   for (const issue of animIssues(ANIMATIONS, elementCount)) need(false, issue)
