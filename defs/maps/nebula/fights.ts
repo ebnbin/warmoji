@@ -7,13 +7,14 @@ export const FIGHTS = {
     name: '喂黑洞',
     desc: '我方伤不了敌人，击退却格外有劲：黑洞的引力会把靠近的东西拖进视界吞掉，敌人往往比你先被吸走；让 35 只敌人被黑洞吞掉，它每吞一只就更重一分',
     note: '只能借地形杀敌：站到黑洞边上当诱饵，自己又不能越过那圈走不出来的光环',
-    team: { slots: ['ringstar', 'boxRoo', 'rocker'], level: 2 },
+    team: { slots: ['ringstar', 'boxRoo', 'horse'], level: 2 },
     stars: [{ kind: 'time', ms: 75_000 }, { kind: 'hazard', by: 'blackhole', damage: 0 }],
     fight: {
       name: '喂黑洞',
       map: 'nebula',
       clockSec: 60,
-      rules: { harmless: true, mods: { mul: { knockback: 2 } } },
+      enemyMods: { mul: { maxHp: 0.5, damage: 0.6 } },
+      rules: { harmless: true, mods: { mul: { knockback: 4 } } },
       phases: [
         {
           intro: { title: '喂黑洞', sub: '让 35 只敌人被黑洞吞掉' },
@@ -42,6 +43,7 @@ export const FIGHTS = {
       name: '别让它长大',
       map: 'nebula',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.5, damage: 0.65 } },
       phases: [
         {
           intro: { title: '别让它长大', sub: '黑洞长到八成就输' },
@@ -71,6 +73,7 @@ export const FIGHTS = {
       name: '流星雨',
       map: 'nebula',
       clockSec: 0,
+      enemyMods: { mul: { maxHp: 0.45, damage: 0.7 } },
       rules: { harmless: true },
       phases: [
         {
@@ -101,6 +104,7 @@ export const FIGHTS = {
       name: '视界边缘',
       map: 'nebula',
       clockSec: 60,
+      enemyMods: { mul: { maxHp: 0.5, damage: 0.6 } },
       chaseLeader: true,
       rules: { leader: { lock: true, critical: true } },
       phases: [

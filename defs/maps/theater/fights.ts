@@ -13,6 +13,7 @@ export const FIGHTS = {
       name: '谢幕前收钱',
       map: 'theater',
       clockSec: 0,
+      enemyMods: { mul: { maxHp: 0.6, damage: 0.65 } },
       phases: [
         {
           intro: { title: '谢幕前收钱', sub: '第三次换幕之前捡满 60 金币' },
@@ -42,6 +43,7 @@ export const FIGHTS = {
       name: '四幕剧',
       map: 'theater',
       clockSec: 0,
+      enemyMods: { mul: { damage: 0.75 } },
       phases: [
         {
           intro: { title: '第一幕', sub: '疯小丑与柴郡猫' },
@@ -100,6 +102,7 @@ export const FIGHTS = {
       name: '独角戏',
       map: 'theater',
       clockSec: 120,
+      enemyMods: { mul: { damage: 0.7 } },
       phases: [
         {
           mix: [

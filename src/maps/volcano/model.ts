@@ -52,7 +52,7 @@ export interface VolcanoState {
   readonly field: LavaField
   /** 崖壁与山体：挡弹体与视线 */
   readonly solids: Solids
-  /** 喷气孔：画面冒蒸汽、出怪口钻出火山怪都从这里取 */
+  /** 喷气孔：画面冒蒸汽、出怪口钻出敌人都从这里取 */
   readonly vents: readonly Point[]
   readonly marks: VolcanoMarks
   phase: EruptionPhase

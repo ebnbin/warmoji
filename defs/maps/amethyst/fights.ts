@@ -42,6 +42,7 @@ export const FIGHTS = {
       name: '守夜',
       map: 'amethyst',
       clockSec: 45,
+      enemyMods: { mul: { damage: 0.75 } },
       phases: [
         {
           intro: { title: '守夜', sub: '撑到日出' },
@@ -72,6 +73,7 @@ export const FIGHTS = {
       name: '晶洞深处',
       map: 'amethyst',
       clockSec: 0,
+      enemyMods: { mul: { damage: 0.8 } },
       phases: [
         {
           intro: { title: '晶洞深处', sub: '击倒躲在小晶洞里的悬赏目标' },
@@ -108,6 +110,7 @@ export const FIGHTS = {
       name: '暗处伏击',
       map: 'amethyst',
       clockSec: 70,
+      enemyMods: { mul: { damage: 0.7 } },
       rules: { surprise: true },
       phases: [
         {

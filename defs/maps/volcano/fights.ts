@@ -7,13 +7,14 @@ export const FIGHTS = {
     name: '引火烧身',
     desc: '我方伤不了敌人，击退却格外有劲：火山隔一阵就喷发，熔岩顺着地势漫下来，敌人追人时会直直穿过熔岩；让 15 只敌人被熔岩烧死',
     note: '只能借地形杀敌：熔岩敌我都烫，要算着喷发的节奏，把敌人引进去、自己站在岩石上',
-    team: { slots: ['boxRoo', 'rocker', 'owl'], level: 2 },
+    team: { slots: ['boxRoo', 'horse', 'owl'], level: 2 },
     stars: [{ kind: 'hazard', by: 'lava', damage: 0 }, { kind: 'time', ms: 110_000 }],
     fight: {
       name: '引火烧身',
       map: 'volcano',
       clockSec: 60,
-      rules: { harmless: true, mods: { mul: { knockback: 2 } } },
+      enemyMods: { mul: { maxHp: 0.45 } },
+      rules: { harmless: true, mods: { mul: { knockback: 4 } } },
       phases: [
         {
           intro: { title: '引火烧身', sub: '让 15 只敌人被熔岩烧死' },
@@ -43,6 +44,7 @@ export const FIGHTS = {
       name: '喷发周期',
       map: 'volcano',
       clockSec: 100,
+      enemyMods: { mul: { maxHp: 0.45, damage: 0.8 } },
       phases: [
         {
           intro: { title: '喷发周期', sub: '撑到第三次喷发' },
@@ -85,6 +87,7 @@ export const FIGHTS = {
       name: '喷气孔巡查',
       map: 'volcano',
       clockSec: 90,
+      enemyMods: { mul: { maxHp: 0.5, damage: 0.7 } },
       phases: [
         {
           intro: { title: '喷气孔巡查', sub: '站上每一个喷气孔' },

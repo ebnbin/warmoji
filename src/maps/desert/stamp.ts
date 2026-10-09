@@ -114,7 +114,7 @@ function groove(t: TrackTex, x0: number, y0: number, x1: number, y1: number, hal
 
 /**
  * 把一个印子盖进贴图：位置换成格（贴图首尾相接，哪一份都一样）。靴印是前掌与后跟两个坑，光脚多五个脚趾，爪印前后两个肉垫，
- * 蹄印是分开的两瓣，蝎王一边四个细点、尾巴拖一道浅沟，跳着落地的是并排的一对；蛇是一道 S 形的沟，钻在沙下的蝎王顶起一道中间裂开的隆起。
+ * 蹄印是分开的两瓣，蝎子一边四个细点、尾巴拖一道浅沟，跳着落地的是并排的一对；蛇是一道 S 形的沟，钻在沙下的巨沙虫顶起一道中间裂开的隆起。
  * 拖着脚时从同一只脚的上一步一路拖出一道浅沟
  */
 export function stampPrint(t: TrackTex, p: Print, unit: number, now: number): void {
