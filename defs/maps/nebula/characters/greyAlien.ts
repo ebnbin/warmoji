@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 👽 外星人：闪到敌人身后扎探针，专挑残血的下手，扎死了潜行再扑；技能把最近的敌人绑进只有彼此的异界
+// 👽 外星人：闪到敌人身后扎探针，是物理，专挑残血的下手，冻住的一扎就碎；身子薄、闪避高；技能把最近的敌人绑进只有彼此的异界
 const greyAlienProbe = {
   trigger: 'auto',
   cooldownMs: 1350,
@@ -37,11 +37,11 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f47d',
   name: '外星人',
-  desc: '灰皮肤的外星来客：闪到敌人身后扎一针探针再闪回来，对残血的下手更狠，扎死了就隐身再扑；技能把最近的敌人绑进只有彼此的异界单挑',
+  desc: '灰皮肤的外星来客，身子薄，生命只有 70，单发的出手四次里躲得开一次，躲不开爆炸、场和燃烧：闪到敌人身后扎一针探针再闪回来，这一针是物理，对残血的下手更狠，冻住的敌人一扎就碎，扎死了就隐身再扑；技能把最近的敌人绑进只有彼此的异界单挑',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4.2, mass: 0.6 },
-  stats: { moveSpeed: 7.2, maxStamina: 90, staminaRegen: 90, exertion: 0.8 },
+  stats: { maxHp: 90, dodge: 0.1, moveSpeed: 7.2, maxStamina: 90, staminaRegen: 90, exertion: 0.8 },
   skill: { name: '绑架', icon: '1f6f8', desc: '把 6 格内最近的敌人拉进只有彼此的异界 4 秒，界外谁也插不了手；这 4 秒里自己的伤害 ×1.5', cdMs: 14_000, ability: 'greyAlienAbduct' },
   weapons: [],
   innate: [

@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 👼 星之使者：星辉治最伤的队友，星弹打敌人，两样轮着来；技能让倒下的队友全部站起来，全队回血并短暂无敌
+// 👼 星之使者：星辉治最伤的队友，雷星打血最多的敌人、打断它的出手，两样轮着来；技能让倒下的队友全部站起来，全队回血并短暂无敌
 const HEAL = { kind: 'heal', amount: 12 } as const
 const SHIELD = { kind: 'shield', amount: 0, ratio: 0.06, ms: 3000 } as const
 const MEND = { kind: 'mend', amount: 3, tickMs: 500, durationMs: 3000 } as const
@@ -11,10 +11,10 @@ const MEND = { kind: 'mend', amount: 3, tickMs: 500, durationMs: 3000 } as const
 const starShot = {
   trigger: 'manual',
   class: 'attack',
-  aim: 'nearest',
+  aim: 'strongest',
   range: 6.5,
-  damage: 13,
-  fireSfx: 'shoot',
+  damage: 11,
+  fireSfx: 'zap',
   shape: { kind: 'bolt', projectile: shot('2b50', 9, 0.42), lifeMs: 1400 },
 } satisfies AbilityDef
 
@@ -58,7 +58,8 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f47c',
   name: '星之使者',
-  desc: '从星空飞下来的小天使：星辉治 5 格内最伤的那个队友，星弹打 6.5 格内最近的敌人，两样轮着来；没人受伤或射程里没敌人时，轮到的那一下空过，轮换照走；技能让倒下的队友全部站起来，全队回血并短暂无敌',
+  element: 'thunder',
+  desc: '从星空飞下来的小天使，本身是雷，别处跳来的电流跳不到身上：星辉治 5 格内最伤的那个队友，雷星打 6.5 格内血最多的敌人，打断它正在蓄的力，电流再跳到它身边的另一个敌人，两样轮着来；没人受伤或射程里没敌人时，轮到的那一下空过，轮换照走；技能让倒下的队友全部站起来，全队回血并短暂无敌',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.6 },

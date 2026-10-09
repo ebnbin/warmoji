@@ -20,6 +20,7 @@ const horizon = {
   firstDelayMs: 5000,
   aim: 'nearest',
   range: 4,
+  element: 'physical',
   damage: 40,
   color: 0x311b92,
   fireSfx: 'boom',
@@ -87,6 +88,7 @@ const repulse = {
   firstDelayMs: 1000,
   aim: 'nearest',
   range: 5,
+  element: 'physical',
   damage: 30,
   knockback: 6,
   color: 0xfff59d,
@@ -101,7 +103,7 @@ const lightShot = {
   firstDelayMs: 800,
   aim: 'nearest',
   range: 9,
-  damage: 16,
+  damage: 12,
   fireSfx: 'zap',
   shape: { kind: 'bolt', projectile: shot('1f506', 5.5, 0.5), lifeMs: 2600 },
   repeat: { count: 8, spreadDeg: 360 },
@@ -112,7 +114,7 @@ const SINGULARITY = {
   role: 'boss',
   emoji: '1f573',
   name: '奇点',
-  desc: '黑洞凝成的奇点：隔一阵在身周撑开一圈 4.5 格的事件视界跟着自己 6 秒，越过那圈线的人（进出都算）当场定住 1 秒并挨一下；张开 6 格的引力井把人往身边吸，蓄力 1.2 秒后重创 4 格内的人，暗物质弹朝八方射，还会用引力拴住最近的人，3 秒内没挣到 7 格外就被拉成面条，眩晕 1 秒并挨一大下；血掉到一半翻成白洞，改用斥力爆发把人炸开、朝八方射光弹，蓄力重创照旧，出手也更快',
+  desc: '黑洞凝成的奇点，护甲 4：隔一阵在身周撑开一圈 4.5 格的事件视界跟着自己 6 秒，越过那圈线的人（进出都算）当场定住 1 秒并挨一下；张开 6 格的引力井把人往身边吸，蓄力 1.2 秒后重创 4 格内的人，暗物质弹朝八方射，还会用引力拴住最近的人，3 秒内没挣到 7 格外就被拉成面条，眩晕 1 秒并挨一大下；这些都是物理，冻住的人挨了就碎；血掉到一半翻成白洞，本身变成火，再也点不着：斥力爆发把人炸开，朝八方射炽白的光弹，打中的人烧起来、挤在一起的互相燎着，蓄力重创照旧是物理，出手也更快',
   size: 3.4,
   radius: 1.1,
   span: [0, 6],
@@ -125,7 +127,7 @@ const SINGULARITY = {
   traits: ['anchored', 'wary'],
   drive: { kind: 'chase' },
   abilities: [eventHorizon, well, horizon, darkShot, spaghettify],
-  phases: [{ below: 0.5, name: '白洞', abilities: [repulse, lightShot, horizon], stats: { mul: { cooldown: 0.8 } } }],
+  phases: [{ below: 0.5, name: '白洞', element: 'fire', abilities: [repulse, lightShot, horizon], stats: { mul: { cooldown: 0.8 } } }],
 } satisfies EnemyDef
 
 export default SINGULARITY

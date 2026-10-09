@@ -2,33 +2,33 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🦁 狮子座：狮爪拍开挡路的，第三下改成怒吼吓跑一圈；技能挂上护盾，把敌人都招到自己身上
+// 🦁 狮子座：狮爪把贴上来的拍飞，拍中的出手发慢，第三下改成震吼把一圈敌人震开；甲厚，怕不吃护甲的燃烧；技能挂上护盾，把敌人都招到自己身上
 const leoClaw = {
   trigger: 'auto',
   cooldownMs: 1200,
   aim: 'nearest',
   range: 2.1,
   damage: 17,
-  knockback: 2.5,
+  knockback: 3,
   fireSfx: 'thud',
   shape: { kind: 'sector', radius: 2, arcDeg: 110, ms: 180 },
 } satisfies AbilityDef
 
-const KING = [{ on: 'fire', to: 'self', effects: [{ kind: 'guard', mul: 0.85, durationMs: 1000 }] }] as const
+const AWE = [{ kind: 'attackSlow', mul: 1.3, durationMs: 2000 }] as const
 
-const leoClaw2 = { ...leoClaw, reactions: KING } satisfies AbilityDef
+const leoClaw2 = { ...leoClaw, onHit: AWE } satisfies AbilityDef
 
 const leoRoar = {
   trigger: 'auto',
   cooldownMs: 1200,
   aim: 'nearest',
   range: 3,
-  damage: 12,
+  damage: 14,
+  knockback: 4,
   fireSfx: 'boom',
   color: 0xfff59d,
   shape: { kind: 'disc', radius: 3, at: 'self' },
-  onHit: [{ kind: 'fear', durationMs: 800 }],
-  reactions: KING,
+  onHit: AWE,
 } satisfies AbilityDef
 
 const leoClaw3 = { ...leoClaw2, cycle: [leoClaw2, leoRoar] } satisfies AbilityDef
@@ -59,7 +59,7 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.15 } }, 
 export default {
   emoji: '1f981',
   name: '狮子座',
-  desc: '从星座里走下来的狮子：狮爪把贴上来的拍开，每第三下改成怒吼吓跑一圈；技能给自己挂上厚厚的护盾，把身边的敌人都招到自己身上，还替队友挡下两成伤害',
+  desc: '从星座里走下来的狮子，皮厚甲硬，挨打掉得少，就怕燃烧、毒这类不吃护甲的：狮爪是物理，把贴上来的拍飞，冻住的一拍就碎，每第三下改成震吼，把一圈敌人震开；技能给自己挂上厚厚的护盾，把身边的敌人都招到自己身上，还替队友挡下两成伤害',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.8 },
@@ -72,8 +72,8 @@ export default {
       icon: '1f981',
       base: 'leoClaw',
       upgrades: [
-        { ability: 'leoClaw2', card: { icon: '1f451', name: '王者', desc: '每次出手后 1 秒内，自己受到的伤害 ×0.85' } },
-        { ability: 'leoClaw3', card: { icon: '1f4e2', name: '狮吼', desc: '每第三下改成怒吼：身周 3 格内的敌人挨一下并恐惧 0.8 秒' } },
+        { ability: 'leoClaw2', card: { icon: '1f451', name: '王者', desc: '被狮爪拍中的敌人 2 秒内出手慢三成' } },
+        { ability: 'leoClaw3', card: { icon: '1f4e2', name: '狮吼', desc: '每第三下改成震吼：身周 3 格内的敌人挨 14 点并被远远震开，出手也慢三成' } },
       ],
     },
   ],
