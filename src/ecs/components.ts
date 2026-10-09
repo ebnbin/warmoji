@@ -63,8 +63,8 @@ export const Sprite = {
   flipX: u8(),
 }
 
-/** 画面上归哪边：精英头目描琥珀边、其余描黑边，队伍的身体与装置脚下放圈；弹体不看它，按此刻的阵营 */
-export const TINT_SIDE = { none: 0, team: 1, elite: 2 } as const
+/** 画面上归哪边：精英描琥珀边、头目描紫边、其余描黑边，队伍的身体与装置脚下放圈；弹体不看它，按此刻的阵营 */
+export const TINT_SIDE = { none: 0, team: 1, elite: 2, boss: 3 } as const
 
 export type TintSide = (typeof TINT_SIDE)[keyof typeof TINT_SIDE]
 

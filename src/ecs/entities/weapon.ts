@@ -26,7 +26,8 @@ import { flyerHits } from '../store'
 import { anchorX, anchorY } from '../utils/ability'
 
 export function holderSide(faction: number, holderEid: number): TintSide {
-  return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? TINT_SIDE.elite : TINT_SIDE.none) : TINT_SIDE.team
+  if (faction !== FACTION.enemy) return TINT_SIDE.team
+  return Boss.v[holderEid] ? TINT_SIDE.boss : Elite.v[holderEid] ? TINT_SIDE.elite : TINT_SIDE.none
 }
 
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {

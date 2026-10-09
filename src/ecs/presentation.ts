@@ -46,7 +46,8 @@ const ICON_MAX = 3
 
 const BAR_W = 0.8 * UNIT
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
-const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x4dd0e1, slow: 0xffa726, low: 0xef5350 }
+const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x66bb6a, slow: 0xffa726, low: 0xef5350 }
+const HP_COLOR = 0xef5350
 
 const ECHO_COLOR = 0x80deea
 const ECHO_ALPHA = 0.5
@@ -67,7 +68,7 @@ const HEAD_GAP = 3
 const HEAD_LEN = 9
 const HEAD_W = 6
 
-/** 队长被后画的身体盖住时，在最上面透出它的金色剪影，只压在敌方弹体下面 */
+/** 队长被后画的身体盖住时，在最上面透出它的黄色剪影，只压在敌方弹体下面 */
 const XRAY_Z = FOE_SHOT_Z - 1
 const XRAY_ALPHA = 0.5
 /** 盖住队长的身体：队长的中心落在它画面的中间这一成里 */
@@ -208,7 +209,7 @@ function bars(sim: Sim, o: Scratch): void {
     const x = Transform.x[m]! + VisOff.x[m]! - BAR_W / 2
     let y = Transform.y[m]! + VisOff.y[m]! + charSize(m) * 0.62
     rect(o, x, y, BAR_W, 6, back)
-    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? SIDE.team : ratio > 0.25 ? 0xffdc5d : 0xef5350, a))
+    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(HP_COLOR, a))
     y += 7
     if (res >= 0) {
       rect(o, x, y, BAR_W, 5, back)
@@ -235,31 +236,32 @@ function footRing(sim: Sim, o: Scratch, eid: number, size: number, color: number
 const FOOTED: QueryTerm[] = [Alive, Radius, Transform, Tint]
 const EMPLACED: QueryTerm[] = [Emplacement, Transform, Tint]
 
-/** 脚下的圈：队伍的身体与装置一圈蓝，队长换成金圈、圈外一个箭头指着朝向，精英与头目一圈琥珀；倒下的不画 */
+/** 脚下的圈：队伍的身体与装置一圈黄，队长的粗一些、圈外一个箭头指着朝向，精英一圈琥珀、头目一圈紫；倒下的不画 */
 function feet(sim: Sim, o: Scratch): void {
   for (const eid of query(sim.world, FOOTED)) {
     if (!Alive.v[eid]) continue
     const a = Tint.alpha[eid]!
     const size = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.w[eid]!
-    if (Tint.side[eid] === TINT_SIDE.elite && (Elite.v[eid] || Boss.v[eid])) footRing(sim, o, eid, size, SIDE.elite, ELITE_RING, a)
+    if (Tint.side[eid] === TINT_SIDE.boss && Boss.v[eid]) footRing(sim, o, eid, size, SIDE.boss, ELITE_RING, a)
+    if (Tint.side[eid] === TINT_SIDE.elite && Elite.v[eid]) footRing(sim, o, eid, size, SIDE.elite, ELITE_RING, a)
     if (Tint.side[eid] !== TINT_SIDE.team) continue
     if (eid !== sim.leader) {
       footRing(sim, o, eid, size, SIDE.team, TEAM_RING, a)
       continue
     }
-    const r = footRing(sim, o, eid, size, SIDE.lead, LEAD_RING, a)
+    const r = footRing(sim, o, eid, size, SIDE.team, LEAD_RING, a)
     const f = norm(Facing.x[eid]!, Facing.y[eid]!)
     const bx = r.x + f.x * (r.rx + HEAD_GAP)
     const by = r.y + f.y * (r.ry + HEAD_GAP * FEET_FLAT)
     const d = norm(f.x, f.y * FEET_FLAT)
-    tri(o, WORLD, bx + d.x * HEAD_LEN, by + d.y * HEAD_LEN, bx - d.y * HEAD_W, by + d.x * HEAD_W, bx + d.y * HEAD_W, by - d.x * HEAD_W, packTint(SIDE.lead, 0.95 * a))
+    tri(o, WORLD, bx + d.x * HEAD_LEN, by + d.y * HEAD_LEN, bx - d.y * HEAD_W, by + d.x * HEAD_W, bx + d.y * HEAD_W, by - d.x * HEAD_W, packTint(SIDE.team, 0.95 * a))
   }
   for (const eid of query(sim.world, EMPLACED)) {
     if (Tint.side[eid] === TINT_SIDE.team) footRing(sim, o, eid, Transform.w[eid]!, SIDE.team, TEAM_RING, Tint.alpha[eid]!)
   }
 }
 
-/** 队长被后画的身体盖住时（按 z 排在它后面、画面中间压着它的中心），在最上面透出它的金色剪影 */
+/** 队长被后画的身体盖住时（按 z 排在它后面、画面中间压着它的中心），在最上面透出它的黄色剪影 */
 function xray(sim: Sim, out: PaintSprite[]): void {
   const lead = sim.leader
   if (!Alive.v[lead]) return
@@ -284,7 +286,7 @@ function xray(sim: Sim, out: PaintSprite[]): void {
     h: Transform.h[lead]!,
     rot: Transform.rot[lead]!,
     flipX: Sprite.flipX[lead]!,
-    color: SIDE.lead,
+    color: SIDE.team,
     alpha: XRAY_ALPHA * hostShown(lead),
     effect: TINT_FILL,
   })
