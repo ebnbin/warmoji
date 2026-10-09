@@ -7,7 +7,7 @@ export const FIGHTS = {
     name: '喂黑洞',
     desc: '我方伤不了敌人，击退却格外有劲：黑洞的引力会把靠近的东西拖进视界吞掉，敌人往往比你先被吸走；让 35 只敌人被黑洞吞掉，它每吞一只就更重一分',
     note: '只能借地形杀敌：站到黑洞边上当诱饵，自己又不能越过那圈走不出来的光环',
-    team: { slots: ['frog', 'boxerBear', 'mage'], level: 2 },
+    team: { slots: ['ringstar', 'boxRoo', 'rocker'], level: 2 },
     stars: [{ kind: 'time', ms: 75_000 }, { kind: 'hazard', by: 'blackhole', damage: 0 }],
     fight: {
       name: '喂黑洞',
@@ -18,9 +18,9 @@ export const FIGHTS = {
         {
           intro: { title: '喂黑洞', sub: '让 35 只敌人被黑洞吞掉' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'chameleon', weight: 1 },
+            { kind: 'spaceInvader', weight: 3 },
+            { kind: 'shootingStar', weight: 2 },
+            { kind: 'darkMatter', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 900, cap: 40 }],
           ends: [
@@ -46,10 +46,10 @@ export const FIGHTS = {
         {
           intro: { title: '别让它长大', sub: '黑洞长到八成就输' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'ufo', weight: 1 },
-            { kind: 'siren', weight: 1 },
+            { kind: 'spaceInvader', weight: 3 },
+            { kind: 'shootingStar', weight: 2 },
+            { kind: 'satellite', weight: 1 },
+            { kind: 'darkMatter', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 700 }],
           ends: [
@@ -63,7 +63,7 @@ export const FIGHTS = {
   meteorShower: {
     emoji: '2604',
     name: '流星雨',
-    desc: '我方伤不了敌人，来的都是蝗虫、外星人这些一砸就死的小东西：壳层每 4 秒甩出一颗流星横穿空腔，照着队长身边砸过来，被黑洞加速后撞得更狠；把敌人引到流星的路上，让流星砸死 8 只',
+    desc: '我方伤不了敌人，来的都是沙蝗、瘟鼠这些不经砸的小东西：壳层每 4 秒甩出一颗流星横穿空腔，照着队长身边砸过来，被黑洞加速后撞得更狠；把敌人引到流星的路上，让流星砸死 8 只',
     note: '借会动的危害杀敌：流星有预警、走直线又被引力弯过，诱敌的站位要跟着每一颗流星变',
     team: { slots: [{ tags: ['mobile'] }, { tags: ['control'] }, { tags: ['defense'] }], level: 2 },
     stars: [{ kind: 'hazard', by: 'meteor', damage: 60 }, { kind: 'time', ms: 90_000 }],
@@ -76,9 +76,9 @@ export const FIGHTS = {
         {
           intro: { title: '流星雨', sub: '让流星砸死 8 只' },
           mix: [
-            { kind: 'locust', weight: 3 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'rat', weight: 1 },
+            { kind: 'sandLocust', weight: 3 },
+            { kind: 'plagueRat', weight: 2 },
+            { kind: 'cheshire', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 700, cap: 40 }],
           cues: [{ cue: 'meteor', atMs: 2000, every: 4000 }],
@@ -93,9 +93,9 @@ export const FIGHTS = {
   eventHorizon: {
     emoji: '1f9ff',
     name: '视界边缘',
-    desc: '你操控的法师就是队长，不能换人，他倒下就输，被黑洞吞掉也算；所有敌人只追他，还会一阵阵围上来。撑过 60 秒',
+    desc: '你操控的摇滚歌手就是队长，不能换人，他倒下就输，被黑洞吞掉也算；所有敌人只追他，还会一阵阵围上来。撑过 60 秒',
     note: '队长倒下就输：玩家本人成了要护住的目标；黑洞把能退的路收窄，绕着视界放风筝又会被吸过去',
-    team: { slots: ['mage', { tags: ['defense'] }, { tags: ['support'] }], level: 2 },
+    team: { slots: ['rocker', { tags: ['defense'] }, { tags: ['support'] }], level: 2 },
     stars: [{ kind: 'downs', count: 0 }, { kind: 'kills', count: 60 }],
     fight: {
       name: '视界边缘',
@@ -107,9 +107,9 @@ export const FIGHTS = {
         {
           intro: { title: '视界边缘', sub: '你倒下就输，撑过 60 秒' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'chameleon', weight: 1 },
+            { kind: 'spaceInvader', weight: 3 },
+            { kind: 'shootingStar', weight: 2 },
+            { kind: 'darkMatter', weight: 1 },
           ],
           spawns: [
             { kind: 'stream', intervalMul: 1.2 },

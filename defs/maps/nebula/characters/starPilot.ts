@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../src/types/characters'
 import type { StatMods } from '../../../../src/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧑‍✈️ 星舰驾驶员：远远连射激光炮，升级后双联装、弹道会追人；技能朝一个方向轰出一道轨道炮
+// 🧑‍✈️ 星舰驾驶员：远远连射穿得过障碍的激光炮，升级后双联装、弹道会追人；技能朝一个方向轰出一道轨道炮
 const starPilotLaser = {
   trigger: 'auto',
   cooldownMs: 550,
@@ -11,6 +11,7 @@ const starPilotLaser = {
   range: 8,
   damage: 14,
   fireSfx: 'zap',
+  piercesWalls: true,
   shape: { kind: 'bolt', projectile: shot('1f538', 14, 0.4), lifeMs: 1000 },
 } satisfies AbilityDef
 
@@ -39,7 +40,7 @@ export default {
   emoji: '1f9d1_200d_2708_fe0f',
   name: '星舰驾驶员',
   element: 'fire',
-  desc: '开过星舰的驾驶员：远远地连射激光炮，升级后一次两发、弹道还会追着敌人拐弯；技能朝一个方向轰出一道贯穿一排敌人的轨道炮',
+  desc: '开过星舰的驾驶员：远远地连射激光炮，激光不受障碍阻挡，隔着墙也瞄得到、打得穿，升级后一次两发、弹道还会追着敌人拐弯；技能朝一个方向轰出一道贯穿一排敌人的轨道炮',
   role: 'ranged',
   tags: ['damage', 'ranged'],
   body: { drag: 4.6, mass: 0.9 },

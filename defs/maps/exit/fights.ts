@@ -17,10 +17,10 @@ export const FIGHTS = {
         {
           intro: { title: '走遍迷宫', sub: '在每一间舱室的入口站满 2.5 秒' },
           mix: [
-            { kind: 'zombie', weight: 3 },
-            { kind: 'ghost', weight: 2 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'crab', weight: 1 },
+            { kind: 'smiley', weight: 3 },
+            { kind: 'mouthless', weight: 2 },
+            { kind: 'commuter', weight: 2 },
+            { kind: 'upsideDown', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 800 }],
           ends: [
@@ -46,10 +46,10 @@ export const FIGHTS = {
         {
           intro: { title: '封站', sub: '25 秒后门全锁死' },
           mix: [
-            { kind: 'ghost', weight: 2 },
-            { kind: 'crab', weight: 2 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'zombie', weight: 2 },
+            { kind: 'mouthless', weight: 2 },
+            { kind: 'upsideDown', weight: 2 },
+            { kind: 'commuter', weight: 2 },
+            { kind: 'smiley', weight: 2 },
           ],
           spawns: [
             { kind: 'stream', intervalMs: 500 },
@@ -76,10 +76,10 @@ export const FIGHTS = {
         {
           intro: { title: '逐间清剿', sub: '每穿过一道门冒出一队，清掉全部六队' },
           mix: [
-            { kind: 'ghost', weight: 2 },
-            { kind: 'crab', weight: 1 },
-            { kind: 'alien', weight: 2 },
-            { kind: 'zombie', weight: 2 },
+            { kind: 'mouthless', weight: 2 },
+            { kind: 'upsideDown', weight: 1 },
+            { kind: 'commuter', weight: 2 },
+            { kind: 'smiley', weight: 2 },
           ],
           spawns: [
             { kind: 'batch', atMs: 1500, squad: { count: 8 }, banner: { title: '逐间清剿', sub: '这间藏着一队' } },
@@ -109,10 +109,10 @@ export const FIGHTS = {
         {
           intro: { title: '精英巡逻', sub: '只只都是精英，击杀 20 只' },
           mix: [
-            { kind: 'alien', weight: 2 },
-            { kind: 'ghost', weight: 2 },
-            { kind: 'gargoyle', weight: 1 },
-            { kind: 'turtle', weight: 1 },
+            { kind: 'commuter', weight: 2 },
+            { kind: 'mouthless', weight: 2 },
+            { kind: 'geodeling', weight: 1 },
+            { kind: 'lavaGiant', weight: 1 },
           ],
           spawns: [{ kind: 'stream', intervalMs: 1500, eliteChance: 1, cap: 6 }],
           ends: [

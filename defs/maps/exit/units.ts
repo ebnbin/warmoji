@@ -10,6 +10,8 @@ import mouthless from './enemies/mouthless.ts'
 import floatingSuit from './enemies/floatingSuit.ts'
 import watcher from './enemies/watcher.ts'
 import reactor from './enemies/reactor.ts'
+import trashFly from './enemies/trashFly.ts'
+import reactorPylon from './enemies/reactorPylon.ts'
 import * as securityBot from './characters/securityBot.ts'
 import * as officer from './characters/officer.ts'
 import * as mazeRat from './characters/mazeRat.ts'
@@ -20,7 +22,7 @@ import * as dispatcher from './characters/dispatcher.ts'
 import * as mastermind from './characters/mastermind.ts'
 
 /** 这张图目录里的新敌人：每个一个文件，文件名就是种类 */
-export const ENEMIES = { smiley, commuter, stander, zipper, poster, upsideDown, mouthless, floatingSuit, watcher, reactor } satisfies Record<string, EnemyDef>
+export const ENEMIES = { smiley, commuter, stander, zipper, poster, upsideDown, mouthless, floatingSuit, watcher, reactor, trashFly, reactorPylon } satisfies Record<string, EnemyDef>
 
 /** 这张图解锁的新角色：每名一个文件，文件名就是 id */
 export const CHARACTERS = { securityBot, officer, mazeRat, sleuth, geek, hacker, dispatcher, mastermind } satisfies Record<string, CharacterFile>
