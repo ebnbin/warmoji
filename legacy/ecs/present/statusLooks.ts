@@ -2,7 +2,9 @@ import Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { ELEMENTS, elementAt } from '../../data/elements'
+import { AFFIXES } from '../../data/affixes'
 import { Alive, Boss, Depth, Elite, MARK, MARK_SLOTS, Mark, Transform, Uid, VisOff } from '../components'
+import { eliteAffixes } from '../store'
 import { statusDef } from '../utils/marks'
 import { elementNow } from '../utils/element'
 import { facingAngle } from '../utils/facing'
@@ -28,8 +30,9 @@ export interface Puff {
 
 /** 精英与头目身上一直冒的元素粒子：隔多久冒一粒 */
 const AURA_MS = 200
-/** 冒粒子的记录里，元素那一条占的号：排在各种状态的号后面 */
+/** 冒粒子的记录里，元素那一条占的号：排在各种状态的号后面，精英词缀接在它前面 */
 const AURA_KEY = 255
+const AFFIX_KEY = 200
 /** 粒子记录里多久没冒的就清掉 */
 const STALE_MS = 10_000
 
@@ -41,6 +44,8 @@ const SHACKLE_LINKS = 10
 /** 拴着的圈比脚下的圈小一圈，压在它上面看得见 */
 const SHACKLE_R = 0.3
 const ARC_WIDTH = 8
+/** 法印：脚下的圈放大多少、几道刻痕、转一圈多久 */
+const SIGIL = { r: 1.15, ticks: 6, periodMs: 3000, width: 4 }
 const FEET_R = 0.42
 const FEET_FLAT = 0.38
 
@@ -134,6 +139,22 @@ function guardArc(sim: Sim, feet: Scratch, b: Body, half: number, color: number)
   }
 }
 
+/** 脚下慢慢转的一圈法印：一圈细线、外面一圈短刻痕 */
+function sigil(sim: Sim, feet: Scratch, b: Body, color: number): void {
+  const fy = footY(sim.world, b.eid)
+  const rx = b.w * FEET_R * SIGIL.r
+  const ry = rx * FEET_FLAT
+  const c = packTint(color, 0.85 * b.alpha)
+  ellipse(feet, WORLD, b.x, fy, rx, ry, SIGIL.width, packTint(color, 0.12 * b.alpha), c)
+  const turn = (sim.fxMs / SIGIL.periodMs) * Math.PI * 2
+  for (let i = 0; i < SIGIL.ticks; i++) {
+    const a = turn + (i / SIGIL.ticks) * Math.PI * 2
+    const x0 = b.x + Math.cos(a) * rx
+    const y0 = fy + Math.sin(a) * ry
+    segment(feet, WORLD, x0, y0, b.x + Math.cos(a) * rx * 1.18, fy + Math.sin(a) * ry * 1.18, SIGIL.width, c)
+  }
+}
+
 /** 记着各个身体上各种粒子上次冒的时刻，按 Uid 认身体 */
 export class PuffClock {
   private readonly last = new Map<number, number>()
@@ -156,7 +177,7 @@ export class PuffClock {
 }
 
 /**
- * 状态与元素在身上的样子：套在身上的图、头上的漫画符号、脚下拴的圈与身前的弧、冒出来的粒子；精英与头目身上一直冒自己元素的粒子。
+ * 状态与元素在身上的样子：套在身上的图、头上的漫画符号、脚下拴的圈、法印与身前的弧、冒出来的粒子；精英的词缀一直带着自己的样子，精英与头目身上一直冒自己元素的粒子。
  * 只按身体的画面大小与位置摆，不看画的是什么；倒下的、几乎看不见的不画
  */
 export function statusLooks(sim: Sim, out: PaintSprite[], feet: Scratch, puffs: Puff[], clock: PuffClock): void {
@@ -174,22 +195,31 @@ export function statusLooks(sim: Sim, out: PaintSprite[], feet: Scratch, puffs: 
       if (alpha < 0.5 || !clock.due(uid, key, fx, everyMs)) return
       puffs.push({ kind, count, ...spot(sim, b, from) })
     }
+    const show = (look: StatusLook, key: number, s: number): void => {
+      if (look.wrap) wrap(sim, out, b, look.wrap)
+      if (look.comic) comic(sim, out, b, look.comic)
+      if (look.shackle !== undefined) shackle(sim, feet, b, look.shackle)
+      if (look.sigil !== undefined) sigil(sim, feet, b, look.sigil)
+      if (look.guardArc !== undefined && s >= 0 && Mark.kind[s] === MARK.frontGuard) guardArc(sim, feet, b, Mark.b[s]!, look.guardArc)
+      const e = look.emit
+      if (!e) return
+      const el = e.puff === 'element' && s >= 0 ? elementAt(Mark.a[s]!) : undefined
+      const kind = e.puff === 'element' ? (el ? ELEMENTS[el].aura : undefined) : e.puff
+      if (kind) puff(kind, key, e.everyMs, e.count, e.from)
+    }
     kinds.length = 0
     for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
       const k = Mark.kind[s]!
       const look = statusDef(k)?.look
       if (!look || Mark.until[s]! <= now || kinds.includes(k)) continue
       kinds.push(k)
-      if (look.wrap) wrap(sim, out, b, look.wrap)
-      if (look.comic) comic(sim, out, b, look.comic)
-      if (look.shackle !== undefined) shackle(sim, feet, b, look.shackle)
-      if (look.guardArc !== undefined && k === MARK.frontGuard) guardArc(sim, feet, b, Mark.b[s]!, look.guardArc)
-      const e = look.emit
-      if (!e) continue
-      const el = e.puff === 'element' ? elementAt(Mark.a[s]!) : undefined
-      const kind = e.puff === 'element' ? (el ? ELEMENTS[el].aura : undefined) : e.puff
-      if (kind) puff(kind, k, e.everyMs, e.count, e.from)
+      show(look, k, s)
     }
+    const affixes = eliteAffixes[eid] ?? []
+    affixes.forEach((id, i) => {
+      const look = AFFIXES[id].look
+      if (look) show(look, AFFIX_KEY + i, -1)
+    })
     if (hasComponent(sim.world, eid, Elite) && (Elite.v[eid] || Boss.v[eid])) {
       const el = elementAt(elementNow(sim, eid))
       if (el) puff(ELEMENTS[el].aura, AURA_KEY, AURA_MS, 2, 'body')

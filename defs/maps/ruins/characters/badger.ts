@@ -13,7 +13,7 @@ const badgerAmbush = {
   shape: { kind: 'blink', behindDist: 0.8, strikeMs: 250, execute: { hpRatio: 0.3, mul: 1.5 } },
 } satisfies AbilityDef
 
-const badgerAmbush2 = { ...badgerAmbush, onHit: [{ kind: 'status', status: 'exposed', ms: 3000, value: 1.25 }] } satisfies AbilityDef
+const badgerAmbush2 = { ...badgerAmbush, damage: 32 } satisfies AbilityDef
 
 const badgerAmbush3 = {
   ...badgerAmbush2,
@@ -25,7 +25,7 @@ const badgerFury = {
   aim: 'self',
   fireSfx: 'rumble',
   shape: { kind: 'world' },
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 4000 }, { kind: 'buff', damageMul: 1.4, durationMs: 4000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 4000 }, { kind: 'buff', cooldownMul: 0.71, durationMs: 4000 }] }],
 } satisfies AbilityDef
 
 export const abilities = { badgerAmbush, badgerAmbush2, badgerAmbush3, badgerFury } satisfies Record<string, AbilityDef>
@@ -40,7 +40,7 @@ export default {
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4.2, mass: 0.9 },
   stats: { moveSpeed: 7, maxStamina: 90, staminaRegen: 90, exertion: 0.8, thorns: 4 },
-  skill: { name: '蜜獾不怕', icon: '1f36f', desc: '解除身上的控制、减速与燃烧、中毒、寒冷、湿，4 秒内霸体、伤害 ×1.4', cdMs: 14_000, ability: 'badgerFury' },
+  skill: { name: '蜜獾不怕', icon: '1f36f', desc: '解除身上的控制、减速与燃烧、中毒、寒冷、湿，4 秒内霸体、出手冷却 ×0.71', cdMs: 14_000, ability: 'badgerFury' },
   weapons: [],
   innate: [
     {
@@ -48,7 +48,7 @@ export default {
       icon: '26cf',
       base: 'badgerAmbush',
       upgrades: [
-        { ability: 'badgerAmbush2', card: { icon: '1fa78', name: '撕皮', desc: '咬中的敌人皮开肉绽，3 秒内受到的伤害 ×1.25' } },
+        { ability: 'badgerAmbush2', card: { icon: '1fa78', name: '撕皮', desc: '一口咬得皮开肉绽，挖地突袭的伤害从 28 提高到 32' } },
         { ability: 'badgerAmbush3', card: { icon: '1f573', name: '打洞', desc: '咬死敌人立刻可以再扑，并 0.5 秒内谁也选不中' } },
       ],
     },

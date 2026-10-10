@@ -49,7 +49,7 @@ const partyHostFiesta = {
   color: 0xffab40,
   fxRadius: 1.25,
   shape: { kind: 'all', of: 'allies' },
-  onHit: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'status', status: 'dmg', ms: 6000, value: 1.25 }, { kind: 'imbue', element: 'fire', ms: 6000 }],
+  onHit: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'buff', cooldownMul: 0.8, durationMs: 6000 }, { kind: 'imbue', element: 'fire', ms: 6000 }],
 } satisfies AbilityDef
 
 export const abilities = { partyHostParty, partyHostParty2, partyHostParty3, partyHostFiesta } satisfies Record<string, AbilityDef>
@@ -60,12 +60,12 @@ export default {
   emoji: '1f973',
   name: '派对王',
   element: 'fire',
-  desc: '走到哪热闹到哪的派对王，本身是火、点不着：礼炮与彩带每 1.3 秒轮着放，礼炮给 4.5 格内最伤的队友回血，中了毒的回不了；彩带甩向 6 格内最近的敌人、把它点着，火会烧到贴着它的敌人；轮到的那样用不上就空过；技能让全队回血、加伤、出手都点火，打进毒云就炸开',
+  desc: '走到哪热闹到哪的派对王，本身是火、点不着：礼炮与彩带每 1.3 秒轮着放，礼炮给 4.5 格内最伤的队友回血，中了毒的回不了；彩带甩向 6 格内最近的敌人、把它点着，火会烧到贴着它的敌人；轮到的那样用不上就空过；技能让全队回血、出手更勤还都带火，打进毒云就炸开',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.8 },
   stats: { moveSpeed: 6, maxStamina: 90, staminaRegen: 80, exertion: 0.8 },
-  skill: { name: '狂欢', icon: '1f389', desc: '全队回复 20% 生命，6 秒内伤害 ×1.25、出手都带上火：打中的敌人都点着，打在毒云里的把毒云引爆', cdMs: 16_000, ability: 'partyHostFiesta' },
+  skill: { name: '狂欢', icon: '1f389', desc: '全队回复 20% 生命，6 秒内出手冷却 ×0.8、出手都带上火：打中的敌人都点着，打在毒云里的把毒云引爆', cdMs: 16_000, ability: 'partyHostFiesta' },
   weapons: [],
   innate: [
     {

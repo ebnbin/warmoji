@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
 import { Act, Alive, Boss, Elem, Elite, EnemyArm, FACTION, Faction, Hp, Leech, Lethal, Manual, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Transform, Uid } from '../../components'
-import { clearMarks, hasMark, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot, strongestSlot } from '../../utils/marks'
+import { clearMarks, inTransit, isInvulnerable, isUntargetable, isUntouchable, markSlot, strongestSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
 import { nearestSummoned } from '../../entities/summon'
@@ -367,7 +367,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   gearHurt(sim, target)
   const { x: jx, y: jy } = knockOf(sim, atk, target, o)
   let hp = mounted(sim, target, dmg) ? Hp.v[target]! : Hp.v[target]! - dmg
-  if (hp <= 0 && hasMark(sim, target, MARK.undying)) hp = 1
   if (hp <= 0 && lethal(sim, target)) hp = Hp.v[target]!
   if (hp <= 0) {
     die(sim, target, src, jx, jy)

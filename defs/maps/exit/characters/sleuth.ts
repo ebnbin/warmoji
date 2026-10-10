@@ -18,7 +18,7 @@ const lens = (onHit: readonly Effect[]) =>
 
 const REVEAL = { kind: 'reveal', durationMs: 2000 } as const
 
-const CASE_CLOSED = [{ kind: 'blast', radius: 2, ratio: 1.2, knockback: 2.5, ring: ring(0xfff59d) }, { kind: 'status', status: 'exposed', ms: 4000, value: 1.3 }] as const
+const CASE_CLOSED = [{ kind: 'blast', radius: 2, ratio: 1.4, knockback: 2.5, ring: ring(0xfff59d) }] as const
 
 const sleuthLens = lens([REVEAL])
 
@@ -35,7 +35,7 @@ const sleuthWarrant = {
   shape: { kind: 'disc', radius: 0.5, at: 'target' },
   onHit: [
     { kind: 'deathMark', ms: 6000, then: [{ kind: 'refresh', what: 'skill', who: 'team' }] },
-    { kind: 'to', who: { side: 'foes', radius: 5 }, then: [{ kind: 'damage', amount: 20 }, { kind: 'reveal', durationMs: 6000 }, { kind: 'status', status: 'exposed', ms: 6000, value: 1.2 }] },
+    { kind: 'to', who: { side: 'foes', radius: 5 }, then: [{ kind: 'damage', amount: 20 }, { kind: 'reveal', durationMs: 6000 }] },
   ],
 } satisfies AbilityDef
 
@@ -54,7 +54,7 @@ export default {
   skill: {
     name: '悬赏令',
     icon: '1f4dc',
-    desc: '给 9 格内血最厚的敌人下悬赏 6 秒：它和它 5 格内的敌人各挨一下，6 秒内显形、受到的伤害 ×1.2；悬赏期间它倒下，全队主动技能立刻转好',
+    desc: '给 9 格内血最厚的敌人下悬赏 6 秒：它和它 5 格内的敌人各挨一下，显形 6 秒；悬赏期间它倒下，全队主动技能立刻转好',
     cdMs: 16_000,
     ability: 'sleuthWarrant',
   },
@@ -65,7 +65,7 @@ export default {
       icon: '1f50d',
       base: 'sleuthLens',
       upgrades: [
-        { ability: 'sleuthLens2', card: { icon: '1f9e9', name: '线索', desc: '同一个敌人挨满 3 发就结案：它和身边 2 格内的敌人各挨一下 1.2 倍的重击，身边的被震开，它 4 秒内受到的伤害 ×1.3' } },
+        { ability: 'sleuthLens2', card: { icon: '1f9e9', name: '线索', desc: '同一个敌人挨满 3 发就结案：它和身边 2 格内的敌人各挨一下 1.4 倍的重击，身边的被震开' } },
         { ability: 'sleuthLens3', card: { icon: '1f6a8', name: '通缉', desc: '结案的敌人 3 秒内倒下，悬赏令的冷却减 3 秒' } },
       ],
     },

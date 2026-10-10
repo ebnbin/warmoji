@@ -406,19 +406,18 @@ export function spawnBoss(sim: Sim, n = 0): void {
   Telegraph.loud[t] = 1
 }
 
-/** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的易伤 */
+/** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形 */
 export function applyMorph(
   sim: Sim,
   atlas: FrameIndex,
   eid: number,
-  spec: { durationMs: number; morphEmoji: string; vulnMul?: number },
+  spec: { durationMs: number; morphEmoji: string },
 ): void {
   if (Boss.v[eid] || hasMark(sim, eid, MARK.morphImmune)) return
   const until = sim.elapsedMs + spec.durationMs
   const anchored = hasComponent(sim.world, eid, Anchored)
   addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH.recastMs)
   addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
-  if (spec.vulnMul !== undefined) addMark(eid, MARK.exposed, TAG.morph, until, spec.vulnMul)
   Sprite.frame[eid] = atlas.index(spec.morphEmoji)
   interrupt(sim, eid)
   Transform.rot[eid] = 0

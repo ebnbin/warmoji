@@ -19,7 +19,7 @@ const ladybugSpit = {
 
 const ladybugSpit2 = { ...ladybugSpit, shape: { ...ladybugSpit.shape, pierce: 1 }, onHit: [sheep(4000)] } satisfies AbilityDef
 
-const ladybugSpit3 = { ...ladybugSpit2, onHit: [{ ...sheep(4000), vulnMul: 1.4 }] } satisfies AbilityDef
+const ladybugSpit3 = { ...ladybugSpit2, onHit: [sheep(5000)] } satisfies AbilityDef
 
 const ladybugStars = {
   trigger: 'manual',
@@ -59,7 +59,7 @@ export default {
       base: 'ladybugSpit',
       upgrades: [
         { ability: 'ladybugSpit2', card: { icon: '1f411', name: '长效', desc: '变羊改成 4 秒，蚜弹还能穿过 1 个敌人打中后面的' } },
-        { ability: 'ladybugSpit3', card: { icon: '1f494', name: '待宰羔羊', desc: '变成绵羊的敌人受到的伤害 ×1.4' } },
+        { ability: 'ladybugSpit3', card: { icon: '1f494', name: '待宰羔羊', desc: '变羊再延长到 5 秒' } },
       ],
     },
   ],

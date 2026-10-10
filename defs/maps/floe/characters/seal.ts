@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🦭 海豹：鳍拍连拍两下，拍湿敌人、攒怒气，攒满了一记顶球把敌人顶上天；技能肚皮贴地怒滑出去（物理），把冻住的撞碎，之后几秒打不倒
+// 🦭 海豹：鳍拍连拍两下，拍湿敌人、攒怒气，攒满了一记顶球把敌人顶上天；技能肚皮贴地怒滑出去（物理），把冻住的撞碎，之后片刻无敌
 const HEADBUTT = { at: 100, spend: 100, damageMul: 2, onHit: [{ kind: 'knockup', durationMs: 600, height: 1.2 }] } as const
 
 const sealSlap = {
@@ -35,7 +35,7 @@ const sealBellySlide = {
   element: 'physical',
   fireSfx: 'whoosh',
   shape: { kind: 'sprint', distance: 7, ms: 500, radius: 1 },
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'undying', durationMs: 4000 }, { kind: 'gain', amount: 100 }, { kind: 'buff', speedMul: 1.25, durationMs: 4000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'invuln', ms: 1500 }, { kind: 'gain', amount: 100 }, { kind: 'buff', speedMul: 1.25, durationMs: 4000 }] }],
 } satisfies AbilityDef
 
 export const abilities = { sealSlap, sealSlap2, sealSlap3, sealBellySlide } satisfies Record<string, AbilityDef>
@@ -47,7 +47,7 @@ export default {
   name: '海豹',
   element: 'water',
   traits: ['coldproof'],
-  desc: '冰上滑得动、海里游得快，不怕冰水、冻不住；本身是水、一直湿着，挨了雷会连到身边湿着的队友。鳍拍一次连拍两下，拍中的敌人浑身湿透 5 秒，给队友的冰与雷铺路；每拍中一下攒 7 点怒气（停手 2.5 秒后每秒掉 15 点），攒满 100 点下一记就是顶球，伤害翻倍并把敌人顶上天 0.6 秒；技能肚皮贴地怒滑出去，物理撞飞一路的敌人、冻住的撞碎，怒气立刻攒满，之后 4 秒怎么打都不倒、跑得更快',
+  desc: '冰上滑得动、海里游得快，不怕冰水、冻不住；本身是水、一直湿着，挨了雷会连到身边湿着的队友。鳍拍一次连拍两下，拍中的敌人浑身湿透 5 秒，给队友的冰与雷铺路；每拍中一下攒 7 点怒气（停手 2.5 秒后每秒掉 15 点），攒满 100 点下一记就是顶球，伤害翻倍并把敌人顶上天 0.6 秒；技能肚皮贴地怒滑出去，物理撞飞一路的敌人、冻住的撞碎，怒气立刻攒满，之后 1.5 秒无敌、4 秒跑得更快',
   role: 'bruiser',
   tags: ['damage', 'defense', 'melee', 'mobile'],
   body: { drag: 4.5, mass: 1.3 },
@@ -55,7 +55,7 @@ export default {
   skill: {
     name: '怒滑',
     icon: '1f4a2',
-    desc: '朝摇杆方向肚皮贴地滑出 7 格，沿路撞到的敌人吃 36 点物理伤害并被撞飞，冻住的撞碎、伤害翻倍；怒气立刻攒满，之后 4 秒内生命不低于 1、移速 ×1.25',
+    desc: '朝摇杆方向肚皮贴地滑出 7 格，沿路撞到的敌人吃 36 点物理伤害并被撞飞，冻住的撞碎、伤害翻倍；怒气立刻攒满，之后 1.5 秒内无敌、4 秒内移速 ×1.25',
     cdMs: 16_000,
     ability: 'sealBellySlide',
     aim: true,

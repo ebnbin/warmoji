@@ -32,7 +32,7 @@ const chase = { trigger: 'manual', class: 'attack', ...slash } satisfies Ability
 // 斩死的那一刻死者还在目标表里，等一拍再追斩，免得闪回去斩尸体
 const ninjaBlade3 = {
   ...ninjaBlade2,
-  reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'fuse', ms: 20, then: [{ kind: 'cast', ability: chase }, { kind: 'stealth', durationMs: 1500 }] }] }],
+  reactions: [{ on: 'kill', to: 'self', effects: [{ kind: 'after', ms: 20, then: [{ kind: 'cast', ability: chase }, { kind: 'stealth', durationMs: 1500 }] }] }],
 } satisfies AbilityDef
 
 const ninjaClones = {

@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { zoneLook } from '../../../kit.ts'
 
-// 🐫 双峰驼：驼峰一撞把敌人撞开、墙也撞得裂，边打边从驼峰里匀出水来回血（中了毒就回不了），第三下立起沙墙；技能扬起沙尘，自己站稳霸体、少挨打
+// 🐫 双峰驼：驼峰一撞把敌人撞开、墙也撞得裂，边打边从驼峰里匀出水来回血（中了毒就回不了），第三下立起沙墙；技能扬起沙尘，自己站稳霸体、挂上护盾
 const bactrianButt = {
   trigger: 'auto',
   cooldownMs: 1150,
@@ -38,7 +38,7 @@ const bactrianDust = {
       on: 'fire',
       to: 'self',
       effects: [
-        { kind: 'guard', mul: 0.6, durationMs: 5000 },
+        { kind: 'shield', amount: 0, ratio: 0.2, ms: 5000 },
         { kind: 'unstoppable', durationMs: 3000 },
       ],
     },
@@ -52,12 +52,12 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f42b',
   name: '双峰驼',
-  desc: '在沙海里走得最稳的双峰驼：皮厚护甲高，挨物理的打不怕，燃烧和中毒却照掉；驼峰一撞把敌人撞开，墙也撞得裂；边打边从驼峰里匀出水来回血，中了毒就回不了；每第三下在身前立起一道沙墙；技能扬起一片沙尘，沙尘里的敌人打不出手，自己站稳霸体、也少挨打',
+  desc: '在沙海里走得最稳的双峰驼：皮厚护甲高，挨物理的打不怕，燃烧和中毒却照掉；驼峰一撞把敌人撞开，墙也撞得裂；边打边从驼峰里匀出水来回血，中了毒就回不了；每第三下在身前立起一道沙墙；技能扬起一片沙尘，沙尘里的敌人打不出手，自己站稳霸体、还挂上一层护盾',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.7 },
   stats: { moveSpeed: 4, maxStamina: 150, staminaRegen: 45, exertion: 0.7 },
-  skill: { name: '沙尘护体', icon: '1f32b', desc: '在脚下扬起 3 格的沙尘 5 秒：沙尘里的敌人睁不开眼、打不出手；自己 3 秒内霸体，5 秒内受到的伤害 ×0.6', cdMs: 14_000, ability: 'bactrianDust' },
+  skill: { name: '沙尘护体', icon: '1f32b', desc: '在脚下扬起 3 格的沙尘 5 秒：沙尘里的敌人睁不开眼、打不出手；自己 3 秒内霸体，挂上生命 20% 的护盾 5 秒', cdMs: 14_000, ability: 'bactrianDust' },
   weapons: [],
   innate: [
     {

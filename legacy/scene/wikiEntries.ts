@@ -182,7 +182,7 @@ function eliteEntry(): WikiEntry {
   return {
     emoji: '2b50',
     name: '精英',
-    desc: `小怪都可能以精英出现：更强、给得更多，出生时从 ${AFFIX_IDS.length} 个词缀里随机带 ${affixCount()} 个不重样的，词缀的图标顶在头上`,
+    desc: `小怪都可能以精英出现：更强、给得更多，出生时从 ${AFFIX_IDS.length} 个词缀里随机带 ${affixCount()} 个不重样的，每个词缀都看得出来：身上的样子、个头、元素，或者挨打、倒下时的反应`,
     lines: [
       `属性：${modTexts(ELITE.stats).join(' · ')}`,
       `掉落：经验 ×${ELITE.xpMul} · 金币 ×${ELITE.coinsMul}`,
@@ -201,6 +201,8 @@ function affixEntry(id: AffixId): WikiEntry {
     name: a.name,
     desc: a.desc,
     lines: [
+      ...(a.element ? [`本身变成${ELEMENTS[a.element].name}：${ELEMENTS[a.element].body}`] : []),
+      ...(a.look ? [lookLine(a.look, false)] : []),
       ...(a.stats ? [`属性：${modTexts(a.stats).join(' · ')}`] : []),
       ...reactionLines(rulesOf({ emoji: a.icon, name: a.name, reactions: a.reactions })),
       `成为精英的小怪随机带 ${affixCount()} 个不重样的词缀，这是其中一个；头目不会带`,
@@ -222,21 +224,21 @@ const MERGE_LABEL: Record<StatusMerge, string> = {
 }
 
 /** 一种状态的规则，从状态表的字段说出来 */
-const CELL_LABEL: Readonly<Record<LookCell, string>> = { ice: '整个包进一块冰', bubble: '罩着一层护罩', glow: '身后泛着光', star: '头上绕着星星', zee: '头上冒 Z', heart: '头上冒心', drop: '冒汗' }
+const CELL_LABEL: Readonly<Record<LookCell, string>> = { ice: '整个包进一块冰', bubble: '罩着一层护罩', glow: '身后泛着光', star: '头上绕着星星', zee: '头上冒 Z', heart: '头上冒心', drop: '冒汗', spikes: '身上一圈尖刺' }
 const COMIC_LABEL: Readonly<Record<NonNullable<StatusLook['comic']>, string>> = { stars: '头上绕着星星', zzz: '头上往上飘 Z', hearts: '头上往上飘心' }
-const PUFF_LABEL: Readonly<Record<LookPuff | 'element', string>> = { flame: '冒火苗', toxic: '冒绿泡', drip: '往下滴水', frost: '冒寒气', zap: '冒电火花', mend: '冒绿色的光点', dust: '扬起尘土', fuse: '冒火星', element: '冒那种元素的粒子' }
+const PUFF_LABEL: Readonly<Record<LookPuff | 'element', string>> = { flame: '冒火苗', toxic: '冒绿泡', drip: '往下滴水', frost: '冒寒气', zap: '冒电火花', mend: '冒绿色的光点', dust: '扬起尘土', fuse: '冒火星', blood: '冒血珠', element: '冒那种元素的粒子' }
 const FROM_LABEL = { body: '身上', head: '头顶', feet: '脚下' } as const
 
-/** 状态在身上的样子；还没有样子的暂时在头顶挂图标 */
-function lookLine(st: StatusDef): string {
-  const l = st.look
-  if (!l) return st.icon ? '样子：暂时在头顶挂图标，同时最多三个' : '样子：看不出来'
+/** 在身上的样子：tinted 是身上还染着色 */
+function lookLine(l: StatusLook | undefined, tinted: boolean): string {
+  if (!l) return '样子：看不出来'
   const parts = [
-    st.tint ? '身上染色' : '',
+    tinted ? '身上染色' : '',
     l.wrap ? CELL_LABEL[l.wrap.cell] : '',
     l.comic ? COMIC_LABEL[l.comic] : '',
     l.shackle !== undefined ? '脚下拴着一圈' : '',
     l.guardArc !== undefined ? '身前地上一道弧' : '',
+    l.sigil !== undefined ? '脚下转着一圈法印' : '',
     l.emit ? `${FROM_LABEL[l.emit.from]}${PUFF_LABEL[l.emit.puff]}` : '',
   ].filter(Boolean)
   return `样子：${parts.length > 0 ? parts.join('，') : '看行为就知道'}`
@@ -265,7 +267,7 @@ function statusLines(st: StatusDef): string[] {
   if (flags.length > 0) lines.push(flags.join('；'))
   const again = st.merge ? MERGE_LABEL[st.merge] : st.keyed ? '按来源分开记，同一来源的只延长时间' : '只延长时间（取更长的），参数用新的'
   lines.push(`再中一次：${again}`)
-  lines.push(lookLine(st))
+  lines.push(lookLine(st.look, st.tint !== undefined))
   return lines
 }
 

@@ -91,11 +91,12 @@ export function struckOf(eid: number): Struck {
   return { eid, uid: Uid.v[eid]! }
 }
 
-/** 标记里按号存的定义：招架反制、叠层、引信、存伤、死亡印记、强化下一击 */
+/** 标记里按号存的定义：招架反制、叠层、引信、延时、存伤、死亡印记、强化下一击 */
 export const PARRY_FX = new Interned<readonly Effect[]>()
 type EffectOfKind<K extends Effect['kind']> = Extract<Effect, { readonly kind: K }>
 export const STACK_DEF = new Interned<EffectOfKind<'stack'>>()
 export const FUSE_DEF = new Interned<EffectOfKind<'fuse'>>()
+export const AFTER_DEF = new Interned<EffectOfKind<'after'>>()
 export const STORE_DEF = new Interned<EffectOfKind<'store'>>()
 export const DEATH_DEF = new Interned<EffectOfKind<'deathMark'>>()
 export const EMPOWER_DEF = new Interned<EffectOfKind<'empower'>>()
@@ -314,7 +315,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const until = fx.durationMs === undefined ? Infinity : sim.elapsedMs + fx.durationMs
     const tag = fx.durationMs === undefined ? TAG.perk : TAG.effect
     eachCapable(sim, at, Mark, (t) => {
-      if (fx.damageMul !== undefined) addMark(t, MARK.dmg, tag, until, fx.damageMul)
+      if (fx.cooldownMul !== undefined) addMark(t, MARK.cd, tag, until, fx.cooldownMul)
       if (fx.speedMul !== undefined) addMark(t, MARK.speed, tag, until, fx.speedMul)
     })
   },
@@ -358,10 +359,6 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     eachCapable(sim, at, Mark, (t) => addCc(sim, t, MARK.taunt, until, by, 0, 0, Uid.v[by]!))
   },
 
-  guard: (sim, _src, fx, at) => {
-    const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.guard, TAG.effect, until, fx.mul))
-  },
 
   revive: (sim, _src, _fx, at) => {
     eachCapable(sim, at, Revive, (t) => {
@@ -480,10 +477,6 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     eachCapable(sim, at, Mark, (t) => addMark(t, MARK.stealth, TAG.effect, until))
   },
 
-  undying: (sim, _src, fx, at) => {
-    const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.undying, TAG.effect, until))
-  },
 
   parry: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
@@ -579,6 +572,12 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
         if (Mark.kind[s] === kind && Mark.ref[s] === ref && Mark.until[s]! > sim.elapsedMs) Mark.until[s] = 0
       }
     }
+  },
+
+  after: (sim, src, fx, at) => {
+    const id = AFTER_DEF.id(fx)
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => markFrom(t, MARK.delay, until, at.baseDamage, id, src))
   },
 
   fuse: (sim, src, fx, at) => {

@@ -13,7 +13,7 @@ const skierPole = {
   shape: { kind: 'blink', behindDist: 0.6, strikeMs: 200, execute: { hpRatio: 0.3, mul: 1.5 } },
 } satisfies AbilityDef
 
-const skierPole2 = { ...skierPole, onHit: [{ kind: 'status', status: 'exposed', ms: 3000, value: 1.2 }] } satisfies AbilityDef
+const skierPole2 = { ...skierPole, damage: 30 } satisfies AbilityDef
 
 const skierPole3 = {
   ...skierPole2,
@@ -50,7 +50,7 @@ export default {
       icon: '26f7',
       base: 'skierPole',
       upgrades: [
-        { ability: 'skierPole2', card: { icon: '1f3af', name: '破绽', desc: '戳中的敌人露出破绽，3 秒内受到的伤害 ×1.2' } },
+        { ability: 'skierPole2', card: { icon: '1f3af', name: '破绽', desc: '专挑破绽下杖，雪杖的伤害从 26 点加到 30 点' } },
         { ability: 'skierPole3', card: { icon: '1f501', name: '回转', desc: '戳死敌人立刻可以再扑，并在 1.5 秒内移速 ×1.3' } },
       ],
     },

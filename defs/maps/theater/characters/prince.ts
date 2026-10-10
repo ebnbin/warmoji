@@ -43,7 +43,7 @@ const princeVow = {
   color: 0xfff59d,
   shape: { kind: 'disc', radius: 5, at: 'self' },
   onHit: [{ kind: 'taunt', durationMs: 3000 }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'invuln', ms: 1200 }, { kind: 'cleanse' }, { kind: 'guard', mul: 0.5, durationMs: 4000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'invuln', ms: 1200 }, { kind: 'cleanse' }, { kind: 'shield', amount: 0, ratio: 0.25, ms: 4000 }] }],
 } satisfies AbilityDef
 
 export const abilities = { princeSword, princeSword2, princeSword3, princeVow } satisfies Record<string, AbilityDef>
@@ -58,7 +58,7 @@ export default {
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.6 },
   stats: { moveSpeed: 4.2, maxStamina: 140, staminaRegen: 45, exertion: 1.2 },
-  skill: { name: '为了公主', icon: '1f478', desc: '1.2 秒内无敌，甩掉身上的燃烧、中毒、寒冷、湿与控制；5 格内的敌人嘲讽 3 秒，自己 4 秒内受到的伤害减半', cdMs: 13_000, ability: 'princeVow' },
+  skill: { name: '为了公主', icon: '1f478', desc: '1.2 秒内无敌，甩掉身上的燃烧、中毒、寒冷、湿与控制；5 格内的敌人嘲讽 3 秒，自己挂上生命 25% 的护盾 4 秒', cdMs: 13_000, ability: 'princeVow' },
   weapons: [],
   innate: [
     {

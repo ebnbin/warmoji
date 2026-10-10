@@ -38,7 +38,7 @@ const smelterCore = {
     {
       on: 'fire',
       to: 'self',
-      effects: [{ kind: 'to', who: { side: 'foes', radius: 4 }, then: [{ kind: 'taunt', durationMs: 2500 }] }, { kind: 'guard', mul: 0.6, durationMs: 5000 }],
+      effects: [{ kind: 'to', who: { side: 'foes', radius: 4 }, then: [{ kind: 'taunt', durationMs: 2500 }] }, { kind: 'shield', amount: 0, ratio: 0.2, ms: 5000 }],
     },
   ],
 } satisfies AbilityDef
@@ -59,7 +59,7 @@ export default {
   skill: {
     name: '炉心',
     icon: '1f3ed',
-    desc: '烧旺炉心：在脚下烧起 3 格的炉火 5 秒，圈里的敌人每半秒烫一下并着火；开炉时 4 格内的敌人嘲讽 2.5 秒，自己 5 秒内受到的伤害 ×0.6',
+    desc: '烧旺炉心：在脚下烧起 3 格的炉火 5 秒，圈里的敌人每半秒烫一下并着火；开炉时 4 格内的敌人嘲讽 2.5 秒，自己挂上生命 20% 的护盾 5 秒',
     cdMs: 14_000,
     ability: 'smelterCore',
   },

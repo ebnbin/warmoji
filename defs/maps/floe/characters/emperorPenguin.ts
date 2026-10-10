@@ -45,7 +45,7 @@ const emperorPenguinShell = {
         { kind: 'stasis', durationMs: 2500 },
         { kind: 'healRatio', ratio: 0.35 },
         {
-          kind: 'fuse',
+          kind: 'after',
           ms: 2500,
           then: [
             { kind: 'blast', radius: 2.6, ratio: 1.5, knockback: 3, ring: ring(0xc5e1a5) },

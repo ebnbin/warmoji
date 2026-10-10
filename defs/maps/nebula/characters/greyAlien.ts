@@ -27,7 +27,7 @@ const greyAlienAbduct = {
   fireSfx: 'warp',
   shape: { kind: 'world' },
   onHit: [{ kind: 'to', who: { side: 'foes', radius: 6, sort: 'nearest', count: 1 }, then: [{ kind: 'realm', ms: 4000 }] }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'buff', damageMul: 1.5, durationMs: 4000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'buff', cooldownMul: 0.67, durationMs: 4000 }] }],
 } satisfies AbilityDef
 
 export const abilities = { greyAlienProbe, greyAlienProbe2, greyAlienProbe3, greyAlienAbduct } satisfies Record<string, AbilityDef>
@@ -42,7 +42,7 @@ export default {
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4.2, mass: 0.6 },
   stats: { maxHp: 90, dodge: 0.1, moveSpeed: 7.2, maxStamina: 90, staminaRegen: 90, exertion: 0.8 },
-  skill: { name: '绑架', icon: '1f6f8', desc: '把 6 格内最近的敌人拉进只有彼此的异界 4 秒，界外谁也插不了手；这 4 秒里自己的伤害 ×1.5', cdMs: 14_000, ability: 'greyAlienAbduct' },
+  skill: { name: '绑架', icon: '1f6f8', desc: '把 6 格内最近的敌人拉进只有彼此的异界 4 秒，界外谁也插不了手；这 4 秒里自己出手的冷却 ×0.67', cdMs: 14_000, ability: 'greyAlienAbduct' },
   weapons: [],
   innate: [
     {

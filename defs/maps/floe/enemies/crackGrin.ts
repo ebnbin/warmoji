@@ -4,7 +4,7 @@ const CRACK_GRIN = {
   kind: 'crackGrin',
   emoji: '1f62c',
   name: '冰缝怪',
-  desc: '从新冰缝里冒出来的冰缝怪，不怕冰水、冻不住，在海里照样游，泡在水里时是湿的；龇牙 0.4 秒后咬住一名队员，拖着往后退 1.5 秒，被拖着的动弹不得，冻住的一口咬碎；拖人的这 1.5 秒顾不上自己，受到的伤害 ×1.5',
+  desc: '从新冰缝里冒出来的冰缝怪，不怕冰水、冻不住，在海里照样游，泡在水里时是湿的；龇牙 0.4 秒后咬住一名队员，拖着往后退 1.5 秒，被拖着的动弹不得，冻住的一口咬碎；拖完累得喘不过气，眩晕 1 秒',
   size: 1.2,
   radius: 0.46,
   hp: 140,
@@ -26,7 +26,8 @@ const CRACK_GRIN = {
       fireSfx: 'gulp',
       windup: { ms: 400, lockAt: 'end', telegraph: 'shake' },
       shape: { kind: 'segment', reach: 1.5, radius: 0.45, ms: 200 },
-      onHit: [{ kind: 'drag', ms: 1500 }, { kind: 'to', who: { side: 'self' }, then: [{ kind: 'status', status: 'exposed', ms: 1500, value: 1.5 }] }],
+      // 拖人时还要往后退，等拖完才晕
+      onHit: [{ kind: 'drag', ms: 1500 }, { kind: 'to', who: { side: 'self' }, then: [{ kind: 'after', ms: 1500, then: [{ kind: 'stun', durationMs: 1000 }] }] }],
     },
   ],
 } satisfies EnemyDef

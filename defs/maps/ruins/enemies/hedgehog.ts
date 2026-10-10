@@ -4,7 +4,7 @@ const HEDGEHOG = {
   kind: 'hedgehog',
   emoji: '1f994',
   name: '刺猬',
-  desc: '缩成刺球朝人滚过来，撞上就把人顶出 2 格，顶到墙上的晕 0.8 秒；浑身是刺，近身打它的每下被反扎 8 点；护甲厚，燃烧和中毒却不吃护甲；挨打时常缩成一团，1.5 秒内受到的伤害减半',
+  desc: '缩成刺球朝人滚过来，撞上就把人顶出 2 格，顶到墙上的晕 0.8 秒；浑身是刺，近身打它的每下被反扎 8 点；护甲厚，燃烧和中毒却不吃护甲；挨打时常缩成一团，挂上生命 25% 的护盾 1.5 秒',
   size: 1.1,
   radius: 0.42,
   span: [0, 1],
@@ -29,7 +29,7 @@ const HEDGEHOG = {
       onHit: [{ kind: 'shove', distance: 2, ms: 240, onWall: [{ kind: 'stun', durationMs: 800 }] }],
     },
   ],
-  reactions: [{ on: 'hurt', to: 'self', chance: 0.4, effects: [{ kind: 'guard', mul: 0.5, durationMs: 1500 }] }],
+  reactions: [{ on: 'hurt', to: 'self', chance: 0.4, effects: [{ kind: 'shield', amount: 0, ratio: 0.25, ms: 1500 }] }],
 } satisfies EnemyDef
 
 export default HEDGEHOG

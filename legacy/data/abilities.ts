@@ -40,6 +40,7 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'if':
       return [fx.then, fx.else]
     case 'stack':
+    case 'after':
     case 'fuse':
     case 'store':
     case 'deathMark':
@@ -91,14 +92,12 @@ export function childEffects(fx: Effect): readonly EffectList[] {
     case 'interrupt':
     case 'timeStop':
     case 'buff':
-    case 'guard':
     case 'invuln':
     case 'untargetable':
     case 'unstoppable':
     case 'cleanse':
     case 'spellShield':
     case 'frontGuard':
-    case 'undying':
     case 'hide':
     case 'stealth':
     case 'reveal':

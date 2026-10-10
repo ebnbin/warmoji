@@ -5,7 +5,6 @@ import { UNIT } from '../util/units'
 import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
 import { rewindMs } from '../data/abilities'
-import { AFFIXES } from '../data/affixes'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
@@ -26,8 +25,6 @@ import {
   Faction,
   Hp,
   LeapShape,
-  MARK_SLOTS,
-  Mark,
   Owner,
   Radius,
   Repeat,
@@ -46,7 +43,7 @@ import {
 import { DEG2RAD } from '../util/units'
 import { volleyAngle } from './systems/shared/fire'
 import { anchorX, anchorY } from './utils/ability'
-import { abilityDef, eliteAffixes, resDef } from './store'
+import { abilityDef, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
 import { goalSpot, holdSpot, leakRings, nearestTo, visitRings } from './fight/state'
@@ -57,7 +54,6 @@ import { dragging, staminaLeft } from './systems/shared/stamina'
 import { traceAt, tracePath } from './systems/shared/trace'
 import { rescuing } from './systems/tickRescue'
 import { hostShown } from './utils/statusTint'
-import { statusDef } from './utils/marks'
 import { leaderX, leaderY } from './utils/team'
 import { ellipse, fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
@@ -79,8 +75,6 @@ const SWEAT_COLOR = 0x81d4fa
 const SWEAT_SIZE = 0.42 * UNIT
 const SWEAT_Z = 29
 
-const ICON_SIZE = 0.34 * UNIT
-const ICON_MAX = 3
 
 const BAR_W = 0.8 * UNIT
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
@@ -135,7 +129,7 @@ interface Mark {
 
 /** 呈现：身体、队长与这一场的目标的数据画出来的样子，不是实体、不存位置，画在身体上的随身体显隐；每帧推进后按数据重画，收尾时停在最后一帧 */
 export class Presentation {
-  /** 按 z 排好的精灵：身体头上的汗、状态在身上的样子与还没画法的状态图标、队长的倒带残影 */
+  /** 按 z 排好的精灵：身体头上的汗、状态在身上的样子、队长的倒带残影 */
   readonly sprites: PaintSprite[] = []
   /** 这一帧从身上冒的粒子：由场景交给粒子发射器 */
   readonly puffs: Puff[] = []
@@ -160,7 +154,6 @@ export class Presentation {
     this.puffs.length = 0
     for (const s of [this.marks, this.trail, this.bars, this.feet, this.pointer, this.warn]) resetScratch(s)
     sweats(sim, this.sprites)
-    headIcons(sim, this.sprites)
     feet(sim, this.feet)
     statusLooks(sim, this.sprites, this.feet, this.puffs, this.clock)
     echo(sim, this.sprites, this.trail)
@@ -204,35 +197,6 @@ function sweats(sim: Sim, out: PaintSprite[]): void {
   for (const eid of query(sim.world, ENEMY_SET)) {
     if (!Alive.v[eid] || staminaLeft(eid) >= STAMINA.slowFrom) continue
     sweat(sim, out, eid, Transform.h[eid]!)
-  }
-}
-
-/** 头顶横排的一排图标，row 是从头顶往上数的第几排 */
-function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly string[], row: number): void {
-  const h = hasComponent(sim.world, eid, Slot) ? charSize(eid) : Transform.h[eid]!
-  const x0 = Transform.x[eid]! + VisOff.x[eid]! - ((emojis.length - 1) * ICON_SIZE) / 2
-  const y = Transform.y[eid]! + VisOff.y[eid]! - h * 0.5 - ICON_SIZE * (0.55 + row)
-  const alpha = hostShown(eid)
-  emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, outlined: true }))
-}
-
-/** 头顶还挂着的图标：精英的词缀贴着头顶一排；在身上画不出样子的状态按图鉴的轻重排，最多三个，再上面一排；倒下的不画 */
-function headIcons(sim: Sim, out: PaintSprite[]): void {
-  const now = sim.elapsedMs
-  const kinds: number[] = []
-  for (const eid of query(sim.world, [Mark, Transform])) {
-    if (!Alive.v[eid]) continue
-    const head = (eliteAffixes[eid] ?? []).map((id) => AFFIXES[id].icon)
-    iconRow(sim, out, eid, head, 0)
-    kinds.length = 0
-    for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
-      const k = Mark.kind[s]!
-      const until = Mark.until[s]!
-      const def = statusDef(k)
-      if (def?.icon && !def.look && until > now && until !== Infinity && !kinds.includes(k)) kinds.push(k)
-    }
-    kinds.sort((a, b) => statusDef(a)!.icon!.rank - statusDef(b)!.icon!.rank)
-    iconRow(sim, out, eid, kinds.slice(0, ICON_MAX).map((k) => statusDef(k)!.icon!.emoji), head.length > 0 ? 1 : 0)
   }
 }
 

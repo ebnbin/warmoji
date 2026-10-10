@@ -1169,7 +1169,7 @@ const TABLES = {
   weapons: WEAPONS,
 }
 
-/** 状态：底色的轻重、强制行为的先后各不相同；种类编号放得进一个字节 */
+/** 状态：底色的轻重、强制行为的先后各不相同；种类编号放得进一个字节；玩家碰得到的都看得出来 */
 {
   const list = Object.entries(STATUSES) as [string, StatusDef][]
   need(list.length < 255, `状态有 ${list.length} 种，超过了一个字节`)
@@ -1180,6 +1180,7 @@ const TABLES = {
   const icons = list.flatMap(([, d]) => (d.icon ? [d.icon.rank] : []))
   need(new Set(icons).size === icons.length, `状态的图标轻重有重复：${icons.join(',')}`)
   for (const [id, d] of list) need(d.merge !== 'bySource' || d.forces !== undefined, `statuses.${id} 按施加者分格的只能是牵着走的状态`)
+  for (const [id, d] of list) need(!d.icon || d.look !== undefined, `statuses.${id} 有图标就是玩家碰得到的状态，须写 look：在身上什么样子，或 {} 靠底色与行为看出来`)
 }
 
 /** 元素：各状态的时长、节拍、层数与倍率都为正，减速在 (0, 1) 内，层数是整数；反应的倍率与范围为正 */
