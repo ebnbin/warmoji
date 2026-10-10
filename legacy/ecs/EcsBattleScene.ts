@@ -97,6 +97,7 @@ import { drain } from './outbox'
 import { keepTape, TapePlayer, TapeRecorder } from './tape'
 import type { DevCommand, Tape, TapeEvent } from './tape'
 import type { Burst } from './outbox'
+import type { LookPuff } from '../types/statuses'
 import { feedback } from './present/feedback'
 import type { Show } from './present/feedback'
 import { newDamageNumbers } from './present/damageNumbers'
@@ -200,6 +201,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
   private stopMs = 0
   private stopGapMs = 0
   private bursts!: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter>
+  /** 状态与元素从身上冒的粒子 */
+  private puffs!: Record<LookPuff, Phaser.GameObjects.Particles.ParticleEmitter>
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
   /** 跟随时镜头对准的地方：队长，换人时从上一任那里滑过来 */
@@ -640,6 +643,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       shards: burstEmitter(this, [0xb48cff, 0x8e5bd9, 0xe2d2ff, 0x6a3fc0], 210, 620, { gravityY: 260, rotate: { min: 0, max: 360 } }),
       paper: burstEmitter(this, [0xfbf3df, 0xf1e4c4, 0xffffff, 0xe6d3ad], 120, 900, { gravityY: 140, rotate: { min: 0, max: 360 } }),
     }
+    const add = Phaser.BlendModes.ADD
+    this.puffs = {
+      flame: burstEmitter(this, [0xffe082, 0xffb74d, 0xff7043], 45, 520, { gravityY: -170, scale: { start: 1.3, end: 0 }, blendMode: add }),
+      toxic: burstEmitter(this, [0xdcedc8, 0xaed581, 0x7cb342], 22, 950, { gravityY: -80, scale: { start: 0.6, end: 1.2 }, alpha: { start: 0.95, end: 0 } }),
+      drip: burstEmitter(this, [0x90caf9, 0x42a5f5, 0xe3f2fd], 12, 480, { gravityY: 650, scale: { start: 0.85, end: 0.4 } }),
+      frost: burstEmitter(this, [0xffffff, 0xe1f5fe, 0xb3e5fc], 18, 1100, { gravityY: -22, scale: { start: 0.7, end: 0 }, alpha: { start: 0.85, end: 0 } }),
+      zap: burstEmitter(this, [0xfff59d, 0xffffff, 0xffd54f], 170, 170, { scale: { start: 0.9, end: 0 }, blendMode: add }),
+      mend: burstEmitter(this, [0x81c784, 0x66bb6a, 0xa5d6a7], 18, 850, { gravityY: -110, scale: { start: 0.8, end: 0 }, blendMode: add }),
+      dust: burstEmitter(this, [0xd7ccc8, 0xbcaaa4, 0xeeeeee], 28, 420, { scale: { start: 1.1, end: 0 }, alpha: { start: 0.75, end: 0 } }),
+      fuse: burstEmitter(this, [0xffe082, 0xff9800, 0xffffff], 130, 320, { gravityY: 220, scale: { start: 0.8, end: 0 }, blendMode: add }),
+    }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.fightDef)
     const numbers = settings.damageNumbers ? newDamageNumbers() : null
@@ -1041,6 +1055,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
     this.damageText?.step(sim.fxMs)
     this.hitCues?.step(sim.fxMs)
     this.paint?.step(sim)
+    for (const p of this.paint?.puffs ?? []) this.puffs[p.kind].explode(p.count, p.x, p.y)
     this.drawDevTargets(sim)
     this.drawInspected()
     this.drawDevWalls(sim)

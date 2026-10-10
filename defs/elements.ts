@@ -6,11 +6,11 @@ import type { ElementRules } from '../legacy/types/elements'
  */
 export const ELEMENTS = {
   list: {
-    fire: { name: '火', icon: '1f525', color: 0xff7043, desc: '点燃：烧着的每隔一阵掉血，还会烧到贴着的同伴；水与冰浇得灭', body: '本身点不着，不怕岩浆', fall: { burst: 'sparks', tint: 0x5d4037 } },
-    ice: { name: '冰', icon: '2744', color: 0x80deea, desc: '寒冷：越打越慢，叠满就冻住；冻住的挨一下物理就碎', body: '本身冻不住，不怕冰水', fall: { burst: 'snow', tint: 0xb3e5fc } },
-    thunder: { name: '雷', icon: '1f329', color: 0xffd54f, desc: '打断挨打的出手，电流再跳到身边的另一个；湿的连成一片一起挨', body: '本身不受传导', fall: { burst: 'glow', tint: 0xfff59d } },
-    water: { name: '水', icon: '1f4a7', color: 0x42a5f5, desc: '浇湿：灭火、点不着；湿的一冰就冻、一电一片', body: '本身一直是湿的，会游泳', fall: { burst: 'splash', tint: 0x90caf9 } },
-    poison: { name: '毒', icon: '1f9ea', color: 0x9ccc65, desc: '中毒：一层层叠上去掉血，中了毒什么回复都不管用', body: '本身不会中毒', fall: { burst: 'bubbles', tint: 0x7cb342 } },
+    fire: { name: '火', icon: '1f525', color: 0xff7043, desc: '点燃：烧着的每隔一阵掉血，还会烧到贴着的同伴；水与冰浇得灭', body: '本身点不着，不怕岩浆', aura: 'flame', fall: { burst: 'sparks', tint: 0x5d4037 } },
+    ice: { name: '冰', icon: '2744', color: 0x80deea, desc: '寒冷：越打越慢，叠满就冻住；冻住的挨一下物理就碎', body: '本身冻不住，不怕冰水', aura: 'frost', fall: { burst: 'snow', tint: 0xb3e5fc } },
+    thunder: { name: '雷', icon: '1f329', color: 0xffd54f, desc: '打断挨打的出手，电流再跳到身边的另一个；湿的连成一片一起挨', body: '本身不受传导', aura: 'zap', fall: { burst: 'glow', tint: 0xfff59d } },
+    water: { name: '水', icon: '1f4a7', color: 0x42a5f5, desc: '浇湿：灭火、点不着；湿的一冰就冻、一电一片', body: '本身一直是湿的，会游泳', aura: 'drip', fall: { burst: 'splash', tint: 0x90caf9 } },
+    poison: { name: '毒', icon: '1f9ea', color: 0x9ccc65, desc: '中毒：一层层叠上去掉血，中了毒什么回复都不管用', body: '本身不会中毒', aura: 'toxic', fall: { burst: 'bubbles', tint: 0x7cb342 } },
   },
   burn: { ratio: 0.15, tickMs: 500, durationMs: 3000, spread: 0.4 },
   chill: { stacks: 3, ms: 3000, slow: 0.75, frozenMs: 1500 },
