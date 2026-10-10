@@ -6,7 +6,6 @@ import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
 import { rewindMs } from '../data/abilities'
 import { AFFIXES } from '../data/affixes'
-import { ELEMENTS, elementAt } from '../data/elements'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
@@ -59,7 +58,6 @@ import { traceAt, tracePath } from './systems/shared/trace'
 import { rescuing } from './systems/tickRescue'
 import { hostShown } from './utils/statusTint'
 import { statusDef } from './utils/marks'
-import { elementNow } from './utils/element'
 import { leaderX, leaderY } from './utils/team'
 import { ellipse, fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
@@ -68,12 +66,16 @@ import { SIDE } from './render/side'
 import { footY } from './render/foot'
 import { FOE_SHOT_Z } from './present/layerShots'
 import type { PaintSprite } from './render/sprites'
+import { lookKey } from './render/lookCells'
+import { PuffClock, statusLooks } from './present/statusLooks'
+import type { Puff } from './present/statusLooks'
 import type { Sim } from './sim'
 
 /** 按世界坐标画：顶点原样记下，渲染时再乘镜头 */
 const WORLD = new Phaser.GameObjects.Components.TransformMatrix()
 
-const SWEAT = '1f4a6'
+/** 汗滴：自己画的一滴，染成浅蓝 */
+const SWEAT_COLOR = 0x81d4fa
 const SWEAT_SIZE = 0.42 * UNIT
 const SWEAT_Z = 29
 
@@ -133,8 +135,11 @@ interface Mark {
 
 /** 呈现：身体、队长与这一场的目标的数据画出来的样子，不是实体、不存位置，画在身体上的随身体显隐；每帧推进后按数据重画，收尾时停在最后一帧 */
 export class Presentation {
-  /** 按 z 排好的精灵：身体头上的汗与状态图标、队长的倒带残影 */
+  /** 按 z 排好的精灵：身体头上的汗、状态在身上的样子与还没画法的状态图标、队长的倒带残影 */
   readonly sprites: PaintSprite[] = []
+  /** 这一帧从身上冒的粒子：由场景交给粒子发射器 */
+  readonly puffs: Puff[] = []
+  private readonly clock = new PuffClock()
   /** 压在实体的圈下面：据点、要到访的地标、不许敌人走到的地方与救援的圈 */
   readonly marks: Scratch = newScratch()
   /** 盖在实体的圈上面：倒带残影下面那段路 */
@@ -152,14 +157,16 @@ export class Presentation {
 
   step(sim: Sim): void {
     this.sprites.length = 0
+    this.puffs.length = 0
     for (const s of [this.marks, this.trail, this.bars, this.feet, this.pointer, this.warn]) resetScratch(s)
     sweats(sim, this.sprites)
-    statusIcons(sim, this.sprites)
+    headIcons(sim, this.sprites)
+    feet(sim, this.feet)
+    statusLooks(sim, this.sprites, this.feet, this.puffs, this.clock)
     echo(sim, this.sprites, this.trail)
     xray(sim, this.sprites)
     this.sprites.sort((a, b) => a.z - b.z)
     bars(sim, this.bars)
-    feet(sim, this.feet)
     warnings(sim, this.warn)
     pointer(sim, this.pointer, goalSpot(sim), GOAL_COLOR)
     pointer(sim, this.pointer, nearestTo(sim, levelUpsOnField(sim)), LEVEL_UP_COLOR)
@@ -176,22 +183,22 @@ export class Presentation {
   }
 }
 
-/** 💦 摆在身体右上方，上下跳着 */
+/** 汗滴摆在身体右上方，上下跳着 */
 function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
   out.push({
     z: SWEAT_Z,
-    frame: sim.frames.index(SWEAT),
+    frame: sim.frames.index(lookKey('drop')),
     x: Transform.x[body]! + VisOff.x[body]! + size * 0.34,
     y: Transform.y[body]! + VisOff.y[body]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4,
     w: SWEAT_SIZE,
     h: SWEAT_SIZE,
-    color: 0xffffff,
+    color: SWEAT_COLOR,
     alpha: hostShown(body),
     outlined: true,
   })
 }
 
-/** 拖慢全队的队员头上冒 💦；累到减速的敌人头上也冒，这是反打的时机 */
+/** 拖慢全队的队员头上冒汗；累到减速的敌人头上也冒，这是反打的时机 */
 function sweats(sim: Sim, out: PaintSprite[]): void {
   for (const m of sim.characters) if (dragging(sim, m)) sweat(sim, out, m, charSize(m))
   for (const eid of query(sim.world, ENEMY_SET)) {
@@ -209,25 +216,20 @@ function iconRow(sim: Sim, out: PaintSprite[], eid: number, emojis: readonly str
   emojis.forEach((emoji, j) => out.push({ z: SWEAT_Z, frame: sim.frames.index(emoji), x: x0 + j * ICON_SIZE, y, w: ICON_SIZE, h: ICON_SIZE, color: 0xffffff, alpha, outlined: true }))
 }
 
-/** 精英与头目头顶第一排打头的元素图标：小怪太多不标，靠图鉴认 */
-function elementIcon(sim: Sim, eid: number): string[] {
-  const el = elementAt(hasComponent(sim.world, eid, Elite) && (Elite.v[eid] || Boss.v[eid]) ? elementNow(sim, eid) : 0)
-  return el ? [ELEMENTS[el].icon] : []
-}
-
-/** 头顶的图标：精英与头目的元素和精英的词缀贴着头顶一排；带时限、正生效的状态按图标的轻重排，最多三个，再上面一排；倒下的不画 */
-function statusIcons(sim: Sim, out: PaintSprite[]): void {
+/** 头顶还挂着的图标：精英的词缀贴着头顶一排；在身上画不出样子的状态按图鉴的轻重排，最多三个，再上面一排；倒下的不画 */
+function headIcons(sim: Sim, out: PaintSprite[]): void {
   const now = sim.elapsedMs
   const kinds: number[] = []
   for (const eid of query(sim.world, [Mark, Transform])) {
     if (!Alive.v[eid]) continue
-    const head = [...elementIcon(sim, eid), ...(eliteAffixes[eid] ?? []).map((id) => AFFIXES[id].icon)]
+    const head = (eliteAffixes[eid] ?? []).map((id) => AFFIXES[id].icon)
     iconRow(sim, out, eid, head, 0)
     kinds.length = 0
     for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
       const k = Mark.kind[s]!
       const until = Mark.until[s]!
-      if (statusDef(k)?.icon && until > now && until !== Infinity && !kinds.includes(k)) kinds.push(k)
+      const def = statusDef(k)
+      if (def?.icon && !def.look && until > now && until !== Infinity && !kinds.includes(k)) kinds.push(k)
     }
     kinds.sort((a, b) => statusDef(a)!.icon!.rank - statusDef(b)!.icon!.rank)
     iconRow(sim, out, eid, kinds.slice(0, ICON_MAX).map((k) => statusDef(k)!.icon!.emoji), head.length > 0 ? 1 : 0)

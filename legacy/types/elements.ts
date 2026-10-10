@@ -1,5 +1,6 @@
 import type elementsJson from '../assets/elements.json'
 import type { EntranceLook } from './maps'
+import type { LookPuff } from './statuses'
 
 /** 元素：一下伤害带的、一个身体本身是的；不带元素的一下是物理 */
 export type ElementId = keyof (typeof elementsJson)['list']
@@ -12,6 +13,8 @@ export interface ElementDef {
   readonly desc: string
   /** 身体本身是这种元素时免疫什么、天生怎样 */
   readonly body: string
+  /** 身体是这种元素时身上一直冒的粒子：精英与头目、附魔与转属的身上看得出来 */
+  readonly aura: LookPuff
   /** 被这种元素打倒的样子：迸出的粒子与碎片染的颜色 */
   readonly fall: { readonly burst: EntranceLook; readonly tint: number }
 }

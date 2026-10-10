@@ -8,7 +8,7 @@ import { STATUSES } from '../data/statuses'
 import type { AffixId } from '../types/affixes'
 import type { Effect } from '../types/abilityDefs'
 import type { BodyRules, EnemyDef, Tenacity } from '../types/enemies'
-import type { StatusAction, StatusDef, StatusForce, StatusMerge } from '../types/statuses'
+import type { LookCell, LookPuff, StatusAction, StatusDef, StatusForce, StatusLook, StatusMerge } from '../types/statuses'
 import type { Span } from '../types/obstacles'
 import { LAYER_M, overOf, STANDARD } from '../ecs/utils/pass'
 import { MAP_IDS, MAPS, bossesOf } from '../data/maps'
@@ -222,6 +222,26 @@ const MERGE_LABEL: Record<StatusMerge, string> = {
 }
 
 /** 一种状态的规则，从状态表的字段说出来 */
+const CELL_LABEL: Readonly<Record<LookCell, string>> = { ice: '整个包进一块冰', bubble: '罩着一层护罩', glow: '身后泛着光', star: '头上绕着星星', zee: '头上冒 Z', heart: '头上冒心', drop: '冒汗' }
+const COMIC_LABEL: Readonly<Record<NonNullable<StatusLook['comic']>, string>> = { stars: '头上绕着星星', zzz: '头上往上飘 Z', hearts: '头上往上飘心' }
+const PUFF_LABEL: Readonly<Record<LookPuff | 'element', string>> = { flame: '冒火苗', toxic: '冒绿泡', drip: '往下滴水', frost: '冒寒气', zap: '冒电火花', mend: '冒绿色的光点', dust: '扬起尘土', fuse: '冒火星', element: '冒那种元素的粒子' }
+const FROM_LABEL = { body: '身上', head: '头顶', feet: '脚下' } as const
+
+/** 状态在身上的样子；还没有样子的暂时在头顶挂图标 */
+function lookLine(st: StatusDef): string {
+  const l = st.look
+  if (!l) return st.icon ? '样子：暂时在头顶挂图标，同时最多三个' : '样子：看不出来'
+  const parts = [
+    st.tint ? '身上染色' : '',
+    l.wrap ? CELL_LABEL[l.wrap.cell] : '',
+    l.comic ? COMIC_LABEL[l.comic] : '',
+    l.shackle !== undefined ? '脚下拴着一圈' : '',
+    l.guardArc !== undefined ? '身前地上一道弧' : '',
+    l.emit ? `${FROM_LABEL[l.emit.from]}${PUFF_LABEL[l.emit.puff]}` : '',
+  ].filter(Boolean)
+  return `样子：${parts.length > 0 ? parts.join('，') : '看行为就知道'}`
+}
+
 function statusLines(st: StatusDef): string[] {
   const lines: string[] = []
   if (st.cc) lines.push('控制：霸体挡得住，施加霸体或净化时解掉；头目与精英被控制会累进韧性条')
@@ -245,11 +265,11 @@ function statusLines(st: StatusDef): string[] {
   if (flags.length > 0) lines.push(flags.join('；'))
   const again = st.merge ? MERGE_LABEL[st.merge] : st.keyed ? '按来源分开记，同一来源的只延长时间' : '只延长时间（取更长的），参数用新的'
   lines.push(`再中一次：${again}`)
-  if (st.icon) lines.push(`头顶图标排第 ${st.icon.rank + 1}：同时有几种，只显示最靠前的三个`)
+  lines.push(lookLine(st))
   return lines
 }
 
-/** 带头顶图标的状态，按图标的先后排 */
+/** 有图鉴图标的状态，按图标的先后排 */
 function statusEntries(): WikiEntry[] {
   return Object.values<StatusDef>(STATUSES)
     .flatMap((st) => (st.icon ? [{ st, icon: st.icon }] : []))

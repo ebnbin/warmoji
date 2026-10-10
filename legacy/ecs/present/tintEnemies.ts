@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
-import { Casting, ENEMY_SET, Flash, MARK, Pop, TELEGRAPH, Tint } from '../components'
-import { hasMark, slowFactor } from '../utils/marks'
+import { Casting, ENEMY_SET, Flash, Pop, TELEGRAPH, Tint } from '../components'
+import { slowFactor } from '../utils/marks'
 import { presence, shownToTeam, statusTint } from '../utils/statusTint'
 import type { Sim } from '../sim'
 
@@ -9,7 +9,7 @@ function castingTint(now: number, eid: number): number {
   return 0xffb74d
 }
 
-/** 敌人的底色按状态优先级：控制、中毒、蓄力、减速、正常；受击闪白期间不改；透明度随存在感，队伍看不见的只剩淡影 */
+/** 敌人的底色按状态优先级：状态表里带底色的（控制、燃烧、中毒、湿、寒冷……）、蓄力、减速、正常；受击闪白期间不改；透明度随存在感，队伍看不见的只剩淡影 */
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET)) {
@@ -19,12 +19,10 @@ export function tintEnemies(sim: Sim): void {
     const cc = statusTint(sim, eid)
     Tint.color[eid] = cc !== 0
       ? cc
-      : hasMark(sim, eid, MARK.poison)
-        ? 0x7bff5a
-        : now < Casting.until[eid]!
-          ? castingTint(now, eid)
-          : slowFactor(sim, eid) < 1
-            ? 0xa5d8ff
-            : 0xffffff
+      : now < Casting.until[eid]!
+        ? castingTint(now, eid)
+        : slowFactor(sim, eid) < 1
+          ? 0xa5d8ff
+          : 0xffffff
   }
 }
