@@ -5,7 +5,7 @@ const POSTER = {
   kind: 'poster',
   emoji: '1f642',
   name: '微笑海报',
-  desc: '贴在墙上的笑脸海报，推不动也不会走，一直盯着队长：队长一进 7 格就被它的视线拴住，3 秒内没跑出 7 格就被看穿，4 秒内显形、受到的伤害 ×1.3；海报后头的墙缝里每 4 秒飞出 2 只绿头蝇绕着它转，最多 6 只，不撕掉海报就一直飞出来；裱了好几层，护甲厚，燃烧、中毒、场这类持续伤害照掉',
+  desc: '贴在墙上的笑脸海报，推不动也不会走，一直盯着队长：队长一进 7 格就被它的视线拴住，3 秒内没跑出 7 格就被看穿，显形 4 秒；海报后头的墙缝里每 4 秒飞出 2 只绿头蝇绕着它转，最多 6 只，不撕掉海报就一直飞出来；裱了好几层，护甲厚，燃烧、中毒、场这类持续伤害照掉',
   size: 1.5,
   radius: 0.55,
   hp: 130,
@@ -30,7 +30,7 @@ const POSTER = {
         {
           kind: 'to',
           who: { side: 'foes', radius: 7, filter: { kind: 'leader', who: 'target' } },
-          then: [{ kind: 'tether', ms: 3000, range: 7, onHold: [{ kind: 'status', status: 'exposed', ms: 4000, value: 1.3 }, { kind: 'reveal', durationMs: 4000 }], color: 0xfff59d }],
+          then: [{ kind: 'tether', ms: 3000, range: 7, onHold: [{ kind: 'reveal', durationMs: 4000 }], color: 0xfff59d }],
         },
       ],
     },

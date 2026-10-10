@@ -58,7 +58,7 @@ const boxRooGrit = {
       to: 'self',
       effects: [
         { kind: 'store', ms: 2500, ratio: 1.6, then: [{ kind: 'blast', radius: 3, ratio: 1, knockback: 10, breach: 1, ring: ring(0xff7043) }] },
-        { kind: 'guard', mul: 0.5, durationMs: 2500 },
+        { kind: 'shield', amount: 0, ratio: 0.25, ms: 2500 },
         { kind: 'unstoppable', durationMs: 2500 },
       ],
     },
@@ -81,7 +81,7 @@ export default {
   skill: {
     name: '以牙还牙',
     icon: '1f4a2',
-    desc: '2.5 秒内霸体，受到的伤害减半并记下，到时以记下的 1.6 倍为伤害震开身周 3 格，墙也震得裂；2.5 秒内再按一次，立刻在原地震开，并朝摇杆方向跃出 5 格，落地时 1.4 格内的敌人挨一记重踢并被踹开',
+    desc: '2.5 秒内霸体，挂上生命 25% 的护盾，护盾挡不住、落到身上的伤害都记下，到时以记下的 1.6 倍为伤害震开身周 3 格，墙也震得裂；2.5 秒内再按一次，立刻在原地震开，并朝摇杆方向跃出 5 格，落地时 1.4 格内的敌人挨一记重踢并被踹开',
     cdMs: 13_000,
     ability: 'boxRooGrit',
     aim: true,

@@ -72,7 +72,6 @@ interface MorphEffect {
   readonly kind: 'morph'
   readonly durationMs: number
   readonly morphEmoji: string
-  readonly vulnMul?: number
 }
 interface SpawnProjectileEffect {
   readonly kind: 'spawnProjectile'
@@ -95,11 +94,11 @@ interface AttackSlowEffect {
   readonly mul: number
   readonly durationMs: number
 }
-/** 倍率增益：不写 durationMs 就是永久 */
+/** 看得出来的增益：移速 × speedMul、出手冷却 × cooldownMul（小于 1 是出手更勤）；不写 durationMs 就是永久 */
 interface BuffEffect {
   readonly kind: 'buff'
-  readonly damageMul?: number
   readonly speedMul?: number
+  readonly cooldownMul?: number
   readonly durationMs?: number
 }
 /** 直接造成一笔伤害：amount 加上基础伤害的 ratio 倍 */
@@ -131,11 +130,6 @@ interface HideEffect {
 /** 嘲讽：目标只看得见施法者 */
 interface TauntEffect {
   readonly kind: 'taunt'
-  readonly durationMs: number
-}
-interface GuardEffect {
-  readonly kind: 'guard'
-  readonly mul: number
   readonly durationMs: number
 }
 interface ReviveEffect {
@@ -242,11 +236,6 @@ interface RevealEffect {
 interface StealthEffect {
   readonly kind: 'stealth'
   readonly durationMs?: number
-}
-/** 不死：生命不会降到 1 以下 */
-interface UndyingEffect {
-  readonly kind: 'undying'
-  readonly durationMs: number
 }
 /** 招架：挡下所有命中，并对出手的身体施加 then */
 interface ParryEffect {
@@ -382,6 +371,12 @@ interface DetonateEffect {
   readonly mark: 'fuse' | 'store'
 }
 /** 引信：ms 后在目标所在处施加 then；jump 为真时目标先死了引信跳到最近的另一个敌人 */
+/** 过 ms 再对同一个目标施加 then：只是计时，身上看不出来 */
+interface AfterEffect {
+  readonly kind: 'after'
+  readonly ms: number
+  readonly then: readonly Effect[]
+}
 interface FuseEffect {
   readonly kind: 'fuse'
   readonly ms: number
@@ -592,7 +587,6 @@ export type Effect =
   | ExhaustEffect
   | HideEffect
   | TauntEffect
-  | GuardEffect
   | ReviveEffect
   | HealRatioEffect
   | InvulnEffect
@@ -615,7 +609,6 @@ export type Effect =
   | FrontGuardEffect
   | RevealEffect
   | StealthEffect
-  | UndyingEffect
   | ParryEffect
   | PullEffect
   | KnockupEffect
@@ -625,6 +618,7 @@ export type Effect =
   | IfEffect
   | StackEffect
   | DetonateEffect
+  | AfterEffect
   | FuseEffect
   | StoreEffect
   | DeathMarkEffect

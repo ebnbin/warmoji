@@ -149,7 +149,29 @@ const drop: Draw = (g, size) => {
   g.fill()
 }
 
-const DRAW: Readonly<Record<LookCell, Draw>> = { glow, ice, bubble, star, zee, heart, drop }
+/** 一圈往外的尖刺：中间空着，垫在身体后面只露出一圈刺尖 */
+const spikes: Draw = (g, size) => {
+  const c = size / 2
+  const n = 14
+  const ri = size * 0.3
+  const ro = size * 0.49
+  const half = Math.PI / n
+  g.beginPath()
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2
+    g.moveTo(c + Math.cos(a - half) * ri, c + Math.sin(a - half) * ri)
+    g.lineTo(c + Math.cos(a) * ro, c + Math.sin(a) * ro)
+    g.lineTo(c + Math.cos(a + half) * ri, c + Math.sin(a + half) * ri)
+    g.closePath()
+  }
+  g.fillStyle = '#ffffff'
+  g.fill()
+  g.lineWidth = size * 0.012
+  g.strokeStyle = 'rgba(80,80,80,0.9)'
+  g.stroke()
+}
+
+const DRAW: Readonly<Record<LookCell, Draw>> = { glow, ice, bubble, star, zee, heart, drop, spikes }
 
 export const LOOK_CELLS = Object.keys(DRAW) as LookCell[]
 

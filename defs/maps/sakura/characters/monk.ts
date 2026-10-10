@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧘 僧人：诵经让身边受伤的队友慢慢回血，念珠打敌人，两样轮着来；技能敲响金钟，震散全队身上的火、毒、寒气与湿，先无敌再减伤
+// 🧘 僧人：诵经让身边受伤的队友慢慢回血，念珠打敌人，两样轮着来；技能敲响金钟，震散全队身上的火、毒、寒气与湿，先无敌再罩上护盾
 const HURT = { side: 'allies', radius: 4, filter: { kind: 'hpBelow', who: 'target', ratio: 1 } } as const
 const NEAR = { side: 'allies', radius: 4 } as const
 const MEND = { kind: 'mend', amount: 3, tickMs: 500, durationMs: 3000 } as const
@@ -57,7 +57,7 @@ const monkBell = {
   onHit: [
     { kind: 'cleanse' },
     { kind: 'invuln', ms: 1500 },
-    { kind: 'guard', mul: 0.6, durationMs: 5500 },
+    { kind: 'shield', amount: 0, ratio: 0.2, ms: 5500 },
   ],
 } satisfies AbilityDef
 
@@ -68,12 +68,12 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9d8',
   name: '僧人',
-  desc: '寺里的僧人：诵经让 4 格内受伤的队友 3 秒里每半秒回 3 点血，中了毒的回不上；弹出两颗念珠打 6.5 格内最近的敌人，打得敌人一退，冻住的一打就碎；两样轮着来，附近没敌人时这一轮念珠落空、诵经照常；自己没护甲，靠金钟保全队：技能敲响金钟，震散全队身上的燃烧、中毒、寒冷与湿，冻住的也敲醒，先无敌一阵再减伤',
+  desc: '寺里的僧人：诵经让 4 格内受伤的队友 3 秒里每半秒回 3 点血，中了毒的回不上；弹出两颗念珠打 6.5 格内最近的敌人，打得敌人一退，冻住的一打就碎；两样轮着来，附近没敌人时这一轮念珠落空、诵经照常；自己没护甲，靠金钟保全队：技能敲响金钟，震散全队身上的燃烧、中毒、寒冷与湿，冻住的也敲醒，先无敌一阵再罩上护盾',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.9 },
   stats: { moveSpeed: 5.4, maxStamina: 110, staminaRegen: 80, exertion: 0.8 },
-  skill: { name: '金钟罩', icon: '1f514', desc: '解除全队身上的控制、减速、燃烧、中毒、寒冷与湿；全队无敌 1.5 秒，之后 4 秒受到的伤害 ×0.6', cdMs: 18_000, ability: 'monkBell' },
+  skill: { name: '金钟罩', icon: '1f514', desc: '解除全队身上的控制、减速、燃烧、中毒、寒冷与湿；全队无敌 1.5 秒，并挂上生命 20% 的护盾 5.5 秒', cdMs: 18_000, ability: 'monkBell' },
   weapons: [],
   innate: [
     {

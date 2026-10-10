@@ -653,6 +653,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevTabsHost
       mend: burstEmitter(this, [0x81c784, 0x66bb6a, 0xa5d6a7], 18, 850, { gravityY: -110, scale: { start: 0.8, end: 0 }, blendMode: add }),
       dust: burstEmitter(this, [0xd7ccc8, 0xbcaaa4, 0xeeeeee], 28, 420, { scale: { start: 1.1, end: 0 }, alpha: { start: 0.75, end: 0 } }),
       fuse: burstEmitter(this, [0xffe082, 0xff9800, 0xffffff], 130, 320, { gravityY: 220, scale: { start: 0.8, end: 0 }, blendMode: add }),
+      blood: burstEmitter(this, [0xc62828, 0xe53935, 0x8e0000], 20, 800, { gravityY: -60, scale: { start: 0.8, end: 0.2 }, alpha: { start: 0.95, end: 0 } }),
     }
     const origin = { x: this.anchor.x, y: this.anchor.y }
     this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, this.fightDef)

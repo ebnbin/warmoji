@@ -33,7 +33,7 @@ const templeTurtleXuanwu = {
   color: 0x4fc3f7,
   shape: { kind: 'all', of: 'allies' },
   onHit: [{ kind: 'attach', ms: 4000 }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 4000 }, { kind: 'guard', mul: 0.5, durationMs: 4000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'unstoppable', durationMs: 4000 }, { kind: 'shield', amount: 0, ratio: 0.25, ms: 4000 }] }],
 } satisfies AbilityDef
 
 export const abilities = { templeTurtleLotus, templeTurtleLotus2, templeTurtleLotus3, templeTurtleXuanwu } satisfies Record<string, AbilityDef>
@@ -44,7 +44,7 @@ export default {
   emoji: '1f422',
   name: '寺龟',
   element: 'ice',
-  desc: '寺院池子里的老龟，冬天池面结冰也冻不住它，走得慢、背壳硬：抛出结霜的睡莲叶，打中的敌人冷一层，冷满三层冻住，冻住的挨一下物理就碎；背壳结着冰，近身打它的挨 3 点反伤、冷一层；会游泳，溪水冲不走；本身是冰，冻不住；护甲厚，怕的是燃烧、中毒这类不吃护甲的伤害；技能玄武让全队爬上龟背 4 秒，队友谁也选不中却照常出手，自己霸体、受到的伤害 ×0.5',
+  desc: '寺院池子里的老龟，冬天池面结冰也冻不住它，走得慢、背壳硬：抛出结霜的睡莲叶，打中的敌人冷一层，冷满三层冻住，冻住的挨一下物理就碎；背壳结着冰，近身打它的挨 3 点反伤、冷一层；会游泳，溪水冲不走；本身是冰，冻不住；护甲厚，怕的是燃烧、中毒这类不吃护甲的伤害；技能玄武让全队爬上龟背 4 秒，队友谁也选不中却照常出手，自己霸体、挂上生命 25% 的护盾',
   role: 'tank',
   tags: ['defense', 'control', 'ranged'],
   body: { drag: 5.5, mass: 1.8 },
@@ -53,7 +53,7 @@ export default {
   skill: {
     name: '玄武',
     icon: '1f6e1',
-    desc: '4 秒内全体队友贴在龟背上，谁也选不中，照常出手；自己霸体 4 秒，受到的伤害 ×0.5',
+    desc: '4 秒内全体队友贴在龟背上，谁也选不中，照常出手；自己霸体 4 秒，并挂上生命 25% 的护盾 4 秒',
     cdMs: 16_000,
     ability: 'templeTurtleXuanwu',
   },

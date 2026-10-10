@@ -33,7 +33,6 @@ const owlFlare = {
   shape: { kind: 'disc', radius: 8, at: 'self' },
   onHit: [
     { kind: 'reveal', durationMs: 6000 },
-    { kind: 'status', status: 'exposed', ms: 5000, value: 1.25 },
     { kind: 'disarm', durationMs: 1000 },
   ],
 } satisfies AbilityDef
@@ -65,7 +64,7 @@ export default {
   skill: {
     name: '月光照明弹',
     icon: '1f387',
-    desc: '打出一颗照明弹：8 格内的敌人显形 6 秒、受到的伤害 ×1.25 5 秒，并被晃得致盲 1 秒',
+    desc: '打出一颗照明弹：8 格内的敌人显形 6 秒，并被晃得致盲 1 秒',
     cdMs: 13_000,
     ability: 'owlFlare',
   },

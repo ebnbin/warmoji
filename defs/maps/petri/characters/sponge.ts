@@ -41,7 +41,7 @@ const spongeSwell = {
       to: 'self',
       effects: [
         { kind: 'unstoppable', durationMs: 4000 },
-        { kind: 'guard', mul: 0.5, durationMs: 4000 },
+        { kind: 'shield', amount: 0, ratio: 0.25, ms: 4000 },
         { kind: 'mend', amount: 0, ratio: 0.02, tickMs: 500, durationMs: 4000 },
       ],
     },
@@ -61,7 +61,7 @@ export default {
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.6 },
   stats: { moveSpeed: 4, maxStamina: 140, staminaRegen: 45, exertion: 1.2 },
-  skill: { name: '海绵体', icon: '1f6e1', desc: '4.5 格内的敌人嘲讽 3 秒；自己 4 秒内霸体，冻不住也推不动，受到的伤害 ×0.5，每半秒回 2% 生命', cdMs: 13_000, ability: 'spongeSwell' },
+  skill: { name: '海绵体', icon: '1f6e1', desc: '4.5 格内的敌人嘲讽 3 秒；自己 4 秒内霸体，冻不住也推不动，挂上生命 25% 的护盾，每半秒回 2% 生命', cdMs: 13_000, ability: 'spongeSwell' },
   weapons: [],
   innate: [
     {

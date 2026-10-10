@@ -100,7 +100,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'ground':
       return `留下 ${grid(e.def.radius)} 的${e.def.trap ? '陷阱' : '场地'} ${sec(e.def.durationMs)}${e.def.damage && e.def.tickMs ? `，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤` : ''}${e.def.effects && !e.def.trap ? `，每 ${sec(e.def.tickMs)} ${joinFx(e.def.effects)}` : ''}${zoneRuleLine(e.def, e.def.effects, e.def.damage)}`
     case 'morph':
-      return `变羊 ${sec(e.durationMs)}${e.vulnMul ? `，受伤 ×${e.vulnMul}` : ''}`
+      return `变羊 ${sec(e.durationMs)}`
     case 'spawnProjectile':
       return `射出一发 ${e.damage} 伤的冷枪`
     case 'heal':
@@ -108,7 +108,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'attackSlow':
       return `攻击冷却 ×${e.mul} 持续 ${sec(e.durationMs)}`
     case 'buff': {
-      const parts = [e.damageMul !== undefined ? `伤害 ×${e.damageMul}` : '', e.speedMul !== undefined ? `移速 ×${e.speedMul}` : ''].filter(Boolean)
+      const parts = [e.speedMul !== undefined ? `移速 ×${e.speedMul}` : '', e.cooldownMul !== undefined ? `出手冷却 ×${e.cooldownMul}` : ''].filter(Boolean)
       return `${parts.join('、')}${e.durationMs === undefined ? '，永久' : ` 持续 ${sec(e.durationMs)}`}`
     }
     case 'damage':
@@ -123,8 +123,6 @@ export function effectLine(e: Effect, self = false): string {
       return `隐匿 ${sec(e.durationMs)}，敌人失去目标只会乱走`
     case 'taunt':
       return `嘲讽 ${sec(e.durationMs)}，只追施法者`
-    case 'guard':
-      return `受到的伤害 ×${e.mul} 持续 ${sec(e.durationMs)}`
     case 'revive':
       return '阵亡者满血复活'
     case 'healRatio':
@@ -169,8 +167,6 @@ export function effectLine(e: Effect, self = false): string {
       return `揭示 ${sec(e.durationMs)}（隐匿失效）`
     case 'stealth':
       return `潜行${e.durationMs === undefined ? '' : ` ${sec(e.durationMs)}`}，出手即现形`
-    case 'undying':
-      return `不死 ${sec(e.durationMs)}（生命不低于 1）`
     case 'parry':
       return `招架 ${sec(e.durationMs)}：挡下所有命中，对出手者 ${joinFx(e.then)}`
     case 'pull':
@@ -189,6 +185,8 @@ export function effectLine(e: Effect, self = false): string {
       return `叠一层（${sec(e.durationMs)} 内同一目标叠满 ${e.max} 层：${joinFx(e.then)}）`
     case 'detonate':
       return `立刻引爆自己留下的${e.mark === 'fuse' ? '引信' : '存伤'}`
+    case 'after':
+      return lead(`${sec(e.ms)} 后`, joinFx(e.then))
     case 'fuse':
       return `挂上引信，${lead(`${sec(e.ms)} 后`, joinFx(e.then))}${e.jump ? '；目标先死则跳到最近的敌人' : ''}`
     case 'store':

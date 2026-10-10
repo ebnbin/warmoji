@@ -39,7 +39,7 @@ const royalGuardWard = {
       effects: [
         { kind: 'cleanse' },
         { kind: 'barrier', shape: 'wall', length: 4, offset: 1.5, durationMs: 5000, bodies: 'foes', shots: true, color: 0xffe082 },
-        { kind: 'guard', mul: 0.6, durationMs: 5000 },
+        { kind: 'shield', amount: 0, ratio: 0.2, ms: 5000 },
       ],
     },
   ],
@@ -60,7 +60,7 @@ export default {
   skill: {
     name: '御前守卫',
     icon: '1f451',
-    desc: '解除自己身上的控制、减速与燃烧、中毒、寒冷、湿；朝最近的敌人在身前 1.5 格立起一道 4 格长的盾墙 5 秒，挡住敌人与敌方弹体；4 格内的敌人嘲讽 2.5 秒，自己 5 秒内受到的伤害减四成',
+    desc: '解除自己身上的控制、减速与燃烧、中毒、寒冷、湿；朝最近的敌人在身前 1.5 格立起一道 4 格长的盾墙 5 秒，挡住敌人与敌方弹体；4 格内的敌人嘲讽 2.5 秒，自己挂上生命 20% 的护盾 5 秒',
     cdMs: 14_000,
     ability: 'royalGuardWard',
   },

@@ -57,9 +57,10 @@ export function withDeath<T extends UnitBase>(unit: T, effects: readonly DeathEf
   return { ...unit, reactions: [...without(unit.reactions, ['death']), ...(effects ? [{ on: 'death', to: 'spot', effects } as const] : [])] }
 }
 
-/** 挂上精英词缀的反应：接在原有的后面，死亡反应并成一条 */
-export function withAffixes<T extends UnitBase>(unit: T, affixes: readonly { readonly reactions?: readonly BodyReaction[] }[]): T {
+/** 挂上精英词缀：反应接在原有的后面，死亡反应并成一条；带元素的词缀换掉本身的元素 */
+export function withAffixes<T extends UnitBase>(unit: T, affixes: readonly { readonly reactions?: readonly BodyReaction[]; readonly element?: UnitBase['element'] }[]): T {
   const reactions = [...(unit.reactions ?? []), ...affixes.flatMap((a) => a.reactions ?? [])]
   const death = reactions.flatMap((r) => (r.on === 'death' ? r.effects : []))
-  return withDeath({ ...unit, reactions }, death.length > 0 ? death : undefined)
+  const element = affixes.find((a) => a.element)?.element ?? unit.element
+  return withDeath({ ...unit, reactions, element }, death.length > 0 ? death : undefined)
 }

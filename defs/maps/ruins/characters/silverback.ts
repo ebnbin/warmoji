@@ -24,7 +24,7 @@ const silverbackRoar = {
   color: 0x8d6e63,
   shape: { kind: 'disc', radius: 3, at: 'self' },
   onHit: [{ kind: 'fear', durationMs: 800 }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'buff', damageMul: 1.2, durationMs: 3000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'buff', cooldownMul: 0.83, durationMs: 3000 }] }],
 } satisfies AbilityDef
 
 const silverbackSmash2 = { ...silverbackSmash, cycle: [silverbackSmash, silverbackSmash, silverbackRoar] } satisfies AbilityDef
@@ -69,7 +69,7 @@ export default {
       icon: '1f44a',
       base: 'silverbackSmash',
       upgrades: [
-        { ability: 'silverbackSmash2', card: { icon: '1f4e2', name: '捶胸', desc: '每第四下改成捶胸怒吼：3 格内的敌人恐惧 0.8 秒，自己 3 秒内伤害 ×1.2' } },
+        { ability: 'silverbackSmash2', card: { icon: '1f4e2', name: '捶胸', desc: '每第四下改成捶胸怒吼：3 格内的敌人恐惧 0.8 秒，自己 3 秒内出手冷却 ×0.83' } },
         { ability: 'silverbackSmash3', card: { icon: '1f9f1', name: '砸墙', desc: '捶击改成把敌人推出 2 格，撞上墙的眩晕 1 秒；捶得动残墙' } },
       ],
     },

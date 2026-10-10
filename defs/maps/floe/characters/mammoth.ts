@@ -45,7 +45,7 @@ const mammothShelter = {
   color: 0xbcaaa4,
   fxRadius: 1.5,
   shape: { kind: 'all', of: 'allies' },
-  onHit: [{ kind: 'cleanse' }, { kind: 'healRatio', ratio: 0.2 }, { kind: 'guard', mul: 0.6, durationMs: 5000 }],
+  onHit: [{ kind: 'cleanse' }, { kind: 'healRatio', ratio: 0.2 }, { kind: 'shield', amount: 0, ratio: 0.2, ms: 5000 }],
   reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'barrier', shape: 'ring', length: 3, durationMs: 5000, bodies: 'foes', shots: false, follow: true, color: 0xbcaaa4 }] }],
 } satisfies AbilityDef
 
@@ -64,7 +64,7 @@ export default {
   skill: {
     name: '冰河庇护',
     icon: '1f3d4',
-    desc: '全队解除控制、减速与身上的燃烧、中毒、寒冷、湿，再回复 20% 生命，5 秒内受到的伤害 ×0.6；身周立起一圈 3 格的长毛屏障跟着自己 5 秒，敌人进不来也出不去',
+    desc: '全队解除控制、减速与身上的燃烧、中毒、寒冷、湿，再回复 20% 生命，各挂上生命 20% 的护盾 5 秒；身周立起一圈 3 格的长毛屏障跟着自己 5 秒，敌人进不来也出不去',
     cdMs: 17_000,
     ability: 'mammothShelter',
   },

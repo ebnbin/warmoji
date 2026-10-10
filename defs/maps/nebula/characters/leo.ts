@@ -46,7 +46,7 @@ const leoGuard = {
       to: 'self',
       effects: [
         { kind: 'shield', amount: 0, ratio: 0.3, ms: 5000 },
-        { kind: 'to', who: { side: 'allies', radius: 5 }, then: [{ kind: 'guard', mul: 0.8, durationMs: 3000 }] },
+        { kind: 'to', who: { side: 'allies', radius: 5 }, then: [{ kind: 'shield', amount: 0, ratio: 0.1, ms: 3000 }] },
       ],
     },
   ],
@@ -59,12 +59,12 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.15 } }, 
 export default {
   emoji: '1f981',
   name: '狮子座',
-  desc: '从星座里走下来的狮子，皮厚甲硬，挨打掉得少，就怕燃烧、毒这类不吃护甲的：狮爪是物理，把贴上来的拍飞，冻住的一拍就碎，每第三下改成震吼，把一圈敌人震开；技能给自己挂上厚厚的护盾，把身边的敌人都招到自己身上，还替队友挡下两成伤害',
+  desc: '从星座里走下来的狮子，皮厚甲硬，挨打掉得少，就怕燃烧、毒这类不吃护甲的：狮爪是物理，把贴上来的拍飞，冻住的一拍就碎，每第三下改成震吼，把一圈敌人震开；技能给自己挂上厚厚的护盾，把身边的敌人都招到自己身上，还给身边的队友各挂一层薄盾',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.8 },
   stats: { moveSpeed: 4.2, maxStamina: 140, staminaRegen: 45, exertion: 1.2 },
-  skill: { name: '星座守护', icon: '264c', desc: '自己挂上生命 30% 的护盾 5 秒，4.5 格内的敌人嘲讽 3 秒；自己和 5 格内的队友 3 秒内受到的伤害 ×0.8', cdMs: 14_000, ability: 'leoGuard' },
+  skill: { name: '星座守护', icon: '264c', desc: '自己挂上生命 30% 的护盾 5 秒，4.5 格内的敌人嘲讽 3 秒；5 格内的队友各挂上生命 10% 的护盾 3 秒', cdMs: 14_000, ability: 'leoGuard' },
   weapons: [],
   innate: [
     {

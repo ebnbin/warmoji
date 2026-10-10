@@ -2,24 +2,23 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🧔 矿工：护甲厚的老矿工，矿镐刨中的敌人更吃痛、刨得开砌墙，撬到墙上就晕，第三下砸地震晕一圈；技能撑起跟着自己的坑道支架，把敌人挡在圈外、招到自己身上
+// 🧔 矿工：护甲厚的老矿工，矿镐刨得又沉又狠、刨得开砌墙，撬到墙上就晕，第三下砸地震晕一圈；技能撑起跟着自己的坑道支架，把敌人挡在圈外、招到自己身上
 const minerPick = {
   trigger: 'auto',
   cooldownMs: 1100,
   aim: 'nearest',
   range: 1.9,
-  damage: 16,
+  damage: 18,
   knockback: 1.5,
   breach: 0.4,
   fireSfx: 'chip',
   shape: { kind: 'sector', radius: 1.8, arcDeg: 100, ms: 180 },
-  onHit: [{ kind: 'status', status: 'exposed', ms: 2000, value: 1.15 }],
 } satisfies AbilityDef
 
 const minerPick2 = {
   ...minerPick,
   knockback: 0,
-  onHit: [...minerPick.onHit, { kind: 'reveal', durationMs: 3000 }, { kind: 'shove', distance: 1.6, ms: 220, onWall: [{ kind: 'stun', durationMs: 800 }] }],
+  onHit: [{ kind: 'reveal', durationMs: 3000 }, { kind: 'shove', distance: 1.6, ms: 220, onWall: [{ kind: 'stun', durationMs: 800 }] }],
 } satisfies AbilityDef
 
 const minerSlam = {
@@ -62,7 +61,7 @@ export const levels = [{ add: { maxHp: 25, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f9d4',
   name: '矿工',
-  desc: '在晶洞里挖了一辈子矿的老矿工，裹着一身厚皮袄（护甲 4），刀砍牙咬伤不了他多少，燃烧与中毒却照样往里钻：矿镐刨中的敌人更吃痛，刨得开砌墙，冻住的挨一镐就碎冰；撑起一圈坑道支架把队友护在里面，把敌人都招到自己身上',
+  desc: '在晶洞里挖了一辈子矿的老矿工，裹着一身厚皮袄（护甲 4），刀砍牙咬伤不了他多少，燃烧与中毒却照样往里钻：矿镐刨得又沉又狠，刨得开砌墙，冻住的挨一镐就碎冰；撑起一圈坑道支架把队友护在里面，把敌人都招到自己身上',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.7 },

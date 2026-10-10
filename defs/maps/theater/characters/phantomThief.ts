@@ -21,7 +21,7 @@ const phantomThiefBlade2 = {
 
 const phantomThiefBlade3 = {
   ...phantomThiefBlade2,
-  onHit: [...phantomThiefBlade.onHit, { kind: 'status', status: 'exposed', ms: 3000, value: 1.25 }],
+  damage: 30,
 } satisfies AbilityDef
 
 const phantomThiefHeist = {
@@ -55,7 +55,7 @@ export default {
       base: 'phantomThiefBlade',
       upgrades: [
         { ability: 'phantomThiefBlade2', card: { icon: '1f576', name: '易容', desc: '打死敌人后潜行 1.5 秒，并立刻可以再扑' } },
-        { ability: 'phantomThiefBlade3', card: { icon: '1f48c', name: '预告函', desc: '打中的敌人 3 秒内受到的伤害 ×1.25' } },
+        { ability: 'phantomThiefBlade3', card: { icon: '1f48c', name: '预告函', desc: '出刀前先发预告，怪盗之刃的伤害从 26 提高到 30' } },
       ],
     },
   ],

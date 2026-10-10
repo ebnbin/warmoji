@@ -45,7 +45,7 @@ const burrow = {
       effects: [
         { kind: 'untargetable', durationMs: 2200 },
         { kind: 'buff', speedMul: 2.5, durationMs: 1500 },
-        { kind: 'fuse', ms: 1500, then: [{ kind: 'cast', ability: erupt }] },
+        { kind: 'after', ms: 1500, then: [{ kind: 'cast', ability: erupt }] },
       ],
     },
   ],
