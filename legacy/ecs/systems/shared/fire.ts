@@ -328,7 +328,8 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         const from = points[points.length - 1]!
         points.push({ x: cur.x, y: cur.y })
         const s = struckOf(cur.eid)
-        if (hit(sim, src, cur.eid, dmg, { knockback: kb, from, cue: 'shown' })) struck.push(s)
+        // 往后的每一跳本身就是传过来的电，不再各自往下传
+        if (hit(sim, src, cur.eid, dmg, { knockback: kb, from, cue: 'shown', relay: hop > 0 || undefined })) struck.push(s)
         last = cur
         dmg *= Chain.decay[e]!
         // 电弧从这一跳往下一跳传：够得着就行，不看施法者看不看得见

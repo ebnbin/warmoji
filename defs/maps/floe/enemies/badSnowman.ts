@@ -6,7 +6,7 @@ const BAD_SNOWMAN = {
   emoji: '2603',
   name: '坏雪人',
   element: 'ice',
-  desc: '从雪堆里钻出来的坏雪人，挪得慢；看见人就停在四格开外扔雪球，砸中的人走不快；倒下时散成一片雪，踩进去也走不快',
+  desc: '从雪堆里钻出来的坏雪人，本身是冰，冻不住、推下海也冻不死，挪得慢：看见人就停在四格开外扔雪球，砸中的冷一层，冷满三层就冻住；倒下时散成一片雪，站在里面每秒冷一层',
   size: 1.4,
   radius: 0.52,
   hp: 100,
@@ -22,13 +22,12 @@ const BAD_SNOWMAN = {
       firstDelayMs: 1000,
       aim: 'nearest',
       range: 6.5,
-      damage: 12,
+      damage: 10,
       fireSfx: 'shoot',
       shape: { kind: 'bolt', projectile: { ...shot('26aa', 7, 0.45), flight: { kind: 'arc', peakM: 1.4 } }, lifeMs: 1400 },
-      onHit: [{ kind: 'slow', factor: 0.7, durationMs: 1000 }],
     },
   ],
-  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'ground', def: patch(1.5, 3000, 0xeceff1, [{ kind: 'slow', factor: 0.6, durationMs: 600 }]) }] }],
+  reactions: [{ on: 'death', to: 'spot', effects: [{ kind: 'ground', def: patch(1.5, 3000, 0xeceff1, undefined, 0, 1000) }] }],
 } satisfies EnemyDef
 
 export default BAD_SNOWMAN

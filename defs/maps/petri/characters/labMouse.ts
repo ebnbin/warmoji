@@ -2,17 +2,16 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🐭 小白鼠：扑上去咬两口，再转着尾巴卷起一道旋风把一排敌人挑上天；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高
+// 🐭 小白鼠：本身是毒；扑上去咬两口，一口叠一层毒，再转着尾巴卷起一道旋风把一排敌人挑上天；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高
 const labMouseBite = {
   trigger: 'auto',
   cooldownMs: 650,
   aim: 'nearest',
   range: 2.6,
-  damage: 16,
+  damage: 13,
   knockback: 2,
   fireSfx: 'whoosh',
   shape: { kind: 'segment', reach: 1.6, radius: 0.45, ms: 160, lungeDist: 0.5 },
-  onHit: [{ kind: 'poison', damage: 0, ratio: 0.1, tickMs: 500, durationMs: 3000 }],
 } satisfies AbilityDef
 
 const knockup = { kind: 'knockup', durationMs: 750, height: 1.3 } as const
@@ -20,7 +19,9 @@ const knockup = { kind: 'knockup', durationMs: 750, height: 1.3 } as const
 const gale = {
   ...labMouseBite,
   range: 5,
+  damage: 16,
   knockback: 0,
+  element: 'physical',
   fireSfx: 'gust',
   color: 0xb3e5fc,
   shape: { kind: 'segment', reach: 5, radius: 0.6, ms: 220, beam: true },
@@ -44,7 +45,7 @@ const labMouseLunge = {
   aim: 'nearest',
   range: 8,
   requires: { kind: 'airborne', who: 'target' },
-  damage: 50,
+  damage: 42,
   fireSfx: 'whoosh',
   shape: { kind: 'blink', behindDist: 0.5, strikeMs: 450 },
   onHit: [{ kind: 'knockup', durationMs: 700, height: 1.6 }],
@@ -57,7 +58,8 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f42d',
   name: '小白鼠',
-  desc: '从实验室里逃出来的小白鼠：扑上去咬两口，咬过的 3 秒里慢慢中毒，第三下转着尾巴卷起一道 5 格长的旋风，把一排敌人挑上天 0.75 秒；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高',
+  element: 'poison',
+  desc: '从实验室里逃出来的小白鼠，本身带毒、不会中毒：扑上去咬两口，每口叠一层毒；第三下转着尾巴卷起一道 5 格长的旋风，不带毒，把一排敌人挑上天 0.75 秒；技能只对空中的敌人出手，钻到它身后狠咬一口再挑高',
   role: 'assassin',
   tags: ['damage', 'control', 'melee', 'mobile'],
   body: { drag: 4, mass: 0.5 },
@@ -65,7 +67,7 @@ export default {
   skill: {
     name: '腾空追咬',
     icon: '1f32a',
-    desc: '只对空中的敌人出手：钻到 8 格内一个被挑上天的敌人身后狠咬一口，打 50 点，再把它挑高 0.7 秒',
+    desc: '只对空中的敌人出手：钻到 8 格内一个被挑上天的敌人身后狠咬一口，打 42 点、叠一层毒，再把它挑高 0.7 秒',
     cdMs: 9_000,
     ability: 'labMouseLunge',
   },
@@ -77,7 +79,7 @@ export default {
       base: 'labMouseCombo',
       upgrades: [
         { ability: 'labMouseCombo2', card: { icon: '1f32c', name: '断风', desc: '旋风过处立起一道 3 格长的风墙 2 秒，吞掉敌方的弹体' } },
-        { ability: 'labMouseCombo3', card: { icon: '26a1', name: '落地惊雷', desc: '被旋风挑上天的敌人落地时眩晕 0.7 秒' } },
+        { ability: 'labMouseCombo3', card: { icon: '1f4ab', name: '倒栽葱', desc: '被旋风挑上天的敌人落地时眩晕 0.7 秒' } },
       ],
     },
   ],

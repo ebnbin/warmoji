@@ -3,13 +3,13 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🦦 水獭：射出打中就裂成两发的水弹；技能朝一个方向喷出一道激流，把一排敌人冲开
+// 🦦 水獭：射出打中就裂成两发的水弹，把一片敌人浇湿；技能朝一个方向喷出一道激流，把一排敌人冲开、浇透
 const otterShot = {
   trigger: 'auto',
   cooldownMs: 600,
   aim: 'nearest',
   range: 7,
-  damage: 14,
+  damage: 11,
   fireSfx: 'plip',
   shape: { kind: 'bolt', projectile: { ...shot('1f4a7', 11, 0.4, 270), split: { count: 2, spreadDeg: 40, ratio: 0.6 } }, lifeMs: 1100 },
 } satisfies AbilityDef
@@ -21,7 +21,7 @@ const wave = {
   cooldownMs: 600,
   aim: 'nearest',
   range: 7,
-  damage: 18,
+  damage: 14,
   fireSfx: 'splash',
   color: 0x42a5f5,
   shape: { kind: 'segment', reach: 5, radius: 0.55, ms: 200, beam: true },
@@ -33,7 +33,7 @@ const otterShot3 = { ...otterShot2, cycle: [otterShot2, wave] } satisfies Abilit
 const otterTorrent = {
   trigger: 'manual',
   aim: 'stick',
-  damage: 30,
+  damage: 22,
   fireSfx: 'wash',
   color: 0x29b6f6,
   shape: { kind: 'segment', reach: 7, radius: 0.45, ms: 300, beam: true },
@@ -48,12 +48,12 @@ export default {
   emoji: '1f9a6',
   name: '水獭',
   element: 'water',
-  desc: '溪里的水獭：射出水弹，打中敌人或飞到头就裂成两发六成伤害的小水弹；技能朝一个方向喷出一道激流，把一排敌人冲开',
+  desc: '溪里的水獭：射出水弹，打中敌人或飞到头就裂成两发六成伤害的小水弹，打中的都被浇湿 5 秒，烧着的被浇灭，湿了的敌人一冰就冻、一电一片，留给队友收拾；水弹打得不重，胜在铺得开；本身一直是湿的，点不着火，在溪里照常游，却也一冰就冻、一电就麻；技能朝一个方向喷出一道激流，把一排敌人冲开，冲进溪里更好',
   role: 'ranged',
   tags: ['damage', 'ranged'],
   body: { drag: 4.5, mass: 0.8 },
   stats: { moveSpeed: 6.2, maxStamina: 100, staminaRegen: 75, exertion: 0.85 },
-  skill: { name: '激流', icon: '1f30a', desc: '朝摇杆方向喷出一道 7 格长的激流，冲中的敌人挨一下并被推开 3 格', cdMs: 10_000, ability: 'otterTorrent', aim: true },
+  skill: { name: '激流', icon: '1f30a', desc: '朝摇杆方向喷出一道 7 格长的激流，冲中的敌人挨一下、被浇湿并推开 3 格', cdMs: 10_000, ability: 'otterTorrent', aim: true },
   weapons: [],
   innate: [
     {
@@ -62,7 +62,7 @@ export default {
       base: 'otterShot',
       upgrades: [
         { ability: 'otterShot2', card: { icon: '3030', name: '打水漂', desc: '水弹能穿过两个敌人，打中第三个或飞到头才裂开' } },
-        { ability: 'otterShot3', card: { icon: '1f4a6', name: '浪花', desc: '每第三发换成一道 5 格长的水浪，扫中的敌人被推开 1.5 格' } },
+        { ability: 'otterShot3', card: { icon: '1f4a6', name: '浪花', desc: '每第三发换成一道 5 格长的水浪，扫中的敌人被浇湿并推开 1.5 格' } },
       ],
     },
   ],

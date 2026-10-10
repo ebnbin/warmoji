@@ -2,12 +2,14 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { EnemyDef } from '../../../../legacy/types/enemies'
 import { shot } from '../../../kit.ts'
 
+// 转成冰以后，咬与扑仍是物理、水弹仍是水，各招都写明元素，不跟着身子变
 const neckBite = {
   trigger: 'auto',
   cooldownMs: 1800,
   firstDelayMs: 800,
   aim: 'nearest',
   range: 3.4,
+  element: 'physical',
   damage: 22,
   knockback: 2,
   fireSfx: 'gulp',
@@ -21,7 +23,8 @@ const waterBolt = {
   firstDelayMs: 1500,
   aim: 'nearest',
   range: 8,
-  damage: 14,
+  element: 'water',
+  damage: 11,
   fireSfx: 'splash',
   shape: { kind: 'bolt', projectile: shot('1f535', 7, 0.5), lifeMs: 1600 },
   repeat: { count: 3, spreadDeg: 30 },
@@ -32,6 +35,7 @@ const ambushLeap = {
   class: 'skill',
   aim: 'nearest',
   range: 7,
+  element: 'physical',
   damage: 28,
   knockback: 2,
   fireSfx: 'splash',
@@ -56,19 +60,16 @@ const ambush = {
 
 const iceBreath = {
   trigger: 'auto',
-  cooldownMs: 4500,
+  cooldownMs: 6000,
   firstDelayMs: 1000,
   aim: 'nearest',
   range: 3.5,
-  damage: 18,
+  element: 'ice',
+  damage: 15,
   fireSfx: 'gust',
   color: 0x80deea,
-  windup: { ms: 500, lockAt: 'start', telegraph: 'shake' },
+  windup: { ms: 600, lockAt: 'start', telegraph: 'shake' },
   shape: { kind: 'sector', radius: 3.5, arcDeg: 120, ms: 250 },
-  onHit: [
-    { kind: 'slow', factor: 0.5, durationMs: 2000 },
-    { kind: 'stack', max: 2, durationMs: 5000, then: [{ kind: 'status', status: 'frozen', ms: 1000 }] },
-  ],
 } satisfies AbilityDef
 
 const PLESIOSAUR = {
@@ -77,7 +78,7 @@ const PLESIOSAUR = {
   emoji: '1f995',
   name: '蛇颈龙',
   element: 'water',
-  desc: '峡谷深处的蛇颈龙：长脖子一伸能咬到 3 格外的人，一口吐出三发散开的水弹；隔一阵潜下去 0.8 秒谁也打不着，再扑出 5 格砸地，把 2 格内的人掀飞；血掉到一半转成冰属性，出手更勤，多一口冰息：前方 3.5 格减速一半，5 秒内吃两口就冻住 1 秒',
+  desc: '峡谷深处的蛇颈龙，本身是水、一直是湿的，一冰就冻、一电就连到身边湿的怪：长脖子一伸能咬到 3 格外的人，一口吐出三发散开的水弹，打中的浇湿；隔一阵潜下去 0.8 秒谁也打不着，再扑出 5 格砸地，把 2 格内的人掀飞。血掉到一半转成冰，身子不再湿、也冻不住了，出手更勤，水弹照吐，多一口冰息：蓄力 0.6 秒，前方 3.5 格的人冷一层，湿的当场冻住，冻住的再挨一口咬就碎冰；躲开水弹，冰息就冻不住你',
   size: 3.3,
   radius: 1.08,
   span: [0, 6],

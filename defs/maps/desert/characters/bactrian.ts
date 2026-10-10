@@ -3,14 +3,15 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { zoneLook } from '../../../kit.ts'
 
-// 🐫 双峰驼：驼峰撞开挡路的，边打边从驼峰里匀出水来回血，第三下立起沙墙；技能扬起沙尘护住自己
+// 🐫 双峰驼：驼峰一撞把敌人撞开、墙也撞得裂，边打边从驼峰里匀出水来回血（中了毒就回不了），第三下立起沙墙；技能扬起沙尘，自己站稳霸体、少挨打
 const bactrianButt = {
   trigger: 'auto',
   cooldownMs: 1150,
   aim: 'nearest',
   range: 2,
   damage: 17,
-  knockback: 3,
+  knockback: 4,
+  breach: 0.3,
   fireSfx: 'thud',
   shape: { kind: 'sector', radius: 1.9, arcDeg: 110, ms: 180 },
 } satisfies AbilityDef
@@ -32,7 +33,16 @@ const bactrianDust = {
   fireSfx: 'gust',
   shape: { kind: 'zone', radius: 3, durationMs: 5000, tickMs: 500, visual: zoneLook(0xd7b98e) },
   onHit: [{ kind: 'disarm', durationMs: 600 }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'guard', mul: 0.6, durationMs: 5000 }] }],
+  reactions: [
+    {
+      on: 'fire',
+      to: 'self',
+      effects: [
+        { kind: 'guard', mul: 0.6, durationMs: 5000 },
+        { kind: 'unstoppable', durationMs: 3000 },
+      ],
+    },
+  ],
 } satisfies AbilityDef
 
 export const abilities = { bactrianButt, bactrianButt2, bactrianButt3, bactrianDust } satisfies Record<string, AbilityDef>
@@ -42,12 +52,12 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f42b',
   name: '双峰驼',
-  desc: '在沙海里走得最稳的双峰驼：驼峰撞开挡路的敌人，边打边从驼峰里匀出水来回血，每第三下在身前立起一道沙墙；技能扬起一片沙尘，沙尘里的敌人打不出手，自己也少挨打',
+  desc: '在沙海里走得最稳的双峰驼：皮厚护甲高，挨物理的打不怕，燃烧和中毒却照掉；驼峰一撞把敌人撞开，墙也撞得裂；边打边从驼峰里匀出水来回血，中了毒就回不了；每第三下在身前立起一道沙墙；技能扬起一片沙尘，沙尘里的敌人打不出手，自己站稳霸体、也少挨打',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.7 },
   stats: { moveSpeed: 4, maxStamina: 150, staminaRegen: 45, exertion: 0.7 },
-  skill: { name: '沙尘护体', icon: '1f32b', desc: '在脚下扬起 3 格的沙尘 5 秒：沙尘里的敌人睁不开眼、打不出手；自己 5 秒内受到的伤害 ×0.6', cdMs: 14_000, ability: 'bactrianDust' },
+  skill: { name: '沙尘护体', icon: '1f32b', desc: '在脚下扬起 3 格的沙尘 5 秒：沙尘里的敌人睁不开眼、打不出手；自己 3 秒内霸体，5 秒内受到的伤害 ×0.6', cdMs: 14_000, ability: 'bactrianDust' },
   weapons: [],
   innate: [
     {
@@ -55,7 +65,7 @@ export default {
       icon: '1f42b',
       base: 'bactrianButt',
       upgrades: [
-        { ability: 'bactrianButt2', card: { icon: '1fad7', name: '驼峰储水', desc: '每撞一下，2 秒里每半秒回 3 点血' } },
+        { ability: 'bactrianButt2', card: { icon: '1fad7', name: '驼峰储水', desc: '每撞一下，2 秒里每半秒回 3 点血；中了毒就回不了' } },
         { ability: 'bactrianButt3', card: { icon: '1f9f1', name: '沙墙', desc: '每第三下在身前 1.2 格立起一道 2.5 格长的沙墙 3 秒，挡住敌人和敌人射来的弹' } },
       ],
     },

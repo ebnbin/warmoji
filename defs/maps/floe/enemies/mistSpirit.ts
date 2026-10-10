@@ -5,7 +5,7 @@ const MIST_SPIRIT = {
   emoji: '1f636_200d_1f32b_fe0f',
   name: '雪雾灵',
   element: 'water',
-  desc: '裹在一团雪雾里飘过来；身周 2.5 格的雾一直跟着它，雾里的怪只挨得到同样站在雾里的出手，雾外打进来的都打不着',
+  desc: '裹在一团雪雾里飘过来，本身是水、一直湿着，冰一打就冻住、雷打上来连到旁边湿的：身周 2.5 格的雾一直跟着它，站进雾里的人每秒被浇湿一次，一冰就冻、一电一片；雾里的怪只挨得到同样站在雾里的出手，雾外打进来的都打不着',
   size: 1.3,
   radius: 0.48,
   span: [1, 2],
@@ -21,7 +21,7 @@ const MIST_SPIRIT = {
       cooldownMs: 0,
       firstDelayMs: 0,
       aim: 'self',
-      shape: { kind: 'zone', radius: 2.5, durationMs: 0, follow: true, mist: true, visual: { color: 0xeceff1, fillAlpha: 0.35, lineAlpha: 0.3, lineWidth: 2, enterMs: 400 } },
+      shape: { kind: 'zone', radius: 2.5, durationMs: 0, tickMs: 1000, follow: true, mist: true, visual: { color: 0xeceff1, fillAlpha: 0.35, lineAlpha: 0.3, lineWidth: 2, enterMs: 400 } },
     },
   ],
 } satisfies EnemyDef

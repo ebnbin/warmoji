@@ -1,38 +1,43 @@
 import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
-import type { ElementId } from '../../../../legacy/types/elements'
 import type { StatMods } from '../../../../legacy/types/stats'
-import { shot } from '../../../kit.ts'
+import { patch, shot } from '../../../kit.ts'
 
-// 🤹 杂耍艺人：火、冰、雷三把飞刀轮着掷，一个人就打得出元素反应；技能让全场敌人跟着蹦迪，同时甩出三圈飞刀
-const knife = (element: ElementId) =>
-  ({
-    trigger: 'auto',
-    cooldownMs: 500,
-    aim: 'nearest',
-    range: 7,
-    damage: 13,
-    element,
-    fireSfx: 'shoot',
-    shape: { kind: 'bolt', projectile: shot('1f5e1', 12, 0.45, -135), lifeMs: 750 },
-  }) satisfies AbilityDef
+// 🤹 杂耍艺人：本身是毒；淬毒的飞刀连着掷，一刀一层毒，每三手抛一只毒药瓶摔出毒云；技能让全场敌人跟着蹦迪，同时甩出两圈毒飞刀
+const knife = {
+  trigger: 'auto',
+  cooldownMs: 500,
+  aim: 'nearest',
+  range: 7,
+  damage: 10,
+  fireSfx: 'shoot',
+  shape: { kind: 'bolt', projectile: shot('1f5e1', 12, 0.45, -135), lifeMs: 750 },
+} satisfies AbilityDef
 
-const juggled = (element: ElementId) => ({ ...knife(element), repeat: { count: 2, spreadDeg: 15 } }) satisfies AbilityDef
+const juggled = { ...knife, repeat: { count: 2, spreadDeg: 15 } } satisfies AbilityDef
 
-const pierced = (element: ElementId) => ({ ...juggled(element), shape: { ...knife(element).shape, pierce: 1 } }) satisfies AbilityDef
+const pierced = { ...juggled, shape: { ...knife.shape, pierce: 1 } } satisfies AbilityDef
 
-const trio = (make: (element: ElementId) => AbilityDef) => ({ ...make('fire'), cycle: [make('ice'), make('thunder')] }) satisfies AbilityDef
+const vial = {
+  trigger: 'auto',
+  cooldownMs: 500,
+  aim: 'nearest',
+  range: 7,
+  damage: 6,
+  fireSfx: 'whoosh',
+  shape: { kind: 'bolt', projectile: { ...shot('1f9ea', 7, 0.5), flight: { kind: 'arc', peakM: 1.4 } }, lifeMs: 1200 },
+  onHit: [{ kind: 'ground', def: patch(1.5, 3000, 0x9ccc65, undefined, 3, 500) }],
+} satisfies AbilityDef
 
-const tricksterKnives = trio(knife)
-const tricksterKnives2 = trio(juggled)
-const tricksterKnives3 = trio(pierced)
+const tricksterKnives = { ...knife, cycle: [knife, knife, vial] } satisfies AbilityDef
+const tricksterKnives2 = { ...juggled, cycle: [juggled, juggled, vial] } satisfies AbilityDef
+const tricksterKnives3 = { ...pierced, cycle: [pierced, pierced, vial] } satisfies AbilityDef
 
-const ring = (element: ElementId, speed: number) =>
+const ring = (speed: number) =>
   ({
     trigger: 'manual',
     aim: 'self',
-    damage: 12,
-    element,
+    damage: 10,
     fireSfx: 'whoosh',
     shape: { kind: 'bolt', projectile: shot('1f5e1', speed, 0.45, -135), lifeMs: Math.round(6500 / speed) },
     repeat: { count: 8, spreadDeg: 360 },
@@ -52,9 +57,8 @@ const tricksterStorm = {
   shape: { kind: 'world' },
   onHit: [
     { kind: 'cast', ability: dance },
-    { kind: 'cast', ability: ring('fire', 9) },
-    { kind: 'cast', ability: ring('ice', 11) },
-    { kind: 'cast', ability: ring('thunder', 13) },
+    { kind: 'cast', ability: ring(9) },
+    { kind: 'cast', ability: ring(12) },
   ],
 } satisfies AbilityDef
 
@@ -65,16 +69,17 @@ export const levels = [{ mul: { damage: 1.2, projSpeed: 1.1 } }, { add: { crit: 
 export default {
   emoji: '1f939',
   name: '杂耍艺人',
-  desc: '手上总抛着三把飞刀的杂耍艺人：火刀、冰刀、雷刀轮着掷，一个人就打得出元素反应；技能让全场的敌人跟着蹦迪 2 秒、动弹不得（头目只蹦 0.5 秒），同时向四面八方甩出三圈飞刀',
+  element: 'poison',
+  desc: '手上总抛着飞刀的杂耍艺人，本身是毒、毒不倒：淬了毒的飞刀连着掷，一刀叠一层毒，最多五层；每掷三手就抛一只毒药瓶，摔出一团 1.5 格的毒云，留 3 秒，云里的敌人一层层中毒、回不了血，火打进去就炸；技能让全场的敌人跟着蹦迪 2 秒、动弹不得（头目只蹦 0.5 秒），同时向四面八方甩出两圈毒飞刀',
   role: 'ranged',
   tags: ['damage', 'ranged'],
   body: { drag: 4.5, mass: 0.8 },
   stats: { moveSpeed: 6, maxStamina: 100, staminaRegen: 75, exertion: 0.8 },
-  skill: { name: '满堂彩', icon: '1f57a', desc: '全场的敌人跟着蹦迪 2 秒，失去行动，头目只蹦 0.5 秒；同时向四面八方甩出火、冰、雷三圈飞刀，每圈 8 把', cdMs: 15_000, ability: 'tricksterStorm' },
+  skill: { name: '满堂彩', icon: '1f57a', desc: '全场的敌人跟着蹦迪 2 秒，失去行动，头目只蹦 0.5 秒；同时向四面八方甩出两圈毒飞刀，每圈 8 把', cdMs: 15_000, ability: 'tricksterStorm' },
   weapons: [],
   innate: [
     {
-      name: '三色飞刀',
+      name: '毒飞刀',
       icon: '1f939',
       base: 'tricksterKnives',
       upgrades: [

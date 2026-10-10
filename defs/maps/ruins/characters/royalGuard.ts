@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 💂 近卫：长戟一刺穿透一排，刺中的冲不动也闪不走，顶到墙上就围起来关住；技能立起盾墙，把周围的敌人引到自己身上
+// 💂 近卫：一身重甲，长戟一刺穿透一排、把人顶开，刺中的冲不动也闪不走，顶到墙上就围起来关住；技能立起盾墙，把周围的敌人引到自己身上，顺带甩掉身上的火与毒
 const royalGuardStab = {
   trigger: 'auto',
   cooldownMs: 1150,
@@ -37,6 +37,7 @@ const royalGuardWard = {
       on: 'fire',
       to: 'self',
       effects: [
+        { kind: 'cleanse' },
         { kind: 'barrier', shape: 'wall', length: 4, offset: 1.5, durationMs: 5000, bodies: 'foes', shots: true, color: 0xffe082 },
         { kind: 'guard', mul: 0.6, durationMs: 5000 },
       ],
@@ -51,7 +52,7 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f482',
   name: '近卫',
-  desc: '持戟的近卫：长戟一刺穿透一排敌人，把贴上来的顶开；升级后刺中的冲不动也闪不走，顶到墙上的被一圈墙关住；技能在身前立起盾墙，把周围的敌人都引到自己身上',
+  desc: '持戟的近卫，一身重甲，挨打少掉血，燃烧和中毒却不吃护甲：长戟一刺穿透一排敌人，把贴上来的顶开，冻住的一刺就碎、伤害翻倍；升级后刺中的冲不动也闪不走，顶到墙上的被一圈墙关住；技能在身前立起盾墙，把周围的敌人都引到自己身上，顺带甩掉身上的火与毒',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.7 },
@@ -59,7 +60,7 @@ export default {
   skill: {
     name: '御前守卫',
     icon: '1f451',
-    desc: '朝最近的敌人在身前 1.5 格立起一道 4 格长的盾墙 5 秒，挡住敌人与敌方弹体；4 格内的敌人嘲讽 2.5 秒，自己 5 秒内受到的伤害减四成',
+    desc: '解除自己身上的控制、减速与燃烧、中毒、寒冷、湿；朝最近的敌人在身前 1.5 格立起一道 4 格长的盾墙 5 秒，挡住敌人与敌方弹体；4 格内的敌人嘲讽 2.5 秒，自己 5 秒内受到的伤害减四成',
     cdMs: 14_000,
     ability: 'royalGuardWard',
   },

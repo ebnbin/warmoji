@@ -1,21 +1,20 @@
 import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
-import { shot } from '../../../kit.ts'
+import { ring, shot } from '../../../kit.ts'
 
-// 🐕 莱卡：放下会射冰弹的卫星天线，冰弹叠满三层把敌人冻住；技能架起一架连射冰光束的望远镜炮
+// 🐕 莱卡：放下会射冰弹的卫星天线，冰弹一发冷一层，叠满三层冻住；技能架起一架望远镜炮，冰光束一扫一排
 const iceShot = {
   trigger: 'auto',
-  cooldownMs: 800,
+  cooldownMs: 2000,
   aim: 'nearest',
   range: 6.5,
-  damage: 8,
+  damage: 14,
   fireSfx: 'plip',
   shape: { kind: 'bolt', projectile: shot('1f539', 10, 0.36), lifeMs: 1100 },
-  onHit: [{ kind: 'slow', factor: 0.8, durationMs: 1000 }],
 } satisfies AbilityDef
 
-const coldShot = { ...iceShot, onHit: [...iceShot.onHit, { kind: 'stack', max: 3, durationMs: 3000, then: [{ kind: 'status', status: 'frozen', ms: 800 }] }] } satisfies AbilityDef
+const coldShot = { ...iceShot, onHit: [{ kind: 'blast', radius: 1.2, ratio: 0.5, knockback: 0, ring: ring(0x80deea) }] } satisfies AbilityDef
 
 const dish = (ability: AbilityDef, maxAlive: number) =>
   ({
@@ -32,14 +31,13 @@ const laikaDish3 = dish(coldShot, 3)
 
 const iceBeam = {
   trigger: 'auto',
-  cooldownMs: 600,
+  cooldownMs: 900,
   aim: 'nearest',
   range: 8,
-  damage: 18,
+  damage: 20,
   fireSfx: 'zap',
   color: 0x80deea,
   shape: { kind: 'segment', reach: 8, radius: 0.5, ms: 200, beam: true },
-  onHit: [{ kind: 'slow', factor: 0.6, durationMs: 1000 }],
 } satisfies AbilityDef
 
 const laikaStrike = {
@@ -57,12 +55,12 @@ export default {
   emoji: '1f415',
   name: '莱卡',
   element: 'ice',
-  desc: '第一只飞上太空的狗：边走边放会射冰弹的卫星天线，冰弹打中的敌人走慢，同一个敌人挨满三发就冻住；技能架起一架望远镜炮，朝敌人连射冰光束',
+  desc: '第一只飞上太空的狗，本身是冰，冻不住：边走边放会射冰弹的卫星天线，冰弹打中的敌人冷一层，越冷越慢，叠满三层就冻住，冻住的挨队友一下物理就碎；技能架起一架望远镜炮，冰光束一扫一排，把一排敌人一起冻上',
   role: 'summoner',
   tags: ['damage', 'summon'],
   body: { drag: 5, mass: 0.8 },
   stats: { moveSpeed: 5.4, maxStamina: 120, staminaRegen: 60, exertion: 1 },
-  skill: { name: '轨道打击', icon: '1f52d', desc: '在身边架起一架望远镜炮 8 秒，每 0.6 秒朝 8 格内最近的敌人射一道冰光束，沿线的敌人各挨 18 点并减速 40%', cdMs: 15_000, ability: 'laikaStrike' },
+  skill: { name: '轨道打击', icon: '1f52d', desc: '在身边架起一架望远镜炮 8 秒，每 0.9 秒朝 8 格内最近的敌人射一道冰光束，沿线的敌人各挨 20 点并冷一层', cdMs: 15_000, ability: 'laikaStrike' },
   weapons: [],
   innate: [
     {
@@ -71,7 +69,7 @@ export default {
       base: 'laikaDish',
       upgrades: [
         { ability: 'laikaDish2', card: { icon: '1f517', name: '星链', desc: '最多同时立着三座天线' } },
-        { ability: 'laikaDish3', card: { icon: '2744', name: '冷光', desc: '同一个敌人挨满三发冰弹就冻结 0.8 秒' } },
+        { ability: 'laikaDish3', card: { icon: '2744', name: '冷光', desc: '冰弹打中炸开一圈寒气：1.2 格内的其他敌人挨一半伤害，也冷一层' } },
       ],
     },
   ],

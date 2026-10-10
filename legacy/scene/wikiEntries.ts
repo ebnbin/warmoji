@@ -287,11 +287,11 @@ function elementRulesEntry(): WikiEntry {
     name: '元素与反应',
     desc: '带元素的一下打在身上，留下这种元素的状态，或者和身上已有的起反应；不带元素的一下是物理。元素之间没有克制倍率，身体本身是哪种元素就免疫哪种',
     lines: [
-      `燃烧：每 ${sec(burn.tickMs)} 掉点燃那一下 ${pct(burn.ratio)} 的血，烧 ${sec(burn.durationMs)}，再点只换跳伤、延长时间；每跳一次烧到身体相距 ${grid(burn.spread)} 内、没在烧的同伴`,
+      `燃烧：每 ${sec(burn.tickMs)} 掉点燃那一下 ${pct(burn.ratio)} 的血，烧 ${sec(burn.durationMs)}，再点跳伤取大的、延长时间；每跳一次烧到身体相距 ${grid(burn.spread)} 内、没在烧的同伴`,
       `寒冷：每挨一下冰加一层，移速 ×${chill.slow}，${sec(chill.ms)} 不再挨冰就散；叠到 ${chill.stacks} 层冻住 ${sec(chill.frozenMs)}`,
       `电：打断挨打的出手（记进韧性），再跳到 ${grid(shock.radius)} 内最近的另一个敌人，吃这一下 ${pct(shock.ratio)}`,
       `湿：浇湿 ${sec(wet.ms)}；本身是水的、泡在水里的一直是湿的`,
-      `中毒：每挨一下毒加一层，每层每 ${sec(poison.tickMs)} 掉那一下 ${pct(poison.ratio)} 的血，最多 ${poison.stacks} 层，${sec(poison.durationMs)} 不再中毒就解；中了毒什么回复都不管用`,
+      `中毒：每挨一下毒加一层，每层每 ${sec(poison.tickMs)} 掉那一下 ${pct(poison.ratio)} 的血，最多 ${poison.stacks} 层，满了以后更强的一层顶掉平均的一层，${sec(poison.durationMs)} 不再中毒就解；中了毒什么回复都不管用`,
       '持续伤害的一跳不沾元素，也不起反应',
       ...REACTIONS.map((r) => `${r.name}：${r.desc}`),
     ],

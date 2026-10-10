@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧑‍🦯 盲琴师：弹出催眠的音符，同一个敌人听满三段就睡过去，叫醒它的那一下格外疼；技能一曲长眠，哄睡身边一圈
+// 🧑‍🦯 盲琴师：弹出催眠的音符，同一个敌人听满三段就睡过去，叫醒它的那一下格外疼；贴身碰它的敌人常被琴声哄睡；技能一曲长眠，哄睡身边一圈
 const bardNote = {
   trigger: 'auto',
   cooldownMs: 1000,
@@ -35,12 +35,13 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f9d1_200d_1f9af',
   name: '盲琴师',
-  desc: '看不见路的琴师，琴声却认得每一个敌人：音符打中同一个敌人三次就让它睡过去 2 秒，叫醒它的那一下伤害 ×1.5；技能一曲长眠，哄睡身边一圈',
+  desc: '看不见路的琴师，琴声却认得每一个敌人：音符打中同一个敌人三次就让它睡过去 2 秒，叫醒它的那一下伤害 ×1.5，正好留给队友的重击；身上烧着、中着毒的挨一跳就醒，哄不住；没有护甲也躲不开，可贴身碰到它的敌人有三成五被琴声哄睡 1.5 秒；技能一曲长眠，哄睡身边一圈',
   role: 'controller',
   tags: ['control', 'ranged'],
   body: { drag: 5, mass: 0.9 },
   stats: { moveSpeed: 5, maxStamina: 100, staminaRegen: 65, exertion: 1 },
-  skill: { name: '长眠', icon: '1f6cc', desc: '弹一曲长眠：4.5 格内的敌人睡着 3 秒，叫醒它的那一下伤害 ×2', cdMs: 14_000, ability: 'bardRest' },
+  reactions: [{ on: 'touched', to: 'other', chance: 0.35, effects: [{ kind: 'sleep', durationMs: 1500, wakeMul: 1.5 }] }],
+  skill: { name: '长眠', icon: '1f6cc', desc: '弹一曲长眠：4.5 格内的敌人睡着 3 秒，叫醒它的那一下伤害 ×2', cdMs: 15_000, ability: 'bardRest' },
   weapons: [],
   innate: [
     {

@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { patch } from '../../../kit.ts'
 
-// 🐙 章鱼：伸出长长的触手把敌人拽到跟前，拽不动的就把自己拽过去；技能落下一团墨，墨阵里的敌人走不动也打不出手
+// 🐙 章鱼：伸出长长的触手把敌人拽到跟前，拽不动的就把自己拽过去；快被打垮时喷墨遁走；技能落下一团墨，墨阵里的敌人走不动也打不出手
 const PULL = { kind: 'pull', speed: 10, gap: 1, heavy: 'self' } as const
 
 const suckers = { kind: 'if', when: { kind: 'marked', who: 'target', mark: 'disarm' }, then: [{ kind: 'root', durationMs: 2000 }], else: [{ kind: 'root', durationMs: 1000 }] } as const
@@ -40,11 +40,12 @@ export const levels = [{ mul: { damage: 1.2, skillCooldown: 0.92 } }, { add: { m
 export default {
   emoji: '1f419',
   name: '章鱼',
-  desc: '八条腕足的章鱼：伸出 3 格长的触手，把打中的敌人拽到跟前，拽不动的重家伙就把自己拽过去；技能在敌人头上落一团墨，墨阵里的敌人走不动也打不出手',
+  desc: '八条腕足的章鱼：伸出 3 格长的触手，把打中的敌人拽到跟前、拽成一堆，拽不动的重家伙就把自己拽过去；每条命第一次掉到三成血以下，喷一口墨潜行 2 秒、移速 ×1.4；技能在敌人头上落一团墨，墨阵里的敌人走不动也打不出手',
   role: 'controller',
   tags: ['control', 'melee'],
   body: { drag: 5, mass: 0.8 },
   stats: { moveSpeed: 5.4, maxStamina: 95, staminaRegen: 75, exertion: 0.9 },
+  reactions: [{ on: 'lowHp', ratio: 0.3, to: 'self', effects: [{ kind: 'stealth', durationMs: 2000 }, { kind: 'status', status: 'speed', ms: 2000, value: 1.4 }] }],
   skill: { name: '墨阵', icon: '26ab', desc: '在最近的敌人头上落一团墨，地上留下 3.2 格的墨阵 4 秒：里面的敌人每半秒定身 0.6 秒、致盲 0.6 秒', cdMs: 13_000, ability: 'inkOctopusInk' },
   weapons: [],
   innate: [

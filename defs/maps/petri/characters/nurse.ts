@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧑‍⚕️ 医护：给伤得最重的队友打一针，再朝敌人甩一支飞针，两样轮着来；技能给全队急救，倒下的当场站起来
+// 🧑‍⚕️ 医护：给伤得最重的队友打一针，再朝敌人甩一支飞针，两样轮着来；技能给全队急救，先解毒再回血，倒下的当场站起来
 const heal = { kind: 'heal', amount: 13, scope: 'lowest' } as const
 const prescription = { kind: 'heal', amount: 13, scope: 'all', ratio: 0.6 } as const
 
@@ -42,7 +42,7 @@ const nurseFirstAid = {
   color: 0xa5d6a7,
   fxRadius: 1.25,
   shape: { kind: 'all', of: 'allies', downed: true },
-  onHit: [{ kind: 'revive' }, { kind: 'healRatio', ratio: 0.3 }, { kind: 'mend', amount: 4, tickMs: 500, durationMs: 4000 }],
+  onHit: [{ kind: 'revive' }, { kind: 'cleanse' }, { kind: 'healRatio', ratio: 0.3 }, { kind: 'mend', amount: 4, tickMs: 500, durationMs: 4000 }],
 } satisfies AbilityDef
 
 export const abilities = { nurseKit, nurseKit2, nurseKit3, nurseFirstAid } satisfies Record<string, AbilityDef>
@@ -52,12 +52,12 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9d1_200d_2695_fe0f',
   name: '医护',
-  desc: '打针和飞针轮着来：一针扎给 5 格内伤得最重的队友，回 13 点血，一针甩向最近的敌人，没人受伤或没有敌人时那一下就空过；技能给全队急救，倒下的当场站起来',
+  desc: '打针和飞针轮着来：一针扎给 5 格内伤得最重的队友，回 13 点血，一针甩向最近的敌人，没人受伤或没有敌人时那一下就空过；中了毒的队友打针也回不了血，得靠技能先解毒：技能给全队急救，解掉身上的毒、火、寒冷、湿和控制，倒下的当场站起来',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 0.7 },
   stats: { moveSpeed: 5.8, maxStamina: 90, staminaRegen: 85, exertion: 0.8 },
-  skill: { name: '急救', icon: '1f691', desc: '倒下的队友当场站起来，其余队友回 30% 生命；全队再在 4 秒里每半秒回 4 点血', cdMs: 18_000, ability: 'nurseFirstAid' },
+  skill: { name: '急救', icon: '1f691', desc: '倒下的队友当场站起来；全队解掉中毒、燃烧、寒冷、湿、减速与控制，其余队友回 30% 生命，再在 4 秒里每半秒回 4 点血', cdMs: 18_000, ability: 'nurseFirstAid' },
   weapons: [],
   innate: [
     {

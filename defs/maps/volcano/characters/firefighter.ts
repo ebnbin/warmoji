@@ -1,8 +1,9 @@
 import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
+import { patch } from '../../../kit.ts'
 
-// 🧑‍🚒 消防员：喷淋给最伤的队友回血、水柱冲开敌人，两样轮着来；技能放下水幕，全队回血减伤，敌方的弹体被弹回去
+// 🧑‍🚒 消防员：喷淋给最伤的队友回血、水柱冲开敌人并浇透，两样轮着来；技能放下水幕，全队回血减伤、浑身湿透点不着火，敌方的弹体被弹回去
 const hurt = { kind: 'hpBelow', who: 'target', ratio: 1 } as const
 
 const firefighterSpray = {
@@ -19,7 +20,7 @@ const jet = {
   class: 'attack',
   aim: 'nearest',
   range: 4.3,
-  damage: 11,
+  damage: 9,
   knockback: 1.5,
   color: 0x4fc3f7,
   fireSfx: 'wash',
@@ -39,7 +40,8 @@ const firefighterSpray2 = {
 } satisfies AbilityDef
 const firefighterHose2 = { ...firefighterSpray2, cycle: [firefighterJet] } satisfies AbilityDef
 
-const firefighterJet3 = { ...firefighterJet, onHit: [{ kind: 'cast', ability: { ...jet, onHit: [{ kind: 'status', status: 'wet', ms: 4000 }] } }] } satisfies AbilityDef
+const puddle = { kind: 'each', then: [{ kind: 'ground', def: patch(1.5, 5000, 0x4fc3f7, undefined, 0, 500) }] } as const
+const firefighterJet3 = { ...firefighterJet, onHit: [{ kind: 'cast', ability: { ...jet, onHit: [puddle] } }] } satisfies AbilityDef
 const firefighterHose3 = { ...firefighterSpray2, cycle: [firefighterJet3] } satisfies AbilityDef
 
 const firefighterCurtain = {
@@ -52,6 +54,7 @@ const firefighterCurtain = {
   onHit: [
     { kind: 'healRatio', ratio: 0.25 },
     { kind: 'guard', mul: 0.7, durationMs: 4000 },
+    { kind: 'status', status: 'wet', ms: 5000 },
   ],
   reactions: [
     {
@@ -70,7 +73,7 @@ export default {
   emoji: '1f9d1_200d_1f692',
   name: '消防员',
   element: 'water',
-  desc: '扛着水带的消防员：喷淋与水柱轮着来，喷淋给身周 4 格内最伤的队友回血，水柱冲开前方一排敌人，没人受伤或没有敌人时那一下就落空；技能放下水幕，全队回血减伤，敌方的弹体被弹回去',
+  desc: '扛着水带的消防员，浑身一直是湿的，点不着火，却一冰就冻、一电一片：喷淋与水柱轮着来，喷淋给身周 4 格内最伤的队友回血，水柱冲开前方一排敌人并浇透 5 秒，烧着的当场浇灭，没人受伤或没有敌人时那一下就落空；技能放下水幕，全队回血减伤、浑身湿透点不着火，敌方的弹体被弹回去',
   role: 'support',
   tags: ['support', 'ranged'],
   body: { drag: 5, mass: 1.2 },
@@ -78,7 +81,7 @@ export default {
   skill: {
     name: '水幕',
     icon: '1f30a',
-    desc: '全队回复 25% 的生命，4 秒内受到的伤害 ×0.7；身周立起一圈 2.5 格、跟着自己的水幕 4 秒，把敌方的弹体弹回去',
+    desc: '全队回复 25% 的生命，4 秒内受到的伤害 ×0.7，并浑身湿透 5 秒：点不着火，但一冰就冻、一电一片；身周立起一圈 2.5 格、跟着自己的水幕 4 秒，把敌方的弹体弹回去',
     cdMs: 16_000,
     ability: 'firefighterCurtain',
   },
@@ -89,8 +92,8 @@ export default {
       icon: '1f692',
       base: 'firefighterHose',
       upgrades: [
-        { ability: 'firefighterHose2', card: { icon: '1f9ef', name: '灭火', desc: '喷淋还给身周 4 格内受伤的队友各挂一层生命 6% 的护盾 3 秒，并解除控制与减速' } },
-        { ability: 'firefighterHose3', card: { icon: '1f4a6', name: '高压', desc: '水柱冲中的敌人浑身湿透 4 秒，一冰就冻、一电一片' } },
+        { ability: 'firefighterHose2', card: { icon: '1f9ef', name: '灭火', desc: '喷淋还给身周 4 格内受伤的队友各挂一层生命 6% 的护盾 3 秒，扑灭身上的火，并解除控制、减速、寒冷与中毒' } },
+        { ability: 'firefighterHose3', card: { icon: '1f4a6', name: '积水', desc: '水柱冲中的敌人脚下各积一滩 1.5 格的水 5 秒，站在里面的敌人一直是湿的' } },
       ],
     },
   ],

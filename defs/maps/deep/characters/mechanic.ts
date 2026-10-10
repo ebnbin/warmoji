@@ -3,17 +3,19 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧑‍🔧 潜艇技工：电焊枪打出电火花，每第三下就地焊下一座炮台；技能投下自己的全息投影，投影照着开火，还能和它换位
+// 🧑‍🔧 潜艇技工：本身是雷，电焊枪打出电火花，打断敌人的出手，每第三下就地焊下一座射铆钉的炮台；技能投下自己的全息投影，投影照着开火，还能和它换位
 const sparkShot = shot('1f387', 10, 0.4)
 
-const spark = {
+// 炮台打物理：电火花只留给电焊枪，免得满场的电把敌人打断得一招都放不出来
+const rivet = {
   trigger: 'auto',
   cooldownMs: 700,
   aim: 'nearest',
   range: 6,
   damage: 8,
-  fireSfx: 'zap',
-  shape: { kind: 'bolt', projectile: sparkShot, lifeMs: 700 },
+  element: 'physical',
+  fireSfx: 'tink',
+  shape: { kind: 'bolt', projectile: shot('1f529', 10, 0.35), lifeMs: 700 },
 } satisfies AbilityDef
 
 const turret = {
@@ -21,7 +23,7 @@ const turret = {
   cooldownMs: 800,
   aim: 'self',
   fireSfx: 'clank',
-  shape: { kind: 'emplace', count: 1, maxAlive: 2, lifeMs: 10000, look: { emoji: '1f529', size: 0.8 }, ability: spark },
+  shape: { kind: 'emplace', count: 1, maxAlive: 2, lifeMs: 10000, look: { emoji: '1f529', size: 0.8 }, ability: rivet },
 } satisfies AbilityDef
 
 const weld = {
@@ -29,7 +31,7 @@ const weld = {
   cooldownMs: 800,
   aim: 'nearest',
   range: 6.5,
-  damage: 10,
+  damage: 8,
   fireSfx: 'zap',
   mirror: true,
   shape: { kind: 'bolt', projectile: sparkShot, lifeMs: 800 },
@@ -65,7 +67,7 @@ export default {
   emoji: '1f9d1_200d_1f527',
   name: '潜艇技工',
   element: 'thunder',
-  desc: '潜艇上的技工：电焊枪朝 6.5 格内最近的敌人打出电火花，每第三下就地焊下一座会射电火花的炮台，最多同时两座、每座撑 10 秒；技能投下自己的全息投影，电焊枪也从投影上照着开火，再按一次就和投影换位',
+  desc: '潜艇上的技工，本身是雷：电焊枪朝 6.5 格内最近的敌人打出电火花，打断它的出手，电流再跳给它身边另一个敌人吃一半，湿的连成一片一起挨；每第三下就地焊下一座射铆钉的炮台，铆钉是物理、敲得碎冻住的，最多同时两座、每座撑 10 秒；技能投下自己的全息投影，电焊枪也从投影上照着开火，再按一次就和投影换位',
   role: 'summoner',
   tags: ['damage', 'summon', 'mobile'],
   body: { drag: 5, mass: 1.1 },

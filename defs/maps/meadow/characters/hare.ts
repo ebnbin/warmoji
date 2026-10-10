@@ -2,13 +2,14 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🐇 野兔：一蹬跃到敌人身上，专挑残血的补刀，踢死了立刻再跳
+// 🐇 野兔：一蹬跃到敌人身上把它蹬开，专挑残血的补刀，踢死了立刻再跳；身子轻躲得开单发的，躲不开范围与持续伤害
 const hareKick = {
   trigger: 'auto',
   cooldownMs: 1500,
   aim: 'nearest',
   range: 3.6,
   damage: 30,
+  knockback: 2,
   fireSfx: 'jump',
   shape: { kind: 'leap', distance: 3.2, ms: 320, height: 0.8, radius: 0.9 },
 } satisfies AbilityDef
@@ -25,6 +26,7 @@ const hareBurrow = {
   aim: 'nearest',
   range: 7,
   damage: 60,
+  knockback: 5,
   fireSfx: 'whoosh',
   shape: { kind: 'blink', behindDist: 0.6, strikeMs: 300 },
   reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'stealth', durationMs: 2000 }] }],
@@ -37,12 +39,12 @@ export const levels = [{ add: { crit: 0.06 }, mul: { damage: 1.2 } }, { add: { c
 export default {
   emoji: '1f407',
   name: '野兔',
-  desc: '一蹬就跃到敌人身上，专挑残血的补刀，踢死了立刻再跳；危险了就钻进草里不见',
+  desc: '一蹬就跃到敌人身上把它蹬开，专挑残血的补刀，踢死了立刻再跳；身子轻、躲得快，单发的出手有 15% 打空，范围与持续伤害却躲不开；危险了就钻进草里不见',
   role: 'assassin',
   tags: ['damage', 'melee', 'mobile'],
   body: { drag: 4, mass: 0.6 },
   stats: { moveSpeed: 7.6, maxStamina: 90, staminaRegen: 95, exertion: 0.8 },
-  skill: { name: '狡兔三窟', icon: '1f573', desc: '闪到 7 格内最近的敌人身后重踹，随后潜行 2 秒', cdMs: 10_000, ability: 'hareBurrow' },
+  skill: { name: '狡兔三窟', icon: '1f573', desc: '闪到 7 格内最近的敌人身后重踹 60 点、把它踹飞，随后潜行 2 秒', cdMs: 10_000, ability: 'hareBurrow' },
   weapons: [],
   innate: [
     {

@@ -2,25 +2,25 @@ import type { AbilityDef, Effect } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { COMBAT } from '../../../combat.ts'
-import { shot } from '../../../kit.ts'
 
-// 🧑‍🦼 调度员：广播里调度与信号弹轮着喊，调度给伤得最重的队友回血，信号弹打最近的敌人，没有对象的那一句就空过；技能把全队一起转移出去
-const dispatcherFlareShot = {
+// 🧑‍🦼 调度员：广播里调度与喷淋轮着喊，调度给伤得最重的队友回血，喷淋往最近的敌人头上洒水、浇湿一片，没有对象的那一句就空过；技能把全队一起转移出去
+const dispatcherSprinkle = {
   trigger: 'manual',
   class: 'attack',
   aim: 'nearest',
   range: 6.5,
-  damage: 10,
-  fireSfx: 'shoot',
-  shape: { kind: 'bolt', projectile: shot('1f4e2', 9, 0.45), lifeMs: 1300 },
+  damage: 5,
+  fireSfx: 'splash',
+  color: 0x42a5f5,
+  shape: { kind: 'disc', radius: 1.6, at: 'target' },
 } satisfies AbilityDef
 
-const dispatcherFlare = {
+const dispatcherSprinkler = {
   trigger: 'auto',
   cooldownMs: 1300,
   aim: 'self',
   shape: { kind: 'world' },
-  onHit: [{ kind: 'cast', ability: dispatcherFlareShot }],
+  onHit: [{ kind: 'cast', ability: dispatcherSprinkle }],
 } satisfies AbilityDef
 
 const HEAL = { kind: 'heal', amount: 11 } as const
@@ -35,7 +35,7 @@ const dispatch = (then: readonly Effect[]) =>
     fireSfx: 'chirp',
     shape: { kind: 'world' },
     onHit: [{ kind: 'to', who: { side: 'allies', radius: 4.5, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 }, then }],
-    cycle: [dispatcherFlare],
+    cycle: [dispatcherSprinkler],
   }) satisfies AbilityDef
 
 const dispatcherBroadcast = dispatch([HEAL])
@@ -63,7 +63,8 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f9d1_200d_1f9bc',
   name: '调度员',
-  desc: '坐着电动轮椅守在调度台前，广播里调度与信号弹轮着喊：调度给 4.5 格内伤得最重的队友回血，信号弹打 6.5 格内最近的敌人，没人可治或没敌人可打时那一句就空过；技能把全队一起转移出去',
+  element: 'water',
+  desc: '坐着电动轮椅守在调度台前，广播里调度与喷淋轮着喊：调度给 4.5 格内伤得最重的队友回血，喷淋往 6.5 格内最近的敌人头上洒水，1.6 格内的敌人各挨一下、浇湿 5 秒，好让队友的雷和冰一打一片；没人可治或没敌人可浇时那一句就空过；身上总是湿的：点不着，可挨冰当场冻住，挨电会连着身边湿的一起挨；技能把全队一起转移出去',
   role: 'support',
   tags: ['support', 'mobile'],
   body: { drag: 5, mass: 1 },

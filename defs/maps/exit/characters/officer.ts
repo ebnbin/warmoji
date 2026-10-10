@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 👮 警卫：两下警棍接一记重砸，砸中的定在原地，同一个敌人挨满四下警棍就被铐住；技能朝一个方向冲锋，撞晕一路的敌人
+// 👮 警卫：两下警棍接一记重砸，砸得开人、砸得动残墙，砸中的定在原地，同一个敌人挨满四下警棍就被铐住；技能举着防暴盾冲锋，撞晕一路的敌人，正面来的都挡下
 const officerJab = {
   trigger: 'auto',
   cooldownMs: 1100,
@@ -21,7 +21,8 @@ const officerSlam = {
   aim: 'nearest',
   range: 2.1,
   damage: 22,
-  knockback: 3,
+  knockback: 3.5,
+  breach: 0.4,
   fireSfx: 'thud',
   shape: { kind: 'sector', radius: 2, arcDeg: 140, ms: 200 },
 } satisfies AbilityDef
@@ -43,10 +44,12 @@ const officerCharge = {
   aim: 'stick',
   damage: 34,
   knockback: 4,
+  breach: 1.5,
   fireSfx: 'whoosh',
   color: 0x42a5f5,
   shape: { kind: 'sprint', distance: 5, ms: 420, radius: 1 },
   onHit: [{ kind: 'stun', durationMs: 800 }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'frontGuard', arcDeg: 120, durationMs: 2500 }] }],
 } satisfies AbilityDef
 
 export const abilities = { officerBaton, officerBaton2, officerBaton3, officerCharge } satisfies Record<string, AbilityDef>
@@ -56,12 +59,19 @@ export const levels = [{ add: { maxHp: 20, armor: 1 }, mul: { damage: 1.2 } }, {
 export default {
   emoji: '1f46e',
   name: '警卫',
-  desc: '训练有素的警卫：两下警棍接一记重砸，把闹事的按住铐走；技能朝一个方向冲锋，撞晕一路的敌人',
+  desc: '训练有素的警卫：两下警棍接一记重砸，砸得开人、砸得动残墙，把闹事的按住铐走；技能举着防暴盾冲锋，撞晕一路的敌人，冲完还举着盾挡正面；绕到背后打、或者燃烧中毒这类持续伤害，盾挡不住',
   role: 'bruiser',
   tags: ['damage', 'control', 'melee'],
   body: { drag: 5, mass: 1.3 },
   stats: { moveSpeed: 5.8, maxStamina: 130, staminaRegen: 65, exertion: 0.95 },
-  skill: { name: '冲锋', icon: '1f6a8', desc: '朝摇杆方向冲出 5 格，沿路撞开敌人并眩晕 0.8 秒', cdMs: 9_000, ability: 'officerCharge', aim: true },
+  skill: {
+    name: '冲锋',
+    icon: '1f6a8',
+    desc: '举起防暴盾朝摇杆方向冲出 5 格，沿路撞开敌人并眩晕 0.8 秒，挡路的矮墙一并撞开；起冲后 2.5 秒内挡下正面 120 度内来的命中',
+    cdMs: 9_000,
+    ability: 'officerCharge',
+    aim: true,
+  },
   weapons: [],
   innate: [
     {

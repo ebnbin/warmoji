@@ -2,7 +2,7 @@ import type { AbilityDef, AbilityReaction, Cond } from '../../../../legacy/types
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🤴 王子：佩剑刺开挡路的，出手时护住身边最伤的队友；每第三下横扫一圈，把敌人都招到自己身上
+// 🤴 王子：一身重甲；佩剑刺开挡路的，出手时护住身边最伤的队友；每第三下横扫一圈，把敌人都招到自己身上；喊一声连身上的火和毒一起甩掉
 
 // 只有自己的圆心落在自己 0.1 格内
 const notSelf = { kind: 'not', cond: { kind: 'within', who: 'target', radius: 0.1 } } satisfies Cond
@@ -43,7 +43,7 @@ const princeVow = {
   color: 0xfff59d,
   shape: { kind: 'disc', radius: 5, at: 'self' },
   onHit: [{ kind: 'taunt', durationMs: 3000 }],
-  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'invuln', ms: 1200 }, { kind: 'guard', mul: 0.5, durationMs: 4000 }] }],
+  reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'invuln', ms: 1200 }, { kind: 'cleanse' }, { kind: 'guard', mul: 0.5, durationMs: 4000 }] }],
 } satisfies AbilityDef
 
 export const abilities = { princeSword, princeSword2, princeSword3, princeVow } satisfies Record<string, AbilityDef>
@@ -53,12 +53,12 @@ export const levels = [{ add: { maxHp: 30, armor: 2 }, mul: { damage: 1.1 } }, {
 export default {
   emoji: '1f934',
   name: '王子',
-  desc: '持剑的王子：佩剑刺开挡路的家伙，出手时顺手护住身边最伤的队友；横扫一圈把敌人都招到自己身上，喊一声“为了公主”什么都挡得住',
+  desc: '持剑的王子：佩剑刺开挡路的家伙，剑是物理，刺得退敌人、敲得碎冻住的；出手时顺手护住身边最伤的队友；横扫一圈把敌人都招到自己身上；一身重甲，刀剑砍上去不痛，烧和毒却不吃护甲，喊一声“为了公主”什么都挡得住，连身上的火和毒一起甩掉',
   role: 'tank',
   tags: ['defense', 'melee'],
   body: { drag: 5.5, mass: 1.6 },
   stats: { moveSpeed: 4.2, maxStamina: 140, staminaRegen: 45, exertion: 1.2 },
-  skill: { name: '为了公主', icon: '1f478', desc: '1.2 秒内无敌，5 格内的敌人嘲讽 3 秒，自己 4 秒内受到的伤害减半', cdMs: 13_000, ability: 'princeVow' },
+  skill: { name: '为了公主', icon: '1f478', desc: '1.2 秒内无敌，甩掉身上的燃烧、中毒、寒冷、湿与控制；5 格内的敌人嘲讽 3 秒，自己 4 秒内受到的伤害减半', cdMs: 13_000, ability: 'princeVow' },
   weapons: [],
   innate: [
     {

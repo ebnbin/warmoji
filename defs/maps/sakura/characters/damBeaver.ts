@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🦫 河狸：边走边打下会射木刺的木桩；技能在前方筑起一道坝，挡住敌人和敌方弹体
+// 🦫 河狸：边走边打下会射木刺的木桩，木刺密、敲得碎冻住的；会游泳，溪水冲不走；技能在前方筑起一道坝，挡住敌人和敌方弹体
 const spike = {
   trigger: 'auto',
   cooldownMs: 800,
@@ -14,7 +14,7 @@ const spike = {
   shape: { kind: 'bolt', projectile: shot('1f962', 10, 0.42, 225), lifeMs: 1200 },
 } satisfies AbilityDef
 
-const barbed = { ...spike, knockback: 1.5, onHit: [{ kind: 'slow', factor: 0.75, durationMs: 1000 }] } satisfies AbilityDef
+const barbed = { ...spike, knockback: 2, shape: { ...spike.shape, pierce: 1 } } satisfies AbilityDef
 
 const stake = (ability: AbilityDef, maxAlive: number) =>
   ({
@@ -44,11 +44,12 @@ export const levels = [{ mul: { summonDamage: 1.2, damage: 1.1 } }, { add: { max
 export default {
   emoji: '1f9ab',
   name: '河狸',
-  desc: '勤快的河狸：边走边打下会射木刺的木桩，每根立 12 秒；技能在前方筑起一道长坝，敌人过不来、敌方的弹体也打不过来',
+  desc: '勤快的河狸：边走边打下会射木刺的木桩，每根立 12 秒，木刺又密又快，冻住的敌人挨一根就碎；会游泳，溪水冲不走它，被围了就游过溪去，只是泡在水里时身上是湿的，点不着火，却一冰就冻、一电一片；技能在前方筑起一道长坝，敌人过不来、敌方的弹体也打不过来',
   role: 'summoner',
   tags: ['damage', 'summon'],
   body: { drag: 5, mass: 1.1 },
   stats: { moveSpeed: 5, maxStamina: 120, staminaRegen: 60, exertion: 1 },
+  traits: ['swims'],
   skill: { name: '筑坝', icon: '1f9f1', desc: '在摇杆方向 2 格处筑起一道 6 格长的坝，6 秒内挡住敌人和敌方的弹体', cdMs: 13_000, ability: 'damBeaverDam', aim: true },
   weapons: [],
   innate: [
@@ -58,7 +59,7 @@ export default {
       base: 'damBeaverStake',
       upgrades: [
         { ability: 'damBeaverStake2', card: { icon: '1fa93', name: '多打几根', desc: '最多同时立三根木桩' } },
-        { ability: 'damBeaverStake3', card: { icon: '1f335', name: '倒刺', desc: '木刺打中的敌人被击退，1 秒内移速 ×0.75' } },
+        { ability: 'damBeaverStake3', card: { icon: '1f335', name: '倒刺', desc: '木刺穿过第一个敌人再打下一个，打中的都被击退' } },
       ],
     },
   ],

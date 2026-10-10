@@ -3,7 +3,7 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import type { WeaponSource } from '../../../../legacy/types/weapons'
 
-// 🦉 猫头鹰：掷出月牙镖，飞出去再飞回来，去程回程都打，打中的敌人显形；技能打出一颗月光照明弹
+// 🦉 猫头鹰：掷出沉甸甸的月牙镖，飞出去再飞回来，去程回程都把敌人打退，打中的显形；身子轻、飞得灵巧；技能打出一颗月光照明弹
 const owlCrescent = {
   trigger: 'auto',
   cooldownMs: 1200,
@@ -57,11 +57,11 @@ export const levels = [{ mul: { damage: 1.2 } }, { add: { crit: 0.08 }, mul: { d
 export default {
   emoji: '1f989',
   name: '猫头鹰',
-  desc: '黑夜里也看得清的猫头鹰：爪里攥着一枚月牙镖，掷出 5 格再飞回来，去程回程都打得中，打中的敌人显形 2 秒，躲在暗处的也藏不住；技能打出一颗月光照明弹，照亮一大片敌人',
+  desc: '黑夜里也看得清的猫头鹰：爪里攥着一枚沉甸甸的月牙镖，掷出 5 格再飞回来，去程回程都打得中、都把敌人远远打退，冻住的挨一下就碎冰，打中的显形 2 秒，躲在暗处的也藏不住；身子轻，生命只有 85，可飞得灵巧，单发的攻击一成五扑空，范围与持续伤害躲不开；技能打出一颗月光照明弹，照亮一大片敌人',
   role: 'ranged',
   tags: ['damage', 'ranged'],
   body: { drag: 4.5, mass: 0.7 },
-  stats: { moveSpeed: 6, maxStamina: 95, staminaRegen: 75, exertion: 0.8 },
+  stats: { moveSpeed: 6, maxStamina: 95, staminaRegen: 75, exertion: 0.8, maxHp: 85, dodge: 0.15 },
   skill: {
     name: '月光照明弹',
     icon: '1f387',

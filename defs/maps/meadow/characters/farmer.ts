@@ -3,13 +3,13 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { shot } from '../../../kit.ts'
 
-// 🧑‍🌾 农夫：种下会吐豆子的向日葵，丰收时向日葵顺带给队友回血；技能一口气种下三门玉米炮
+// 🧑‍🌾 农夫：种下吐拌药豆子的向日葵，一粒叠一层毒，丰收时向日葵顺带给队友回血；技能一口气种下三门玉米炮，抛出的玉米实打实地把敌人砸开
 const seedShot = {
   trigger: 'auto',
   cooldownMs: 900,
   aim: 'nearest',
   range: 6,
-  damage: 9,
+  damage: 7,
   fireSfx: 'plip',
   shape: { kind: 'bolt', projectile: shot('1fad8', 10, 0.36), lifeMs: 1400 },
 } satisfies AbilityDef
@@ -34,6 +34,8 @@ const cornShot = {
   aim: 'nearest',
   range: 7,
   damage: 14,
+  knockback: 2,
+  element: 'physical',
   fireSfx: 'shoot',
   shape: { kind: 'bolt', projectile: { ...shot('1f33d', 7, 0.5), flight: { kind: 'arc', peakM: 1.6 }, split: { count: 3, spreadDeg: 90, ratio: 0.5 } }, lifeMs: 1600 },
 } satisfies AbilityDef
@@ -52,12 +54,13 @@ export const levels = [{ mul: { summonDamage: 1.2, damage: 1.1 } }, { add: { max
 export default {
   emoji: '1f9d1_200d_1f33e',
   name: '农夫',
-  desc: '边走边种会吐豆子的向日葵，丰收时向日葵还给身边的队友回血；技能一口气种下三门玉米炮',
+  element: 'poison',
+  desc: '常年和农药打交道、本身不会中毒的农夫：边走边种向日葵，向日葵吐出拌过农药的豆子，打中一下叠一层中毒，几株一起吐叠得飞快；丰收时向日葵还给身边的队友回血；技能一口气种下三门玉米炮，抛出的玉米实打实地把敌人砸开',
   role: 'summoner',
   tags: ['damage', 'summon'],
   body: { drag: 5, mass: 1.1 },
   stats: { moveSpeed: 5, maxStamina: 120, staminaRegen: 60, exertion: 1 },
-  skill: { name: '玉米炮', icon: '1f33d', desc: '在身边种下三门玉米炮，8 秒内朝敌人抛玉米，落地裂成三粒', cdMs: 15_000, ability: 'farmerCorn' },
+  skill: { name: '玉米炮', icon: '1f33d', desc: '在身边种下三门玉米炮，8 秒内朝敌人抛玉米，砸中的被撞开，落地裂成三粒', cdMs: 15_000, ability: 'farmerCorn' },
   weapons: [],
   innate: [
     {

@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🦭 海豹：鳍拍一次连拍两下，打中攒怒气，攒满了一记顶球把敌人顶上天；技能肚皮贴地怒滑出去，之后几秒打不倒
+// 🦭 海豹：鳍拍连拍两下，拍湿敌人、攒怒气，攒满了一记顶球把敌人顶上天；技能肚皮贴地怒滑出去（物理），把冻住的撞碎，之后几秒打不倒
 const HEADBUTT = { at: 100, spend: 100, damageMul: 2, onHit: [{ kind: 'knockup', durationMs: 600, height: 1.2 }] } as const
 
 const sealSlap = {
@@ -10,7 +10,7 @@ const sealSlap = {
   cooldownMs: 850,
   aim: 'nearest',
   range: 1.8,
-  damage: 12,
+  damage: 9,
   knockback: 1.5,
   fireSfx: 'thud',
   shape: { kind: 'segment', reach: 1.7, radius: 0.5, ms: 200 },
@@ -32,6 +32,7 @@ const sealBellySlide = {
   aim: 'stick',
   damage: 36,
   knockback: 5,
+  element: 'physical',
   fireSfx: 'whoosh',
   shape: { kind: 'sprint', distance: 7, ms: 500, radius: 1 },
   reactions: [{ on: 'fire', to: 'self', effects: [{ kind: 'undying', durationMs: 4000 }, { kind: 'gain', amount: 100 }, { kind: 'buff', speedMul: 1.25, durationMs: 4000 }] }],
@@ -45,8 +46,8 @@ export default {
   emoji: '1f9ad',
   name: '海豹',
   element: 'water',
-  traits: ['swims', 'coldproof'],
-  desc: '冰上滑得动、海里游得快，不怕冰水：鳍拍一次连拍两下，每拍中一下攒 7 点怒气（停手 2.5 秒后每秒掉 15 点），攒满 100 点下一记就是顶球，伤害翻倍并把敌人顶上天 0.6 秒；技能肚皮贴地怒滑出去撞飞一路的敌人，怒气立刻攒满，之后 4 秒怎么打都不倒、跑得更快',
+  traits: ['coldproof'],
+  desc: '冰上滑得动、海里游得快，不怕冰水、冻不住；本身是水、一直湿着，挨了雷会连到身边湿着的队友。鳍拍一次连拍两下，拍中的敌人浑身湿透 5 秒，给队友的冰与雷铺路；每拍中一下攒 7 点怒气（停手 2.5 秒后每秒掉 15 点），攒满 100 点下一记就是顶球，伤害翻倍并把敌人顶上天 0.6 秒；技能肚皮贴地怒滑出去，物理撞飞一路的敌人、冻住的撞碎，怒气立刻攒满，之后 4 秒怎么打都不倒、跑得更快',
   role: 'bruiser',
   tags: ['damage', 'defense', 'melee', 'mobile'],
   body: { drag: 4.5, mass: 1.3 },
@@ -54,7 +55,7 @@ export default {
   skill: {
     name: '怒滑',
     icon: '1f4a2',
-    desc: '朝摇杆方向肚皮贴地滑出 7 格，沿路撞到的敌人吃 36 点伤害并被撞飞；怒气立刻攒满，之后 4 秒内生命不低于 1、移速 ×1.25',
+    desc: '朝摇杆方向肚皮贴地滑出 7 格，沿路撞到的敌人吃 36 点物理伤害并被撞飞，冻住的撞碎、伤害翻倍；怒气立刻攒满，之后 4 秒内生命不低于 1、移速 ×1.25',
     cdMs: 16_000,
     ability: 'sealBellySlide',
     aim: true,

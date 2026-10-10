@@ -2,7 +2,7 @@ import type { AbilityDef } from '../../../../legacy/types/abilityDefs'
 import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 
-// 🐘 大象：绕身转的水罐给附近最伤的队友浇水，长鼻子喷出水柱冲开敌人，两样轮着来；技能给全队裹上一层挡三下的泥
+// 🐘 大象：绕身转的水罐给附近最伤的队友浇水，长鼻子横扫把敌人抽飞，两样轮着来；技能给全队糊上一层泥，洗掉燃烧与中毒、挡三下、再慢慢回血
 const jar = { emoji: '1f3fa', size: 0.7 } as const
 
 const mostHurt = { side: 'allies', radius: 4, filter: { kind: 'hpBelow', who: 'target', ratio: 1 }, sort: 'weakest', count: 1 } as const
@@ -17,26 +17,26 @@ const elephantPour = {
   onHit: [{ kind: 'to', who: mostHurt, then: [{ kind: 'heal', amount: 12 }] }],
 } satisfies AbilityDef
 
-const jet = {
+const trunk = {
   trigger: 'manual',
   class: 'attack',
   aim: 'nearest',
-  range: 3,
-  damage: 12,
-  fireSfx: 'wash',
-  color: 0x4fc3f7,
-  shape: { kind: 'sector', radius: 3, arcDeg: 60, ms: 200 },
-  onHit: [{ kind: 'shove', distance: 1.5, ms: 220 }],
+  range: 2.6,
+  damage: 14,
+  knockback: 5,
+  fireSfx: 'whoosh',
+  color: 0x8d6e63,
+  shape: { kind: 'sector', radius: 2.6, arcDeg: 120, ms: 220 },
 } satisfies AbilityDef
 
-// 轮换只在这一式真放出去后才往下走，所以水柱套在总能出手的 world 里，身边没敌人就喷空
-const elephantJet = { trigger: 'auto', cooldownMs: 1200, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability: jet }] } satisfies AbilityDef
+// 轮换只在这一式真放出去后才往下走，所以横扫套在总能出手的 world 里，身边没敌人就扫空
+const elephantSwing = { trigger: 'auto', cooldownMs: 1200, aim: 'self', shape: { kind: 'world' }, onHit: [{ kind: 'cast', ability: trunk }] } satisfies AbilityDef
 
-const elephantSpray = { ...elephantPour, cycle: [elephantJet] } satisfies AbilityDef
+const elephantSpray = { ...elephantPour, cycle: [elephantSwing] } satisfies AbilityDef
 
-const elephantSpray2 = { ...elephantPour, anchor: { look: jar, mode: 'trail', distance: 0 }, cycle: [elephantJet] } satisfies AbilityDef
+const elephantSpray2 = { ...elephantPour, anchor: { look: jar, mode: 'trail', distance: 0 }, cycle: [elephantSwing] } satisfies AbilityDef
 
-const elephantSpray3 = { ...elephantPour, anchor: { look: jar, mode: 'ally', distance: 1 }, cycle: [elephantJet] } satisfies AbilityDef
+const elephantSpray3 = { ...elephantPour, anchor: { look: jar, mode: 'ally', distance: 1 }, cycle: [elephantSwing] } satisfies AbilityDef
 
 const elephantMud = {
   trigger: 'manual',
@@ -46,6 +46,7 @@ const elephantMud = {
   fxRadius: 1.25,
   shape: { kind: 'all', of: 'allies' },
   onHit: [
+    { kind: 'cleanse' },
     { kind: 'spellShield', count: 3, durationMs: 6000 },
     { kind: 'mend', amount: 4, tickMs: 500, durationMs: 4000 },
   ],
@@ -58,13 +59,12 @@ export const levels = [{ mul: { healing: 1.2 } }, { add: { maxHp: 20 }, mul: { h
 export default {
   emoji: '1f418',
   name: '大象',
-  element: 'water',
-  desc: '带着一只水罐的大象，两样轮着来：绕着身子转的水罐给 4 格内最伤的队友浇 12 点水，长鼻子喷出水柱把 3 格内的敌人冲开；没人受伤时那一下浇空，身边没敌人时那一下喷空，照样轮着来；技能给全队裹上一层泥，挡下接下来 3 次命中，再慢慢回血',
+  desc: '带着一只水罐的大象，身子沉、推不太动，两样轮着来：绕着身子转的水罐给 4 格内最伤的队友浇 12 点水，中了毒的浇了也不回血；长鼻子横扫身前 2.6 格，把敌人狠狠抽飞；没人受伤时那一下浇空，身边没敌人时那一下扫空，照样轮着来；技能给全队糊上一层泥，先洗掉燃烧和中毒，再挡下接下来 3 次命中、慢慢回血',
   role: 'support',
   tags: ['support', 'area'],
   body: { drag: 5.5, mass: 1.8 },
   stats: { moveSpeed: 4.4, maxStamina: 130, staminaRegen: 50, exertion: 1.1 },
-  skill: { name: '泥浴', icon: '1f6c1', desc: '全队裹上一层泥 6 秒，每人挡下接下来 3 次命中；4 秒里每半秒回 4 点血', cdMs: 16_000, ability: 'elephantMud' },
+  skill: { name: '泥浴', icon: '1f6c1', desc: '全队糊上一层泥：先洗掉身上的燃烧、中毒、湿、寒冷、减速与控制，6 秒内每人挡下接下来 3 次命中，4 秒里每半秒回 4 点血', cdMs: 16_000, ability: 'elephantMud' },
   weapons: [],
   innate: [
     {

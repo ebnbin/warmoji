@@ -3,10 +3,10 @@ import type { CharacterAuthoring } from '../../../../legacy/types/characters'
 import type { StatMods } from '../../../../legacy/types/stats'
 import { ring, shot } from '../../../kit.ts'
 
-// 🎅 圣诞老人：朝敌人抛礼物，砸中就炸开一片，大礼包还会裂成三个；平安夜从天上砸下一堆礼物
+// 🎅 圣诞老人：朝敌人抛沉甸甸的礼物，砸中就炸开一片，把人震开、把冻住的震碎、把墙炸出缺口；平安夜从天上砸下一堆礼物
 const gift = { ...shot('1f381', 9, 0.55), flight: { kind: 'arc', peakM: 1.8 } } as const
 
-const giftBurst = { kind: 'blast', radius: 1.6, ratio: 1, knockback: 2, ring: ring(0xfff59d) } as const
+const giftBurst = { kind: 'blast', radius: 1.6, ratio: 1, knockback: 2, breach: 0.3, ring: ring(0xfff59d) } as const
 
 const santaGift = {
   trigger: 'auto',
@@ -31,7 +31,7 @@ const santaSilentNight = {
   damage: 20,
   fireSfx: 'boom',
   shape: { kind: 'drop', targets: 8, look: { emoji: '1f381', size: 0.9 }, fromAbove: 4, dropMs: 600, staggerMs: 120 },
-  onHit: [{ kind: 'blast', radius: 1, ratio: 0.5, knockback: 1, ring: ring(0xfff59d) }],
+  onHit: [{ kind: 'blast', radius: 1, ratio: 0.5, knockback: 1, breach: 0.4, ring: ring(0xfff59d) }],
 } satisfies AbilityDef
 
 export const abilities = { santaGift, santaGift2, santaGift3, santaSilentNight } satisfies Record<string, AbilityDef>
@@ -41,12 +41,12 @@ export const levels = [{ add: { maxHp: 10 }, mul: { damage: 1.2, areaDamage: 1.1
 export default {
   emoji: '1f385',
   name: '圣诞老人',
-  desc: '扛着一大袋礼物：朝敌人抛礼物，砸中就在 1.6 格内炸开一片；技能平安夜从天上砸下一堆礼物',
+  desc: '扛着一大袋礼物，身子沉、不容易被撞开，礼物砸人都是物理：朝敌人抛礼物，砸中就在 1.6 格内炸开一片，把敌人震开，冻住的一炸就碎、伤害翻倍，挡路的矮墙也炸得出缺口；技能平安夜从天上砸下一堆礼物',
   role: 'area',
   tags: ['damage', 'area', 'ranged'],
   body: { drag: 5, mass: 1.4 },
   stats: { moveSpeed: 5, maxStamina: 110, staminaRegen: 60, exertion: 1.1 },
-  skill: { name: '平安夜', icon: '1f514', desc: '在最近的八个敌人头上各砸下一个礼物，每个 20 点伤害，再在落点炸开 1 格，周围的敌人吃一半', cdMs: 14_000, ability: 'santaSilentNight' },
+  skill: { name: '平安夜', icon: '1f514', desc: '在最近的八个敌人头上各砸下一个礼物，每个 20 点伤害，再在落点炸开 1 格，周围的敌人吃一半；冻住的砸碎、伤害翻倍', cdMs: 14_000, ability: 'santaSilentNight' },
   weapons: [],
   innate: [
     {

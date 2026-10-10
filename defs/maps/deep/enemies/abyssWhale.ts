@@ -29,12 +29,14 @@ const swallow = {
   onHit: [{ kind: 'devour', ms: 3000, dps: 14, escape: 180, spit: 3 }],
 } satisfies AbilityDef
 
+// 浮上来以后身子是水，尾巴照样是物理
 const tailSwipe = {
   trigger: 'auto',
   cooldownMs: 2400,
   firstDelayMs: 1000,
   aim: 'nearest',
   range: 3.4,
+  element: 'physical',
   damage: 20,
   knockback: 4,
   fireSfx: 'whoosh',
@@ -60,10 +62,11 @@ const diveRam = {
   firstDelayMs: 2000,
   aim: 'nearest',
   range: 7,
-  damage: 30,
+  element: 'water',
+  damage: 24,
   knockback: 4,
   fireSfx: 'splash',
-  color: 0x7e57c2,
+  color: 0x42a5f5,
   windup: { ms: 700, lockAt: 'start', telegraph: 'shake' },
   shape: { kind: 'leap', distance: 6, ms: 700, height: 2, radius: 2.4 },
 } satisfies AbilityDef
@@ -73,7 +76,7 @@ const ABYSS_WHALE = {
   role: 'boss',
   emoji: '1f40b',
   name: '深渊巨鲸',
-  desc: '从陡坎下浮上来的巨鲸：蓄力一秒唱起鲸歌，6 格内的人睡 2 秒，叫醒的那一下伤害 ×1.5；一口吞下贴近的人，3 秒里每秒消化 14 点，打它够疼才吐出来；尾巴横扫一大片；隔一阵召来三群鱼。血掉到六成后隔一阵就潜下去，再冲出 6 格砸地；掉到四分之一霸体 2 秒，之后出手更勤',
+  desc: '从陡坎下浮上来的巨鲸，皮厚肉沉：蓄力一秒唱起鲸歌，6 格内的人睡 2 秒，叫醒的那一下伤害 ×1.5，雷打得断它的蓄力；一口吞下贴近的人，3 秒里每秒消化 14 点，打它够疼才吐出来；尾巴横扫一大片，把人远远扫开，冻住的扫一下就碎冰；隔一阵召来三群湿漉漉的鱼。血掉到六成潜下去再浮上来，从此浑身湿透，一冰就冻、一电就连到身边的鱼群：隔一阵冲出 6 格砸地，2.4 格内的人浇湿、被撞开；掉到四分之一霸体 2 秒，之后出手更勤',
   size: 3.6,
   radius: 1.15,
   span: [0, 6],
@@ -87,7 +90,7 @@ const ABYSS_WHALE = {
   drive: { kind: 'chase' },
   abilities: [whaleSong, swallow, tailSwipe, fishCall],
   phases: [
-    { below: 0.6, name: '深潜', abilities: [whaleSong, swallow, tailSwipe, fishCall, diveRam] },
+    { below: 0.6, name: '深潜', element: 'water', abilities: [whaleSong, swallow, tailSwipe, fishCall, diveRam] },
     { below: 0.25, name: '吞天', stats: { mul: { cooldown: 0.75 } }, effects: [{ kind: 'unstoppable', durationMs: 2000 }] },
   ],
 } satisfies EnemyDef

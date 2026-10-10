@@ -2,7 +2,7 @@ import { hasComponent, query } from 'bitecs'
 import { Alive, Faction, Lifetime, MARK, MARK_SLOTS, Mark, Radius, TAG, Transform, Uid, Zone } from '../../components'
 import { BURN, CHILL, CONDUCT, EL, IGNITE, POISON, REACTIONS, reactionIndex, SHOCK, WET_MS } from '../../../data/elements'
 import { TENACITY } from '../../../data/enemies'
-import { addCc, addMark, clearMarks, isSteadfast, markSlot, realmOf } from '../../utils/marks'
+import { addCc, addMark, clearMarks, hasMark, isSteadfast, markSlot, realmOf } from '../../utils/marks'
 import { burnProof, coldProof, isBurning, isChilled, isFrozen, isWet, poisonProof, shockProof } from '../../utils/element'
 import { eachAlly, targetsWithin } from '../../utils/targets'
 import { HIT } from '../../utils/hitTags'
@@ -30,11 +30,11 @@ function remember(t: number, s: number, src: Source): void {
   list[s - t * MARK_SLOTS] = src
 }
 
-/** 点燃：已经在烧的换成这一下的跳伤、时间只延长，节拍照旧 */
+/** 点燃：已经在烧的跳伤取大的、时间只延长，节拍照旧 */
 function setBurn(sim: Sim, src: Source, t: number, tick: number, until: number): void {
   const s = markSlot(sim, t, MARK.burn)
   if (s >= 0) {
-    Mark.a[s] = tick
+    Mark.a[s] = Math.max(Mark.a[s]!, tick)
     Mark.until[s] = Math.max(Mark.until[s]!, until)
     remember(t, s, src)
     return
@@ -56,7 +56,7 @@ export function spreadBurn(sim: Sim, eid: number, s: number): void {
   }, realmOf(sim, eid))
 }
 
-/** 中毒：没中毒的上一层；已经中毒的，叠层的加一层（到顶只续时间），不叠层的跳伤取大的；节拍照旧；本身是毒的不中毒 */
+/** 中毒：没中毒的上一层；已经中毒的，叠层的加一层（叠满了就比平均一层强时顶掉平均的一层），不叠层的跳伤取大的；节拍照旧；本身是毒的不中毒 */
 export function addPoison(sim: Sim, src: Source, t: number, tick: number, tickMs: number, durationMs: number, stack: boolean): void {
   if (poisonProof(sim, t)) return
   const now = sim.elapsedMs
@@ -71,7 +71,7 @@ export function addPoison(sim: Sim, src: Source, t: number, tick: number, tickMs
   else if (Mark.ref[s]! < POISON.stacks) {
     Mark.a[s] = Mark.a[s]! + tick
     Mark.ref[s] = Mark.ref[s]! + 1
-  }
+  } else if (tick > Mark.a[s]! / Mark.ref[s]!) Mark.a[s] = Mark.a[s]! - Mark.a[s]! / Mark.ref[s]! + tick
   Mark.until[s] = Math.max(Mark.until[s]!, until)
   remember(t, s, src)
 }
@@ -109,8 +109,10 @@ export function elementLands(sim: Sim, src: Source, t: number, el: number, dealt
         return 'thaw'
       }
       if (isWet(sim, t)) {
+        // 本身是水、泡在水里的蒸不干，火照样点不着，只是不再起反应
+        const dried = hasMark(sim, t, MARK.wet)
         clearMarks(t, [MARK.wet])
-        return 'quench'
+        return dried ? 'quench' : undefined
       }
       if (dealt > 0 && !burnProof(sim, t)) setBurn(sim, src, t, dealt * BURN.ratio, now + BURN.durationMs)
       return undefined
